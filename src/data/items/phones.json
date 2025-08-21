@@ -1,0 +1,30 @@
+[
+  {
+    "id": "police",
+    "categoryId": "phones",
+  "name": "Police (Emergency)",
+  "name_el": "Αστυνομία (Έκτακτης Ανάγκης)",
+    "phone": "112",
+  "summary": "Emergency number across EU",
+  "summary_el": "Αριθμός έκτακτης ανάγκης στην ΕΕ",
+    "featured": true
+  },
+  {
+    "id": "ambulance",
+    "categoryId": "phones",
+  "name": "Ambulance",
+  "name_el": "Ασθενοφόρο",
+    "phone": "166",
+  "summary": "Medical emergencies",
+  "summary_el": "Ιατρικές ανάγκες"
+  },
+  {
+    "id": "taxi",
+    "categoryId": "phones",
+  "name": "Taxi",
+  "name_el": "Ταξί",
+    "phone": "+30 210 1234567",
+  "summary": "24/7 taxi line",
+  "summary_el": "Γραμμή ταξί 24/7"
+  }
+]

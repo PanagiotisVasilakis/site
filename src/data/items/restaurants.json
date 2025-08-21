@@ -1,0 +1,32 @@
+[
+  {
+    "id": "osteria-rome",
+    "categoryId": "restaurants",
+  "name": "Osteria Roma",
+  "name_el": "Οστερία Ρόμα",
+  "summary": "Authentic Roman cuisine",
+  "summary_el": "Αυθεντική ρωμαϊκή κουζίνα",
+  "address": "Via Roma 12, Center",
+  "address_el": "Βία Ρόμα 12, Κέντρο",
+    "website": "https://example.com/osteria-roma",
+    "reservationUrl": "https://example.com/osteria-roma/reserve",
+    "priceLevel": 2,
+    "rating": 4.6,
+    "tags": ["italian", "pasta"],
+    "featured": true
+  },
+  {
+    "id": "sea-breeze",
+    "categoryId": "restaurants",
+  "name": "Sea Breeze",
+  "name_el": "Θαλασσινή Πνοή",
+  "summary": "Seafood by the harbor",
+  "summary_el": "Θαλασσινά στο λιμάνι",
+  "address": "Harbor Rd 5",
+  "address_el": "Οδός Λιμανιού 5",
+    "website": "https://example.com/sea-breeze",
+    "priceLevel": 3,
+    "rating": 4.5,
+    "tags": ["seafood", "view"]
+  }
+]

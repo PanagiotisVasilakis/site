@@ -1,0 +1,12 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Remove conflicting manifest.webmanifest route directory",
+			"type": "shell",
+			"command": "rm -rf src/app/manifest.webmanifest",
+			"isBackground": false,
+			"group": "build"
+		}
+	]
+}

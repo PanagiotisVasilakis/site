@@ -1,11 +1,35 @@
 @import "tailwindcss";
 
 :root {
+  /* Base */
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Tropical palette */
+  --brand-50:  #e6faf7;
+  --brand-100: #cff3ed;
+  --brand-200: #a1e5db;
+  --brand-300: #74d7c9;
+  --brand-400: #49cbb9;
+  --brand-500: #2ec4b6; /* primary */
+  --brand-600: #25a89d;
+  --brand-700: #1e8b82;
+
+  --accent-50:  #fff0ea;
+  --accent-100: #ffd9ca;
+  --accent-200: #ffb896;
+  --accent-300: #ff9d72;
+  --accent-400: #ff915f;
+  --accent-500: #ff8a5b; /* coral accent */
+
+  --sand-50: #f7f2e9;
+  --sand-100: #efe7d7;
+  --sea-50: #e8f7f4;
+  --sea-100: #d7f0ea;
 }
 
-@theme inline {
+/* Tailwind v4 inline theme variables (without @theme to avoid build errors) */
+:root {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
@@ -20,7 +44,49 @@
 }
 
 body {
-  background: var(--background);
+  background: linear-gradient(180deg, var(--sand-50) 0%, var(--sea-50) 100%);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Focus ring */
+:where(a, button):focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+/* Card utility (optional) */
+.card {
+  background: rgba(255,255,255,0.8);
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+}
+
+/* Safe-area helpers for iOS notches/home indicator */
+.safe-top {
+  padding-top: constant(safe-area-inset-top);
+  padding-top: env(safe-area-inset-top);
+}
+.safe-bottom {
+  padding-bottom: constant(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.safe-left {
+  padding-left: constant(safe-area-inset-left);
+  padding-left: env(safe-area-inset-left);
+}
+.safe-right {
+  padding-right: constant(safe-area-inset-right);
+  padding-right: env(safe-area-inset-right);
+}
+.safe-area {
+  padding-top: constant(safe-area-inset-top);
+  padding-bottom: constant(safe-area-inset-bottom);
+  padding-left: constant(safe-area-inset-left);
+  padding-right: constant(safe-area-inset-right);
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
