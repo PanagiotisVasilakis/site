@@ -34,3 +34,7 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Coverage Badge Endpoint
+
+The route `/api/coverage` returns a Shields.io style JSON badge computed from `coverage/lcov.info`. Run `npm test` (which generates lcov) before build/deploy to update values. In CI, tests run prior to build so the badge reflects the latest commit.

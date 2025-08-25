@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import { ItemSchema, type Item } from "@/data/schemas";
-import { categories } from "@/data/categories";
+import { ItemSchema, type Item } from "../data/schemas";
+import { categories } from "../data/categories";
 import type { Locale } from "@/i18n/config";
 
 const dataRoot = path.join(process.cwd(), "src", "data", "items");
@@ -9,20 +9,24 @@ const dataRoot = path.join(process.cwd(), "src", "data", "items");
 export type CategoryWithCount = (typeof categories)[number] & { count: number };
 
 export function getCategoriesWithCounts(): CategoryWithCount[] {
-  return categories.map((c) => ({ ...c, count: getItemsByCategory(c.id).length }));
+  return categories
+    .slice()
+    .sort((a,b) => (a.order ?? 999) - (b.order ?? 999))
+    .map((c) => ({ ...c, count: getItemsByCategory(c.id).length }));
 }
 
 export function getItemsByCategory(categoryId: string): Item[] {
   const file = path.join(dataRoot, `${categoryId}.json`);
   if (!fs.existsSync(file)) return [];
   const raw = fs.readFileSync(file, "utf-8");
-  const parsed = JSON.parse(raw) as unknown[];
+  let parsed: unknown[] = [];
+  try { parsed = JSON.parse(raw) as unknown[]; } catch { return []; }
   return parsed
     .map((i) => {
       if (!i || typeof i !== "object") return null;
       const obj = i as Record<string, unknown>;
       const name = typeof obj["name"] === "string" ? (obj["name"] as string) : "";
-      return ItemSchema.parse({ ...(obj as object), slug: toSlug(name) });
+  return ItemSchema.parse({ ...(obj as object), slug: toSlug(name) });
     })
     .filter(Boolean) as Item[];
 }
@@ -30,6 +34,13 @@ export function getItemsByCategory(categoryId: string): Item[] {
 export function getItem(categoryId: string, slug: string): Item | null {
   const items = getItemsByCategory(categoryId);
   return items.find((i) => (i.slug ?? toSlug(i.name)) === slug) ?? null;
+}
+
+export function isRecentlyUpdated(item: Item, days = 30): boolean {
+  if (!item.updatedAt) return false;
+  const updated = Date.parse(item.updatedAt);
+  if (isNaN(updated)) return false;
+  return Date.now() - updated < days * 86400_000;
 }
 
 export function toSlug(name: string): string {

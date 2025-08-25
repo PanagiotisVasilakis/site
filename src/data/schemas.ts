@@ -10,6 +10,7 @@ export const CategorySchema = z.object({
   description_en: z.string().optional(),
   description_el: z.string().optional(),
   icon: z.string().optional(),
+  order: z.number().optional(),
 });
 
 export type Category = z.infer<typeof CategorySchema>;
@@ -47,6 +48,7 @@ export const ItemSchema = z.object({
     .optional(),
   featured: z.boolean().optional(),
   slug: z.string().optional(),
+  updatedAt: z.string().datetime().optional(),
 });
 
 export type Item = z.infer<typeof ItemSchema>;
