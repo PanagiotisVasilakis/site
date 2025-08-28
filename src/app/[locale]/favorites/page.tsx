@@ -23,7 +23,7 @@ export default async function FavoritesPage({ params }: { params: Promise<{ loca
     }));
   });
   return (
-    <main className="mx-auto max-w-4xl p-6 safe-bottom">
+    <div className="mx-auto max-w-4xl p-6">
       <FavoritesClient
         allItems={allItems}
         emptyLabel={t.emptyState}
@@ -31,9 +31,9 @@ export default async function FavoritesPage({ params }: { params: Promise<{ loca
         locale={eff}
       />
       <nav className="pt-6">
-        <Link href={`/${eff}`} className="text-sm text-teal-700">{t.backHome}</Link>
+        <Link href={`/${eff}`} className="text-sm" style={{color:'var(--brand-700)'}}>{t.backHome}</Link>
       </nav>
-    </main>
+    </div>
   );
 }
 

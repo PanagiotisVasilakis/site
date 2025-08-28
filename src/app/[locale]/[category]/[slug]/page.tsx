@@ -33,7 +33,7 @@ export default async function ItemPage({ params }: { params: Promise<{ locale: s
   const website = normalizeExternalUrl(item.website);
   const reservationUrl = normalizeExternalUrl(item.reservationUrl);
   return (
-    <main className="mx-auto max-w-3xl p-6 space-y-4 safe-bottom">
+    <div className="mx-auto max-w-3xl p-6 space-y-4 safe-bottom">
       <script
         type="application/ld+json"
         suppressHydrationWarning
@@ -52,7 +52,7 @@ export default async function ItemPage({ params }: { params: Promise<{ locale: s
       <header className="flex flex-col gap-2">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold text-teal-800 flex items-center gap-2">{name}{recently && <span className="text-xs rounded bg-amber-200 text-amber-900 px-2 py-0.5">{t.labels?.updated ?? 'Updated'}</span>}</h1>
+            <h1 className="text-2xl font-semibold flex items-center gap-2 text-brand-800">{name}{recently && <span className="text-xs rounded bg-amber-200 text-amber-900 px-2 py-0.5">{t.labels?.updated ?? 'Updated'}</span>}</h1>
             {summary && <p className="text-sm text-gray-600">{summary}</p>}
           </div>
           <FavoriteButton id={`${cat.id}:${item.id}`} label={name} />
@@ -88,10 +88,10 @@ export default async function ItemPage({ params }: { params: Promise<{ locale: s
         <ShareButton title={name} text={summary} />
       </div>
       {/* Sticky action bar for mobile */}
-      <div className="fixed inset-x-0 bottom-0 md:hidden safe-bottom px-4 pb-3 pt-2 bg-white/90 backdrop-blur border-t border-teal-100 flex gap-2 overflow-x-auto">
-        {tel && <a href={tel} className="flex-1 text-center rounded bg-teal-600 text-white py-2 text-sm" aria-label={`${t.cta.call} ${name}`}>{t.cta.call}</a>}
-        {maps && <a href={maps} target="_blank" className="flex-1 text-center rounded bg-emerald-600 text-white py-2 text-sm" aria-label={`${t.cta.directions} ${name}`}>{t.cta.directions}</a>}
-  {website && <a href={website} target="_blank" className="flex-1 text-center rounded bg-teal-800 text-white py-2 text-sm" aria-label={`${t.cta.website} ${name}`}>{t.cta.website}</a>}
+  <div className="fixed inset-x-0 bottom-0 md:hidden safe-bottom px-4 pb-3 pt-2 bg-white/90 backdrop-blur border-t border-soft flex gap-2 overflow-x-auto">
+    {tel && <a href={tel} className="flex-1 text-center rounded bg-brand-600 text-white py-2 text-sm" aria-label={`${t.cta.call} ${name}`}>{t.cta.call}</a>}
+    {maps && <a href={maps} target="_blank" className="flex-1 text-center rounded bg-emerald-600 text-white py-2 text-sm" aria-label={`${t.cta.directions} ${name}`}>{t.cta.directions}</a>}
+  {website && <a href={website} target="_blank" className="flex-1 text-center rounded bg-brand-800 text-white py-2 text-sm" aria-label={`${t.cta.website} ${name}`}>{t.cta.website}</a>}
       </div>
 
   {address && <p className="text-sm text-gray-700">{address}</p>}
@@ -102,16 +102,16 @@ export default async function ItemPage({ params }: { params: Promise<{ locale: s
       {item.tags && item.tags.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {item.tags.map((tp) => (
-            <span key={tp} className="text-xs rounded-full px-2 py-1 border border-teal-200 text-teal-800 bg-white/70">{tp}</span>
+            <span key={tp} className="text-xs rounded-full px-2 py-1 border" style={{borderColor:'var(--brand-200)', color:'var(--brand-800)', background:'var(--layer-raised)'}}>{tp}</span>
           ))}
         </div>
       )}
 
       <nav className="pt-2 flex gap-4">
-  <Link href={`/${eff}/${cat.slug}`} className="text-sm text-teal-700">← {t.categories[cat.slug as "phones" | "restaurants" | "sightseeing"] ?? cat.title}</Link>
-  <Link href={`/${eff}`} className="text-sm text-teal-700">{t.cta.home}</Link>
+  <Link href={`/${eff}/${cat.slug}`} className="text-sm" style={{color:'var(--brand-700)'}}>← {t.categories[cat.slug as "phones" | "restaurants" | "sightseeing"] ?? cat.title}</Link>
+  <Link href={`/${eff}`} className="text-sm" style={{color:'var(--brand-700)'}}>{t.cta.home}</Link>
       </nav>
-    </main>
+    </div>
   );
 }
 

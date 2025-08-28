@@ -4,11 +4,11 @@ type Common = { variant?: 'primary' | 'secondary' | 'outline'; asChild?: boolean
 type ButtonProps = Common & React.ButtonHTMLAttributes<HTMLButtonElement>;
 
 export function CTAButton({ variant='primary', className='', asChild=false, ...rest }: ButtonProps) {
-  const base = 'inline-flex items-center justify-center rounded px-4 py-3 text-base sm:text-sm font-medium transition-colors focus:outline-none';
+  const base = 'focus:outline-none';
   const styles: Record<string,string> = {
-    primary: 'bg-teal-600 text-white hover:bg-teal-700',
-    secondary: 'bg-emerald-600 text-white hover:bg-emerald-700',
-    outline: 'border border-teal-300 text-teal-800 bg-white/70 hover:bg-white'
+    primary: 'btn-primary',
+    secondary: 'btn-accent',
+    outline: 'btn-outline'
   };
   if (asChild) {
     // Expect caller to pass an <a> as children; clone to inject className

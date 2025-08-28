@@ -28,7 +28,7 @@ export default function FavoritesClient({ allItems, emptyLabel, titleLabel }: Pr
   return (
     <section>
       <header className="mb-4 flex items-end justify-between">
-        <h1 className="text-2xl font-semibold text-teal-800 dark:text-teal-100">{titleLabel}</h1>
+  <h1 className="text-2xl font-semibold text-brand-800">{titleLabel}</h1>
         {list.length > 0 && <div className="text-xs opacity-60">{list.length}</div>}
       </header>
       {list.length === 0 && (

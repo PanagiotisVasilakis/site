@@ -16,7 +16,7 @@ export default function ShareButton({ title, text }: { title: string; text?: str
 		} catch {}
 	};
 	return (
-		<button onClick={share} className="flex items-center gap-1 rounded px-3 py-2 text-sm border border-teal-300 text-teal-800 bg-white/70 hover:bg-white">
+		<button onClick={share} className="fav-btn">
 			<span>{copied ? '✅' : '🔗'}</span>
 			<span className="hidden sm:inline">{copied ? 'Copied' : 'Share'}</span>
 		</button>

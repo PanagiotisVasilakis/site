@@ -62,16 +62,16 @@ export default function FilterDrawer({ open, onClose, children, title }: Props) 
   return (
     <div aria-hidden={!open} className={`fixed inset-0 z-40 ${open ? '' : 'pointer-events-none'} `}>
       <div className={`absolute inset-0 bg-black/40 transition-opacity ${open ? 'opacity-100' : 'opacity-0'}`} onClick={onClose} />
-  <aside ref={panelRef} className={`absolute bottom-0 left-0 right-0 md:right-auto md:w-96 md:top-0 md:bottom-0 bg-white dark:bg-teal-900/95 backdrop-blur border-t md:border-t-0 md:border-r border-teal-200 dark:border-teal-700 rounded-t-xl md:rounded-none shadow-lg flex flex-col transform transition-transform ${open ? 'translate-y-0 md:translate-x-0' : 'translate-y-full md:-translate-x-full'}`} role="dialog" aria-modal="true" aria-label={title || 'Filters'}>
-        <header className="p-4 border-b border-teal-100 dark:border-teal-800 flex items-center justify-between">
+  <aside ref={panelRef} className={`absolute bottom-0 left-0 right-0 md:right-auto md:w-96 md:top-0 md:bottom-0 backdrop-blur border-t md:border-t-0 md:border-r border-soft rounded-t-xl md:rounded-none shadow-lg flex flex-col transform transition-transform bg-[var(--layer-surface)] dark:bg-[rgba(17,25,26,0.9)] ${open ? 'translate-y-0 md:translate-x-0' : 'translate-y-full md:-translate-x-full'}`} role="dialog" aria-modal="true" aria-label={title || 'Filters'}>
+        <header className="p-4 border-b divider flex items-center justify-between">
           <h2 className="text-sm font-semibold tracking-wide uppercase">{title || 'Filters'}</h2>
-          <button onClick={onClose} aria-label="Close filters" className="text-xs px-2 py-1 rounded bg-teal-100 dark:bg-teal-800">✕</button>
+          <button onClick={onClose} aria-label="Close filters" className="btn-outline btn-sm">✕</button>
         </header>
         <div className="p-4 overflow-y-auto text-sm flex-1">
           {children}
         </div>
-        <div className="p-4 border-t border-teal-100 dark:border-teal-800 flex gap-2">
-          <button onClick={onClose} className="flex-1 py-2 rounded-md bg-teal-600 text-white text-sm font-medium">Done</button>
+        <div className="p-4 border-t divider flex gap-2">
+          <button onClick={onClose} className="btn-primary flex-1">Done</button>
         </div>
       </aside>
     </div>

@@ -32,7 +32,11 @@ export function TagFilters({ items, active: controlledActive, onChange }: Props)
       {all.map(tag => {
         const on = active.includes(tag);
         return (
-          <button key={tag} onClick={() => toggle(tag)} className={`px-3 py-1 rounded-full text-xs border transition-colors ${on ? 'bg-teal-600 text-white border-teal-600' : 'border-teal-300 text-teal-800 bg-white/70 hover:bg-white'}`}>{tag}</button>
+          <button
+            key={tag}
+            onClick={() => toggle(tag)}
+            className={`tag-filter ${on ? 'is-on' : ''}`}
+          >{tag}</button>
         );
       })}
     </div>

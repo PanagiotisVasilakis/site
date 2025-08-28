@@ -52,7 +52,7 @@ export default function SearchBar({ onSearch, initial, labels }: Props) {
       </div>
       <div className="search-action">
         <button type="button" onClick={submit} className="search-go">
-          <span className="hidden sm:inline">{labels?.search || 'Search'}</span>
+            <span className="hidden sm:inline search-go-text">{labels?.search || 'Search'}</span>
           <span aria-hidden>🔍</span>
         </button>
       </div>

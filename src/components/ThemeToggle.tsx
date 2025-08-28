@@ -41,7 +41,7 @@ export default function ThemeToggle() {
       aria-label={label}
       suppressHydrationWarning
       onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-      className="h-8 w-8 inline-flex items-center justify-center rounded border border-teal-300 bg-white/70 dark:bg-teal-900/40 dark:border-teal-700 text-teal-800 dark:text-teal-100 shadow-sm hover:bg-white focus:outline-none focus:ring-2 focus:ring-teal-400 transition"
+  className="theme-toggle"
     >
       <span aria-hidden suppressHydrationWarning>{icon}</span>
     </button>

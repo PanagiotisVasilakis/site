@@ -81,12 +81,12 @@ export default function CategoryGridClient({ items, locale, emptyLabel, category
           <TagFilters items={items.map(i => ({ tags: i.tags }))} active={active} onChange={setActive} />
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setFiltersOpen(true)} className="px-3 py-2 rounded-full bg-white dark:bg-teal-800 border border-teal-200 dark:border-teal-700 shadow-sm text-xs font-medium">{ui?.filters || 'Filters'}</button>
-          <button onClick={() => setShowMap(m => !m)} className="px-3 py-2 rounded-full bg-white dark:bg-teal-800 border border-teal-200 dark:border-teal-700 shadow-sm text-xs font-medium">{showMap ? (ui?.list || 'List') : (ui?.map || 'Map')}</button>
+          <button onClick={() => setFiltersOpen(true)} className="btn-outline btn-sm">{ui?.filters || 'Filters'}</button>
+          <button onClick={() => setShowMap(m => !m)} className="btn-outline btn-sm">{showMap ? (ui?.list || 'List') : (ui?.map || 'Map')}</button>
         </div>
       </div>
       {showMap && (
-        <div className="mb-6 h-64 rounded-lg border border-teal-200 dark:border-teal-700 flex items-center justify-center text-xs text-teal-700 dark:text-teal-300 bg-white/60 dark:bg-teal-900/40">Map placeholder (integrate real map later)</div>
+  <div className="mb-6 h-64 rounded-lg border-soft flex items-center justify-center text-xs bg-white/60 dark:bg-[rgba(17,25,26,0.5)]" style={{color:'var(--brand-700)'}}>Map placeholder (integrate real map later)</div>
       )}
       {/* Skeleton while no items loaded (initial mount) */}
       {items.length === 0 && (
@@ -112,7 +112,7 @@ export default function CategoryGridClient({ items, locale, emptyLabel, category
             {active.length > 0 && (
               <ul className="flex flex-wrap gap-1">
                 {active.map(t => (
-                  <li key={t} className="px-2 py-1 bg-teal-100 dark:bg-teal-800 rounded-full text-xs flex items-center gap-1">{t}<button aria-label={`Remove ${t}`} onClick={() => setActive(prev => prev.filter(x => x !== t))}>✕</button></li>
+                  <li key={t} className="tag-filter is-on flex items-center gap-1">{t}<button aria-label={`Remove ${t}`} onClick={() => setActive(prev => prev.filter(x => x !== t))}>✕</button></li>
                 ))}
               </ul>
             )}

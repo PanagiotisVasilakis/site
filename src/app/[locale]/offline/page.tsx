@@ -9,14 +9,14 @@ export default async function OfflineLocalePage({ params }: { params: Promise<{ 
   const greek = eff === "el";
   const homeHref = `/${eff}`;
   return (
-    <main className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-b from-teal-50 to-white safe-bottom">
-      <div className="max-w-md w-full rounded-xl border border-teal-100 bg-white/90 backdrop-blur shadow-sm p-8 relative overflow-hidden">
-        <div className="absolute -top-10 -right-10 w-32 h-32 bg-teal-100 rounded-full opacity-40" aria-hidden></div>
+  <div className="min-h-screen flex items-center justify-center p-6 safe-bottom bg-app-vertical">
+      <div className="max-w-md w-full rounded-xl panel shadow-sm p-8 relative overflow-hidden">
+        <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full opacity-30" style={{background:'var(--brand-100)'}} aria-hidden></div>
         <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-amber-100 rounded-full opacity-30" aria-hidden></div>
         <div className="relative">
           <div className="flex items-center gap-3 mb-4">
             <span className="text-3xl" aria-hidden>📡</span>
-            <h1 className="text-2xl font-semibold text-teal-800">{t.appTitle}</h1>
+            <h1 className="text-2xl font-semibold text-brand-800">{t.appTitle}</h1>
           </div>
           <p className="text-sm text-gray-700 leading-relaxed mb-3">
             {greek
@@ -34,6 +34,6 @@ export default async function OfflineLocalePage({ params }: { params: Promise<{ 
           <OfflineActions homeHref={homeHref} homeLabel={t.cta.home} retryLabel={greek ? "Επαναφόρτωση" : "Retry"} />
         </div>
       </div>
-    </main>
+  </div>
   );
 }

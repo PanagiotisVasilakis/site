@@ -13,7 +13,7 @@ export default function HomeInteractiveBar({ categories, labels }: Props) {
   const [active, setActive] = useState<string | null>(null);
   return (
     <div className="flex flex-col gap-4 -mt-6 mb-10">
-  <SearchBar labels={labels} onSearch={(s) => console.log('search', s)} />
+  <SearchBar labels={labels} />
   <CategoryChips categories={categories} active={active} onChange={setActive} />
     </div>
   );

@@ -1,0 +1,20 @@
+{
+  "generatedAt": "2025-08-28T14:21:05.331Z",
+  "base": "http://localhost:3000",
+  "paths": [
+    "/en",
+    "/en/favorites"
+  ],
+  "issues": [
+    {
+      "url": "http://localhost:3000/en",
+      "id": "color-contrast",
+      "impact": "serious",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "nodes": 1,
+      "snippets": [
+        "<span class=\"hidden sm:inline search-go-text\">Search</span>"
+      ]
+    }
+  ]
+}

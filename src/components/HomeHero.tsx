@@ -61,19 +61,19 @@ export default function HomeHero({ title, subtitle }: HomeHeroProps) {
   return () => { running = false; cancelAnimationFrame(raf); window.removeEventListener('resize', onResize); document.removeEventListener('visibilitychange', visHandler); };
   }, []);
   return (
-    <div className="relative mb-10 overflow-hidden rounded-2xl border border-teal-100 dark:border-teal-800 bg-gradient-to-br from-white/80 to-teal-50/80 dark:from-teal-900/30 dark:to-teal-800/10 backdrop-blur px-6 sm:px-10 pt-12 pb-14 shadow-sm">
+  <div className="relative mb-10 overflow-hidden rounded-2xl panel backdrop-blur px-6 sm:px-10 pt-12 pb-14 shadow-sm bg-panel-soft">
       <div className="relative z-10 max-w-2xl">
-        <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-teal-800 dark:text-teal-100">
+  <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-brand-800">
           {title}
         </h1>
-        <p className="mt-3 text-sm sm:text-base text-gray-600 dark:text-teal-200/80 leading-relaxed">
+  <p className="mt-3 text-sm sm:text-base text-muted leading-relaxed">
           {subtitle}
         </p>
   {/* Removed live/update indicators per user request */}
       </div>
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden />
       {mounted && (
-        <div className="pointer-events-none absolute -top-32 -right-32 w-96 h-96 bg-gradient-to-br from-teal-300/20 via-teal-400/10 to-transparent blur-3xl" aria-hidden></div>
+  <div className="pointer-events-none absolute -top-32 -right-32 w-96 h-96 blur-3xl" style={{background:'radial-gradient(circle at 30% 30%, rgba(54,185,171,0.28), rgba(54,185,171,0) 70%)'}} aria-hidden></div>
       )}
     </div>
   );

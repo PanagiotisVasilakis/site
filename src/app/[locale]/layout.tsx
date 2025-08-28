@@ -35,30 +35,32 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : "en";
   const t = getDictionary(eff);
   return (
-  <div className={`${geistSans.variable} ${geistMono.variable}`} data-locale={eff} dir={(['ar','he'] as string[]).includes(eff as string) ? 'rtl' : 'ltr'}>
-  <PwaManager />
-  <Analytics />
+    <div className={`${geistSans.variable} ${geistMono.variable}`} data-locale={eff} dir={(['ar','he'] as string[]).includes(eff as string) ? 'rtl' : 'ltr'}>
+      <PwaManager />
+      <Analytics />
       <div className="border-b bg-white/70 backdrop-blur safe-top">
-        <div className="mx-auto max-w-3xl p-4 text-sm text-teal-800 font-medium flex items-center justify-between">
-          <span>{t.appTitle} <small id="current-version" className="ml-1 text-[10px] font-normal text-teal-500 align-super"></small></span>
+        <header className="mx-auto max-w-3xl p-4 text-sm font-medium flex items-center justify-between" style={{ color: 'var(--brand-800)' }}>
+          <span>{t.appTitle} <small id="current-version" className="ml-1 text-[10px] font-normal" style={{ color: 'var(--brand-500)' }}></small></span>
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <LocaleSwitcher />
-            <button id="install-btn" className="hidden items-center gap-1 text-teal-800 border border-teal-200 rounded px-2 py-1 bg-white/80 hover:bg-white">Install</button>
+            <nav aria-label="Locale and install" className="flex items-center gap-2">
+              <button id="install-btn" className="hidden items-center gap-1 btn-outline btn-sm">Install</button>
+            </nav>
           </div>
-        </div>
+        </header>
       </div>
       {/* Update banner */}
-      <div id="update-banner" className="hidden fixed bottom-2 left-1/2 -translate-x-1/2 z-50 safe-bottom bg-white/90 backdrop-blur border border-teal-200 text-teal-900 rounded-full px-3 py-2 text-xs items-center gap-2 shadow" aria-live="polite">
+      <div id="update-banner" className="hidden fixed bottom-2 left-1/2 -translate-x-1/2 z-50 safe-bottom backdrop-blur border-soft bg-[var(--layer-surface)] text-xs items-center gap-2 shadow rounded-full px-3 py-2" aria-live="polite" style={{ color: 'var(--brand-800)' }}>
         <span>New version available</span>
-        <button id="update-reload-btn" className="px-2 py-1 rounded bg-teal-600 text-white">Refresh</button>
+        <button id="update-reload-btn" className="btn-primary btn-sm">Refresh</button>
       </div>
       {/* iOS Add to Home Screen tip */}
-      <div id="ios-a2hs-tip" className="hidden fixed bottom-2 left-1/2 -translate-x-1/2 z-50 safe-bottom bg-white/90 backdrop-blur border border-teal-200 text-teal-900 rounded-full px-3 py-2 text-xs items-center gap-2 shadow">
+      <div id="ios-a2hs-tip" className="hidden fixed bottom-2 left-1/2 -translate-x-1/2 z-50 safe-bottom bg-white/90 backdrop-blur border-soft rounded-full px-3 py-2 text-xs items-center gap-2 shadow" style={{ color: 'var(--brand-800)' }}>
         <span>Add to Home Screen: Share → Add to Home Screen</span>
-        <button id="ios-tip-close" aria-label="Close" className="text-teal-700">×</button>
+        <button id="ios-tip-close" aria-label="Close" className="btn-outline btn-sm">×</button>
       </div>
-      <div className="safe-bottom">{children}</div>
+      <main className="safe-bottom" role="main">{children}</main>
     </div>
   );
 }

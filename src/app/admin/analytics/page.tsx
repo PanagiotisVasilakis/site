@@ -18,13 +18,13 @@ export default function AnalyticsAdminPage() {
   const p90 = percentile(hourCounts, 0.9);
   const p99 = percentile(hourCounts, 0.99);
   return (
-    <main className="mx-auto max-w-4xl p-6 space-y-8">
+    <div className="mx-auto max-w-4xl p-6 space-y-8">
       <AdminSessionManager />
-      <h1 className="text-2xl font-semibold text-teal-800">Analytics Overview</h1>
+  <h1 className="text-2xl font-semibold text-brand-800">Analytics Overview</h1>
       <section className="grid gap-4 md:grid-cols-2">
-        <div className="p-3 rounded border border-teal-200 bg-teal-50">
-          <div className="text-xs uppercase tracking-wide text-teal-600">Unique Paths</div>
-          <div className="text-2xl font-semibold text-teal-800">{summary.uniquePaths}</div>
+  <div className="p-3 rounded border-soft" style={{background:'var(--layer-surface)'}}>
+          <div className="text-xs uppercase tracking-wide" style={{color:'var(--brand-700)'}}>Unique Paths</div>
+          <div className="text-2xl font-semibold text-brand-800">{summary.uniquePaths}</div>
         </div>
         <div className="p-3 rounded border border-emerald-200 bg-emerald-50">
           <div className="text-xs uppercase tracking-wide text-emerald-600">Daily New Paths (14d)</div>
@@ -73,7 +73,7 @@ export default function AnalyticsAdminPage() {
                   <div className="absolute left-0 right-0" style={{bottom: `${(p99/max)*100}%`}}>
                     <div className="h-[1px] bg-rose-400/70" />
                   </div>
-                  {list.map(v => <div key={v.id} title={new Date(v.ts).toISOString()+` value:${v.value.toFixed(2)}`} style={{height: `${(v.value/max)*100}%`}} className="w-[4px] bg-teal-500/70" />)}
+                  {list.map(v => <div key={v.id} title={new Date(v.ts).toISOString()+` value:${v.value.toFixed(2)}`} style={{height: `${(v.value/max)*100}%`, background:'color-mix(in srgb, var(--brand-500) 70%, transparent)', width:'4px'}} />)}
                 </div>
                 <div className="text-[10px] text-gray-500 mt-1 flex flex-wrap gap-2">max {max.toFixed(2)} <span className="text-emerald-500">p50 {p50.toFixed(2)}</span> <span className="text-amber-500">p90 {p90.toFixed(2)}</span> <span className="text-rose-500">p99 {p99.toFixed(2)}</span></div>
               </div>
@@ -85,7 +85,7 @@ export default function AnalyticsAdminPage() {
         <h2 className="text-lg font-medium mb-2">Last 24 Hours (UTC)</h2>
         <div className="text-xs text-gray-600">P50: {p50} • P90: {p90} • P99: {p99}</div>
         <div className="flex gap-1 items-end h-32">
-          {hours.map(b => <div key={b.start} title={`${new Date(b.start).toISOString()} avg:${b.avg.toFixed(1)}`} className="bg-teal-600/70 hover:bg-teal-600 relative" style={{height: (b.count ? 4 + Math.min(80, b.count)*4 : 4), width: '12px'}}>
+          {hours.map(b => <div key={b.start} title={`${new Date(b.start).toISOString()} avg:${b.avg.toFixed(1)}`} style={{background:'color-mix(in srgb, var(--brand-600) 70%, transparent)', height: (b.count ? 4 + Math.min(80, b.count)*4 : 4), width: '12px'}} className="relative hover:brightness-110">
             <div className="absolute bottom-0 left-0 right-0 bg-emerald-400/70" style={{height: `${Math.min(100, b.avg*4)}%`}} />
           </div>)}
         </div>
@@ -93,12 +93,12 @@ export default function AnalyticsAdminPage() {
       <section className="space-y-2">
         <h2 className="text-lg font-medium mb-2">Last 30 Days (UTC)</h2>
         <div className="flex gap-1 items-end h-32 overflow-x-auto">
-          {days.map(b => <div key={b.start} title={`${new Date(b.start).toISOString().slice(0,10)} avg:${b.avg.toFixed(1)}`} className="bg-teal-400/70 hover:bg-teal-400 relative" style={{height: (b.count ? 4 + Math.min(80, b.count)*2 : 4), width: '10px'}}>
+          {days.map(b => <div key={b.start} title={`${new Date(b.start).toISOString().slice(0,10)} avg:${b.avg.toFixed(1)}`} style={{background:'color-mix(in srgb, var(--brand-400) 70%, transparent)', height: (b.count ? 4 + Math.min(80, b.count)*2 : 4), width: '10px'}} className="relative hover:brightness-110">
             <div className="absolute bottom-0 left-0 right-0 bg-emerald-300/70" style={{height: `${Math.min(100, b.avg*2)}%`}} />
           </div>)}
         </div>
       </section>
   <p className="text-xs text-gray-500">Paths may be hashed & UA omitted if anonymization enabled. Vitals are client-reported (CLS, INP, LCP, FID, TTFB).</p>
-    </main>
+  </div>
   );
 }

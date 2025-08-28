@@ -33,7 +33,7 @@ export default function AdminSessionManager() {
   }
   return (
     <>
-      <div className="fixed top-2 right-2 z-50 flex gap-2 items-center text-xs bg-teal-700 text-white px-2 py-1 rounded shadow">
+  <div className="fixed top-2 right-2 z-50 flex gap-2 items-center text-xs px-2 py-1 rounded shadow" style={{background:'var(--brand-700)', color:'var(--fg-inverse)'}}>
         <span>Session: {status}</span>
         <button onClick={logout} className="bg-white/20 hover:bg-white/30 px-1 rounded">Logout</button>
       </div>

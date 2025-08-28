@@ -43,10 +43,10 @@ export default function CategoryItemsClient({ items, locale, categorySlug, tDeta
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="font-medium text-teal-900">{i.name}</div>
+                  <div className="font-medium text-brand-800">{i.name}</div>
                   {i.summary && <div className="text-xs text-gray-600">{i.summary}</div>}
                 </div>
-                <div className="text-sm text-teal-700">{tDetails}</div>
+                <div className="text-sm" style={{color:'var(--brand-700)'}}>{tDetails}</div>
               </div>
             </Link>
           ))}
