@@ -18,7 +18,7 @@ export default function LocaleSwitcher() {
   const target = isEL ? "en" : "el";
   const href = swapLocale(pathname, target);
   return (
-  <Link href={href} className="btn-outline btn-sm">
+  <Link href={href} className="btn-tint btn-sm">
       {isEL ? "EN" : "EL"}
     </Link>
   );

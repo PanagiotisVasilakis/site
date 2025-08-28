@@ -1,5 +1,6 @@
 "use client";
 import { useFavorites } from '@/lib/favorites';
+import { useToast } from '@/components/Toast';
 import Image from 'next/image';
 
 interface ListingCardProps {
@@ -20,8 +21,9 @@ interface ListingCardProps {
 export default function ListingCard({ id, title, subtitle, image, rating, price, href = '#', icon, footer, favoriteId, favLabelAdd = 'Add to favorites', favLabelRemove = 'Remove from favorites' }: ListingCardProps) {
   const fid = favoriteId || id;
   const { isFavorite, toggle } = useFavorites();
+  const { push } = useToast();
   const wish = isFavorite(fid);
-  const toggleLocal = () => toggle(fid);
+  const toggleLocal = () => { const before = isFavorite(fid); toggle(fid); if (!before) push('Added to favorites'); else push('Removed from favorites'); };
   return (
     <a href={href} className="listing-card group" data-id={id}>
       <div className="relative">
@@ -45,7 +47,7 @@ export default function ListingCard({ id, title, subtitle, image, rating, price,
             </div>
           )}
         </div>
-        {subtitle && <p className="text-[0.68rem] opacity-70 line-clamp-2">{subtitle}</p>}
+  {subtitle && <p className="text-[0.68rem] text-small-strong line-clamp-2" style={{fontWeight:500}}>{subtitle}</p>}
         <div className="mt-1 text-[0.7rem] font-medium opacity-80 flex items-center gap-2">
           {price && <span>{price}</span>}
           {footer && <span className="ml-auto truncate max-w-[8rem] opacity-60">{footer}</span>}

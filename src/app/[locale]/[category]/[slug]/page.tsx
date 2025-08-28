@@ -52,7 +52,7 @@ export default async function ItemPage({ params }: { params: Promise<{ locale: s
       <header className="flex flex-col gap-2">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold flex items-center gap-2 text-brand-800">{name}{recently && <span className="text-xs rounded bg-amber-200 text-amber-900 px-2 py-0.5">{t.labels?.updated ?? 'Updated'}</span>}</h1>
+            <h1 className="text-2xl font-semibold flex items-center gap-2" style={{color:'var(--text-accent)'}}>{name}{recently && <span className="text-xs rounded bg-amber-200 text-amber-900 px-2 py-0.5">{t.labels?.updated ?? 'Updated'}</span>}</h1>
             {summary && <p className="text-sm text-gray-600">{summary}</p>}
           </div>
           <FavoriteButton id={`${cat.id}:${item.id}`} label={name} />
@@ -102,14 +102,14 @@ export default async function ItemPage({ params }: { params: Promise<{ locale: s
       {item.tags && item.tags.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {item.tags.map((tp) => (
-            <span key={tp} className="text-xs rounded-full px-2 py-1 border" style={{borderColor:'var(--brand-200)', color:'var(--brand-800)', background:'var(--layer-raised)'}}>{tp}</span>
+            <span key={tp} className="text-xs rounded-full px-2 py-1 border" style={{borderColor:'var(--border-soft)', color:'var(--text-accent)', background:'var(--layer-surface)'}}>{tp}</span>
           ))}
         </div>
       )}
 
       <nav className="pt-2 flex gap-4">
-  <Link href={`/${eff}/${cat.slug}`} className="text-sm" style={{color:'var(--brand-700)'}}>← {t.categories[cat.slug as "phones" | "restaurants" | "sightseeing"] ?? cat.title}</Link>
-  <Link href={`/${eff}`} className="text-sm" style={{color:'var(--brand-700)'}}>{t.cta.home}</Link>
+  <Link href={`/${eff}/${cat.slug}`} className="text-sm" style={{color:'var(--text-accent-subtle)'}}>← {t.categories[cat.slug as "phones" | "restaurants" | "sightseeing"] ?? cat.title}</Link>
+  <Link href={`/${eff}`} className="text-sm" style={{color:'var(--text-accent-subtle)'}}>{t.cta.home}</Link>
       </nav>
     </div>
   );

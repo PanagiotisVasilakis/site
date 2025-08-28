@@ -1,18 +1,11 @@
 {
-  "generatedAt": "2025-08-28T14:14:37.848Z",
-  "base": "http://localhost:3000",
+  "generatedAt": "2025-08-28T14:50:03.424Z",
+  "base": "http://localhost:3001",
   "paths": [
     "/en",
     "/en/favorites",
     "/en/offline"
   ],
-  "violations": [
-    {
-      "id": "color-contrast",
-      "impact": "serious",
-      "help": "Elements must meet minimum color contrast ratio thresholds",
-      "nodes": 1,
-      "url": "http://localhost:3000/en"
-    }
-  ]
+  "violations": [],
+  "errors": []
 }

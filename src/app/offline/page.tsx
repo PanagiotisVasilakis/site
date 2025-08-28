@@ -9,7 +9,7 @@ export default function OfflinePage() {
         <div className="relative">
           <div className="flex items-center gap-3 mb-4">
             <span className="text-3xl" aria-hidden>📡</span>
-            <h1 className="text-2xl font-semibold text-brand-800">Offline</h1>
+            <h1 className="text-2xl font-semibold" style={{color:'var(--text-accent)'}}>Offline</h1>
           </div>
           <p className="text-sm text-gray-700 leading-relaxed mb-3">
             You’re offline. Content you opened before is still available. Once the connection is back, this page will refresh automatically.

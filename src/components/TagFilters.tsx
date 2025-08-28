@@ -26,9 +26,20 @@ export function TagFilters({ items, active: controlledActive, onChange }: Props)
   const toggle = (tag: string) => {
     setActive(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
   };
+  const clearAll = () => {
+    setActive(() => []);
+  };
   if (all.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-2 mb-4">
+      {active.length > 0 && (
+        <button
+          key="__reset"
+          onClick={clearAll}
+          className="tag-filter reset-chip"
+          aria-label="Reset filters"
+        >Reset filters</button>
+      )}
       {all.map(tag => {
         const on = active.includes(tag);
         return (

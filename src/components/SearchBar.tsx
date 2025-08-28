@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
 interface SearchState {
   location: string;
@@ -21,6 +21,23 @@ export default function SearchBar({ onSearch, initial, labels }: Props) {
     dates: initial?.dates || "",
     guests: initial?.guests || 1,
   });
+  const shortcut = '/';
+  const firstSegRef = useRef<HTMLButtonElement | null>(null);
+  // Global shortcut listener to focus search (location segment)
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        // Ignore if typing inside editable/inputs
+        const tag = (e.target as HTMLElement)?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return;
+        e.preventDefault();
+        firstSegRef.current?.focus();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  // Future: global key listener to focus search when pressing '/'
   function update<K extends keyof SearchState>(key: K, value: SearchState[K]) {
     setState(s => ({ ...s, [key]: value }));
   }
@@ -28,10 +45,13 @@ export default function SearchBar({ onSearch, initial, labels }: Props) {
     onSearch?.(state);
   }
   return (
-    <div className="search-bar" role="search" aria-label="Search destination">
-      <button type="button" className="search-seg text-left" onClick={() => { /* future: open location picker */ }}>
+    <div className="search-bar" role="search" aria-label={labels?.search || 'Search'}>
+  <button ref={firstSegRef} type="button" className="search-seg text-left" onClick={() => { /* future: open location picker */ }}>
         <span className="search-label">{labels?.where || 'Where'}</span>
-        <span className="search-value">{state.location || labels?.addLocation || 'Add location'}</span>
+        <span className="search-value flex items-center gap-1">
+          {state.location || labels?.addLocation || 'Add location'}
+          {!state.location && <kbd className="text-[10px] font-normal opacity-60 border border-soft px-1 py-0.5 rounded">{shortcut}</kbd>}
+        </span>
       </button>
       <button type="button" className="search-seg text-left hidden sm:flex" onClick={() => { /* future: open date picker */ }}>
         <span className="search-label">{labels?.dates || 'Dates'}</span>

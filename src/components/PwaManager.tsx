@@ -20,7 +20,14 @@ export default function PwaManager() {
           const reg = await navigator.serviceWorker.register('/sw.js');
           // Request current runtime version
           navigator.serviceWorker.controller?.postMessage({ type: 'REQUEST_VERSION' });
-          const showBanner = () => { const b = document.getElementById('update-banner'); if (b) b.style.display = 'flex'; };
+          const showBanner = () => {
+            const b = document.getElementById('update-banner');
+            if (!b) return;
+            const dismissedVer = localStorage.getItem('update-dismissed-version');
+            const newVer = b.getAttribute('data-new-version');
+            if (dismissedVer && newVer && dismissedVer === newVer) return; // don't re-show for dismissed version
+            b.style.display = 'flex';
+          };
             if (reg.waiting) {
               showBanner();
             }
@@ -54,6 +61,15 @@ export default function PwaManager() {
         if (newHash) localStorage.setItem('app-precache-hash', newHash);
       } catch {}
       window.location.reload();
+    });
+    const dismiss = document.getElementById('update-dismiss-btn');
+    dismiss?.addEventListener('click', () => {
+      const banner = document.getElementById('update-banner');
+      if (banner) {
+        const ver = banner.getAttribute('data-new-version') || banner.getAttribute('data-old-version');
+        if (ver) localStorage.setItem('update-dismissed-version', ver);
+        banner.style.display = 'none';
+      }
     });
     // Install prompt button
   // Track deferred install prompt event
@@ -99,11 +115,13 @@ export default function PwaManager() {
         if (banner && (versionChanged || hashChanged)) {
           const span = banner.querySelector('span');
           if (span) {
+            const updateTpl = banner.getAttribute('data-t-update-fromto') || 'Update available: {old} → {new}';
+            const assetsTpl = banner.getAttribute('data-t-assets-fromto') || 'Assets updated: {old} → {new}';
             if (versionChanged) {
-              span.textContent = `Update available: ${storedVersion} → ${newVersion}`;
+              span.textContent = updateTpl.replace('{old}', storedVersion || '').replace('{new}', newVersion || '');
             } else if (hashChanged) {
               const oldShort = storedHash ? storedHash.slice(0,8) : '';
-              span.textContent = `Assets updated: ${oldShort || 'old'} → ${shortNewHash}`;
+              span.textContent = assetsTpl.replace('{old}', oldShort || 'old').replace('{new}', shortNewHash || '');
             }
           }
           banner.setAttribute('data-old-version', storedVersion);
@@ -111,6 +129,11 @@ export default function PwaManager() {
           if (hashChanged && newHash) {
             banner.setAttribute('data-new-hash', shortNewHash);
             banner.setAttribute('data-new-hash-full', newHash);
+          }
+          // If user previously dismissed this same new version, keep hidden.
+          const dismissedVer = localStorage.getItem('update-dismissed-version');
+          if (dismissedVer === newVersion) {
+            banner.style.display = 'none';
           }
         }
       }

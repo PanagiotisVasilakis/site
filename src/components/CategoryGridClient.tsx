@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { TagFilters } from '@/components/TagFilters';
 import ListingCard from '@/components/ListingCard';
 import FilterDrawer from '@/components/FilterDrawer';
@@ -52,11 +52,28 @@ export default function CategoryGridClient({ items, locale, emptyLabel, category
   }, [items, active]);
   const featured = filtered.filter(i => i.featured);
   const rest = filtered.filter(i => !i.featured);
-  const renderGroup = (group: Item[]) => {
+  // Progressive reveal for large groups (only apply to non-featured group) to reduce initial paint cost
+  const [visibleCount, setVisibleCount] = useState(24);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => { setVisibleCount(24); }, [filtered]);
+  useEffect(() => {
+    const el = loadMoreRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(entries => {
+      if (entries.some(e => e.isIntersecting)) {
+        setVisibleCount(v => Math.min(v + 24, rest.length));
+      }
+    }, { rootMargin: '600px 0px 600px 0px' });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [rest.length]);
+
+  const renderGroup = (group: Item[], progressive = false) => {
     if (group.length === 0) return null;
+    const slice = progressive ? group.slice(0, visibleCount) : group;
     return (
-      <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(170px,1fr))] mb-8">
-        {group.map(i => (
+      <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(170px,1fr))] mb-8" aria-busy={progressive && slice.length < group.length}>
+        {slice.map(i => (
           <ListingCard
             key={i.id}
             id={i.id}
@@ -71,6 +88,9 @@ export default function CategoryGridClient({ items, locale, emptyLabel, category
             favLabelRemove="Remove favorite"
           />
         ))}
+        {progressive && slice.length < group.length && (
+          <div ref={loadMoreRef} className="col-span-full flex justify-center py-4 text-xs opacity-60 loading-sentinel">Loading more…</div>
+        )}
       </div>
     );
   };
@@ -81,8 +101,8 @@ export default function CategoryGridClient({ items, locale, emptyLabel, category
           <TagFilters items={items.map(i => ({ tags: i.tags }))} active={active} onChange={setActive} />
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setFiltersOpen(true)} className="btn-outline btn-sm">{ui?.filters || 'Filters'}</button>
-          <button onClick={() => setShowMap(m => !m)} className="btn-outline btn-sm">{showMap ? (ui?.list || 'List') : (ui?.map || 'Map')}</button>
+          <button onClick={() => setFiltersOpen(true)} className="btn-tint btn-sm">{ui?.filters || 'Filters'}</button>
+          <button onClick={() => setShowMap(m => !m)} className="btn-tint btn-sm">{showMap ? (ui?.list || 'List') : (ui?.map || 'Map')}</button>
         </div>
       </div>
       {showMap && (
@@ -96,18 +116,18 @@ export default function CategoryGridClient({ items, locale, emptyLabel, category
       )}
       {featured.length > 0 && (
         <section>
-          <h2 className="text-xs font-semibold tracking-wide uppercase mb-2 opacity-70">Featured</h2>
+          <h2 className="text-xs font-semibold tracking-wide uppercase mb-2 text-small-strong">Featured</h2>
           {renderGroup(featured)}
         </section>
       )}
-      {renderGroup(rest)}
+  {renderGroup(rest, true)}
       {filtered.length === 0 && (
         <div className="text-xs text-gray-600 px-2">{emptyLabel}</div>
       )}
   <FilterDrawer open={filtersOpen} onClose={() => setFiltersOpen(false)} title={ui?.filters || 'Filters'}>
         <div className="space-y-4">
           <div>
-    <h3 className="text-xs font-semibold uppercase mb-1 opacity-70">{ui?.activeTags || 'Active Tags'}</h3>
+  <h3 className="text-xs font-semibold uppercase mb-1 text-small-strong">{ui?.activeTags || 'Active Tags'}</h3>
     {active.length === 0 && <div className="text-xs opacity-50">{ui?.none || 'None'}</div>}
             {active.length > 0 && (
               <ul className="flex flex-wrap gap-1">
@@ -118,8 +138,8 @@ export default function CategoryGridClient({ items, locale, emptyLabel, category
             )}
           </div>
           <div>
-            <h3 className="text-xs font-semibold uppercase mb-1 opacity-70">Stub Controls</h3>
-            <p className="text-xs opacity-60">Add price range, rating slider, open now, etc.</p>
+            <h3 className="text-xs font-semibold uppercase mb-1 text-small-strong">Stub Controls</h3>
+            <p className="text-xs text-small-strong" style={{fontWeight:400}}>Add price range, rating slider, open now, etc.</p>
           </div>
           <div>
     <button onClick={() => { setActive([]); }} className="text-xs underline">{ui?.resetAll || 'Reset All'}</button>

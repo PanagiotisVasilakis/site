@@ -20,11 +20,11 @@ export default function AnalyticsAdminPage() {
   return (
     <div className="mx-auto max-w-4xl p-6 space-y-8">
       <AdminSessionManager />
-  <h1 className="text-2xl font-semibold text-brand-800">Analytics Overview</h1>
+  <h1 className="text-2xl font-semibold" style={{color:'var(--text-accent)'}}>Analytics Overview</h1>
       <section className="grid gap-4 md:grid-cols-2">
   <div className="p-3 rounded border-soft" style={{background:'var(--layer-surface)'}}>
-          <div className="text-xs uppercase tracking-wide" style={{color:'var(--brand-700)'}}>Unique Paths</div>
-          <div className="text-2xl font-semibold text-brand-800">{summary.uniquePaths}</div>
+          <div className="text-xs uppercase tracking-wide" style={{color:'var(--text-accent-subtle)'}}>Unique Paths</div>
+          <div className="text-2xl font-semibold" style={{color:'var(--text-accent)'}}>{summary.uniquePaths}</div>
         </div>
         <div className="p-3 rounded border border-emerald-200 bg-emerald-50">
           <div className="text-xs uppercase tracking-wide text-emerald-600">Daily New Paths (14d)</div>

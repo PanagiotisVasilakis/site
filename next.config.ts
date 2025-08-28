@@ -30,6 +30,14 @@ const nextConfig: NextConfig = {
     // Explicit root to silence multiple lockfile inference warning
     root: __dirname,
   },
+  webpack(config, { dev }) {
+    // Mitigate intermittent ENOENT rename errors in Next.js filesystem webpack pack cache on macOS
+    // by switching to in-memory cache during development.
+    if (dev) {
+      config.cache = { type: 'memory' } as any;
+    }
+    return config;
+  },
   // Allow accessing dev server assets from local network IP (suppress forthcoming warning)
   async headers() {
     return [

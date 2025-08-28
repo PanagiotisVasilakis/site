@@ -3,7 +3,7 @@
 const CACHE_VERSION = self.__CACHE_VERSION || 'v4';
 let RUNTIME_META = { version: CACHE_VERSION, pkgVersion: undefined, precacheHash: undefined };
 let ACTIVE_CACHE_NAME = `guest-guide-${CACHE_VERSION}`; // updated after reading version.json
-// Keep core shell + locale offline pages for all supported locales.
+// Keep core shell + locale root + offline pages for all supported locales.
 const CORE_ASSETS = [
   '/',
   '/en','/el',
@@ -83,9 +83,11 @@ function broadcastQueueSize() {
   if (bqsTimer) return; // debounce within 500ms window
   bqsTimer = setTimeout(async () => {
     bqsTimer = null;
-    const size = await getQueueSize();
-    const clients = await self.clients.matchAll();
-    for (const c of clients) c.postMessage({ type: 'ANALYTICS_QUEUE_SIZE', size });
+    try {
+      const size = await getQueueSize();
+      const clients = await self.clients.matchAll();
+      for (const c of clients) c.postMessage({ type: 'ANALYTICS_QUEUE_SIZE', size });
+    } catch {}
   }, 500);
 }
 
@@ -136,6 +138,12 @@ self.addEventListener('activate', (event) => {
         const data = await res.json();
         RUNTIME_META = { ...RUNTIME_META, ...data, version: data.version || RUNTIME_META.version };
         if (data.version) ACTIVE_CACHE_NAME = `guest-guide-${data.version}`;
+        // SECONDARY CLEANUP: now that ACTIVE_CACHE_NAME may have changed based on version.json,
+        // remove any older caches not caught by initial pass.
+        try {
+          const keys = await caches.keys();
+          await Promise.all(keys.map(k => (k === ACTIVE_CACHE_NAME ? null : caches.delete(k))));
+        } catch {}
       }
     } catch {}
     // Broadcast version info to all clients so UI can display it
@@ -153,7 +161,51 @@ self.addEventListener('activate', (event) => {
       } catch {}
     }
   })());
+  // Pre-warm dynamic JSON endpoints so first offline visit still has basic data.
+  event.waitUntil(prewarmData());
 });
+
+async function prewarmData() {
+  try {
+    const cache = await caches.open(ACTIVE_CACHE_NAME);
+    const bust = RUNTIME_META.precacheHash || RUNTIME_META.version;
+    const withBust = (url) => bust ? `${url}?v=${bust}` : url;
+    // Helper: fetch with bust param but store under canonical URL (without param) for runtime matches.
+    const fetchAndStore = async (canonicalUrl) => {
+      try {
+        const res = await fetchInternal(withBust(canonicalUrl), { cache: 'no-store' });
+        if (res.ok) {
+          const clone = res.clone();
+          // Store response under canonical URL key
+          cache.put(canonicalUrl, clone).catch(()=>{});
+          return res;
+        }
+      } catch {}
+      return null;
+    };
+    const catsRes = await fetchAndStore('/api/categories');
+    if (!catsRes) return;
+    let json = null;
+    try { json = await catsRes.json(); } catch { return; }
+    const cats = Array.isArray(json?.categories) ? json.categories : [];
+    for (const c of cats.slice(0,25)) { // safety cap
+      if (!c?.id) continue;
+      const listUrl = `/api/categories/${c.id}/items`;
+      const listRes = await fetchAndStore(listUrl);
+      if (!listRes) continue;
+      // Attempt to prewarm top item detail endpoints (first 2 items) for richer offline experience
+      try {
+        const listJson = await listRes.clone().json();
+        const items = Array.isArray(listJson?.items) ? listJson.items : [];
+        for (const item of items.slice(0,2)) { // first 2 items per category
+          if (!item?.slug) continue;
+            const detailUrl = `/api/categories/${c.id}/items/${item.slug}`;
+            await fetchAndStore(detailUrl); // best-effort
+        }
+      } catch {}
+    }
+  } catch {}
+}
 
 // Allow clients to request immediate activation of the new SW
 self.addEventListener('message', (event) => {
@@ -167,8 +219,9 @@ self.addEventListener('message', (event) => {
   }
   if (event.data.type === 'BG_SYNC_TRIGGER') {
     // Placeholder: attempt to refetch precache manifest
+  // NOTE: Previously used undefined CACHE_NAME; intentionally using ACTIVE_CACHE_NAME.
   fetchInternal('/precache.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : []).then(async (urls) => {
-      const cache = await caches.open(CACHE_NAME);
+  const cache = await caches.open(ACTIVE_CACHE_NAME);
       if (Array.isArray(urls)) {
         for (const u of urls) cache.add(u).catch(()=>{});
       }
@@ -195,8 +248,9 @@ self.addEventListener('periodicsync', (event) => {
   // @ts-expect-error periodicSync event tag not typed
   if (event.tag === 'precache-refresh') {
     // @ts-expect-error waitUntil overload not typed for periodic sync event
+  // NOTE: Previously used undefined CACHE_NAME; intentionally using ACTIVE_CACHE_NAME.
   event.waitUntil(fetchInternal('/precache.json', { cache: 'no-store' }).then(r => r.json()).then(async (urls) => {
-      const cache = await caches.open(CACHE_NAME);
+  const cache = await caches.open(ACTIVE_CACHE_NAME);
       for (const u of urls) cache.add(u).catch(()=>{});
     }).catch(()=>{}));
   }
@@ -227,8 +281,28 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Prefer network for dynamic data routes; cache-first for static/page GETs
+  // Prefer network for dynamic data (JSON) routes; cache-first for static/page GETs
   if (request.method === 'GET') {
+    // JSON / API data: stale-while-revalidate so previously fetched data is available offline.
+    if (request.headers.get('accept')?.includes('application/json') || url.pathname.endsWith('.json')) {
+      event.respondWith((async () => {
+        const cache = await caches.open(ACTIVE_CACHE_NAME);
+        const cached = await cache.match(request);
+        // Broadcast simple metric about cache hit vs network for JSON.
+        const report = (source) => {
+          try { broadcastJsonMetric(url.pathname, source); } catch {}
+        };
+        if (cached) report('cache');
+        const fetchPromise = fetchInternal(request).then(res => {
+          if (res.ok) cache.put(request, res.clone()).catch(()=>{});
+          if (!cached) report('network');
+          return res;
+        }).catch(() => cached || new Response('offline', { status: 503 }));
+        // Return cached immediately if present for fast offline; else wait network
+        return cached || fetchPromise;
+      })());
+      return;
+    }
     // HTML navigation requests: offline-first but revalidate in background
     if (request.headers.get('accept')?.includes('text/html')) {
       event.respondWith((async () => {
@@ -278,6 +352,17 @@ self.addEventListener('fetch', (event) => {
     }
   }
 });
+
+// JSON fetch metric broadcasting (dev/diagnostic; lightweight throttled)
+let __jsonMetricSent = 0;
+async function broadcastJsonMetric(path, source) {
+  if (__jsonMetricSent > 50) return; // throttle to avoid noise
+  __jsonMetricSent++;
+  try {
+    const clients = await self.clients.matchAll();
+    for (const c of clients) c.postMessage({ type: 'SW_JSON_FETCH', path, source });
+  } catch {}
+}
 
 // Background sync event flush
 self.addEventListener('sync', (event) => {

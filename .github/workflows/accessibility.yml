@@ -1,0 +1,101 @@
+name: Accessibility Audits
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  audits:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Puppeteer Chromium
+        id: puppeteer-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/puppeteer
+          key: puppeteer-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            puppeteer-${{ runner.os }}-
+
+      - name: Build (ensure Next can compile)
+        run: npm run build
+      - name: Start server
+        run: npm start &
+
+      - name: Wait for server
+        run: npx wait-on http://localhost:3000 || (echo "Server failed to start" && exit 1)
+
+      - name: Run accessibility + contrast audits
+        env:
+          AXE_BASE: http://localhost:3000
+        run: |
+          export KEEP_REPORTS=${KEEP_REPORTS:-5}
+          echo "Using KEEP_REPORTS=$KEEP_REPORTS"
+          npm run ci:accessibility
+
+      - name: Fail if violations present
+        run: |
+          if grep -q '"violations": \[\]' axe-a11y-report-*.json; then
+            echo "No accessibility violations detected";
+          else
+            echo "Accessibility violations found"; exit 1;
+          fi
+          if grep -q '"issues": \[\]' axe-contrast-report-*.json; then
+            echo "No contrast issues detected";
+          else
+            echo "Contrast issues found"; exit 1;
+          fi
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: axe-reports
+          path: |
+            axe-a11y-report-*.json
+            axe-contrast-report-*.json
+
+      - name: PR summary comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            function latest(pattern){
+              const files = fs.readdirSync('.')
+                .filter(f=>pattern.test(f))
+                .map(f=>({f, m: fs.statSync(f).mtimeMs}))
+                .sort((a,b)=>b.m - a.m);
+              return files[0]?.f;
+            }
+            const a11y = latest(/^axe-a11y-report-.*\.json$/);
+            const contrast = latest(/^axe-contrast-report-.*\.json$/);
+            function summarize(file, key){
+              if(!file) return `${key}: (no file)`;
+              const data = JSON.parse(fs.readFileSync(file,'utf8'));
+              const count = key==='a11y'? data.violations.length : data.issues.length;
+              return `${key} (${file}): ${count} ${count===1?'issue':'issues'}`;
+            }
+            const body = `### Accessibility Audit Summary\n- ${summarize(a11y,'a11y')}\n- ${summarize(contrast,'contrast')}\n\nKEEP_REPORTS=${process.env.KEEP_REPORTS || '5 (default)'}`;
+            const {context, github} = require('@actions/github');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });

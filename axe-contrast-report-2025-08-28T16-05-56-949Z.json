@@ -1,0 +1,115 @@
+{
+  "generatedAt": "2025-08-28T16:05:56.948Z",
+  "base": "http://localhost:3000",
+  "paths": [
+    "/en",
+    "/en/favorites",
+    "/en/offline",
+    "/en/phones",
+    "/en/phones/police-emergency"
+  ],
+  "issues": [
+    {
+      "url": "http://localhost:3000/en",
+      "id": "color-contrast",
+      "impact": "serious",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "nodes": 18,
+      "snippets": [
+        "<a href=\"#main-content\" class=\"skip-link\">Skip to content</a>",
+        "<a class=\"btn-tint btn-sm\" href=\"/el\">EL</a>",
+        "<h3 class=\"font-medium text-[0.84rem] leading-snug line-clamp-2 flex-1\">Police (Emergency)</h3>",
+        "<p class=\"text-[0.68rem] text-small-strong line-clamp-2\" style=\"font-weight:500\">Emergency number across EU</p>",
+        "<h3 class=\"font-medium text-[0.84rem] leading-snug line-clamp-2 flex-1\">Osteria Roma</h3>",
+        "<div class=\"text-[0.7rem] font-semibold flex items-center gap-1\"><span aria-hidden=\"true\">⭐</span>4.6</div>",
+        "<p class=\"text-[0.68rem] text-small-strong line-clamp-2\" style=\"font-weight:500\">Authentic Roman cuisine</p>",
+        "<h3 class=\"font-medium text-[0.84rem] leading-snug line-clamp-2 flex-1\">Old Town</h3>",
+        "<p class=\"text-[0.68rem] text-small-strong line-clamp-2\" style=\"font-weight:500\">Historic neighborhood</p>",
+        "<div class=\"text-lg font-medium\" style=\"color:var(--text-accent)\">Important Phones</div>",
+        "<div class=\"text-xs text-gray-600\">Emergency, taxi, services</div>",
+        "<div class=\"text-xs mt-1 text-gray-500\">3<!-- --> <!-- -->items</div>",
+        "<div class=\"text-lg font-medium\" style=\"color:var(--text-accent)\">Restaurants</div>",
+        "<div class=\"text-xs text-gray-600\">Our top recommendations</div>",
+        "<div class=\"text-xs mt-1 text-gray-500\">2<!-- --> <!-- -->items</div>",
+        "<div class=\"text-lg font-medium\" style=\"color:var(--text-accent)\">Sightseeing</div>",
+        "<div class=\"text-xs text-gray-600\">Must-see places</div>",
+        "<div class=\"text-xs mt-1 text-gray-500\">2<!-- --> <!-- -->items</div>"
+      ]
+    },
+    {
+      "url": "http://localhost:3000/en/favorites",
+      "id": "color-contrast",
+      "impact": "serious",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "nodes": 2,
+      "snippets": [
+        "<a href=\"#main-content\" class=\"skip-link\">Skip to content</a>",
+        "<a class=\"btn-tint btn-sm\" href=\"/el/favorites\">EL</a>"
+      ]
+    },
+    {
+      "url": "http://localhost:3000/en/offline",
+      "id": "color-contrast",
+      "impact": "serious",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "nodes": 3,
+      "snippets": [
+        "<a href=\"#main-content\" class=\"skip-link\">Skip to content</a>",
+        "<a class=\"btn-tint btn-sm\" href=\"/el/offline\">EL</a>",
+        "<a class=\"btn-tint text-sm\" href=\"/en\">Home</a>"
+      ]
+    },
+    {
+      "url": "http://localhost:3000/en/phones",
+      "id": "color-contrast",
+      "impact": "serious",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "nodes": 8,
+      "snippets": [
+        "<a href=\"#main-content\" class=\"skip-link\">Skip to content</a>",
+        "<a class=\"btn-tint btn-sm\" href=\"/el/phones\">EL</a>",
+        "<h3 class=\"font-medium text-[0.84rem] leading-snug line-clamp-2 flex-1\">Police (Emergency)</h3>",
+        "<p class=\"text-[0.68rem] text-small-strong line-clamp-2\" style=\"font-weight:500\">Emergency number across EU</p>",
+        "<h3 class=\"font-medium text-[0.84rem] leading-snug line-clamp-2 flex-1\">Ambulance</h3>",
+        "<p class=\"text-[0.68rem] text-small-strong line-clamp-2\" style=\"font-weight:500\">Medical emergencies</p>",
+        "<h3 class=\"font-medium text-[0.84rem] leading-snug line-clamp-2 flex-1\">Taxi</h3>",
+        "<p class=\"text-[0.68rem] text-small-strong line-clamp-2\" style=\"font-weight:500\">24/7 taxi line</p>"
+      ]
+    },
+    {
+      "url": "http://localhost:3000/en/phones/police-emergency",
+      "id": "color-contrast",
+      "impact": "serious",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "nodes": 4,
+      "snippets": [
+        "<a href=\"#main-content\" class=\"skip-link\">Skip to content</a>",
+        "<a class=\"btn-tint btn-sm\" href=\"/el/phones/police-emergency\">EL</a>",
+        "<a href=\"tel:112\">Call</a>",
+        "<a href=\"tel:112\" class=\"flex-1 text-center rounded bg-brand-600 text-white py-2 text-sm\" aria-label=\"Call Police (Emergency)\">Call</a>"
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "url": "http://localhost:3000/en",
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000/en"
+    },
+    {
+      "url": "http://localhost:3000/en/favorites",
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000/en/favorites"
+    },
+    {
+      "url": "http://localhost:3000/en/offline",
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000/en/offline"
+    },
+    {
+      "url": "http://localhost:3000/en/phones",
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000/en/phones"
+    },
+    {
+      "url": "http://localhost:3000/en/phones/police-emergency",
+      "error": "net::ERR_CONNECTION_REFUSED at http://localhost:3000/en/phones/police-emergency"
+    }
+  ]
+}

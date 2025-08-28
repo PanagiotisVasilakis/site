@@ -1,20 +1,25 @@
 {
   "name": "qr-city-guide",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "next dev",
-    "build": "tsx scripts/generate-precache.ts && tsx scripts/validate-content.ts && tsx scripts/generate-version.ts && next build --turbopack",
+  "dev:clean": "rm -rf .next/cache && next dev",
+  "build": "tsx scripts/generate-house-photos.ts && tsx scripts/generate-precache.ts && tsx scripts/validate-content.ts && tsx scripts/generate-version.ts && next build --turbopack",
     "typecheck": "tsc --noEmit",
     "start": "next start",
     "lint": "eslint",
     "qr": "tsx scripts/generate-qr.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "contrast": "node scripts/contrast-scan.ts",
-    "audit:contrast": "node scripts/axe-contrast.ts",
-    "audit:a11y": "node scripts/axe-a11y.ts"
+  "contrast": "tsx scripts/contrast-scan.ts",
+  "audit:contrast": "tsx scripts/axe-contrast.ts",
+  "audit:a11y": "tsx scripts/axe-a11y.ts",
+  "ci:a11y": "AXE_JSON=timestamp tsx scripts/axe-a11y.ts",
+  "ci:contrast": "AXE_JSON=timestamp tsx scripts/axe-contrast.ts",
+  "ci:accessibility": "npm run ci:contrast && npm run ci:a11y && npm run reports:prune",
+  "reports:prune": "tsx scripts/prune-reports.ts"
   },
   "dependencies": {
     "@types/jsdom": "^21.1.7",
@@ -44,6 +49,10 @@
     "tsx": "^4.20.4",
     "typescript": "^5",
     "vite-tsconfig-paths": "^5.1.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "image-size": "^1.0.2"
+  },
+  "optionalDependencies": {
+    "sharp": "^0.33.5"
   }
 }

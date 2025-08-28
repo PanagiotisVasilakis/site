@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import WebVitalsReporter from '@/components/WebVitalsReporter';
+import StatusCluster from '@/components/StatusCluster';
+import DataWarmup from '@/components/DataWarmup';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -46,8 +48,11 @@ export default function RootLayout({
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <div className="min-h-svh">{children}</div>
+  <DataWarmup />
         <WebVitalsReporter />
-        <div id="analytics-queue-indicator" className="hidden fixed bottom-2 right-2 z-50 text-[10px] rounded bg-teal-700 text-white px-2 py-1 shadow" />
+        <div className="fixed bottom-2 left-2 z-50 sm:hidden">
+          <StatusCluster labels={{ online:'Online', offline:'Offline', reconnecting:'Reconnected', slow:'Slow', syncPending:'Sync pending', syncIdle:'Synced' }} />
+        </div>
       </body>
     </html>
   );

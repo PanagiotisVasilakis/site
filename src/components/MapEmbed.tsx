@@ -37,7 +37,7 @@ export default function MapEmbed({ lat, lng, name, mapsHref }: Props) {
             href={mapsHref}
             target="_blank"
             rel="noopener"
-            className="absolute bottom-2 right-2 btn-primary btn-sm shadow"
+            className="absolute bottom-2 right-2 btn-tint btn-sm shadow"
             aria-label={`Open directions to ${name}`}
           >Open</a>
         )}

@@ -9,11 +9,13 @@ import { ListingCardSkeleton } from '@/components/ListingCardSkeleton';
 import HomeInteractiveBar from "@/components/HomeInteractiveBar";
 import ListingCard from "@/components/ListingCard";
 
+interface CategoryWithCount { id: string; slug: string; title: string; description?: string; count: number; icon?: string; }
+
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : "en";
   const t = getDictionary(eff);
-  const cats = getCategoriesWithCounts();
+  const cats: CategoryWithCount[] = getCategoriesWithCounts() as CategoryWithCount[];
   // Collect featured items (simple slice for now)
   const featured = cats.flatMap(c => getItemsByCategory(c.id).filter(i => i.featured).map(i => ({
     id: i.id,
@@ -49,7 +51,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
       />
       {featured.length > 0 && (
         <section className="mb-10">
-          <h2 className="text-sm font-semibold tracking-wide uppercase mb-3 text-brand-800" data-dark-color="var(--brand-100)">Featured</h2>
+          <h2 className="text-sm font-semibold tracking-wide uppercase mb-3" style={{color:'var(--text-accent)'}}>Featured</h2>
           <Suspense fallback={<div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(170px,1fr))]">{Array.from({length:6}).map((_,i)=><ListingCardSkeleton key={i}/> )}</div>}>
             <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(170px,1fr))]">
               {featured.map(f => (
@@ -60,6 +62,17 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         </section>
       )}
       <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Link
+          href={`/${eff}/house`}
+          className="card p-4 flex items-center justify-between transition-colors hover:bg-white/90"
+        >
+          <div>
+            <div className="text-lg font-medium" style={{color:'var(--text-accent)'}}>{t.house?.navLabel || 'House Info'}</div>
+            <div className="text-xs text-gray-600">{t.house?.navSubtitle || 'Photos, amenities & rules'}</div>
+            <div className="text-xs mt-1 text-gray-500">—</div>
+          </div>
+          <div className="text-2xl" aria-hidden>🏡</div>
+        </Link>
         {cats.map((c) => (
           <Link
             key={c.id}
@@ -67,7 +80,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
             className="card p-4 flex items-center justify-between transition-colors hover:bg-white/90"
           >
             <div>
-              <div className="text-lg font-medium text-brand-800">{t.categories[c.slug as "phones" | "restaurants" | "sightseeing"] ?? (pickCategoryLocale(c, "title", eff) ?? c.title)}</div>
+              <div className="text-lg font-medium" style={{color:'var(--text-accent)'}}>{t.categories[c.slug as "phones" | "restaurants" | "sightseeing"] ?? (pickCategoryLocale(c, "title", eff) ?? c.title)}</div>
               {(pickCategoryLocale(c, "description", eff) ?? c.description) && (
                 <div className="text-xs text-gray-600">{pickCategoryLocale(c, "description", eff) ?? c.description}</div>
               )}
