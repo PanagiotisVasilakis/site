@@ -5,9 +5,9 @@ import type { HousePhoto } from '@/data/housePhotos';
 
 type AltMap = { living: string; bedroom: string; kitchen: string } | undefined;
 interface PhotoWithAlt extends HousePhoto { altKey: 'bedroom'|'kitchen'|'living'; }
-interface Props { photos: PhotoWithAlt[]; alts: AltMap; springPreset?: 'gentle'|'medium'|'snappy'; }
+interface Props { photos: PhotoWithAlt[]; alts: AltMap; springPreset?: 'gentle'|'medium'|'snappy'; enableHaptics?: boolean; }
 
-export default function HouseGalleryLightbox({ photos, alts, springPreset='medium' }: Props) {
+export default function HouseGalleryLightbox({ photos, alts, springPreset='medium', enableHaptics=true }: Props) {
   // Configurable constants grouped
   const CONFIG = {
     MAX_SCALE: 4,
@@ -37,6 +37,17 @@ export default function HouseGalleryLightbox({ photos, alts, springPreset='mediu
   const [reduceMotion,setReduceMotion]=useState(false);
   useEffect(()=>{ const mq=window.matchMedia('(prefers-reduced-motion: reduce)'); const apply=()=>setReduceMotion(mq.matches); apply(); mq.addEventListener('change',apply); return ()=> mq.removeEventListener('change',apply); },[]);
   const [open,setOpen]=useState(false); const [index,setIndex]=useState(0);
+  const [fadeFrom,setFadeFrom]=useState<number|null>(null); // previous index for cross-fade while zoomed
+  const lastPersistedIndex=useRef(0);
+  const triggerHaptic=(pattern:number|number[]=8)=>{ 
+    if(!enableHaptics) return; 
+    if(typeof navigator==='undefined') return; 
+    if(reduceMotion) return; 
+    try { 
+      const nav = navigator as Navigator & { vibrate?: (p:number|number[])=>boolean };
+      if(typeof nav.vibrate === 'function') nav.vibrate(pattern);
+    } catch { /* ignore */ }
+  };
   // Core gesture refs
   const startX=useRef<number|null>(null); const startY=useRef<number|null>(null);
   // Preserve original pointer down position separately for swipe detection when startX is mutated incrementally
@@ -50,7 +61,7 @@ export default function HouseGalleryLightbox({ photos, alts, springPreset='mediu
   const currentImgRef=useRef<HTMLImageElement|null>(null); const viewerRef=useRef<HTMLDivElement|null>(null);
   const rafPending=useRef(false); const allowOverflow=useRef(false); const snappingFrame=useRef<number|null>(null);
   // Pinch inertia & background fade refs
-  const pinchPrevScale=useRef(1); const pinchPrevTime=useRef(0); const pinchVelocity=useRef(0); const pinchMidClientX=useRef(0); const pinchMidClientY=useRef(0);
+  const pinchPrevScale=useRef(1); const pinchPrevTime=useRef(0); const pinchVelocity=useRef(0); const pinchMidClientX=useRef(0); const pinchMidClientY=useRef(0); const pinchStartMidX=useRef(0);
   const overlayRef=useRef<HTMLDivElement|null>(null);
   // Horizontal slider refs (for base scale swiping)
   const sliderRef=useRef<HTMLDivElement|null>(null);
@@ -95,18 +106,25 @@ export default function HouseGalleryLightbox({ photos, alts, springPreset='mediu
   const animateSnap=useCallback(()=>{ if(!needsClamp()||allowOverflow.current) return; if(snappingFrame.current) return; const m=getMetrics(); if(!m) return; const targetX=Math.min(m.maxPanX,Math.max(-m.maxPanX,panX.current)); const targetY=Math.min(m.maxPanY,Math.max(-m.maxPanY,panY.current)); if(Math.abs(targetX-panX.current)<0.5 && Math.abs(targetY-panY.current)<0.5){ updateEdgeHints(m); return; } const sx=panX.current; const sy=panY.current; const start=performance.now(); const duration=CONFIG.SNAP_DURATION; const ease=(t:number)=>1-Math.pow(1-t,3); const step=()=>{ const p=Math.min(1,(performance.now()-start)/duration); panX.current=sx+(targetX-sx)*ease(p); panY.current=sy+(targetY-sy)*ease(p); if(currentImgRef.current) currentImgRef.current.style.transform=`translate3d(${panX.current}px,${panY.current}px,0) scale(${scale.current})`; updateEdgeHints(m); if(p<1) snappingFrame.current=requestAnimationFrame(step); else snappingFrame.current=null; }; snappingFrame.current=requestAnimationFrame(step); },[needsClamp,getMetrics,updateEdgeHints,CONFIG.SNAP_DURATION]);
   // Show / hide
   const total=photos.length;
-  const show=useCallback((i:number)=>{ const t=total; const normalized=((i%t)+t)%t; setIndex(normalized); scale.current=1; panX.current=0; panY.current=0; swipeDragX.current=0; requestAnimationFrame(()=>{ updateSlider(); }); setOpen(true); },[total,updateSlider]);
-  const hide=useCallback(()=>setOpen(false),[]);
-  const next=useCallback(()=>show(index+1),[index,show]);
-  const prevRef=useRef<(()=>void)|null>(null); prevRef.current=()=>show(index-1);
+  const show=useCallback((i:number)=>{ const t=total; const normalized=((i%t)+t)%t; setFadeFrom(null); setIndex(normalized); scale.current=1; panX.current=0; panY.current=0; swipeDragX.current=0; requestAnimationFrame(()=>{ updateSlider(); }); setOpen(true); },[total,updateSlider]);
+  // Navigate while zoomed: keep transform and cross-fade
+  const zoomedNavigate=useCallback((delta:number)=>{ if(!(scale.current>1.05)) return; const t=total; const targetRaw=index+delta; const target=((targetRaw%t)+t)%t; if(target===index) return; setFadeFrom(index); setIndex(target); // keep scale and pans
+    // remove fadeFrom after animation
+    setTimeout(()=>{ setFadeFrom(f=> f===index? null:f); },320);
+  },[index,total]);
+  const hide=useCallback(()=>{ setOpen(false); try{ localStorage.setItem('houseGalleryLastIndex',String(index)); }catch{} },[index]);
+  const next=useCallback(()=>{ if(scale.current>1.05) zoomedNavigate(1); else show(index+1); },[index,show,zoomedNavigate]);
+  const prevRef=useRef<(()=>void)|null>(null); prevRef.current=()=>{ if(scale.current>1.05) zoomedNavigate(-1); else show(index-1); };
   // External trigger
-  useEffect(()=>{ const handler=(e:Event)=>{ const d=(e as CustomEvent).detail||0; show(d); }; window.addEventListener('open-house-lightbox',handler as EventListener); return ()=> window.removeEventListener('open-house-lightbox',handler as EventListener);},[show]);
+  // On mount, restore last index
+  useEffect(()=>{ if(typeof window!=='undefined'){ try{ const v=localStorage.getItem('houseGalleryLastIndex'); if(v!=null){ const n=parseInt(v,10); if(!Number.isNaN(n)) { lastPersistedIndex.current=n; setIndex(n); } } }catch{} } },[]);
+  useEffect(()=>{ const handler=(e:Event)=>{ const detail=(e as CustomEvent).detail; if(detail==null || Number.isNaN(detail)) show(lastPersistedIndex.current); else show(detail); }; window.addEventListener('open-house-lightbox',handler as EventListener); return ()=> window.removeEventListener('open-house-lightbox',handler as EventListener);},[show]);
   // Keyboard nav
   useEffect(()=>{ if(!open) return; const onKey=(e:KeyboardEvent)=>{ if(e.key==='Escape') hide(); else if(e.key==='ArrowRight') next(); else if(e.key==='ArrowLeft') prevRef.current?.(); }; window.addEventListener('keydown',onKey); return ()=> window.removeEventListener('keydown',onKey); },[open,hide,next]);
   // Focus trap
   useEffect(()=>{ if(open){ prevFocused.current=document.activeElement as HTMLElement; dialogRef.current?.focus(); } else if(prevFocused.current){ prevFocused.current.focus(); } },[open]);
   // Touch start
-  const onTouchStart=(e:React.TouchEvent)=>{ stopInertia(); moveHistory.current=[]; allowOverflow.current=true; if(e.touches.length===1){ const t=e.touches[0]; startX.current=t.clientX; startY.current=t.clientY; originX.current=t.clientX; originY.current=t.clientY; moveHistory.current.push({x:t.clientX,y:t.clientY,t:performance.now()}); } else if(e.touches.length===2){ const [a,b]=[e.touches[0],e.touches[1]]; const midX=(a.clientX+b.clientX)/2; const midY=(a.clientY+b.clientY)/2; pinchStartDist.current=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY); pinchStartScale.current=scale.current; pinchMidImgX.current=(midX - panX.current)/scale.current; pinchMidImgY.current=(midY - panY.current)/scale.current; pinchPrevScale.current=scale.current; pinchPrevTime.current=performance.now(); pinchVelocity.current=0; pinchMidClientX.current=midX; pinchMidClientY.current=midY; } };
+  const onTouchStart=(e:React.TouchEvent)=>{ stopInertia(); moveHistory.current=[]; allowOverflow.current=true; if(e.touches.length===1){ const t=e.touches[0]; startX.current=t.clientX; startY.current=t.clientY; originX.current=t.clientX; originY.current=t.clientY; moveHistory.current.push({x:t.clientX,y:t.clientY,t:performance.now()}); } else if(e.touches.length===2){ const [a,b]=[e.touches[0],e.touches[1]]; const midX=(a.clientX+b.clientX)/2; const midY=(a.clientY+b.clientY)/2; pinchStartDist.current=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY); pinchStartScale.current=scale.current; pinchMidImgX.current=(midX - panX.current)/scale.current; pinchMidImgY.current=(midY - panY.current)/scale.current; pinchPrevScale.current=scale.current; pinchPrevTime.current=performance.now(); pinchVelocity.current=0; pinchMidClientX.current=midX; pinchMidClientY.current=midY; pinchStartMidX.current=midX; } };
   // Touch move
   const onTouchMove=(e:React.TouchEvent)=>{ const now=performance.now(); if(e.touches.length===2 && pinchStartDist.current){ const [a,b]=[e.touches[0],e.touches[1]]; const midX=(a.clientX+b.clientX)/2; const midY=(a.clientY+b.clientY)/2; const dist=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY); const newScale=Math.min(CONFIG.MAX_SCALE,Math.max(1,pinchStartScale.current*(dist/(pinchStartDist.current||dist)))); scale.current=newScale; panX.current=midX - pinchMidImgX.current * scale.current; panY.current=midY - pinchMidImgY.current * scale.current; const dt=now-pinchPrevTime.current; if(dt>0){ pinchVelocity.current=(scale.current-pinchPrevScale.current)/dt; pinchPrevScale.current=scale.current; pinchPrevTime.current=now; } pinchMidClientX.current=midX; pinchMidClientY.current=midY; applyTransform(); e.preventDefault(); return; } if(e.touches.length===1 && startX.current!=null && startY.current!=null){ const t=e.touches[0]; const dx=t.clientX-startX.current; const dy=t.clientY-startY.current; if(scale.current <=1.05){ // vertical drag & horizontal live slide
       panY.current=dy;
@@ -149,6 +167,8 @@ export default function HouseGalleryLightbox({ photos, alts, springPreset='mediu
         requestAnimationFrame(step);
         pinchInertiaStarted=true;
       }
+      // Pinch-to-swipe handoff: if scale nearly base and horizontal movement of pinch midpoint large
+      if(!pinchInertiaStarted && scale.current<=1.05){ const dx=pinchMidClientX.current - pinchStartMidX.current; if(Math.abs(dx) > CONFIG.SWIPE_THRESHOLD/1.2 && Math.abs(panY.current)<80){ if(dx<0) next(); else prevRef.current?.(); return; } }
     }
     // Double tap detection (only if not pinch inertia)
     if(!pinchInertiaStarted && e.changedTouches.length===1 && !pinchStartDist.current){
@@ -166,7 +186,7 @@ export default function HouseGalleryLightbox({ photos, alts, springPreset='mediu
     }
     // Gesture end behavior (skip if pinch inertia running)
     if(!pinchInertiaStarted){
-      if(originX.current!=null && originY.current!=null && scale.current<=1.05){
+  if(originX.current!=null && originY.current!=null && scale.current<=1.05){
   const dxTotal=swipeDragX.current; // already rubber-banded
         const verticalClose = Math.abs(panY.current)>CONFIG.CLOSE_VERTICAL_THRESHOLD;
         // compute flick velocity (pixels per ms) using last ~100ms samples
@@ -179,7 +199,7 @@ export default function HouseGalleryLightbox({ photos, alts, springPreset='mediu
           const startOffset=-index*w + swipeDragX.current;
           const endOffset=- (advanceBy!==0 && target>=0 && target<total ? target : index) * w;
           // spring animation
-          const animateSpring=(finalIndex:number)=>{ if(sliding.current) return; sliding.current=true; if(reduceMotion){ if(sliderRef.current) sliderRef.current.style.transform=`translate3d(${endOffset}px,0,0)`; sliding.current=false; swipeDragX.current=0; if(finalIndex!==index) show(finalIndex); else updateSlider(); return; } const k=activeSpring.k; const d=activeSpring.d; let pos=startOffset; let vel=0; const step=()=>{ const disp=endOffset-pos; const force=disp*k; vel=(vel+force)*d; pos+=vel; if(sliderRef.current) sliderRef.current.style.transform=`translate3d(${pos}px,0,0)`; if(Math.abs(disp)<0.6 && Math.abs(vel)<0.6){ if(sliderRef.current) sliderRef.current.style.transform=`translate3d(${endOffset}px,0,0)`; sliding.current=false; swipeDragX.current=0; if(finalIndex!==index) show(finalIndex); else updateSlider(); return; } springFrame.current=requestAnimationFrame(step); }; springFrame.current=requestAnimationFrame(step); };
+          const animateSpring=(finalIndex:number)=>{ if(sliding.current) return; sliding.current=true; if(reduceMotion){ if(sliderRef.current) sliderRef.current.style.transform=`translate3d(${endOffset}px,0,0)`; sliding.current=false; swipeDragX.current=0; if(finalIndex!==index) { show(finalIndex); triggerHaptic(12);} else updateSlider(); return; } const k=activeSpring.k; const d=activeSpring.d; let pos=startOffset; let vel=0; const step=()=>{ const disp=endOffset-pos; const force=disp*k; vel=(vel+force)*d; pos+=vel; if(sliderRef.current) sliderRef.current.style.transform=`translate3d(${pos}px,0,0)`; if(Math.abs(disp)<0.6 && Math.abs(vel)<0.6){ if(sliderRef.current) sliderRef.current.style.transform=`translate3d(${endOffset}px,0,0)`; sliding.current=false; swipeDragX.current=0; if(finalIndex!==index){ show(finalIndex); triggerHaptic(12);} else updateSlider(); return; } springFrame.current=requestAnimationFrame(step); }; springFrame.current=requestAnimationFrame(step); };
           const finalIndex = (advanceBy!==0 && target>=0 && target<total)? target : index;
           animateSpring(finalIndex);
         }
@@ -258,14 +278,20 @@ export default function HouseGalleryLightbox({ photos, alts, springPreset='mediu
   // Delegate click from server grid
   useEffect(()=>{ const container=document.querySelector('[aria-label="House photos"]'); if(!container) return; const handler=(e:Event)=>{ const btn=(e.target as HTMLElement).closest('[data-open-photo]'); if(btn){ const idx=Number(btn.getAttribute('data-open-photo'))||0; show(idx);} }; container.addEventListener('click',handler); return ()=> container.removeEventListener('click',handler); },[show]);
   return (<>{open && (<div role="dialog" aria-modal="true" aria-label="Photo viewer" tabIndex={-1} ref={el=>{ dialogRef.current=el; overlayRef.current=el; if(el) el.style.backgroundColor='rgba(0,0,0,0.9)'; }} className="fixed inset-0 z-50 flex flex-col bg-black/90 backdrop-blur-sm touch-none" onKeyDown={(e)=>{ if(e.key==='Tab'){ e.preventDefault(); dialogRef.current?.focus(); }}} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
-  <div className="flex items-center justify-between p-3 text-white text-sm"><div>{index+1}/{total}</div><div className="flex gap-2"><button className="btn-tint btn-sm" onClick={()=>{ if(scale.current<=1.05 && index>0){ const w=viewerRef.current?.clientWidth||window.innerWidth; const startOffset=-index*w + swipeDragX.current; const endOffset=-(index-1)*w; if(sliding.current) return; sliding.current=true; if(reduceMotion){ if(sliderRef.current) sliderRef.current.style.transform=`translate3d(${endOffset}px,0,0)`; sliding.current=false; swipeDragX.current=0; show(index-1); return; } const k=activeSpring.k; const d=activeSpring.d; let pos=startOffset; let vel=0; const step=()=>{ const disp=endOffset-pos; const force=disp*k; vel=(vel+force)*d; pos+=vel; if(sliderRef.current) sliderRef.current.style.transform=`translate3d(${pos}px,0,0)`; if(Math.abs(disp)<0.6 && Math.abs(vel)<0.6){ if(sliderRef.current) sliderRef.current.style.transform=`translate3d(${endOffset}px,0,0)`; sliding.current=false; swipeDragX.current=0; show(index-1); return;} requestAnimationFrame(step); }; requestAnimationFrame(step); } else prevRef.current?.(); }} aria-label="Previous image">◀</button><button className="btn-tint btn-sm" onClick={()=>{ if(scale.current<=1.05 && index<total-1){ const w=viewerRef.current?.clientWidth||window.innerWidth; const startOffset=-index*w + swipeDragX.current; const endOffset=-(index+1)*w; if(sliding.current) return; sliding.current=true; if(reduceMotion){ if(sliderRef.current) sliderRef.current.style.transform=`translate3d(${endOffset}px,0,0)`; sliding.current=false; swipeDragX.current=0; show(index+1); return; } const k=activeSpring.k; const d=activeSpring.d; let pos=startOffset; let vel=0; const step=()=>{ const disp=endOffset-pos; const force=disp*k; vel=(vel+force)*d; pos+=vel; if(sliderRef.current) sliderRef.current.style.transform=`translate3d(${pos}px,0,0)`; if(Math.abs(disp)<0.6 && Math.abs(vel)<0.6){ if(sliderRef.current) sliderRef.current.style.transform=`translate3d(${endOffset}px,0,0)`; sliding.current=false; swipeDragX.current=0; show(index+1); return;} requestAnimationFrame(step); }; requestAnimationFrame(step); } else next(); }} aria-label="Next image">▶</button><button className="btn-outline btn-sm" onClick={hide} aria-label="Close viewer">✕</button></div></div>
+  <div className="flex items-center justify-between p-3 text-white text-sm"><div>{index+1}/{total}</div><div className="flex gap-2"><button className="btn-tint btn-sm" onClick={()=>{ if(scale.current>1.05){ zoomedNavigate(-1); triggerHaptic(6); return; } if(scale.current<=1.05 && index>0){ const w=viewerRef.current?.clientWidth||window.innerWidth; const startOffset=-index*w + swipeDragX.current; const endOffset=-(index-1)*w; if(sliding.current) return; sliding.current=true; if(reduceMotion){ if(sliderRef.current) sliderRef.current.style.transform=`translate3d(${endOffset}px,0,0)`; sliding.current=false; swipeDragX.current=0; show(index-1); triggerHaptic(10); return; } const k=activeSpring.k; const d=activeSpring.d; let pos=startOffset; let vel=0; const step=()=>{ const disp=endOffset-pos; const force=disp*k; vel=(vel+force)*d; pos+=vel; if(sliderRef.current) sliderRef.current.style.transform=`translate3d(${pos}px,0,0)`; if(Math.abs(disp)<0.6 && Math.abs(vel)<0.6){ if(sliderRef.current) sliderRef.current.style.transform=`translate3d(${endOffset}px,0,0)`; sliding.current=false; swipeDragX.current=0; show(index-1); triggerHaptic(10); return;} requestAnimationFrame(step); }; requestAnimationFrame(step); } else prevRef.current?.(); }} aria-label="Previous image">◀</button><button className="btn-tint btn-sm" onClick={()=>{ if(scale.current>1.05){ zoomedNavigate(1); triggerHaptic(6); return; } if(scale.current<=1.05 && index<total-1){ const w=viewerRef.current?.clientWidth||window.innerWidth; const startOffset=-index*w + swipeDragX.current; const endOffset=-(index+1)*w; if(sliding.current) return; sliding.current=true; if(reduceMotion){ if(sliderRef.current) sliderRef.current.style.transform=`translate3d(${endOffset}px,0,0)`; sliding.current=false; swipeDragX.current=0; show(index+1); triggerHaptic(10); return; } const k=activeSpring.k; const d=activeSpring.d; let pos=startOffset; let vel=0; const step=()=>{ const disp=endOffset-pos; const force=disp*k; vel=(vel+force)*d; pos+=vel; if(sliderRef.current) sliderRef.current.style.transform=`translate3d(${pos}px,0,0)`; if(Math.abs(disp)<0.6 && Math.abs(vel)<0.6){ if(sliderRef.current) sliderRef.current.style.transform=`translate3d(${endOffset}px,0,0)`; sliding.current=false; swipeDragX.current=0; show(index+1); triggerHaptic(10); return;} requestAnimationFrame(step); }; requestAnimationFrame(step); } else next(); }} aria-label="Next image">▶</button><button className="btn-outline btn-sm" onClick={()=>{ hide(); triggerHaptic(4); }} aria-label="Close viewer">✕</button></div></div>
   <div ref={viewerRef} className="relative flex-1 flex items-start justify-start overflow-hidden select-none" style={{ '--edge-left':'0','--edge-right':'0','--edge-top':'0','--edge-bottom':'0' } as React.CSSProperties}>
       <div ref={sliderRef} className="flex h-full w-full will-change-transform" style={{transition:'none'}}>
-        {photos.map((p,i)=>{ const alt=(alts && alts[p.altKey])||p.altKey; const active=i===index; return (
+        {photos.map((p,i)=>{ const alt=(alts && alts[p.altKey])||p.altKey; const active=i===index; const fadingOut=fadeFrom===i && fadeFrom!==index; return (
           <div key={p.src} className="w-full h-full flex-shrink-0 flex justify-center items-start transition-transform duration-150" ref={el=>{ if(active) activeWrapperRef.current=el; }}>
-            <Image src={p.src} alt={alt} width={p.width} height={p.height} placeholder="blur" blurDataURL={p.blurDataURL} sizes="100vw" className={`object-contain max-w-full max-h-full select-none ${active? '':'pointer-events-none'}`} ref={el=>{ if(active){ currentImgRef.current=el; applyTransform(); } }} priority={active} />
+            <Image src={p.src} alt={alt} width={p.width} height={p.height} placeholder="blur" blurDataURL={p.blurDataURL} sizes="100vw" className={`object-contain max-w-full max-h-full select-none ${active? '':'pointer-events-none'} ${(scale.current>1.05 && active)? 'opacity-0':''} ${(scale.current>1.05 && fadingOut)? 'opacity-0':''}`} ref={el=>{ if(active){ currentImgRef.current=el; applyTransform(); } }} priority={active} />
           </div>
         ); })}
+        {fadeFrom!==null && scale.current>1.05 && photos[fadeFrom] && (
+          <div className="absolute inset-0 flex justify-center items-start pointer-events-none">
+            <Image src={photos[index].src} alt="" width={photos[index].width} height={photos[index].height} placeholder="blur" blurDataURL={photos[index].blurDataURL} sizes="100vw" className="object-contain max-w-full max-h-full select-none opacity-100 transition-opacity duration-300" />
+            <Image src={photos[fadeFrom].src} alt="" width={photos[fadeFrom].width} height={photos[fadeFrom].height} placeholder="blur" blurDataURL={photos[fadeFrom].blurDataURL} sizes="100vw" className="object-contain max-w-full max-h-full select-none absolute opacity-0 transition-opacity duration-300" />
+          </div>
+        )}
       </div>
       {/* Edge hint overlays */}
       <div className="pointer-events-none absolute inset-0">
