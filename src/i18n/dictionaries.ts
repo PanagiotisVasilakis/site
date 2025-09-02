@@ -63,6 +63,7 @@ export type Dictionary = {
     navLabel: string;
     navSubtitle: string;
     title: string;
+    location?: string;
     intro: string;
     overview: string;
     amenities: string;
@@ -71,7 +72,42 @@ export type Dictionary = {
     emergency: string;
     amenityList: string[]; // pre-translated bullet list
     rulesList: string[];   // house rules bullets
-  photoAlts?: { living: string; bedroom: string; kitchen: string; };
+    distances?: string[]; // nearby distances list
+    photoAlts?: { living: string; bedroom: string; kitchen: string; };
+  };
+  booking?: {
+    locationDesc: string; // appended after location name
+  completeTitle?: string;
+  yourDetails?: string;
+  datesLabel?: string;
+  guestsLabel?: string;
+  durationLabel?: string;
+  notSelected?: string;
+  selectDatesPrompt?: string;
+  priceBreakdown?: string;
+  cleaningFee?: string;
+  serviceFee?: string;
+  total?: string;
+  whatsIncluded?: string;
+  completeDetailsHint?: string;
+  };
+  locationPanel?: {
+    title: string;
+    villaTitle: string;
+    city: string;
+    blurb: string;
+    nearby: string;
+    attractions: string[];
+    howToEnableMapTitle: string;
+    howToEnableSteps: string[];
+  };
+  map?: {
+    loading: string;
+    villaMarkerTitle: string;
+    villaMarkerDesc: string;
+    viewDetails: string;
+    failed: string;
+    tokenMissing: string;
   };
 };
 
@@ -103,32 +139,88 @@ const dict: Record<Locale, Dictionary> = {
       sightseeing: "Sightseeing",
     },
     house: {
-      navLabel: "House Info",
-      navSubtitle: "Photos, amenities & rules",
-      title: "Guest House Info",
-      intro: "Practical details, amenities and a quick photo tour.",
+      navLabel: "Villa Photos",
+      navSubtitle: "Photo tour & location",
+      title: "2-Bedroom Apartment with Mountain & Sea Views",
+      location: "Kalamata, Greece",
+      intro: "A spacious apartment with large sunny terraces and beautiful views, in a quiet neighborhood near the Town Hall.",
       overview: "Overview",
       amenities: "Amenities",
       rules: "House Rules",
       checkin: "Check-in / Check-out",
       emergency: "Emergency & Support",
       amenityList: [
-        "Fast Wi‑Fi",
-        "Air conditioning / heating",
+        "Free Wi-Fi",
+        "Air conditioning", 
+        "Large sunny terraces",
+        "Mountain & sea views",
+        "Free private parking",
+        "Baby equipment available",
         "Fully equipped kitchen",
-        "Washer & basic detergents",
-        "Fresh linens & towels",
-        "Smart TV with streaming apps",
-        "Dedicated workspace"
+        "Washing machine"
       ],
       rulesList: [
         "No smoking inside",
-        "No parties or events",
         "Quiet hours after 22:00",
-        "Report any damage promptly"
-  ],
-  photoAlts: { living: 'Living area', bedroom: 'Bedroom', kitchen: 'Kitchen' }
+        "Maximum 4 guests",
+        "Check-in: 15:00-22:00",
+        "Check-out: 11:00",
+        "Families with children welcome"
+      ],
+      photoAlts: { living: 'Living area', bedroom: 'Bedroom', kitchen: 'Kitchen' },
+      distances: [
+        "Town Hall: 50m (1 min walk)",
+        "Public Library & Gallery: 1.8km (15 min walk)",
+        "Archaeological Museum: 2km (15 min walk)", 
+        "Nearest beach: 5 min drive",
+        "Kalamata Airport: 6km (15 min drive)"
+      ]
     },
+    booking: {
+  locationDesc: "Quiet neighborhood near the Town Hall",
+  completeTitle: "Complete your booking",
+  yourDetails: "Your booking details",
+  datesLabel: "Dates",
+  guestsLabel: "Guests",
+  durationLabel: "Duration",
+  notSelected: "Not selected",
+  selectDatesPrompt: "Please complete your booking details above to continue.",
+  priceBreakdown: "Price breakdown",
+  cleaningFee: "Cleaning fee",
+  serviceFee: "Service fee",
+  total: "Total",
+  whatsIncluded: "What's included",
+  completeDetailsHint: "Select dates to see pricing"
+    }
+    ,locationPanel: {
+      title: "Villa Location & Nearby Attractions",
+      villaTitle: "2-Bedroom Apartment with Views",
+      city: "Kalamata, Greece",
+      blurb: "Quiet neighborhood, 50m from Town Hall with mountain & sea views",
+      nearby: "Nearby Attractions",
+      attractions: [
+        "🏛️ Town Hall (50m walk)",
+        "📚 Public Library & Gallery (1.8km)",
+        "🏺 Archaeological Museum (2km)",
+        "🏖️ Beach (5 min drive)",
+        "✈️ Kalamata Airport (6km)",
+        "🚗 Free private parking"
+      ],
+      howToEnableMapTitle: "To enable interactive map:",
+      howToEnableSteps: [
+        "Get a free token from mapbox.com",
+        "Add NEXT_PUBLIC_MAPBOX_TOKEN to .env",
+        "Restart dev server"
+      ]
+    }
+    ,map: {
+      loading: "Loading map...",
+      villaMarkerTitle: "Seaside Modern Villa",
+      villaMarkerDesc: "Your accommodation",
+      viewDetails: "View details",
+      failed: "Map failed to load",
+      tokenMissing: "Mapbox token not configured"
+    }
   },
   el: {
     appTitle: "Οδηγός Επισκεπτών",
@@ -157,32 +249,88 @@ const dict: Record<Locale, Dictionary> = {
       sightseeing: "Αξιοθέατα",
     },
     house: {
-      navLabel: "Πληροφορίες Σπιτιού",
-      navSubtitle: "Φωτογραφίες, παροχές & κανόνες",
-      title: "Πληροφορίες Ξενώνα",
-      intro: "Χρήσιμες λεπτομέρειες, παροχές και μια γρήγορη περιήγηση.",
+      navLabel: "Φωτογραφίες Διαμερίσματος",
+      navSubtitle: "Φωτογραφική περιήγηση & τοποθεσία",
+      title: "Διαμέρισμα 2 Υπνοδωματίων με Θέα Βουνό & Θάλασσα",
+      location: "Καλαμάτα, Ελλάδα", 
+      intro: "Ένα ευρύχωρο διαμέρισμα με μεγάλες ηλιόλουστες βεράντες και όμορφη θέα, σε ήσυχη γειτονιά κοντά στο Δημαρχείο.",
       overview: "Επισκόπηση",
       amenities: "Παροχές",
       rules: "Κανόνες Σπιτιού",
       checkin: "Άφιξη / Αναχώρηση",
       emergency: "Έκτακτη Ανάγκη & Υποστήριξη",
       amenityList: [
-        "Γρήγορο Wi‑Fi",
-        "Κλιματισμός / Θέρμανση",
+        "Δωρεάν Wi-Fi",
+        "Κλιματισμός",
+        "Μεγάλες ηλιόλουστες βεράντες", 
+        "Θέα βουνού και θάλασσας",
+        "Δωρεάν ιδιωτικό πάρκινγκ",
+        "Εξοπλισμός μωρού διαθέσιμος",
         "Πλήρως εξοπλισμένη κουζίνα",
-        "Πλυντήριο & βασικά απορρυπαντικά",
-        "Καθαρά σεντόνια & πετσέτες",
-        "Smart TV με εφαρμογές streaming",
-        "Χώρος εργασίας"
+        "Πλυντήριο ρούχων"
       ],
       rulesList: [
         "Απαγορεύεται το κάπνισμα μέσα",
-        "Όχι πάρτι ή εκδηλώσεις",
         "Ήσυχες ώρες μετά τις 22:00",
-        "Αναφέρετε άμεσα τυχόν ζημιές"
-  ],
-  photoAlts: { living: 'Καθιστικό', bedroom: 'Υπνοδωμάτιο', kitchen: 'Κουζίνα' }
+        "Μέγιστο 4 άτομα",
+        "Άφιξη: 15:00-22:00",
+        "Αναχώρηση: 11:00",
+        "Οικογένειες με παιδιά καλοδεχούμενες"
+      ],
+      photoAlts: { living: 'Καθιστικό', bedroom: 'Υπνοδωμάτιο', kitchen: 'Κουζίνα' },
+      distances: [
+        "Δημαρχείο: 50μ (1 λεπτό με τα πόδια)",
+        "Δημόσια Βιβλιοθήκη–Πινακοθήκη: 1,8 χλμ (15 λεπτά με τα πόδια)",
+        "Μπενάκειο Αρχαιολογικό Μουσείο: 2 χλμ (15 λεπτά με τα πόδια)",
+        "Κοντινότερη παραλία: 5 λεπτά με αυτοκίνητο", 
+        "Αεροδρόμιο Καλαμάτας: 6 χλμ (15 λεπτά οδήγηση)"
+      ]
     },
+    booking: {
+  locationDesc: "Ήσυχη γειτονιά κοντά στο Δημαρχείο",
+  completeTitle: "Ολοκληρώστε την κράτηση",
+  yourDetails: "Στοιχεία κράτησης",
+  datesLabel: "Ημερομηνίες",
+  guestsLabel: "Επισκέπτες",
+  durationLabel: "Διάρκεια",
+  notSelected: "Δεν έχει επιλεγεί",
+  selectDatesPrompt: "Συμπληρώστε τα στοιχεία κράτησης παραπάνω για να συνεχίσετε.",
+  priceBreakdown: "Ανάλυση τιμής",
+  cleaningFee: "Τέλος καθαρισμού",
+  serviceFee: "Τέλος υπηρεσίας",
+  total: "Σύνολο",
+  whatsIncluded: "Τι περιλαμβάνεται",
+  completeDetailsHint: "Επιλέξτε ημερομηνίες για να δείτε τιμή"
+    }
+    ,locationPanel: {
+      title: "Τοποθεσία & Κοντινά Αξιοθέατα",
+      villaTitle: "Διαμέρισμα 2 Υπνοδωματίων με Θέα",
+      city: "Καλαμάτα, Ελλάδα",
+      blurb: "Ήσυχη γειτονιά, 50μ από το Δημαρχείο με θέα βουνό & θάλασσα",
+      nearby: "Κοντινά Σημεία",
+      attractions: [
+        "🏛️ Δημαρχείο (50μ περπάτημα)",
+        "📚 Δημόσια Βιβλιοθήκη & Πινακοθήκη (1,8χλμ)",
+        "🏺 Αρχαιολογικό Μουσείο (2χλμ)",
+        "🏖️ Παραλία (5 λεπτά με αυτοκίνητο)",
+        "✈️ Αεροδρόμιο Καλαμάτας (6χλμ)",
+        "🚗 Δωρεάν ιδιωτικό πάρκινγκ"
+      ],
+      howToEnableMapTitle: "Για ενεργοποίηση διαδραστικού χάρτη:",
+      howToEnableSteps: [
+        "Λάβετε ένα δωρεάν token από το mapbox.com",
+        "Προσθέστε το NEXT_PUBLIC_MAPBOX_TOKEN στο .env",
+        "Επανεκκινήστε τον dev server"
+      ]
+    }
+    ,map: {
+      loading: "Φόρτωση χάρτη...",
+      villaMarkerTitle: "Σύγχρονη Βίλα κοντά στη Θάλασσα",
+      villaMarkerDesc: "Το κατάλυμά σας",
+      viewDetails: "Προβολή λεπτομερειών",
+      failed: "Αποτυχία φόρτωσης χάρτη",
+      tokenMissing: "Το Mapbox token δεν έχει ρυθμιστεί"
+    }
   },
 };
 

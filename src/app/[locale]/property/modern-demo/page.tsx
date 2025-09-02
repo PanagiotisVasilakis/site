@@ -59,7 +59,7 @@ export default function PropertyPage() {
           priority
           fetchPriority="high"
           sizes="100vw"
-          className="object-cover will-change-transform [animation-timeline:scroll()] [animation-range:0_65%] hero-ken-burns"
+          className="object-cover will-change-transform hero-ken-burns"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-black/25 to-black/10 pointer-events-none" aria-hidden="true" />
         <div className="absolute inset-x-0 top-0 flex h-full flex-col justify-center px-6 md:px-[56px] text-white">
@@ -125,11 +125,15 @@ export default function PropertyPage() {
       </div>
 
       <style jsx global>{`
-        /* Hero Ken Burns (very gentle) – limited to first 65% scroll of viewport height */
+        /* Hero Ken Burns (gentle) – scroll driven when supported */
         @supports (animation-timeline: scroll()) {
-          .hero-ken-burns { animation: heroPan 2s ease-out forwards; }
-          @keyframes heroPan { from { transform: scale(1) translateZ(0); } to { transform: scale(1.03) translateZ(0); } }
+          .hero-ken-burns { animation: heroPan linear both; animation-timeline: scroll(root block); animation-range: 0 65%; }
         }
+        /* Fallback: time-based 2s ease-out once */
+        @supports not (animation-timeline: scroll()) {
+          .hero-ken-burns { animation: heroPan 2s ease-out forwards; }
+        }
+        @keyframes heroPan { from { transform: scale(1) translateZ(0); } to { transform: scale(1.03) translateZ(0); } }
         @media (prefers-reduced-motion: reduce) {
           .hero-ken-burns { animation: none !important; transform: scale(1) !important; }
         }

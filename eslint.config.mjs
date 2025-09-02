@@ -15,6 +15,16 @@ const eslintConfig = [
   {
     rules: { 'internal-fetch/no-internal-fetch': 'warn' }
   },
+  // Test file specific overrides (relax strictness, allow mocks)
+  {
+    files: ['**/__tests__/**/*.{js,jsx,ts,tsx}','**/*.test.{js,jsx,ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/triple-slash-reference': 'off',
+      '@next/next/no-img-element': 'off',
+      'jsx-a11y/alt-text': 'off'
+    }
+  },
   {
     plugins: {
       'internal-fetch': {

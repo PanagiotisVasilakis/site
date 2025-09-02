@@ -8,12 +8,13 @@ export default function FavoriteButton({ id, label }: { id: string; label: strin
   const active = isFavorite(id);
   return (
     <button
-  onClick={() => { const before = isFavorite(id); toggle(id); if (!before) push('Added to favorites'); else push('Removed from favorites'); }}
+      type="button"
+      onClick={() => { const before = isFavorite(id); toggle(id); if (!before) push('Added to favorites'); else push('Removed from favorites'); }}
       aria-pressed={active}
       aria-label={active ? `Remove ${label} from favorites` : `Add ${label} to favorites`}
       className={`fav-btn ${active ? 'is-active' : ''}`}
     >
-      <span>{active ? '★' : '☆'}</span>
+      <span aria-hidden>{active ? '★' : '☆'}</span>
       <span className="hidden sm:inline">{active ? 'Saved' : 'Save'}</span>
     </button>
   );

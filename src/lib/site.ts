@@ -1,4 +1,5 @@
-export const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') || 'https://example.com';
+import { config } from '@/lib/config';
+export const siteUrl = config.absoluteSiteUrl().replace(/\/$/, '');
 
 // Build absolute URL from a path
 export function absUrl(path: string) {

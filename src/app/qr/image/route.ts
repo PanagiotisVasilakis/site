@@ -2,10 +2,10 @@ import QRCode from 'qrcode';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { locales, defaultLocale } from '@/i18n/config';
+import { config } from '@/lib/config';
 
 export async function GET(req: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL || 'http://localhost:3000';
-  const absolute = url.startsWith('http') ? url : `https://${url}`;
+  const absolute = config.absoluteSiteUrl();
   const cookieLocale = req.cookies.get('lang')?.value;
   const locale = cookieLocale && (locales as readonly string[]).includes(cookieLocale) ? cookieLocale : defaultLocale;
   const target = `${absolute}/${locale}`;

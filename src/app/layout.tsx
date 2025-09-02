@@ -1,19 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+// Replacing Google font import (Geist) with system stack to avoid external fetch failures during build.
 import "./globals.css";
 import WebVitalsReporter from '@/components/WebVitalsReporter';
 import StatusCluster from '@/components/StatusCluster';
 import DataWarmup from '@/components/DataWarmup';
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+// Font variables removed (system fonts used)
 
 export const metadata: Metadata = {
   manifest: "/app.webmanifest",
@@ -46,9 +38,9 @@ export default function RootLayout({
   {/* next/font handles Google Fonts optimizations; manual preconnect tags removed to satisfy lint */}
         <link rel="preconnect" href="https://maps.geoapify.com" />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+  <body className="antialiased">
         <div className="min-h-svh">{children}</div>
-  <DataWarmup />
+        <DataWarmup />
         <WebVitalsReporter />
         <div className="fixed bottom-2 left-2 z-50 sm:hidden">
           <StatusCluster labels={{ online:'Online', offline:'Offline', reconnecting:'Reconnected', slow:'Slow', syncPending:'Sync pending', syncIdle:'Synced' }} />

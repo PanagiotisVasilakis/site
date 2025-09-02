@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { createStorageAdapter } from './storageAdapter';
+import { logger } from '@/lib/logger';
 
 export interface AnalyticsHit { path: string; ts: number; ua: string | null; locale?: string }
 
@@ -28,7 +29,7 @@ export function loadHits() {
     if (Array.isArray(data.hits)) hits.push(...data.hits);
     Object.assign(firstSeen, data.firstSeen || {});
     if (Array.isArray(data.vitals)) vitals.push(...data.vitals.slice(-5000));
-  } catch {}
+  } catch (err) { logger.error('loadHits failed', err); }
 }
 
 function persist() {

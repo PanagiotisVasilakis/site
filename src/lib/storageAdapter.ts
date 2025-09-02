@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { logger } from '@/lib/logger';
 import type { AnalyticsHit, Vital } from './analyticsStore';
 
 export interface AnalyticsPersistenceData {
@@ -29,25 +30,25 @@ class FileAdapter implements AnalyticsStorageAdapter {
         const data = JSON.parse(fs.readFileSync(this.hitsFile, 'utf-8'));
         if (Array.isArray(data)) out.hits = data;
       }
-    } catch {}
+    } catch (err) { logger.error('FileAdapter load hits failed', err); }
     try {
       if (fs.existsSync(this.vitalsFile)) {
         const data = JSON.parse(fs.readFileSync(this.vitalsFile, 'utf-8'));
         if (Array.isArray(data)) out.vitals = data;
       }
-    } catch {}
+    } catch (err) { logger.error('FileAdapter load vitals failed', err); }
     try {
       if (fs.existsSync(this.firstSeenFile)) {
         const data = JSON.parse(fs.readFileSync(this.firstSeenFile, 'utf-8'));
         if (data && typeof data === 'object') out.firstSeen = data;
       }
-    } catch {}
+    } catch (err) { logger.error('FileAdapter load firstSeen failed', err); }
     return out;
   }
   save(data: AnalyticsPersistenceData) {
-    try { fs.writeFileSync(this.hitsFile, JSON.stringify(data.hits.slice(-5000))); } catch {}
-    try { fs.writeFileSync(this.vitalsFile, JSON.stringify(data.vitals.slice(-5000))); } catch {}
-    try { fs.writeFileSync(this.firstSeenFile, JSON.stringify(data.firstSeen)); } catch {}
+    try { fs.writeFileSync(this.hitsFile, JSON.stringify(data.hits.slice(-5000))); } catch (err) { logger.error('FileAdapter save hits failed', err); }
+    try { fs.writeFileSync(this.vitalsFile, JSON.stringify(data.vitals.slice(-5000))); } catch (err) { logger.error('FileAdapter save vitals failed', err); }
+    try { fs.writeFileSync(this.firstSeenFile, JSON.stringify(data.firstSeen)); } catch (err) { logger.error('FileAdapter save firstSeen failed', err); }
   }
 }
 
@@ -77,7 +78,7 @@ class KvAdapter implements AnalyticsStorageAdapter {
           firstSeen: parsed.firstSeen && typeof parsed.firstSeen === 'object' ? parsed.firstSeen : {}
         };
       }
-    } catch {}
+    } catch (err) { logger.error('KvAdapter load failed', err); }
     return { hits: [], vitals: [], firstSeen: {} };
   }
   save(data: AnalyticsPersistenceData) {
@@ -88,7 +89,7 @@ class KvAdapter implements AnalyticsStorageAdapter {
         vitals: data.vitals.slice(-5000),
         firstSeen: data.firstSeen
       }));
-    } catch {}
+    } catch (err) { logger.error('KvAdapter save failed', err); }
   }
 }
 

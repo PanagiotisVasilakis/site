@@ -1,9 +1,10 @@
 "use client";
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback, memo } from 'react';
 import { TagFilters } from '@/components/TagFilters';
 import ListingCard from '@/components/ListingCard';
 import FilterDrawer from '@/components/FilterDrawer';
 import { ListingCardSkeleton } from '@/components/ListingCardSkeleton';
+import VillaLocationMap from '@/components/VillaLocationMap';
 
 interface Item {
   id: string;
@@ -26,7 +27,7 @@ interface Props {
   ui?: { filters: string; map: string; list: string; resetAll: string; activeTags: string; none: string; };
 }
 
-export default function CategoryGridClient({ items, locale, emptyLabel, categorySlug, ui }: Props) {
+function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, ui }: Props) {
   const [active, setActive] = useState<string[]>([]);
   const [showMap, setShowMap] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -68,7 +69,7 @@ export default function CategoryGridClient({ items, locale, emptyLabel, category
     return () => obs.disconnect();
   }, [rest.length]);
 
-  const renderGroup = (group: Item[], progressive = false) => {
+  const renderGroup = useCallback((group: Item[], progressive = false) => {
     if (group.length === 0) return null;
     const slice = progressive ? group.slice(0, visibleCount) : group;
     return (
@@ -93,7 +94,7 @@ export default function CategoryGridClient({ items, locale, emptyLabel, category
         )}
       </div>
     );
-  };
+  }, [visibleCount, locale, categorySlug]);
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
@@ -106,7 +107,23 @@ export default function CategoryGridClient({ items, locale, emptyLabel, category
         </div>
       </div>
       {showMap && (
-  <div className="mb-6 h-64 rounded-lg border-soft flex items-center justify-center text-xs bg-white/60 dark:bg-[rgba(17,25,26,0.5)]" style={{color:'var(--brand-700)'}}>Map placeholder (integrate real map later)</div>
+        <div className="mb-6">
+          <VillaLocationMap 
+            locale={locale}
+            height="400px"
+            zoom={13}
+            showNearbyAttractions={true}
+            className="rounded-lg overflow-hidden shadow-sm"
+            nearbyRestaurants={categorySlug === 'restaurants' ? items : []}
+            nearbyServices={categorySlug === 'phones' ? items : []}
+            nearbyAttractions={categorySlug === 'sightseeing' ? items : []}
+          />
+          <div className="mt-3 text-center">
+            <p className="text-sm text-gray-600">
+              🏡 Villa location and nearby {categorySlug} • Zoom and click markers for details
+            </p>
+          </div>
+        </div>
       )}
       {/* Skeleton while no items loaded (initial mount) */}
       {items.length === 0 && (
@@ -149,3 +166,4 @@ export default function CategoryGridClient({ items, locale, emptyLabel, category
     </div>
   );
 }
+export default memo(CategoryGridClientComponent);

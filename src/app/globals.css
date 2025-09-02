@@ -83,6 +83,40 @@
   --radius-xl: 20px;
   --radius-full: 9999px;
 
+/* Self-hosted font faces (developers: add actual woff2 files in public/fonts) */
+@font-face {
+  font-family: 'GeistLocal';
+  src: url('/fonts/geist-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GeistLocal';
+  src: url('/fonts/geist-medium.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GeistLocal';
+  src: url('/fonts/geist-semibold.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GeistLocal';
+  src: url('/fonts/geist-mono-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+  font-style: normal;
+}
+
+body {
+  font-family: 'GeistLocal', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+code, pre, kbd, samp {
+  font-family: 'GeistLocal', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
   /* Shadow tokens */
   --shadow-xs: 0 1px 2px rgba(0,0,0,0.06);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px -1px rgba(0,0,0,0.06);
@@ -390,8 +424,25 @@ input, textarea { color: inherit; }
   overflow: hidden;
   position: relative;
 }
+
+/* Booking bar for single property */
+.booking-bar {
+  --seg-gap: 1px;
+  display: flex;
+  align-items: stretch;
+  background: white;
+  border-radius: 16px;
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  position: relative;
+  max-width: 500px;
+  margin: 0 auto;
+}
 [data-theme="dark"] .search-bar { background: rgba(17,25,26,0.75); border-color: var(--border-soft); }
+[data-theme="dark"] .booking-bar { background: rgba(17,25,26,0.75); border-color: var(--border-soft); }
 .search-bar:focus-within { box-shadow: var(--shadow-glow); }
+.booking-bar:focus-within { box-shadow: var(--shadow-glow); }
 .search-seg { position: relative; padding: 0.75rem 1.25rem; display: flex; flex-direction: column; justify-content: center; min-width: 140px; }
 .search-seg:not(:last-child)::after { content: ""; position: absolute; top: 12%; right: 0; height: 76%; width: 1px; background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.12), transparent); }
 [data-theme="dark"] .search-seg:not(:last-child)::after { background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.15), transparent); }
@@ -408,6 +459,71 @@ input, textarea { color: inherit; }
 [data-theme="dark"] .search-go { background: var(--brand-500); color: #042c28; }
 [data-theme="dark"] .search-go:hover { background: var(--brand-400); }
 [data-theme="dark"] .search-go-text { color: #042c28; }
+
+/* Booking button for single property */
+.booking-button {
+  background: var(--brand-700);
+  color: var(--fg-inverse);
+  border: none;
+  font-size: 0.875rem;
+  padding: 0.875rem 1.25rem;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  min-width: 140px;
+  box-shadow: 0 4px 14px -4px rgba(0,0,0,0.25);
+  transition: all var(--transition-fast);
+  margin: 4px;
+}
+
+.booking-button:hover:not(:disabled) {
+  background: var(--brand-800);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px -4px rgba(0,0,0,0.35);
+}
+
+.booking-button:active {
+  transform: translateY(0);
+}
+
+.booking-button:disabled {
+  background: var(--fg-muted);
+  color: rgba(255,255,255,0.7);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.booking-button.ready {
+  background: var(--accent-500);
+  box-shadow: 0 6px 20px -4px rgba(200,108,81,0.4);
+}
+
+.booking-button.ready:hover {
+  background: var(--accent-400);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -4px rgba(200,108,81,0.5);
+}
+
+[data-theme="dark"] .booking-button {
+  background: var(--brand-400);
+  color: #042c28;
+}
+
+[data-theme="dark"] .booking-button:hover:not(:disabled) {
+  background: var(--brand-300);
+}
+
+[data-theme="dark"] .booking-button.ready {
+  background: var(--accent-400);
+  color: white;
+}
+
+[data-theme="dark"] .booking-button.ready:hover {
+  background: var(--accent-300);
+}
 
 /* Horizontal scroll chips */
 .h-scroll { display: flex; gap: .75rem; overflow-x: auto; padding-bottom: .5rem; scrollbar-width: none; -ms-overflow-style: none; }
@@ -446,9 +562,220 @@ input, textarea { color: inherit; }
 /* Hit target utility */
 .hit-target { min-width:44px; min-height:44px; display:inline-flex; align-items:center; justify-content:center; }
 
+/* React Day Picker Custom Styles */
+.custom-day-picker {
+  --rdp-accent-color: var(--brand-600);
+  --rdp-background-color: var(--brand-100);
+}
+
+.custom-day-picker .rdp-months {
+  gap: 2rem;
+}
+
+.custom-day-picker .rdp-day {
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  font-size: 0.875rem;
+  min-width: 2.5rem;
+  height: 2.5rem;
+}
+
+.custom-day-picker .rdp-day:hover:not([disabled]) {
+  background-color: var(--brand-50);
+  color: var(--brand-800);
+}
+
+.custom-day-picker .rdp-day_selected {
+  background-color: var(--brand-600) !important;
+  color: white !important;
+  font-weight: 600;
+}
+
+.custom-day-picker .rdp-day_range_middle {
+  background-color: var(--brand-100) !important;
+  color: var(--brand-900) !important;
+}
+
+.custom-day-picker .rdp-day_today:not(.rdp-day_selected) {
+  background-color: var(--layer-surface-alt);
+  font-weight: 600;
+  border: 1px solid var(--brand-300);
+}
+
+.custom-day-picker .rdp-day[disabled] {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.custom-day-picker .rdp-caption_label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-accent);
+}
+
+.custom-day-picker .rdp-nav_button {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 6px;
+  transition: background-color 0.15s ease;
+}
+
+.custom-day-picker .rdp-nav_button:hover {
+  background-color: var(--brand-100);
+}
+
+/* Dark theme overrides */
+[data-theme="dark"] .custom-day-picker {
+  --rdp-accent-color: var(--brand-400);
+  --rdp-background-color: var(--brand-900);
+}
+
+[data-theme="dark"] .custom-day-picker .rdp-day_selected {
+  background-color: var(--brand-400) !important;
+  color: var(--brand-900) !important;
+}
+
+[data-theme="dark"] .custom-day-picker .rdp-day_range_middle {
+  background-color: var(--brand-800) !important;
+  color: var(--brand-200) !important;
+}
+
+[data-theme="dark"] .custom-day-picker .rdp-day:hover:not([disabled]) {
+  background-color: var(--brand-900);
+  color: var(--brand-200);
+}
+
 @media (max-width: 640px) {
   .search-seg { min-width: 110px; padding: 0.6rem 0.9rem; }
   .search-bar { font-size: 0.875rem; }
   .search-value { font-size: 0.75rem; }
   .search-go { padding: 0.6rem .9rem; }
+  
+  /* Mobile date picker adjustments */
+  .custom-day-picker .rdp-day {
+    min-width: 2.75rem;
+    height: 2.75rem;
+  }
+  
+  .custom-day-picker .rdp-months {
+    gap: 1rem;
+  }
+}
+
+/* Mapbox overrides to match theme */
+.mapboxgl-map {
+  font-family: var(--font-sans);
+}
+
+.mapboxgl-popup {
+  max-width: 320px;
+}
+
+.mapboxgl-popup-content {
+  padding: 0;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+}
+
+.mapboxgl-popup-close-button {
+  font-size: 18px;
+  color: var(--fg-muted);
+  background: transparent;
+  border: none;
+  padding: 8px;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mapboxgl-popup-close-button:hover {
+  background: var(--layer-surface-alt);
+  color: var(--fg-default);
+}
+
+.mapboxgl-ctrl-group {
+  background: white;
+  border-radius: 8px;
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-sm);
+}
+
+.mapboxgl-ctrl-zoom-in,
+.mapboxgl-ctrl-zoom-out {
+  color: var(--text-accent);
+  background: white;
+  border: none;
+}
+
+.mapboxgl-ctrl-zoom-in:hover,
+.mapboxgl-ctrl-zoom-out:hover {
+  background: var(--layer-surface-alt);
+}
+
+[data-theme="dark"] .mapboxgl-ctrl-group {
+  background: var(--layer-surface);
+  border-color: var(--border-soft);
+}
+
+[data-theme="dark"] .mapboxgl-ctrl-zoom-in,
+[data-theme="dark"] .mapboxgl-ctrl-zoom-out {
+  background: var(--layer-surface);
+  color: var(--text-accent);
+}
+
+[data-theme="dark"] .mapboxgl-ctrl-zoom-in:hover,
+[data-theme="dark"] .mapboxgl-ctrl-zoom-out:hover {
+  background: var(--layer-surface-alt);
+}
+
+/* Utility classes for line clamping */
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-4 {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-5 {
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-6 {
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }

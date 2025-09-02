@@ -1,6 +1,7 @@
 "use client";
 import { useEffect } from 'react';
 import { internalFetch } from '@/lib/internalFetchClient';
+import { logger } from '@/lib/logger';
 
 /**
  * DataWarmup triggers an initial fetch of core JSON endpoints so the service worker
@@ -18,16 +19,16 @@ export default function DataWarmup() {
         const cats = Array.isArray(json?.categories) ? json.categories : [];
         // Opportunistically fetch each category list (first 3 to limit overhead)
         await Promise.all(
-          (cats as CategoryLite[]).slice(0,3).map((c) => internalFetch(`/api/categories/${c.id}/items`, { headers: { accept: 'application/json' }, cache: 'no-store' }).catch(()=>{}))
+          (cats as CategoryLite[]).slice(0,3).map((c) => internalFetch(`/api/categories/${c.id}/items`, { headers: { accept: 'application/json' }, cache: 'no-store' }).catch((err)=>{ logger.warn('Warmup category list failed', err); }))
         );
         // Schedule deeper warmup (remaining lists + item details) after first user interaction & idle.
         setupDeepWarmup(cats as CategoryLite[]);
-      } catch {}
+      } catch (err) { logger.error('DataWarmup initial fetch failed', err); }
     };
     const schedule = (cb: () => void) => {
       try {
-        // @ts-expect-error requestIdleCallback optional
-        (window.requestIdleCallback || setTimeout)(cb, 400);
+        const w = window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number };
+        if (typeof w.requestIdleCallback === 'function') w.requestIdleCallback(cb, { timeout: 400 }); else setTimeout(cb, 400);
       } catch { setTimeout(cb, 400); }
     };
     schedule(run);
@@ -52,14 +53,14 @@ function setupDeepWarmup(cats: { id: string }[]) {
             // Skip first 2 (already prewarmed by SW) and limit additional detail fetches
             for (const item of items.slice(2, 12)) {
               if (!item?.slug) continue;
-              internalFetch(`/api/categories/${c.id}/items/${item.slug}`, { headers: { accept: 'application/json' }, cache: 'no-store' }).catch(()=>{});
+              internalFetch(`/api/categories/${c.id}/items/${item.slug}`, { headers: { accept: 'application/json' }, cache: 'no-store' }).catch((err)=>{ logger.warn('Warmup item detail failed', err); });
             }
           }
-        } catch {}
+        } catch (err) { logger.error('DataWarmup deep fetch failed', err); }
       };
       try {
-        // @ts-expect-error requestIdleCallback may not exist in all TS lib targets
-  (self.requestIdleCallback || setTimeout)(doWork, 1500);
+        const g = self as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number };
+        if (typeof g.requestIdleCallback === 'function') g.requestIdleCallback(doWork, { timeout: 1500 }); else setTimeout(doWork, 1500);
       } catch { setTimeout(doWork, 1500); }
       detach();
     };

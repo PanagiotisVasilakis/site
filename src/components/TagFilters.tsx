@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo, useCallback } from 'react';
 
 interface Props {
   items: Array<{ tags?: string[] }>;
@@ -7,7 +7,7 @@ interface Props {
   onChange?: (tags: string[]) => void;
 }
 
-export function TagFilters({ items, active: controlledActive, onChange }: Props) {
+function TagFiltersComponent({ items, active: controlledActive, onChange }: Props) {
   const all = useMemo(() => {
     const s = new Set<string>();
     items.forEach(i => i.tags?.forEach(t => s.add(t)));
@@ -15,20 +15,20 @@ export function TagFilters({ items, active: controlledActive, onChange }: Props)
   }, [items]);
   const [uncontrolled, setUncontrolled] = useState<string[]>([]);
   const active = controlledActive ?? uncontrolled;
-  const setActive = (val: (prev: string[]) => string[]) => {
+  const setActive = useCallback((val: (prev: string[]) => string[]) => {
     if (controlledActive != null && onChange) {
       onChange(val(active));
     } else {
       setUncontrolled(val(active));
       onChange?.(val(active));
     }
-  };
-  const toggle = (tag: string) => {
+  }, [active, controlledActive, onChange]);
+  const toggle = useCallback((tag: string) => {
     setActive(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
-  };
-  const clearAll = () => {
+  }, [setActive]);
+  const clearAll = useCallback(() => {
     setActive(() => []);
-  };
+  }, [setActive]);
   if (all.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-2 mb-4">
@@ -53,3 +53,4 @@ export function TagFilters({ items, active: controlledActive, onChange }: Props)
     </div>
   );
 }
+export const TagFilters = memo(TagFiltersComponent);

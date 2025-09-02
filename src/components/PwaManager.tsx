@@ -1,5 +1,6 @@
 "use client";
 import { useEffect } from 'react';
+import { logger } from '@/lib/logger';
 
 export default function PwaManager() {
   useEffect(() => {
@@ -12,7 +13,7 @@ export default function PwaManager() {
         }
         return;
       }
-    try { document.documentElement.lang = document.documentElement.getAttribute('lang') || 'en'; } catch {}
+    try { document.documentElement.lang = document.documentElement.getAttribute('lang') || 'en'; } catch (err) { logger.warn('Set document lang failed', err); }
     // SW registration & update banner
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', async () => {
@@ -37,7 +38,7 @@ export default function PwaManager() {
                 if (nw.state === 'installed' && navigator.serviceWorker.controller) showBanner();
               });
             });
-        } catch {}
+        } catch (err) { logger.error('Service worker registration failed', err); }
       });
     }
     // iOS A2HS tip
@@ -59,7 +60,7 @@ export default function PwaManager() {
         if (reg?.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
         if (newV) localStorage.setItem('app-version', newV);
         if (newHash) localStorage.setItem('app-precache-hash', newHash);
-      } catch {}
+      } catch (err) { logger.error('Update reload handler failed', err); }
       window.location.reload();
     });
     const dismiss = document.getElementById('update-dismiss-btn');
@@ -146,7 +147,7 @@ export default function PwaManager() {
         await reg?.update();
   // Ask SW to refresh precache opportunistically
   reg?.active?.postMessage({ type: 'BG_SYNC_TRIGGER' });
-      } catch {}
+      } catch (err) { logger.error('Manual update check failed', err); }
     });
   }, []);
   return null;

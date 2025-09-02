@@ -2,6 +2,7 @@
 import { useFavorites } from '@/lib/favorites';
 import { useToast } from '@/components/Toast';
 import Image from 'next/image';
+import { memo, useCallback, useMemo } from 'react';
 
 interface ListingCardProps {
   id: string;
@@ -18,14 +19,18 @@ interface ListingCardProps {
   favLabelRemove?: string;
 }
 
-export default function ListingCard({ id, title, subtitle, image, rating, price, href = '#', icon, footer, favoriteId, favLabelAdd = 'Add to favorites', favLabelRemove = 'Remove from favorites' }: ListingCardProps) {
+function ListingCardComponent({ id, title, subtitle, image, rating, price, href = '#', icon, footer, favoriteId, favLabelAdd = 'Add to favorites', favLabelRemove = 'Remove from favorites' }: ListingCardProps) {
   const fid = favoriteId || id;
   const { isFavorite, toggle } = useFavorites();
   const { push } = useToast();
   const wish = isFavorite(fid);
-  const toggleLocal = () => { const before = isFavorite(fid); toggle(fid); if (!before) push('Added to favorites'); else push('Removed from favorites'); };
+  const toggleLocal = useCallback(() => { const before = isFavorite(fid); toggle(fid); if (!before) push('Added to favorites'); else push('Removed from favorites'); }, [fid, isFavorite, toggle, push]);
+  const aria = useMemo(() => ({
+    labelledby: `title-${id}`,
+    describedby: `desc-${id}`
+  }), [id]);
   return (
-    <a href={href} className="listing-card group" data-id={id}>
+    <a href={href} className="listing-card group" data-id={id} aria-labelledby={aria.labelledby} aria-describedby={aria.describedby}> 
       <div className="relative">
         {image ? (
           <Image src={image} alt="" width={600} height={400} className="w-full h-auto" />
@@ -40,14 +45,14 @@ export default function ListingCard({ id, title, subtitle, image, rating, price,
       </div>
       <div className="listing-info">
         <div className="flex items-start justify-between gap-3">
-          <h3 className="font-medium text-[0.84rem] leading-snug line-clamp-2 flex-1">{title}</h3>
+          <h3 id={`title-${id}`} className="font-medium text-[0.84rem] leading-snug line-clamp-2 flex-1">{title}</h3>
           {rating && (
             <div className="text-[0.7rem] font-semibold flex items-center gap-1">
               <span aria-hidden>⭐</span>{rating.toFixed(1)}
             </div>
           )}
         </div>
-  {subtitle && <p className="text-[0.68rem] text-small-strong line-clamp-2" style={{fontWeight:500}}>{subtitle}</p>}
+  {subtitle && <p id={`desc-${id}`} className="text-[0.68rem] text-small-strong line-clamp-2" style={{fontWeight:500}}>{subtitle}</p>}
         <div className="mt-1 text-[0.7rem] font-medium opacity-80 flex items-center gap-2">
           {price && <span>{price}</span>}
           {footer && <span className="ml-auto truncate max-w-[8rem] opacity-60">{footer}</span>}
@@ -56,3 +61,4 @@ export default function ListingCard({ id, title, subtitle, image, rating, price,
     </a>
   );
 }
+export default memo(ListingCardComponent);

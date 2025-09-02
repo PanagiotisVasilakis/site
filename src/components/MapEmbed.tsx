@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 
 type Props = {
   lat?: number;
@@ -27,8 +28,15 @@ export default function MapEmbed({ lat, lng, name, mapsHref }: Props) {
     <div className="mt-4">
   <div className="relative rounded-md overflow-hidden border-soft bg-slate-100 aspect-[2/1] flex items-center justify-center">
         {online ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={staticUrl} alt={`Map for ${name}`} className="object-cover w-full h-full" loading="lazy" />
+          <Image 
+            src={staticUrl} 
+            alt={`Map for ${name}`} 
+            fill 
+            sizes="(max-width: 768px) 100vw, 600px" 
+            className="object-cover"
+            loading="lazy"
+            unoptimized
+          />
         ) : (
           <div className="text-xs p-4 text-center text-brand-800">Map unavailable offline</div>
         )}

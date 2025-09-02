@@ -2,6 +2,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import type { HousePhoto } from '@/data/housePhotos';
+import { logger } from '@/lib/logger';
 
 type AltMap = { living: string; bedroom: string; kitchen: string } | undefined;
 interface PhotoWithAlt extends HousePhoto { altKey: 'bedroom'|'kitchen'|'living'; }
@@ -46,7 +47,7 @@ export default function HouseGalleryLightbox({ photos, alts, springPreset='mediu
     try { 
       const nav = navigator as Navigator & { vibrate?: (p:number|number[])=>boolean };
       if(typeof nav.vibrate === 'function') nav.vibrate(pattern);
-    } catch { /* ignore */ }
+    } catch (err) { logger.warn('Haptics vibrate failed', err); }
   };
   // Core gesture refs
   const startX=useRef<number|null>(null); const startY=useRef<number|null>(null);
@@ -112,12 +113,12 @@ export default function HouseGalleryLightbox({ photos, alts, springPreset='mediu
     // remove fadeFrom after animation
     setTimeout(()=>{ setFadeFrom(f=> f===index? null:f); },320);
   },[index,total]);
-  const hide=useCallback(()=>{ setOpen(false); try{ localStorage.setItem('houseGalleryLastIndex',String(index)); }catch{} },[index]);
+  const hide=useCallback(()=>{ setOpen(false); try{ localStorage.setItem('houseGalleryLastIndex',String(index)); }catch(err){ logger.warn('Persist last gallery index failed', err); } },[index]);
   const next=useCallback(()=>{ if(scale.current>1.05) zoomedNavigate(1); else show(index+1); },[index,show,zoomedNavigate]);
   const prevRef=useRef<(()=>void)|null>(null); prevRef.current=()=>{ if(scale.current>1.05) zoomedNavigate(-1); else show(index-1); };
   // External trigger
   // On mount, restore last index
-  useEffect(()=>{ if(typeof window!=='undefined'){ try{ const v=localStorage.getItem('houseGalleryLastIndex'); if(v!=null){ const n=parseInt(v,10); if(!Number.isNaN(n)) { lastPersistedIndex.current=n; setIndex(n); } } }catch{} } },[]);
+  useEffect(()=>{ if(typeof window!=='undefined'){ try{ const v=localStorage.getItem('houseGalleryLastIndex'); if(v!=null){ const n=parseInt(v,10); if(!Number.isNaN(n)) { lastPersistedIndex.current=n; setIndex(n); } } }catch(err){ logger.warn('Read last gallery index failed', err); } } },[]);
   useEffect(()=>{ const handler=(e:Event)=>{ const detail=(e as CustomEvent).detail; if(detail==null || Number.isNaN(detail)) show(lastPersistedIndex.current); else show(detail); }; window.addEventListener('open-house-lightbox',handler as EventListener); return ()=> window.removeEventListener('open-house-lightbox',handler as EventListener);},[show]);
   // Keyboard nav
   useEffect(()=>{ if(!open) return; const onKey=(e:KeyboardEvent)=>{ if(e.key==='Escape') hide(); else if(e.key==='ArrowRight') next(); else if(e.key==='ArrowLeft') prevRef.current?.(); }; window.addEventListener('keydown',onKey); return ()=> window.removeEventListener('keydown',onKey); },[open,hide,next]);

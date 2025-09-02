@@ -5,12 +5,13 @@ import { addHits, getHits } from '@/lib/analyticsStore';
 const recentByIp: Record<string, number[]> = {};
 let lastPersist = 0;
 import fs from 'node:fs';
+import { logger } from '@/lib/logger';
 function persistRateLimit() {
   if (process.env.ANALYTICS_PERSIST !== '1') return;
   const now = Date.now();
   if (now - lastPersist < 30_000) return; // throttle
   lastPersist = now;
-  try { fs.writeFileSync(process.cwd() + '/analytics-ratelimit.json', JSON.stringify(recentByIp)); } catch {}
+  try { fs.writeFileSync(process.cwd() + '/analytics-ratelimit.json', JSON.stringify(recentByIp)); } catch (err) { logger.error('Persist ratelimit failed', err); }
 }
 function loadRateLimit() {
   if (process.env.ANALYTICS_PERSIST !== '1') return;
@@ -25,7 +26,7 @@ function loadRateLimit() {
         }
       }
     }
-  } catch {}
+  } catch (err) { logger.error('Load ratelimit failed', err); }
 }
 loadRateLimit();
 const WINDOW_MS = 60_000; // 1 minute
@@ -45,12 +46,24 @@ export async function POST(req: NextRequest) {
     let parsed: unknown;
     try { parsed = JSON.parse(body); } catch { return new Response('bad json', { status: 400 }); }
     const arr = Array.isArray(parsed) ? parsed : [parsed];
-    const normalized = arr.filter(d => d && typeof d.path === 'string').map(d => ({ path: d.path, ts: typeof d.ts === 'number' ? d.ts : Date.now(), locale: d.locale }));
+    const normalized = arr
+      .filter(d => d && typeof (d as { path?: unknown }).path === 'string')
+      .map(d => {
+        const rec = d as { path: string; ts?: unknown; locale?: unknown; event?: { name?: unknown; props?: unknown } };
+        return {
+          path: rec.path,
+          ts: typeof rec.ts === 'number' ? rec.ts : Date.now(),
+          locale: typeof rec.locale === 'string' ? rec.locale : undefined,
+          // events are accepted but not persisted to hits; could extend store later
+          event: (rec.event && typeof rec.event === 'object' && typeof rec.event.name === 'string') ? { name: rec.event.name, props: rec.event.props } : undefined,
+        };
+      });
   const accepted = addHits(normalized, ua);
   for (let i = 0; i < accepted; i++) arrTimes.push(now);
   persistRateLimit();
     return new Response(JSON.stringify({ accepted }), { status: 201, headers: { 'content-type': 'application/json' } });
-  } catch {
+  } catch (err) {
+    logger.error('Analytics POST failed', err);
     return new Response('error', { status: 500 });
   }
 }

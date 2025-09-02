@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { locales, type Locale } from "@/i18n/config";
-import { Geist, Geist_Mono } from "next/font/google";
+// Removed Google font imports (Geist) to prevent build-time external fetch failures.
 import "../globals.css";
 import { getDictionary } from "@/i18n/dictionaries";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
@@ -11,8 +11,7 @@ import Analytics from "@/components/Analytics";
 import ThemeToggle from "@/components/ThemeToggle";
 import JsonFetchHud from "@/components/JsonFetchHud";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+// Removed font variable placeholders.
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
@@ -38,7 +37,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : "en";
   const t = getDictionary(eff);
   return (
-  <div className={`${geistSans.variable} ${geistMono.variable}`} data-locale={eff}>
+  <div data-locale={eff}>
   <a href="#main-content" className="skip-link">{t.skipLink || 'Skip to content'}</a>
       <ToastProvider>
       <PwaManager />
