@@ -4,6 +4,8 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { logger } from '@/lib/logger';
 import StaticLocationMap from './StaticLocationMap';
+import dynamic from 'next/dynamic';
+const LeafletMap = dynamic(() => import('./LeafletMap'), { ssr: false });
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
 
@@ -209,14 +211,19 @@ export default function InteractiveMap({
 
   // If token not configured, show helpful fallback
   if (error === 'Mapbox token not configured') {
+    // Use free OpenStreetMap + Leaflet fallback first; keep old static as noscript support.
     return (
-      <StaticLocationMap 
-        height={height}
-        className={className}
-        title="Villa Location & Nearby Attractions"
-        locale={locale}
-        showHeading={false}
-      />
+      <div className={className} style={{ height }}>
+        <LeafletMap 
+          center={center}
+          zoom={zoom}
+          height={height}
+          markers={markers.map(m => ({ id: m.id, name: m.name, description: m.description, coordinates: m.coordinates, price: m.price }))}
+        />
+        <noscript>
+          <StaticLocationMap height={height} className="mt-4" title="Villa Location" locale={locale} showHeading={false} />
+        </noscript>
+      </div>
     );
   }
 

@@ -2,7 +2,7 @@
 import '@testing-library/jest-dom';
 
 declare module 'vitest' {
-  interface Assertion<T = any> {
+  interface Assertion {
     toBeInTheDocument(): void;
     toHaveTextContent(text: string | RegExp, options?: { normalizeWhitespace?: boolean }): void;
   }
@@ -10,5 +10,5 @@ declare module 'vitest' {
 
 // Fallback ambient declarations in case editor doesn't pick up vitest globals
 declare const describe: (name: string, fn: () => void) => void;
-declare const it: (name: string, fn: () => any) => void;
-declare const expect: (value: any) => any;
+declare const it: (name: string, fn: () => unknown) => void;
+declare const expect: (value: unknown) => unknown;

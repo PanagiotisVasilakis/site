@@ -156,7 +156,7 @@ export default function BookingForm({ dateRange, guests, total, locale, submissi
           </div>
         </div>
         <div className="flex gap-3 justify-center">
-          <Link href={`/${locale}/house`} className="btn-outline">
+          <Link href={`/${locale}/villa`} className="btn-outline">
             View property details
           </Link>
           <Link href={`/${locale}`} className="btn-primary">

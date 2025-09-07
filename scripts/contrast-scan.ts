@@ -79,8 +79,7 @@ async function main() {
   for (const p of paths) {
     try {
       const u = base + p;
-      // eslint-disable-next-line no-console
-      console.log('Scanning', u);
+  console.log('Scanning', u);
       const issues = await scan(u);
       all.push(...issues);
     } catch (e) {

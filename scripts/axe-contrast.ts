@@ -8,17 +8,15 @@ import puppeteer from 'puppeteer';
 import fs from 'node:fs';
 import path from 'node:path';
 import inlineCss from './inlineCss';
-import url from 'node:url';
 
 // Dynamically load axe-core script text
 import axePkg from 'axe-core';
-// @ts-ignore - axe.min.js path exposed via package exports fallback
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const axeSource: string = (axePkg as any).source || fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
+// axe-core ESM export doesn't type .source; cast carefully.
+const axeSource: string = (axePkg as unknown as { source?: string }).source || fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 
 const BASE = process.env.AXE_BASE || 'http://localhost:3000';
 // Expanded default PATHS for broader coverage; can override via AXE_PATHS env.
-const PATHS = (process.env.AXE_PATHS || '/en,/en/house,/en/favorites,/en/offline,/en/phones,/en/phones/police-emergency').split(',');
+const PATHS = (process.env.AXE_PATHS || '/en,/en/villa,/en/favorites,/en/offline,/en/phones,/en/phones/police-emergency').split(',');
 // Allow static fallback using prerendered HTML in .next if network fetch fails (useful in locked CI sandboxes)
 const STATIC_DIR = process.env.AXE_STATIC_DIR || '.next/server/app';
 
@@ -40,7 +38,6 @@ process.on('uncaughtException', (err) => {
   const errors: { url: string; error: string }[] = [];
   for (const p of PATHS) {
     const target = BASE + p;
-    // eslint-disable-next-line no-console
     console.log(`Auditing ${target}`);
     let navigated = false;
     try {
@@ -88,7 +85,7 @@ process.on('uncaughtException', (err) => {
     console.log('[axe-contrast] axe injected, running...');
     // Run axe restricted to color-contrast to keep runtime minimal
     const result = await page.evaluate(async () => {
-      // @ts-ignore
+      // @ts-expect-error axe injected globally by script tag
       return await axe.run(document, { runOnly: ['color-contrast'] });
     });
     console.log(`[axe-contrast] rule count: ${result.violations?.length ?? 0}`);
@@ -122,7 +119,7 @@ process.on('uncaughtException', (err) => {
   console.log(`[axe-contrast] total issues: ${findings.length}`);
   if (findings.length) {
     console.log('\nContrast violations summary:');
-    findings.forEach(f => console.log(`- ${f.url} (${f.nodes} nodes) ${f.help}`));
+  findings.forEach(f => console.log(`- ${f.url} (${f.nodes} nodes) ${f.help}`));
     process.exitCode = 1;
   } else {
     console.log('No axe color-contrast violations on scanned paths.');

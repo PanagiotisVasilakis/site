@@ -42,9 +42,9 @@ export default function ThemeToggle() {
       aria-label={label}
       suppressHydrationWarning
       onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-  className="theme-toggle"
+  className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-black/10 hover:bg-black/20 text-slate-800 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/70 dark:text-white text-sm leading-none transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60 dark:focus-visible:ring-brand-400/50"
     >
-      <span aria-hidden suppressHydrationWarning>{icon}</span>
+      <span aria-hidden suppressHydrationWarning className="select-none">{icon}</span>
     </button>
   );
 }

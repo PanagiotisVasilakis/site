@@ -8,13 +8,12 @@ import fs from 'node:fs';
 import inlineCss from './inlineCss';
 
 // Load axe source
-// @ts-ignore
 import axePkg from 'axe-core';
-// @ts-ignore
-const axeSource: string = (axePkg as any).source || fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
+// axe-core types don't surface .source in ESM import; cast cautiously.
+const axeSource: string = (axePkg as unknown as { source?: string }).source || fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 
 const BASE = process.env.AXE_BASE || 'http://localhost:3000';
-const PATHS = (process.env.AXE_PATHS || '/en,/en/house,/en/favorites,/en/offline,/en/phones,/en/phones/police-emergency').split(',');
+const PATHS = (process.env.AXE_PATHS || '/en,/en/villa,/en/favorites,/en/offline,/en/phones,/en/phones/police-emergency').split(',');
 const STATIC_DIR = process.env.AXE_STATIC_DIR || '.next/server/app';
 
 interface ViolationSummary { id: string; impact: string | null; help: string; nodes: number; url: string; }
@@ -74,7 +73,7 @@ process.on('uncaughtException', (err) => {
     await page.addScriptTag({ content: axeSource });
     console.log('[axe-a11y] axe injected, running...');
     const result = await page.evaluate(async () => {
-      // @ts-ignore
+      // @ts-expect-error axe injected globally at runtime
       return await axe.run();
     });
     console.log(`[axe-a11y] violations found: ${result.violations.length}`);

@@ -2,13 +2,15 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import type { HousePhoto } from '@/data/housePhotos';
+// Single tiny transparent blur placeholder (2x2 white-ish jpeg) to provide consistent shimmer
+const GENERIC_BLUR = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDABALDA4MChAODQ4SERATGCgaGBYWGh4iJiQiJi4qOjY2OjY2OjY2OjY2OjY2OjY2OjY2OjY2OjY2OjY2OjY2OjY2OjY2/2wBDARESEh4aJiYaJiY2OjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2/3QAEAAP/2gAMAwEAAhEDEQA/AMf/AP/Z';
 import { logger } from '@/lib/logger';
 
 type AltMap = { living: string; bedroom: string; kitchen: string } | undefined;
 interface PhotoWithAlt extends HousePhoto { altKey: 'bedroom'|'kitchen'|'living'; }
 interface Props { photos: PhotoWithAlt[]; alts: AltMap; springPreset?: 'gentle'|'medium'|'snappy'; enableHaptics?: boolean; }
 
-export default function HouseGalleryLightbox({ photos, alts, springPreset='medium', enableHaptics=true }: Props) {
+export default function VillaGalleryLightbox({ photos, alts, springPreset='medium', enableHaptics=true }: Props) {
   // Configurable constants grouped
   const CONFIG = {
     MAX_SCALE: 4,
@@ -119,7 +121,7 @@ export default function HouseGalleryLightbox({ photos, alts, springPreset='mediu
   // External trigger
   // On mount, restore last index
   useEffect(()=>{ if(typeof window!=='undefined'){ try{ const v=localStorage.getItem('houseGalleryLastIndex'); if(v!=null){ const n=parseInt(v,10); if(!Number.isNaN(n)) { lastPersistedIndex.current=n; setIndex(n); } } }catch(err){ logger.warn('Read last gallery index failed', err); } } },[]);
-  useEffect(()=>{ const handler=(e:Event)=>{ const detail=(e as CustomEvent).detail; if(detail==null || Number.isNaN(detail)) show(lastPersistedIndex.current); else show(detail); }; window.addEventListener('open-house-lightbox',handler as EventListener); return ()=> window.removeEventListener('open-house-lightbox',handler as EventListener);},[show]);
+  useEffect(()=>{ const handler=(e:Event)=>{ const detail=(e as CustomEvent).detail; if(detail==null || Number.isNaN(detail)) show(lastPersistedIndex.current); else show(detail); }; window.addEventListener('open-villa-lightbox',handler as EventListener); return ()=> window.removeEventListener('open-villa-lightbox',handler as EventListener);},[show]);
   // Keyboard nav
   useEffect(()=>{ if(!open) return; const onKey=(e:KeyboardEvent)=>{ if(e.key==='Escape') hide(); else if(e.key==='ArrowRight') next(); else if(e.key==='ArrowLeft') prevRef.current?.(); }; window.addEventListener('keydown',onKey); return ()=> window.removeEventListener('keydown',onKey); },[open,hide,next]);
   // Focus trap
@@ -284,13 +286,17 @@ export default function HouseGalleryLightbox({ photos, alts, springPreset='mediu
       <div ref={sliderRef} className="flex h-full w-full will-change-transform" style={{transition:'none'}}>
         {photos.map((p,i)=>{ const alt=(alts && alts[p.altKey])||p.altKey; const active=i===index; const fadingOut=fadeFrom===i && fadeFrom!==index; return (
           <div key={p.src} className="w-full h-full flex-shrink-0 flex justify-center items-start transition-transform duration-150" ref={el=>{ if(active) activeWrapperRef.current=el; }}>
-            <Image src={p.src} alt={alt} width={p.width} height={p.height} placeholder="blur" blurDataURL={p.blurDataURL} sizes="100vw" className={`object-contain max-w-full max-h-full select-none ${active? '':'pointer-events-none'} ${(scale.current>1.05 && active)? 'opacity-0':''} ${(scale.current>1.05 && fadingOut)? 'opacity-0':''}`} ref={el=>{ if(active){ currentImgRef.current=el; applyTransform(); } }} priority={active} />
+            <div className={`relative w-full h-full flex items-start justify-center ${active? '':'pointer-events-none'}`}>
+              <Image src={p.src} alt={alt} fill sizes="100vw" placeholder="blur" blurDataURL={GENERIC_BLUR} className={`object-contain select-none ${ (scale.current>1.05 && active)? 'opacity-0':''} ${(scale.current>1.05 && fadingOut)? 'opacity-0':''}`} ref={el=>{ if(active){ currentImgRef.current=el; applyTransform(); } }} priority={active} />
+            </div>
           </div>
         ); })}
         {fadeFrom!==null && scale.current>1.05 && photos[fadeFrom] && (
           <div className="absolute inset-0 flex justify-center items-start pointer-events-none">
-            <Image src={photos[index].src} alt="" width={photos[index].width} height={photos[index].height} placeholder="blur" blurDataURL={photos[index].blurDataURL} sizes="100vw" className="object-contain max-w-full max-h-full select-none opacity-100 transition-opacity duration-300" />
-            <Image src={photos[fadeFrom].src} alt="" width={photos[fadeFrom].width} height={photos[fadeFrom].height} placeholder="blur" blurDataURL={photos[fadeFrom].blurDataURL} sizes="100vw" className="object-contain max-w-full max-h-full select-none absolute opacity-0 transition-opacity duration-300" />
+            <div className="relative w-full h-full">
+              <Image src={photos[index].src} alt="" fill sizes="100vw" placeholder="blur" blurDataURL={GENERIC_BLUR} className="object-contain select-none opacity-100 transition-opacity duration-300" />
+              <Image src={photos[fadeFrom].src} alt="" fill sizes="100vw" placeholder="blur" blurDataURL={GENERIC_BLUR} className="object-contain select-none absolute inset-0 opacity-0 transition-opacity duration-300" />
+            </div>
           </div>
         )}
       </div>
@@ -305,6 +311,6 @@ export default function HouseGalleryLightbox({ photos, alts, springPreset='mediu
         <div className="absolute top-0 bottom-0 right-0 w-24 pointer-events-none bg-gradient-to-l from-white/10 to-transparent" style={{opacity:'var(--overscroll-right,0)'}} />
       </div>
     </div>
-    <div className="p-3 flex gap-1 overflow-x-auto" aria-label="Thumbnails">{photos.map((p,i)=>(<button key={p.src} onClick={()=>show(i)} className={`relative w-16 h-12 rounded overflow-hidden ring-2 ${i===index?'ring-white':'ring-transparent'} focus:outline-none focus:ring-white`} aria-label={`Show photo ${i+1}`}><Image src={p.src} alt="" width={p.width} height={p.height} className="object-cover w-full h-full" /></button>))}</div>
+  <div className="p-3 flex gap-1 overflow-x-auto" aria-label="Thumbnails">{photos.map((p,i)=>(<button key={p.src} onClick={()=>show(i)} className={`relative w-16 h-12 rounded overflow-hidden ring-2 ${i===index?'ring-white':'ring-transparent'} focus:outline-none focus:ring-white`} aria-label={`Show photo ${i+1}`}><span className="absolute inset-0"><Image src={p.src} alt="" fill sizes="64px" placeholder="blur" blurDataURL={GENERIC_BLUR} className="object-cover" /></span></button>))}</div>
   </div>)}</>);
 }

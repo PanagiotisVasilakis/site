@@ -34,7 +34,8 @@ const nextConfig: NextConfig = {
     // Mitigate intermittent ENOENT rename errors in Next.js filesystem webpack pack cache on macOS
     // by switching to in-memory cache during development.
     if (dev) {
-      config.cache = { type: 'memory' } as any;
+      // Narrow type: Next.js webpack config cache can be undefined | false | object; we set simple in-memory cache.
+      config.cache = { type: 'memory' } as { type: 'memory' };
     }
     return config;
   },

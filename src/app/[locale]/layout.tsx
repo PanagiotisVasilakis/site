@@ -3,13 +3,11 @@ import { locales, type Locale } from "@/i18n/config";
 // Removed Google font imports (Geist) to prevent build-time external fetch failures.
 import "../globals.css";
 import { getDictionary } from "@/i18n/dictionaries";
-import LocaleSwitcher from "@/components/LocaleSwitcher";
-import StatusCluster from "@/components/StatusCluster";
 import PwaManager from "@/components/PwaManager";
 import { ToastProvider } from "@/components/Toast";
 import Analytics from "@/components/Analytics";
-import ThemeToggle from "@/components/ThemeToggle";
 import JsonFetchHud from "@/components/JsonFetchHud";
+import TopControls from "@/components/TopControls";
 
 // Removed font variable placeholders.
 
@@ -43,29 +41,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
       <PwaManager />
       <Analytics />
   <JsonFetchHud />
-      <div className="border-b bg-white/70 backdrop-blur safe-top">
-        <header className="mx-auto max-w-3xl p-4 text-sm font-medium flex items-center justify-between" style={{ color: 'var(--text-accent)' }}>
-          <span>{t.appTitle} <small id="current-version" className="ml-1 text-[10px] font-normal" style={{ color: 'var(--text-accent-subtle)' }}></small></span>
-          <div className="flex items-center gap-3">
-            <StatusCluster
-              className="hidden sm:inline-flex"
-              labels={{
-                online: t.labels?.networkOnline || 'Online',
-                offline: t.labels?.networkOffline || 'Offline',
-                slow: t.labels?.networkSlow || 'Slow',
-                reconnecting: t.labels?.networkReconnected || 'Reconnected',
-                syncPending: t.labels?.syncPending || 'Sync pending',
-                syncIdle: t.labels?.syncIdle || 'Synced'
-              }}
-            />
-            <ThemeToggle />
-            <LocaleSwitcher />
-            <nav aria-label="Locale and install" className="flex items-center gap-2">
-              <button id="install-btn" className="hidden items-center gap-1 btn-outline btn-sm">Install</button>
-            </nav>
-          </div>
-        </header>
-      </div>
+  <TopControls locale={eff} appTitle={t.appTitle} />
       {/* Update banner: light surface uses dark brand text; buttons tinted; dismiss available */}
       <div
         id="update-banner"

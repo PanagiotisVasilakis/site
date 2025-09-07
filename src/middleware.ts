@@ -40,6 +40,15 @@ export function middleware(req: NextRequest) {
     return res;
   }
 
+  // Legacy /[locale]/house redirect to /[locale]/villa (permanent for clients/SEO)
+  if (/^\/[a-zA-Z-]+\/house(\/)?$/.test(pathname)) {
+    const segs = pathname.split('/');
+    const loc = segs[1];
+    const url2 = req.nextUrl.clone();
+    url2.pathname = `/${loc}/villa`;
+    return NextResponse.redirect(url2, 308);
+  }
+
   // When a locale is present in URL, ensure cookie matches it
   const current = pathname.split("/")[1] as string;
   if ((locales as readonly string[]).includes(current) && cookieLocale !== current) {

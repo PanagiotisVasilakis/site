@@ -23,9 +23,11 @@ async function main() {
     console.warn('[house-photos] no image files found, skipping');
     return;
   }
-  let size: any = null;
+  // image-size import can have multiple shapes; type as unknown then refine when used
+  let size: unknown = null;
   try { size = (await import('image-size')).default || (await import('image-size')); } catch {}
-  let sharp: any = null;
+  // sharp is optional; type as unknown
+  let sharp: unknown = null;
   try { sharp = (await import('sharp')).default || (await import('sharp')); } catch {
     console.warn('[house-photos] sharp not installed, using naive blur extraction (first bytes)');
   }
@@ -34,13 +36,25 @@ async function main() {
     const abs = path.join(HOUSE_DIR, f);
     const buf = fs.readFileSync(abs);
     let width = 0; let height = 0;
-    try { const dim = size?.imageSize ? size.imageSize(abs) : (size?.default ? size.default(abs) : size(abs)); width = dim.width; height = dim.height; } catch {}
+    try {
+  type Dim = { width: number; height: number };
+  type SizeFn = (p: string) => Dim;
+  type SizeModuleObj = { imageSize?: SizeFn; default?: SizeFn };
+  const sm = size as SizeFn | SizeModuleObj;
+      let dim: { width: number; height: number } | undefined;
+  if (typeof sm === 'function') dim = sm(abs);
+  else if (sm.imageSize) dim = sm.imageSize(abs);
+  else if (sm.default) dim = sm.default(abs);
+      if (dim && typeof dim.width === 'number' && typeof dim.height === 'number') { width = dim.width; height = dim.height; }
+    } catch {}
     let blur = '';
-    if (sharp) {
+  if (sharp) {
       try {
-        const mini = await sharp(buf).resize(24).jpeg({ quality: 40 }).toBuffer();
+  type SharpFn = (input: Buffer) => { resize: (w: number) => { jpeg: (opts: { quality: number }) => { toBuffer: () => Promise<Buffer> } } };
+  const maybeSharp = sharp as unknown as SharpFn;
+  const mini = await maybeSharp(buf).resize(24).jpeg({ quality: 40 }).toBuffer();
         blur = `data:image/jpeg;base64,${mini.toString('base64')}`;
-      } catch (e) {
+  } catch {
         blur = `data:image/jpeg;base64,${buf.slice(0,1200).toString('base64')}`;
       }
     } else {

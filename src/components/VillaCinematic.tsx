@@ -16,13 +16,11 @@ interface Props { locale: string; t: unknown; houseText: HouseText | undefined; 
 
 export default function VillaCinematic({ houseText, photos }: Props){
   const ht = houseText || {};
-  // Detect Greek content by characters present in intro (locale prop passed separately if needed)
   const introStr = typeof ht?.intro === 'string' ? ht.intro : '';
   const isGreek = /[Α-Ωα-ω]/.test(introStr);
   return (
     <div className="relative" style={{'--ink':'#1c1c20','--muted':'#6e727a','--border':'#e6e8ee'} as React.CSSProperties}>
-      {/* Hero */}
-      <section className="relative h-[90svh] md:h-[100svh] overflow-hidden" aria-label="House hero">
+      <section className="relative h-[90svh] md:h-[100svh] overflow-hidden" aria-label="Villa hero">
         <Image src={photos[0].src} alt={ht?.title || 'Hero'} fill priority fetchPriority="high" decoding="async" sizes="100vw" className="object-cover hero-ken-burns" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/35 to-black/15" aria-hidden="true" />
   <div className="absolute inset-x-0 top-0 flex h-full flex-col justify-center px-6 md:px-14 pt-20 md:pt-24 text-white max-w-5xl">
@@ -32,17 +30,16 @@ export default function VillaCinematic({ houseText, photos }: Props){
           <div className="mt-10 flex items-center gap-5 text-xs tracking-wide uppercase opacity-80">
             <span className="animate-pulse">Scroll ↓</span>
             <button className="btn-outline btn-sm bg-white/10 hover:bg-white/20" onClick={()=>{
-              const anchor=document.getElementById('house-content-start'); anchor?.scrollIntoView({behavior:'smooth'});
+              const anchor=document.getElementById('villa-content-start'); anchor?.scrollIntoView({behavior:'smooth'});
             }}>Skip intro</button>
           </div>
         </div>
         <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-b from-transparent to-white" aria-hidden="true" />
       </section>
-      <div id="house-content-start" className="relative bg-white text-[color:var(--ink)]">
+      <div id="villa-content-start" className="relative bg-white text-[color:var(--ink)]">
         <div className="h-10" aria-hidden="true" />
   <div className="mx-auto max-w-6xl px-6 md:px-14 py-14 lg:py-20 grid lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] gap-12">
           <div className="space-y-12">
-            {/* Narrative Sections */}
             {['Living Room','Kitchen','Bedroom','Deck'].map(key=>{
               const description = String(ht?.[`desc_${key.toLowerCase().replace(/\s+/g,'_')}`] || 'Well-proportioned space with daylight and material warmth emphasizing relaxation.');
               return (
@@ -54,7 +51,7 @@ export default function VillaCinematic({ houseText, photos }: Props){
                       className="mt-3"
                       expandText={isGreek ? 'Περισσότερα' : 'Read more'}
                       collapseText={isGreek ? 'Λιγότερα' : 'Read less'}
-                      disableClamp={isGreek} /* allow full Greek text to avoid mid-word clipping */
+                      disableClamp={isGreek}
                     >
                       <p className="text-[15px] leading-relaxed text-[color:var(--muted)]">
                         {description}
@@ -64,7 +61,6 @@ export default function VillaCinematic({ houseText, photos }: Props){
                 </article>
               );
             })}
-            {/* Specs & CTAs */}
             <section aria-label="Specifications and actions" className="space-y-6">
               <h2 className="text-2xl font-semibold">At a Glance</h2>
               <ul className="flex flex-wrap gap-2 text-sm">
@@ -77,7 +73,6 @@ export default function VillaCinematic({ houseText, photos }: Props){
             </section>
             <footer className="pt-20 text-xs text-[color:var(--muted)]">© Kalamata Apartment — 2-bedroom rental in historic Kalamata.</footer>
           </div>
-          {/* Right Rail */}
           <div className="relative space-y-12" role="region" aria-label="Photo gallery right rail">
             {photos.slice(0,4).map(p=> {
               const descMap: Record<string,string> = {
