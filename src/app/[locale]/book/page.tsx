@@ -76,7 +76,7 @@ export default async function BookingPage({
   return (
     // Allow global gradient background like home page (no local override)
     <div className="min-h-screen transition-colors">
-      <div className="mx-auto max-w-6xl p-6">
+  <div className="page-container mx-auto max-w-6xl">
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div>

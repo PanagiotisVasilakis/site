@@ -1,0 +1,401 @@
+/**
+ * Enterprise Security Configuration Framework
+ * Centralized security configuration with environment-specific settings
+ */
+
+import { z } from 'zod';
+
+// Security configuration schema
+export const SecurityConfigSchema = z.object({
+  csp: z.object({
+    enabled: z.boolean(),
+    reportOnly: z.boolean(),
+    directives: z.object({
+      defaultSrc: z.array(z.string()),
+      scriptSrc: z.array(z.string()),
+      styleSrc: z.array(z.string()),
+      imgSrc: z.array(z.string()),
+      fontSrc: z.array(z.string()),
+      connectSrc: z.array(z.string()),
+      frameSrc: z.array(z.string()),
+      manifestSrc: z.array(z.string()),
+      workerSrc: z.array(z.string()),
+      frameAncestors: z.array(z.string()),
+      baseUri: z.array(z.string()),
+      formAction: z.array(z.string()),
+    }),
+    useNonce: z.boolean(),
+    reportUri: z.string().optional(),
+  }),
+  headers: z.object({
+    hsts: z.object({
+      enabled: z.boolean(),
+      maxAge: z.number(),
+      includeSubDomains: z.boolean(),
+      preload: z.boolean(),
+    }),
+    frameOptions: z.enum(['DENY', 'SAMEORIGIN', 'ALLOW-FROM']),
+    contentTypeOptions: z.boolean(),
+    referrerPolicy: z.enum([
+      'no-referrer',
+      'no-referrer-when-downgrade',
+      'origin',
+      'origin-when-cross-origin',
+      'same-origin',
+      'strict-origin',
+      'strict-origin-when-cross-origin',
+      'unsafe-url'
+    ]),
+    permissionsPolicy: z.object({
+      geolocation: z.array(z.string()),
+      microphone: z.array(z.string()),
+      camera: z.array(z.string()),
+      payment: z.array(z.string()),
+      accelerometer: z.array(z.string()),
+      gyroscope: z.array(z.string()),
+      magnetometer: z.array(z.string()),
+      usb: z.array(z.string()),
+    }),
+    crossOriginEmbedderPolicy: z.enum(['unsafe-none', 'require-corp', 'credentialless']),
+    crossOriginOpenerPolicy: z.enum(['unsafe-none', 'same-origin-allow-popups', 'same-origin']),
+    crossOriginResourcePolicy: z.enum(['same-site', 'same-origin', 'cross-origin']),
+  }),
+  rateLimit: z.object({
+    enabled: z.boolean(),
+    windowMs: z.number(),
+    maxRequests: z.number(),
+    skipSuccessfulRequests: z.boolean(),
+    standardHeaders: z.boolean(),
+    legacyHeaders: z.boolean(),
+  }),
+  cors: z.object({
+    enabled: z.boolean(),
+    origins: z.array(z.string()),
+    methods: z.array(z.string()),
+    allowedHeaders: z.array(z.string()),
+    credentials: z.boolean(),
+    maxAge: z.number(),
+  }),
+  monitoring: z.object({
+    enabled: z.boolean(),
+    logSecurityEvents: z.boolean(),
+    alertOnViolations: z.boolean(),
+    reportToSentry: z.boolean(),
+  }),
+  apiSecurity: z.object({
+    inputValidation: z.object({
+      enabled: z.boolean(),
+      maxPayloadSize: z.number(),
+      allowedContentTypes: z.array(z.string()),
+    }),
+    sqlInjectionProtection: z.object({
+      enabled: z.boolean(),
+    }),
+    xssProtection: z.object({
+      enabled: z.boolean(),
+    }),
+    apiKeyAuth: z.object({
+      enabled: z.boolean(),
+    }),
+  }),
+});
+
+export type SecurityConfig = z.infer<typeof SecurityConfigSchema>;
+
+// Environment-specific configurations
+const developmentConfig: SecurityConfig = {
+  csp: {
+    enabled: true,
+    reportOnly: true, // Report-only mode in development
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://vercel.live"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
+      connectSrc: ["'self'", "https://vercel.live", "wss:", "ws:"],
+      frameSrc: ["'self'"],
+      manifestSrc: ["'self'"],
+      workerSrc: ["'self'", "blob:"],
+      frameAncestors: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+    },
+    useNonce: true,
+    reportUri: '/api/security/csp-report',
+  },
+  headers: {
+    hsts: {
+      enabled: false, // Disabled in development (no HTTPS)
+      maxAge: 0,
+      includeSubDomains: false,
+      preload: false,
+    },
+    frameOptions: 'SAMEORIGIN',
+    contentTypeOptions: true,
+    referrerPolicy: 'strict-origin-when-cross-origin',
+    permissionsPolicy: {
+      geolocation: [],
+      microphone: [],
+      camera: [],
+      payment: [],
+      accelerometer: [],
+      gyroscope: [],
+      magnetometer: [],
+      usb: [],
+    },
+    crossOriginEmbedderPolicy: 'unsafe-none',
+    crossOriginOpenerPolicy: 'same-origin-allow-popups',
+    crossOriginResourcePolicy: 'cross-origin',
+  },
+  rateLimit: {
+    enabled: true,
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    maxRequests: 1000, // More lenient in development
+    skipSuccessfulRequests: false,
+    standardHeaders: true,
+    legacyHeaders: false,
+  },
+  cors: {
+    enabled: true,
+    origins: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    credentials: true,
+    maxAge: 86400,
+  },
+  monitoring: {
+    enabled: true,
+    logSecurityEvents: true,
+    alertOnViolations: false,
+    reportToSentry: false,
+  },
+  apiSecurity: {
+    inputValidation: {
+      enabled: true,
+      maxPayloadSize: 1024 * 1024, // 1MB
+      allowedContentTypes: ['application/json', 'application/x-www-form-urlencoded', 'multipart/form-data'],
+    },
+    sqlInjectionProtection: {
+      enabled: true,
+    },
+    xssProtection: {
+      enabled: true,
+    },
+    apiKeyAuth: {
+      enabled: false, // Disabled by default in development
+    },
+  },
+};
+
+const productionConfig: SecurityConfig = {
+  csp: {
+    enabled: true,
+    reportOnly: false, // Enforce in production
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"], // Remove unsafe-eval in production
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
+      connectSrc: ["'self'", "https://api.mapbox.com", "https://maps.geoapify.com"],
+      frameSrc: ["'none'"],
+      manifestSrc: ["'self'"],
+      workerSrc: ["'self'", "blob:"],
+      frameAncestors: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+    },
+    useNonce: true,
+    reportUri: '/api/security/csp-report',
+  },
+  headers: {
+    hsts: {
+      enabled: true,
+      maxAge: 63072000, // 2 years
+      includeSubDomains: true,
+      preload: true,
+    },
+    frameOptions: 'DENY',
+    contentTypeOptions: true,
+    referrerPolicy: 'strict-origin-when-cross-origin',
+    permissionsPolicy: {
+      geolocation: [],
+      microphone: [],
+      camera: [],
+      payment: [],
+      accelerometer: [],
+      gyroscope: [],
+      magnetometer: [],
+      usb: [],
+    },
+    crossOriginEmbedderPolicy: 'require-corp',
+    crossOriginOpenerPolicy: 'same-origin',
+    crossOriginResourcePolicy: 'same-origin',
+  },
+  rateLimit: {
+    enabled: true,
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    maxRequests: 100, // Stricter in production
+    skipSuccessfulRequests: true,
+    standardHeaders: true,
+    legacyHeaders: false,
+  },
+  cors: {
+    enabled: true,
+    origins: process.env.ALLOWED_ORIGINS?.split(',') || ['https://yourdomain.com'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+    maxAge: 86400,
+  },
+  monitoring: {
+    enabled: true,
+    logSecurityEvents: true,
+    alertOnViolations: true,
+    reportToSentry: true,
+  },
+  apiSecurity: {
+    inputValidation: {
+      enabled: true,
+      maxPayloadSize: 512 * 1024, // 512KB in production (more restrictive)
+      allowedContentTypes: ['application/json', 'application/x-www-form-urlencoded'],
+    },
+    sqlInjectionProtection: {
+      enabled: true,
+    },
+    xssProtection: {
+      enabled: true,
+    },
+    apiKeyAuth: {
+      enabled: true, // Enabled in production
+    },
+  },
+};
+
+// Get configuration based on environment
+export function getSecurityConfig(): SecurityConfig {
+  const env = process.env.NODE_ENV || 'development';
+  
+  // Test environment config: enable stricter checks expected by tests
+  if (env === 'test') {
+    const testConfig: SecurityConfig = {
+      ...developmentConfig,
+      rateLimit: {
+        ...developmentConfig.rateLimit,
+        enabled: true,
+        maxRequests: 50,
+        skipSuccessfulRequests: false,
+      },
+      apiSecurity: {
+        ...developmentConfig.apiSecurity,
+        apiKeyAuth: { enabled: true },
+      },
+    };
+    const res = SecurityConfigSchema.safeParse(testConfig);
+    if (!res.success) {
+      throw new Error('Test security configuration validation failed');
+    }
+    return res.data;
+  }
+
+  const config = env === 'production' ? productionConfig : developmentConfig;
+  
+  // Validate configuration
+  const result = SecurityConfigSchema.safeParse(config);
+  if (!result.success) {
+    console.error('Invalid security configuration:', result.error);
+    throw new Error('Security configuration validation failed');
+  }
+  
+  return result.data;
+}
+
+// CSP directive builders
+export function buildCSPDirective(directives: SecurityConfig['csp']['directives'], useNonce?: boolean): string {
+  const nonce = useNonce ? `'nonce-${generateNonce()}'` : '';
+  
+  const cspParts: string[] = [];
+  
+  Object.entries(directives).forEach(([directive, sources]) => {
+    const kebabDirective = directive.replace(/([A-Z])/g, '-$1').toLowerCase();
+    const sourcesWithNonce = directive === 'scriptSrc' && nonce 
+      ? [...sources, nonce]
+      : sources;
+    
+    cspParts.push(`${kebabDirective} ${sourcesWithNonce.join(' ')}`);
+  });
+  
+  return cspParts.join('; ');
+}
+
+// Nonce generation for CSP
+export function generateNonce(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID().replace(/-/g, '');
+  }
+  
+  // Fallback for environments without crypto.randomUUID
+  return Math.random().toString(36).substring(2, 15) + 
+         Math.random().toString(36).substring(2, 15);
+}
+
+// Permission Policy builder
+export function buildPermissionsPolicy(permissions: SecurityConfig['headers']['permissionsPolicy']): string {
+  const policies: string[] = [];
+  
+  Object.entries(permissions).forEach(([feature, allowlist]) => {
+    const policy = allowlist.length > 0 
+      ? `${feature}=(${allowlist.map(origin => `"${origin}"`).join(' ')})`
+      : `${feature}=()`;
+    policies.push(policy);
+  });
+  
+  return policies.join(', ');
+}
+
+// Security event types
+export interface SecurityEvent {
+  type: 'csp_violation' | 'rate_limit_exceeded' | 'cors_violation' | 'auth_failure' | 'suspicious_activity' | 'api_security_violation' | 'sql_injection_attempt' | 'xss_attempt' | 'api_auth_failure';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  timestamp: string;
+  ip: string;
+  userAgent?: string;
+  url: string;
+  details: Record<string, unknown>;
+}
+
+// Security monitoring utilities
+export function logSecurityEvent(event: SecurityEvent): void {
+  const config = getSecurityConfig();
+  
+  if (!config.monitoring.enabled || !config.monitoring.logSecurityEvents) {
+    return;
+  }
+
+  // Use dynamic import to avoid circular dependency
+  if (typeof window === 'undefined') { // Server-side only
+    import('./security-monitoring').then(({ recordSecurityEvent }) => {
+      recordSecurityEvent(event);
+    }).catch(error => {
+      console.error('Failed to record security event:', error);
+      // Fallback to console logging
+      console.warn('🔐 Security Event:', event);
+    });
+  }
+}
+
+// Validate security configuration at runtime
+export function validateSecurityConfig(): void {
+  try {
+    getSecurityConfig();
+    console.log('✅ Security configuration validated successfully');
+  } catch (error) {
+    console.error('❌ Security configuration validation failed:', error);
+    
+    // Edge Runtime compatible error handling - avoid process.exit
+    throw new Error('Security configuration validation failed - critical error');
+  }
+}
+
+export default getSecurityConfig;

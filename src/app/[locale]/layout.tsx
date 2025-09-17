@@ -62,7 +62,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
         <span>Add to Home Screen: Share → Add to Home Screen</span>
         <button id="ios-tip-close" aria-label="Close" className="btn-outline btn-sm">×</button>
       </div>
-  <main id="main-content" className="safe-bottom" role="main">{children}</main>
+  <main id="main-content" className="safe-bottom top-gap" role="main">{children}</main>
   </ToastProvider>
     </div>
   );

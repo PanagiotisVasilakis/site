@@ -1,6 +1,11 @@
 import { ImageResponse } from 'next/og';
 import { NextRequest } from 'next/server';
 import React from 'react';
+// Note: This route generates Open Graph images and intentionally uses the Edge runtime
+// for low-latency rendering. Next.js prints a build-time note:
+// "Using edge runtime on a page currently disables static generation for that page".
+// This applies only to this dynamic route handler and does not affect static
+// generation of your actual pages.
 export const runtime = 'edge';
 
 export function GET(req: NextRequest) {

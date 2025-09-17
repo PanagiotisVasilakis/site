@@ -1,0 +1,89 @@
+# Multi-stage Docker build for enhanced security
+# Stage 1: Build dependencies and application
+FROM node:20-alpine AS builder
+
+# Add security labels
+LABEL maintainer="security@villa-app.com"
+LABEL version="1.0"
+LABEL description="Villa booking application - secure build"
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
+
+# Create non-root user for build
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nextjs -u 1001
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY .npmrc* ./
+
+# Install dependencies with security flags
+RUN npm ci --only=production --audit=false --fund=false && \
+    npm cache clean --force
+
+# Copy source code with proper ownership
+COPY --chown=nextjs:nodejs . .
+
+# Build application
+RUN npm run build && \
+    # Remove dev dependencies and source after build
+    rm -rf node_modules src && \
+    npm ci --only=production --audit=false --fund=false
+
+# Stage 2: Production runtime
+FROM node:20-alpine AS runner
+
+# Install security updates
+RUN apk upgrade --no-cache && \
+    apk add --no-cache dumb-init curl && \
+    # Remove unnecessary packages
+    apk del --no-cache && \
+    rm -rf /var/cache/apk/*
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nextjs -u 1001
+
+WORKDIR /app
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+
+# Copy built application from builder stage
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Security: Remove write permissions
+RUN chmod -R 755 /app && \
+    find /app -type d -exec chmod 755 {} \; && \
+    find /app -type f -exec chmod 644 {} \; && \
+    chmod +x /app/server.js
+
+# Switch to non-root user
+USER nextjs
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3000/api/health || exit 1
+
+# Use dumb-init for proper signal handling
+ENTRYPOINT ["dumb-init", "--"]
+CMD ["node", "server.js"]
+
+# Security: Run as non-root, minimal base image, no unnecessary tools
+# Metadata for security scanning
+LABEL org.opencontainers.image.title="Villa Booking App"
+LABEL org.opencontainers.image.description="Secure containerized villa booking application"
+LABEL org.opencontainers.image.version="1.0.0"
+LABEL org.opencontainers.image.vendor="Villa App Inc."
+LABEL org.opencontainers.image.licenses="MIT"

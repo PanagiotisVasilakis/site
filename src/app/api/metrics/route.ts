@@ -1,0 +1,406 @@
+/**
+ * Metrics Collection API Endpoint
+ * Provides access to collected metrics data for dashboard visualization
+ */
+
+import { NextRequest } from 'next/server';
+import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
+import { logger } from '@/lib/logger-enterprise';
+import { metrics } from '@/lib/metrics-collector';
+import { tracer, SpanStatus } from '@/lib/distributed-tracing';
+
+export const dynamic = 'force-dynamic';
+
+interface MetricsQuery {
+  metric?: string;
+  timeRange?: number; // milliseconds
+  aggregation?: 'sum' | 'avg' | 'min' | 'max' | 'count';
+  tags?: Record<string, string>;
+}
+
+interface MetricsResponse {
+  timestamp: number;
+  timeRange: number;
+  metrics: Array<{
+    name: string;
+    type: 'counter' | 'gauge' | 'histogram' | 'timer';
+    values: Array<{
+      timestamp: number;
+      value: number;
+      tags?: Record<string, string>;
+    }>;
+    aggregatedValue?: number;
+    summary?: {
+      count: number;
+      sum: number;
+      avg: number;
+      min: number;
+      max: number;
+    };
+  }>;
+  systemMetrics: {
+    requestCount: number;
+    errorCount: number;
+    averageResponseTime: number;
+    healthStatus: 'healthy' | 'degraded' | 'unhealthy';
+  };
+}
+
+type Aggregation = NonNullable<MetricsQuery['aggregation']>;
+interface MetricRecord {
+  name: string;
+  timestamp: number;
+  value: number;
+  tags?: Record<string, string>;
+}
+
+function isAggregation(v: string | null): v is Aggregation {
+  return v === 'sum' || v === 'avg' || v === 'min' || v === 'max' || v === 'count';
+}
+
+// System metrics calculation
+function calculateSystemMetrics(allMetrics: MetricRecord[]): MetricsResponse['systemMetrics'] {
+  const now = Date.now();
+  const oneHourAgo = now - (60 * 60 * 1000);
+  
+  // Filter recent metrics
+  const recentMetrics = allMetrics.filter(m => m.timestamp >= oneHourAgo);
+  
+  // Calculate request count
+  const requestMetrics = recentMetrics.filter(m => m.name.includes('request') || m.name.includes('http'));
+  const requestCount = requestMetrics.reduce((sum, m) => sum + m.value, 0);
+  
+  // Calculate error count
+  const errorMetrics = recentMetrics.filter(m => m.name.includes('error') || m.name.includes('exception'));
+  const errorCount = errorMetrics.reduce((sum, m) => sum + m.value, 0);
+  
+  // Calculate average response time
+  const responseTimeMetrics = recentMetrics.filter(m => m.name.includes('response_time') || m.name.includes('duration'));
+  const avgResponseTime = responseTimeMetrics.length > 0 
+    ? responseTimeMetrics.reduce((sum, m) => sum + m.value, 0) / responseTimeMetrics.length
+    : 0;
+  
+  // Determine health status based on error rate
+  const errorRate = requestCount > 0 ? (errorCount / requestCount) * 100 : 0;
+  let healthStatus: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
+  
+  if (errorRate > 10) {
+    healthStatus = 'unhealthy';
+  } else if (errorRate > 5 || avgResponseTime > 1000) {
+    healthStatus = 'degraded';
+  }
+  
+  return {
+    requestCount,
+    errorCount,
+    averageResponseTime: avgResponseTime,
+    healthStatus,
+  };
+}
+
+// Aggregate metric values
+function aggregateMetricValues(values: MetricRecord[], aggregation: Aggregation) {
+  if (values.length === 0) return 0;
+  
+  const numericValues = values.map(v => v.value);
+  
+  switch (aggregation) {
+    case 'sum':
+      return numericValues.reduce((sum, val) => sum + val, 0);
+    case 'avg':
+      return numericValues.reduce((sum, val) => sum + val, 0) / numericValues.length;
+    case 'min':
+      return Math.min(...numericValues);
+    case 'max':
+      return Math.max(...numericValues);
+    case 'count':
+      return numericValues.length;
+    default:
+      return numericValues.reduce((sum, val) => sum + val, 0) / numericValues.length;
+  }
+}
+
+// Calculate summary statistics
+function calculateSummary(values: MetricRecord[]) {
+  if (values.length === 0) {
+    return { count: 0, sum: 0, avg: 0, min: 0, max: 0 };
+  }
+  
+  const numericValues = values.map(v => v.value);
+  const sum = numericValues.reduce((sum, val) => sum + val, 0);
+  
+  return {
+    count: numericValues.length,
+    sum,
+    avg: sum / numericValues.length,
+    min: Math.min(...numericValues),
+    max: Math.max(...numericValues),
+  };
+}
+
+export const GET = withErrorHandler(async (request: NextRequest) => {
+  const span = tracer.startSpan('metrics_query', undefined, {
+    component: 'metrics',
+    'http.method': request.method,
+    'http.url': request.url,
+  });
+
+  const correlationId = logger.getContext()?.correlationId;
+  const startTime = Date.now();
+
+  try {
+    const url = new URL(request.url);
+    const query: MetricsQuery = {
+      metric: url.searchParams.get('metric') || undefined,
+      timeRange: parseInt(url.searchParams.get('timeRange') || '3600000'), // Default: 1 hour
+      aggregation: isAggregation(url.searchParams.get('aggregation')) ? (url.searchParams.get('aggregation') as Aggregation) : 'avg',
+      tags: url.searchParams.get('tags') ? JSON.parse(url.searchParams.get('tags')!) : undefined,
+    };
+
+    // Ensure defaults for required fields
+    const timeRange = query.timeRange || 3600000;
+    const aggregation = query.aggregation || 'avg';
+
+    tracer.addTags(span, {
+      'metrics.query.metric': query.metric || 'all',
+      'metrics.query.timeRange': timeRange.toString(),
+      'metrics.query.aggregation': aggregation,
+    });
+
+    logger.info('Metrics query requested', {
+      metric: query.metric,
+      timeRange: timeRange,
+      aggregation: aggregation,
+      tags: query.tags,
+    });
+
+    // Calculate time range
+    const now = Date.now();
+    const since = now - timeRange;
+
+    // Get metrics from collector
+  let allMetrics: MetricRecord[] = [];
+    
+    if (query.metric) {
+      // Get specific metric
+      allMetrics = metrics.getMetrics(query.metric, since);
+    } else {
+      // Get all metrics (this would need to be implemented in MetricsCollector)
+      // For now, get some common metrics
+      const commonMetrics = [
+        'http.requests',
+        'http.response_time',
+        'http.errors',
+        'health_check.executed',
+        'health_check.response_time',
+        'system.memory.usage',
+        'system.cpu.usage',
+      ];
+      
+      for (const metricName of commonMetrics) {
+        try {
+          const metricData = metrics.getMetrics(metricName, since);
+          allMetrics.push(...metricData);
+        } catch {
+          // Metric might not exist, continue
+        }
+      }
+    }
+
+    // Group metrics by name
+    const groupedMetrics = new Map<string, MetricRecord[]>();
+    for (const metric of allMetrics) {
+      const existing = groupedMetrics.get(metric.name) || [];
+      existing.push(metric);
+      groupedMetrics.set(metric.name, existing);
+    }
+
+    // Process metrics
+    const processedMetrics = Array.from(groupedMetrics.entries()).map(([name, metricValues]) => {
+      const aggregatedValue = aggregateMetricValues(metricValues, aggregation);
+      const summary = calculateSummary(metricValues);
+      
+      // Determine metric type (would be stored in the actual metric)
+      let type: 'counter' | 'gauge' | 'histogram' | 'timer' = 'gauge';
+      if (name.includes('count') || name.includes('requests') || name.includes('errors')) {
+        type = 'counter';
+      } else if (name.includes('time') || name.includes('duration')) {
+        type = 'timer';
+      } else if (name.includes('histogram')) {
+        type = 'histogram';
+      }
+
+      return {
+        name,
+        type,
+        values: metricValues.map((m) => ({
+          timestamp: m.timestamp,
+          value: m.value,
+          tags: m.tags,
+        })),
+        aggregatedValue,
+        summary,
+      };
+    });
+
+    // Calculate system metrics
+    const systemMetrics = calculateSystemMetrics(allMetrics);
+
+    const response: MetricsResponse = {
+      timestamp: now,
+      timeRange: timeRange,
+      metrics: processedMetrics,
+      systemMetrics,
+    };
+
+    tracer.addTags(span, {
+      'metrics.count': processedMetrics.length,
+      'metrics.system.requests': systemMetrics.requestCount,
+      'metrics.system.errors': systemMetrics.errorCount,
+      'metrics.system.health': systemMetrics.healthStatus,
+    });
+
+    const duration = Date.now() - startTime;
+    metrics.timer('metrics_query.duration', duration, {
+      metric: query.metric || 'all',
+      aggregation: aggregation,
+    });
+
+    logger.info('Metrics query completed', {
+      duration,
+      metricsCount: processedMetrics.length,
+      systemHealth: systemMetrics.healthStatus,
+      requestCount: systemMetrics.requestCount,
+    });
+
+    tracer.finishSpan(span);
+
+    return createSuccessResponse(response, 200, correlationId);
+
+  } catch (error) {
+    tracer.addLog(span, 'error', 'Metrics query failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    tracer.finishSpan(span, SpanStatus.ERROR);
+
+    logger.error('Metrics query failed', {}, error instanceof Error ? error : new Error(String(error)));
+
+    metrics.counter('metrics_query.errors', 1);
+
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    throw new ApiError(
+      ApiErrorCode.INTERNAL_ERROR,
+      'Metrics query failed',
+      {
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : String(error),
+      },
+      correlationId
+    );
+  }
+}, {
+  enableErrorLogging: true,
+  enablePerformanceLogging: true,
+  enableRequestLogging: false,
+  requestTimeoutMs: 15000, // 15 second timeout for metrics queries
+});
+
+// POST endpoint for custom metric submission
+export const POST = withErrorHandler(async (request: NextRequest) => {
+  const span = tracer.startSpan('metrics_submit', undefined, {
+    component: 'metrics',
+    'http.method': request.method,
+  });
+
+  const correlationId = logger.getContext()?.correlationId;
+
+  try {
+    const body = await request.json();
+    
+    const { metric, value, tags, type = 'gauge' } = body;
+    
+    if (!metric || typeof value !== 'number') {
+      throw new ApiError(
+        ApiErrorCode.VALIDATION_ERROR,
+        'Invalid metric data',
+        { required: ['metric', 'value'] },
+        correlationId
+      );
+    }
+
+    tracer.addTags(span, {
+      'metrics.submit.metric': metric,
+      'metrics.submit.type': type,
+      'metrics.submit.value': value.toString(),
+    });
+
+    // Submit metric based on type
+    switch (type) {
+      case 'counter':
+        metrics.counter(metric, value, tags);
+        break;
+      case 'gauge':
+        metrics.gauge(metric, value, tags);
+        break;
+      case 'timer':
+        metrics.timer(metric, value, tags);
+        break;
+      case 'histogram':
+        metrics.histogram(metric, value, tags);
+        break;
+      default:
+        metrics.gauge(metric, value, tags);
+    }
+
+    logger.info('Custom metric submitted', {
+      metric,
+      type,
+      value,
+      tags,
+    });
+
+    tracer.finishSpan(span);
+
+    return createSuccessResponse(
+      { 
+        success: true, 
+        metric, 
+        type, 
+        value, 
+        timestamp: Date.now() 
+      }, 
+      201, 
+      correlationId
+    );
+
+  } catch (error) {
+    tracer.addLog(span, 'error', 'Metric submission failed', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    tracer.finishSpan(span, SpanStatus.ERROR);
+
+    logger.error('Metric submission failed', {}, error instanceof Error ? error : new Error(String(error)));
+
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    throw new ApiError(
+      ApiErrorCode.INTERNAL_ERROR,
+      'Metric submission failed',
+      {
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : String(error),
+      },
+      correlationId
+    );
+  }
+}, {
+  enableErrorLogging: true,
+  enablePerformanceLogging: true,
+  enableRequestLogging: true,
+  requestTimeoutMs: 5000,
+});

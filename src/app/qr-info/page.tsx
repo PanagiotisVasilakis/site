@@ -7,7 +7,7 @@ export default function QrInfoPage() {
   // Use explicit static asset for Next.js Image optimization (size 256x256)
   const qrSrc = '/qr/site.png';
   return (
-  <div className="mx-auto max-w-md p-6 flex flex-col items-center gap-6" style={{color:'var(--text-accent)'}}>
+  <div className="page-container mx-auto max-w-md flex flex-col items-center gap-6" style={{color:'var(--text-accent)'}}>
       <h1 className="text-xl font-semibold">QR Code</h1>
       <div className="relative group">
         <Image

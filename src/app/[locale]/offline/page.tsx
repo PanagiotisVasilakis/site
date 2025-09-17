@@ -9,7 +9,7 @@ export default async function OfflineLocalePage({ params }: { params: Promise<{ 
   const greek = eff === "el";
   const homeHref = `/${eff}`;
   return (
-  <div className="min-h-screen flex items-center justify-center p-6 safe-bottom bg-app-vertical">
+  <div className="min-h-screen flex items-center justify-center page-container safe-bottom bg-app-vertical">
       <div className="max-w-md w-full rounded-xl panel shadow-sm p-8 relative overflow-hidden">
         <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full opacity-30" style={{background:'var(--brand-100)'}} aria-hidden></div>
         <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-amber-100 rounded-full opacity-30" aria-hidden></div>

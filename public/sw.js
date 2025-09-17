@@ -20,6 +20,43 @@ const CORE_ASSETS = [
 // Internal fetch helper to centralize internal route calls (for lint compliance)
 function fetchInternal(input, init) { return fetch(input, init); }
 
+// Cache validation helper to prevent serving corrupted responses
+async function validateCachedResponse(response) {
+  if (!response) return false;
+  try {
+    // Check if response is readable and has valid headers
+    if (!response.ok && response.status !== 0) return false;
+    
+    // For HTML responses, verify basic structure integrity
+    if (response.headers.get('content-type')?.includes('text/html')) {
+      const clone = response.clone();
+      const text = await clone.text();
+      // Basic validation - should have opening tag and some content
+      if (text.length < 10 || !text.includes('<')) return false;
+    }
+    
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Cache storage management for quota exceeded scenarios
+async function manageCacheStorage(cache) {
+  try {
+    const keys = await cache.keys();
+    // Remove oldest 25% of cached items to free up space
+    const keysToDelete = keys.slice(0, Math.floor(keys.length * 0.25));
+    await Promise.all(keysToDelete.map(key => cache.delete(key)));
+  } catch {
+    // If management fails, clear all cache as last resort
+    try {
+      const keys = await cache.keys();
+      await Promise.all(keys.map(key => cache.delete(key)));
+    } catch {}
+  }
+}
+
 // Simple IndexedDB wrapper for queueing failed analytics POSTs
 const DB_NAME = 'analytics-queue-db';
 const STORE = 'queue';
@@ -33,6 +70,73 @@ function openQueueDb() {
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
+}
+
+async function enqueue(body) {
+  try {
+    const db = await openQueueDb();
+    
+    // Use a single transaction for atomic queue management
+    const tx = db.transaction(STORE, 'readwrite');
+    const store = tx.objectStore(STORE);
+    
+    // Get current queue size within the same transaction
+    const sizeRequest = store.count();
+    const currentSize = await new Promise((resolve, reject) => {
+      sizeRequest.onsuccess = () => resolve(sizeRequest.result);
+      sizeRequest.onerror = () => reject(sizeRequest.error);
+    });
+    
+    // If queue is full, remove oldest entries atomically
+    if (currentSize >= 100) {
+      console.warn('Analytics queue full, dropping oldest entries');
+      
+      // Get oldest entries to delete
+      const deletePromises = [];
+      const cursor = store.openCursor();
+      
+      await new Promise((resolve, reject) => {
+        let deletedCount = 0;
+        cursor.onsuccess = (e) => {
+          const cur = e.target.result;
+          if (cur && deletedCount < 10) {
+            deletePromises.push(
+              new Promise((delResolve, delReject) => {
+                const deleteReq = store.delete(cur.primaryKey);
+                deleteReq.onsuccess = () => delResolve();
+                deleteReq.onerror = () => delReject(deleteReq.error);
+              })
+            );
+            deletedCount++;
+            cur.continue();
+          } else {
+            resolve();
+          }
+        };
+        cursor.onerror = () => reject(cursor.error);
+      });
+      
+      // Wait for all deletions to complete
+      await Promise.all(deletePromises);
+    }
+    
+    // Add new entry atomically
+    await new Promise((resolve, reject) => {
+      const req = store.add({ body, timestamp: Date.now() });
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    
+    // Ensure transaction completes
+    await new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    
+    broadcastQueueSize();
+  } catch (err) {
+    console.error('Failed to enqueue analytics:', err);
+  }
 }
 async function flushQueue() {
   try {
@@ -332,30 +436,67 @@ self.addEventListener('fetch', (event) => {
       event.respondWith((async () => {
         const cache = await caches.open(ACTIVE_CACHE_NAME);
         const cached = await cache.match(request);
+        
+        // Validate cached response before serving
+        const validCached = cached && await validateCachedResponse(cached) ? cached : null;
+        
         const fetchPromise = fetchInternal(request).then(res => {
-          if (res.ok) cache.put(request, res.clone()).catch(()=>{});
+          if (res.ok) {
+            cache.put(request, res.clone()).catch(async (err) => {
+              // Handle storage quota exceeded
+              if (err.name === 'QuotaExceededError') {
+                await manageCacheStorage(cache);
+                // Retry cache operation after cleanup
+                cache.put(request, res.clone()).catch(() => {});
+              }
+            });
+          }
           return res;
-        }).catch(() => cached || Promise.reject('offline'));
-        return cached || fetchPromise;
+        }).catch(() => validCached || Promise.reject('offline'));
+        return validCached || fetchPromise;
       })());
       return;
     }
     // Other static assets (Next chunks, css/js): cache-first with populate
     if (url.pathname.startsWith('/_next') || url.pathname.match(/\.(css|js|ico)$/)) {
       event.respondWith(
-        caches.match(request).then((cached) => cached || fetchInternal(request).then((res) => {
-          if (res.ok) caches.open(ACTIVE_CACHE_NAME).then((c) => c.put(request, res.clone()));
-          return res;
-        }))
+        caches.match(request).then(async (cached) => {
+          const validCached = cached && await validateCachedResponse(cached) ? cached : null;
+          return validCached || fetchInternal(request).then(async (res) => {
+            if (res.ok) {
+              try {
+                const cache = await caches.open(ACTIVE_CACHE_NAME);
+                await cache.put(request, res.clone());
+              } catch (err) {
+                if (err.name === 'QuotaExceededError') {
+                  const cache = await caches.open(ACTIVE_CACHE_NAME);
+                  await manageCacheStorage(cache);
+                  try {
+                    await cache.put(request, res.clone());
+                  } catch {}
+                }
+              }
+            }
+            return res;
+          });
+        })
       );
       return;
     }
   }
 });
 
-// JSON fetch metric broadcasting (dev/diagnostic; lightweight throttled)
+// JSON fetch metric broadcasting (dev/diagnostic; time-based throttled)
 let __jsonMetricSent = 0;
+let __jsonMetricResetTime = Date.now();
 async function broadcastJsonMetric(path, source) {
+  const now = Date.now();
+  // Reset counter every 60 seconds
+  if (now - __jsonMetricResetTime > 60000) {
+    __jsonMetricSent = 0;
+    __jsonMetricResetTime = now;
+  }
+  
   if (__jsonMetricSent > 50) return; // throttle to avoid noise
   __jsonMetricSent++;
   try {
@@ -364,11 +505,20 @@ async function broadcastJsonMetric(path, source) {
   } catch {}
 }
 
-// Background sync event flush
+// Background sync event flush with concurrency protection
+let syncInProgress = false;
 self.addEventListener('sync', (event) => {
   // @ts-expect-error Background Sync event tag not typed
   if (event.tag === 'analytics-sync') {
     // @ts-expect-error waitUntil typed generically
-    event.waitUntil(flushQueue());
+    event.waitUntil((async () => {
+      if (syncInProgress) return; // Prevent concurrent sync operations
+      syncInProgress = true;
+      try {
+        await flushQueue();
+      } finally {
+        syncInProgress = false;
+      }
+    })());
   }
 });

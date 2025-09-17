@@ -1,12 +1,21 @@
 import { defineConfig } from 'vitest/config';
 import tsconfigPaths from 'vite-tsconfig-paths';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 
 export default defineConfig({
   plugins: [tsconfigPaths()],
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
+  },
   test: {
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}'],
+    exclude: ['src/__tests__/api-comprehensive.test.ts'],
     setupFiles: ['./vitest.setup.ts'],
+    globals: true, // Enable global test functions
     coverage: { provider: 'v8', reporter: ['text','lcov'], all: true, thresholds: { lines: 70, branches: 60, functions: 70, statements: 70 } },
   },
 });

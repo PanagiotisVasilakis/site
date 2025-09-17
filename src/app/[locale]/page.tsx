@@ -14,7 +14,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   const t = getDictionary(eff);
   const cats: CategoryWithCount[] = getCategoriesWithCounts() as CategoryWithCount[];
   return (
-  <div className="mx-auto max-w-4xl p-6">
+  <div className="page-container mx-auto max-w-4xl">
       <script
         type="application/ld+json"
         suppressHydrationWarning

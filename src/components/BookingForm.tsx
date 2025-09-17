@@ -170,7 +170,16 @@ export default function BookingForm({ dateRange, guests, total, locale, submissi
   const validation = validateForm();
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+      {/* Live region for form-wide announcements */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only">
+        {!validation.valid && validation.errors.length > 0 && showValidation && (
+          `Form has ${validation.errors.length} error${validation.errors.length > 1 ? 's' : ''}. Please review and correct the highlighted fields.`
+        )}
+        {submitted && "Booking submitted successfully!"}
+        {isSubmitting && "Submitting booking, please wait..."}
+      </div>
+      
       <div>
         <h3 className="text-lg font-semibold mb-4 text-[color:var(--fg-default)]">Guest information</h3>
         
@@ -189,7 +198,7 @@ export default function BookingForm({ dateRange, guests, total, locale, submissi
               aria-describedby={getFieldError('firstName') ? 'firstName-error' : undefined}
             />
             {getFieldError('firstName') && (
-              <p id="firstName-error" className="mt-1 text-sm text-red-600">
+              <p id="firstName-error" className="mt-1 text-sm text-red-600" role="alert">
                 {getFieldError('firstName')}
               </p>
             )}
@@ -209,7 +218,7 @@ export default function BookingForm({ dateRange, guests, total, locale, submissi
               aria-describedby={getFieldError('lastName') ? 'lastName-error' : undefined}
             />
             {getFieldError('lastName') && (
-              <p id="lastName-error" className="mt-1 text-sm text-red-600">
+              <p id="lastName-error" className="mt-1 text-sm text-red-600" role="alert">
                 {getFieldError('lastName')}
               </p>
             )}
@@ -225,9 +234,16 @@ export default function BookingForm({ dateRange, guests, total, locale, submissi
               required
               value={guestDetails.email}
               onChange={e => updateGuestDetails('email', e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] text-[color:var(--fg-default)] placeholder:text-[color:var(--fg-muted)] focus:outline-none focus:ring-2 focus:ring-[color:var(--brand-400)] focus:border-[color:var(--brand-400)] transition-colors"
+              className={`w-full px-4 py-3 rounded-lg border bg-[color:var(--layer-surface)] text-[color:var(--fg-default)] placeholder:text-[color:var(--fg-muted)] focus:outline-none focus:ring-2 focus:ring-[color:var(--brand-400)] focus:border-[color:var(--brand-400)] transition-colors ${getFieldError('email') ? 'border-red-400 bg-red-50' : 'border-[color:var(--border-soft)]'}`}
               placeholder="john@example.com"
+              aria-invalid={!!getFieldError('email')}
+              aria-describedby={getFieldError('email') ? 'email-error' : undefined}
             />
+            {getFieldError('email') && (
+              <p id="email-error" className="mt-1 text-sm text-red-600" role="alert">
+                {getFieldError('email')}
+              </p>
+            )}
           </div>
           
           <div>
@@ -238,9 +254,16 @@ export default function BookingForm({ dateRange, guests, total, locale, submissi
               required
               value={guestDetails.phone}
               onChange={e => updateGuestDetails('phone', e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] text-[color:var(--fg-default)] placeholder:text-[color:var(--fg-muted)] focus:outline-none focus:ring-2 focus:ring-[color:var(--brand-400)] focus:border-[color:var(--brand-400)] transition-colors"
+              className={`w-full px-4 py-3 rounded-lg border bg-[color:var(--layer-surface)] text-[color:var(--fg-default)] placeholder:text-[color:var(--fg-muted)] focus:outline-none focus:ring-2 focus:ring-[color:var(--brand-400)] focus:border-[color:var(--brand-400)] transition-colors ${getFieldError('phone') ? 'border-red-400 bg-red-50' : 'border-[color:var(--border-soft)]'}`}
               placeholder="+30 123 456 7890"
+              aria-invalid={!!getFieldError('phone')}
+              aria-describedby={getFieldError('phone') ? 'phone-error' : undefined}
             />
+            {getFieldError('phone') && (
+              <p id="phone-error" className="mt-1 text-sm text-red-600" role="alert">
+                {getFieldError('phone')}
+              </p>
+            )}
           </div>
         </div>
 

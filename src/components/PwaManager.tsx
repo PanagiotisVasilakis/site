@@ -42,8 +42,10 @@ export default function PwaManager() {
       });
     }
     // iOS A2HS tip
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && (navigator as unknown as { maxTouchPoints?: number }).maxTouchPoints! > 1);
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+  const hasTouch = 'maxTouchPoints' in navigator ? navigator.maxTouchPoints > 1 : false;
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && hasTouch);
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+    ('standalone' in window.navigator ? (window.navigator as { standalone?: boolean }).standalone === true : false);
     const dismissed = localStorage.getItem('ios-a2hs-dismissed') === '1';
     if (isIOS && !isStandalone && !dismissed) {
       const tip = document.getElementById('ios-a2hs-tip'); if (tip) tip.style.display = 'flex';
@@ -74,13 +76,22 @@ export default function PwaManager() {
     });
     // Install prompt button
   // Track deferred install prompt event
-  let deferred: { prompt: () => void; userChoice: Promise<unknown> } | null = null;
+  interface BeforeInstallPromptEvent extends Event {
+    prompt: () => void;
+    userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+  }
+  
+  let deferred: BeforeInstallPromptEvent | null = null;
     const btn = document.getElementById('install-btn');
     if (isIOS && btn) btn.style.display = 'none';
+    
     window.addEventListener('beforeinstallprompt', (e: Event) => {
       e.preventDefault();
-  deferred = e as unknown as { prompt: () => void; userChoice: Promise<unknown> };
-      if (btn && !isIOS) btn.style.display = 'inline-flex';
+      // Validate that the event has the expected install prompt interface
+      if (e && typeof (e as BeforeInstallPromptEvent).prompt === 'function' && (e as BeforeInstallPromptEvent).userChoice) {
+        deferred = e as BeforeInstallPromptEvent;
+        if (btn && !isIOS) btn.style.display = 'inline-flex';
+      }
     });
     btn?.addEventListener('click', async () => {
       if (!deferred) return;

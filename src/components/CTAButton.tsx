@@ -13,8 +13,9 @@ export function CTAButton({ variant='primary', className='', asChild=false, ...r
   };
   if (asChild) {
     // Expect caller to pass an <a> as children; clone to inject className
-    const child = (rest as unknown as { children?: React.ReactElement<{ className?: string }> }).children;
-    if (!child) return null;
+    const restWithChildren = rest as { children?: React.ReactElement<{ className?: string }> };
+    const child = restWithChildren.children;
+    if (!child || !React.isValidElement(child)) return null;
     const childProps = child.props as { className?: string; children?: React.ReactNode };
     const inner = childProps.children;
     const combinedClass = `${base} ${styles[variant]} ${childProps.className || ''} ${className}`.trim();

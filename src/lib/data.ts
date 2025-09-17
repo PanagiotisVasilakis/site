@@ -3,6 +3,7 @@ import path from "node:path";
 import { ItemSchema, type Item } from "../data/schemas";
 import { categories } from "../data/categories";
 import type { Locale } from "@/i18n/config";
+import { logger } from '@/lib/logger';
 
 const dataRoot = path.join(process.cwd(), "src", "data", "items");
 
@@ -16,22 +17,59 @@ export function getCategoriesWithCounts(): CategoryWithCount[] {
 }
 
 export function getItemsByCategory(categoryId: string): Item[] {
+  // Validate categoryId to prevent path traversal attacks
+  if (!categoryId || typeof categoryId !== 'string' || 
+      categoryId.length > 50 || 
+      /[^a-z0-9\-_]/.test(categoryId) || 
+      categoryId.includes('..')) {
+    return [];
+  }
+  
   const file = path.join(dataRoot, `${categoryId}.json`);
   if (!fs.existsSync(file)) return [];
   const raw = fs.readFileSync(file, "utf-8");
   let parsed: unknown[] = [];
-  try { parsed = JSON.parse(raw) as unknown[]; } catch { return []; }
-  return parsed
-    .map((i) => {
-      if (!i || typeof i !== "object") return null;
-      const obj = i as Record<string, unknown>;
-      const name = typeof obj["name"] === "string" ? (obj["name"] as string) : "";
-  return ItemSchema.parse({ ...(obj as object), slug: toSlug(name) });
-    })
-    .filter(Boolean) as Item[];
+  try { 
+    const jsonResult = JSON.parse(raw);
+    // Validate that parsed result is actually an array
+    if (Array.isArray(jsonResult)) {
+      parsed = jsonResult;
+    } else {
+      console.warn(`Data file ${categoryId}.json does not contain an array, got:`, typeof jsonResult);
+      return [];
+    }
+  } catch (err) { 
+    console.warn(`Failed to parse JSON from ${categoryId}.json:`, err);
+    return []; 
+  }
+  const items: Item[] = [];
+  for (const i of parsed) {
+    if (!i || typeof i !== "object") continue;
+    const obj = i as Record<string, unknown>;
+    const name = typeof obj["name"] === "string" ? (obj["name"] as string) : "";
+    const result = ItemSchema.safeParse({ ...(obj as object), slug: toSlug(name) });
+    if (result.success) {
+      items.push(result.data);
+    } else {
+      // Log a compact error summary without throwing to keep category load resilient
+      logger.warn('Invalid item skipped in category data', {
+        issues: result.error.issues.map(iss => ({ path: iss.path, code: iss.code, message: iss.message })).slice(0, 5)
+      });
+    }
+  }
+  return items;
 }
 
 export function getItem(categoryId: string, slug: string): Item | null {
+  // Validate inputs to prevent injection attacks
+  if (!categoryId || !slug || 
+      typeof categoryId !== 'string' || typeof slug !== 'string' ||
+      categoryId.length > 50 || slug.length > 100 ||
+      /[^a-z0-9\-_]/.test(categoryId) || /[^a-z0-9\-_]/.test(slug) ||
+      categoryId.includes('..') || slug.includes('..')) {
+    return null;
+  }
+  
   const items = getItemsByCategory(categoryId);
   return items.find((i) => (i.slug ?? toSlug(i.name)) === slug) ?? null;
 }

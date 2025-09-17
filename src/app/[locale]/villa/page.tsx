@@ -24,7 +24,7 @@ export default async function VillaPage({ params }: { params: Promise<{ locale: 
   const nearbyAttractions = getItemsByCategory('sightseeing').slice(0,4);
 
   return (
-    <div>
+    <div className="cancel-top-gap">
   <VillaCinematic locale={eff} t={t} houseText={ht} photos={photos} />
       <section className="bg-white py-16">
         <div className="mx-auto max-w-6xl px-6 md:px-14">

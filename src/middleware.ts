@@ -2,61 +2,238 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { locales, defaultLocale } from "@/i18n/config";
 import { verifyAdmin } from '@/lib/auth';
+import { createSecurityMiddleware } from '@/lib/security-middleware';
+import { tracer, SpanStatus } from '@/lib/distributed-tracing';
+import { metrics } from '@/lib/metrics-collector';
 
 function hasLocale(pathname: string) {
   return locales.some((l) => pathname === `/${l}` || pathname.startsWith(`/${l}/`));
 }
 
+// Initialize security middleware
+const securityMiddleware = createSecurityMiddleware({
+  skipPaths: ['/api/health', '/favicon.ico', '/_next'],
+  enableNonce: true,
+});
+
 export function middleware(req: NextRequest) {
+  const startTime = Date.now();
   const { pathname } = req.nextUrl;
-  if (pathname.startsWith("/_next") || pathname.startsWith("/api") || pathname === "/qr") {
-    return NextResponse.next();
-  }
-  const url = new URL(req.url);
-  // Simple auth gate for /admin/analytics
+  
+  // Extract trace context from headers
+  const traceHeaders: Record<string, string> = {};
+  req.headers.forEach((value, key) => {
+    traceHeaders[key] = value;
+  });
+  
+  const parentContext = tracer.extractTraceContext(traceHeaders);
+  
+  // Start middleware span
+  const span = tracer.startSpan('middleware', parentContext || undefined, {
+    'http.method': req.method,
+    'http.url': req.url,
+    'http.pathname': pathname,
+    component: 'middleware',
+  });
+
+  try {
+    // Track middleware invocation
+    metrics.counter('middleware.invocations', 1, {
+      pathname: pathname.substring(0, 50), // Limit length
+      method: req.method,
+    });
+
+    // Apply security headers first (will skip if path is in skipPaths)
+    const response = securityMiddleware(req);
+    
+    // Add tracing headers to response
+    const traceHeaders = tracer.injectTraceContext({
+      traceId: span.traceId,
+      spanId: span.spanId,
+      flags: 1,
+    });
+    
+    Object.entries(traceHeaders).forEach(([key, value]) => {
+      response.headers.set(key, value);
+    });
+
+    // Skip routing logic for Next.js internals, API routes, and QR page
+    if (pathname.startsWith("/_next") || pathname.startsWith("/api") || pathname === "/qr") {
+      tracer.addTags(span, { 'middleware.action': 'skip_routing' });
+      tracer.finishSpan(span);
+      
+      // Track performance
+      const duration = Date.now() - startTime;
+      metrics.timer('middleware.duration', duration, { action: 'skip_routing' });
+      
+      return response;
+    }
+    
+    const url = new URL(req.url);
+    // Secure auth gate for /admin/analytics - requires BOTH valid secret AND valid JWT
     if (url.pathname.startsWith('/admin/analytics')) {
+      tracer.addTags(span, { 'middleware.action': 'admin_auth' });
+      
       const secret = process.env.ADMIN_DASH_SECRET;
       const provided = req.headers.get('x-admin-secret') || url.searchParams.get('token');
-      const jwt = (req.headers.get('cookie') || '').split(';').map(c=>c.trim()).find(c=>c.startsWith('admin_jwt='))?.split('=')[1];
-      if (secret) {
-        if (provided === secret) {
-          return NextResponse.next();
-        }
+      
+      // Parse JWT token safely from cookie
+      const cookieHeader = req.headers.get('cookie') || '';
+      const jwt = cookieHeader
+        .split(';')
+        .map(c => c.trim())
+        .find(c => c.startsWith('admin_jwt='))
+        ?.split('=', 2)[1]; // Use split with limit to handle JWT with = signs
+      
+      // Check if admin dashboard is configured
+      if (!secret) {
+        tracer.addLog(span, 'error', 'Admin dashboard not configured');
+        tracer.finishSpan(span, SpanStatus.ERROR);
+        
+        metrics.counter('middleware.admin_auth_failures', 1, { reason: 'not_configured' });
+        
+        const errorResponse = new NextResponse('Admin dashboard not configured', { status: 503 });
+        // Copy security headers from original response
+        response.headers.forEach((value, key) => {
+          errorResponse.headers.set(key, value);
+        });
+        return errorResponse;
       }
-      if (jwt && verifyAdmin(jwt)) {
-        return NextResponse.next();
+      
+      // Validate both secret and JWT for enhanced security
+      const hasValidSecret = provided === secret;
+      const hasValidJWT = jwt && verifyAdmin(jwt);
+      
+      // SECURITY FIX: Always require BOTH secret AND JWT - no bypass allowed
+      if (hasValidSecret && hasValidJWT) {
+        tracer.addTags(span, { 'auth.success': true });
+        tracer.finishSpan(span);
+        
+        metrics.counter('middleware.admin_auth_success', 1);
+        const duration = Date.now() - startTime;
+        metrics.timer('middleware.duration', duration, { action: 'admin_auth_success' });
+        
+        return response;
       }
-      return new NextResponse('Unauthorized', { status: 401 });
-  }
-  const cookieLocale = req.cookies.get("lang")?.value as string | undefined;
-  const isValidCookie = cookieLocale ? (locales as readonly string[]).includes(cookieLocale) : false;
+      
+      tracer.addLog(span, 'warn', 'Admin authentication failed', {
+        hasValidSecret: !!hasValidSecret,
+        hasValidJWT: !!hasValidJWT,
+      });
+      tracer.finishSpan(span, SpanStatus.ERROR);
+      
+      metrics.counter('middleware.admin_auth_failures', 1, { 
+        reason: !hasValidSecret ? 'invalid_secret' : 'invalid_jwt' 
+      });
+      
+      const unauthorizedResponse = new NextResponse('Unauthorized', { status: 401 });
+      // Copy security headers from original response
+      response.headers.forEach((value, key) => {
+        unauthorizedResponse.headers.set(key, value);
+      });
+      return unauthorizedResponse;
+    }
+    
+    const cookieLocale = req.cookies.get("lang")?.value as string | undefined;
+    const isValidCookie = cookieLocale ? (locales as readonly string[]).includes(cookieLocale) : false;
 
-  if (!hasLocale(pathname)) {
-    const target = (isValidCookie ? cookieLocale : defaultLocale) as string;
-    const url = req.nextUrl.clone();
-    url.pathname = `/${target}${pathname === "/" ? "" : pathname}`;
-    const res = NextResponse.redirect(url);
-    res.cookies.set("lang", target, { path: "/", maxAge: 60 * 60 * 24 * 365 });
-    return res;
-  }
+    if (!hasLocale(pathname)) {
+      tracer.addTags(span, { 'middleware.action': 'locale_redirect' });
+      
+      const target = (isValidCookie ? cookieLocale : defaultLocale) as string;
+      const url = req.nextUrl.clone();
+      url.pathname = `/${target}${pathname === "/" ? "" : pathname}`;
+      const redirectResponse = NextResponse.redirect(url);
+      
+      // Copy security headers to redirect response
+      response.headers.forEach((value, key) => {
+        redirectResponse.headers.set(key, value);
+      });
+      
+      redirectResponse.cookies.set("lang", target, { 
+        path: "/", 
+        maxAge: 60 * 60 * 24 * 365,
+        sameSite: "lax", // Allow cross-origin for language detection
+        secure: process.env.NODE_ENV === 'production'
+      });
+      
+      tracer.addTags(span, { 'locale.target': target });
+      tracer.finishSpan(span);
+      
+      metrics.counter('middleware.locale_redirects', 1, { target });
+      const duration = Date.now() - startTime;
+      metrics.timer('middleware.duration', duration, { action: 'locale_redirect' });
+      
+      return redirectResponse;
+    }
 
-  // Legacy /[locale]/house redirect to /[locale]/villa (permanent for clients/SEO)
-  if (/^\/[a-zA-Z-]+\/house(\/)?$/.test(pathname)) {
-    const segs = pathname.split('/');
-    const loc = segs[1];
-    const url2 = req.nextUrl.clone();
-    url2.pathname = `/${loc}/villa`;
-    return NextResponse.redirect(url2, 308);
-  }
+    // Legacy /[locale]/house redirect to /[locale]/villa (permanent for clients/SEO)
+    if (/^\/[a-zA-Z-]+\/house(\/)?$/.test(pathname)) {
+      tracer.addTags(span, { 'middleware.action': 'legacy_redirect' });
+      
+      const segs = pathname.split('/');
+      const loc = segs[1];
+      const url2 = req.nextUrl.clone();
+      url2.pathname = `/${loc}/villa`;
+      const redirectResponse = NextResponse.redirect(url2, 308);
+      
+      // Copy security headers to redirect response
+      response.headers.forEach((value, key) => {
+        redirectResponse.headers.set(key, value);
+      });
+      
+      tracer.addTags(span, { 'redirect.from': pathname, 'redirect.to': url2.pathname });
+      tracer.finishSpan(span);
+      
+      metrics.counter('middleware.legacy_redirects', 1, { locale: loc });
+      const duration = Date.now() - startTime;
+      metrics.timer('middleware.duration', duration, { action: 'legacy_redirect' });
+      
+      return redirectResponse;
+    }
 
-  // When a locale is present in URL, ensure cookie matches it
-  const current = pathname.split("/")[1] as string;
-  if ((locales as readonly string[]).includes(current) && cookieLocale !== current) {
-    const res = NextResponse.next();
-    res.cookies.set("lang", current, { path: "/", maxAge: 60 * 60 * 24 * 365 });
-    return res;
+    // When a locale is present in URL, ensure cookie matches it
+    const current = pathname.split("/")[1] as string;
+    if ((locales as readonly string[]).includes(current) && cookieLocale !== current) {
+      tracer.addTags(span, { 'middleware.action': 'cookie_update' });
+      
+      // Copy security headers to response with updated cookie
+      response.cookies.set("lang", current, { 
+        path: "/", 
+        maxAge: 60 * 60 * 24 * 365,
+        sameSite: "lax", // Allow cross-origin for language detection
+        secure: process.env.NODE_ENV === 'production'
+      });
+      
+      tracer.addTags(span, { 'locale.updated': current });
+      tracer.finishSpan(span);
+      
+      metrics.counter('middleware.cookie_updates', 1, { locale: current });
+      const duration = Date.now() - startTime;
+      metrics.timer('middleware.duration', duration, { action: 'cookie_update' });
+      
+      return response;
+    }
+    
+    tracer.addTags(span, { 'middleware.action': 'passthrough' });
+    tracer.finishSpan(span);
+    
+    const duration = Date.now() - startTime;
+    metrics.timer('middleware.duration', duration, { action: 'passthrough' });
+    
+    return response;
+    
+  } catch (error) {
+    tracer.addLog(span, 'error', 'Middleware error', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    tracer.finishSpan(span, SpanStatus.ERROR);
+    
+    metrics.counter('middleware.errors', 1);
+    
+    // Re-throw to maintain Next.js error handling
+    throw error;
   }
-  return NextResponse.next();
 }
 
 export const config = {

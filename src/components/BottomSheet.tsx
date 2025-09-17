@@ -134,7 +134,8 @@ export default function BottomSheet({ isOpen, onClose, children, title, maxHeigh
         ref={sheetRef}
         role="dialog"
         aria-modal="true"
-        aria-label={title || 'Dialog'}
+        aria-labelledby={title ? "bottom-sheet-title" : undefined}
+        aria-label={!title ? 'Dialog' : undefined}
         className={`
           absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl
           transform transition-transform duration-300 ease-out
@@ -168,11 +169,11 @@ export default function BottomSheet({ isOpen, onClose, children, title, maxHeigh
         {/* Header */}
         {title && (
           <div className="flex items-center justify-between px-6 pb-4">
-            <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+            <h2 id="bottom-sheet-title" className="text-lg font-semibold text-gray-900">{title}</h2>
             <button
               onClick={onClose}
               className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
-              aria-label="Close"
+              aria-label="Close dialog"
             >
               <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />

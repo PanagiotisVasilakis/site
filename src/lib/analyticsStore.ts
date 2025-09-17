@@ -9,11 +9,14 @@ const firstSeen: Record<string, number> = {};
 export type Vital = { name: string; value: number; id: string; ts: number };
 const vitals: Vital[] = [];
 let loaded = false;
+let loading = false; // Prevent concurrent loading
+let lastBackup = 0; // Track last backup time
 
 const persistEnabled = process.env.ANALYTICS_PERSIST === '1' && !process.env.VERCEL; // opt-in persistence
 const retentionDays = Math.max(1, parseInt(process.env.ANALYTICS_RETENTION_DAYS || '30', 10));
 const storage = createStorageAdapter();
 const hashPaths = process.env.ANALYTICS_HASH_PATHS === '1';
+const backupIntervalMs = 24 * 60 * 60 * 1000; // 24 hours
 
 function maybeHash(p: string) {
   if (!hashPaths) return p;
@@ -22,34 +25,187 @@ function maybeHash(p: string) {
 
 export function loadHits() {
   if (loaded) return;
-  loaded = true;
-  if (!persistEnabled) return; // skip loading if not persisting
+  if (loading) {
+    // Wait for concurrent load to complete
+    let attempts = 0;
+    while (loading && attempts < 50) { // Max 500ms wait
+      attempts++;
+      // Use sync sleep to avoid async complications in this context
+      const start = Date.now();
+      while (Date.now() - start < 10) { /* busy wait 10ms */ }
+    }
+    return;
+  }
+  
+  loading = true;
+  
   try {
+    if (!persistEnabled) return; // skip loading if not persisting
+    
     const data = storage.load();
-    if (Array.isArray(data.hits)) hits.push(...data.hits);
-    Object.assign(firstSeen, data.firstSeen || {});
-    if (Array.isArray(data.vitals)) vitals.push(...data.vitals.slice(-5000));
-  } catch (err) { logger.error('loadHits failed', err); }
+    
+    // Validate loaded data structure
+    if (data && typeof data === 'object') {
+      if (Array.isArray(data.hits)) {
+        // Additional validation for hit structure
+        const validHits = data.hits.filter(h => 
+          h && typeof h === 'object' && 
+          typeof h.path === 'string' && 
+          typeof h.ts === 'number' && 
+          h.ts > 0 && 
+          h.ts <= Date.now() + 86400000 // Not more than 1 day in future
+        );
+        hits.push(...validHits);
+        
+        if (validHits.length !== data.hits.length) {
+          logger.warn(`Filtered invalid hits: ${data.hits.length - validHits.length} removed`);
+        }
+      }
+      
+      if (data.firstSeen && typeof data.firstSeen === 'object') {
+        // Validate firstSeen entries
+        for (const [path, timestamp] of Object.entries(data.firstSeen)) {
+          if (typeof timestamp === 'number' && timestamp > 0 && timestamp <= Date.now()) {
+            firstSeen[path] = timestamp;
+          }
+        }
+      }
+      
+      if (Array.isArray(data.vitals)) {
+        const validVitals = data.vitals.filter(v =>
+          v && typeof v === 'object' &&
+          typeof v.name === 'string' && v.name.length < 100 &&
+          typeof v.value === 'number' && !isNaN(v.value) &&
+          typeof v.id === 'string' && v.id.length < 100 &&
+          typeof v.ts === 'number' && v.ts > 0 && v.ts <= Date.now() + 86400000
+        );
+        vitals.push(...validVitals.slice(-5000));
+        
+        if (validVitals.length !== data.vitals.length) {
+          logger.warn(`Filtered invalid vitals: ${data.vitals.length - validVitals.length} removed`);
+        }
+      }
+    }
+    
+    loaded = true;
+    
+  } catch (err) { 
+    logger.error('loadHits failed', err);
+    loaded = true; // Mark as loaded even on error to prevent infinite retries
+  } finally {
+    loading = false;
+  }
 }
 
 function persist() {
   if (!persistEnabled) return;
-  storage.save({ hits, vitals, firstSeen });
+  
+  try {
+    storage.save({ hits, vitals, firstSeen });
+    
+    // Trigger backup if enough time has passed
+    const now = Date.now();
+    if (storage.backup && (now - lastBackup) > backupIntervalMs) {
+      storage.backup();
+      lastBackup = now;
+    }
+    
+  } catch (err) {
+    logger.error('Analytics persistence failed', err);
+  }
 }
 
 export function addHits(newHits: Array<Omit<AnalyticsHit, 'ua'>> , ua: string | null) {
   loadHits();
+  
+  let validHitsAdded = 0;
+  
   for (const h of newHits) {
-    if (!h.path) continue;
-  const norm = maybeHash(h.path);
-  hits.push({ path: norm, ts: h.ts || Date.now(), ua: hashPaths ? null : ua, locale: h.locale });
-  if (firstSeen[norm] == null) firstSeen[norm] = Date.now();
+    if (!h.path || typeof h.path !== 'string') {
+      logger.warn('Invalid hit path skipped', h);
+      continue;
+    }
+    
+    // Additional validation for hit data
+    const timestamp = h.ts && typeof h.ts === 'number' ? h.ts : Date.now();
+    const locale = h.locale && typeof h.locale === 'string' ? h.locale : undefined;
+    
+    // Validate timestamp is reasonable (not too far in past/future)
+    const now = Date.now();
+    if (timestamp < now - 86400000 * 30 || timestamp > now + 86400000) {
+      logger.warn('Hit with invalid timestamp skipped', { path: h.path, ts: timestamp });
+      continue;
+    }
+    
+    const norm = maybeHash(h.path);
+    hits.push({ path: norm, ts: timestamp, ua: hashPaths ? null : ua, locale });
+    
+    if (firstSeen[norm] == null) {
+      firstSeen[norm] = timestamp; // Use hit timestamp, not current time
+    }
+    
+    validHitsAdded++;
   }
-  // Drop hits older than 30 days for rolling retention
+  
+  if (validHitsAdded === 0) {
+    logger.warn('No valid hits were added from batch', newHits);
+    return 0;
+  }
+  
+  // Drop hits older than retentionDays for rolling retention (O(log n) performance)
   const cutoff = Date.now() - retentionDays * 86400_000;
-  while (hits.length && hits[0].ts < cutoff) hits.shift();
-  if (newHits.length) persist();
-  return newHits.length;
+  const firstValidIndex = hits.findIndex(h => h.ts >= cutoff);
+  if (firstValidIndex > 0) {
+    const removedCount = firstValidIndex;
+    hits.splice(0, firstValidIndex);
+    if (removedCount > 0) {
+      logger.info(`Removed ${removedCount} expired hits older than ${retentionDays} days`);
+    }
+  }
+  
+  // Clean up vitals array to prevent unbounded growth
+  if (vitals.length > 5000) {
+    const removedCount = vitals.length - 5000;
+    vitals.splice(0, vitals.length - 5000);
+    if (removedCount > 0) {
+      logger.info(`Removed ${removedCount} old vitals to maintain size limit`);
+    }
+  }
+  
+  // Clean up stale firstSeen entries to prevent memory leaks
+  cleanupFirstSeen(cutoff);
+  
+  persist();
+  return validHitsAdded;
+}
+
+// Helper function to clean up stale firstSeen entries
+function cleanupFirstSeen(cutoff: number) {
+  // Remove firstSeen entries for paths that haven't been hit recently
+  const activePathsSet = new Set(hits.map(h => h.path));
+  
+  for (const [path, firstSeenTime] of Object.entries(firstSeen)) {
+    // Remove if the path hasn't been seen recently AND it's not in current hits
+    if (firstSeenTime < cutoff && !activePathsSet.has(path)) {
+      delete firstSeen[path];
+    }
+  }
+  
+  // Limit firstSeen object size as a safety measure
+  const entries = Object.entries(firstSeen);
+  if (entries.length > 10000) {
+    // Keep only the most recent 8000 entries
+    entries.sort((a, b) => b[1] - a[1]);
+    const toKeep = entries.slice(0, 8000);
+    
+    // Clear and repopulate
+    for (const key of Object.keys(firstSeen)) {
+      delete firstSeen[key];
+    }
+    for (const [path, time] of toKeep) {
+      firstSeen[path] = time;
+    }
+  }
 }
 
 export function getHits() {
@@ -150,11 +306,58 @@ export function dailyNewPaths(lastDays = 30) {
 }
 
 export function addVital(v: Vital) {
+  // Validate vital data before adding
+  if (!v || typeof v !== 'object') {
+    logger.warn('Invalid vital object skipped', v);
+    return;
+  }
+  
+  if (typeof v.name !== 'string' || v.name.length === 0 || v.name.length > 100) {
+    logger.warn('Invalid vital name skipped', v);
+    return;
+  }
+  
+  if (typeof v.value !== 'number' || isNaN(v.value) || !isFinite(v.value)) {
+    logger.warn('Invalid vital value skipped', v);
+    return;
+  }
+  
+  if (typeof v.id !== 'string' || v.id.length === 0 || v.id.length > 100) {
+    logger.warn('Invalid vital id skipped', v);
+    return;
+  }
+  
+  if (typeof v.ts !== 'number' || v.ts <= 0) {
+    logger.warn('Invalid vital timestamp skipped', v);
+    return;
+  }
+  
+  // Validate timestamp is reasonable
+  const now = Date.now();
+  if (v.ts < now - 86400000 * 30 || v.ts > now + 86400000) {
+    logger.warn('Vital with invalid timestamp skipped', v);
+    return;
+  }
+  
   vitals.push(v);
-  if (vitals.length > 5000) vitals.splice(0, vitals.length - 5000);
-  // Drop vitals older than 30 days
+  
+  if (vitals.length > 5000) {
+    const removedCount = vitals.length - 5000;
+    vitals.splice(0, vitals.length - 5000);
+    logger.info(`Removed ${removedCount} old vitals to maintain size limit`);
+  }
+  
+  // Drop vitals older than retentionDays (O(log n) performance)
   const cutoff = Date.now() - retentionDays * 86400_000;
-  while (vitals.length && vitals[0].ts < cutoff) vitals.shift();
+  const firstValidIndex = vitals.findIndex(v => v.ts >= cutoff);
+  if (firstValidIndex > 0) {
+    const removedCount = firstValidIndex;
+    vitals.splice(0, firstValidIndex);
+    if (removedCount > 0) {
+      logger.info(`Removed ${removedCount} expired vitals older than ${retentionDays} days`);
+    }
+  }
+  
   persist();
 }
 

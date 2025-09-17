@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 interface Labels {
   online: string; offline: string; reconnecting: string; slow: string;
@@ -15,42 +15,122 @@ export default function StatusCluster({ className = '', labels, pollMs = 15000 }
   const [effectiveType, setEffectiveType] = useState<string | undefined>();
   // Sync
   const [queueSize, setQueueSize] = useState(0);
-  // Removed lastSyncTs (unused) to keep component lean.
-
-  useEffect(() => {
-    function online() { setIsOnline(true); setReconnecting(true); setTimeout(()=>setReconnecting(false), 2500); }
-    function offline() { setIsOnline(false); }
-    window.addEventListener('online', online); window.addEventListener('offline', offline);
-    return () => { window.removeEventListener('online', online); window.removeEventListener('offline', offline); };
+  
+  // Use useCallback to prevent unnecessary re-renders and ensure stable references
+  const handleOnline = useCallback(() => {
+    // Use React's automatic batching for state updates
+    setIsOnline(true);
+    setReconnecting(true);
+    
+    // Set a timeout to clear reconnecting state with proper cleanup
+    const timeoutId = setTimeout(() => {
+      setReconnecting(false);
+    }, 2500);
+    
+    // Return cleanup function to prevent memory leaks
+    return () => clearTimeout(timeoutId);
+  }, []);
+  
+  const handleOffline = useCallback(() => {
+    setIsOnline(false);
+    setReconnecting(false); // Clear reconnecting when going offline
   }, []);
 
   useEffect(() => {
-    interface NavWithConn extends Navigator { connection?: { effectiveType?: string; addEventListener?(type:string, cb:()=>void): void; removeEventListener?(type:string, cb:()=>void): void } }
+    let cleanupReconnecting: (() => void) | undefined;
+    
+    const handleOnlineWrapper = () => {
+      cleanupReconnecting?.(); // Clean up any previous timeout
+      cleanupReconnecting = handleOnline();
+    };
+    
+    window.addEventListener('online', handleOnlineWrapper);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnlineWrapper);
+      window.removeEventListener('offline', handleOffline);
+      cleanupReconnecting?.(); // Clean up timeout on unmount
+    };
+  }, [handleOnline, handleOffline]);
+
+  useEffect(() => {
+    interface NavWithConn extends Navigator { 
+      connection?: { 
+        effectiveType?: string; 
+        addEventListener?(type: string, cb: () => void): void; 
+        removeEventListener?(type: string, cb: () => void): void;
+      };
+    }
+    
     const nav = navigator as NavWithConn;
-    function updateConn() { if (nav.connection?.effectiveType) setEffectiveType(nav.connection.effectiveType); }
+    
+    const updateConn = () => {
+      if (nav.connection?.effectiveType) {
+        setEffectiveType(nav.connection.effectiveType);
+      }
+    };
+    
     updateConn();
-    if (nav.connection?.addEventListener) { nav.connection.addEventListener('change', updateConn); return () => nav.connection?.removeEventListener?.('change', updateConn); }
+    
+    if (nav.connection?.addEventListener) {
+      nav.connection.addEventListener('change', updateConn);
+      return () => nav.connection?.removeEventListener?.('change', updateConn);
+    }
   }, []);
 
   // Optional polling to verify connectivity beyond onLine
   useEffect(() => {
-    if (!pollMs || pollMs < 5000) return; let timer: ReturnType<typeof setTimeout> | undefined; let aborted = false;
+    if (!pollMs || pollMs < 5000) return;
+    
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let aborted = false;
+    
     async function probe() {
       if (aborted) return;
-      try { const ctrl = new AbortController(); const t = setTimeout(()=>ctrl.abort(), 4000); await fetch('/manifest.webmanifest?probe='+Date.now(), { method:'HEAD', cache:'no-store', signal: ctrl.signal }); clearTimeout(t); setIsOnline(true); } catch { setIsOnline(false); }
-      finally { timer = setTimeout(probe, pollMs); }
+      
+      try {
+        const ctrl = new AbortController();
+        const timeoutId = setTimeout(() => ctrl.abort(), 4000);
+        
+        await fetch('/manifest.webmanifest?probe=' + Date.now(), {
+          method: 'HEAD',
+          cache: 'no-store',
+          signal: ctrl.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        // Only update if we're currently offline to avoid unnecessary re-renders
+        setIsOnline(current => current ? current : true);
+      } catch {
+        // Only update if we're currently online to avoid unnecessary re-renders
+        setIsOnline(current => current ? false : current);
+      } finally {
+        if (!aborted) {
+          timer = setTimeout(probe, pollMs);
+        }
+      }
     }
+    
     probe();
-  return () => { aborted = true; if (timer) clearTimeout(timer); };
+    
+    return () => {
+      aborted = true;
+      if (timer) clearTimeout(timer);
+    };
   }, [pollMs]);
 
   // Service worker sync queue listener
   useEffect(() => {
-    function onMessage(e: MessageEvent) {
+    const onMessage = (e: MessageEvent) => {
       if (e.data?.type === 'ANALYTICS_QUEUE_SIZE') {
-  setQueueSize(e.data.size || 0);
+        const newSize = e.data.size || 0;
+        // Only update if the size actually changed
+        setQueueSize(current => current !== newSize ? newSize : current);
       }
-    }
+    };
+    
     navigator.serviceWorker?.addEventListener('message', onMessage);
     return () => navigator.serviceWorker?.removeEventListener('message', onMessage);
   }, []);
@@ -64,16 +144,22 @@ export default function StatusCluster({ className = '', labels, pollMs = 15000 }
   const dotColorVar = netState === 'offline' ? 'var(--badge-warn-bg)' : netState === 'slow' ? 'var(--brand-400)' : 'var(--brand-500)';
   const warn = queueSize > 0 || netState === 'offline';
 
+  const handleClick = useCallback(() => {
+    if (queueSize > 0) {
+      navigator.serviceWorker?.controller?.postMessage({ type: 'REPLAY_ANALYTICS' });
+    }
+  }, [queueSize]);
+
   return (
     <button
       type="button"
       className={`net-status ${className}`.trim()}
       data-state={warn ? 'offline' : 'online'}
       aria-live="polite"
-      aria-label={aria + (queueSize>0 ? ' Tap to sync now.' : '')}
+      aria-label={aria + (queueSize > 0 ? ' Tap to sync now.' : '')}
       title={aria}
-      onClick={() => { if (queueSize > 0) navigator.serviceWorker?.controller?.postMessage({ type:'REPLAY_ANALYTICS' }); }}
-      style={{ display:'inline-flex', gap:'.5rem' }}
+      onClick={handleClick}
+      style={{ display: 'inline-flex', gap: '.5rem' }}
     >
       <span className="net-status-dot" aria-hidden style={{ background: dotColorVar }} />
       <span className="flex items-center gap-1">

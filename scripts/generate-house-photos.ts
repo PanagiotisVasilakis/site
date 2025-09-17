@@ -11,6 +11,12 @@ import path from 'node:path';
 const HOUSE_DIR = path.join(process.cwd(), 'public', 'house');
 const OUT_FILE = path.join(process.cwd(), 'src', 'data', 'housePhotos.ts');
 
+// Configuration constants
+const MAX_PHOTOS = 12; // safety cap for processing
+const BLUR_THUMBNAIL_SIZE = 24; // pixels for low-quality image placeholder
+const BLUR_JPEG_QUALITY = 40; // quality for blur placeholder generation
+const FALLBACK_BLUR_BYTES = 1200; // bytes to use for naive blur when sharp unavailable
+
 interface PhotoMeta { src: string; width: number; height: number; blurDataURL: string; }
 
 async function main() {
@@ -32,33 +38,33 @@ async function main() {
     console.warn('[house-photos] sharp not installed, using naive blur extraction (first bytes)');
   }
   const metas: PhotoMeta[] = [];
-  for (const f of files.slice(0, 12)) { // safety cap
+  for (const f of files.slice(0, MAX_PHOTOS)) { // safety cap
     const abs = path.join(HOUSE_DIR, f);
     const buf = fs.readFileSync(abs);
     let width = 0; let height = 0;
     try {
-  type Dim = { width: number; height: number };
-  type SizeFn = (p: string) => Dim;
-  type SizeModuleObj = { imageSize?: SizeFn; default?: SizeFn };
-  const sm = size as SizeFn | SizeModuleObj;
+      type Dim = { width: number; height: number };
+      type SizeFn = (p: string) => Dim;
+      type SizeModuleObj = { imageSize?: SizeFn; default?: SizeFn };
+      const sm = size as SizeFn | SizeModuleObj;
       let dim: { width: number; height: number } | undefined;
-  if (typeof sm === 'function') dim = sm(abs);
-  else if (sm.imageSize) dim = sm.imageSize(abs);
-  else if (sm.default) dim = sm.default(abs);
+      if (typeof sm === 'function') dim = sm(abs);
+      else if (sm.imageSize) dim = sm.imageSize(abs);
+      else if (sm.default) dim = sm.default(abs);
       if (dim && typeof dim.width === 'number' && typeof dim.height === 'number') { width = dim.width; height = dim.height; }
     } catch {}
     let blur = '';
-  if (sharp) {
+    if (sharp) {
       try {
-  type SharpFn = (input: Buffer) => { resize: (w: number) => { jpeg: (opts: { quality: number }) => { toBuffer: () => Promise<Buffer> } } };
-  const maybeSharp = sharp as unknown as SharpFn;
-  const mini = await maybeSharp(buf).resize(24).jpeg({ quality: 40 }).toBuffer();
+        type SharpFn = (input: Buffer) => { resize: (w: number) => { jpeg: (opts: { quality: number }) => { toBuffer: () => Promise<Buffer> } } };
+        const maybeSharp = sharp as unknown as SharpFn;
+        const mini = await maybeSharp(buf).resize(BLUR_THUMBNAIL_SIZE).jpeg({ quality: BLUR_JPEG_QUALITY }).toBuffer();
         blur = `data:image/jpeg;base64,${mini.toString('base64')}`;
-  } catch {
-        blur = `data:image/jpeg;base64,${buf.slice(0,1200).toString('base64')}`;
+      } catch {
+        blur = `data:image/jpeg;base64,${buf.slice(0, FALLBACK_BLUR_BYTES).toString('base64')}`;
       }
     } else {
-      blur = `data:image/jpeg;base64,${buf.slice(0,1200).toString('base64')}`;
+      blur = `data:image/jpeg;base64,${buf.slice(0, FALLBACK_BLUR_BYTES).toString('base64')}`;
     }
     metas.push({ src: `/house/${f}`, width, height, blurDataURL: blur });
   }

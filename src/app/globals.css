@@ -165,6 +165,31 @@ code, pre, kbd, samp {
   }
 }
 
+/* Global top gap under fixed main bar */
+:root {
+  --top-gap: 5vh; /* Adjust this to increase/decrease the uniform spacing */
+}
+.top-gap {
+  /* Add safe-area inset for iOS notch devices */
+  margin-top: calc(var(--top-gap, 5vh) + env(safe-area-inset-top));
+}
+/* Utility to cancel the top gap on specific pages (e.g., villa) */
+.cancel-top-gap {
+  margin-top: calc(var(--top-gap, 5vh) * -1);
+}
+
+/* Responsive page container utility for consistent spacing */
+.page-container {
+  margin-left: auto;
+  margin-right: auto;
+  /* Fluid horizontal/vertical padding that adapts to viewport */
+  padding-left: clamp(1rem, 4vw, 2.5rem);
+  padding-right: clamp(1rem, 4vw, 2.5rem);
+  padding-top: clamp(1rem, 3vw, 2rem);
+  padding-bottom: clamp(1rem, 3vw, 2rem);
+  width: 100%; /* Let pages control max-width (e.g., max-w-3xl/6xl) */
+}
+
 /* Explicit dark theme via data-theme="dark" overrides media query */
 [data-theme="dark"] {
   --background: #0a0f10;

@@ -23,7 +23,28 @@ function formatMessage(level: LogLevel, message: string) {
 
 function safeSerialize(meta: unknown): unknown {
   if (!meta) return undefined;
-  try { return JSON.parse(JSON.stringify(meta)); } catch { return String(meta); }
+  
+  // Avoid expensive serialization for simple types
+  if (typeof meta === 'string' || typeof meta === 'number' || typeof meta === 'boolean') {
+    return meta;
+  }
+  
+  // For objects, do lightweight validation and truncation to prevent memory issues
+  if (typeof meta === 'object') {
+    try {
+      // Quick size check to prevent serializing huge objects
+      const stringified = JSON.stringify(meta);
+      if (stringified.length > 1000) {
+        // Truncate large objects to prevent memory/performance issues
+        return `[Object too large: ${stringified.length} chars]`;
+      }
+      return JSON.parse(stringified); // Only do round-trip for validated small objects
+    } catch { 
+      return '[Unserializable object]'; 
+    }
+  }
+  
+  return String(meta);
 }
 
 export const logger = {
@@ -58,7 +79,11 @@ export const logger = {
     if (isBrowser()) {
       console.error(formatMessage('error', message), data);
     } else {
-      console.error(formatMessage('error', message), data);
+      // In production, don't log stack traces to prevent information disclosure
+      const sanitizedData = process.env.NODE_ENV === 'production' && data && typeof data === 'object' 
+        ? { ...data, stack: undefined } 
+        : data;
+      console.error(formatMessage('error', message), sanitizedData);
     }
   }
 };

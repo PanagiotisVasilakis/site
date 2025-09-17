@@ -77,12 +77,10 @@ export default function BookingBar({ onBooking, initial, locale = 'en', property
   }, [updateState]);
 
   const handleDatePickerOpen = useCallback(() => {
-    console.log('Opening date picker');
     setIsDatePickerOpen(true);
   }, []);
 
   const handleDatePickerClose = useCallback(() => {
-    console.log('Closing date picker');
     setIsDatePickerOpen(false);
   }, []);
 

@@ -6,6 +6,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import 'leaflet.markercluster';
 import { formatTravelChip, TravelMode } from '@/lib/travelFormat';
+import { logger } from '@/lib/logger';
 
 export interface LeafletMarkerData {
   id: string;
@@ -378,15 +379,26 @@ export default function LeafletMap({
         if (enableRouting && origin) {
           const profile = routeProfile === 'auto' ? (effectiveModes[0] || 'driving') : routeProfile;
           const url = `${osrmBase}/route/v1/${profile}/${origin[0]},${origin[1]};${m.coordinates[0]},${m.coordinates[1]}?overview=full&geometries=geojson`;
-          fetch(url).then(r=> r.ok ? r.json(): null).then(data => {
-            if(!data || !mapRef.current) return;
-            const coords: [number, number][] = data.routes?.[0]?.geometry?.coordinates || [];
-            if(!coords.length) return;
-            if(routeLayerRef.current){ routeLayerRef.current.remove(); routeLayerRef.current = null; }
-            const latlngs = coords.map(c => [c[1], c[0]] as [number, number]);
-            routeLayerRef.current = L.polyline(latlngs, { color: routeColor, weight: 4, opacity: 0.85 }).addTo(mapRef.current);
-            mapRef.current.fitBounds(routeLayerRef.current.getBounds().pad(0.15));
-          }).catch(()=>{});
+          // Use async/await properly with error handling
+          (async () => {
+            try {
+              const response = await fetch(url);
+              if (!response.ok) return;
+              const data = await response.json();
+              if (!data || !mapRef.current) return;
+              const coords: [number, number][] = data.routes?.[0]?.geometry?.coordinates || [];
+              if (!coords.length) return;
+              if (routeLayerRef.current) { 
+                routeLayerRef.current.remove(); 
+                routeLayerRef.current = null; 
+              }
+              const latlngs = coords.map(c => [c[1], c[0]] as [number, number]);
+              routeLayerRef.current = L.polyline(latlngs, { color: routeColor, weight: 4, opacity: 0.85 }).addTo(mapRef.current);
+              mapRef.current.fitBounds(routeLayerRef.current.getBounds().pad(0.15));
+            } catch (err) {
+              logger.warn('Route fetch failed', err);
+            }
+          })();
         }
       });
       // Animation

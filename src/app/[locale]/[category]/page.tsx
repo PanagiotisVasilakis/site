@@ -16,7 +16,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
   // Filtering & segmentation handled client-side now
 
   return (
-    <div className="mx-auto max-w-3xl p-6 safe-bottom">
+  <div className="page-container mx-auto max-w-3xl safe-bottom">
       <header className="mb-4">
   <h1 className="text-2xl font-semibold" style={{color:'var(--text-accent)'}}>{t.categories[cat.slug as "phones" | "restaurants" | "sightseeing"] ?? (pickCategoryLocale(cat, "title", eff) ?? cat.title)}</h1>
   {(pickCategoryLocale(cat, "description", eff) ?? cat.description) && <p className="text-sm text-gray-600">{pickCategoryLocale(cat, "description", eff) ?? cat.description}</p>}

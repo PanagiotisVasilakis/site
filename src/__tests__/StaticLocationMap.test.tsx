@@ -1,5 +1,4 @@
 import React from 'react';
-import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import StaticLocationMap from '@/components/StaticLocationMap';
 
@@ -75,12 +74,11 @@ describe('StaticLocationMap', () => {
 
   it('renders Greek content', () => {
     render(<StaticLocationMap locale="el" compact />);
-    const allTitles = screen.getAllByTestId('static-map-title');
-    expect(allTitles[0]).toHaveTextContent(/Villa Location|Attractions/i);
-    expect(allTitles[1]).toHaveTextContent(/Τοποθεσία|Αξιοθέατα/i);
+    const title = screen.getByTestId('static-map-title');
+    expect(title).toHaveTextContent(/Τοποθεσία|Αξιοθέατα/i);
     expect(screen.getByText(/Καλαμάτα/)).toBeInTheDocument();
-    // Snapshot only the Greek instance
-    expect(allTitles[1].parentElement?.parentElement?.parentElement?.parentElement).toMatchInlineSnapshot(`
+    // Snapshot the Greek instance
+    expect(title.parentElement?.parentElement?.parentElement?.parentElement).toMatchInlineSnapshot(`
       <div
         class=" relative"
         style="height: 400px;"

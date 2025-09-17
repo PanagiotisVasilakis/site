@@ -1,0 +1,70 @@
+# GitHub Dependabot configuration for automated security updates
+version: 2
+updates:
+  # Enable version updates for npm dependencies
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    # Security updates are always immediate
+    open-pull-requests-limit: 10
+    
+    # Group patch updates together to reduce noise
+    groups:
+      patch-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+    
+    # Security-focused settings
+    commit-message:
+      prefix: "security"
+      prefix-development: "deps-dev"
+      include: "scope"
+    
+    # Target branches
+    target-branch: "main"
+    
+    # Custom labels for security tracking
+    labels:
+      - "dependencies"
+      - "security"
+      - "automated"
+    
+    # Allow all dependency types for comprehensive security coverage
+    allow:
+      - dependency-type: "direct"
+      - dependency-type: "indirect"
+    
+    # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "github-actions"
+      - "security"
+      - "automated"
+    
+  # Enable updates for Docker base images
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "09:00"
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+    labels:
+      - "docker"
+      - "security"
+      - "automated"
