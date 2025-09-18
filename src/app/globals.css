@@ -96,6 +96,24 @@
   font-weight: 500;
   font-display: swap;
 }
+
+/* Optional self-hosted modern sans display font */
+@font-face {
+  font-family: 'BrandDisplaySans';
+  src: url('/fonts/brand-display-sans.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* High-end display font (self-hosted) */
+@font-face {
+  font-family: 'BrandDisplay';
+  src: url('/fonts/brand-display.woff2') format('woff2');
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
 @font-face {
   font-family: 'GeistLocal';
   src: url('/fonts/geist-semibold.woff2') format('woff2');
@@ -401,6 +419,128 @@ input, textarea { color: inherit; }
   background: rgba(17,25,26,0.85);
   border-color: rgba(255,255,255,0.08);
   box-shadow: 0 6px 24px -4px rgba(0,0,0,0.5);
+}
+
+/* Elevated hero card with soft glow */
+.hero-card {
+  box-shadow:
+    0 6px 24px -8px rgba(0,0,0,0.20),
+    0 12px 48px -12px rgba(0,0,0,0.30),
+    0 0 0 1px rgba(54,185,171,0.08);
+}
+[data-theme="dark"] .hero-card {
+  box-shadow:
+    0 12px 48px -12px rgba(0,0,0,0.65),
+    0 0 0 1px rgba(255,255,255,0.06);
+}
+
+/* Elegant display font treatment for hero titles */
+.display-serif {
+  font-family: 'BrandDisplay', Georgia, 'Times New Roman', Times, serif;
+  letter-spacing: 0.01em;
+  font-weight: 600;
+}
+/* Optional modern sans display alternative */
+.display-sans {
+  font-family: 'BrandDisplaySans', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'Liberation Sans', sans-serif;
+  letter-spacing: 0.01em;
+  font-weight: 700;
+}
+
+/* Italian-style title flourish */
+.italian-title {
+  font-style: italic;
+  letter-spacing: 0.005em; /* slightly tighter */
+  font-variant-ligatures: discretionary-ligatures;
+  text-rendering: optimizeLegibility;
+}
+@supports (font-variation-settings: normal) {
+  .italian-title {
+    /* Nudge slant if variable font supports it (fallback to italic otherwise) */
+    font-variation-settings: 'slnt' -6;
+  }
+}
+/* Subtle baseline lift for italic display on large screens */
+@media (min-width: 768px) {
+  .italian-title { position: relative; top: -0.02em; }
+}
+
+/* Gradient text accent for hero titles (cross-browser with fallback) */
+.title-gradient {
+  /* Fallback solid color for browsers without background-clip:text */
+  color: var(--brand-900);
+  display: inline-block; /* improves clipping reliability across engines */
+}
+[data-theme="dark"] .title-gradient {
+  color: var(--brand-300);
+}
+
+/* Enable gradient fill when supported */
+@supports (-webkit-background-clip: text) or (background-clip: text) {
+  .title-gradient {
+    background: linear-gradient(135deg, var(--brand-900) 0%, var(--brand-600) 40%, var(--accent-500) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+  }
+  [data-theme="dark"] .title-gradient {
+    background: linear-gradient(135deg, var(--brand-300) 0%, var(--brand-500) 40%, var(--accent-400) 100%);
+    /* Remove glow to prevent boxy halo artifacts on some engines */
+    text-shadow: none;
+  }
+}
+
+/* When inside a blurred backdrop in dark mode, fall back to solid color to avoid glow artifacts */
+[data-theme="dark"] .backdrop-blur .title-gradient {
+  background: none !important;
+  color: var(--brand-300) !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+
+/* Delicate underline ornament */
+.title-ornament {
+  position: relative;
+}
+.title-ornament::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%) skewX(-2deg);
+  bottom: -0.4rem;
+  width: clamp(34%, 44vw, 44%);
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(54,185,171,0.65), transparent);
+  border-radius: 9999px; /* rounded, brush-like ends */
+  /* Tapered ends using masks */
+  -webkit-mask-image: radial-gradient(120% 100% at 0% 50%, black 60%, transparent 100%),
+                       radial-gradient(120% 100% at 100% 50%, black 60%, transparent 100%);
+  -webkit-mask-size: 50% 100%, 50% 100%;
+  -webkit-mask-position: 0 50%, 100% 50%;
+  -webkit-mask-repeat: no-repeat;
+  mask-image: radial-gradient(120% 100% at 0% 50%, black 60%, transparent 100%),
+               radial-gradient(120% 100% at 100% 50%, black 60%, transparent 100%);
+  mask-size: 50% 100%, 50% 100%;
+  mask-position: 0 50%, 100% 50%;
+  mask-repeat: no-repeat;
+}
+[data-theme="dark"] .title-ornament::after {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+}
+
+/* On larger screens, center and widen the underline */
+@media (min-width: 640px) {
+  .title-ornament::after {
+    left: 50%;
+    transform: translateX(-50%) skewX(-2deg);
+    width: clamp(44%, 56vw, 56%);
+  }
+}
+@media (min-width: 1024px) {
+  .title-ornament::after {
+    width: clamp(52%, 68vw, 68%);
+    height: 3px; /* slightly richer stroke on desktop */
+  }
 }
 
 /* Scrollbar theming */

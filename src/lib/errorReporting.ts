@@ -137,29 +137,63 @@ class ErrorReporter {
     if (!this.isEnabled) return false;
 
     try {
+      const truncate = (value: string | undefined, max: number): string | undefined => {
+        if (typeof value !== 'string') return value;
+        return value.length > max ? value.slice(0, max) : value;
+      };
+
+      const safeMetadata = (() => {
+        if (!metadata) return undefined;
+        try {
+          const str = JSON.stringify(metadata);
+          if (str.length > 2000) {
+            return { _truncated: true, _originalSize: str.length } as Record<string, unknown>;
+          }
+          return metadata;
+        } catch {
+          return { _truncated: true } as Record<string, unknown>;
+        }
+      })();
+
       // Add breadcrumb for this error unless skipped
       if (!options.skipBreadcrumb) {
         this.addBreadcrumb(
           options.category || 'error',
-          `Error: ${error.name}: ${error.message}`,
+          truncate(`Error: ${error.name}: ${error.message}`, 200) || 'Error',
           'error',
-          metadata
+          safeMetadata
         );
       }
 
+      // Prepare context with length bounds matching server schema
+      const rawContext = this.getErrorContext();
+      const boundedContext = {
+        ...rawContext,
+        url: truncate(rawContext.url, 500) || rawContext.url,
+        userAgent: truncate(rawContext.userAgent, 500) || rawContext.userAgent,
+        buildVersion: truncate(rawContext.buildVersion, 50),
+      };
+
+      // Extract file info once, then bound string lengths
+      const fileName = this.extractFileFromStack(error.stack);
+
       const report: ErrorReport = {
         error: {
-          name: error.name,
-          message: error.message,
-          stack: error.stack,
+          name: truncate(error.name, 100) || error.name,
+          message: truncate(error.message, 500) || error.message,
+          stack: truncate(error.stack, 5000),
           // Extract file info from stack if available
-          fileName: this.extractFileFromStack(error.stack),
+          fileName: truncate(fileName, 200),
           lineNumber: this.extractLineFromStack(error.stack),
           columnNumber: this.extractColumnFromStack(error.stack),
         },
-        context: this.getErrorContext(),
-        metadata,
-        breadcrumbs: [...this.breadcrumbs], // Send copy
+        context: boundedContext,
+        metadata: safeMetadata,
+        breadcrumbs: this.breadcrumbs.slice(-20).map(b => ({
+          ...b,
+          category: truncate(b.category, 50) || b.category,
+          message: truncate(b.message, 200) || b.message,
+        })),
       };
 
       const response = await fetch(this.reportingEndpoint, {

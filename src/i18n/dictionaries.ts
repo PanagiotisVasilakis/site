@@ -114,8 +114,8 @@ export type Dictionary = {
 const dict: Record<Locale, Dictionary> = {
   en: {
     appTitle: "Guest Guide",
-    homeTitle: "Your Guest Guide",
-    homeSubtitle: "Curated essentials: phones, restaurants, and sightseeing.",
+  homeTitle: "Dolce Far Niente",
+  homeSubtitle: "The Luxury of a Lazy Afternoon",
     backHome: "← Back home",
   skipLink: "Skip to content",
     details: "Details →",

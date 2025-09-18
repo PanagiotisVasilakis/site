@@ -61,12 +61,12 @@ export default function HomeHero({ title, subtitle }: HomeHeroProps) {
   return () => { running = false; cancelAnimationFrame(raf); window.removeEventListener('resize', onResize); document.removeEventListener('visibilitychange', visHandler); };
   }, []);
   return (
-  <div className="relative mb-10 overflow-hidden rounded-2xl panel backdrop-blur px-6 sm:px-10 pt-12 pb-14 shadow-sm bg-panel-soft">
-      <div className="relative z-10 max-w-2xl">
-  <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-brand-800">
+  <div className="relative mb-10 overflow-hidden rounded-2xl panel hero-card backdrop-blur px-6 sm:px-10 pt-12 pb-14 bg-panel-soft">
+      <div className="relative z-10 max-w-2xl mx-auto text-center">
+  <h1 className="display-serif italian-title title-gradient title-ornament text-4xl sm:text-5xl md:text-6xl leading-tight tracking-tight">
           {title}
         </h1>
-  <p className="mt-3 text-sm sm:text-base text-muted leading-relaxed">
+  <p className="mt-4 text-base sm:text-lg text-muted leading-relaxed">
           {subtitle}
         </p>
   {/* Removed live/update indicators per user request */}
