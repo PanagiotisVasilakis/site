@@ -137,6 +137,12 @@ class MetricsCollector {
   private retentionPeriod: number = 24 * 60 * 60 * 1000; // 24 hours
   private aggregationInterval: number = 60 * 1000; // 1 minute
   private lastAggregation: number = Date.now();
+  // Simple in-process alerts
+  private alerts: {
+    verificationFailed: { windowMs: number; threshold: number; recent: number[] };
+  } = {
+    verificationFailed: { windowMs: 60_000, threshold: 20, recent: [] },
+  };
 
   constructor(config?: {
     maxMetricsPerType?: number;
@@ -169,6 +175,11 @@ class MetricsCollector {
     };
 
     this.addMetric(metric);
+
+    // Alert hooks
+    if (name === 'verification_failed') {
+      this.recordVerificationFailed();
+    }
   }
 
   public gauge(name: string, value: number, tags?: Record<string, string>): void {
@@ -183,6 +194,46 @@ class MetricsCollector {
     };
 
     this.addMetric(metric);
+  }
+
+  // Alert config controls (dev/testing support)
+  public setVerificationFailedAlertConfig(config: { windowMs?: number; threshold?: number }): void {
+    if (typeof config.windowMs === 'number' && config.windowMs > 0) {
+      this.alerts.verificationFailed.windowMs = config.windowMs;
+    }
+    if (typeof config.threshold === 'number' && config.threshold > 0) {
+      this.alerts.verificationFailed.threshold = config.threshold;
+    }
+  }
+
+  public getVerificationFailedAlertConfig(): { windowMs: number; threshold: number } {
+    return {
+      windowMs: this.alerts.verificationFailed.windowMs,
+      threshold: this.alerts.verificationFailed.threshold,
+    };
+  }
+
+  public resetVerificationFailedAlertConfig(): void {
+    this.alerts.verificationFailed.windowMs = 60_000;
+    this.alerts.verificationFailed.threshold = 20;
+  }
+
+  // Simple alerting for verification failures per minute
+  private recordVerificationFailed(): void {
+    const bucket = this.alerts.verificationFailed;
+    const now = Date.now();
+    bucket.recent.push(now);
+    // Evict outside window
+    const cutoff = now - bucket.windowMs;
+    bucket.recent = bucket.recent.filter(t => t >= cutoff);
+    if (bucket.recent.length >= bucket.threshold) {
+      logger.warn('ALERT: verification_failed spike', { count: bucket.recent.length, windowMs: bucket.windowMs });
+      // Emit an alert metric for dashboards/automation
+      this.counter('alert.verification_failed.spike', 1, {
+        windowMs: String(bucket.windowMs),
+        count: String(bucket.recent.length),
+      });
+    }
   }
 
   public histogram(name: string, value: number, tags?: Record<string, string>): void {

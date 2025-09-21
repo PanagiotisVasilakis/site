@@ -20,9 +20,11 @@ interface Props {
   labels?: {
     dates: string; addDates: string; guestsLabel: string; guestSingular: string; guestPlural: string; checkAvailability: string;
   };
+  subline?: string; // Optional line under property name (e.g., localized subtitle)
+  showPropertyHeader?: boolean; // Controls display of the property name line
 }
 
-export default function BookingBar({ onBooking, initial, locale = 'en', propertyName, labels }: Props) {
+export default function BookingBar({ onBooking, initial, locale = 'en', propertyName, labels, subline, showPropertyHeader = true }: Props) {
   const villaContent = getVillaContent(locale as 'en' | 'el');
   const router = useRouter();
   const [isHydrated, setIsHydrated] = useState(false);
@@ -131,8 +133,10 @@ export default function BookingBar({ onBooking, initial, locale = 'en', property
     <div className="relative">
       {/* Property Info */}
       <div className="mb-4 text-center">
-        <h2 className="text-lg font-semibold text-brand-800">{propertyName || villaContent.shortName}</h2>
-        <p className="text-sm text-gray-600">{villaContent.location.city}, {villaContent.location.country} • €{basePrice}/night</p>
+        {showPropertyHeader && (
+          <h2 className="text-lg font-semibold text-brand-800">{propertyName || villaContent.shortName}</h2>
+        )}
+        <p className="text-sm text-muted">{subline ?? `${villaContent.location.city}, ${villaContent.location.country} • €${basePrice}/night`}</p>
       </div>
       
       <div className="booking-bar" role="search" aria-label="Check availability">

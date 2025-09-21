@@ -19,6 +19,7 @@ const raw = {
   analyticsStorage: process.env.ANALYTICS_STORAGE,
   analyticsHashPaths: process.env.ANALYTICS_HASH_PATHS,
   adminDashSecret: process.env.ADMIN_DASH_SECRET,
+  
 };
 
 export const config = {
@@ -37,6 +38,7 @@ export const config = {
   admin: {
     secret: raw.adminDashSecret || '',
   },
+  
 };
 
 export type AppConfig = typeof config;

@@ -9,6 +9,11 @@ interface Props { className?: string; labels: Labels; pollMs?: number; }
 
 // Combined network + sync queue indicator in a single pill for compact header usage.
 export default function StatusCluster({ className = '', labels, pollMs = 15000 }: Props) {
+  // Ensure SSR and first client paint match to avoid hydration mismatches
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
   // Network
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [reconnecting, setReconnecting] = useState(false);
@@ -135,10 +140,15 @@ export default function StatusCluster({ className = '', labels, pollMs = 15000 }
     return () => navigator.serviceWorker?.removeEventListener('message', onMessage);
   }, []);
 
-  const slow = isOnline && effectiveType && /^(2g|slow-2g)$/i.test(effectiveType);
-  const netState = !isOnline ? 'offline' : reconnecting ? 'reconnecting' : slow ? 'slow' : 'online';
-  const netLabel = !isOnline ? labels.offline : reconnecting ? labels.reconnecting : slow ? labels.slow : labels.online;
-  const syncLabel = queueSize > 0 ? `${labels.syncPending} (${queueSize})` : labels.syncIdle;
+  const slowRaw = isOnline && effectiveType && /^(2g|slow-2g)$/i.test(effectiveType);
+  const netStateRaw = !isOnline ? 'offline' : reconnecting ? 'reconnecting' : slowRaw ? 'slow' : 'online';
+  const netLabelRaw = !isOnline ? labels.offline : reconnecting ? labels.reconnecting : slowRaw ? labels.slow : labels.online;
+  const syncLabelRaw = queueSize > 0 ? `${labels.syncPending} (${queueSize})` : labels.syncIdle;
+
+  // During SSR/first client render, lock to stable placeholders so HTML matches
+  const netState = hydrated ? netStateRaw : 'online';
+  const netLabel = hydrated ? netLabelRaw : labels.online;
+  const syncLabel = hydrated ? syncLabelRaw : labels.syncIdle;
 
   const aria = `${netLabel}. ${syncLabel}.`;
   const dotColorVar = netState === 'offline' ? 'var(--badge-warn-bg)' : netState === 'slow' ? 'var(--brand-400)' : 'var(--brand-500)';

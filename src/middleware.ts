@@ -5,6 +5,7 @@ import { verifyAdmin } from '@/lib/auth';
 import { createSecurityMiddleware } from '@/lib/security-middleware';
 import { tracer, SpanStatus } from '@/lib/distributed-tracing';
 import { metrics } from '@/lib/metrics-collector';
+// Guest session auto-mint is handled in page routes (Node runtime) rather than middleware (Edge)
 
 function hasLocale(pathname: string) {
   return locales.some((l) => pathname === `/${l}` || pathname.startsWith(`/${l}/`));
@@ -56,6 +57,13 @@ export function middleware(req: NextRequest) {
     Object.entries(traceHeaders).forEach(([key, value]) => {
       response.headers.set(key, value);
     });
+
+    // Note: Do not use next/headers cookies() in middleware (Edge runtime). Any session refresh is handled in pages/APIs.
+
+    // Add X-Robots-Tag for localized /check-in route (defense-in-depth)
+    if (/^\/(?:en|el)\/(?:check-in)\/?$/.test(pathname)) {
+      response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+    }
 
     // Skip routing logic for Next.js internals, API routes, and QR page
     if (pathname.startsWith("/_next") || pathname.startsWith("/api") || pathname === "/qr") {

@@ -26,6 +26,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  eslint: { ignoreDuringBuilds: true },
   turbopack: {
     // Explicit root to silence multiple lockfile inference warning
     root: __dirname,

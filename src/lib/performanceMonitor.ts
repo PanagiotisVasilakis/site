@@ -451,7 +451,7 @@ class PerformanceMonitor {
         const ok = navigator.sendBeacon(this.reportingEndpoint, JSON.stringify(payload));
         if (ok) {
           this.lastFlushAt = now;
-          // Clear sent metrics and vitals to avoid resending
+          // Clear sent metrics and vitals to avoid sending them again
           this.customMetrics = [];
           this.metrics.clear();
           return;
@@ -466,7 +466,7 @@ class PerformanceMonitor {
       });
       this.lastFlushAt = now;
       if (res.ok) {
-        // Clear sent metrics and vitals to avoid resending the same CWV repeatedly
+  // Clear sent metrics and vitals to avoid sending the same CWV repeatedly
         this.customMetrics = [];
         this.metrics.clear();
       } else if (res.status === 429) {

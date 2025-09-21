@@ -8,6 +8,9 @@ import { ToastProvider } from "@/components/Toast";
 import Analytics from "@/components/Analytics";
 import JsonFetchHud from "@/components/JsonFetchHud";
 import TopControls from "@/components/TopControls";
+import { getGuestSessionFromCookies, hasVerifiedBookingSession, tryAutoMintSessionFromRefresh } from "@/lib/guestSession";
+import { cookies as getCookieJar } from 'next/headers';
+import { getFeatureFlags } from "@/lib/featureFlags";
 
 // Removed font variable placeholders.
 
@@ -34,6 +37,26 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   const { locale } = await params;
   const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : "en";
   const t = getDictionary(eff);
+  // Read current session from cookie
+  let session = await getGuestSessionFromCookies();
+
+  // SSR auto-restore: if no verified booking session but refresh token exists, mint a new session.
+  // We use server helper (equivalent to calling /api/portal/refresh) to avoid parsing Set-Cookie headers from a fetch.
+  if (!hasVerifiedBookingSession(session)) {
+    const restored = await tryAutoMintSessionFromRefresh();
+    if (restored.cookies && restored.cookies.length) {
+      const jar = await getCookieJar();
+      for (const c of restored.cookies) {
+        jar.set(c.name, c.value, c.options);
+      }
+    }
+    if (restored.session) {
+      session = restored.session;
+    }
+  }
+  const ff = getFeatureFlags();
+  const hasBookingSession = hasVerifiedBookingSession(session);
+  const showCheckIn = ff.checkinEnabled && hasBookingSession;
   return (
   <div data-locale={eff}>
   <a href="#main-content" className="skip-link">{t.skipLink || 'Skip to content'}</a>
@@ -41,7 +64,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
       <PwaManager />
       <Analytics />
   <JsonFetchHud />
-  <TopControls locale={eff} appTitle={t.appTitle} />
+  <TopControls locale={eff} appTitle={t.appTitle} showCheckIn={showCheckIn} />
       {/* Update banner: light surface uses dark brand text; buttons tinted; dismiss available */}
       <div
         id="update-banner"

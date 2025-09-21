@@ -10,6 +10,8 @@ export function GET() {
   const urls: string[] = [];
   for (const locale of locales) {
     urls.push(`${siteUrl}/${locale}`);
+    // Include guest portal entry but exclude protected check-in
+    urls.push(`${siteUrl}/${locale}/guest`);
     for (const c of categories) {
       urls.push(`${siteUrl}/${locale}/${c.slug}`);
       const items = getItemsByCategory(c.id);

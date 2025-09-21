@@ -1,0 +1,4 @@
+{
+  "GR": { "minLength": 6, "maxLength": 15, "allowChars": "[A-Z0-9]", "message": "Use 6–15 letters or numbers only" },
+  "US": { "minLength": 6, "maxLength": 9, "allowChars": "[A-Z0-9]" }
+}

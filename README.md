@@ -38,3 +38,23 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 ## Coverage Badge Endpoint
 
 The route `/api/coverage` returns a Shields.io style JSON badge computed from `coverage/lcov.info`. Run `npm test` (which generates lcov) before build/deploy to update values. In CI, tests run prior to build so the badge reflects the latest commit.
+
+## Architecture: Direct Verification Only
+
+The guest portal uses a direct verification flow without extra challenge steps. The unified page at `/{locale}/guest` supports Sign‑in and Sign‑up modes with:
+
+- Origin selection (Greece vs Abroad) and phone + AFM/Passport details
+- Submission to `/api/portal/verify` which issues session cookies on success
+- Redirect to `/{locale}/check-in` upon success
+
+Analytics are constrained to a minimal, PII-safe set:
+
+- portal_opened
+- origin_selected
+- form_submitted
+- auth_mode_changed
+- no_booking_cta_clicked
+- checkin_viewed
+- checkin_completed
+
+No optional challenge flags or strings are present in the codebase; i18n dictionaries have been pruned accordingly.

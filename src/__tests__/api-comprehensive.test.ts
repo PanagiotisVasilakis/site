@@ -4,12 +4,13 @@
  */
 
 import { NextRequest } from 'next/server';
-import { apiValidator, ApiSchemas } from '@/lib/api-validation';
-import { openApiSpec } from '@/app/api/docs/openapi/route';
+import type { z } from 'zod';
+import { apiValidator, ApiSchemas } from '../lib/api-validation';
+import { openApiSpec } from '../lib/openapi';
 
 // Import route handlers for testing
-import { GET as getCategories } from '@/app/api/categories/route';
-import { GET as getAnalytics } from '@/app/api/analytics/route';
+import { GET as getCategories } from '../app/api/categories/route';
+import { GET as getAnalytics } from '../app/api/analytics/route';
 
 // Test utilities
 class APITestFramework {
@@ -124,7 +125,7 @@ class APITestFramework {
     const sqlPayloads = [
       "'; DROP TABLE users; --",
       "' OR 1=1 --",
-      "UNION SELECT * FROM users",
+      'UNION SELECT * FROM users',
       "'; SELECT * FROM users WHERE '1'='1",
     ];
 
@@ -295,7 +296,7 @@ class APITestFramework {
     // Validate against schema
     const validation = apiValidator.validateResponse(
       data,
-      ApiSchemas.Category.array().transform(categories => ({ categories })),
+      ApiSchemas.Category.array().transform((categories: Array<z.infer<typeof ApiSchemas.Category>>) => ({ categories })),
       { method: 'GET', url: '/api/categories', status: 200 }
     );
 

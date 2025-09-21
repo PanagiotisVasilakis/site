@@ -34,6 +34,7 @@ export type Dictionary = {
     resetAll: string;
     activeTags: string;
     none: string;
+    back?: string;
   };
   cta: {
     call: string;
@@ -109,13 +110,61 @@ export type Dictionary = {
     failed: string;
     tokenMissing: string;
   };
+  checkin?: {
+    title?: string;
+    summary?: string;
+    bookingId?: string;
+    reference?: string;
+    source?: string;
+    phone?: string;
+    dates?: string;
+    room?: string;
+    arrivalTime?: string;
+    arrivalTimeInvalid?: string;
+    specialRequests?: string;
+    acceptTerms?: string;
+    submit?: string;
+    submitted?: string;
+    saving?: string;
+    loading?: string;
+  };
+  portal?: {
+    signInTitle: string;
+    signUpTitle?: string;
+    originQuestion: string;
+    originGR: string;
+    originAbroad: string;
+    phoneLabel: string;
+    afmLabel: string;
+    passportLabel: string;
+    bookingRefLabel: string;
+    lastNameLabel: string;
+    continueBtn: string;
+  // verifyingBtn removed (direct verification only)
+    noBookingYet: string;
+    ctaStartBooking?: string;
+    goHome: string;
+    rememberMe?: string;
+  // verifyRequired removed (no extra prompts)
+    // Additional UX strings for auth toggles
+    alreadyRegistered?: string;
+    newHere?: string;
+    signInCta?: string;
+    signUpCta?: string;
+    hints?: { phone?: string; afm?: string; passport?: string };
+    validation?: {
+      phoneRequired?: string; phoneInvalid?: string;
+      afmRequired?: string; afmInvalid?: string;
+      passportRequired?: string; passportInvalid?: string;
+    };
+  };
 };
 
 const dict: Record<Locale, Dictionary> = {
   en: {
     appTitle: "Guest Guide",
   homeTitle: "Dolce Far Niente",
-  homeSubtitle: "The Luxury of a Lazy Afternoon",
+  homeSubtitle: "The luxury of a Lazy Afternoon",
     backHome: "← Back home",
   skipLink: "Skip to content",
     details: "Details →",
@@ -220,12 +269,65 @@ const dict: Record<Locale, Dictionary> = {
       viewDetails: "View details",
       failed: "Map failed to load",
       tokenMissing: "Mapbox token not configured"
+    },
+    portal: {
+      signInTitle: "Guest Sign‑in",
+      signUpTitle: "Guest Sign‑up",
+      originQuestion: "Where are you coming from?",
+      originGR: "Greece",
+      originAbroad: "Abroad",
+      phoneLabel: "Phone (E.164)",
+      afmLabel: "AFM (9 digits)",
+      passportLabel: "Passport",
+      bookingRefLabel: "Booking reference (optional)",
+      lastNameLabel: "Last name (optional)",
+      continueBtn: "Continue",
+      noBookingYet: "No booking yet?",
+      ctaStartBooking: "Start booking",
+      goHome: "Go to Home",
+      rememberMe: "Remember me on this device",
+      
+      alreadyRegistered: "Already registered?",
+      newHere: "New here?",
+      signInCta: "Sign‑in",
+      signUpCta: "Sign‑up",
+      hints: {
+        phone: "Include country code (e.g., +1 415…)",
+        afm: "9 digits",
+        passport: "Use letters and numbers only."
+      },
+      validation: {
+        phoneRequired: "Phone is required",
+        phoneInvalid: "Enter a valid phone with country code (e.g., +1…)",
+        afmRequired: "AFM is required",
+        afmInvalid: "AFM must be 9 digits",
+        passportRequired: "Passport number is required",
+        passportInvalid: "Use 5–20 letters or numbers"
+      }
+    }
+    ,checkin: {
+      title: "Check-in",
+      summary: "Booking summary",
+      bookingId: "Booking ID",
+      reference: "Reference",
+      source: "Source",
+      phone: "Phone",
+      dates: "Dates",
+      room: "Room",
+      arrivalTime: "Arrival time",
+      arrivalTimeInvalid: "Please enter a valid time (HH:mm)",
+      specialRequests: "Special requests",
+      acceptTerms: "I confirm my details are correct and accept the terms",
+      submit: "Complete Check-in",
+      submitted: "Check-in completed",
+      saving: "Saving…",
+      loading: "Loading booking…",
     }
   },
   el: {
     appTitle: "Οδηγός Επισκεπτών",
-    homeTitle: "Ο οδηγός σας",
-    homeSubtitle: "Τα απαραίτητα: τηλέφωνα, εστιατόρια και αξιοθέατα.",
+    homeTitle: "Dolce Far Niente",
+    homeSubtitle: "Η πολυτέλεια ενός χαλαρού απογεύματος",
     backHome: "← Πίσω στην αρχική",
   skipLink: "Μετάβαση στο περιεχόμενο",
     details: "Λεπτομέρειες →",
@@ -233,7 +335,7 @@ const dict: Record<Locale, Dictionary> = {
   itemSingular: "στοιχείο",
   itemPlural: "στοιχεία",
   search: { where: "Προορισμός", addLocation: "Προσθήκη τοποθεσίας", dates: "Ημερομηνίες", addDates: "Προσθήκη ημερομηνιών", guestsLabel: "Επισκέπτες", guestSingular: "επισκέπτης", guestPlural: "επισκέπτες", search: "Αναζήτηση" },
-  ui: { filters: "Φίλτρα", map: "Χάρτης", list: "Λίστα", resetAll: "Επαναφορά", activeTags: "Ενεργές Ετικέτες", none: "Κανένα" },
+  ui: { filters: "Φίλτρα", map: "Χάρτης", list: "Λίστα", resetAll: "Επαναφορά", activeTags: "Ενεργές Ετικέτες", none: "Κανένα", back: "Πίσω" },
   updates: { updateAvailable: "Νέα έκδοση διαθέσιμη", refresh: "Ανανέωση", dismiss: "Κλείσιμο", fromTo: "Διαθέσιμη ενημέρωση: {old} → {new}", assetsFromTo: "Ενημερωμένα αρχεία: {old} → {new}" },
     cta: {
       call: "Κλήση",
@@ -330,6 +432,59 @@ const dict: Record<Locale, Dictionary> = {
       viewDetails: "Προβολή λεπτομερειών",
       failed: "Αποτυχία φόρτωσης χάρτη",
       tokenMissing: "Το Mapbox token δεν έχει ρυθμιστεί"
+    },
+    portal: {
+      signInTitle: "Σύνδεση Επισκέπτη",
+      signUpTitle: "Εγγραφή Επισκέπτη",
+      originQuestion: "Από πού έρχεστε;",
+      originGR: "Ελλάδα",
+      originAbroad: "Εξωτερικό",
+      phoneLabel: "Τηλέφωνο (E.164)",
+      afmLabel: "ΑΦΜ (9 ψηφία)",
+      passportLabel: "Διαβατήριο",
+      bookingRefLabel: "Κωδικός κράτησης (προαιρετικό)",
+      lastNameLabel: "Επώνυμο (προαιρετικό)",
+      continueBtn: "Συνέχεια",
+      noBookingYet: "Δεν έχετε κράτηση;",
+      ctaStartBooking: "Ξεκινήστε κράτηση",
+      goHome: "Μετάβαση στην Αρχική",
+      rememberMe: "Να με θυμάσαι σε αυτή τη συσκευή",
+      
+      alreadyRegistered: "Έχετε ήδη εγγραφεί;",
+      newHere: "Νέος/α εδώ;",
+      signInCta: "Σύνδεση",
+      signUpCta: "Εγγραφή",
+      hints: {
+        phone: "Συμπεριλάβετε κωδικό χώρας (π.χ. +30 69…)",
+        afm: "9 ψηφία",
+        passport: "Μόνο γράμματα και αριθμοί."
+      },
+      validation: {
+        phoneRequired: "Απαιτείται τηλέφωνο",
+        phoneInvalid: "Εισάγετε έγκυρο τηλέφωνο με κωδικό χώρας (π.χ., +30…)",
+        afmRequired: "Απαιτείται ΑΦΜ",
+        afmInvalid: "Το ΑΦΜ πρέπει να έχει 9 ψηφία",
+        passportRequired: "Απαιτείται αριθμός διαβατηρίου",
+        passportInvalid: "Χρησιμοποιήστε 5–20 γράμματα ή αριθμούς"
+      }
+    }
+    ,checkin: {
+      title: "Άφιξη",
+      summary: "Σύνοψη κράτησης",
+      bookingId: "Κωδικός κράτησης",
+      reference: "Αναφορά",
+      source: "Πηγή",
+      phone: "Τηλέφωνο",
+      dates: "Ημερομηνίες",
+      room: "Δωμάτιο",
+      arrivalTime: "Ώρα άφιξης",
+      arrivalTimeInvalid: "Παρακαλώ εισάγετε έγκυρη ώρα (ΩΩ:λλ)",
+      specialRequests: "Ειδικά αιτήματα",
+      acceptTerms: "Επιβεβαιώνω ότι τα στοιχεία είναι σωστά και αποδέχομαι τους όρους",
+      submit: "Ολοκλήρωση Άφιξης",
+      submitted: "Η άφιξη ολοκληρώθηκε",
+      saving: "Γίνεται αποθήκευση…",
+      loading: "Φόρτωση κράτησης…",
     }
   },
 };
