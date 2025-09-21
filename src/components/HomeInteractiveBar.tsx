@@ -6,9 +6,10 @@ interface BookingLabels { dates: string; addDates: string; guestsLabel: string; 
 interface Props {
   locale: string;
   labels?: BookingLabels;
+  subline?: string; // localized subtitle passed from server page for SSR consistency
 }
 
-export default function HomeInteractiveBar({ locale, labels }: Props) {
+export default function HomeInteractiveBar({ locale, labels, subline }: Props) {
   const villaContent = getVillaContent(locale as 'en' | 'el');
   
   return (
@@ -17,6 +18,8 @@ export default function HomeInteractiveBar({ locale, labels }: Props) {
         locale={locale} 
         labels={labels}
         propertyName={villaContent.shortName}
+        subline={subline}
+        showPropertyHeader={false}
       />
     </div>
   );

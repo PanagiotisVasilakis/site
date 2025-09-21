@@ -33,6 +33,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
       />
       <HomeInteractiveBar
         locale={eff}
+        subline={eff === 'el' ? 'Πολυτελές διαμέρισμα στην Καλαμάτα' : 'Luxury apartment in Kalamata, Greece'}
         labels={{
           dates: t.search?.dates || 'Dates',
           addDates: t.search?.addDates || 'Add dates',
@@ -50,7 +51,6 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         >
           <div className="text-4xl mb-3 group-hover:scale-110 transition-transform" aria-hidden>🏡</div>
           <div className="text-lg font-medium mb-2" style={{color:'var(--text-accent)'}}>{t.house?.navLabel || 'Villa Photos'}</div>
-          <div className="text-sm text-gray-600">{t.house?.navSubtitle || 'Cinematic tour & amenities'}</div>
         </Link>
 
         {cats.slice(0, 2).map((c) => (
@@ -64,9 +64,6 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
             </div>
             <div className="text-lg font-medium mb-2" style={{color:'var(--text-accent)'}}>
               {t.categories[c.slug as "phones" | "restaurants" | "sightseeing"] ?? (pickCategoryLocale(c, "title", eff) ?? c.title)}
-            </div>
-            <div className="text-sm text-gray-600">
-              {c.count} local {c.count === 1 ? t.itemSingular : t.itemPlural}
             </div>
           </Link>
         ))}

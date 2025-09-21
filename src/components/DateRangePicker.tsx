@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { DayPicker, type DateRange as RDPDateRange } from 'react-day-picker';
-import { format } from 'date-fns';
 import { 
   DateRange, 
   getBlockedDates, 
@@ -31,15 +30,18 @@ export default function DateRangePicker({
   showPricing = true
 }: DateRangePickerProps) {
   const [selectedRange, setSelectedRange] = useState<DateRange>(value || { from: undefined, to: undefined });
-  // currentMonth state removed (unused)
+  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [isMobile, setIsMobile] = useState(false);
 
   // Check if mobile on mount
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    const checkViewport = () => {
+      const w = window.innerWidth;
+      setIsMobile(w < 768);
+    };
+    checkViewport();
+    window.addEventListener('resize', checkViewport);
+    return () => window.removeEventListener('resize', checkViewport);
   }, []);
 
   // Sync with external value
@@ -104,6 +106,23 @@ export default function DateRangePicker({
     onChange?.(emptyRange);
   }, [onChange]);
 
+  // Handle month navigation
+  const handlePreviousMonth = useCallback(() => {
+    setCurrentMonth(prev => {
+      const newMonth = new Date(prev);
+      newMonth.setMonth(newMonth.getMonth() - 1);
+      return newMonth;
+    });
+  }, []);
+
+  const handleNextMonth = useCallback(() => {
+    setCurrentMonth(prev => {
+      const newMonth = new Date(prev);
+      newMonth.setMonth(newMonth.getMonth() + 1);
+      return newMonth;
+    });
+  }, []);
+
   // Get pricing info for selected range
   const pricingInfo = useMemo(() => {
     if (!selectedRange?.from || !selectedRange?.to || !showPricing) return null;
@@ -132,79 +151,84 @@ export default function DateRangePicker({
 
 
   const DatePickerContent = () => (
-    <div className="space-y-6">
-      {/* Date Selection Header */}
-      <div className="grid grid-cols-2 gap-4" role="group" aria-label="Selected date range">
-        <div className="text-center">
-          <div className="text-xs font-semibold text-gray-500 uppercase mb-1" id="checkin-label">Check-in</div>
-          <div className="text-lg font-medium" aria-labelledby="checkin-label">
-            {selectedRange?.from ? format(selectedRange.from, 'MMM d') : 'Select date'}
-          </div>
-        </div>
-        <div className="text-center">
-          <div className="text-xs font-semibold text-gray-500 uppercase mb-1" id="checkout-label">Check-out</div>
-          <div className="text-lg font-medium" aria-labelledby="checkout-label">
-            {selectedRange?.to ? format(selectedRange.to, 'MMM d') : 'Select date'}
-          </div>
-        </div>
-      </div>
+    <div className="space-y-3">
+      {/* Calendar with inline controls */}
+      <div className="relative" role="application" aria-label="Date picker calendar">
+        {/* Clear button positioned top-right, only show when dates selected */}
+        {(selectedRange?.from || selectedRange?.to) && (
+          <button
+            onClick={handleClear}
+            className="absolute top-0 right-0 z-10 p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+            aria-label="Clear selected dates"
+            title="Clear dates"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L8 6.586l2.293-2.293a1 1 0 111.414 1.414L9.414 8l2.293 2.293a1 1 0 01-1.414 1.414L8 9.414l-2.293 2.293a1 1 0 01-1.414-1.414L6.586 8 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
+        )}
 
-      {/* Calendar */}
-      <div className="flex justify-center" role="application" aria-label="Date picker calendar">
+        {/* Custom navigation buttons for desktop streamlined layout */}
+        {!isMobile && (
+          <>
+            <button
+              onClick={handlePreviousMonth}
+              className="absolute left-4 top-0 z-20 w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-md transition-colors border border-gray-200"
+              aria-label="Previous month"
+              style={{ top: '0rem' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <path fillRule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+              </svg>
+            </button>
+            <button
+              onClick={handleNextMonth}
+              className="absolute right-4 top-0 z-20 w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-md transition-colors border border-gray-200"
+              aria-label="Next month"
+              style={{ top: '0rem' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <path fillRule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+              </svg>
+            </button>
+          </>
+        )}
+        
         <DayPicker
           mode="range"
           selected={selectedRange as RDPDateRange}
           onSelect={handleDateSelect}
           disabled={disabledDays}
-          numberOfMonths={isMobile ? 1 : 2}
-          showOutsideDays
-          className="custom-day-picker"
+          numberOfMonths={2}
+          showOutsideDays={false}
+          className={`custom-day-picker ${!isMobile ? 'streamlined' : ''}`}
           aria-label="Select check-in and check-out dates"
+          month={currentMonth}
+          onMonthChange={setCurrentMonth}
+          hideNavigation={!isMobile}
         />
       </div>
 
-      {/* Pricing Summary */}
-      {pricingInfo && (
-        <div className="bg-gray-50 rounded-lg p-4 space-y-2" role="region" aria-label="Booking summary">
-          <div className="flex justify-between text-sm">
-            <span>€{pricingInfo.avgPerNight} x {pricingInfo.nights} nights</span>
-            <span>€{pricingInfo.total}</span>
-          </div>
-          <div className="flex justify-between font-medium">
-            <span>Total</span>
-            <span aria-label={`Total price: €${pricingInfo.total}`}>€{pricingInfo.total}</span>
+      {/* Compact pricing summary - only when both dates selected */}
+      {pricingInfo && selectedRange?.from && selectedRange?.to && (
+        <div className="bg-brand-50 border border-brand-200 rounded-lg px-3 py-2" role="region" aria-label="Booking summary">
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-gray-600">{pricingInfo.nights} night{pricingInfo.nights !== 1 ? 's' : ''}</span>
+            <span className="font-semibold text-brand-800">€{pricingInfo.total}</span>
           </div>
         </div>
       )}
 
-      {/* Actions */}
-      <div className="flex gap-3 pt-4" role="group" aria-label="Date picker actions">
-        <button
-          onClick={handleClear}
-          className="flex-1 px-4 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
-          aria-describedby={selectedRange?.from ? "clear-dates-help" : undefined}
-        >
-          Clear
-          {selectedRange?.from && (
-            <span id="clear-dates-help" className="sr-only">
-              Clear selected check-in and check-out dates
-            </span>
-          )}
-        </button>
+      {/* Single action button - Apply only shows when both dates selected */}
+      {selectedRange?.from && selectedRange?.to && (
         <button
           onClick={handleApply}
-          disabled={!selectedRange?.from || !selectedRange?.to}
-          className="flex-1 px-4 py-3 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          aria-describedby="apply-dates-help"
+          className="w-full px-4 py-2.5 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 transition-colors"
+          aria-label="Apply selected date range"
         >
-          Apply
-          <span id="apply-dates-help" className="sr-only">
-            {!selectedRange?.from || !selectedRange?.to 
-              ? "Select both check-in and check-out dates to apply selection" 
-              : "Apply selected date range"}
-          </span>
+          Apply dates
         </button>
-      </div>
+      )}
     </div>
   );
 
@@ -214,20 +238,21 @@ export default function DateRangePicker({
         isOpen={isOpen}
         onClose={onClose || (() => {})}
         title="Select dates"
-        maxHeight="90vh"
+        maxHeight="75vh"
       >
         <DatePickerContent />
       </BottomSheet>
     );
   }
 
-  // Desktop popover - simplified for testing
+  // Desktop popover - streamlined and responsive
   return isOpen ? (
     <div 
-      className="absolute top-full left-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 p-6 z-50 min-w-[600px]"
+      className="absolute top-full left-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 p-4 pr-5 z-50"
       role="dialog"
       aria-modal="true"
       aria-label="Date range picker"
+      style={{ width: 'min(92vw, 640px)', maxHeight: 'min(80vh, 450px)', overflow: 'visible' }}
     >
       <div className="absolute -top-2 left-4 w-4 h-4 bg-white border-l border-t border-gray-200 transform rotate-45" />
       <DatePickerContent />

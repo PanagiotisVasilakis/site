@@ -734,15 +734,28 @@ input, textarea { color: inherit; }
 }
 
 .custom-day-picker .rdp-months {
-  gap: 2rem;
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: nowrap; /* keep months on one row */
+}
+
+.custom-day-picker .rdp-month { 
+  flex: 0 0 auto; 
+  min-width: 16.5rem; /* ensure 7 columns fit in default sizing */
+  padding: 0; /* remove side padding so caption aligns with grid */
+  margin: 0;  /* rely on .rdp-months gap for spacing */
+  display: grid; /* center caption and table on the same axis */
+  justify-content: center;
 }
 
 .custom-day-picker .rdp-day {
   border-radius: 6px;
   transition: all 0.15s ease;
-  font-size: 0.875rem;
-  min-width: 2.5rem;
-  height: 2.5rem;
+  font-size: 0.85rem;
+  min-width: 2.25rem;
+  height: 2.25rem;
+  font-weight: 500;
+  margin: 0 !important; /* eliminate any inter-cell gaps from margins */
 }
 
 .custom-day-picker .rdp-day:hover:not([disabled]) {
@@ -768,25 +781,120 @@ input, textarea { color: inherit; }
 }
 
 .custom-day-picker .rdp-day[disabled] {
-  opacity: 0.3;
+  opacity: 0.25;
   cursor: not-allowed;
 }
 
 .custom-day-picker .rdp-caption_label {
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: var(--text-accent);
+  text-align: center;
+  display: inline-block; /* shrink to content */
+  width: auto;
+  margin: 0 auto;
+  pointer-events: none; /* ensure nav/buttons remain clickable */
+}
+
+/* Ensure caption container supports absolute-centered label */
+.custom-day-picker .rdp-caption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  min-height: 1.75rem; /* reserve height for label and buttons */
+  padding: 0; /* eliminate side padding that offsets center */
+  margin: 0 0 0.25rem; /* slightly tighter gap below caption */
+  justify-self: center; /* center relative to dates grid */
+}
+
+/* Center the dates table as well so its center aligns with caption */
+.custom-day-picker .rdp-table { 
+  justify-self: center; 
+  border-collapse: collapse !important; /* remove space between rows/cols */
+  border-spacing: 0 !important; 
+}
+
+/* Tighten default variant cell padding (rows/columns gaps) */
+.custom-day-picker .rdp-head_cell,
+.custom-day-picker .rdp-cell {
+  padding: 0 !important; /* minimal gaps between rows/columns */
 }
 
 .custom-day-picker .rdp-nav_button {
-  width: 2rem;
-  height: 2rem;
+  width: 1.75rem;
+  height: 1.75rem;
   border-radius: 6px;
   transition: background-color 0.15s ease;
 }
 
 .custom-day-picker .rdp-nav_button:hover {
   background-color: var(--brand-100);
+}
+
+/* Streamlined variant for desktop popover */
+.custom-day-picker.streamlined {
+  --rdp-day-size: 2rem;
+}
+.custom-day-picker.streamlined .rdp-months { 
+  gap: 1rem; 
+  position: relative;
+  display: flex;
+  flex-wrap: nowrap; /* force side-by-side */
+}
+.custom-day-picker.streamlined .rdp-month { 
+  flex: 0 0 auto; 
+  min-width: calc(var(--rdp-day-size) * 7 + 2.75rem); /* 7 days + header/gutters */
+  padding: 0; /* remove side padding so caption aligns with grid */
+  margin: 0;  /* rely on .rdp-months gap for spacing */
+  display: grid; /* center caption and table on the same axis */
+  justify-content: center;
+}
+.custom-day-picker.streamlined .rdp-day { 
+  min-width: var(--rdp-day-size); 
+  height: var(--rdp-day-size); 
+  font-size: 0.8rem; 
+}
+.custom-day-picker.streamlined .rdp-caption_label { 
+  font-size: 0.875rem; 
+  text-align: center;
+  display: inline-block; /* shrink to content */
+  width: auto;
+  margin: 0 auto;
+  pointer-events: none; /* ensure nav/buttons remain clickable */
+}
+.custom-day-picker.streamlined .rdp-table { 
+  margin: 0; 
+  justify-self: center;
+}
+
+/* Streamlined caption styling to match regular variant */
+.custom-day-picker.streamlined .rdp-caption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  min-height: 1.75rem; /* reserve height for label and buttons */
+  padding: 0; /* eliminate side padding that offsets center */
+  margin: 0 0 0.25rem; /* slightly tighter gap below caption */
+  justify-self: center; /* center relative to dates grid */
+}
+
+/* Hide default navigation on streamlined desktop layout (custom React buttons are used) */
+.custom-day-picker.streamlined .rdp-nav {
+  display: none;
+}
+
+/* Remove outer day padding on streamlined */
+.custom-day-picker.streamlined .rdp-head_cell,
+.custom-day-picker.streamlined .rdp-cell {
+  padding: 0 !important; /* minimal gap between rows/columns */
+}
+
+/* Remove default table spacing to tighten grid further */
+.custom-day-picker.streamlined .rdp-table {
+  border-collapse: collapse;
+  border-spacing: 0;
 }
 
 /* Dark theme overrides */
@@ -810,13 +918,18 @@ input, textarea { color: inherit; }
   color: var(--brand-200);
 }
 
+/* Responsive calendar styles for all screen sizes */
 @media (max-width: 640px) {
-  .search-seg { min-width: 110px; padding: 0.6rem 0.9rem; }
-  .search-bar { font-size: 0.875rem; }
-  .search-value { font-size: 0.75rem; }
-  .search-go { padding: 0.6rem .9rem; }
+  /* Mobile: single month, standard nav buttons */
+  .custom-day-picker:not(.streamlined) .rdp-months {
+    flex-direction: column;
+  }
   
-  /* Mobile date picker adjustments */
+  .custom-day-picker:not(.streamlined) .rdp-month {
+    min-width: auto;
+    width: 100%;
+  }
+  
   .custom-day-picker .rdp-day {
     min-width: 2.75rem;
     height: 2.75rem;
@@ -826,6 +939,8 @@ input, textarea { color: inherit; }
     gap: 1rem;
   }
 }
+
+/* End of React Day Picker customizations */
 
 /* Mapbox overrides to match theme */
 .mapboxgl-map {
