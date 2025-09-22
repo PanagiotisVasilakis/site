@@ -11,5 +11,6 @@ export default async function GuestUnifiedPage({ params }: { params: Promise<{ l
   const p = await params;
   const eff = (locales as readonly string[]).includes(p.locale) ? (p.locale as Locale) : 'en';
   // Render the client component; i18n is handled inside via useParams
-  return <UnifiedGuestClient key={eff} />;
+  // Note: No key prop to preserve component state during locale changes
+  return <UnifiedGuestClient />;
 }

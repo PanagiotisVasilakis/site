@@ -26,7 +26,7 @@ export default function StartBookingCTA({ locale }: { locale: Locale }) {
 
   return (
     <button type="button" className="btn-outline w-full" onClick={onClick}>
-      {(dict.portal?.noBookingYet || 'No booking yet?')} {(dict.portal?.ctaStartBooking || 'Start booking')}
+      {(dict.portal?.noBookingYet || 'No booking yet?')} {(dict.portal?.ctaStartBooking || 'Start here')}
     </button>
   );
 }

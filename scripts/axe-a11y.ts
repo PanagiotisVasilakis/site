@@ -5,7 +5,6 @@
  */
 import puppeteer from 'puppeteer';
 import fs from 'node:fs';
-import inlineCss from './inlineCss';
 
 // Load axe source
 import axePkg from 'axe-core';
@@ -58,8 +57,7 @@ process.on('uncaughtException', (err) => {
         for (const f of guessFiles) { if (fs.existsSync(f)) { found = f; break; } }
         if (found) {
           console.log(`[axe-a11y] static fallback using ${found}`);
-          let html = await fs.promises.readFile(found, 'utf8');
-          try { html = inlineCss(html); } catch {}
+          const html = await fs.promises.readFile(found, 'utf8');
           await page.setContent(html, { waitUntil: 'domcontentloaded' });
           navigated = true;
         } else {
@@ -119,4 +117,4 @@ process.on('uncaughtException', (err) => {
   console.log('[axe-a11y] done');
 })();
 
-// inlineCss now shared via scripts/inlineCss.ts
+

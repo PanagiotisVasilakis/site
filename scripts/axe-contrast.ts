@@ -7,7 +7,6 @@
 import puppeteer from 'puppeteer';
 import fs from 'node:fs';
 import path from 'node:path';
-import inlineCss from './inlineCss';
 
 // Dynamically load axe-core script text
 import axePkg from 'axe-core';
@@ -67,9 +66,8 @@ process.on('uncaughtException', (err) => {
         for (const f of guessFiles) { if (fs.existsSync(f)) { found = f; break; } }
         if (found) {
           console.log(`[axe-contrast] static fallback using ${found}`);
-          let html = await fs.promises.readFile(found, 'utf8');
-          // Inline built Next.js CSS so contrast calculations have real variable values.
-          try { html = inlineCss(html); } catch {}
+          const html = await fs.promises.readFile(found, 'utf8');
+          // Note: CSS inlining removed for simplicity
           await page.setContent(html, { waitUntil: 'domcontentloaded' });
           navigated = true;
         } else {
@@ -127,5 +125,3 @@ process.on('uncaughtException', (err) => {
   await browser.close();
   console.log('[axe-contrast] done');
 })();
-
-// inlineCss now shared via scripts/inlineCss.ts

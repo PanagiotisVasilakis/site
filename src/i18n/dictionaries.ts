@@ -143,6 +143,7 @@ export type Dictionary = {
     or?: string;
   // verifyingBtn removed (direct verification only)
     noBookingYet: string;
+    alreadyBooked?: string;
     ctaStartBooking?: string;
     goHome: string;
     rememberMe?: string;
@@ -272,11 +273,11 @@ const dict: Record<Locale, Dictionary> = {
       tokenMissing: "Mapbox token not configured"
     },
     portal: {
-      signInTitle: "Guest Sign‑in",
-      signUpTitle: "Guest Sign‑up",
+      signInTitle: "Sign‑in",
+      signUpTitle: "Sign‑up",
       originQuestion: "Where are you coming from?",
       originGR: "Greece",
-      originAbroad: "Abroad",
+      originAbroad: "World",
   phoneLabel: "Phone Number",
       afmLabel: "AFM (9 digits)",
   passportLabel: "Passport Number",
@@ -285,7 +286,8 @@ const dict: Record<Locale, Dictionary> = {
       continueBtn: "Continue",
       or: "or",
       noBookingYet: "No booking yet?",
-      ctaStartBooking: "Start booking",
+      alreadyBooked: "Booking & Check-in Details",
+      ctaStartBooking: "Start here",
       goHome: "Go to Home",
       rememberMe: "Remember me on this device",
       
@@ -436,11 +438,11 @@ const dict: Record<Locale, Dictionary> = {
       tokenMissing: "Το Mapbox token δεν έχει ρυθμιστεί"
     },
     portal: {
-      signInTitle: "Σύνδεση Επισκέπτη",
-      signUpTitle: "Εγγραφή Επισκέπτη",
+      signInTitle: "Σύνδεση",
+      signUpTitle: "Εγγραφή",
       originQuestion: "Από πού έρχεστε;",
       originGR: "Ελλάδα",
-      originAbroad: "Εξωτερικό",
+      originAbroad: "Κόσμος",
   phoneLabel: "Αριθμός Τηλεφώνου",
       afmLabel: "ΑΦΜ (9 ψηφία)",
   passportLabel: "Αριθμός Διαβατηρίου",
@@ -449,7 +451,8 @@ const dict: Record<Locale, Dictionary> = {
       continueBtn: "Συνέχεια",
       or: "ή",
       noBookingYet: "Δεν έχετε κράτηση;",
-      ctaStartBooking: "Ξεκινήστε κράτηση",
+      alreadyBooked: "Κράτηση & Στοιχεία Check-in",
+      ctaStartBooking: "Ξεκινήστε εδώ",
       goHome: "Μετάβαση στην Αρχική",
       rememberMe: "Να με θυμάσαι σε αυτή τη συσκευή",
       

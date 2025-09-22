@@ -36,18 +36,28 @@ describe('UnifiedGuestClient', () => {
     const user = userEvent.setup();
     render(<UnifiedGuestClient />);
 
-    // Initial mode is signin per mocked search params
-  const signinTab = document.getElementById('tab-signin') as HTMLButtonElement;
-  expect(signinTab.getAttribute('aria-selected')).toBe('true');
-  const headingText = screen.getByRole('heading', { level: 1 }).textContent || '';
-  expect(/sign|guest\s*sign/i.test(headingText)).toBe(true);
+    // Entry gate: reveal tabs by choosing existing booking
+    await user.click(screen.getByRole('button', { name: /I have already booked/i }));
+
+  // Initial mode is signin per mocked search params
+    const signinTab = document.getElementById('tab-signin') as HTMLButtonElement;
+    expect(signinTab.getAttribute('aria-selected')).toBe('true');
+    // Panel should be present and associated to the active tab
+    const signInPanel = document.getElementById('panel-signin') as HTMLDivElement;
+    expect(signInPanel).toBeTruthy();
+    expect(signInPanel.getAttribute('role')).toBe('tabpanel');
+    expect(signInPanel.getAttribute('aria-labelledby')).toBe('tab-signin');
     // Router.replace called on mount and on mode changes
     expect(replaceMock).toHaveBeenCalledWith('/en/guest?mode=signin', { scroll: false });
 
     // Switch to Sign up
-  await user.click(document.getElementById('tab-signup') as HTMLButtonElement);
-  const signupTab = document.getElementById('tab-signup') as HTMLButtonElement;
-  expect(signupTab.getAttribute('aria-selected')).toBe('true');
+    await user.click(document.getElementById('tab-signup') as HTMLButtonElement);
+    const signupTab = document.getElementById('tab-signup') as HTMLButtonElement;
+    expect(signupTab.getAttribute('aria-selected')).toBe('true');
+    const signUpPanel = document.getElementById('panel-signup') as HTMLDivElement;
+    expect(signUpPanel).toBeTruthy();
+    expect(signUpPanel.getAttribute('role')).toBe('tabpanel');
+    expect(signUpPanel.getAttribute('aria-labelledby')).toBe('tab-signup');
     expect(replaceMock).toHaveBeenLastCalledWith('/en/guest?mode=signup', { scroll: false });
   });
 });
