@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+// Vitest globals are enabled; no named imports needed.
 import { isValidAFM, computeAfmCheckDigit } from '@/lib/afm';
 
 describe('AFM (Greek Tax ID) validation', () => {

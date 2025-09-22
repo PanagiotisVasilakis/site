@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+// Vitest globals are enabled; no named imports needed.
 import { bookingLookup } from '@/lib/bookingLookup';
 import { guestStore } from '@/lib/guestDataStore';
 

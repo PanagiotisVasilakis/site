@@ -36,20 +36,8 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   }
 
   // Collect footprint
-  const bookings = [
-    ...guestStore
-      .findEligibleBookingForUser(subject.id) ? [guestStore.findEligibleBookingForUser(subject.id)!] : [],
-    // include historical bookings for subject (basic: any matching user_id)
-    ...(() => {
-      // @ts-ignore internal access to db via available methods
-      const db: any = (guestStore as any);
-      try {
-        // We don't have a public list API; re-read through find by id calls.
-        // As a fallback, we search by id from known references in access records below.
-        return [] as any[];
-      } catch { return [] as any[]; }
-    })(),
-  ].filter(Boolean);
+  const eligible = guestStore.findEligibleBookingForUser(subject.id);
+  const bookings = [eligible].filter(Boolean) as NonNullable<typeof eligible>[];
 
   // Access records for this user (store helper)
   const subjectAccess = guestStore.listAccessByUser(subject.id).map(a => ({ booking_id: a.booking_id, status: a.status, updated_at: a.updated_at }));

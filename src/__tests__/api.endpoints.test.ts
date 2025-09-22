@@ -1,9 +1,8 @@
 // Vitest globals are enabled; no named imports needed.
-import { GET as getCategories } from './app/api/categories/route';
-import { GET as getCategoryItems } from './app/api/categories/[category]/items/route';
-import { GET as getItem } from './app/api/categories/[category]/items/[slug]/route';
+import { GET as getCategories } from '../app/api/categories/route';
+import { GET as getCategoryItems } from '../app/api/categories/[category]/items/route';
+import { GET as getItem } from '../app/api/categories/[category]/items/[slug]/route';
 import { NextRequest } from 'next/server';
-import { describe, expect, it } from 'vitest';
 
 // Utility helpers to call route handlers with minimal boilerplate.
 const makeReq = (url: string) => new NextRequest(new URL(url, 'http://localhost'));

@@ -732,12 +732,10 @@ export function validateOpenAPISpec(): boolean {
       throw new Error('Invalid OpenAPI version format');
     }
 
-    // eslint-disable-next-line no-console
-    console.log('✅ OpenAPI specification validated successfully');
+  console.log('✅ OpenAPI specification validated successfully');
     return true;
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('❌ OpenAPI specification validation failed:', error);
+  console.error('❌ OpenAPI specification validation failed:', error);
     return false;
   }
 }

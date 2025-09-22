@@ -239,9 +239,10 @@ code, pre, kbd, samp {
   --border-soft: rgba(255,255,255,0.08);
   --border-soft-strong: rgba(255,255,255,0.15);
   --border-accent: var(--brand-400);
-  --text-accent: var(--brand-300);
-  --text-accent-subtle: var(--brand-400);
-  --text-strong: var(--brand-300);
+  /* Increase brand contrast for readability in dark mode */
+  --text-accent: var(--brand-400);
+  --text-accent-subtle: var(--brand-300);
+  --text-strong: var(--brand-500);
 
   /* Badge tokens (dark) */
   --badge-info-bg: rgba(17,25,26,0.55);
@@ -275,7 +276,7 @@ code, pre, kbd, samp {
 
 /* Generic panel + borders */
 .panel { background: var(--layer-surface); border:1px solid var(--border-soft); border-radius: var(--radius-lg); }
-[data-theme="dark"] .panel { background: rgba(17,25,26,0.85); border-color: var(--border-soft); }
+[data-theme="dark"] .panel { background: rgba(17,25,26,0.85); border-color: var(--border-soft); box-shadow: 0 6px 24px -8px rgba(0,0,0,0.6); }
 .border-soft { border-color: var(--border-soft); }
 [data-theme="dark"] .border-soft { border-color: var(--border-soft); }
 .divider { border-color: var(--border-soft); }
@@ -314,6 +315,23 @@ code, pre, kbd, samp {
 /* Status / badges */
 .badge { display:inline-flex; align-items:center; gap:.25rem; font-size:.55rem; padding:.35rem .55rem; min-height:24px; border-radius:999px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; background: var(--brand-100); color: var(--text-accent); }
 [data-theme="dark"] .badge { background: var(--brand-400); color:#042c28; }
+
+/* Inputs: elegant, accessible, theme-aware */
+.input { width: 100%; padding: 0.675rem 0.85rem; border-radius: 10px; border:1px solid var(--border-soft); background: var(--layer-surface); color: var(--fg-default); transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast); }
+.input:hover { border-color: var(--border-soft-strong); }
+.input:focus { outline: none; border-color: var(--brand-400); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-400) 20%, transparent); }
+.input::placeholder { color: var(--placeholder-color); }
+[data-theme="dark"] .input { background: rgba(17,25,26,0.6); border-color: var(--border-soft); color: var(--foreground); }
+[data-theme="dark"] .input:hover { border-color: var(--border-soft-strong); }
+[data-theme="dark"] .input:focus { box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-400) 22%, transparent); }
+.input.input-error, .input[aria-invalid="true"] { border-color: #e35b5b; background: color-mix(in srgb, #e35b5b 6%, var(--layer-surface)); }
+[data-theme="dark"] .input.input-error, [data-theme="dark"] .input[aria-invalid="true"] { background: color-mix(in srgb, #e35b5b 10%, rgba(17,25,26,0.6)); }
+
+/* Subtle button for secondary actions following theme */
+.btn-subtle { display:inline-flex; align-items:center; justify-content:center; width:auto; gap:.5rem; padding:.6rem .9rem; border-radius: 999px; background: var(--layer-surface); color: var(--text-accent); border:1px solid var(--border-soft); transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast); }
+.btn-subtle:hover { background: var(--layer-surface-alt); border-color: var(--border-soft-strong); }
+[data-theme="dark"] .btn-subtle { background: rgba(17,25,26,0.6); color: var(--brand-300); }
+[data-theme="dark"] .btn-subtle:hover { background: rgba(17,25,26,0.8); }
 
 /* Skeleton shimmer (neutral, not brand-saturated) */
 .skeleton { position:relative; overflow:hidden; background: linear-gradient(90deg, #e0e7e7 0%, #e9efef 40%, #e0e7e7 80%); /* slightly darker for contrast */ background-size:200% 100%; animation: shimmer 2.2s infinite linear; }
@@ -432,6 +450,21 @@ input, textarea { color: inherit; }
   box-shadow:
     0 12px 48px -12px rgba(0,0,0,0.65),
     0 0 0 1px rgba(255,255,255,0.06);
+}
+
+/* Soft glass panel: backdrop blur + translucent surface using color-mix */
+.backdrop-blur {
+  backdrop-filter: blur(10px) saturate(160%);
+  -webkit-backdrop-filter: blur(10px) saturate(160%);
+}
+.glass-panel {
+  /* Slightly higher opacity to ensure readable text on gradient backgrounds */
+  background: color-mix(in srgb, var(--layer-surface) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-soft) 80%, transparent);
+}
+[data-theme="dark"] .glass-panel {
+  background: color-mix(in srgb, var(--layer-surface) 88%, transparent);
+  border-color: color-mix(in srgb, var(--border-soft) 85%, transparent);
 }
 
 /* Elegant display font treatment for hero titles */

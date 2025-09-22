@@ -9,10 +9,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   // Support GET-style redirect flow too by allowing query params in POST
   const nextUrl = req.nextUrl
   const nextRaw = nextUrl.searchParams.get('next');
-  const failureRaw = nextUrl.searchParams.get('failure');
   const isSafePath = (p?: string | null) => !!p && p.startsWith('/') && !p.startsWith('//');
   const nextParam = isSafePath(nextRaw) ? nextRaw! : undefined;
-  const failureParam = isSafePath(failureRaw) ? failureRaw! : undefined;
   const refresh = req.cookies.get('guest_rt')?.value;
   if (!refresh) throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Missing refresh token');
 

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+// Vitest globals are enabled; no named imports needed.
 import { encryptJSON, decryptJSON, hashSensitive, verifySensitive } from '@/lib/crypto';
 import { guestStore } from '@/lib/guestDataStore';
 

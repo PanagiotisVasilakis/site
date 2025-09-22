@@ -37,26 +37,34 @@ export function categorizeReason(reason: string): string {
   return trimStr('other');
 }
 
-function sanitize<K extends EventProps['name']>(name: K, props: any): Record<string, unknown> | undefined {
+type PropsOf<N extends EventProps['name']> = Extract<EventProps, { name: N }>['props'];
+function sanitize<K extends EventProps['name']>(name: K, props: PropsOf<K> | unknown): Record<string, unknown> | undefined {
   switch (name) {
     case 'portal_opened':
-      return props && typeof props.source === 'string' ? { source: trimStr(props.source, 20) } : {};
+      if (props && typeof (props as PropsOf<'portal_opened'>).source === 'string') {
+        return { source: trimStr((props as PropsOf<'portal_opened'>).source!, 20) };
+      }
+      return {};
     case 'origin_selected': {
-      const origin = props?.origin === 'GR' || props?.origin === 'ABROAD' ? props.origin : undefined;
-      const mode = props?.mode === 'signup' ? 'signup' : undefined;
+      const p = props as PropsOf<'origin_selected'> | undefined;
+      const origin = p?.origin === 'GR' || p?.origin === 'ABROAD' ? p.origin : undefined;
+      const mode = p?.mode === 'signup' ? 'signup' : undefined;
       return { ...(origin ? { origin } : {}), ...(mode ? { mode } : {}) };
     }
     case 'form_submitted': {
-      const form = props?.form === 'sign-in' || props?.form === 'sign-up' ? props.form : undefined;
+      const p = props as PropsOf<'form_submitted'> | undefined;
+      const form = p?.form === 'sign-in' || p?.form === 'sign-up' ? p.form : undefined;
       return form ? { form } : {};
     }
     case 'auth_mode_changed': {
-      const mode = props?.mode === 'signin' || props?.mode === 'signup' ? props.mode : 'signin';
+      const p = props as PropsOf<'auth_mode_changed'> | undefined;
+      const mode = p?.mode === 'signin' || p?.mode === 'signup' ? p.mode : 'signin';
       return { mode };
     }
     case 'no_booking_cta_clicked': {
-      const from = props?.from === 'guest' || props?.from === 'home' ? props.from : undefined;
-      const ref = typeof props?.ref === 'string' ? trimStr(props.ref, 80) : undefined;
+      const p = props as PropsOf<'no_booking_cta_clicked'> | undefined;
+      const from = p?.from === 'guest' || p?.from === 'home' ? p.from : undefined;
+      const ref = typeof p?.ref === 'string' ? trimStr(p.ref, 80) : undefined;
       return { ...(from ? { from } : {}), ...(ref ? { ref } : {}) };
     }
     case 'checkin_viewed':
@@ -70,11 +78,35 @@ function sanitize<K extends EventProps['name']>(name: K, props: any): Record<str
 export function track(e: EventProps) {
   try {
     ensureFunnel();
-    const safe = sanitize(e.name as any, e.props || {});
+    let safe: Record<string, unknown> | undefined;
+    switch (e.name) {
+      case 'portal_opened':
+        safe = sanitize('portal_opened', e.props ?? {});
+        break;
+      case 'origin_selected':
+        safe = sanitize('origin_selected', e.props);
+        break;
+      case 'form_submitted':
+        safe = sanitize('form_submitted', e.props);
+        break;
+      case 'auth_mode_changed':
+        safe = sanitize('auth_mode_changed', e.props);
+        break;
+      case 'no_booking_cta_clicked':
+        safe = sanitize('no_booking_cta_clicked', e.props ?? {});
+        break;
+      case 'checkin_viewed':
+        safe = sanitize('checkin_viewed', {} as Record<string, never>);
+        break;
+      case 'checkin_completed':
+        safe = sanitize('checkin_completed', {} as Record<string, never>);
+        break;
+      default:
+        safe = undefined;
+    }
     baseTrack(e.name, safe);
     if (process.env.NODE_ENV !== 'production') {
       // Visible in dev tools for quick verification
-      // eslint-disable-next-line no-console
       console.debug('[analytics]', e.name, safe);
     }
   } catch {}

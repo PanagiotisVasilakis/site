@@ -133,14 +133,14 @@ function readDB(): RuntimeDB {
       updated_at: pu.updated_at,
     }));
     // Backfill booking tokens from legacy normalized plaintext if present
-    const bookings: Booking[] = (pdb.bookings || []).map((b: any) => {
+    const bookings: Booking[] = (pdb.bookings || []).map((raw) => {
+      const b = { ...raw } as Partial<Booking> & { last_name_plain_lower?: string; last_name_plain_lower_nows?: string };
       if (!b.last_name_token && b.last_name_plain_lower) {
         b.last_name_token = hmacDeterministic(b.last_name_plain_lower);
       }
       if (!b.last_name_token_nows && b.last_name_plain_lower_nows) {
         b.last_name_token_nows = hmacDeterministic(b.last_name_plain_lower_nows);
       }
-      // Drop legacy fields in runtime object
       delete b.last_name_plain_lower;
       delete b.last_name_plain_lower_nows;
       return b as Booking;

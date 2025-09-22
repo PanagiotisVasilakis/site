@@ -3,6 +3,7 @@
  */
 
 import { NextResponse } from 'next/server';
+export const dynamic = 'force-dynamic';
 import { openApiSpec } from '@/lib/openapi';
 
 // Generate OpenAPI JSON endpoint

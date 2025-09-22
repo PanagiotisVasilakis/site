@@ -96,6 +96,14 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   const lang = request.cookies.get('lang')?.value;
   const effLocale = lang && (locales as readonly string[]).includes(lang) ? lang : (defaultLocale as string);
   const res = createSuccessResponse({ redirect: `/${effLocale}/check-in`, bookingId: booking.id });
+  // Mark last sign-in for 5 days so homepage can skip the portal
+  res.cookies.set('portal_last_signin', '1', {
+    path: '/',
+    httpOnly: false, // readable by client for UX, not sensitive
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 5 * 24 * 60 * 60,
+  });
   res.cookies.set(cookie.name, cookie.value, cookie.options);
   if (body.remember) {
     const issued = guestStore.issueRefreshToken(user.id);

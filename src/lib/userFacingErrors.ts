@@ -11,15 +11,15 @@ export function mapApiErrorToUI(err: unknown): UIError {
   try {
     const fallback: UIError = { summary: 'Something went wrong. Please try again.' };
     if (!err || typeof err !== 'object') return fallback;
-    const e = err as { error?: { code?: string; message?: string; details?: any } };
+  const e = err as { error?: { code?: string; message?: string; details?: unknown } };
     const code = e.error?.code as ApiErrorCode | undefined;
-    const details = e.error?.details as any;
+  const details = e.error?.details as unknown as { validationErrors?: Array<{ path?: string; message?: string }> } | undefined;
 
     switch (code) {
       case ApiErrorCode.VALIDATION_ERROR: {
         const fields: Record<string, string> = {};
         const list: string[] = [];
-        const issues: Array<{ path?: string; message?: string }> = details?.validationErrors || [];
+  const issues: Array<{ path?: string; message?: string }> = details?.validationErrors || [];
         for (const i of issues) {
           if (i?.path) fields[i.path] = i.message || 'Invalid value';
           if (i?.message) list.push(i.message);

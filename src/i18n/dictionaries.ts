@@ -140,6 +140,7 @@ export type Dictionary = {
     bookingRefLabel: string;
     lastNameLabel: string;
     continueBtn: string;
+    or?: string;
   // verifyingBtn removed (direct verification only)
     noBookingYet: string;
     ctaStartBooking?: string;
@@ -276,12 +277,13 @@ const dict: Record<Locale, Dictionary> = {
       originQuestion: "Where are you coming from?",
       originGR: "Greece",
       originAbroad: "Abroad",
-      phoneLabel: "Phone (E.164)",
+  phoneLabel: "Phone Number",
       afmLabel: "AFM (9 digits)",
-      passportLabel: "Passport",
+  passportLabel: "Passport Number",
       bookingRefLabel: "Booking reference (optional)",
       lastNameLabel: "Last name (optional)",
       continueBtn: "Continue",
+      or: "or",
       noBookingYet: "No booking yet?",
       ctaStartBooking: "Start booking",
       goHome: "Go to Home",
@@ -439,12 +441,13 @@ const dict: Record<Locale, Dictionary> = {
       originQuestion: "Από πού έρχεστε;",
       originGR: "Ελλάδα",
       originAbroad: "Εξωτερικό",
-      phoneLabel: "Τηλέφωνο (E.164)",
+  phoneLabel: "Αριθμός Τηλεφώνου",
       afmLabel: "ΑΦΜ (9 ψηφία)",
-      passportLabel: "Διαβατήριο",
+  passportLabel: "Αριθμός Διαβατηρίου",
       bookingRefLabel: "Κωδικός κράτησης (προαιρετικό)",
       lastNameLabel: "Επώνυμο (προαιρετικό)",
       continueBtn: "Συνέχεια",
+      or: "ή",
       noBookingYet: "Δεν έχετε κράτηση;",
       ctaStartBooking: "Ξεκινήστε κράτηση",
       goHome: "Μετάβαση στην Αρχική",

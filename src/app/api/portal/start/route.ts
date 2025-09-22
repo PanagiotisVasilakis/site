@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server';
 import { withErrorHandler, createSuccessResponse } from '@/lib/apiErrorHandler';
 import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
-import { config } from '@/lib/config';
 import { getFeatureFlags } from '@/lib/featureFlags';
 import { ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 

@@ -61,7 +61,7 @@ export default function CheckInForm({ locale }: { locale: string }) {
       errors.acceptTerms = t.checkin?.acceptTerms || 'You must accept the terms to continue';
     }
     return { valid: Object.keys(errors).length === 0, errors };
-  }, [arrivalTime, specialRequests, acceptTerms]);
+  }, [arrivalTime, specialRequests, acceptTerms, t]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+// Vitest globals are enabled; no named imports needed.
 import { normalizePhone, isE164 } from '@/lib/phone';
 
 describe('Phone normalization (E.164)', () => {

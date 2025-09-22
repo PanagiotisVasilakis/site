@@ -13,6 +13,7 @@ import { notFound } from "next/navigation";
 import { getDictionary } from "@/i18n/dictionaries";
 import { locales, type Locale } from "@/i18n/config";
 
+export const dynamic = 'force-dynamic';
 export default async function ItemPage({ params }: { params: Promise<{ locale: string; category: string; slug: string }> }) {
   const { locale, category, slug } = await params;
   const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : "en";

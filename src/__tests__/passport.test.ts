@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { validatePassport, rulesFromConfig } from '@/lib/passport';
+// Vitest globals are enabled; no named imports needed.
+import { validatePassport } from '@/lib/passport';
 import rules from '@/config/passport.rules.json';
 
 describe('Passport validation', () => {
@@ -16,7 +16,6 @@ describe('Passport validation', () => {
   });
 
   it('applies country overrides when provided', () => {
-    const gr = rulesFromConfig('GR', rules);
     expect(validatePassport('ABCDEF', { countryCode: 'GR', config: rules }).ok).toBe(true); // min 6
     expect(validatePassport('ABCDE', { countryCode: 'GR', config: rules }).ok).toBe(false); // too short for GR override
   });

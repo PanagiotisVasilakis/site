@@ -1,10 +1,10 @@
 "use client";
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import tracker from '@/lib/tracker';
 import ErrorSummary from '@/components/ErrorSummary';
 import { mapApiErrorToUI } from '@/lib/userFacingErrors';
-import { getDictionary } from '@/i18n';
+import { getDictionary, type Locale } from '@/i18n';
+import internalFetch from '@/lib/internalFetchClient';
 
 type Origin = 'GR' | 'ABROAD';
 
@@ -26,9 +26,8 @@ function makeValidators(dict: ReturnType<typeof getDictionary>) {
   };
 }
 
-export default function GuestPortalForm({ locale }: { locale: string }) {
-  const router = useRouter();
-  const dict = getDictionary(locale as any);
+export default function GuestPortalForm({ locale }: { locale: Locale }) {
+  const dict = getDictionary(locale);
   const { validatePhone, validateAfm, validatePassport } = makeValidators(dict);
   const [step, setStep] = useState<1 | 2>(1);
   const [origin, setOrigin] = useState<Origin>('GR');
@@ -66,7 +65,7 @@ export default function GuestPortalForm({ locale }: { locale: string }) {
       setSubmitError(null);
   try {
         // This is a placeholder; wire real request once endpoint is integrated with form
-        const res = await fetch('/api/portal/start', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ origin, phone }) });
+    const res = await internalFetch('/api/portal/start', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ origin, phone }) });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           const mapped = mapApiErrorToUI(data);
@@ -102,7 +101,7 @@ export default function GuestPortalForm({ locale }: { locale: string }) {
   }
 
   return (
-    <div className="rounded-xl border border-[color:var(--border-soft)] p-4 bg-[color:var(--layer-surface)]">
+    <div className="panel backdrop-blur glass-panel p-4">
       {submitError ? (
         <div className="mb-3">
           <ErrorSummary

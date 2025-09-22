@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+// Vitest globals are enabled; no named imports needed.
 import { signGuestSession, parseGuestSession, hasVerifiedBookingSession, type GuestSessionPayload } from '../lib/guestSession';
 
 describe('guest session helpers', () => {

@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+// Vitest globals are enabled; no named imports needed.
 import { isRecentlyUpdated, mapsHref, telHref } from './data';
 
 import type { Item } from '../data/schemas';
+import { describe, expect, it } from 'vitest';
 
 describe('isRecentlyUpdated', () => {
   const base: Item = {

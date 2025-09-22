@@ -145,12 +145,19 @@ export function middleware(req: NextRequest) {
     const cookieLocale = req.cookies.get("lang")?.value as string | undefined;
     const isValidCookie = cookieLocale ? (locales as readonly string[]).includes(cookieLocale) : false;
 
-    if (!hasLocale(pathname)) {
+  if (!hasLocale(pathname)) {
       tracer.addTags(span, { 'middleware.action': 'locale_redirect' });
       
       const target = (isValidCookie ? cookieLocale : defaultLocale) as string;
       const url = req.nextUrl.clone();
-      url.pathname = `/${target}${pathname === "/" ? "" : pathname}`;
+      // For the bare root "/", send guests to the unified guest page by default,
+      // except when the user has signed in recently (cookie from verify API)
+      if (pathname === "/") {
+        const last = req.cookies.get('portal_last_signin')?.value;
+        url.pathname = `/${target}${last ? '' : '/guest'}`;
+      } else {
+        url.pathname = `/${target}${pathname}`;
+      }
       const redirectResponse = NextResponse.redirect(url);
       
       // Copy security headers to redirect response

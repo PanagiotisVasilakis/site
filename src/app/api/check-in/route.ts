@@ -17,7 +17,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Not authorized');
   }
   // Hydrate booking details from store (dates/reference) if possible
-  let booking: { id?: string; reference?: string; start_date?: string; end_date?: string; source?: Booking['source'] } | undefined = session?.booking as any;
+  let booking: { id?: string; reference?: string; start_date?: string; end_date?: string; source?: Booking['source'] } | undefined = session?.booking as { id?: string } | undefined;
   let completion: { arrivalTime: string; specialRequests?: string; acceptedAt: number } | null = null;
   if (booking?.id) {
     const b = guestStore.findBookingById(booking.id as string);

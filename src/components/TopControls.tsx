@@ -38,6 +38,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
 
   // Refresh on route changes too for instant feedback
   const pathname: string | null = usePathname?.() ?? null;
+  const isGuest = pathname ? /\/guest(\/|$)/.test(pathname) : false;
   useEffect(() => {
     if (pathname != null) refreshCheckIn();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -123,35 +124,42 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
   return (
     <div className={`fixed top-0 left-0 right-0 z-40 flex justify-center pointer-events-none transition-transform duration-300 ${hidden ? '-translate-y-full' : 'translate-y-0'}`} aria-hidden={hidden}>
     <div ref={containerRef} className="w-full px-4 pt-2 pointer-events-auto">
-  <div className={`flex items-center justify-between gap-2 h-8 rounded-full px-3 backdrop-blur bg-white/12 border ${scrolled ? 'shadow-md border-[color:var(--border-soft,#e5e7eb)]' : 'shadow-sm border-transparent'} transition-colors`}
+  <div className={`flex items-center ${isGuest ? 'justify-end' : 'justify-between'} gap-2 h-8 rounded-full ${isGuest ? 'px-0 bg-transparent border-transparent shadow-none' : 'px-3 backdrop-blur bg-white/12 border'} ${!isGuest && scrolled ? 'shadow-md border-[color:var(--border-soft,#e5e7eb)]' : !isGuest ? 'shadow-sm border-transparent' : ''} transition-colors`}
           style={{ color: 'var(--text-accent)' }}>
-          <Link href={`/${locale}`} className="group shrink min-w-0 flex items-center gap-1 px-3 h-7 rounded-full bg-black/10 hover:bg-black/20 text-slate-800 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/70 dark:text-white transition text-[11px] font-semibold tracking-wide focus:outline-none focus-visible:ring-2 ring-brand-400/60 dark:focus-visible:ring-brand-400/50" aria-label="Home">
-            <span className="text-[13px] leading-none" aria-hidden>🏠</span>
-            <span className="truncate max-w-[120px]" title={appTitle}>{appTitle}</span>
-            <small id="current-version" className="hidden sm:inline text-[10px] font-normal opacity-60" style={{ color: 'var(--text-accent-subtle)' }}></small>
-          </Link>
+          {!isGuest && (
+            <Link href={`/${locale}`} className="group shrink min-w-0 flex items-center gap-1 px-3 h-7 rounded-full bg-black/10 hover:bg-black/20 text-slate-800 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/70 dark:text-white transition text-[11px] font-semibold tracking-wide focus:outline-none focus-visible:ring-2 ring-brand-400/60 dark:focus-visible:ring-brand-400/50" aria-label="Home">
+              <span className="text-[13px] leading-none" aria-hidden>🏠</span>
+              <span className="truncate max-w-[120px]" title={appTitle}>{appTitle}</span>
+              <small id="current-version" className="hidden sm:inline text-[10px] font-normal opacity-60" style={{ color: 'var(--text-accent-subtle)' }}></small>
+            </Link>
+          )}
           <div className="flex items-center gap-2">
             {/* Desktop buttons */}
             <div className="hidden md:flex items-center gap-2">
               <ThemeToggle />
               <LocaleSwitcher />
-              {checkInVisible ? (
+              {!isGuest && checkInVisible ? (
                 <Link href={`/${locale}/check-in`} className="h-8 px-3 rounded-full bg-white/30 hover:bg-white/60 transition border border-white/30 text-[11px] font-medium"
                   onClick={() => import('@/lib/analyticsClient').then(m => m.trackEvent('checkin_nav_clicked'))}>
                   Check‑in
                 </Link>
               ) : null}
-              <button id="install-btn" className="hidden h-8 px-3 rounded-full bg-white/30 hover:bg-white/60 transition border border-white/30 text-[11px] font-medium">Install</button>
+              {!isGuest && (
+                <button id="install-btn" className="hidden h-8 px-3 rounded-full bg-white/30 hover:bg-white/60 transition border border-white/30 text-[11px] font-medium">Install</button>
+              )}
             </div>
             {/* Mobile menu trigger */}
+            {!isGuest && (
             <div className="md:hidden flex items-center">
               <button aria-label="Menu" aria-expanded={open} onClick={() => setOpen(o => !o)} className={`h-8 w-8 rounded-full flex items-center justify-center bg-white/30 hover:bg-white/60 transition border border-white/30 text-sm shadow-sm ${open ? 'ring-2 ring-brand-400' : ''}`}>
                 <span aria-hidden>{open ? '×' : '☰'}</span>
               </button>
             </div>
+            )}
           </div>
         </div>
         {/* Mobile panel */}
+        {!isGuest && (
         <div className={`md:hidden fixed top-12 right-3 z-40 w-56 rounded-xl border border-[color:var(--border-soft,#e5e7eb)] bg-white/90 backdrop-blur shadow-lg p-3 flex flex-col gap-3 transition-transform origin-top-right ${open ? 'scale-100 opacity-100' : 'scale-90 opacity-0 pointer-events-none'}`} role="menu" aria-label="Quick settings">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold tracking-wide uppercase opacity-70">Quick Access</span>
@@ -165,6 +173,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
             </Link>
           ) : null}
         </div>
+        )}
       </div>
     </div>
   );

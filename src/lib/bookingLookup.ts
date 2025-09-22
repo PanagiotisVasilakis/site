@@ -19,11 +19,6 @@ export interface BookingLookupProvider {
   lookupByPhone(params: LookupByPhoneParams): Promise<Booking | null>;
 }
 
-function normalizeLastName(v: string): string {
-  // Lowercase and remove all whitespace to be resilient to spacing variations
-  return v.trim().toLowerCase().replace(/\s+/g, '');
-}
-
 function toBooking(b: StoreBooking, u?: User, lastNameInput?: string): Booking {
   return {
     id: b.id,

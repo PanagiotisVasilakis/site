@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 import { metrics } from '@/lib/metrics-collector';
 import { logger } from '@/lib/logger-enterprise';
@@ -34,10 +34,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   requireDevAndSecret(req);
 
   const body = await req.json().catch(() => ({} as Record<string, unknown>));
-  const count = Math.max(1, Math.min(1000, Number((body as any).count) || 25));
-  const delayMs = Math.max(0, Math.min(1000, Number((body as any).delayMs) || 0));
-  const threshold = (body as any).threshold as number | undefined;
-  const windowMs = (body as any).windowMs as number | undefined;
+  const count = Math.max(1, Math.min(1000, Number((body as { count?: unknown }).count) || 25));
+  const delayMs = Math.max(0, Math.min(1000, Number((body as { delayMs?: unknown }).delayMs) || 0));
+  const threshold = (body as { threshold?: unknown }).threshold as number | undefined;
+  const windowMs = (body as { windowMs?: unknown }).windowMs as number | undefined;
 
   if ((threshold !== undefined && (!Number.isFinite(threshold) || threshold <= 0)) ||
       (windowMs !== undefined && (!Number.isFinite(windowMs) || windowMs <= 0))) {
@@ -53,7 +53,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   // Emit the requested number of failure metrics
   for (let i = 0; i < count; i++) {
     metrics.counter('verification_failed', 1, { reason: 'synthetic_spike' });
-    // eslint-disable-next-line no-await-in-loop
     if (delayMs > 0) await new Promise((res) => setTimeout(res, delayMs));
   }
 

@@ -29,11 +29,45 @@ function safeSerialize(meta: unknown): unknown {
     return meta;
   }
   
+  // Fast-path for Error instances
+  function toErrorJSON(err: unknown) {
+    if (!err || typeof err !== 'object') return err;
+    const anyErr = err as { name?: string; message?: string; stack?: string; code?: string | number; cause?: unknown };
+    const includeStack = process.env.NODE_ENV !== 'production';
+    return {
+      name: anyErr.name || 'Error',
+      message: String(anyErr.message || ''),
+      ...(includeStack && anyErr.stack ? { stack: String(anyErr.stack) } : {}),
+      ...(anyErr.code ? { code: anyErr.code } : {}),
+      ...(anyErr.cause ? { cause: typeof anyErr.cause === 'object' ? { name: (anyErr.cause as { name?: string })?.name, message: (anyErr.cause as { message?: string })?.message } : String(anyErr.cause) } : {}),
+    } as const;
+  }
+
+  // Handle root-level Error early to avoid empty object from JSON.stringify
+  if (meta instanceof Error) {
+    return toErrorJSON(meta);
+  }
+
   // For objects, do lightweight validation and truncation to prevent memory issues
   if (typeof meta === 'object') {
     try {
+      // JSON-stringify with a replacer that:
+      // - Converts Error instances to plain objects
+      // - Handles circular references
+      const seen = new WeakSet<object>();
+      const replacer = (_key: string, value: unknown) => {
+        // Normalize Error instances anywhere in the structure
+        if (value instanceof Error) {
+          return toErrorJSON(value);
+        }
+        if (typeof value === 'object' && value !== null) {
+          if (seen.has(value as object)) return '[Circular]';
+          seen.add(value as object);
+        }
+        return value as unknown;
+      };
       // Quick size check to prevent serializing huge objects
-      const stringified = JSON.stringify(meta);
+  const stringified = JSON.stringify(meta, replacer);
       if (stringified.length > 1000) {
         // Truncate large objects to prevent memory/performance issues
         return `[Object too large: ${stringified.length} chars]`;

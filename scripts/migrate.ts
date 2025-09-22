@@ -1,16 +1,16 @@
 /* Minimal sql.js migration runner: apply/rollback migrations in ./migrations */
 import fs from 'node:fs';
 import path from 'node:path';
-import initSqlJs from 'sql.js';
+import initSqlJs, { type Database as SqlJsDatabase, type SqlJsStatic } from 'sql.js';
 
 const MIGRATIONS_DIR = path.join(process.cwd(), 'migrations');
 const DB_FILE = path.join(process.cwd(), '.localdb.sqlite');
 
 type Direction = 'up' | 'down';
 
-async function loadDB() {
+async function loadDB(): Promise<{ SQL: SqlJsStatic; db: SqlJsDatabase }> {
   const SQL = await initSqlJs({});
-  let db;
+  let db: SqlJsDatabase;
   if (fs.existsSync(DB_FILE)) {
     const buf = fs.readFileSync(DB_FILE);
     db = new SQL.Database(new Uint8Array(buf));
@@ -23,7 +23,7 @@ async function loadDB() {
   return { SQL, db };
 }
 
-function persist(db: any) {
+function persist(db: SqlJsDatabase) {
   const data = db.export();
   const buf = Buffer.from(data);
   fs.writeFileSync(DB_FILE, buf);
@@ -42,7 +42,7 @@ function listMigrations(dir: string) {
   return [...byId.entries()].map(([id, files]) => ({ id, ...files }));
 }
 
-function getApplied(db: any): Set<string> {
+function getApplied(db: SqlJsDatabase): Set<string> {
   const res = db.exec('SELECT id FROM _migrations ORDER BY id');
   const out = new Set<string>();
   if (res && res[0]) {
@@ -51,7 +51,7 @@ function getApplied(db: any): Set<string> {
   return out;
 }
 
-function runSQL(db: any, sql: string) {
+function runSQL(db: SqlJsDatabase, sql: string) {
   // Split on ; while keeping statements simple; ignore empty
   const parts = sql
     .split(/;\s*(\n|$)/)
