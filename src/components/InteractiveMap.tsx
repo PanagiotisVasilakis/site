@@ -8,22 +8,14 @@ import dynamic from 'next/dynamic';
 const LeafletMap = dynamic(() => import('./LeafletMap'), { ssr: false });
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
+import { MarkerData, VILLA_LOCATION } from '@/lib/mapUtils';
+
+// Re-export utilities for backwards compatibility
+export { createMarkerFromItem, type MarkerData } from '@/lib/mapUtils';
 
 // Note: In production, move this to environment variables
 // You'll need to get your own token from https://mapbox.com
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || 'pk.eyJ1IjoidGVzdCIsImEiOiJjbDdnNmJiZHIwNnA3M29wZjdkMWY0YmZsIn0.fake'; // Replace with real token
-
-export interface MarkerData {
-  id: string;
-  name: string;
-  description?: string;
-  coordinates: [number, number]; // [lng, lat]
-  type: 'villa' | 'restaurant' | 'service' | 'attraction';
-  price?: string;
-  rating?: number;
-  category?: string;
-  href?: string;
-}
 
 interface InteractiveMapProps {
   markers?: MarkerData[];
@@ -34,9 +26,6 @@ interface InteractiveMapProps {
   onMarkerClick?: (marker: MarkerData) => void;
   locale?: string; // for localized static fallback
 }
-
-// Villa location (Kalamata, Greece - real coordinates)
-const VILLA_LOCATION: [number, number] = [22.094364, 37.040635]; // Kalamata, Messenia
 
 export default function InteractiveMap({
   markers = [],
@@ -399,36 +388,4 @@ export default function InteractiveMap({
   );
 }
 
-// Helper to create marker from category item
-interface GenericCategoryItem {
-  id: string;
-  name: string;
-  summary?: string;
-  location?: { lat: number; lng: number };
-  rating?: number;
-  priceLevel?: number;
-  slug?: string;
-}
 
-export function createMarkerFromItem(item: GenericCategoryItem, categorySlug: string, locale: string): MarkerData {
-  // Extract coordinates from item or use default location near villa
-  const coords: [number, number] = item.location ? 
-    [item.location.lng, item.location.lat] : 
-    [
-      VILLA_LOCATION[0] + (Math.random() - 0.5) * 0.02, // Small random offset
-      VILLA_LOCATION[1] + (Math.random() - 0.5) * 0.02
-    ];
-
-  return {
-    id: item.id,
-    name: item.name,
-    description: item.summary,
-    coordinates: coords,
-    type: categorySlug === 'restaurants' ? 'restaurant' : 
-          categorySlug === 'phones' ? 'service' : 'attraction',
-    rating: item.rating,
-    price: item.priceLevel ? '€'.repeat(item.priceLevel) : undefined,
-    category: categorySlug,
-    href: `/${locale}/${categorySlug}/${item.slug || item.id}`
-  };
-}

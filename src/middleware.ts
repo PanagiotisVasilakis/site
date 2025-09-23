@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { locales, defaultLocale } from "@/i18n/config";
-import { verifyAdmin } from '@/lib/auth';
 import { createSecurityMiddleware } from '@/lib/security-middleware';
 import { tracer, SpanStatus } from '@/lib/distributed-tracing';
 import { metrics } from '@/lib/metrics-collector';
@@ -78,20 +77,12 @@ export function middleware(req: NextRequest) {
     }
     
     const url = new URL(req.url);
-    // Secure auth gate for /admin/analytics - requires BOTH valid secret AND valid JWT
+    // Basic auth gate for /admin/analytics - requires secret, JWT validation happens server-side
     if (url.pathname.startsWith('/admin/analytics')) {
-      tracer.addTags(span, { 'middleware.action': 'admin_auth' });
+      tracer.addTags(span, { 'middleware.action': 'admin_auth_basic' });
       
       const secret = process.env.ADMIN_DASH_SECRET;
       const provided = req.headers.get('x-admin-secret') || url.searchParams.get('token');
-      
-      // Parse JWT token safely from cookie
-      const cookieHeader = req.headers.get('cookie') || '';
-      const jwt = cookieHeader
-        .split(';')
-        .map(c => c.trim())
-        .find(c => c.startsWith('admin_jwt='))
-        ?.split('=', 2)[1]; // Use split with limit to handle JWT with = signs
       
       // Check if admin dashboard is configured
       if (!secret) {
@@ -108,38 +99,30 @@ export function middleware(req: NextRequest) {
         return errorResponse;
       }
       
-      // Validate both secret and JWT for enhanced security
-      const hasValidSecret = provided === secret;
-      const hasValidJWT = jwt && verifyAdmin(jwt);
-      
-      // SECURITY FIX: Always require BOTH secret AND JWT - no bypass allowed
-      if (hasValidSecret && hasValidJWT) {
-        tracer.addTags(span, { 'auth.success': true });
-        tracer.finishSpan(span);
+      // Basic secret check in middleware (JWT verification happens server-side in page)
+      if (provided !== secret) {
+        tracer.addLog(span, 'warn', 'Admin secret authentication failed');
+        tracer.finishSpan(span, SpanStatus.ERROR);
         
-        metrics.counter('middleware.admin_auth_success', 1);
-        const duration = Date.now() - startTime;
-        metrics.timer('middleware.duration', duration, { action: 'admin_auth_success' });
+        metrics.counter('middleware.admin_auth_failures', 1, { reason: 'invalid_secret' });
         
-        return response;
+        const unauthorizedResponse = new NextResponse('Unauthorized', { status: 401 });
+        // Copy security headers from original response
+        response.headers.forEach((value, key) => {
+          unauthorizedResponse.headers.set(key, value);
+        });
+        return unauthorizedResponse;
       }
       
-      tracer.addLog(span, 'warn', 'Admin authentication failed', {
-        hasValidSecret: !!hasValidSecret,
-        hasValidJWT: !!hasValidJWT,
-      });
-      tracer.finishSpan(span, SpanStatus.ERROR);
+      // Secret is valid, allow through to page for JWT verification
+      tracer.addTags(span, { 'auth.secret_valid': true });
+      tracer.finishSpan(span);
       
-      metrics.counter('middleware.admin_auth_failures', 1, { 
-        reason: !hasValidSecret ? 'invalid_secret' : 'invalid_jwt' 
-      });
+      metrics.counter('middleware.admin_secret_success', 1);
+      const duration = Date.now() - startTime;
+      metrics.timer('middleware.duration', duration, { action: 'admin_secret_success' });
       
-      const unauthorizedResponse = new NextResponse('Unauthorized', { status: 401 });
-      // Copy security headers from original response
-      response.headers.forEach((value, key) => {
-        unauthorizedResponse.headers.set(key, value);
-      });
-      return unauthorizedResponse;
+      return response;
     }
     
     const cookieLocale = req.cookies.get("lang")?.value as string | undefined;

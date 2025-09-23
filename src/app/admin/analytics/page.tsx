@@ -1,9 +1,22 @@
 import { topPaths, hourBuckets, dayBuckets, rollingAverage, percentile, vitalsSummary, stats, dailyNewPaths, vitalsRecent } from '@/lib/analyticsStore';
 import AdminSessionManager from '@/components/AdminSessionManager';
+import { verifyAdmin } from '@/lib/auth';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
-export default function AnalyticsAdminPage() {
+export default async function AnalyticsAdminPage() {
+  // Server-side JWT verification (Node.js runtime compatible)
+  const cookieStore = await cookies();
+  const jwtCookie = cookieStore.get('admin_jwt');
+  
+  if (!jwtCookie?.value || !verifyAdmin(jwtCookie.value)) {
+    // JWT is missing or invalid, redirect to login
+    redirect('/admin/login?error=session_expired');
+  }
+  
+  // If we reach here, both secret (from middleware) and JWT are valid
   const top = topPaths(20);
   const summary = stats();
   const newPaths = dailyNewPaths(14);

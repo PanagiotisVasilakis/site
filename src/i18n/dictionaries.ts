@@ -447,7 +447,7 @@ const dict: Record<Locale, Dictionary> = {
       afmLabel: "ΑΦΜ (9 ψηφία)",
   passportLabel: "Αριθμός Διαβατηρίου",
       bookingRefLabel: "Κωδικός κράτησης (προαιρετικό)",
-      lastNameLabel: "Επώνυμο (προαιρετικό)",
+      lastNameLabel: "Επώνυμο<br/>(προαιρετικό)",
       continueBtn: "Συνέχεια",
       or: "ή",
       noBookingYet: "Δεν έχετε κράτηση;",

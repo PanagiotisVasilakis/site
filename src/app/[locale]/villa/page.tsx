@@ -1,12 +1,22 @@
+import nextDynamic from 'next/dynamic';
 import { locales, type Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 import { housePhotos } from '@/data/housePhotos';
 import { getItemsByCategory } from '@/lib/data';
 import VillaCinematic from '@/components/VillaCinematic';
-import VillaLocationMap from '@/components/VillaLocationMap';
 import type { VillaPhotoWithAlt } from '@/types/villa';
+import MapLoadingSkeleton from '@/components/MapLoadingSkeleton';
+import { MAP_DEFAULTS } from '@/lib/mapConstants';
 
-export const dynamic = 'force-static';
+// Dynamic import for map component - only loads when needed
+const VillaLocationMap = nextDynamic(() => import('@/components/VillaLocationMap'), {
+  loading: () => (
+    <MapLoadingSkeleton height={MAP_DEFAULTS.HEIGHT.VILLA_PAGE} />
+  )
+});
+
+// Remove force-static to allow client components with dynamic imports
+export const dynamic = 'auto';
 
 export default async function VillaPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;

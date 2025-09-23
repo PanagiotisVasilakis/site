@@ -4,7 +4,17 @@ import { TagFilters } from '@/components/TagFilters';
 import ListingCard from '@/components/ListingCard';
 import FilterDrawer from '@/components/FilterDrawer';
 import { ListingCardSkeleton } from '@/components/ListingCardSkeleton';
-import VillaLocationMap from '@/components/VillaLocationMap';
+import dynamic from 'next/dynamic';
+
+// Dynamic import for map component - only loads when needed
+const VillaLocationMap = dynamic(() => import('@/components/VillaLocationMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[400px] bg-gray-100 rounded-lg flex items-center justify-center">
+      <div className="text-sm text-gray-500">Loading map...</div>
+    </div>
+  )
+});
 
 interface Item {
   id: string;

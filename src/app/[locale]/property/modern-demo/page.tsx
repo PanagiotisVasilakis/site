@@ -4,7 +4,7 @@ import Image from 'next/image';
 // import { getDictionary } from '@/i18n/dictionaries';
 import React from 'react';
 
-export const dynamic = 'force-static';
+// Remove force-static as this is a client component
 
 // Design tokens (could move to CSS vars / tailwind config extension)
 const TOKENS = {

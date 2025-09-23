@@ -1,17 +1,26 @@
 import React, { Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import { locales, type Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 import { dateRangeFromParams, formatDateRange, validateDateRange, getNights } from '@/lib/dateUtils';
 // Removed unused Skeleton import
 import { BookingFormSkeleton } from '@/components/LoadingSkeleton';
 import BookingForm from '@/components/BookingForm';
-import VillaLocationMap from '@/components/VillaLocationMap';
 import StaticLocationMap from '@/components/StaticLocationMap';
 import { ClientBoundary } from '@/components/ClientBoundary';
 import AmenitiesList from '@/components/AmenitiesList';
 import { getVillaContent } from '@/data/villaData';
+import MapLoadingSkeleton from '@/components/MapLoadingSkeleton';
+import { MAP_DEFAULTS } from '@/lib/mapConstants';
+
+// Dynamic import for map component - only loads when needed
+const VillaLocationMap = dynamic(() => import('@/components/VillaLocationMap'), {
+  loading: () => (
+    <MapLoadingSkeleton height={MAP_DEFAULTS.HEIGHT.BOOKING} />
+  )
+});
 
 interface BookingParams {
   checkin?: string;

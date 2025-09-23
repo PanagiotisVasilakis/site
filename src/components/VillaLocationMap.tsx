@@ -1,6 +1,7 @@
 "use client";
 import React, { useMemo } from 'react';
-import InteractiveMap, { createMarkerFromItem, type MarkerData } from './InteractiveMap';
+import LazyInteractiveMap from './LazyInteractiveMap';
+import { createMarkerFromItem, type MarkerData, VILLA_LOCATION } from '@/lib/mapUtils';
 import StaticLocationMap from './StaticLocationMap';
 
 interface CategoryItem {
@@ -31,7 +32,7 @@ const VILLA_DATA = {
   id: 'villa',
   name: '2-Bedroom Apartment with Views',
   description: 'Spacious apartment with mountain & sea views',
-  coordinates: [22.094364, 37.040635] as [number, number], // Kalamata, Greece
+  coordinates: VILLA_LOCATION, // Use imported constant
   type: 'villa' as const,
   price: '€65/night'
 };
@@ -87,13 +88,13 @@ export default function VillaLocationMap({
   // Single responsibility: delegate fallback to InteractiveMap; add dedicated static panel for no-JS via <noscript>
   return (
     <div className={className}>
-      <InteractiveMap
+      <LazyInteractiveMap
         markers={nearbyMarkers}
         center={VILLA_DATA.coordinates}
         zoom={zoom}
         height={height}
         onMarkerClick={handleMarkerClick}
-        locale={locale}
+        locale={locale as 'en' | 'el'}
       />
       <noscript>
         <div className="mt-4">

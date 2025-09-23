@@ -31,12 +31,67 @@ export default function UnifiedGuestClient() {
   const [afm, setAfm] = useState('');
   const [passport, setPassport] = useState('');
   const [email, setEmail] = useState('');
-  const [consent, setConsent] = useState(false);
   const [remember, setRemember] = useState(true);
   const [bookingRef, setBookingRef] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState<{ summary: string; details?: string[] } | null>(null);
+  
+  // Custom dropdown state
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Optional section collapse state
+  const [isOptionalExpanded, setIsOptionalExpanded] = useState(false);
+
+  // Validation functions
+  const validateAfm = (value: string): boolean => {
+    return /^\d{9}$/.test(value);
+  };
+
+  const validatePassport = (value: string): boolean => {
+    return /^[A-Za-z0-9]{9}$/.test(value);
+  };
+
+  // Input handlers with validation
+  const handleAfmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+    if (value.length <= 9) {
+      setAfm(value);
+    }
+  };
+
+  const handlePassportChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/[^A-Za-z0-9]/g, ''); // Remove non-alphanumeric
+    if (value.length <= 9) {
+      setPassport(value.toUpperCase());
+    }
+  };
+
+  // Form validation
+  const isFormValid = (): boolean => {
+    if (!origin || !phone || !fullName) return false;
+    if (origin === 'GR' && !validateAfm(afm)) return false;
+    if (origin === 'ABROAD' && !validatePassport(passport)) return false;
+    return true;
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleCountrySelect = (dialCode: string) => {
+    setPhoneDial(dialCode);
+    setIsDropdownOpen(false);
+  };
 
   const panelRef = useRef<HTMLDivElement | null>(null);
   const phoneInputRef = useRef<HTMLInputElement | null>(null);
@@ -77,6 +132,24 @@ export default function UnifiedGuestClient() {
   const onSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
     e.preventDefault();
     if (!origin) return;
+
+    // Frontend validation
+    if (origin === 'GR' && !validateAfm(afm)) {
+      setSubmitError({
+        summary: 'Invalid AFM',
+        details: ['AFM must be exactly 9 digits']
+      });
+      return;
+    }
+
+    if (origin === 'ABROAD' && !validatePassport(passport)) {
+      setSubmitError({
+        summary: 'Invalid Passport Number',
+        details: ['Passport number must be exactly 9 alphanumeric characters']
+      });
+      return;
+    }
+
     setLoading(true);
     setSubmitError(null);
     try {
@@ -91,10 +164,9 @@ export default function UnifiedGuestClient() {
       if (origin === 'GR') base.afm = afm;
       if (origin === 'ABROAD') base.passport = passport;
       if (mode === 'signup') {
+        base.fullName = fullName;
         if (bookingRef) base.bookingRef = bookingRef;
-        if (lastName) base.lastName = lastName;
         if (email) base.email = email;
-        base.consent = consent;
       }
 
       const res = await internalFetch('/api/portal/verify', {
@@ -134,10 +206,9 @@ export default function UnifiedGuestClient() {
     setAfm('');
     setPassport('');
     setEmail('');
-    setConsent(false);
     setRemember(true);
     setBookingRef('');
-    setLastName('');
+    setFullName('');
     setSubmitError(null);
     setLoading(false);
   };
@@ -219,29 +290,112 @@ export default function UnifiedGuestClient() {
                       {origin ? (
                         <div className="text-[color:var(--fg-default)]">
                           <div>
-                            <label className="block text-sm mb-1" style={{ color: 'var(--fg-default)' }}>{dict.portal?.phoneLabel || 'Phone Number'}</label>
-                            <div className="grid grid-cols-[auto,1fr] gap-2 items-center">
-                              <select
-                                aria-label="Country code"
-                                className="input"
-                                style={{ color: 'var(--fg-default) !important' }}
-                                value={phoneDial}
-                                onChange={(e) => setPhoneDial(e.target.value)}
-                              >
-                                {phoneOptions.map(opt => (
-                                  <option key={opt.cc} value={opt.dial}>{`${opt.flag} ${opt.dial} ${opt.name}`}</option>
-                                ))}
-                              </select>
+                            <label className="block text-sm mb-1" style={{ color: 'var(--fg-default)' }}>{dict.portal?.phoneLabel || 'Phone Number'} *</label>
+                            <div className="relative flex items-center border rounded-lg" style={{ borderColor: 'var(--border-soft)' }}>
+                              <div className="relative" ref={dropdownRef}>
+                                {/* Custom Dropdown Button */}
+                                <button
+                                  type="button"
+                                  aria-label="Select country code"
+                                  className="flex items-center py-3 pl-3 pr-6 rounded-l-lg transition-all duration-300 ease-in-out cursor-pointer text-sm relative border-none outline-none"
+                                  style={{ 
+                                    color: 'var(--fg-default)',
+                                    backgroundColor: 'var(--layer-surface)',
+                                    minWidth: '80px',
+                                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1)',
+                                  }}
+                                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                  aria-expanded={isDropdownOpen}
+                                  aria-haspopup="listbox"
+                                >
+                                  <span className="font-medium tracking-wide">{phoneDial}</span>
+                                </button>
+                                
+                                {/* Custom Dropdown Arrow */}
+                                <div 
+                                  className={`absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none text-xs transition-all duration-200 ease-in-out ${isDropdownOpen ? 'rotate-180' : ''}`}
+                                  style={{ 
+                                    color: 'var(--fg-muted)',
+                                    filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))',
+                                  }}
+                                >
+                                  <svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M1 1.5L6 6.5L11 1.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                </div>
+
+                                {/* Custom Dropdown Menu */}
+                                <AnimatePresence>
+                                  {isDropdownOpen && (
+                                    <motion.div
+                                      initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                                      exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                                      transition={{ 
+                                        duration: 0.2, 
+                                        ease: [0.16, 1, 0.3, 1] 
+                                      }}
+                                      className="absolute top-full left-0 w-64 mt-2 bg-white rounded-xl shadow-xl border max-h-64 overflow-y-auto"
+                                      style={{ 
+                                        backgroundColor: 'var(--layer-surface)',
+                                        borderColor: 'var(--border-soft)',
+                                        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.12), 0 4px 16px rgba(0, 0, 0, 0.08)',
+                                        backdropFilter: 'blur(12px)',
+                                        zIndex: 9999,
+                                      }}
+                                      role="listbox"
+                                      aria-label="Country codes"
+                                    >
+                                      {phoneOptions.map((opt, index) => (
+                                        <motion.button
+                                          key={opt.cc}
+                                          type="button"
+                                          initial={{ opacity: 0, x: -10 }}
+                                          animate={{ opacity: 1, x: 0 }}
+                                          transition={{ delay: index * 0.02, duration: 0.15 }}
+                                          className="w-full text-left px-4 py-3 hover:bg-opacity-50 transition-all duration-150 ease-out border-b last:border-b-0 first:rounded-t-xl last:rounded-b-xl group relative overflow-hidden"
+                                          style={{
+                                            color: 'var(--fg-default)',
+                                            borderBottomColor: 'var(--border-soft)',
+                                            fontSize: '14px',
+                                            fontWeight: '500',
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.03)';
+                                            document.documentElement.getAttribute('data-theme') === 'dark' && 
+                                            (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)');
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = 'transparent';
+                                          }}
+                                          onClick={() => handleCountrySelect(opt.dial)}
+                                          role="option"
+                                          aria-selected={phoneDial === opt.dial}
+                                        >
+                                          <div className="flex items-center gap-3">
+                                            <span className="text-lg">{opt.flag}</span>
+                                            <span className="font-medium" style={{ color: 'var(--brand-600)' }}>{opt.dial}</span>
+                                            <span className="text-sm opacity-75">{opt.name}</span>
+                                          </div>
+                                        </motion.button>
+                                      ))}
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+                              <div className="w-px bg-gray-200" style={{ backgroundColor: 'var(--border-soft)' }}></div>
                               <input 
                                 ref={phoneInputRef} 
-                                className="w-full input" 
+                                className="flex-1 border-none outline-none py-3 pl-3 pr-3 rounded-r-lg input" 
                                 style={{ 
                                   color: 'var(--fg-default) !important',
                                   '--placeholder-color': 'var(--fg-muted)',
+                                  backgroundColor: 'var(--layer-surface)',
+                                  border: 'none',
                                 } as React.CSSProperties & { '--placeholder-color'?: string }}
                                 value={phone} 
                                 onChange={e=>setPhone(e.target.value)} 
-                                placeholder={`${phoneDial} …`} 
+                                placeholder="123 456 7890" 
                                 inputMode="tel" 
                                 required 
                               />
@@ -249,7 +403,7 @@ export default function UnifiedGuestClient() {
                           </div>
                           {origin === 'GR' && (
                             <div>
-                              <label className="block text-sm mb-1" style={{ color: 'var(--fg-default)' }}>{dict.portal?.afmLabel || 'AFM (9 digits)'}</label>
+                              <label className="block text-sm mb-1" style={{ color: 'var(--fg-default)' }}>{dict.portal?.afmLabel || 'AFM (9 digits)'} *</label>
                               <input 
                                 className="w-full input" 
                                 style={{ 
@@ -257,17 +411,24 @@ export default function UnifiedGuestClient() {
                                   '--placeholder-color': 'var(--fg-muted)',
                                 } as React.CSSProperties}
                                 value={afm} 
-                                onChange={e=>setAfm(e.target.value)} 
+                                onChange={handleAfmChange}
                                 placeholder="123456789"
                                 inputMode="numeric" 
                                 pattern="\\d{9}" 
+                                maxLength={9}
+                                title="AFM must be exactly 9 digits"
                                 required 
                               />
+                              {afm && !validateAfm(afm) && (
+                                <p className="text-xs mt-1" style={{ color: 'var(--danger-600)' }}>
+                                  AFM must be exactly 9 digits
+                                </p>
+                              )}
                             </div>
                           )}
                           {origin === 'ABROAD' && (
                             <div>
-                              <label className="block text-sm mb-1" style={{ color: 'var(--fg-default)' }}>{dict.portal?.passportLabel || 'Passport Number'}</label>
+                              <label className="block text-sm mb-1" style={{ color: 'var(--fg-default)' }}>{dict.portal?.passportLabel || 'Passport Number (9 characters)'} *</label>
                               <input 
                                 className="w-full input" 
                                 style={{ 
@@ -275,69 +436,147 @@ export default function UnifiedGuestClient() {
                                   '--placeholder-color': 'var(--fg-muted)',
                                 } as React.CSSProperties}
                                 value={passport} 
-                                onChange={e=>setPassport(e.target.value)} 
+                                onChange={handlePassportChange}
                                 placeholder="A12345678"
+                                maxLength={9}
+                                title="Passport number must be exactly 9 alphanumeric characters"
+                                required 
+                              />
+                              {passport && !validatePassport(passport) && (
+                                <p className="text-xs mt-1" style={{ color: 'var(--danger-600)' }}>
+                                  Passport number must be exactly 9 alphanumeric characters
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {mode === 'signup' && (
+                            <div>
+                              <label className="block text-sm mb-1" style={{ color: 'var(--fg-default)' }}>
+                                {locale === 'el' ? 'Όνομα - Επώνυμο' : 'Name - Surname'} *
+                              </label>
+                              <input 
+                                className="w-full input" 
+                                style={{ 
+                                  color: 'var(--fg-default) !important',
+                                  '--placeholder-color': 'var(--fg-muted)',
+                                } as React.CSSProperties}
+                                value={fullName} 
+                                onChange={e=>setFullName(e.target.value)} 
+                                placeholder={locale === 'el' ? 'Ιωάννης Παπαδόπουλος' : 'John Doe'}
                                 required 
                               />
                             </div>
                           )}
 
+                          {/* Collapsible Optional Information Section */}
                           {mode === 'signup' && (
-                            <div className="grid grid-cols-1 gap-3">
-                              <div>
-                                <label className="block text-sm mb-1" style={{ color: 'var(--fg-default)' }}>Email (optional)</label>
-                                <input 
-                                  className="w-full input" 
-                                  style={{ 
-                                    color: 'var(--fg-default) !important',
-                                    '--placeholder-color': 'var(--fg-muted)',
-                                  } as React.CSSProperties}
-                                  type="email" 
-                                  value={email} 
-                                  onChange={e=>setEmail(e.target.value)} 
-                                  placeholder="guest@example.com"
-                                />
-                              </div>
-                              <label className="inline-flex items-center gap-2 text-sm" style={{ color: 'var(--fg-default)' }}><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)} /> I agree to receive updates (optional)</label>
-                            </div>
+                            <motion.div 
+                              className="mt-6"
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: 0.2, duration: 0.3 }}
+                            >
+                              {/* Toggle Button */}
+                              <button
+                                type="button"
+                                onClick={() => setIsOptionalExpanded(!isOptionalExpanded)}
+                                className="w-full flex items-center justify-between px-3 py-2 rounded-lg border hover:bg-opacity-50 transition-all duration-200 ease-out"
+                                style={{ 
+                                  borderColor: 'var(--border-soft)', 
+                                  backgroundColor: 'color-mix(in srgb, var(--layer-surface) 30%, transparent)',
+                                  color: 'var(--fg-default)'
+                                }}
+                                aria-expanded={isOptionalExpanded}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium opacity-75">
+                                    {locale === 'el' ? 'Πρόσθετες Πληροφορίες (Προαιρετικό)' : 'Additional Information (Optional)'}
+                                  </span>
+                                  <span className="text-xs opacity-50">
+                                    {isOptionalExpanded ? '' : (locale === 'el' ? '• Email, Αριθμός κράτησης' : '• Email, Booking reference')}
+                                  </span>
+                                </div>
+                                
+                                <motion.div
+                                  animate={{ rotate: isOptionalExpanded ? 180 : 0 }}
+                                  transition={{ duration: 0.2, ease: "easeInOut" }}
+                                  className="text-xs opacity-60"
+                                >
+                                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M4 6L8 10L12 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                </motion.div>
+                              </button>
+
+                              {/* Collapsible Content */}
+                              <AnimatePresence>
+                                {isOptionalExpanded && (
+                                  <motion.div
+                                    initial={{ opacity: 0, height: 0, y: -10 }}
+                                    animate={{ opacity: 1, height: "auto", y: 0 }}
+                                    exit={{ opacity: 0, height: 0, y: -10 }}
+                                    transition={{ 
+                                      duration: 0.3, 
+                                      ease: [0.4, 0, 0.2, 1],
+                                      opacity: { duration: 0.2 }
+                                    }}
+                                    className="overflow-hidden"
+                                  >
+                                    <div className="mt-3 p-4 rounded-lg border" style={{ 
+                                      borderColor: 'var(--border-soft)', 
+                                      backgroundColor: 'color-mix(in srgb, var(--layer-surface) 50%, transparent)' 
+                                    }}>
+                                      <div className="space-y-4">
+                                        <motion.div
+                                          initial={{ opacity: 0, x: -10 }}
+                                          animate={{ opacity: 1, x: 0 }}
+                                          transition={{ delay: 0.1, duration: 0.2 }}
+                                        >
+                                          <label className="block text-sm mb-1" style={{ color: 'var(--fg-default)' }}>Email (optional)</label>
+                                          <input 
+                                            className="w-full input" 
+                                            style={{ 
+                                              color: 'var(--fg-default) !important',
+                                              '--placeholder-color': 'var(--fg-muted)',
+                                            } as React.CSSProperties}
+                                            type="email" 
+                                            value={email} 
+                                            onChange={e=>setEmail(e.target.value)} 
+                                            placeholder="guest@example.com"
+                                          />
+                                        </motion.div>
+                                        
+                                        <motion.div
+                                          initial={{ opacity: 0, x: -10 }}
+                                          animate={{ opacity: 1, x: 0 }}
+                                          transition={{ delay: 0.2, duration: 0.2 }}
+                                        >
+                                          <label className="block text-sm mb-1" style={{ color: 'var(--fg-default)' }}>{dict.portal?.bookingRefLabel || 'Booking reference (optional)'}</label>
+                                          <input 
+                                            className="w-full input" 
+                                            style={{ 
+                                              color: 'var(--fg-default) !important',
+                                              '--placeholder-color': 'var(--fg-muted)',
+                                            } as React.CSSProperties}
+                                            value={bookingRef} 
+                                            onChange={e=>setBookingRef(e.target.value)} 
+                                            placeholder="ABC123"
+                                          />
+                                        </motion.div>
+                                      </div>
+                                    </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </motion.div>
                           )}
 
-                          {mode === 'signup' && (
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-sm mb-1" style={{ color: 'var(--fg-default)' }}>{dict.portal?.bookingRefLabel || 'Booking reference (optional)'}</label>
-                                <input 
-                                  className="w-full input" 
-                                  style={{ 
-                                    color: 'var(--fg-default) !important',
-                                    '--placeholder-color': 'var(--fg-muted)',
-                                  } as React.CSSProperties}
-                                  value={bookingRef} 
-                                  onChange={e=>setBookingRef(e.target.value)} 
-                                  placeholder="ABC123"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-sm mb-1" style={{ color: 'var(--fg-default)' }}>{dict.portal?.lastNameLabel || 'Last name (optional)'}</label>
-                                <input 
-                                  className="w-full input" 
-                                  style={{ 
-                                    color: 'var(--fg-default) !important',
-                                    '--placeholder-color': 'var(--fg-muted)',
-                                  } as React.CSSProperties}
-                                  value={lastName} 
-                                  onChange={e=>setLastName(e.target.value)} 
-                                  placeholder="Smith"
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          <div>
+                          <div className="mt-6">
                             <label className="inline-flex items-center gap-2 text-sm" style={{ color: 'var(--fg-default)' }}><input type="checkbox" checked={remember} onChange={e=>setRemember(e.target.checked)} /> {dict.portal?.rememberMe || 'Remember me on this device'}</label>
                           </div>
 
-                          <button className="btn-primary w-full" type="submit" disabled={loading || !origin} aria-busy={loading}>
+                          <button className="btn-primary w-full mt-6" type="submit" disabled={loading || !origin || (mode === 'signup' && !isFormValid())} aria-busy={loading}>
                             {loading ? 'Working…' : (dict.portal?.continueBtn || 'Continue')}
                           </button>
                         </div>
