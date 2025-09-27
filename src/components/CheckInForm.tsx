@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useState } from 'react';
 import internalFetch from '@/lib/internalFetchClient';
-import tracker from '@/lib/tracker';
+import { tracker } from '@/lib/tracker';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
 import ErrorSummary from '@/components/ErrorSummary';

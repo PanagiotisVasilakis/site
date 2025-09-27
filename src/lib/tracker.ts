@@ -122,5 +122,3 @@ export const tracker = {
   checkinViewed: () => track({ name: 'checkin_viewed' }),
   checkinCompleted: () => track({ name: 'checkin_completed' }),
 };
-
-export default tracker;

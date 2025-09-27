@@ -27,7 +27,7 @@ function buildHeaders(init?: RequestInit, adminSecret?: string): HeadersInit | u
   return headers;
 }
 
-export async function internalFetch(input: string, init?: RequestInit) {
+async function internalFetch(input: string, init?: RequestInit) {
   const isAdminAPI = typeof input === 'string' && input.startsWith('/api/admin/');
   const adminSecret = isAdminAPI ? getAdminSecret() : null;
   const finalInit: RequestInit = { ...init };

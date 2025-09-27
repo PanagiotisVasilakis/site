@@ -26,6 +26,10 @@ export type Dictionary = {
     guestSingular: string;
     guestPlural: string;
     search: string;
+    arrivalLabel?: string;
+    arrivalPlaceholder?: string;
+    departureLabel?: string;
+    departurePlaceholder?: string;
   };
   ui?: {
     filters: string;
@@ -109,6 +113,8 @@ export type Dictionary = {
     viewDetails: string;
     failed: string;
     tokenMissing: string;
+    deferredInteractiveLabel: string;
+    travelPrompt: string;
   };
   checkin?: {
     title?: string;
@@ -173,7 +179,20 @@ const dict: Record<Locale, Dictionary> = {
   emptyState: "No items yet.",
   itemSingular: "item",
   itemPlural: "items",
-  search: { where: "Where", addLocation: "Add location", dates: "Dates", addDates: "Add dates", guestsLabel: "Guests", guestSingular: "guest", guestPlural: "guests", search: "Search" },
+  search: {
+    where: "Where",
+    addLocation: "Add location",
+    dates: "Dates",
+    addDates: "Add dates",
+    guestsLabel: "Guests",
+    guestSingular: "guest",
+    guestPlural: "guests",
+    search: "Search",
+    arrivalLabel: "Arrival",
+    departureLabel: "Departure",
+    arrivalPlaceholder: "Select arrival",
+    departurePlaceholder: "Select departure"
+  },
   ui: { filters: "Filters", map: "Map", list: "List", resetAll: "Reset All", activeTags: "Active Tags", none: "None" },
   updates: { updateAvailable: "New version available", refresh: "Refresh", dismiss: "Dismiss", fromTo: "Update available: {old} → {new}", assetsFromTo: "Assets updated: {old} → {new}" },
     cta: {
@@ -259,9 +278,9 @@ const dict: Record<Locale, Dictionary> = {
       ],
       howToEnableMapTitle: "To enable interactive map:",
       howToEnableSteps: [
-        "Get a free token from mapbox.com",
-        "Add NEXT_PUBLIC_MAPBOX_TOKEN to .env",
-        "Restart dev server"
+        "Make sure JavaScript is enabled in your browser",
+        "Pan or zoom the map to explore the neighborhood",
+        "Tap a marker to open details and travel times"
       ]
     }
     ,map: {
@@ -270,7 +289,9 @@ const dict: Record<Locale, Dictionary> = {
       villaMarkerDesc: "Your accommodation",
       viewDetails: "View details",
       failed: "Map failed to load",
-      tokenMissing: "Mapbox token not configured"
+      tokenMissing: "Interactive map temporarily unavailable",
+      deferredInteractiveLabel: "Interactive map loads once it's in view to keep things speedy.",
+      travelPrompt: "Tap a marker to calculate travel time."
     },
     portal: {
       signInTitle: "Sign‑in",
@@ -338,7 +359,20 @@ const dict: Record<Locale, Dictionary> = {
   emptyState: "Δεν υπάρχουν στοιχεία ακόμη.",
   itemSingular: "στοιχείο",
   itemPlural: "στοιχεία",
-  search: { where: "Προορισμός", addLocation: "Προσθήκη τοποθεσίας", dates: "Ημερομηνίες", addDates: "Προσθήκη ημερομηνιών", guestsLabel: "Επισκέπτες", guestSingular: "επισκέπτης", guestPlural: "επισκέπτες", search: "Αναζήτηση" },
+  search: {
+    where: "Προορισμός",
+    addLocation: "Προσθήκη τοποθεσίας",
+    dates: "Ημερομηνίες",
+    addDates: "Προσθήκη ημερομηνιών",
+    guestsLabel: "Επισκέπτες",
+    guestSingular: "επισκέπτης",
+    guestPlural: "επισκέπτες",
+    search: "Αναζήτηση",
+    arrivalLabel: "Άφιξη",
+    departureLabel: "Αναχώρηση",
+    arrivalPlaceholder: "Επιλογή άφιξης",
+    departurePlaceholder: "Επιλογή αναχώρησης"
+  },
   ui: { filters: "Φίλτρα", map: "Χάρτης", list: "Λίστα", resetAll: "Επαναφορά", activeTags: "Ενεργές Ετικέτες", none: "Κανένα", back: "Πίσω" },
   updates: { updateAvailable: "Νέα έκδοση διαθέσιμη", refresh: "Ανανέωση", dismiss: "Κλείσιμο", fromTo: "Διαθέσιμη ενημέρωση: {old} → {new}", assetsFromTo: "Ενημερωμένα αρχεία: {old} → {new}" },
     cta: {
@@ -424,9 +458,9 @@ const dict: Record<Locale, Dictionary> = {
       ],
       howToEnableMapTitle: "Για ενεργοποίηση διαδραστικού χάρτη:",
       howToEnableSteps: [
-        "Λάβετε ένα δωρεάν token από το mapbox.com",
-        "Προσθέστε το NEXT_PUBLIC_MAPBOX_TOKEN στο .env",
-        "Επανεκκινήστε τον dev server"
+        "Βεβαιωθείτε ότι η JavaScript είναι ενεργοποιημένη στο πρόγραμμα περιήγησης",
+        "Μετακινήστε ή μεγεθύνετε τον χάρτη για να εξερευνήσετε τη γειτονιά",
+        "Πατήστε έναν δείκτη για να δείτε λεπτομέρειες και χρόνους διαδρομής"
       ]
     }
     ,map: {
@@ -435,7 +469,9 @@ const dict: Record<Locale, Dictionary> = {
       villaMarkerDesc: "Το κατάλυμά σας",
       viewDetails: "Προβολή λεπτομερειών",
       failed: "Αποτυχία φόρτωσης χάρτη",
-      tokenMissing: "Το Mapbox token δεν έχει ρυθμιστεί"
+      tokenMissing: "Ο διαδραστικός χάρτης είναι προσωρινά μη διαθέσιμος",
+      deferredInteractiveLabel: "Ο διαδραστικός χάρτης φορτώνει όταν εμφανιστεί για καλύτερη απόδοση.",
+      travelPrompt: "Πατήστε έναν δείκτη για να υπολογίσουμε τον χρόνο διαδρομής."
     },
     portal: {
       signInTitle: "Σύνδεση",

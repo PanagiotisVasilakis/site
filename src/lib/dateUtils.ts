@@ -62,17 +62,9 @@ export function isPastDate(date: Date): boolean {
   return isBefore(startOfDay(date), startOfDay(new Date()));
 }
 
-// Get blocked dates (this would typically come from an API)
+// Get blocked dates (would typically come from an API; return none for full availability)
 export function getBlockedDates(): Date[] {
-  // Demo blocked dates - in real app, this would be fetched from API
-  const today = new Date();
-  return [
-    addDays(today, 5),  // 5 days from now
-    addDays(today, 6),  // 6 days from now  
-    addDays(today, 15), // 2 weeks from now
-    addDays(today, 16), 
-    addDays(today, 17),
-  ];
+  return [];
 }
 
 // Check date availability (mock implementation)

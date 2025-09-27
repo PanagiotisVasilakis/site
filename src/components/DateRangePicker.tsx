@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { DayPicker, type DateRange as RDPDateRange } from 'react-day-picker';
 import { 
   DateRange, 
@@ -20,6 +20,16 @@ interface DateRangePickerProps {
   onClose?: () => void;
   isOpen?: boolean;
   showPricing?: boolean;
+  activeField?: 'arrival' | 'departure' | null;
+  fieldLabels?: {
+    arrival?: string;
+    departure?: string;
+  };
+  anchor?: {
+    left: number;
+    width: number;
+    containerWidth: number;
+  };
 }
 
 export default function DateRangePicker({
@@ -27,11 +37,15 @@ export default function DateRangePicker({
   onChange,
   onClose,
   isOpen = false,
-  showPricing = true
+  showPricing = true,
+  activeField = null,
+  fieldLabels,
+  anchor
 }: DateRangePickerProps) {
   const [selectedRange, setSelectedRange] = useState<DateRange>(value || { from: undefined, to: undefined });
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [isMobile, setIsMobile] = useState(false);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
 
   // Check if mobile on mount
   useEffect(() => {
@@ -50,6 +64,15 @@ export default function DateRangePicker({
       setSelectedRange(value);
     }
   }, [value]);
+
+  useEffect(() => {
+    if (!value) return;
+    if (activeField === 'arrival' && value.from) {
+      setCurrentMonth(value.from);
+    } else if (activeField === 'departure' && value.to) {
+      setCurrentMonth(value.to);
+    }
+  }, [activeField, value]);
 
   // Get blocked dates
   const blockedDates = useMemo(() => getBlockedDates(), []);
@@ -150,8 +173,43 @@ export default function DateRangePicker({
   }, [selectedRange, showPricing]);
 
 
+  const popoverWidth = 360;
+
+  const anchorLeft = useMemo(() => {
+    if (isMobile || !anchor) return 0;
+    const maxOffset = Math.max(0, anchor.containerWidth - popoverWidth);
+    const desiredCenter = anchor.left + anchor.width / 2 - popoverWidth / 2;
+    return Math.min(Math.max(0, desiredCenter), maxOffset);
+  }, [anchor, isMobile, popoverWidth]);
+
+  const arrowLeft = useMemo(() => {
+    if (isMobile || !anchor) return 16;
+    const relativeCenter = anchor.left + anchor.width / 2 - anchorLeft;
+    return Math.min(Math.max(12, relativeCenter), popoverWidth - 12);
+  }, [anchor, anchorLeft, isMobile, popoverWidth]);
+
+  useEffect(() => {
+    if (!isOpen || isMobile) return;
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      if (!popoverRef.current) return;
+      if (popoverRef.current.contains(event.target as Node)) {
+        return;
+      }
+      onClose?.();
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+    };
+  }, [isOpen, isMobile, onClose]);
+
   const DatePickerContent = () => (
-    <div className="space-y-3">
+  <div className="space-y-1.5">
       {/* Calendar with inline controls */}
       <div className="relative" role="application" aria-label="Date picker calendar">
         {/* Clear button positioned top-right, only show when dates selected */}
@@ -199,9 +257,9 @@ export default function DateRangePicker({
           selected={selectedRange as RDPDateRange}
           onSelect={handleDateSelect}
           disabled={disabledDays}
-          numberOfMonths={2}
+          numberOfMonths={1}
           showOutsideDays={false}
-          className={`custom-day-picker ${!isMobile ? 'streamlined' : ''}`}
+          className={`custom-day-picker ${!isMobile ? 'streamlined compact' : ''}`}
           aria-label="Select check-in and check-out dates"
           month={currentMonth}
           onMonthChange={setCurrentMonth}
@@ -211,8 +269,8 @@ export default function DateRangePicker({
 
       {/* Compact pricing summary - only when both dates selected */}
       {pricingInfo && selectedRange?.from && selectedRange?.to && (
-        <div className="bg-brand-50 border border-brand-200 rounded-lg px-3 py-2" role="region" aria-label="Booking summary">
-          <div className="flex justify-between items-center text-sm">
+        <div className="bg-brand-50 border border-brand-200 rounded-md px-3 py-1.5" role="region" aria-label="Booking summary">
+          <div className="flex justify-between items-center text-xs">
             <span className="text-gray-600">{pricingInfo.nights} night{pricingInfo.nights !== 1 ? 's' : ''}</span>
             <span className="font-semibold text-brand-800">€{pricingInfo.total}</span>
           </div>
@@ -223,7 +281,7 @@ export default function DateRangePicker({
       {selectedRange?.from && selectedRange?.to && (
         <button
           onClick={handleApply}
-          className="w-full px-4 py-2.5 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 transition-colors"
+          className="w-full px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-md hover:bg-brand-700 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:ring-offset-1 transition-colors"
           aria-label="Apply selected date range"
         >
           Apply dates
@@ -248,13 +306,17 @@ export default function DateRangePicker({
   // Desktop popover - streamlined and responsive
   return isOpen ? (
     <div 
-      className="absolute top-full left-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 p-4 pr-5 z-50"
+      ref={popoverRef}
+      className="absolute top-full left-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 p-3 z-50"
       role="dialog"
       aria-modal="true"
       aria-label="Date range picker"
-      style={{ width: 'min(92vw, 640px)', maxHeight: 'min(80vh, 450px)', overflow: 'visible' }}
+  style={{ width: 'min(92vw, 360px)', maxHeight: 'min(80vh, 450px)', overflow: 'visible', left: anchorLeft }}
     >
-      <div className="absolute -top-2 left-4 w-4 h-4 bg-white border-l border-t border-gray-200 transform rotate-45" />
+      <div
+        className="absolute -top-2 w-4 h-4 bg-white border-l border-t border-gray-200 transform rotate-45"
+        style={{ left: arrowLeft }}
+      />
       <DatePickerContent />
     </div>
   ) : null;

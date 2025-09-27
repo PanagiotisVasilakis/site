@@ -4,7 +4,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
 import internalFetch from '@/lib/internalFetchClient';
-import tracker from '@/lib/tracker';
+import { tracker } from '@/lib/tracker';
 import ErrorSummary from '@/components/ErrorSummary';
 import { mapApiErrorToUI } from '@/lib/userFacingErrors';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';

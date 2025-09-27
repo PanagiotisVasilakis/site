@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { internalFetch } from './internalFetchClient';
+import internalFetch from './internalFetchClient';
 
 describe('internalFetch', () => {
   const originalFetch = global.fetch;

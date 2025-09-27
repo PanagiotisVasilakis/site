@@ -2,7 +2,18 @@
 import BookingBar from "@/components/SearchBar";
 import { getVillaContent } from '@/data/villaData';
 
-interface BookingLabels { dates: string; addDates: string; guestsLabel: string; guestSingular: string; guestPlural: string; checkAvailability: string; }
+interface BookingLabels {
+  dates: string;
+  addDates: string;
+  guestsLabel: string;
+  guestSingular: string;
+  guestPlural: string;
+  checkAvailability: string;
+  arrivalLabel?: string;
+  arrivalPlaceholder?: string;
+  departureLabel?: string;
+  departurePlaceholder?: string;
+}
 interface Props {
   locale: string;
   labels?: BookingLabels;

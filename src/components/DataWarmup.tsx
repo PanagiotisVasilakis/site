@@ -1,6 +1,6 @@
 "use client";
 import { useEffect } from 'react';
-import { internalFetch } from '@/lib/internalFetchClient';
+import internalFetch from '@/lib/internalFetchClient';
 import { logger } from '@/lib/logger';
 
 /**

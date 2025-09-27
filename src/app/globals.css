@@ -208,6 +208,28 @@ code, pre, kbd, samp {
   width: 100%; /* Let pages control max-width (e.g., max-w-3xl/6xl) */
 }
 
+/* Top menu bar dark mode: match menu item color */
+[data-theme="dark"] .fixed.top-0.left-0.right-0 .flex.items-center {
+  color: var(--text-accent) !important;
+}
+
+/* Homepage typography: make headings/text match the main menu color */
+.home-typography {
+  color: var(--text-accent);
+}
+.home-typography .card { color: inherit; }
+.home-typography h1, .home-typography h2, .home-typography h3, .home-typography h4, .home-typography .text-lg, .home-typography .text-xl, .home-typography .text-2xl {
+  color: inherit;
+}
+
+/* Language button color: match Guest Guide/menu accent */
+.locale-switcher {
+  color: var(--text-accent) !important;
+}
+[data-theme="dark"] .locale-switcher {
+  color: var(--text-accent) !important;
+}
+
 /* Explicit dark theme via data-theme="dark" overrides media query */
 [data-theme="dark"] {
   --background: #0a0f10;
@@ -655,21 +677,32 @@ input, textarea { color: inherit; }
   box-shadow: var(--shadow-md);
   overflow: hidden;
   position: relative;
-  max-width: 500px;
+  max-width: min(100%, 720px);
   margin: 0 auto;
 }
 [data-theme="dark"] .search-bar { background: rgba(17,25,26,0.75); border-color: var(--border-soft); }
 [data-theme="dark"] .booking-bar { background: rgba(17,25,26,0.75); border-color: var(--border-soft); }
 .search-bar:focus-within { box-shadow: var(--shadow-glow); }
 .booking-bar:focus-within { box-shadow: var(--shadow-glow); }
-.search-seg { position: relative; padding: 0.75rem 1.25rem; display: flex; flex-direction: column; justify-content: center; min-width: 140px; }
+.search-seg { position: relative; padding: 0.5rem 1.75rem; display: flex; flex-direction: column; justify-content: center; min-width: 150px; }
 .search-seg:not(:last-child)::after { content: ""; position: absolute; top: 12%; right: 0; height: 76%; width: 1px; background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.12), transparent); }
 [data-theme="dark"] .search-seg:not(:last-child)::after { background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.15), transparent); }
+.search-trigger { border-radius: 12px; padding: 0.25rem 0.5rem; transition: background-color var(--transition-fast), box-shadow var(--transition-fast); }
+.search-trigger:hover { background-color: color-mix(in srgb, var(--brand-100) 65%, transparent); }
+.search-trigger.is-active { background-color: color-mix(in srgb, var(--brand-100) 85%, transparent); }
+[data-theme="dark"] .search-trigger:hover { background-color: color-mix(in srgb, var(--brand-900) 50%, transparent); }
+[data-theme="dark"] .search-trigger.is-active { background-color: color-mix(in srgb, var(--brand-900) 70%, transparent); }
 .search-label { font-size: 0.65rem; letter-spacing: .05em; font-weight: 600; text-transform: uppercase; color: var(--text-accent-subtle); opacity: 1; }
 .search-value { font-size: 0.8rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-accent); }
 [data-theme="dark"] .search-label { color: var(--brand-400); }
 [data-theme="dark"] .search-value { color: var(--brand-300); }
-.search-action { display: flex; align-items: center; justify-content: center; margin: 6px 6px 6px 0; }
+.guest-input { appearance: textfield; }
+.guest-input::-webkit-outer-spin-button,
+.guest-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.guest-input:focus { outline: none; box-shadow: none; }
+.guest-input { color: var(--text-accent); }
+.guest-input::selection { background: color-mix(in srgb, var(--brand-200) 40%, transparent); }
+.search-action { display: flex; align-items: center; justify-content: center; margin: 6px 12px 6px 6px; }
 .search-go { background: var(--brand-900); color: var(--fg-inverse); border: none; font-size: 0.85rem; padding: 0.75rem 1.05rem; border-radius: 1000px; display: inline-flex; gap: 6px; align-items: center; font-weight: 700; letter-spacing:.02em; box-shadow: 0 4px 14px -4px rgba(0,0,0,0.30); transition: background var(--transition-fast), transform var(--transition-fast); }
 /* Ensure text has maximum contrast: remove decorative shadow */
 .search-go-text { color: var(--fg-inverse); }
@@ -685,7 +718,7 @@ input, textarea { color: inherit; }
   color: var(--fg-inverse);
   border: none;
   font-size: 0.875rem;
-  padding: 0.875rem 1.25rem;
+  padding: 0.75rem 1.75rem;
   border-radius: 12px;
   display: inline-flex;
   align-items: center;
@@ -791,6 +824,7 @@ input, textarea { color: inherit; }
   display: flex;
   gap: 1.5rem;
   flex-wrap: nowrap; /* keep months on one row */
+  justify-content: center;
 }
 
 .custom-day-picker .rdp-month { 
@@ -895,6 +929,7 @@ input, textarea { color: inherit; }
   position: relative;
   display: flex;
   flex-wrap: nowrap; /* force side-by-side */
+  justify-content: center;
 }
 .custom-day-picker.streamlined .rdp-month { 
   flex: 0 0 auto; 
@@ -996,72 +1031,49 @@ input, textarea { color: inherit; }
 
 /* End of React Day Picker customizations */
 
-/* Mapbox overrides to match theme */
-.mapboxgl-map {
+/* Leaflet overrides to match theme */
+.leaflet-container {
   font-family: var(--font-sans);
 }
 
-.mapboxgl-popup {
-  max-width: 320px;
-}
-
-.mapboxgl-popup-content {
-  padding: 0;
+.leaflet-popup-content-wrapper {
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-}
-
-.mapboxgl-popup-close-button {
-  font-size: 18px;
-  color: var(--fg-muted);
-  background: transparent;
-  border: none;
-  padding: 8px;
-  border-radius: 50%;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.mapboxgl-popup-close-button:hover {
-  background: var(--layer-surface-alt);
-  color: var(--fg-default);
-}
-
-.mapboxgl-ctrl-group {
-  background: white;
-  border-radius: 8px;
   border: 1px solid var(--border-soft);
-  box-shadow: var(--shadow-sm);
 }
 
-.mapboxgl-ctrl-zoom-in,
-.mapboxgl-ctrl-zoom-out {
+.leaflet-popup-content {
+  margin: 0;
+  padding: 0;
+}
+
+.leaflet-bar a,
+.leaflet-control-zoom a {
+  background: var(--layer-surface, #fff);
   color: var(--text-accent);
-  background: white;
-  border: none;
+  border: 1px solid var(--border-soft);
+  transition: background 120ms ease;
 }
 
-.mapboxgl-ctrl-zoom-in:hover,
-.mapboxgl-ctrl-zoom-out:hover {
-  background: var(--layer-surface-alt);
+.leaflet-bar a:hover,
+.leaflet-control-zoom a:hover {
+  background: var(--layer-surface-alt, #f6f6f6);
 }
 
-[data-theme="dark"] .mapboxgl-ctrl-group {
+[data-theme="dark"] .leaflet-popup-content-wrapper {
   background: var(--layer-surface);
   border-color: var(--border-soft);
 }
 
-[data-theme="dark"] .mapboxgl-ctrl-zoom-in,
-[data-theme="dark"] .mapboxgl-ctrl-zoom-out {
+[data-theme="dark"] .leaflet-bar a,
+[data-theme="dark"] .leaflet-control-zoom a {
   background: var(--layer-surface);
-  color: var(--text-accent);
+  color: var(--fg-default);
+  border-color: var(--border-soft);
 }
 
-[data-theme="dark"] .mapboxgl-ctrl-zoom-in:hover,
-[data-theme="dark"] .mapboxgl-ctrl-zoom-out:hover {
+[data-theme="dark"] .leaflet-bar a:hover,
+[data-theme="dark"] .leaflet-control-zoom a:hover {
   background: var(--layer-surface-alt);
 }
 

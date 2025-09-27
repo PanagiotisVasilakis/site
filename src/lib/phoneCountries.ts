@@ -217,8 +217,7 @@ function prioritizeCountries(
     if (item && !out.find(x => x.cc === cc)) out.push(item);
   }
   // Append the rest alphabetically
-  const rest = list.filter(c => !out.find(x => x.cc === c.cc));
-  rest.sort((a,b)=>a.name.localeCompare(b.name));
+  const rest = sortPhoneCountries(list.filter(c => !out.find(x => x.cc === c.cc)));
   out.push(...rest);
   return out;
 }

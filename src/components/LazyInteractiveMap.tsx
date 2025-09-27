@@ -27,7 +27,7 @@ interface LazyInteractiveMapProps {
 }
 
 // Dynamic import for the entire InteractiveMap component
-// This prevents mapbox-gl from being included in the initial bundle
+// Keeps Leaflet (and window-dependent modules) out of the initial bundle
 const InteractiveMap = dynamic(() => import('./InteractiveMap'), {
   ssr: false,
   loading: () => (

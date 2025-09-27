@@ -6,7 +6,7 @@
 import { z } from 'zod';
 
 // Performance budget schema
-const performanceBudgetSchema = z.object({
+export const performanceBudgetSchema = z.object({
   buildTime: z.object({
     max: z.number(), // milliseconds
     warning: z.number(),
@@ -110,7 +110,7 @@ export class PerformanceBudgetValidator {
   private budget: PerformanceBudget;
 
   constructor(budget: PerformanceBudget = defaultPerformanceBudget) {
-    this.budget = budget;
+    this.budget = performanceBudgetSchema.parse(budget);
   }
 
   validateBuildTime(buildTime: number): { status: 'pass' | 'warning' | 'fail'; message: string } {

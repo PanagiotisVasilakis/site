@@ -11,7 +11,7 @@ interface StaticLocationMapProps {
   variant?: 'full' | 'panel'; // panel: render only textual panel (no outer gradient / heading container)
 }
 
-// Fallback component when Mapbox isn't configured
+// Fallback component when JavaScript or tiles are unavailable
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
 
@@ -51,9 +51,7 @@ export default function StaticLocationMap({
           <ol className="text-left space-y-1 list-decimal list-inside">
             {lp?.howToEnableSteps?.map((step, i) => (
               <li key={i} className="leading-snug">
-                {step.includes('mapbox.com') ? step.replace('mapbox.com', '') : step}
-                {step.includes('mapbox.com') && ' '} 
-                {step.includes('mapbox.com') && <a href="https://mapbox.com" target="_blank" className="text-brand-600 underline">mapbox.com</a>}
+                {step}
               </li>
             ))}
           </ol>

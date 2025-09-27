@@ -70,6 +70,10 @@ export interface LeafletMapProps {
   routeProfile?: TravelMode | 'auto';
   /** Polyline color */
   routeColor?: string;
+  /** Defer OSRM travel calculations until interaction */
+  lazyTravelMetrics?: boolean;
+  /** Instruction text shown before travel metrics are requested */
+  travelPrompt?: string;
 }
 
 const CATEGORY_ICON: Record<string, string> = {
@@ -121,7 +125,9 @@ export default function LeafletMap({
   onTravelProfilesFailed,
   enableRouting = false,
   routeProfile = 'auto',
-  routeColor = '#2563eb'
+  routeColor = '#2563eb',
+  lazyTravelMetrics = false,
+  travelPrompt = 'Tap a marker to calculate travel time.'
 }: LeafletMapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -133,6 +139,7 @@ export default function LeafletMap({
   interface ModeData { distance: number; duration: number }
   const travelCacheRef = useRef<Record<string, { driving?: ModeData; foot?: ModeData; cycling?: ModeData }>>({});
   const [selectedModes, setSelectedModes] = React.useState<TravelMode[]>(travelModes);
+  const [shouldFetchTravel, setShouldFetchTravel] = React.useState(() => !lazyTravelMetrics);
   // Keep selectedModes in sync if prop changes (when toggle disabled)
   useEffect(()=>{
     if(!enableTravelModeToggle){
@@ -144,6 +151,11 @@ export default function LeafletMap({
   },[travelModes, enableTravelModeToggle]);
   useEffect(()=>{ if(enableTravelModeToggle && persistKey){ try { localStorage.setItem(persistKey+':modes', JSON.stringify(selectedModes)); } catch {} } },[selectedModes, enableTravelModeToggle, persistKey]);
   const effectiveModes = enableTravelModeToggle ? selectedModes : travelModes;
+  useEffect(() => {
+    if (!lazyTravelMetrics) {
+      setShouldFetchTravel(true);
+    }
+  }, [lazyTravelMetrics]);
   const osrmBase = (typeof osrmBaseUrl === 'string' && osrmBaseUrl) ? osrmBaseUrl.replace(/\/$/,'') : 'https://router.project-osrm.org';
   // Global-ish in-module cache of OSRM responses by key (profile+coord list)
   const osrmCacheRef = useRef<Record<string, { distances: number[][]; durations: number[][] }>>({});
@@ -369,15 +381,29 @@ export default function LeafletMap({
       markersLayerRef.current = L.layerGroup();
     }
 
+    const safeTravelPrompt = travelPrompt
+      ? travelPrompt.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      : '';
+
   markers.forEach(m => {
       const marker = L.marker([m.coordinates[1], m.coordinates[0]], { icon: buildIcon(m.type) });
-      const loadingPlaceholder = origin ? `<div class=\"mt-2 text-[11px] opacity-70 flex gap-2 travel-loading\">${effectiveModes.map(mode => {
-        const icon = mode==='driving'?'🚗': mode==='foot'?'🚶':'🚲';
-        return `<span class=\\"inline-flex items-center gap-1 bg-black/5 dark:bg-white/10 px-2 py-[2px] rounded-full\\">${icon}<span class=spinner size=10></span></span>`;}).join(' ')}<span class=\"sr-only\">Loading distances...</span></div>` : '';
+      let loadingPlaceholder = '';
+      if (origin) {
+        if (lazyTravelMetrics && !shouldFetchTravel && safeTravelPrompt) {
+          loadingPlaceholder = `<div class="mt-2 text-[11px] opacity-70 travel-prompt">${safeTravelPrompt}</div>`;
+        } else if (!lazyTravelMetrics || shouldFetchTravel) {
+          loadingPlaceholder = `<div class="mt-2 text-[11px] opacity-70 flex gap-2 travel-loading">${effectiveModes.map(mode => {
+            const icon = mode==='driving'?'🚗': mode==='foot'?'🚶':'🚲';
+            return `<span class=\"inline-flex items-center gap-1 bg-black/5 dark:bg-white/10 px-2 py-[2px] rounded-full\">${icon}<span class=spinner size=10></span></span>`;}).join(' ')}<span class="sr-only">Loading distances...</span></div>`;
+        }
+      }
   const html = `<div style=\"font-weight:600;margin-bottom:4px;\">${m.name}</div>${m.description ? `<div style='font-size:12px;line-height:1.3;'>${m.description}</div>` : ''}${m.price ? `<div style='margin-top:4px;font-size:12px;font-weight:600;'>${m.price}</div>` : ''}${loadingPlaceholder}`;
       marker.bindPopup(html);
       marker.on('click', () => {
         onMarkerClick?.(m);
+        if (lazyTravelMetrics) {
+          setShouldFetchTravel(true);
+        }
         if (enableRouting && origin) {
           const profile = routeProfile === 'auto' ? (effectiveModes[0] || 'driving') : routeProfile;
           const url = `${osrmBase}/route/v1/${profile}/${origin[0]},${origin[1]};${m.coordinates[0]},${m.coordinates[1]}?overview=full&geometries=geojson`;
@@ -433,11 +459,12 @@ export default function LeafletMap({
         }
       } catch {}
     }
-  }, [markers, onMarkerClick, clusterMin, animateMarkers, origin, effectiveModes, enableRouting, persistKey, routeColor, osrmBase, routeProfile]);
+  }, [markers, onMarkerClick, clusterMin, animateMarkers, origin, effectiveModes, enableRouting, persistKey, routeColor, osrmBase, routeProfile, lazyTravelMetrics, shouldFetchTravel, travelPrompt]);
 
   // Compute travel distances (matrix) using OSRM (public demo – not for heavy production) and update popups
   useEffect(() => {
     if (!origin || !mapRef.current || markers.length === 0) return;
+    if (!shouldFetchTravel) return;
     if (effectiveModes.length === 0) return;
 
   let cancelled = false;
@@ -573,7 +600,7 @@ export default function LeafletMap({
       intervalId = window.setInterval(()=>{ if(!cancelled){ void run(); } }, travelRefreshMinutes * 60 * 1000) as unknown as number;
     }
     return () => { cancelled = true; window.clearTimeout(timeout); if(intervalId) window.clearInterval(intervalId); };
-  }, [origin, markers, effectiveModes, osrmBase, travelFetchDebounceMs, partialUpdates, maxTableBatch, travelRefreshMinutes, onTravelProfilesFailed, enableRouting, routeProfile, routeColor, showOriginMarker, originPopup]);
+  }, [origin, markers, effectiveModes, osrmBase, travelFetchDebounceMs, partialUpdates, maxTableBatch, travelRefreshMinutes, onTravelProfilesFailed, enableRouting, routeProfile, routeColor, showOriginMarker, originPopup, shouldFetchTravel]);
 
   // Deprecated legacy formatter kept for potential backward compatibility (unused)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

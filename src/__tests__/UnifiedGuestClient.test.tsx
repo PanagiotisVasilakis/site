@@ -20,12 +20,17 @@ vi.mock('framer-motion', () => ({
 
 // Mock analytics tracker to no-op
 vi.mock('@/lib/tracker', () => ({
-  default: {
-    portalOpened: () => {},
-    authModeChanged: () => {},
-    formSubmitted: () => {},
-    originSelected: () => {},
+  tracker: {
+    portalOpened: vi.fn(),
+    authModeChanged: vi.fn(),
+    formSubmitted: vi.fn(),
+    originSelected: vi.fn(),
+    noBookingCTAClicked: vi.fn(),
+    checkinViewed: vi.fn(),
+    checkinCompleted: vi.fn(),
   },
+  track: vi.fn(),
+  categorizeReason: vi.fn(),
 }));
 
 // Render the client component

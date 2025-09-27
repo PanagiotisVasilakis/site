@@ -12,7 +12,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   const t = getDictionary(eff);
   const cats: CategoryWithCount[] = getCategoriesWithCounts();
   return (
-  <div className="page-container mx-auto max-w-4xl">
+  <div className="page-container home-typography mx-auto max-w-4xl">
       <script
         type="application/ld+json"
         suppressHydrationWarning
@@ -27,7 +27,6 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
       <HomeHero
         title={t.homeTitle}
         subtitle={t.homeSubtitle}
-        locale={eff}
       />
       <HomeInteractiveBar
         locale={eff}
@@ -38,7 +37,11 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           guestsLabel: t.search?.guestsLabel || 'Guests',
           guestSingular: t.search?.guestSingular || 'guest',
           guestPlural: t.search?.guestPlural || 'guests',
-          checkAvailability: 'Check availability'
+          checkAvailability: 'Check availability',
+          arrivalLabel: t.search?.arrivalLabel,
+          arrivalPlaceholder: t.search?.arrivalPlaceholder,
+          departureLabel: t.search?.departureLabel,
+          departurePlaceholder: t.search?.departurePlaceholder
         }}
       />
       {/* Villa Features */}

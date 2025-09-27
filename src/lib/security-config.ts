@@ -113,7 +113,7 @@ const developmentConfig: SecurityConfig = {
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
-      connectSrc: ["'self'", "https://vercel.live", "wss:", "ws:"],
+  connectSrc: ["'self'", "https://vercel.live", "https://router.project-osrm.org", "wss:", "ws:"],
       frameSrc: ["'self'"],
       manifestSrc: ["'self'"],
       workerSrc: ["'self'", "blob:"],
@@ -198,7 +198,7 @@ const productionConfig: SecurityConfig = {
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
-      connectSrc: ["'self'", "https://api.mapbox.com", "https://maps.geoapify.com"],
+  connectSrc: ["'self'", "https://router.project-osrm.org", "https://maps.geoapify.com"],
       frameSrc: ["'none'"],
       manifestSrc: ["'self'"],
       workerSrc: ["'self'", "blob:"],
@@ -398,4 +398,3 @@ export function validateSecurityConfig(): void {
   }
 }
 
-export default getSecurityConfig;

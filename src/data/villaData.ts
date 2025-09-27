@@ -1,5 +1,5 @@
 // Real villa data for Kalamata apartment
-export const villaData = {
+const villaData = {
   id: 'kalamata-apartment',
   name: {
     en: '2-Bedroom Apartment with Mountain & Sea Views',
