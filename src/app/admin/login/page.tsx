@@ -1,6 +1,6 @@
 "use client";
 import { useState } from 'react';
-import { internalFetch } from '@/lib/internalFetch';
+import internalFetch, { ADMIN_SECRET_STORAGE_KEY } from '@/lib/internalFetchClient';
 
 export default function AdminLoginPage() {
   const [token, setToken] = useState('');
@@ -11,8 +11,15 @@ export default function AdminLoginPage() {
     try {
       const res = await internalFetch('/api/admin/login', { method: 'POST', body: JSON.stringify({ token }), headers: { 'content-type': 'application/json' } });
       if (!res.ok) throw new Error('bad');
+      try {
+        if (typeof window !== 'undefined') {
+          window.sessionStorage?.setItem(ADMIN_SECRET_STORAGE_KEY, token);
+        }
+      } catch (err) {
+        console.warn('Failed to persist admin secret', err);
+      }
       setStatus('success');
-      window.location.href = '/admin/analytics';
+      window.location.href = `/admin/analytics?token=${encodeURIComponent(token)}`;
     } catch {
       setStatus('error');
     }

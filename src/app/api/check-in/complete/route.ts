@@ -4,7 +4,7 @@ import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode, valida
 import { getGuestSessionFromCookies, hasVerifiedBookingSession } from '@/lib/guestSession';
 import { guestStore } from '@/lib/guestDataStore';
 import { tracer, SpanStatus } from '@/lib/distributed-tracing';
-import { metrics, trackApiCall } from '@/lib/metrics-collector';
+import { metrics } from '@/lib/metrics-collector';
 import { getFeatureFlags } from '@/lib/featureFlags';
 
 export const dynamic = 'force-dynamic';
@@ -43,7 +43,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const ok = saveCompletion(session.booking.id, body);
   metrics.counter('api_checkin_complete_count', 1, { endpoint: '/api/check-in/complete', method: 'POST' });
-  trackApiCall('/api/check-in/complete', 'POST', 200, Date.now() - start);
+  metrics.trackApiCall('/api/check-in/complete', 'POST', 200, Date.now() - start);
   tracer.finishSpan(span, ok ? SpanStatus.OK : SpanStatus.ERROR);
   metrics.timer('api_checkin_complete_duration_ms', Date.now() - start, { endpoint: '/api/check-in/complete', method: 'POST', result: ok ? 'ok' : 'error' });
   return createSuccessResponse({ ok: true }) as NextResponse;

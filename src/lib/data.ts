@@ -109,10 +109,6 @@ export function pickLocale<T extends Record<string, unknown>>(obj: T, baseKey: s
   return (typeof lv === "string" && lv) || (typeof bv === "string" && bv) || (typeof ev === "string" && ev) || undefined;
 }
 
-// Narrow helpers for known shapes to avoid any-casts at call sites
-export const pickItemLocale = (item: import("@/data/schemas").Item, key: "name" | "summary" | "address", locale: Locale) =>
-  pickLocale(item as Record<string, unknown>, key, locale);
-
 export const pickCategoryLocale = (
   cat: import("@/data/schemas").Category,
   key: "title" | "description",

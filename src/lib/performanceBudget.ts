@@ -6,7 +6,7 @@
 import { z } from 'zod';
 
 // Performance budget schema
-export const PerformanceBudgetSchema = z.object({
+const performanceBudgetSchema = z.object({
   buildTime: z.object({
     max: z.number(), // milliseconds
     warning: z.number(),
@@ -54,7 +54,7 @@ export const PerformanceBudgetSchema = z.object({
   }),
 });
 
-export type PerformanceBudget = z.infer<typeof PerformanceBudgetSchema>;
+export type PerformanceBudget = z.infer<typeof performanceBudgetSchema>;
 
 // Default performance budget based on industry best practices
 export const defaultPerformanceBudget: PerformanceBudget = {

@@ -1,5 +1,5 @@
 // Simple custom ESLint rule to forbid fetch of internal routes outside /src/lib
-export const internalFetchRule = {
+const internalFetchRule = {
   meta: { type: 'problem', docs: { description: 'Disallow direct fetch to internal routes outside lib layer' } },
   create(context) {
     return {

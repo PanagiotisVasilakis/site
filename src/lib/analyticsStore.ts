@@ -23,7 +23,7 @@ function maybeHash(p: string) {
   return crypto.createHash('sha256').update(p).digest('hex').slice(0, 32); // shorten
 }
 
-export function loadHits() {
+function loadHits() {
   if (loaded) return;
   if (loading) {
     // Wait for concurrent load to complete

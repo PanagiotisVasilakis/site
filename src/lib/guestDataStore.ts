@@ -385,6 +385,32 @@ export const guestStore = {
     const db = readDB();
     return db.access.filter(a => a.user_id === user_id);
   },
+
+  // Admin helpers - get all data for export/analysis
+  getAllBookings(): Booking[] {
+    const db = readDB();
+    return db.bookings || [];
+  },
+
+  getAllUsers(): User[] {
+    const db = readDB();
+    return db.users || [];
+  },
+
+  getAllIdentities(): Identity[] {
+    const db = readDB();
+    return db.identities || [];
+  },
+
+  getAllCheckins(): CheckinCompletionRec[] {
+    const db = readDB();
+    return db.checkins || [];
+  },
+
+  getAllAccess(): BookingAccess[] {
+    const db = readDB();
+    return db.access || [];
+  },
 };
 
 function safeDecryptPhone(enc: string): string {

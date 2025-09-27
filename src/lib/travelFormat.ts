@@ -3,12 +3,12 @@
 
 export type TravelMode = 'driving' | 'foot' | 'cycling';
 
-export interface DistanceDurationLabels {
+type DistanceDurationLabels = {
   distanceLabel: string;
   durationLabel: string;
-}
+};
 
-export function formatDistanceDuration(distMeters: number, durSeconds: number): DistanceDurationLabels {
+function formatDistanceDuration(distMeters: number, durSeconds: number): DistanceDurationLabels {
   const km = distMeters / 1000;
   const distanceLabel = km < 1 ? `${Math.round(distMeters)}m` : `${km.toFixed(km < 10 ? 1 : 0)}km`;
   const mins = Math.round(durSeconds / 60);

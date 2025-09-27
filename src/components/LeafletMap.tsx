@@ -5,8 +5,10 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import 'leaflet.markercluster';
-import { formatTravelChip, TravelMode } from '@/lib/travelFormat';
+import { formatTravelChip } from '@/lib/travelFormat';
 import { logger } from '@/lib/logger';
+
+type TravelMode = 'driving' | 'foot' | 'cycling';
 
 export interface LeafletMarkerData {
   id: string;
@@ -47,7 +49,7 @@ export interface LeafletMapProps {
   /** Show a dedicated control button to fit origin + markers */
   showRefitAllControl?: boolean;
   /** Travel modes to compute (OSRM profiles). Supported: driving, foot */
-  travelModes?: ("driving" | "foot" | "cycling")[];
+  travelModes?: TravelMode[];
   /** Allow user to toggle travel modes client-side */
   enableTravelModeToggle?: boolean;
   /** Override OSRM base URL (must support /table); default public demo server */
@@ -130,7 +132,7 @@ export default function LeafletMap({
   const routeLayerRef = useRef<L.Polyline | null>(null);
   interface ModeData { distance: number; duration: number }
   const travelCacheRef = useRef<Record<string, { driving?: ModeData; foot?: ModeData; cycling?: ModeData }>>({});
-  const [selectedModes, setSelectedModes] = React.useState<("driving"|"foot"|"cycling")[]>(travelModes);
+  const [selectedModes, setSelectedModes] = React.useState<TravelMode[]>(travelModes);
   // Keep selectedModes in sync if prop changes (when toggle disabled)
   useEffect(()=>{
     if(!enableTravelModeToggle){

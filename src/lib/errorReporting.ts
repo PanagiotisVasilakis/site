@@ -302,13 +302,6 @@ class ErrorReporter {
 // Create global instance
 export const errorReporter = new ErrorReporter();
 
-// Convenience exports
-export const reportError = errorReporter.reportError.bind(errorReporter);
-export const addBreadcrumb = errorReporter.addBreadcrumb.bind(errorReporter);
-export const setUserId = errorReporter.setUserId.bind(errorReporter);
-export const trackNavigation = errorReporter.trackNavigation.bind(errorReporter);
-export const trackUserInteraction = errorReporter.trackUserInteraction.bind(errorReporter);
-
 // React integration
 export function useErrorReporting() {
   return {
@@ -321,5 +314,3 @@ export function useErrorReporting() {
   };
 }
 
-// Types export
-export type { ErrorLevel, ErrorBreadcrumb, ErrorContext, ErrorReport };

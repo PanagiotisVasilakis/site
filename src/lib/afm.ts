@@ -30,8 +30,3 @@ export function isValidAFM(input: string): boolean {
   return Number(afm[8]) === expected;
 }
 
-/** Normalize AFM by trimming whitespace; returns null if not 9 digits numeric after trim. */
-export function normalizeAFM(input: string): string | null {
-  const v = (input ?? '').trim();
-  return /^\d{9}$/.test(v) ? v : null;
-}

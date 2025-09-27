@@ -362,8 +362,9 @@ export default function UnifiedGuestClient() {
                                           }}
                                           onMouseEnter={(e) => {
                                             e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.03)';
-                                            document.documentElement.getAttribute('data-theme') === 'dark' && 
-                                            (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)');
+                                            if (document.documentElement.getAttribute('data-theme') === 'dark') {
+                                              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                                            }
                                           }}
                                           onMouseLeave={(e) => {
                                             e.currentTarget.style.backgroundColor = 'transparent';

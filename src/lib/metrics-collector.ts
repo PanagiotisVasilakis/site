@@ -6,7 +6,7 @@
 import { logger } from '@/lib/logger-enterprise';
 
 // Core metric types
-export interface BaseMetric {
+interface BaseMetric {
   name: string;
   value: number;
   timestamp: number;
@@ -14,33 +14,33 @@ export interface BaseMetric {
   type: MetricType;
 }
 
-export interface CounterMetric extends BaseMetric {
+interface CounterMetric extends BaseMetric {
   type: 'counter';
   delta?: number;
 }
 
-export interface GaugeMetric extends BaseMetric {
+interface GaugeMetric extends BaseMetric {
   type: 'gauge';
 }
 
-export interface HistogramMetric extends BaseMetric {
+interface HistogramMetric extends BaseMetric {
   type: 'histogram';
   buckets?: number[];
   samples?: number[];
 }
 
-export interface TimerMetric extends BaseMetric {
+interface TimerMetric extends BaseMetric {
   type: 'timer';
   duration: number;
   startTime: number;
   endTime: number;
 }
 
-export type MetricType = 'counter' | 'gauge' | 'histogram' | 'timer';
-export type Metric = CounterMetric | GaugeMetric | HistogramMetric | TimerMetric;
+type MetricType = 'counter' | 'gauge' | 'histogram' | 'timer';
+type Metric = CounterMetric | GaugeMetric | HistogramMetric | TimerMetric;
 
 // Metric aggregation interfaces
-export interface MetricAggregation {
+interface MetricAggregation {
   name: string;
   count: number;
   sum: number;
@@ -55,7 +55,7 @@ export interface MetricAggregation {
   tags: Record<string, string>;
 }
 
-export interface BusinessMetric {
+interface BusinessMetric {
   event: string;
   value?: number;
   properties?: Record<string, unknown>;
@@ -65,7 +65,7 @@ export interface BusinessMetric {
 }
 
 // System metrics interface
-export interface SystemMetrics {
+interface SystemMetrics {
   cpu: {
     usage: number;
     loadAverage: number[];
@@ -91,7 +91,7 @@ export interface SystemMetrics {
 }
 
 // Application performance metrics
-export interface ApplicationMetrics {
+interface ApplicationMetrics {
   requests: {
     total: number;
     rate: number;
@@ -747,30 +747,3 @@ export const metrics = new MetricsCollector({
   aggregationInterval: 60 * 1000, // 1 minute
 });
 
-// Convenience functions for common metrics
-export const trackPageLoad = (path: string, loadTime: number, navigationTiming?: PerformanceNavigationTiming) => {
-  metrics.trackPageLoad(path, loadTime, navigationTiming);
-};
-
-export const trackApiCall = (endpoint: string, method: string, statusCode: number, responseTime: number) => {
-  metrics.trackApiCall(endpoint, method, statusCode, responseTime);
-};
-
-export const trackUserAction = (action: string, category: string, value?: number) => {
-  metrics.trackUserAction(action, category, value);
-};
-
-export const trackError = (error: Error, context?: Record<string, unknown>) => {
-  metrics.trackError(error, context);
-};
-
-export const trackWebVital = (name: string, value: number, rating: string) => {
-  metrics.trackWebVital(name, value, rating);
-};
-
-export const trackEvent = (event: string, properties?: Record<string, unknown>, value?: number) => {
-  metrics.trackEvent(event, properties, value);
-};
-
-// Export the collector class for advanced usage
-export { MetricsCollector };

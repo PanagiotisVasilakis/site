@@ -7,7 +7,7 @@ import { logger } from '@/lib/logger-enterprise';
 import { metrics } from '@/lib/metrics-collector';
 
 // Trace interfaces
-export interface TraceContext {
+interface TraceContext {
   traceId: string;
   spanId: string;
   parentSpanId?: string;
@@ -15,7 +15,7 @@ export interface TraceContext {
   baggage?: Record<string, string>;
 }
 
-export interface Span {
+interface Span {
   traceId: string;
   spanId: string;
   parentSpanId?: string;
@@ -29,7 +29,7 @@ export interface Span {
   component: string;
 }
 
-export interface SpanLog {
+interface SpanLog {
   timestamp: number;
   level: 'info' | 'warn' | 'error' | 'debug';
   message: string;
@@ -380,7 +380,7 @@ class DistributedTracer {
 }
 
 // Trace analysis interface
-export interface TraceAnalysis {
+interface TraceAnalysis {
   traceId: string;
   totalDuration: number;
   spanCount: number;
@@ -389,211 +389,8 @@ export interface TraceAnalysis {
   criticalPath: Span[];
 }
 
-// Request tracing middleware
-export function createTracingMiddleware() {
-  interface RequestLike {
-    headers?: Record<string, unknown>;
-    method?: string;
-    url?: string;
-    route?: { path?: string };
-    span?: Span;
-    traceContext?: TraceContext;
-  }
-  interface ResponseLike {
-    setHeader: (key: string, value: string) => void;
-    statusCode: number;
-    end: (...args: unknown[]) => unknown;
-    get: (name: string) => unknown;
-  }
-  type NextFn = () => void;
-
-  return (req: unknown, res: ResponseLike, next: NextFn) => {
-    const startTime = Date.now();
-    
-    // Extract or create trace context
-    const headers: Record<string, string> = {};
-    // Narrow req to expected shape for headers
-  const reqWithHeaders = req as RequestLike;
-    const headersSource = reqWithHeaders.headers ?? {};
-    for (const [key, value] of Object.entries(headersSource)) {
-      if (typeof value === 'string') {
-        headers[key] = value;
-      }
-    }
-    
-    const parentContext = tracer.extractTraceContext(headers);
-    
-    // Start request span
-    const span = tracer.startSpan('http_request', parentContext || undefined, {
-      'http.method': reqWithHeaders.method || 'UNKNOWN',
-      'http.url': reqWithHeaders.url || 'UNKNOWN',
-      'http.route': reqWithHeaders.route?.path,
-      'user_agent': typeof headers['user-agent'] === 'string' ? headers['user-agent'] : undefined,
-      component: 'http',
-    });
-
-    // Add trace headers to response
-    const traceHeaders = tracer.injectTraceContext({
-      traceId: span.traceId,
-      spanId: span.spanId,
-      flags: 1,
-    });
-    
-    Object.entries(traceHeaders).forEach(([key, value]) => {
-      res.setHeader(key, value);
-    });
-
-    // Track request in context
-  reqWithHeaders.span = span;
-  reqWithHeaders.traceContext = { traceId: span.traceId, spanId: span.spanId, flags: 1 };
-
-    // Override res.end to finish span
-    const originalEnd = res.end;
-    res.end = function(...args: unknown[]) {
-      const duration = Date.now() - startTime;
-      
-      tracer.addTags(span, {
-        'http.status_code': res.statusCode,
-        'http.response_size': res.get('content-length') || 0,
-      });
-
-      // Determine span status
-      let status = SpanStatus.OK;
-      if (res.statusCode >= 500) {
-        status = SpanStatus.ERROR;
-      } else if (res.statusCode >= 400) {
-        tracer.addLog(span, 'warn', 'Client error response', {
-          statusCode: res.statusCode,
-        });
-      }
-
-      tracer.finishSpan(span, status);
-
-      // Track request metrics
-      metrics.trackApiCall(
-        reqWithHeaders.route?.path || reqWithHeaders.url || 'UNKNOWN',
-        reqWithHeaders.method || 'GET',
-        res.statusCode,
-        duration
-      );
-
-      return originalEnd.apply(this, args);
-    };
-
-    next();
-  };
-}
-
-// APM (Application Performance Monitoring) utilities
-export class APM {
-  // Track database queries
-  public static trackDatabaseQuery(
-    query: string,
-    database: string,
-    table?: string
-  ): { finish: (error?: Error) => void } {
-    const startTime = Date.now();
-    
-    return {
-      finish: (error?: Error) => {
-        const duration = Date.now() - startTime;
-        
-        metrics.timer('database.query_time', duration, {
-          database,
-          table: table || 'unknown',
-          operation: query.split(' ')[0]?.toLowerCase() || 'unknown',
-        });
-
-        if (error) {
-          metrics.counter('database.errors', 1, {
-            database,
-            table: table || 'unknown',
-          });
-        }
-
-        if (duration > 1000) {
-          logger.warn('Slow database query', {
-            query: query.substring(0, 100),
-            duration,
-            database,
-            table,
-            error: error?.message,
-          });
-        }
-      },
-    };
-  }
-
-  // Track external API calls
-  public static trackExternalAPI(
-    service: string,
-    endpoint: string,
-    method: string = 'GET'
-  ): { finish: (statusCode: number, error?: Error) => void } {
-    const startTime = Date.now();
-    
-    return {
-      finish: (statusCode: number, error?: Error) => {
-        const duration = Date.now() - startTime;
-        
-        metrics.timer('external_api.response_time', duration, {
-          service,
-          endpoint,
-          method,
-          status: statusCode.toString(),
-        });
-
-        if (error || statusCode >= 400) {
-          metrics.counter('external_api.errors', 1, {
-            service,
-            endpoint,
-            method,
-            status: statusCode.toString(),
-          });
-        }
-
-        if (duration > 5000) {
-          logger.warn('Slow external API call', {
-            service,
-            endpoint,
-            method,
-            duration,
-            statusCode,
-            error: error?.message,
-          });
-        }
-      },
-    };
-  }
-
-  // Track cache operations
-  public static trackCacheOperation(
-    operation: 'get' | 'set' | 'delete',
-    key: string,
-    hit: boolean = false
-  ): void {
-    metrics.counter(`cache.${operation}`, 1, {
-      hit: hit.toString(),
-    });
-
-    if (operation === 'get') {
-      metrics.counter('cache.requests', 1, {
-        result: hit ? 'hit' : 'miss',
-      });
-    }
-  }
-}
-
 // Global tracer instance
 export const tracer = new DistributedTracer({
   maxSpans: 10000,
   retentionPeriod: 60 * 60 * 1000, // 1 hour
 });
-
-// Convenience functions
-export const startSpan = tracer.startSpan.bind(tracer);
-export const finishSpan = tracer.finishSpan.bind(tracer);
-export const addLog = tracer.addLog.bind(tracer);
-export const addTags = tracer.addTags.bind(tracer);
-export const getTrace = tracer.getTrace.bind(tracer);
-export const analyzeTrace = tracer.analyzeTrace.bind(tracer);

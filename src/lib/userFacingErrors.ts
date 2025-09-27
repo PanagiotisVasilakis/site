@@ -1,6 +1,6 @@
 import { ApiErrorCode } from '@/lib/apiErrorHandler';
 
-export type UIError = {
+type UIError = {
   summary: string;
   details?: string[];
   fields?: Record<string, string>;

@@ -94,7 +94,7 @@ function sendMetric(metric: { name: string; value: number; id: string; rating: s
   }
 }
 
-export function WebVitalsReporter({
+function WebVitalsReporterInternal({
   showWidget = process.env.NODE_ENV === 'development',
   position = 'bottom-right',
   // Default to false to avoid duplicate reporting; performanceMonitor handles sending
@@ -325,7 +325,6 @@ export function WebVitalsReporter({
   );
 }
 
-// Default export for backward compatibility
-export default function WebVitalsReporterDefault() {
-  return <WebVitalsReporter showWidget={false} />;
+export default function WebVitalsReporter(props: Partial<WebVitalsReporterProps> = {}) {
+  return <WebVitalsReporterInternal showWidget={false} {...(props as WebVitalsReporterProps)} />;
 }

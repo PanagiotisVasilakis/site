@@ -2,9 +2,47 @@
 // consistent future enhancements (auth headers, logging, etc.)
 import { logger } from '@/lib/logger';
 
-export async function internalFetch(input: string, init?: RequestInit) {
+export const ADMIN_SECRET_STORAGE_KEY = 'admin_secret';
+
+function getAdminSecret(): string | null {
+  if (typeof window === 'undefined') return null;
   try {
-    const res = await fetch(input, init);
+    return window.sessionStorage?.getItem(ADMIN_SECRET_STORAGE_KEY) || null;
+  } catch (err) {
+    logger.warn('internalFetch admin secret access failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
+function buildHeaders(init?: RequestInit, adminSecret?: string): HeadersInit | undefined {
+  const shouldAttachSecret = Boolean(adminSecret);
+  if (!shouldAttachSecret && !init?.headers) return init?.headers;
+
+  const headers = new Headers(init?.headers as HeadersInit | undefined);
+  if (shouldAttachSecret && adminSecret) {
+    headers.set('x-admin-secret', adminSecret);
+  }
+  return headers;
+}
+
+export async function internalFetch(input: string, init?: RequestInit) {
+  const isAdminAPI = typeof input === 'string' && input.startsWith('/api/admin/');
+  const adminSecret = isAdminAPI ? getAdminSecret() : null;
+  const finalInit: RequestInit = { ...init };
+
+  if (typeof window !== 'undefined') {
+    finalInit.credentials = finalInit.credentials ?? 'same-origin';
+  }
+
+  const headers = buildHeaders(init, adminSecret ?? undefined);
+  if (headers) {
+    finalInit.headers = headers;
+  }
+
+  try {
+    const res = await fetch(input, finalInit);
     if (!res.ok) {
       // Log minimal but meaningful context
       logger.warn('internalFetch non-OK response', {

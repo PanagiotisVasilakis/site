@@ -1,18 +1,16 @@
 import Link from "next/link";
-import { getCategoriesWithCounts, pickCategoryLocale } from "@/lib/data";
+import { getCategoriesWithCounts, pickCategoryLocale, type CategoryWithCount } from "@/lib/data";
 import { absUrl, siteUrl } from "@/lib/site";
 import { getDictionary } from "@/i18n/dictionaries";
 import { locales, type Locale } from "@/i18n/config";
 import HomeHero from "@/components/HomeHero";
 import HomeInteractiveBar from "@/components/HomeInteractiveBar";
 
-interface CategoryWithCount { id: string; slug: string; title: string; description?: string; count: number; icon?: string; }
-
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : "en";
   const t = getDictionary(eff);
-  const cats: CategoryWithCount[] = getCategoriesWithCounts() as CategoryWithCount[];
+  const cats: CategoryWithCount[] = getCategoriesWithCounts();
   return (
   <div className="page-container mx-auto max-w-4xl">
       <script

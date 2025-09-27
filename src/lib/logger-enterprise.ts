@@ -414,9 +414,3 @@ class EnterpriseLogger {
 
 // Export singleton instance
 export const logger = new EnterpriseLogger();
-
-// Export class for custom instances
-export { EnterpriseLogger };
-
-// Utility types
-export type Logger = typeof logger;

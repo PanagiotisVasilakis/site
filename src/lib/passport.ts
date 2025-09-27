@@ -3,23 +3,21 @@
  * Future: per-country overrides driven by JSON config.
  */
 
-export interface PassportRules {
+interface PassportRules {
   minLength: number;
   maxLength: number;
   allowChars: RegExp; // character class for individual chars, e.g., /[A-Z0-9]/
   message?: string; // optional custom message
 }
 
-export interface PassportConfigByCountry {
-  [iso2: string]: {
-    minLength?: number;
-    maxLength?: number;
-    allowChars?: string; // string form of regex class, e.g., "[A-Z0-9]"
-    message?: string;
-  };
-}
+type PassportConfigByCountry = Record<string, {
+  minLength?: number;
+  maxLength?: number;
+  allowChars?: string; // string form of regex class, e.g., "[A-Z0-9]"
+  message?: string;
+}>;
 
-export const defaultPassportRules: PassportRules = {
+const defaultPassportRules: PassportRules = {
   minLength: 5,
   maxLength: 20,
   allowChars: /[A-Z0-9]/,
@@ -35,7 +33,7 @@ function mergeRules(base: PassportRules, overrides?: Partial<PassportRules>): Pa
   };
 }
 
-export function rulesFromConfig(countryCode?: string, config?: PassportConfigByCountry): PassportRules {
+function rulesFromConfig(countryCode?: string, config?: PassportConfigByCountry): PassportRules {
   if (!countryCode || !config) return defaultPassportRules;
   const cc = countryCode.toUpperCase();
   const item = config[cc];

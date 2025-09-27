@@ -37,7 +37,7 @@ describe('UnifiedGuestClient', () => {
     render(<UnifiedGuestClient />);
 
     // Entry gate: reveal tabs by choosing existing booking
-    await user.click(screen.getByRole('button', { name: /I have already booked/i }));
+  await user.click(screen.getByRole('button', { name: /Booking & Check-in Details/i }));
 
   // Initial mode is signin per mocked search params
     const signinTab = document.getElementById('tab-signin') as HTMLButtonElement;

@@ -1,11 +1,11 @@
-export type PhoneCountry = {
+type PhoneCountry = {
   cc: string; // ISO 3166-1 alpha-2
   name: string;
   dial: string; // E.164 country calling code with +
   flag: string; // Emoji flag
 };
 
-export const phoneCountries: PhoneCountry[] = [
+const phoneCountries: PhoneCountry[] = [
   // Europe
   { cc: 'GR', name: 'Greece', dial: '+30', flag: '🇬🇷' },
   { cc: 'AL', name: 'Albania', dial: '+355', flag: '🇦🇱' },
@@ -189,29 +189,22 @@ export const phoneCountries: PhoneCountry[] = [
 export const DEFAULT_ABROAD_DIAL = '+1';
 
 // European Union ISO-2 members (as of 2025)
-export const EU_CC: string[] = [
+const EU_CC: string[] = [
   'AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE'
 ];
 
 // Pinned top markets (put first), then EU countries
-export const POPULAR_CC: string[] = [
+const POPULAR_CC: string[] = [
   'GR', // local market
   'GB','DE','FR','IT','NL','ES','SE','AT', // key EU markets
   'US', // international
 ];
 
-export function getDialByCC(cc: string): string | undefined {
-  const hit = phoneCountries.find(c => c.cc === cc.toUpperCase());
-  return hit?.dial;
-}
-
-export function sortPhoneCountries(list: PhoneCountry[] = phoneCountries): PhoneCountry[] {
+function sortPhoneCountries(list: PhoneCountry[] = phoneCountries): PhoneCountry[] {
   return [...list].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export const phoneCountriesSorted = sortPhoneCountries();
-
-export function prioritizeCountries(
+function prioritizeCountries(
   pinnedCC: string[] = [...POPULAR_CC, ...EU_CC],
   list: PhoneCountry[] = phoneCountries
 ): PhoneCountry[] {
