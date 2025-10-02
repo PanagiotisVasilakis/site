@@ -8,7 +8,7 @@ import DataWarmup from '@/components/DataWarmup';
 // Font variables removed (system fonts used)
 
 export const metadata: Metadata = {
-  manifest: "/app.webmanifest",
+  manifest: "/manifest.webmanifest",
   icons: {
     icon: [
       { url: "/favicon.ico" },

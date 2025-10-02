@@ -39,6 +39,8 @@ export type Dictionary = {
     activeTags: string;
     none: string;
     back?: string;
+    signIn?: string;
+    signOut?: string;
   };
   cta: {
     call: string;
@@ -117,6 +119,7 @@ export type Dictionary = {
     travelPrompt: string;
   };
   checkin?: {
+    navLabel?: string;
     title?: string;
     summary?: string;
     bookingId?: string;
@@ -133,6 +136,51 @@ export type Dictionary = {
     submitted?: string;
     saving?: string;
     loading?: string;
+  };
+  checkinInfo?: {
+    welcome?: string;
+    welcomeMessage?: string;
+    checkInOutTitle?: string;
+    checkInTime?: string;
+    checkOutTime?: string;
+    wifiTitle?: string;
+    wifiNetwork?: string;
+    wifiPassword?: string;
+    copy?: string;
+    copied?: string;
+    emergencyTitle?: string;
+    hostContact?: string;
+    hostName?: string;
+    emergencyServices?: string;
+    police?: string;
+    localHospital?: string;
+    houseRulesTitle?: string;
+    rule1?: string;
+    rule2?: string;
+    rule3?: string;
+    rule4?: string;
+    rule5?: string;
+    amenitiesTitle?: string;
+    ac?: string;
+    heating?: string;
+    kitchen?: string;
+    washer?: string;
+    parking?: string;
+    pool?: string;
+    tipsTitle?: string;
+    tip1?: string;
+    tip2?: string;
+    tip3?: string;
+    tip4?: string;
+    additionalTitle?: string;
+    keysInfo?: string;
+    keysDetail?: string;
+    trashInfo?: string;
+    trashDetail?: string;
+    waterInfo?: string;
+    waterDetail?: string;
+    tvInfo?: string;
+    tvDetail?: string;
   };
   portal?: {
     signInTitle: string;
@@ -193,7 +241,7 @@ const dict: Record<Locale, Dictionary> = {
     arrivalPlaceholder: "Select arrival",
     departurePlaceholder: "Select departure"
   },
-  ui: { filters: "Filters", map: "Map", list: "List", resetAll: "Reset All", activeTags: "Active Tags", none: "None" },
+  ui: { filters: "Filters", map: "Map", list: "List", resetAll: "Reset All", activeTags: "Active Tags", none: "None", back: "Back", signIn: "Sign in", signOut: "Sign out" },
   updates: { updateAvailable: "New version available", refresh: "Refresh", dismiss: "Dismiss", fromTo: "Update available: {old} → {new}", assetsFromTo: "Assets updated: {old} → {new}" },
     cta: {
       call: "Call",
@@ -331,6 +379,7 @@ const dict: Record<Locale, Dictionary> = {
       }
     }
     ,checkin: {
+      navLabel: "Check-in",
       title: "Check-in",
       summary: "Booking summary",
       bookingId: "Booking ID",
@@ -347,6 +396,51 @@ const dict: Record<Locale, Dictionary> = {
       submitted: "Check-in completed",
       saving: "Saving…",
       loading: "Loading booking…",
+    }
+    ,checkinInfo: {
+      welcome: "🎉 Welcome to Our Villa!",
+      welcomeMessage: "We're delighted to have you here. Below you'll find everything you need for a comfortable stay.",
+      checkInOutTitle: "Check-in & Check-out",
+      checkInTime: "Check-in",
+      checkOutTime: "Check-out",
+      wifiTitle: "WiFi Connection",
+      wifiNetwork: "Network Name",
+      wifiPassword: "Password",
+      copy: "Copy",
+      copied: "Copied",
+      emergencyTitle: "Emergency Contacts",
+      hostContact: "Host (24/7)",
+      hostName: "Available anytime",
+      emergencyServices: "Emergency Services",
+      police: "Police, Fire, Ambulance",
+      localHospital: "Local Hospital",
+      houseRulesTitle: "House Rules",
+      rule1: "Quiet hours: 23:00 - 08:00",
+      rule2: "No smoking inside the property",
+      rule3: "Maximum capacity: 6 guests",
+      rule4: "Please respect the neighborhood",
+      rule5: "Pets allowed with prior approval",
+      amenitiesTitle: "Key Amenities",
+      ac: "Air Conditioning",
+      heating: "Heating",
+      kitchen: "Full Kitchen",
+      washer: "Washer/Dryer",
+      parking: "Free Parking",
+      pool: "Swimming Pool",
+      tipsTitle: "Local Tips",
+      tip1: "The nearest beach is just 5 minutes walk away",
+      tip2: "Supermarket \"AB Vassilopoulos\" is 300m away, open 8:00-21:00",
+      tip3: "Check our restaurant recommendations in the main menu",
+      tip4: "Need a taxi? Call +30 2721 023456 or use the Taxi app",
+      additionalTitle: "Good to Know",
+      keysInfo: "Keys:",
+      keysDetail: "Please leave keys in the lockbox when checking out",
+      trashInfo: "Trash:",
+      trashDetail: "Recycling bins are located near the main entrance",
+      waterInfo: "Water:",
+      waterDetail: "Tap water is safe to drink",
+      tvInfo: "Entertainment:",
+      tvDetail: "Smart TV with Netflix and YouTube available"
     }
   },
   el: {
@@ -373,7 +467,7 @@ const dict: Record<Locale, Dictionary> = {
     arrivalPlaceholder: "Επιλογή άφιξης",
     departurePlaceholder: "Επιλογή αναχώρησης"
   },
-  ui: { filters: "Φίλτρα", map: "Χάρτης", list: "Λίστα", resetAll: "Επαναφορά", activeTags: "Ενεργές Ετικέτες", none: "Κανένα", back: "Πίσω" },
+  ui: { filters: "Φίλτρα", map: "Χάρτης", list: "Λίστα", resetAll: "Επαναφορά", activeTags: "Ενεργές Ετικέτες", none: "Κανένα", back: "Πίσω", signIn: "Σύνδεση", signOut: "Αποσύνδεση" },
   updates: { updateAvailable: "Νέα έκδοση διαθέσιμη", refresh: "Ανανέωση", dismiss: "Κλείσιμο", fromTo: "Διαθέσιμη ενημέρωση: {old} → {new}", assetsFromTo: "Ενημερωμένα αρχεία: {old} → {new}" },
     cta: {
       call: "Κλήση",
@@ -511,6 +605,7 @@ const dict: Record<Locale, Dictionary> = {
       }
     }
     ,checkin: {
+      navLabel: "Άφιξη",
       title: "Άφιξη",
       summary: "Σύνοψη κράτησης",
       bookingId: "Κωδικός κράτησης",
@@ -527,6 +622,51 @@ const dict: Record<Locale, Dictionary> = {
       submitted: "Η άφιξη ολοκληρώθηκε",
       saving: "Γίνεται αποθήκευση…",
       loading: "Φόρτωση κράτησης…",
+    }
+    ,checkinInfo: {
+      welcome: "🎉 Καλώς Ήρθατε στη Βίλα μας!",
+      welcomeMessage: "Χαιρόμαστε που είστε εδώ. Παρακάτω θα βρείτε όλα όσα χρειάζεστε για μια άνετη διαμονή.",
+      checkInOutTitle: "Άφιξη & Αναχώρηση",
+      checkInTime: "Άφιξη",
+      checkOutTime: "Αναχώρηση",
+      wifiTitle: "Σύνδεση WiFi",
+      wifiNetwork: "Όνομα Δικτύου",
+      wifiPassword: "Κωδικός",
+      copy: "Αντιγραφή",
+      copied: "Αντιγράφηκε",
+      emergencyTitle: "Επαφές Έκτακτης Ανάγκης",
+      hostContact: "Οικοδεσπότης (24/7)",
+      hostName: "Διαθέσιμος ανά πάσα στιγμή",
+      emergencyServices: "Υπηρεσίες Έκτακτης Ανάγκης",
+      police: "Αστυνομία, Πυροσβεστική, Ασθενοφόρο",
+      localHospital: "Τοπικό Νοσοκομείο",
+      houseRulesTitle: "Κανόνες Οικίας",
+      rule1: "Ώρες ησυχίας: 23:00 - 08:00",
+      rule2: "Απαγορεύεται το κάπνισμα μέσα στο ακίνητο",
+      rule3: "Μέγιστη χωρητικότητα: 6 άτομα",
+      rule4: "Παρακαλούμε σεβαστείτε τη γειτονιά",
+      rule5: "Κατοικίδια επιτρέπονται με προηγούμενη έγκριση",
+      amenitiesTitle: "Βασικές Ανέσεις",
+      ac: "Κλιματισμός",
+      heating: "Θέρμανση",
+      kitchen: "Πλήρης Κουζίνα",
+      washer: "Πλυντήριο/Στεγνωτήριο",
+      parking: "Δωρεάν Πάρκινγκ",
+      pool: "Πισίνα",
+      tipsTitle: "Τοπικές Συμβουλές",
+      tip1: "Η πλησιέστερη παραλία απέχει μόλις 5 λεπτά με τα πόδια",
+      tip2: "Το σούπερ μάρκετ \"AB Βασιλόπουλος\" απέχει 300μ, ανοιχτό 8:00-21:00",
+      tip3: "Δείτε τις προτάσεις μας για εστιατόρια στο κύριο μενού",
+      tip4: "Χρειάζεστε ταξί; Καλέστε +30 2721 023456 ή χρησιμοποιήστε την εφαρμογή Taxi",
+      additionalTitle: "Καλό να Γνωρίζετε",
+      keysInfo: "Κλειδιά:",
+      keysDetail: "Παρακαλούμε αφήστε τα κλειδιά στο lockbox κατά την αναχώρηση",
+      trashInfo: "Σκουπίδια:",
+      trashDetail: "Οι κάδοι ανακύκλωσης βρίσκονται κοντά στην κεντρική είσοδο",
+      waterInfo: "Νερό:",
+      waterDetail: "Το νερό της βρύσης είναι πόσιμο",
+      tvInfo: "Ψυχαγωγία:",
+      tvDetail: "Smart TV με Netflix και YouTube διαθέσιμα"
     }
   },
 };

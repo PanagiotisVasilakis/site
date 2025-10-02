@@ -14,6 +14,9 @@ import BottomSheet from './BottomSheet';
 // Import styles
 import 'react-day-picker/dist/style.css';
 
+// Constants
+const MOBILE_BREAKPOINT = 768;
+
 interface DateRangePickerProps {
   value?: DateRange;
   onChange?: (range: DateRange) => void;
@@ -21,10 +24,6 @@ interface DateRangePickerProps {
   isOpen?: boolean;
   showPricing?: boolean;
   activeField?: 'arrival' | 'departure' | null;
-  fieldLabels?: {
-    arrival?: string;
-    departure?: string;
-  };
   anchor?: {
     left: number;
     width: number;
@@ -39,7 +38,6 @@ export default function DateRangePicker({
   isOpen = false,
   showPricing = true,
   activeField = null,
-  fieldLabels,
   anchor
 }: DateRangePickerProps) {
   const [selectedRange, setSelectedRange] = useState<DateRange>(value || { from: undefined, to: undefined });
@@ -51,7 +49,7 @@ export default function DateRangePicker({
   useEffect(() => {
     const checkViewport = () => {
       const w = window.innerWidth;
-      setIsMobile(w < 768);
+      setIsMobile(w < MOBILE_BREAKPOINT);
     };
     checkViewport();
     window.addEventListener('resize', checkViewport);

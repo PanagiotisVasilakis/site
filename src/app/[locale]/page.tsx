@@ -54,6 +54,14 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           <div className="text-lg font-medium mb-2" style={{color:'var(--text-accent)'}}>{t.house?.navLabel || 'Villa Photos'}</div>
         </Link>
 
+        <Link
+          href={`/${eff}/check-in`}
+          className="card p-6 flex flex-col items-center text-center transition-colors hover:bg-white/90 group"
+        >
+          <div className="text-4xl mb-3 group-hover:scale-110 transition-transform" aria-hidden>✅</div>
+          <div className="text-lg font-medium mb-2" style={{color:'var(--text-accent)'}}>Check-In Info</div>
+        </Link>
+
         {cats.slice(0, 2).map((c) => (
           <Link
             key={c.id}

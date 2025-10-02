@@ -8,7 +8,6 @@ import { tracker } from '@/lib/tracker';
 import ErrorSummary from '@/components/ErrorSummary';
 import { mapApiErrorToUI } from '@/lib/userFacingErrors';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import StartBookingCTA from './start-booking-cta';
 import { DEFAULT_ABROAD_DIAL, phoneCountriesPrioritized } from '@/lib/phoneCountries';
 
 type Mode = 'signin' | 'signup';
@@ -23,13 +22,14 @@ export default function UnifiedGuestClient() {
   const prefersReduced = useReducedMotion();
 
   const initialMode: Mode = (search?.get('mode') === 'signup' ? 'signup' : 'signin');
-  const [entry, setEntry] = useState<'initial' | 'has'>('initial');
   const [mode, setMode] = useState<Mode>(initialMode);
   const [origin, setOrigin] = useState<Origin>('');
   const [phone, setPhone] = useState('');
   const [phoneDial, setPhoneDial] = useState<string>('+30');
   const [afm, setAfm] = useState('');
   const [passport, setPassport] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [remember, setRemember] = useState(true);
   const [bookingRef, setBookingRef] = useState('');
@@ -46,11 +46,12 @@ export default function UnifiedGuestClient() {
 
   // Validation functions
   const validateAfm = (value: string): boolean => {
+    // Simple validation: exactly 9 digits (0-9), no checksum validation
     return /^\d{9}$/.test(value);
   };
 
   const validatePassport = (value: string): boolean => {
-    return /^[A-Za-z0-9]{9}$/.test(value);
+    return /^[A-Za-z0-9]{5,20}$/.test(value);
   };
 
   // Input handlers with validation
@@ -63,14 +64,19 @@ export default function UnifiedGuestClient() {
 
   const handlePassportChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/[^A-Za-z0-9]/g, ''); // Remove non-alphanumeric
-    if (value.length <= 9) {
+    if (value.length <= 20) {
       setPassport(value.toUpperCase());
     }
   };
 
   // Form validation
   const isFormValid = (): boolean => {
-    if (!origin || !phone || !fullName) return false;
+    // Sign-in: only phone and password required
+    if (mode === 'signin') {
+      return phone.length > 0 && password.length >= 8;
+    }
+    // Sign-up: all fields required
+    if (!origin || !phone || !fullName || !password || password.length < 8) return false;
     if (origin === 'GR' && !validateAfm(afm)) return false;
     if (origin === 'ABROAD' && !validatePassport(passport)) return false;
     return true;
@@ -133,19 +139,103 @@ export default function UnifiedGuestClient() {
     e.preventDefault();
     if (!origin) return;
 
-    // Frontend validation
-    if (origin === 'GR' && !validateAfm(afm)) {
+    // Frontend validation with specific field guidance
+    if (!fullName || fullName.trim().length === 0) {
       setSubmitError({
-        summary: 'Invalid AFM',
-        details: ['AFM must be exactly 9 digits']
+        summary: '❌ Problem with: Name - Surname',
+        details: [
+          'This field is empty',
+          'Please enter your full name as it appears on your booking'
+        ]
       });
       return;
     }
 
-    if (origin === 'ABROAD' && !validatePassport(passport)) {
+    if (!phone || phone.trim().length === 0) {
       setSubmitError({
-        summary: 'Invalid Passport Number',
-        details: ['Passport number must be exactly 9 alphanumeric characters']
+        summary: '❌ Problem with: Phone Number',
+        details: [
+          'This field is empty',
+          'Please enter your phone number with country code',
+          'Example: +30 695 581 0051 or 6955810051'
+        ]
+      });
+      return;
+    }
+
+    if (phone.trim().length < 8) {
+      setSubmitError({
+        summary: '❌ Problem with: Phone Number',
+        details: [
+          `You entered: ${phone} (only ${phone.trim().length} digits)`,
+          'Phone numbers must be at least 8 digits',
+          'Please enter your complete phone number'
+        ]
+      });
+      return;
+    }
+
+    // Sign-up mode: validate origin and identity documents
+    if (mode === 'signup' && origin === 'GR') {
+      if (!afm || afm.trim().length === 0) {
+        setSubmitError({
+          summary: '❌ Problem with: AFM (9 digits)',
+          details: [
+            'This field is empty',
+            'Please enter your 9-digit AFM (Αριθμός Φορολογικού Μητρώου)',
+            'Your Greek tax identification number'
+          ]
+        });
+        return;
+      }
+      if (!validateAfm(afm)) {
+        setSubmitError({
+          summary: '❌ Problem with: AFM (9 digits)',
+          details: [
+            `You entered: ${afm} (${afm.length} ${afm.length === 1 ? 'digit' : 'digits'})`,
+            'AFM must be exactly 9 digits (0-9)',
+            'Example: 123456789',
+            'Please enter all 9 digits of your Greek tax number'
+          ]
+        });
+        return;
+      }
+    }
+
+    if (mode === 'signup' && origin === 'ABROAD') {
+      if (!passport || passport.trim().length === 0) {
+        setSubmitError({
+          summary: '❌ Problem with: Passport Number',
+          details: [
+            'This field is empty',
+            'Please enter your passport number',
+            'Found on the information page of your passport'
+          ]
+        });
+        return;
+      }
+      if (!validatePassport(passport)) {
+        setSubmitError({
+          summary: '❌ Problem with: Passport Number',
+          details: [
+            `You entered: ${passport} (${passport.length} characters)`,
+            'Passport must be 5-20 letters and numbers only',
+            'Example: AB1234567',
+            'Please check your passport and enter the number correctly'
+          ]
+        });
+        return;
+      }
+    }
+
+    if (mode === 'signup' && bookingRef && bookingRef.trim().length > 0 && bookingRef.trim().length < 3) {
+      setSubmitError({
+        summary: '❌ Problem with: Booking Reference',
+        details: [
+          `You entered: ${bookingRef.trim()} (only ${bookingRef.trim().length} characters)`,
+          'Booking reference must be at least 3 characters',
+          'Or leave it empty if you don\'t have one'
+        ]
       });
       return;
     }
@@ -157,16 +247,19 @@ export default function UnifiedGuestClient() {
       const phoneE164 = raw.startsWith('+') ? raw : `+${raw}`;
 
       const base: Record<string, unknown> = {
-        origin: origin === 'GR' ? 'GR' : 'ABROAD',
+        mode,
         phone: phoneE164,
+        password,
         remember,
       };
-      if (origin === 'GR') base.afm = afm;
-      if (origin === 'ABROAD') base.passport = passport;
+      
+      // Sign-up mode: include all additional fields
       if (mode === 'signup') {
-        base.fullName = fullName;
+        base.origin = origin === 'GR' ? 'GR' : 'ABROAD';
+        if (origin === 'GR') base.afm = afm;
+        if (origin === 'ABROAD') base.passport = passport;
+        base.lastName = fullName;
         if (bookingRef) base.bookingRef = bookingRef;
-        if (email) base.email = email;
       }
 
       const res = await internalFetch('/api/portal/verify', {
@@ -181,8 +274,94 @@ export default function UnifiedGuestClient() {
         try {
           const errJson = await res.json();
           const mapped = mapApiErrorToUI(errJson);
-          summary = mapped.summary;
-          details = mapped.details;
+          
+          // Make error messages more specific based on field errors
+          if (mapped.fields) {
+            const fieldErrors: string[] = [];
+            
+            if (mapped.fields.afm) {
+              summary = '❌ Problem with: AFM (9 digits)';
+              fieldErrors.push('Error: ' + mapped.fields.afm);
+              fieldErrors.push('AFM must be exactly 9 digits (0-9)');
+              fieldErrors.push('Please check your Greek tax identification number');
+            }
+            
+            if (mapped.fields.passport) {
+              summary = '❌ Problem with: Passport Number';
+              fieldErrors.push('Error: ' + mapped.fields.passport);
+              fieldErrors.push('Passport must be 5-20 letters and numbers');
+              fieldErrors.push('Please check your passport and enter correctly');
+            }
+            
+            if (mapped.fields.phone) {
+              summary = '❌ Problem with: Phone Number';
+              fieldErrors.push('Error: ' + mapped.fields.phone);
+              fieldErrors.push('Phone number format is incorrect');
+              fieldErrors.push('Include country code: +30 695 581 0051');
+            }
+            
+            if (mapped.fields.password) {
+              summary = '❌ Problem with: Password';
+              fieldErrors.push('Error: ' + mapped.fields.password);
+              fieldErrors.push('Password must be at least 8 characters long');
+              fieldErrors.push('Please enter a stronger password');
+            }
+            
+            if (mapped.fields.lastName) {
+              summary = '❌ Problem with: Name - Surname';
+              fieldErrors.push('Error: ' + mapped.fields.lastName);
+              fieldErrors.push('Please enter your name as shown on your booking');
+            }
+            
+            if (mapped.fields.bookingRef) {
+              summary = '❌ Problem with: Booking Reference';
+              fieldErrors.push('Error: ' + mapped.fields.bookingRef);
+              fieldErrors.push('Check your booking confirmation email');
+            }
+            
+            if (fieldErrors.length > 0) {
+              details = fieldErrors;
+            } else {
+              summary = mapped.summary;
+              details = mapped.details;
+            }
+          } else {
+            // No field-specific errors, check if it's an authentication error
+            if (mapped.summary.toLowerCase().includes('not found') || 
+                mapped.summary.toLowerCase().includes('no matching')) {
+              summary = '❌ Could not verify your information';
+              if (mode === 'signup') {
+                // For sign-up, suggest contacting support if data doesn't match
+                details = [
+                  'Please check that all these fields are correct:',
+                  '',
+                  '📝 Name - Surname: Must match your booking',
+                  '📱 Phone Number: Include +30 or just the 10 digits',
+                  origin === 'GR' 
+                    ? '🆔 AFM: All 9 digits of your tax number' 
+                    : '🛂 Passport: Your passport number',
+                  '',
+                  'If everything looks correct, contact support'
+                ];
+              } else {
+                // For sign-in, just ask them to double-check their info
+                details = [
+                  'Please double-check that all fields are correct:',
+                  '',
+                  '📝 Name - Surname: Must match your booking exactly',
+                  '📱 Phone Number: Include +30 or just the 10 digits',
+                  origin === 'GR' 
+                    ? '🆔 AFM: All 9 digits of your tax number' 
+                    : '🛂 Passport: Your passport number',
+                  '',
+                  'Try again with the exact information from your booking'
+                ];
+              }
+            } else {
+              summary = mapped.summary;
+              details = mapped.details;
+            }
+          }
         } catch {}
         setSubmitError({ summary, details });
       } else {
@@ -198,48 +377,9 @@ export default function UnifiedGuestClient() {
     }
   };
 
-  const handleBack = () => {
-    // Go back to entry gate and reset transient state
-    setEntry('initial');
-    setOrigin('');
-    setPhone('');
-    setAfm('');
-    setPassport('');
-    setEmail('');
-    setRemember(true);
-    setBookingRef('');
-    setFullName('');
-    setSubmitError(null);
-    setLoading(false);
-  };
-
   return (
     <div className="mx-auto max-w-md p-4">
   <div className="main-glass-container card p-5">
-        {entry === 'initial' ? (
-          <div className="min-h-[220px] flex items-center justify-center">
-            <div className="w-full max-w-sm mx-auto flex flex-col gap-3 text-center">
-              <button type="button" className="btn-primary w-full" onClick={() => setEntry('has')}>
-                {dict.portal?.alreadyBooked || 'Booking & Check-in Details'}
-              </button>
-              <StartBookingCTA locale={locale} />
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Back arrow */}
-            <div className="mb-3">
-              <button
-                type="button"
-                onClick={handleBack}
-                aria-label={dict.ui?.back || 'Back'}
-                title={dict.ui?.back || 'Back'}
-                className="btn-outline"
-              >
-                <span aria-hidden>←</span>
-                <span className="ml-1">{dict.ui?.back || 'Back'}</span>
-              </button>
-            </div>
             <motion.div
               role="tablist"
               aria-label="Authentication mode"
@@ -271,23 +411,27 @@ export default function UnifiedGuestClient() {
                     ) : null}
 
                     <form onSubmit={onSubmit} className="space-y-3" aria-busy={loading} noValidate>
-                      <motion.div layout>
-                        <div>
-                          <label className="block text-lg md:text-xl font-semibold mb-4" style={{ color: 'var(--fg-default)' }}>{dict.portal?.originQuestion || 'Where are you coming from?'}</label>
-                          <div role="radiogroup" aria-label="Origin selection" className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5">
-                            <button type="button" role="radio" aria-checked={origin === 'GR'} tabIndex={0} onClick={() => selectOrigin('GR')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectOrigin('GR'); } }} className="card p-5 md:p-6 h-32 md:h-36 w-full flex flex-col items-center justify-center transition focus:outline-none" style={origin === 'GR' ? { border: '1px solid var(--brand-400)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--brand-400) 20%, transparent)' } : {}}>
-                              <div className="text-4xl md:text-5xl mb-2" aria-hidden>🇬🇷</div>
-                              <div className="text-base md:text-lg font-semibold" style={{ color: origin === 'GR' ? 'var(--fg-default)' : 'var(--fg-muted)' }}>{dict.portal?.originGR || 'Greece'}</div>
-                            </button>
-                            <button type="button" role="radio" aria-checked={origin === 'ABROAD'} tabIndex={0} onClick={() => selectOrigin('ABROAD')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectOrigin('ABROAD'); } }} className="card p-5 md:p-6 h-32 md:h-36 w-full flex flex-col items-center justify-center transition focus:outline-none" style={origin === 'ABROAD' ? { border: '1px solid var(--brand-400)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--brand-400) 20%, transparent)' } : {}}>
-                              <div className="text-4xl md:text-5xl mb-2" aria-hidden>🌍</div>
-                              <div className="text-base md:text-lg font-semibold" style={{ color: origin === 'ABROAD' ? 'var(--fg-default)' : 'var(--fg-muted)' }}>{dict.portal?.originAbroad || 'World'}</div>
-                            </button>
+                      {/* Sign-up mode: show origin selection */}
+                      {mode === 'signup' && (
+                        <motion.div layout>
+                          <div>
+                            <label className="block text-lg md:text-xl font-semibold mb-4" style={{ color: 'var(--fg-default)' }}>{dict.portal?.originQuestion || 'Where are you coming from?'}</label>
+                            <div role="radiogroup" aria-label="Origin selection" className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5">
+                              <button type="button" role="radio" aria-checked={origin === 'GR'} tabIndex={0} onClick={() => selectOrigin('GR')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectOrigin('GR'); } }} className="card p-5 md:p-6 h-32 md:h-36 w-full flex flex-col items-center justify-center transition focus:outline-none" style={origin === 'GR' ? { border: '1px solid var(--brand-400)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--brand-400) 20%, transparent)' } : {}}>
+                                <div className="text-4xl md:text-5xl mb-2" aria-hidden>🇬🇷</div>
+                                <div className="text-base md:text-lg font-semibold" style={{ color: origin === 'GR' ? 'var(--fg-default)' : 'var(--fg-muted)' }}>{dict.portal?.originGR || 'Greece'}</div>
+                              </button>
+                              <button type="button" role="radio" aria-checked={origin === 'ABROAD'} tabIndex={0} onClick={() => selectOrigin('ABROAD')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectOrigin('ABROAD'); } }} className="card p-5 md:p-6 h-32 md:h-36 w-full flex flex-col items-center justify-center transition focus:outline-none" style={origin === 'ABROAD' ? { border: '1px solid var(--brand-400)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--brand-400) 20%, transparent)' } : {}}>
+                                <div className="text-4xl md:text-5xl mb-2" aria-hidden>🌍</div>
+                                <div className="text-base md:text-lg font-semibold" style={{ color: origin === 'ABROAD' ? 'var(--fg-default)' : 'var(--fg-muted)' }}>{dict.portal?.originAbroad || 'World'}</div>
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      </motion.div>
+                        </motion.div>
+                      )}
 
-                      {origin ? (
+                      {/* Sign-in mode: always show fields; Sign-up mode: show after origin selected */}
+                      {(mode === 'signin' || origin) ? (
                         <div className="text-[color:var(--fg-default)]">
                           <div>
                             <label className="block text-sm mb-1" style={{ color: 'var(--fg-default)' }}>{dict.portal?.phoneLabel || 'Phone Number'} *</label>
@@ -402,7 +546,44 @@ export default function UnifiedGuestClient() {
                               />
                             </div>
                           </div>
-                          {origin === 'GR' && (
+                          
+                          {/* Password Field - always shown */}
+                          <div>
+                            <label className="block text-sm mb-1" style={{ color: 'var(--fg-default)' }}>
+                              {locale === 'el' ? 'Κωδικός Πρόσβασης' : 'Password'} *
+                            </label>
+                            <div className="relative">
+                              <input 
+                                type={showPassword ? 'text' : 'password'}
+                                className="w-full input pr-10" 
+                                style={{ 
+                                  color: 'var(--fg-default) !important',
+                                  '--placeholder-color': 'var(--fg-muted)',
+                                } as React.CSSProperties}
+                                value={password} 
+                                onChange={e => setPassword(e.target.value)}
+                                placeholder={locale === 'el' ? 'Τουλάχιστον 8 χαρακτήρες' : 'At least 8 characters'}
+                                minLength={8}
+                                required 
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm opacity-60 hover:opacity-100 transition-opacity"
+                                style={{ color: 'var(--fg-muted)' }}
+                                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                              >
+                                {showPassword ? '👁️' : '👁️‍🗨️'}
+                              </button>
+                            </div>
+                            {password && password.length < 8 && (
+                              <p className="text-xs mt-1" style={{ color: 'var(--danger-600)' }}>
+                                {locale === 'el' ? 'Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες' : 'Password must be at least 8 characters'}
+                              </p>
+                            )}
+                          </div>
+
+                          {mode === 'signup' && origin === 'GR' && (
                             <div>
                               <label className="block text-sm mb-1" style={{ color: 'var(--fg-default)' }}>{dict.portal?.afmLabel || 'AFM (9 digits)'} *</label>
                               <input 
@@ -427,9 +608,9 @@ export default function UnifiedGuestClient() {
                               )}
                             </div>
                           )}
-                          {origin === 'ABROAD' && (
+                          {mode === 'signup' && origin === 'ABROAD' && (
                             <div>
-                              <label className="block text-sm mb-1" style={{ color: 'var(--fg-default)' }}>{dict.portal?.passportLabel || 'Passport Number (9 characters)'} *</label>
+                              <label className="block text-sm mb-1" style={{ color: 'var(--fg-default)' }}>{dict.portal?.passportLabel || 'Passport Number (5-20 characters)'} *</label>
                               <input 
                                 className="w-full input" 
                                 style={{ 
@@ -439,13 +620,13 @@ export default function UnifiedGuestClient() {
                                 value={passport} 
                                 onChange={handlePassportChange}
                                 placeholder="A12345678"
-                                maxLength={9}
-                                title="Passport number must be exactly 9 alphanumeric characters"
+                                maxLength={20}
+                                title="Passport number must be 5-20 alphanumeric characters"
                                 required 
                               />
                               {passport && !validatePassport(passport) && (
                                 <p className="text-xs mt-1" style={{ color: 'var(--danger-600)' }}>
-                                  Passport number must be exactly 9 alphanumeric characters
+                                  Passport number must be 5-20 alphanumeric characters
                                 </p>
                               )}
                             </div>
@@ -587,8 +768,6 @@ export default function UnifiedGuestClient() {
                 </motion.div>
               </AnimatePresence>
             </motion.div>
-          </>
-        )}
       </div>
     </div>
   );

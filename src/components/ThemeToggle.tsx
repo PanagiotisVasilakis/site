@@ -21,7 +21,13 @@ export default function ThemeToggle() {
   useEffect(() => {
     if (!mounted) return;
     const root = document.documentElement;
-    if (theme === 'dark') root.setAttribute('data-theme', 'dark'); else root.removeAttribute('data-theme');
+    if (theme === 'dark') {
+      root.setAttribute('data-theme', 'dark');
+      root.classList.add('dark');
+    } else {
+      root.removeAttribute('data-theme');
+      root.classList.remove('dark');
+    }
     try { localStorage.setItem('theme', theme); } catch (err) { logger.warn('ThemeToggle write localStorage failed', err); }
   }, [theme, mounted]);
   // Listen to system changes only if user hasn't chosen explicitly
@@ -42,7 +48,7 @@ export default function ThemeToggle() {
       aria-label={label}
       suppressHydrationWarning
       onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-  className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-black/10 hover:bg-black/20 text-slate-800 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/70 dark:text-white text-sm leading-none transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60 dark:focus-visible:ring-brand-400/50"
+  className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-black/10 hover:bg-black/20 text-slate-800 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/70 dark:!text-white text-sm leading-none transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60 dark:focus-visible:ring-brand-400/50"
     >
       <span aria-hidden suppressHydrationWarning className="select-none">{icon}</span>
     </button>
