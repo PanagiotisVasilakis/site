@@ -43,7 +43,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
   // If next is provided, perform a redirect after setting cookies
   if (nextParam) {
-    return NextResponse.redirect(nextParam, { headers: res.headers });
+    const origin = req.nextUrl.origin;
+    return NextResponse.redirect(`${origin}${nextParam}`, { headers: res.headers });
   }
   return res;
 });
@@ -56,13 +57,20 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   const isSafePath = (p?: string | null) => !!p && p.startsWith('/') && !p.startsWith('//');
   const nextParam = isSafePath(nextRaw) ? nextRaw! : undefined;
   const failureParam = isSafePath(failureRaw) ? failureRaw! : undefined;
+  
+  // Helper to convert relative path to absolute URL
+  const toAbsoluteUrl = (path: string) => {
+    const origin = req.nextUrl.origin;
+    return `${origin}${path}`;
+  };
+  
   if (!refresh) {
-    if (failureParam) return NextResponse.redirect(failureParam);
+    if (failureParam) return NextResponse.redirect(toAbsoluteUrl(failureParam));
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Missing refresh token');
   }
   const rec = guestStore.verifyRefreshToken(refresh);
   if (!rec) {
-    if (failureParam) return NextResponse.redirect(failureParam);
+    if (failureParam) return NextResponse.redirect(toAbsoluteUrl(failureParam));
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Invalid refresh token');
   }
   const rotated = guestStore.rotateRefreshToken(refresh);
@@ -86,7 +94,8 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     headers.append('Set-Cookie', `${refreshCookie.name}=${refreshCookie.value}; Path=${refreshCookie.options.path}; HttpOnly; SameSite=Lax; Max-Age=${refreshCookie.options.maxAge};${refreshCookie.options.secure ? ' Secure;' : ''}`);
   }
   if (nextParam) {
-    return new NextResponse(null, { status: 302, headers: new Headers([...headers, ['Location', nextParam]]) });
+    const absoluteUrl = toAbsoluteUrl(nextParam);
+    return new NextResponse(null, { status: 302, headers: new Headers([...headers, ['Location', absoluteUrl]]) });
   }
   return new NextResponse(null, { status: 204, headers });
 });

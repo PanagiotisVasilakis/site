@@ -133,11 +133,9 @@ export function middleware(req: NextRequest) {
       
       const target = (isValidCookie ? cookieLocale : defaultLocale) as string;
       const url = req.nextUrl.clone();
-      // For the bare root "/", send guests to the unified guest page by default,
-      // except when the user has signed in recently (cookie from verify API)
+      // Always redirect to home page for root "/"
       if (pathname === "/") {
-        const last = req.cookies.get('portal_last_signin')?.value;
-        url.pathname = `/${target}${last ? '' : '/guest'}`;
+        url.pathname = `/${target}`;
       } else {
         url.pathname = `/${target}${pathname}`;
       }

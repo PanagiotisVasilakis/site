@@ -41,7 +41,7 @@ export default function ErrorSummary({
         {onRetry ? (
           <button type="button" className="btn-outline btn-sm" onClick={onRetry}>Try again</button>
         ) : null}
-        <a className="btn-link btn-sm" href={supportHref}>Contact support</a>
+        <a className="btn-outline btn-sm" href={supportHref}>Contact support</a>
       </div>
     </div>
   );

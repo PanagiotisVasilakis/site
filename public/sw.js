@@ -10,7 +10,7 @@ const CORE_ASSETS = [
   '/offline',
   '/en/offline','/el/offline',
   '/favicon.ico',
-  '/app.webmanifest',
+  '/manifest.webmanifest',
   // Key icons / imagery likely referenced above the fold (add more as needed)
   '/globe.svg','/window.svg','/file.svg'
   // Curated hero / brand images (add if present; harmless if 404 skipped)
@@ -157,12 +157,15 @@ async function flushQueue() {
       };
     });
     if (payloads.length) {
-      try {
-        const merged = payloads.map(p => { try { return JSON.parse(p); } catch { return null; } }).filter(Boolean);
-        await fetchInternal('/api/analytics', { method: 'POST', body: JSON.stringify(merged), headers: { 'content-type': 'application/json' } });
-      } catch {
-        for (const body of payloads) enqueue(body);
-        return;
+      // Send payloads individually to support servers that expect single-event POSTs.
+      for (const body of payloads) {
+        try {
+          // body is stored as a JSON string
+          await fetchInternal('/api/analytics', { method: 'POST', body, headers: { 'content-type': 'application/json' } });
+        } catch {
+          // Re-enqueue failed payload for next sync attempt
+          try { await enqueue(body); } catch {}
+        }
       }
     }
     broadcastQueueSize();
@@ -213,18 +216,23 @@ self.addEventListener('install', (event) => {
     } catch {}
   const cache = await caches.open(ACTIVE_CACHE_NAME);
     try {
-      const res = await fetchInternal('/precache.json', { cache: 'no-store' });
-      if (res.ok) {
-        const urls = await res.json();
-        // Add assets individually to tolerate 404s (hero images optional)
-        for (const u of [...CORE_ASSETS, ...urls]) {
-          try { await cache.add(u); } catch { /* ignore missing */ }
-        }
-      } else {
-        for (const u of CORE_ASSETS) { try { await cache.add(u); } catch {} }
+      // Prefer a smaller critical precache to reduce install cost. Fall back to full precache.
+      let urls = [];
+      try {
+        const crit = await fetchInternal('/critical-precache.json', { cache: 'no-store' });
+        if (crit.ok) urls = await crit.json();
+      } catch {}
+      if (!urls || urls.length === 0) {
+        try {
+          const res = await fetchInternal('/precache.json', { cache: 'no-store' });
+          if (res.ok) urls = await res.json();
+        } catch {}
       }
+      // Add assets in parallel (best-effort) to speed up install; individual failures ignored.
+      const allAssets = [...CORE_ASSETS, ...(Array.isArray(urls) ? urls : [])];
+      await Promise.allSettled(allAssets.map(u => cache.add(u).catch(() => {})));
     } catch {
-      for (const u of CORE_ASSETS) { try { await cache.add(u); } catch {} }
+      await Promise.allSettled(CORE_ASSETS.map(u => cache.add(u).catch(() => {})));
     }
     await self.skipWaiting();
   })());
@@ -241,7 +249,9 @@ self.addEventListener('activate', (event) => {
       if (res.ok) {
         const data = await res.json();
         RUNTIME_META = { ...RUNTIME_META, ...data, version: data.version || RUNTIME_META.version };
-        if (data.version) ACTIVE_CACHE_NAME = `guest-guide-${data.version}`;
+        // Keep naming consistent with install: include precacheHash when present
+        const suffix = data.precacheHash ? `${data.version}-${data.precacheHash.slice(0,8)}` : data.version || RUNTIME_META.version;
+        if (data.version) ACTIVE_CACHE_NAME = `guest-guide-${suffix}`;
         // SECONDARY CLEANUP: now that ACTIVE_CACHE_NAME may have changed based on version.json,
         // remove any older caches not caught by initial pass.
         try {
@@ -292,22 +302,45 @@ async function prewarmData() {
     let json = null;
     try { json = await catsRes.json(); } catch { return; }
     const cats = Array.isArray(json?.categories) ? json.categories : [];
+    // Build a list of URLs to prewarm (bounded)
+    const toPrewarm = [];
     for (const c of cats.slice(0,25)) { // safety cap
       if (!c?.id) continue;
       const listUrl = `/api/categories/${c.id}/items`;
-      const listRes = await fetchAndStore(listUrl);
-      if (!listRes) continue;
-      // Attempt to prewarm top item detail endpoints (first 2 items) for richer offline experience
+      toPrewarm.push(listUrl);
+    }
+    // Helper to run limited concurrency
+    async function runWithConcurrency(tasks, worker, concurrency = 5) {
+      const results = [];
+      let i = 0;
+      const runOne = async () => {
+        while (i < tasks.length) {
+          const idx = i++;
+          try { results[idx] = await worker(tasks[idx]); } catch { results[idx] = null; }
+        }
+      };
+      const workers = new Array(Math.max(1, Math.min(concurrency, tasks.length))).fill(0).map(() => runOne());
+      await Promise.all(workers);
+      return results;
+    }
+
+    // First fetch lists with limited concurrency
+    const listResults = await runWithConcurrency(toPrewarm, async (u) => await fetchAndStore(u), 5);
+    // For each successful list, prewarm first 2 item details (also limited concurrently)
+    const detailUrls = [];
+    for (const lr of (listResults || [])) {
+      if (!lr) continue;
       try {
-        const listJson = await listRes.clone().json();
+        const listJson = await lr.clone().json();
         const items = Array.isArray(listJson?.items) ? listJson.items : [];
-        for (const item of items.slice(0,2)) { // first 2 items per category
+        for (const item of items.slice(0,2)) {
           if (!item?.slug) continue;
-            const detailUrl = `/api/categories/${c.id}/items/${item.slug}`;
-            await fetchAndStore(detailUrl); // best-effort
+          detailUrls.push(`/api/categories/${item.categoryId ?? ''}/items/${item.slug}`.replace('//','/'));
         }
       } catch {}
     }
+    // Run detail prewarm with the same concurrency cap
+    await runWithConcurrency(detailUrls, async (u) => await fetchAndStore(u), 5);
   } catch {}
 }
 
@@ -418,8 +451,11 @@ self.addEventListener('fetch', (event) => {
         }
         try {
           const res = await fetch(request);
-          const copy = res.clone();
-          caches.open(ACTIVE_CACHE_NAME).then((c) => c.put(request, copy));
+          // Only cache successful responses to avoid storing 404s/errors
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(ACTIVE_CACHE_NAME).then((c) => c.put(request, copy)).catch(()=>{});
+          }
           return res;
         } catch {
           // Fallback to locale-aware offline page if possible

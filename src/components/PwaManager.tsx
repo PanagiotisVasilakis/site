@@ -44,6 +44,7 @@ export default function PwaManager() {
     // iOS A2HS tip
   const hasTouch = 'maxTouchPoints' in navigator ? navigator.maxTouchPoints > 1 : false;
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && hasTouch);
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || hasTouch;
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
     ('standalone' in window.navigator ? (window.navigator as { standalone?: boolean }).standalone === true : false);
     const dismissed = localStorage.getItem('ios-a2hs-dismissed') === '1';
@@ -83,14 +84,14 @@ export default function PwaManager() {
   
   let deferred: BeforeInstallPromptEvent | null = null;
     const btn = document.getElementById('install-btn');
-    if (isIOS && btn) btn.style.display = 'none';
+  if (btn) btn.style.display = 'none';
     
     window.addEventListener('beforeinstallprompt', (e: Event) => {
       e.preventDefault();
       // Validate that the event has the expected install prompt interface
       if (e && typeof (e as BeforeInstallPromptEvent).prompt === 'function' && (e as BeforeInstallPromptEvent).userChoice) {
         deferred = e as BeforeInstallPromptEvent;
-        if (btn && !isIOS) btn.style.display = 'inline-flex';
+  if (btn && !isIOS && isMobile) btn.style.display = 'inline-flex';
       }
     });
     btn?.addEventListener('click', async () => {

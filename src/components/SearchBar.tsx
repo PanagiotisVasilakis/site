@@ -325,7 +325,6 @@ export default function BookingBar({
           onClose={handleDatePickerClose}
           showPricing={true}
           activeField={activeDateField}
-          fieldLabels={{ arrival: arrivalLabel, departure: departureLabel }}
           anchor={pickerAnchor ?? undefined}
         />
       )}

@@ -12,6 +12,7 @@ export interface User {
   id: string;
   email?: string;
   phone_e164: string;
+  password_hash?: string; // bcrypt hash
   country_origin: 'GR' | 'ABROAD';
   created_at: number;
   updated_at: number;
@@ -23,6 +24,7 @@ interface PersistedUser {
   email?: string;
   phone_enc: string; // AES-GCM base64
   phone_hmac: string; // deterministic HMAC-SHA256
+  password_hash?: string; // bcrypt hash (already secure, no need to encrypt)
   country_origin: 'GR' | 'ABROAD';
   created_at: number;
   updated_at: number;
@@ -128,6 +130,7 @@ function readDB(): RuntimeDB {
       id: pu.id,
       email: pu.email,
       phone_e164: safeDecryptPhone(pu.phone_enc),
+      password_hash: pu.password_hash,
       country_origin: pu.country_origin,
       created_at: pu.created_at,
       updated_at: pu.updated_at,
@@ -180,6 +183,7 @@ function writeDB(db: RuntimeDB) {
       email: u.email,
       phone_enc: encryptString(u.phone_e164),
       phone_hmac: hmacDeterministic(u.phone_e164),
+      password_hash: u.password_hash,
       country_origin: u.country_origin,
       created_at: u.created_at,
       updated_at: u.updated_at,
@@ -209,6 +213,15 @@ export const guestStore = {
   findUserById(user_id: string): User | undefined {
     const db = readDB();
     return db.users.find(u => u.id === user_id);
+  },
+  updateUserPassword(user_id: string, password_hash: string): User | undefined {
+    const db = readDB();
+    const user = db.users.find(u => u.id === user_id);
+    if (!user) return undefined;
+    user.password_hash = password_hash;
+    user.updated_at = Date.now();
+    writeDB(db);
+    return user;
   },
 
   // Identity

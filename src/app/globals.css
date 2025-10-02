@@ -210,7 +210,36 @@ code, pre, kbd, samp {
 
 /* Top menu bar dark mode: match menu item color */
 [data-theme="dark"] .fixed.top-0.left-0.right-0 .flex.items-center {
-  color: var(--text-accent) !important;
+  color: inherit;
+}
+
+/* Mobile Quick Access menu dark mode */
+.mobile-menu-panel {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgb(226, 232, 240);
+}
+[data-theme="dark"] .mobile-menu-panel {
+  background: rgba(15, 23, 42, 0.95);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.mobile-menu-item {
+  background: rgb(241, 245, 249);
+  border-color: rgb(226, 232, 240);
+  color: rgb(30, 41, 59);
+}
+[data-theme="dark"] .mobile-menu-item {
+  background: rgb(30, 41, 59);
+  border-color: rgb(51, 65, 85);
+  color: white;
+}
+
+.mobile-menu-item:hover {
+  background: rgb(226, 232, 240);
+}
+[data-theme="dark"] .mobile-menu-item:hover {
+  background: rgb(51, 65, 85);
 }
 
 /* Homepage typography: make headings/text match the main menu color */
@@ -222,13 +251,7 @@ code, pre, kbd, samp {
   color: inherit;
 }
 
-/* Language button color: match Guest Guide/menu accent */
-.locale-switcher {
-  color: var(--text-accent) !important;
-}
-[data-theme="dark"] .locale-switcher {
-  color: var(--text-accent) !important;
-}
+/* Language button color now inherits from utility classes */
 
 /* Explicit dark theme via data-theme="dark" overrides media query */
 [data-theme="dark"] {
@@ -277,10 +300,7 @@ code, pre, kbd, samp {
   --badge-warn-fg: #ffb877;
   --badge-ok-bg: #12352c;
   --badge-ok-fg: #49d1a8;
-  --action-bg: var(--brand-300);
-  --action-bg-hover: var(--brand-400);
-  --action-fg: #042c28;
-
+  
   /* Dark semantic action mapping (slightly lighter brand step to equalize contrast) */
   --action-bg: var(--brand-300);
   --action-bg-hover: var(--brand-400);
@@ -308,35 +328,8 @@ code, pre, kbd, samp {
 .divider { border-color: var(--border-soft); }
 [data-theme="dark"] .divider { border-color: var(--border-soft-strong); }
 
-/* Theme toggle */
-.theme-toggle { height:2rem; width:2rem; display:inline-flex; align-items:center; justify-content:center; border:1px solid rgba(0,0,0,0.12); background: var(--layer-surface); border-radius: 8px; font-size: .9rem; cursor:pointer; transition: background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast); }
-.theme-toggle:hover { background: var(--layer-surface-alt); }
-[data-theme="dark"] .theme-toggle { background: rgba(17,25,26,0.5); border-color: rgba(255,255,255,0.08); }
-[data-theme="dark"] .theme-toggle:hover { background: rgba(17,25,26,0.7); }
-
 /* Focus polyfill helper: apply if scripting sets .js-focus-visible */
 .focus-outline { outline: 2px solid rgba(37,99,235,0.85); outline-offset:3px; box-shadow: 0 0 0 2px rgba(255,255,255,0.9),0 0 0 4px rgba(37,99,235,0.4); }
-
-/* Favorite button (toggle) */
-.fav-btn { display:inline-flex; align-items:center; gap:.4rem; font-size:.75rem; font-weight:500; padding:.5rem .85rem; min-height:40px; border-radius:999px; border:1px solid var(--brand-300); background: var(--brand-tint); color: var(--text-strong); transition: background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast); }
-.fav-btn:hover { background: var(--layer-surface-alt); }
-.fav-btn.is-active { background: var(--action-bg); color: var(--action-fg); border-color: var(--action-bg); box-shadow: 0 2px 6px -2px rgba(0,0,0,0.25); }
-
-/* Tag filter pills */
-.tag-filter { padding:.45rem .9rem; font-size:.65rem; letter-spacing:.02em; font-weight:500; border-radius:999px; border:1px solid rgba(0,0,0,0.18); background: var(--layer-surface); color: var(--text-accent); transition: background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast); }
-.tag-filter:hover { background: var(--layer-surface-alt); }
-.tag-filter.is-on { background: var(--brand-tint); border-color: var(--brand-400); color: var(--text-accent); box-shadow: 0 2px 6px -2px rgba(0,0,0,0.15); font-weight:600; }
-[data-theme="dark"] .tag-filter { background: rgba(17,25,26,0.55); color: var(--brand-300); border-color: rgba(255,255,255,0.08); }
-[data-theme="dark"] .tag-filter:hover { background: rgba(17,25,26,0.75); }
-[data-theme="dark"] .tag-filter.is-on { background: var(--brand-400); color:#042c28; border-color: var(--brand-500); }
-.tag-filter.reset-chip { background: var(--layer-surface-alt); color: var(--fg-muted); border-color: rgba(0,0,0,0.12); font-weight:500; }
-.tag-filter.reset-chip:hover { background: var(--layer-surface); }
-[data-theme="dark"] .tag-filter.reset-chip { background: rgba(17,25,26,0.6); color: var(--fg-muted); border-color: rgba(255,255,255,0.12); }
-[data-theme="dark"] .tag-filter.reset-chip:hover { background: rgba(17,25,26,0.8); }
-
-[data-theme="dark"] .fav-btn { background: rgba(17,25,26,0.6); color: var(--brand-300); border-color: rgba(255,255,255,0.08); }
-[data-theme="dark"] .fav-btn:hover { background: rgba(17,25,26,0.8); }
-[data-theme="dark"] .fav-btn.is-active { background: var(--action-bg); color: var(--action-fg); border-color: var(--action-bg); }
 
 /* Status / badges */
 .badge { display:inline-flex; align-items:center; gap:.25rem; font-size:.55rem; padding:.35rem .55rem; min-height:24px; border-radius:999px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; background: var(--brand-100); color: var(--text-accent); }
@@ -353,16 +346,7 @@ code, pre, kbd, samp {
 .input.input-error, .input[aria-invalid="true"] { border-color: #e35b5b; background: color-mix(in srgb, #e35b5b 6%, var(--layer-surface)); }
 [data-theme="dark"] .input.input-error, [data-theme="dark"] .input[aria-invalid="true"] { background: color-mix(in srgb, #e35b5b 10%, rgba(17,25,26,0.6)); }
 
-/* Subtle button for secondary actions following theme */
-.btn-subtle { display:inline-flex; align-items:center; justify-content:center; width:auto; gap:.5rem; padding:.6rem .9rem; border-radius: 999px; background: var(--layer-surface); color: var(--text-accent); border:1px solid var(--border-soft); transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast); }
-.btn-subtle:hover { background: var(--layer-surface-alt); border-color: var(--border-soft-strong); }
-[data-theme="dark"] .btn-subtle { background: rgba(17,25,26,0.6); color: var(--brand-300); }
-[data-theme="dark"] .btn-subtle:hover { background: rgba(17,25,26,0.8); }
 
-/* Skeleton shimmer (neutral, not brand-saturated) */
-.skeleton { position:relative; overflow:hidden; background: linear-gradient(90deg, #e0e7e7 0%, #e9efef 40%, #e0e7e7 80%); /* slightly darker for contrast */ background-size:200% 100%; animation: shimmer 2.2s infinite linear; }
-[data-theme="dark"] .skeleton { background: linear-gradient(90deg, #1b2729 0%, #223133 40%, #1b2729 80%); }
-@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
 /* Toast animation */
 @keyframes toast-in { 0% { transform: translateY(8px) scale(.96); opacity:0; } 100% { transform: translateY(0) scale(1); opacity:1; } }
@@ -373,19 +357,7 @@ code, pre, kbd, samp {
 .icon[data-thick="true"] { stroke-width: 2; }
 .icon path, .icon circle, .icon line, .icon polyline, .icon rect { vector-effect: non-scaling-stroke; }
 
-/* Network status indicator */
-.net-status { display:inline-flex; align-items:center; gap:.4rem; font-size:.65rem; letter-spacing:.03em; font-weight:600; padding:.35rem .6rem; border-radius:999px; background: var(--layer-surface); border:1px solid var(--border-soft); color: var(--text-accent-subtle); }
-.net-status-dot { width:8px; height:8px; border-radius:50%; background: var(--brand-500); box-shadow:0 0 0 3px rgba(0,0,0,0.05); }
-.net-status[data-state="offline"] { color: #b5534a; }
-.net-status[data-state="offline"] .net-status-dot { background: #d85a3f; }
-.net-status[data-state="slow"] { color: var(--text-accent); }
-.net-status[data-state="slow"] .net-status-dot { background: var(--brand-400); }
-[data-theme="dark"] .net-status { background: rgba(17,25,26,0.6); }
 
-/* Loading sentinel animation (respect reduced motion) */
-@keyframes sentinel-pulse { 0% { opacity:.45; } 50% { opacity:1; } 100% { opacity:.45; } }
-.loading-sentinel { animation: sentinel-pulse 2.2s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce) { .loading-sentinel { animation: none; } }
 
 body {
   background: linear-gradient(160deg, var(--sand-50) 0%, var(--sea-50) 55%, var(--sea-100) 100%);
@@ -443,8 +415,6 @@ input, textarea { color: inherit; }
 /* Reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important; }
-  .skeleton { animation: none !important; background: #e4eaea; }
-  [data-theme="dark"] .skeleton { background: #1f2b2d; }
   .toast-item { animation: none !important; }
 }
 
@@ -466,20 +436,24 @@ input, textarea { color: inherit; }
 .layer-surface { background: var(--layer-surface); }
 .layer-alt { background: var(--layer-surface-alt); }
 
-/* Card utility (optional) */
+/* Card utility with liquid glass effect */
 .card {
-  background: linear-gradient(145deg, rgba(255,255,255,0.82), rgba(255,255,255,0.75));
-  border: 1px solid rgba(0,0,0,0.05);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 12px;
-  box-shadow:
-    0 2px 4px rgba(0,0,0,0.04),
-    0 6px 18px -4px rgba(0,0,0,0.06);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), 
+              0 1px 0 rgba(255, 255, 255, 0.8) inset;
 }
 
 [data-theme="dark"] .card {
-  background: rgba(17,25,26,0.85);
-  border-color: rgba(255,255,255,0.08);
-  box-shadow: 0 6px 24px -4px rgba(0,0,0,0.5);
+  background: rgba(23, 35, 37, 0.75);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 
+              0 1px 0 rgba(255, 255, 255, 0.1) inset;
 }
 
 /* Elevated hero card with soft glow */
@@ -510,11 +484,13 @@ input, textarea { color: inherit; }
   border-color: color-mix(in srgb, var(--border-soft) 85%, transparent);
 }
 
-/* Elegant display font treatment for hero titles */
+/* Elegant display font treatment for hero titles - prioritize most calligraphic fonts */
 .display-serif {
-  font-family: 'BrandDisplay', Georgia, 'Times New Roman', Times, serif;
-  letter-spacing: 0.01em;
-  font-weight: 600;
+  font-family: 'Brush Script MT', 'Dancing Script', 'Great Vibes', 'Pacifico', cursive, 'BrandDisplay', 'Palatino Linotype', 'Book Antiqua', Palatino, 'Bodoni MT', 'Hoefler Text', 'Baskerville Old Face', Baskerville, 'Goudy Old Style', Garamond, 'Garamond Premier Pro', 'Apple Garamond', 'ITC Garamond Std', 'Cormorant Garamond', Georgia, 'Times New Roman', Times, serif;
+  letter-spacing: 0.015em; /* Slightly more spacing for elegance */
+  font-weight: 700;
+  font-variant-numeric: oldstyle-nums; /* Use old-style numerals if available */
+  font-feature-settings: "liga" 1, "dlig" 1; /* Enable ligatures */
 }
 /* Optional modern sans display alternative */
 .display-sans {
@@ -523,58 +499,66 @@ input, textarea { color: inherit; }
   font-weight: 700;
 }
 
-/* Italian-style title flourish */
+/* Italian-style calligraphic title with elegant flourish - MASSIVE SCALE */
 .italian-title {
   font-style: italic;
-  letter-spacing: 0.005em; /* slightly tighter */
-  font-variant-ligatures: discretionary-ligatures;
+  letter-spacing: 0.045em; /* Open, but more harmonious spacing */
+  font-variant-ligatures: discretionary-ligatures contextual;
+  font-feature-settings: "liga" 1, "dlig" 1, "swsh" 1, "cswh" 1;
   text-rendering: optimizeLegibility;
+  font-weight: 300; /* Delicate Italian calligraphic touch */
+  /* Layered shadowing for graceful depth without harsh glow */
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.65),
+    0 3px 6px rgba(15, 23, 42, 0.18),
+    0 10px 24px rgba(54, 185, 171, 0.18);
+  /* font-size removed - controlled by inline Tailwind clamp() */
+  line-height: 1.28; /* Slightly more air for readability */
+  word-spacing: 0.02em; /* Tighter calligraphic word separation */
+  transform-origin: center center;
 }
+
+[data-theme="dark"] .italian-title {
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18),
+    0 3px 8px rgba(0, 0, 0, 0.55),
+    0 12px 30px rgba(54, 185, 171, 0.35);
+}
+
 @supports (font-variation-settings: normal) {
   .italian-title {
-    /* Nudge slant if variable font supports it (fallback to italic otherwise) */
-    font-variation-settings: 'slnt' -6;
+    /* Elegant upright slant reminiscent of Italian copperplate */
+    font-variation-settings: 'slnt' -11, 'wght' 320;
   }
 }
-/* Subtle baseline lift for italic display on large screens */
+
+/* Enhanced baseline lift and scaling for italic display on large screens */
 @media (min-width: 768px) {
-  .italian-title { position: relative; top: -0.02em; }
-}
-
-/* Gradient text accent for hero titles (cross-browser with fallback) */
-.title-gradient {
-  /* Fallback solid color for browsers without background-clip:text */
-  color: var(--brand-900);
-  display: inline-block; /* improves clipping reliability across engines */
-}
-[data-theme="dark"] .title-gradient {
-  color: var(--brand-300);
-}
-
-/* Enable gradient fill when supported */
-@supports (-webkit-background-clip: text) or (background-clip: text) {
-  .title-gradient {
-    background: linear-gradient(135deg, var(--brand-900) 0%, var(--brand-600) 40%, var(--accent-500) 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    -webkit-text-fill-color: transparent;
-  }
-  [data-theme="dark"] .title-gradient {
-    background: linear-gradient(135deg, var(--brand-300) 0%, var(--brand-500) 40%, var(--accent-400) 100%);
-    /* Remove glow to prevent boxy halo artifacts on some engines */
-    text-shadow: none;
+  .italian-title {
+    position: relative;
+    top: -0.035em;
+    transform: scale(1.06, 0.965); /* Graceful horizontal flourish */
+    /* font-size removed - controlled by inline Tailwind clamp() */
+    letter-spacing: 0.055em;
   }
 }
 
-/* When inside a blurred backdrop in dark mode, fall back to solid color to avoid glow artifacts */
-[data-theme="dark"] .backdrop-blur .title-gradient {
-  background: none !important;
-  color: var(--brand-300) !important;
-  -webkit-text-fill-color: currentColor !important;
+@media (min-width: 1024px) {
+  .italian-title {
+    /* font-size removed - controlled by inline Tailwind clamp() */
+    letter-spacing: 0.06em;
+    transform: scale(1.08, 0.96);
+  }
 }
 
-/* Delicate underline ornament */
+@media (min-width: 1440px) {
+  .italian-title {
+    /* font-size removed - controlled by inline Tailwind clamp() */
+    letter-spacing: 0.065em;
+  }
+}
+
+/* Delicate underline ornament - original style */
 .title-ornament {
   position: relative;
 }
@@ -617,6 +601,61 @@ input, textarea { color: inherit; }
     width: clamp(52%, 68vw, 68%);
     height: 3px; /* slightly richer stroke on desktop */
   }
+}
+
+/* Gradient text accent for hero titles (cross-browser with fallback) */
+.title-gradient {
+  /* Fallback solid color for browsers without background-clip:text */
+  color: #111111;
+  display: inline-block; /* improves clipping reliability across engines */
+}
+[data-theme="dark"] .title-gradient {
+  color: var(--brand-300);
+}
+
+/* Enable luxurious Italian-inspired gradient fill when supported */
+@supports (-webkit-background-clip: text) or (background-clip: text) {
+  .title-gradient {
+    background: none;
+    -webkit-background-clip: border-box;
+    background-clip: border-box;
+    color: #111111;
+    -webkit-text-fill-color: currentColor;
+    transition: color 0.3s ease;
+  }
+
+  [data-theme="dark"] .title-gradient {
+    /* Luminous gradient exclusively for dark mode */
+    background: linear-gradient(
+      120deg,
+      var(--brand-200) 0%,
+      var(--brand-300) 30%,
+      var(--brand-400) 50%,
+      var(--accent-400) 75%,
+      var(--accent-300) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    background-size: 200% 100%;
+    transition: background-position 0.8s ease;
+    /* Keep the elegant text shadow for dark mode */
+    text-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.5),
+      0 2px 12px rgba(18, 71, 66, 0.25);
+  }
+
+  [data-theme="dark"] .title-gradient:hover {
+    background-position: 100% 0;
+  }
+}
+
+/* When inside a blurred backdrop in dark mode, fall back to solid color to avoid glow artifacts */
+[data-theme="dark"] .backdrop-blur .title-gradient {
+  background: none !important;
+  color: var(--brand-300) !important;
+  -webkit-text-fill-color: currentColor !important;
 }
 
 /* Scrollbar theming */
@@ -688,10 +727,10 @@ input, textarea { color: inherit; }
 .search-seg:not(:last-child)::after { content: ""; position: absolute; top: 12%; right: 0; height: 76%; width: 1px; background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.12), transparent); }
 [data-theme="dark"] .search-seg:not(:last-child)::after { background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.15), transparent); }
 .search-trigger { border-radius: 12px; padding: 0.25rem 0.5rem; transition: background-color var(--transition-fast), box-shadow var(--transition-fast); }
-.search-trigger:hover { background-color: color-mix(in srgb, var(--brand-100) 65%, transparent); }
-.search-trigger.is-active { background-color: color-mix(in srgb, var(--brand-100) 85%, transparent); }
-[data-theme="dark"] .search-trigger:hover { background-color: color-mix(in srgb, var(--brand-900) 50%, transparent); }
-[data-theme="dark"] .search-trigger.is-active { background-color: color-mix(in srgb, var(--brand-900) 70%, transparent); }
+.search-trigger:hover { background-color: color-mix(in srgb, var(--brand-100) 95%, transparent); }
+.search-trigger.is-active { background-color: color-mix(in srgb, var(--brand-100) 98%, transparent); }
+[data-theme="dark"] .search-trigger:hover { background-color: color-mix(in srgb, var(--brand-900) 92%, transparent); }
+[data-theme="dark"] .search-trigger.is-active { background-color: color-mix(in srgb, var(--brand-900) 96%, transparent); }
 .search-label { font-size: 0.65rem; letter-spacing: .05em; font-weight: 600; text-transform: uppercase; color: var(--text-accent-subtle); opacity: 1; }
 .search-value { font-size: 0.8rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-accent); }
 [data-theme="dark"] .search-label { color: var(--brand-400); }
@@ -1142,11 +1181,6 @@ html:not([data-theme="dark"]) select {
   color: #000000 !important; /* Black text in inputs */
 }
 
-/* Light mode card backgrounds */
-html:not([data-theme="dark"]) .card {
-  background: #ffffff !important; /* White background for cards */
-}
-
 /* Light mode button fixes */
 html:not([data-theme="dark"]) .btn-outline {
   background: #ffffff !important; /* White background for back button */
@@ -1157,27 +1191,6 @@ html:not([data-theme="dark"]) .btn-outline {
 /* Light mode layer surface override */
 html:not([data-theme="dark"]) {
   --layer-surface: #ffffff !important; /* White background for tabs and surfaces */
-}
-
-/* Liquid glass effect for main containers */
-html:not([data-theme="dark"]) .card,
-html:not([data-theme="dark"]) .panel {
-  background: rgba(255, 255, 255, 0.85) !important; /* Semi-transparent white */
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), 
-              0 1px 0 rgba(255, 255, 255, 0.8) inset !important;
-}
-
-[data-theme="dark"] .card,
-[data-theme="dark"] .panel {
-  background: rgba(23, 35, 37, 0.75) !important; /* Semi-transparent dark */
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 
-              0 1px 0 rgba(255, 255, 255, 0.1) inset !important;
 }
 
 /* Enhanced liquid glass effect for main container */
@@ -1260,4 +1273,38 @@ button[role="tab"] {
     rgba(255, 255, 255, 0.05)) !important;
   border-radius: 26px !important;
   z-index: -1 !important;
+}
+
+/* CRITICAL FIX: Force menu bar navigation text to be white in dark mode */
+.dark a[href*="guest"],
+.dark button[aria-label*="Sign"],
+.dark .locale-switcher,
+[data-theme="dark"] a[href*="guest"],
+[data-theme="dark"] button[aria-label*="Sign"],
+[data-theme="dark"] .locale-switcher {
+  color: #ffffff !important;
+}
+
+.dark a[href*="guest"] span,
+.dark button[aria-label*="Sign"] span,
+.dark .locale-switcher span,
+[data-theme="dark"] a[href*="guest"] span,
+[data-theme="dark"] button[aria-label*="Sign"] span,
+[data-theme="dark"] .locale-switcher span {
+  color: #ffffff !important;
+}
+
+/* Force the home link (Guest Guide) text to be white */
+.dark a[href$="/en"],
+.dark a[href$="/el"],
+[data-theme="dark"] a[href$="/en"],
+[data-theme="dark"] a[href$="/el"] {
+  color: #ffffff !important;
+}
+
+.dark a[href$="/en"] span,
+.dark a[href$="/el"] span,
+[data-theme="dark"] a[href$="/en"] span,
+[data-theme="dark"] a[href$="/el"] span {
+  color: #ffffff !important;
 }
