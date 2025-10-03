@@ -5,7 +5,7 @@ import { DateRange, dateRangeFromParams, dateRangeToParams, getNights } from "@/
 import { format } from "date-fns";
 import dynamic from "next/dynamic";
 import { trackEvent } from "@/lib/analyticsClient";
-import { getVillaContent } from "@/data/villaData";
+import { getApartmentContent } from "@/data/apartmentData";
 
 interface BookingState {
   dateRange: DateRange;
@@ -66,7 +66,7 @@ export default function BookingBar({
   subline,
   showPropertyHeader = true,
 }: Props) {
-  const villaContent = getVillaContent(locale as "en" | "el");
+  const apartmentContent = getApartmentContent(locale as "en" | "el");
   const router = useRouter();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -227,17 +227,17 @@ export default function BookingBar({
 
   const nights = getNights(state.dateRange);
   const hasValidDates = state.dateRange?.from && state.dateRange?.to;
-  const basePrice = villaContent.pricing.basePrice;
+  const basePrice = apartmentContent.pricing.basePrice;
   const totalPrice = hasValidDates ? nights * basePrice : 0;
 
   return (
     <div className="relative" ref={containerRef}>
       <div className="mb-4 text-center">
         {showPropertyHeader && (
-          <h2 className="text-lg font-semibold text-brand-800">{propertyName || villaContent.shortName}</h2>
+          <h2 className="text-lg font-semibold text-brand-800">{propertyName || apartmentContent.shortName}</h2>
         )}
         <p className="text-sm text-muted">
-          {subline ?? `${villaContent.location.city}, ${villaContent.location.country} • €${basePrice}/night`}
+          {subline ?? `${apartmentContent.location.city}, ${apartmentContent.location.country} • €${basePrice}/night`}
         </p>
       </div>
 
@@ -281,12 +281,12 @@ export default function BookingBar({
               aria-label={labels?.guestsLabel || "Guests"}
               type="number"
               min={1}
-              max={villaContent.specs.maxGuests}
+              max={apartmentContent.specs.maxGuests}
               value={state.guests}
               onChange={(e) =>
                 updateState(
                   "guests",
-                  Math.max(1, Math.min(villaContent.specs.maxGuests, Number(e.target.value) || 1))
+                  Math.max(1, Math.min(apartmentContent.specs.maxGuests, Number(e.target.value) || 1))
                 )
               }
               className="guest-input bg-transparent w-14 focus:outline-none"

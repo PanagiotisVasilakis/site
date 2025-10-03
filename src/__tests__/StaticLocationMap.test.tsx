@@ -33,7 +33,7 @@ describe('StaticLocationMap', () => {
                 class="text-lg sm:text-xl font-semibold text-brand-800"
                 data-testid="static-map-title"
               >
-                Villa Location & Nearby Attractions
+                Apartment Location & Nearby Attractions
               </h3>
             </div>
             <div

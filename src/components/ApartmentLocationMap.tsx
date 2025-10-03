@@ -1,7 +1,7 @@
 "use client";
 import React, { useMemo } from 'react';
 import LazyInteractiveMap from './LazyInteractiveMap';
-import { createMarkerFromItem, type MarkerData, VILLA_LOCATION } from '@/lib/mapUtils';
+import { createMarkerFromItem, type MarkerData, APARTMENT_LOCATION } from '@/lib/mapUtils';
 import StaticLocationMap from './StaticLocationMap';
 
 interface CategoryItem {
@@ -14,7 +14,7 @@ interface CategoryItem {
   location?: { lat: number; lng: number };
 }
 
-interface VillaLocationMapProps {
+interface ApartmentLocationMapProps {
   locale: string;
   height?: string;
   zoom?: number;
@@ -27,17 +27,17 @@ interface VillaLocationMapProps {
 
 // (villa content import removed – not needed here)
 
-// Villa details - now using real Kalamata location
-const VILLA_DATA = {
-  id: 'villa',
+// Apartment details - now using real Kalamata location
+const APARTMENT_DATA = {
+  id: 'apartment',
   name: '2-Bedroom Apartment with Views',
   description: 'Spacious apartment with mountain & sea views',
-  coordinates: VILLA_LOCATION, // Use imported constant
-  type: 'villa' as const,
+  coordinates: APARTMENT_LOCATION, // Use imported constant
+  type: 'apartment' as const,
   price: '€65/night'
 };
 
-export default function VillaLocationMap({ 
+export default function ApartmentLocationMap({ 
   locale, 
   height = "300px", 
   zoom = 14,
@@ -46,17 +46,17 @@ export default function VillaLocationMap({
   nearbyRestaurants = [],
   nearbyServices = [],
   nearbyAttractions = []
-}: VillaLocationMapProps) {
+}: ApartmentLocationMapProps) {
   
   // Get nearby attractions from props
   const nearbyMarkers: MarkerData[] = useMemo(() => {
     const markers: MarkerData[] = [{
-      id: VILLA_DATA.id,
-      name: VILLA_DATA.name,
-      description: VILLA_DATA.description,
-      coordinates: VILLA_DATA.coordinates,
-      type: 'villa',
-      price: VILLA_DATA.price
+      id: APARTMENT_DATA.id,
+      name: APARTMENT_DATA.name,
+      description: APARTMENT_DATA.description,
+      coordinates: APARTMENT_DATA.coordinates,
+      type: 'apartment',
+      price: APARTMENT_DATA.price
     }];
     
     if (!showNearbyAttractions) return markers;
@@ -90,7 +90,7 @@ export default function VillaLocationMap({
     <div className={className}>
       <LazyInteractiveMap
         markers={nearbyMarkers}
-        center={VILLA_DATA.coordinates}
+  center={APARTMENT_DATA.coordinates}
         zoom={zoom}
         height={height}
         onMarkerClick={handleMarkerClick}

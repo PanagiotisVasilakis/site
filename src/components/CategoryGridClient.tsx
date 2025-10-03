@@ -7,7 +7,7 @@ import { ListingCardSkeleton } from '@/components/ListingCardSkeleton';
 import dynamic from 'next/dynamic';
 
 // Dynamic import for map component - only loads when needed
-const VillaLocationMap = dynamic(() => import('@/components/VillaLocationMap'), {
+const ApartmentLocationMap = dynamic(() => import('@/components/ApartmentLocationMap'), {
   ssr: false,
   loading: () => (
     <div className="h-[400px] bg-gray-100 rounded-lg flex items-center justify-center">
@@ -118,7 +118,7 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
       </div>
       {showMap && (
         <div className="mb-6">
-          <VillaLocationMap 
+          <ApartmentLocationMap 
             locale={locale}
             height="400px"
             zoom={13}
@@ -130,7 +130,7 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
           />
           <div className="mt-3 text-center">
             <p className="text-sm text-gray-600">
-              🏡 Villa location and nearby {categorySlug} • Zoom and click markers for details
+              🏡 Apartment location and nearby {categorySlug} • Zoom and click markers for details
             </p>
           </div>
         </div>

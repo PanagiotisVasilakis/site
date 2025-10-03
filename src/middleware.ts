@@ -163,14 +163,14 @@ export function middleware(req: NextRequest) {
       return redirectResponse;
     }
 
-    // Legacy /[locale]/house redirect to /[locale]/villa (permanent for clients/SEO)
+  // Legacy /[locale]/house redirect to /[locale]/apartment (permanent for clients/SEO)
     if (/^\/[a-zA-Z-]+\/house(\/)?$/.test(pathname)) {
       tracer.addTags(span, { 'middleware.action': 'legacy_redirect' });
       
       const segs = pathname.split('/');
       const loc = segs[1];
       const url2 = req.nextUrl.clone();
-      url2.pathname = `/${loc}/villa`;
+  url2.pathname = `/${loc}/apartment`;
       const redirectResponse = NextResponse.redirect(url2, 308);
       
       // Copy security headers to redirect response

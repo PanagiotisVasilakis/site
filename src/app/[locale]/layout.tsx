@@ -8,8 +8,7 @@ import { ToastProvider } from "@/components/Toast";
 import Analytics from "@/components/Analytics";
 import JsonFetchHud from "@/components/JsonFetchHud";
 import TopControls from "@/components/TopControls";
-import { getGuestSessionFromCookies, hasVerifiedBookingSession, tryAutoMintSessionFromRefresh } from "@/lib/guestSession";
-import { cookies as getCookieJar } from 'next/headers';
+import { getGuestSessionFromCookies, hasVerifiedBookingSession } from "@/lib/guestSession";
 import { getFeatureFlags } from "@/lib/featureFlags";
 
 // Removed font variable placeholders.
@@ -38,22 +37,9 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : "en";
   const t = getDictionary(eff);
   // Read current session from cookie
-  let session = await getGuestSessionFromCookies();
-
-  // SSR auto-restore: if no verified booking session but refresh token exists, mint a new session.
-  // We use server helper (equivalent to calling /api/portal/refresh) to avoid parsing Set-Cookie headers from a fetch.
-  if (!hasVerifiedBookingSession(session)) {
-    const restored = await tryAutoMintSessionFromRefresh();
-    if (restored.cookies && restored.cookies.length) {
-      const jar = await getCookieJar();
-      for (const c of restored.cookies) {
-        jar.set(c.name, c.value, c.options);
-      }
-    }
-    if (restored.session) {
-      session = restored.session;
-    }
-  }
+  // Note: In Next.js 15+, cookies can only be modified in Server Actions or Route Handlers.
+  // The session refresh logic is handled by /api/portal/refresh endpoint instead.
+  const session = await getGuestSessionFromCookies();
   const ff = getFeatureFlags();
   const hasBookingSession = hasVerifiedBookingSession(session);
   const showCheckIn = ff.checkinEnabled && hasBookingSession;

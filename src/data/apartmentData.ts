@@ -1,5 +1,5 @@
-// Real villa data for Kalamata apartment
-const villaData = {
+// Real apartment data for Kalamata stay
+const apartmentData = {
   id: 'kalamata-apartment',
   name: {
     en: '2-Bedroom Apartment with Mountain & Sea Views',
@@ -135,8 +135,8 @@ const villaData = {
 };
 
 // Helper to get localized content
-export function getVillaContent(locale: 'en' | 'el' = 'en') {
-  const data = villaData;
+export function getApartmentContent(locale: 'en' | 'el' = 'en') {
+  const data = apartmentData;
   return {
     name: data.name[locale],
     shortName: data.shortName[locale],

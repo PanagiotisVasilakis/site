@@ -80,7 +80,21 @@ export type Dictionary = {
     amenityList: string[]; // pre-translated bullet list
     rulesList: string[];   // house rules bullets
     distances?: string[]; // nearby distances list
-    photoAlts?: { living: string; bedroom: string; kitchen: string; };
+    photoAlts?: { living: string; bedroom: string; kitchen: string; balcony?: string; bathroom?: string; };
+    heroScrollHint?: string;
+    skipIntro?: string;
+    glanceTitle?: string;
+    specs?: string[];
+    ctaPrimary?: string;
+    ctaSecondary?: string;
+    rooms?: Partial<Record<'living_room' | 'kitchen' | 'bedroom' | 'balcony' | 'bathroom', { title?: string; description?: string }>>;
+    photoViewer?: {
+      instructions?: string;
+      counter?: string;
+      prev?: string;
+      next?: string;
+      close?: string;
+    };
   };
   booking?: {
     locationDesc: string; // appended after location name
@@ -100,7 +114,7 @@ export type Dictionary = {
   };
   locationPanel?: {
     title: string;
-    villaTitle: string;
+    apartmentTitle: string;
     city: string;
     blurb: string;
     nearby: string;
@@ -110,8 +124,8 @@ export type Dictionary = {
   };
   map?: {
     loading: string;
-    villaMarkerTitle: string;
-    villaMarkerDesc: string;
+    apartmentMarkerTitle: string;
+    apartmentMarkerDesc: string;
     viewDetails: string;
     failed: string;
     tokenMissing: string;
@@ -257,16 +271,29 @@ const dict: Record<Locale, Dictionary> = {
       sightseeing: "Sightseeing",
     },
     house: {
-      navLabel: "Villa Photos",
+  navLabel: "Apartment Photos",
       navSubtitle: "Photo tour & location",
       title: "2-Bedroom Apartment with Mountain & Sea Views",
       location: "Kalamata, Greece",
       intro: "A spacious apartment with large sunny terraces and beautiful views, in a quiet neighborhood near the Town Hall.",
+      heroScrollHint: "Scroll ↓",
+      skipIntro: "Skip intro",
       overview: "Overview",
       amenities: "Amenities",
       rules: "House Rules",
       checkin: "Check-in / Check-out",
       emergency: "Emergency & Support",
+      glanceTitle: "At a Glance",
+      specs: [
+        "2 bedrooms",
+        "1 bathroom",
+        "2nd floor",
+        "75 m²",
+        "Mountain & sea views",
+        "Free parking"
+      ],
+      ctaPrimary: "Book",
+      ctaSecondary: "Contact Us",
       amenityList: [
         "Free Wi-Fi",
         "Air conditioning", 
@@ -285,7 +312,36 @@ const dict: Record<Locale, Dictionary> = {
         "Check-out: 11:00",
         "Families with children welcome"
       ],
-      photoAlts: { living: 'Living area', bedroom: 'Bedroom', kitchen: 'Kitchen' },
+  photoAlts: { living: 'Living area', bedroom: 'Bedroom', kitchen: 'Kitchen', balcony: 'Balcony', bathroom: 'Bathroom' },
+      rooms: {
+        living_room: {
+          title: "Living Room",
+          description: "An airy lounge with soft seating, daylight, and access to the balcony for relaxed gatherings."
+        },
+        kitchen: {
+          title: "Kitchen",
+          description: "Fully equipped with modern appliances and a breakfast nook for easy meals and morning coffee."
+        },
+        bedroom: {
+          title: "Bedroom",
+          description: "A calming retreat with plush bedding, blackout shades, and built-in storage for long stays."
+        },
+        balcony: {
+          title: "Balcony",
+          description: "Open-air terrace capturing both mountain and sea breezes, perfect for sunset unwinding."
+        },
+        bathroom: {
+          title: "Bathroom",
+          description: "Bright bathroom with rainfall shower, premium amenities, and ample counter space."
+        }
+      },
+      photoViewer: {
+        instructions: "Photo viewer controls: Use arrow keys to navigate between images, Home/End keys to jump to first/last image, Escape to close viewer.",
+        counter: "Currently viewing image {current} of {total}.",
+        prev: "Previous image",
+        next: "Next image",
+        close: "Close viewer"
+      },
       distances: [
         "Town Hall: 50m (1 min walk)",
         "Public Library & Gallery: 1.8km (15 min walk)",
@@ -311,8 +367,8 @@ const dict: Record<Locale, Dictionary> = {
   completeDetailsHint: "Select dates to see pricing"
     }
     ,locationPanel: {
-      title: "Villa Location & Nearby Attractions",
-      villaTitle: "2-Bedroom Apartment with Views",
+  title: "Apartment Location & Nearby Attractions",
+      apartmentTitle: "2-Bedroom Apartment with Views",
       city: "Kalamata, Greece",
       blurb: "Quiet neighborhood, 50m from Town Hall with mountain & sea views",
       nearby: "Nearby Attractions",
@@ -333,8 +389,8 @@ const dict: Record<Locale, Dictionary> = {
     }
     ,map: {
       loading: "Loading map...",
-      villaMarkerTitle: "Seaside Modern Villa",
-      villaMarkerDesc: "Your accommodation",
+  apartmentMarkerTitle: "Seaside Modern Apartment",
+      apartmentMarkerDesc: "Your accommodation",
       viewDetails: "View details",
       failed: "Map failed to load",
       tokenMissing: "Interactive map temporarily unavailable",
@@ -398,7 +454,7 @@ const dict: Record<Locale, Dictionary> = {
       loading: "Loading booking…",
     }
     ,checkinInfo: {
-      welcome: "🎉 Welcome to Our Villa!",
+  welcome: "🎉 Welcome to Our Apartment!",
       welcomeMessage: "We're delighted to have you here. Below you'll find everything you need for a comfortable stay.",
       checkInOutTitle: "Check-in & Check-out",
       checkInTime: "Check-in",
@@ -488,11 +544,24 @@ const dict: Record<Locale, Dictionary> = {
       title: "Διαμέρισμα 2 Υπνοδωματίων με Θέα Βουνό & Θάλασσα",
       location: "Καλαμάτα, Ελλάδα", 
       intro: "Ένα ευρύχωρο διαμέρισμα με μεγάλες ηλιόλουστες βεράντες και όμορφη θέα, σε ήσυχη γειτονιά κοντά στο Δημαρχείο.",
+      heroScrollHint: "Κύλιση ↓",
+      skipIntro: "Παράλειψη εισαγωγής",
       overview: "Επισκόπηση",
       amenities: "Παροχές",
       rules: "Κανόνες Σπιτιού",
       checkin: "Άφιξη / Αναχώρηση",
       emergency: "Έκτακτη Ανάγκη & Υποστήριξη",
+      glanceTitle: "Με μια Ματιά",
+      specs: [
+        "2 υπνοδωμάτια",
+        "1 μπάνιο",
+        "2ος όροφος",
+        "75 τ.μ.",
+        "Θέα βουνό & θάλασσα",
+        "Δωρεάν πάρκινγκ"
+      ],
+      ctaPrimary: "Κράτηση",
+      ctaSecondary: "Επικοινωνία",
       amenityList: [
         "Δωρεάν Wi-Fi",
         "Κλιματισμός",
@@ -511,7 +580,36 @@ const dict: Record<Locale, Dictionary> = {
         "Αναχώρηση: 11:00",
         "Οικογένειες με παιδιά καλοδεχούμενες"
       ],
-      photoAlts: { living: 'Καθιστικό', bedroom: 'Υπνοδωμάτιο', kitchen: 'Κουζίνα' },
+  photoAlts: { living: 'Καθιστικό', bedroom: 'Υπνοδωμάτιο', kitchen: 'Κουζίνα', balcony: 'Μπαλκόνι', bathroom: 'Μπάνιο' },
+      rooms: {
+        living_room: {
+          title: "Καθιστικό",
+          description: "Φωτεινό καθιστικό με άνετο καναπέ, ημέρας φως και πρόσβαση στο μπαλκόνι για στιγμές χαλάρωσης."
+        },
+        kitchen: {
+          title: "Κουζίνα",
+          description: "Πλήρως εξοπλισμένη με σύγχρονες ηλεκτρικές συσκευές και χώρο πρωινού για εύκολα γεύματα."
+        },
+        bedroom: {
+          title: "Υπνοδωμάτιο",
+          description: "Ήρεμο δωμάτιο με αναπαυτικό στρώμα, συσκότιση και ευρύχωρες ντουλάπες για μεγαλύτερες διαμονές."
+        },
+        balcony: {
+          title: "Μπαλκόνι",
+          description: "Ανοιχτός χώρος με δροσερό αεράκι βουνού και θάλασσας, ιδανικός για χαλάρωση στο ηλιοβασίλεμα."
+        },
+        bathroom: {
+          title: "Μπάνιο",
+          description: "Φωτεινό μπάνιο με ντους βροχής, ποιοτικά προϊόντα και άνετο πάγκο."
+        }
+      },
+      photoViewer: {
+        instructions: "Χειρισμός προβολής: Χρησιμοποιήστε τα βελάκια για εναλλαγή εικόνων, Home/End για μετάβαση στην πρώτη/τελευταία, Escape για κλείσιμο.",
+        counter: "Προβάλλεται η εικόνα {current} από {total}.",
+        prev: "Προηγούμενη εικόνα",
+        next: "Επόμενη εικόνα",
+        close: "Κλείσιμο προβολής"
+      },
       distances: [
         "Δημαρχείο: 50μ (1 λεπτό με τα πόδια)",
         "Δημόσια Βιβλιοθήκη–Πινακοθήκη: 1,8 χλμ (15 λεπτά με τα πόδια)",
@@ -538,7 +636,7 @@ const dict: Record<Locale, Dictionary> = {
     }
     ,locationPanel: {
       title: "Τοποθεσία & Κοντινά Αξιοθέατα",
-      villaTitle: "Διαμέρισμα 2 Υπνοδωματίων με Θέα",
+  apartmentTitle: "Διαμέρισμα 2 Υπνοδωματίων με Θέα",
       city: "Καλαμάτα, Ελλάδα",
       blurb: "Ήσυχη γειτονιά, 50μ από το Δημαρχείο με θέα βουνό & θάλασσα",
       nearby: "Κοντινά Σημεία",
@@ -559,8 +657,8 @@ const dict: Record<Locale, Dictionary> = {
     }
     ,map: {
       loading: "Φόρτωση χάρτη...",
-      villaMarkerTitle: "Σύγχρονη Βίλα κοντά στη Θάλασσα",
-      villaMarkerDesc: "Το κατάλυμά σας",
+    apartmentMarkerTitle: "Σύγχρονο Διαμέρισμα κοντά στη Θάλασσα",
+        apartmentMarkerDesc: "Το κατάλυμά σας",
       viewDetails: "Προβολή λεπτομερειών",
       failed: "Αποτυχία φόρτωσης χάρτη",
       tokenMissing: "Ο διαδραστικός χάρτης είναι προσωρινά μη διαθέσιμος",
@@ -624,7 +722,7 @@ const dict: Record<Locale, Dictionary> = {
       loading: "Φόρτωση κράτησης…",
     }
     ,checkinInfo: {
-      welcome: "🎉 Καλώς Ήρθατε στη Βίλα μας!",
+  welcome: "🎉 Καλώς Ήρθατε στο Διαμέρισμά μας!",
       welcomeMessage: "Χαιρόμαστε που είστε εδώ. Παρακάτω θα βρείτε όλα όσα χρειάζεστε για μια άνετη διαμονή.",
       checkInOutTitle: "Άφιξη & Αναχώρηση",
       checkInTime: "Άφιξη",

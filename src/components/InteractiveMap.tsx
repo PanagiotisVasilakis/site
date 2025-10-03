@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
 import StaticLocationMap from './StaticLocationMap';
-import { MarkerData, VILLA_LOCATION } from '@/lib/mapUtils';
+import { MarkerData, APARTMENT_LOCATION } from '@/lib/mapUtils';
 import type { LeafletMarkerData } from '@/components/LeafletMap';
 
 const LeafletMap = dynamic(() => import('@/components/LeafletMap'), { ssr: false });
@@ -24,7 +24,7 @@ interface InteractiveMapProps {
 
 export default function InteractiveMap({
   markers = [],
-  center = VILLA_LOCATION,
+  center = APARTMENT_LOCATION,
   zoom = 13,
   height = "400px",
   className = "",
@@ -77,13 +77,13 @@ export default function InteractiveMap({
       deduped.push(marker);
     });
 
-    if (!deduped.some(marker => marker.id === 'villa' || marker.type === 'villa')) {
+    if (!deduped.some(marker => marker.id === 'apartment' || marker.type === 'apartment')) {
       deduped.unshift({
-        id: 'villa',
-        name: mapT?.villaMarkerTitle || 'Villa',
-        description: mapT?.villaMarkerDesc,
-        coordinates: VILLA_LOCATION,
-        type: 'villa',
+        id: 'apartment',
+  name: mapT?.apartmentMarkerTitle || 'Apartment',
+  description: mapT?.apartmentMarkerDesc,
+        coordinates: APARTMENT_LOCATION,
+        type: 'apartment',
         price: '€150/night'
       });
     }
@@ -122,7 +122,7 @@ export default function InteractiveMap({
           height={height}
           markers={leafletMarkers}
           onMarkerClick={handleMarkerClick}
-          origin={VILLA_LOCATION}
+          origin={APARTMENT_LOCATION}
           showOriginMarker={false}
           autoFitToOriginAndMarkers
           refitOnMarkerChange
@@ -138,7 +138,7 @@ export default function InteractiveMap({
         </div>
       )}
       <noscript>
-        <StaticLocationMap height={height} className="mt-4" title={mapT?.villaMarkerTitle} locale={locale} showHeading={false} />
+  <StaticLocationMap height={height} className="mt-4" title={mapT?.apartmentMarkerTitle} locale={locale} showHeading={false} />
       </noscript>
     </div>
   );

@@ -215,13 +215,14 @@ code, pre, kbd, samp {
 
 /* Mobile Quick Access menu dark mode */
 .mobile-menu-panel {
-  background: rgba(255, 255, 255, 0.95);
+  background: #ffffff;
   border-color: rgb(226, 232, 240);
+  color: rgb(30, 41, 59);
 }
 [data-theme="dark"] .mobile-menu-panel {
-  background: rgba(15, 23, 42, 0.95);
-  border-color: rgba(255, 255, 255, 0.2);
-  color: white;
+  background: #050b11;
+  border-color: rgba(148, 163, 184, 0.35);
+  color: #ffffff;
 }
 
 .mobile-menu-item {
@@ -230,9 +231,9 @@ code, pre, kbd, samp {
   color: rgb(30, 41, 59);
 }
 [data-theme="dark"] .mobile-menu-item {
-  background: rgb(30, 41, 59);
-  border-color: rgb(51, 65, 85);
-  color: white;
+  background: #1f2937;
+  border-color: #475569;
+  color: #f8fafc;
 }
 
 .mobile-menu-item:hover {
@@ -1307,4 +1308,96 @@ button[role="tab"] {
 [data-theme="dark"] a[href$="/en"] span,
 [data-theme="dark"] a[href$="/el"] span {
   color: #ffffff !important;
+}
+
+/* Villa page dark mode styles */
+.villa-cinematic-container {
+  --villa-ink: #1c1c20;
+  --villa-muted: #6e727a;
+  --villa-border: #e6e8ee;
+}
+
+[data-theme="dark"] .villa-cinematic-container {
+  --villa-ink: var(--fg-default);
+  --villa-muted: var(--fg-muted);
+  --villa-border: var(--border-soft);
+}
+
+.villa-content-section {
+  background: #ffffff;
+  color: var(--villa-ink);
+}
+
+[data-theme="dark"] .villa-content-section {
+  background: var(--layer-bg-subtle);
+  color: var(--fg-default);
+}
+
+.villa-section-title {
+  color: var(--villa-ink);
+}
+
+[data-theme="dark"] .villa-section-title {
+  color: var(--fg-default);
+}
+
+.villa-description-text {
+  color: var(--villa-muted);
+}
+
+[data-theme="dark"] .villa-description-text {
+  color: var(--fg-muted);
+}
+
+.villa-spec-badge {
+  border: 1px solid var(--villa-border);
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+[data-theme="dark"] .villa-spec-badge {
+  border: 1px solid var(--border-soft);
+  background: var(--layer-surface);
+  color: var(--fg-default);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.villa-btn-primary {
+  background: #000000;
+  color: #ffffff;
+}
+
+[data-theme="dark"] .villa-btn-primary {
+  background: var(--brand-500);
+  color: #042c28;
+}
+
+.villa-btn-secondary {
+  background: #ffffff;
+  border: 1px solid var(--villa-border);
+  color: var(--villa-ink);
+}
+
+[data-theme="dark"] .villa-btn-secondary {
+  background: var(--layer-surface);
+  border: 1px solid var(--border-soft);
+  color: var(--fg-default);
+}
+
+.villa-footer-text {
+  color: var(--villa-muted);
+}
+
+[data-theme="dark"] .villa-footer-text {
+  color: var(--fg-muted);
+}
+
+.villa-photo-card {
+  border: 1px solid var(--villa-border);
+  background: #ffffff;
+}
+
+[data-theme="dark"] .villa-photo-card {
+  border: 1px solid var(--border-soft);
+  background: var(--layer-surface);
 }

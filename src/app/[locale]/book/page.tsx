@@ -11,12 +11,12 @@ import BookingForm from '@/components/BookingForm';
 import StaticLocationMap from '@/components/StaticLocationMap';
 import { ClientBoundary } from '@/components/ClientBoundary';
 import AmenitiesList from '@/components/AmenitiesList';
-import { getVillaContent } from '@/data/villaData';
+import { getApartmentContent } from '@/data/apartmentData';
 import MapLoadingSkeleton from '@/components/MapLoadingSkeleton';
 import { MAP_DEFAULTS } from '@/lib/mapConstants';
 
 // Dynamic import for map component - only loads when needed
-const VillaLocationMap = dynamic(() => import('@/components/VillaLocationMap'), {
+const ApartmentLocationMap = dynamic(() => import('@/components/ApartmentLocationMap'), {
   loading: () => (
     <MapLoadingSkeleton height={MAP_DEFAULTS.HEIGHT.BOOKING} />
   )
@@ -55,19 +55,19 @@ export default async function BookingPage({
   const dateValidation = hasValidDates ? validateDateRange(dateRange) : { valid: false, error: 'Please select dates' };
   const nights = hasValidDates ? getNights(dateRange) : 0;
 
-  // Get real villa data
-  const villaContent = getVillaContent(eff);
+  // Get real apartment data
+  const apartmentContent = getApartmentContent(eff);
   const property = {
-    name: villaContent.name,
-    location: `${villaContent.location.city}, ${villaContent.location.country}`,
-    maxGuests: villaContent.specs.maxGuests,
-    bedrooms: villaContent.specs.bedrooms,
-    bathrooms: villaContent.specs.bathrooms,
-    floor: villaContent.specs.floor,
-    size: villaContent.specs.size,
-    basePrice: villaContent.pricing.basePrice,
-    cleaningFee: villaContent.pricing.cleaningFee,
-    serviceFee: villaContent.pricing.serviceFee,
+    name: apartmentContent.name,
+    location: `${apartmentContent.location.city}, ${apartmentContent.location.country}`,
+    maxGuests: apartmentContent.specs.maxGuests,
+    bedrooms: apartmentContent.specs.bedrooms,
+    bathrooms: apartmentContent.specs.bathrooms,
+    floor: apartmentContent.specs.floor,
+    size: apartmentContent.specs.size,
+    basePrice: apartmentContent.pricing.basePrice,
+    cleaningFee: apartmentContent.pricing.cleaningFee,
+    serviceFee: apartmentContent.pricing.serviceFee,
     image: '/house/att.FcEjVIjFuWRZjLgXbVE8uocMCMkIQ23IOfjVpyylEGM.jpeg'
   };
 
@@ -231,7 +231,7 @@ export default async function BookingPage({
               <div className="mt-6 pt-6 border-t border-[color:var(--border-soft)]">
                 <h4 className="font-semibold mb-3 text-[color:var(--fg-default)]">{t.locationPanel?.title}</h4>
                 <ClientBoundary>
-                  <VillaLocationMap 
+                  <ApartmentLocationMap 
                     locale={eff}
                     height="260px"
                     zoom={15}
@@ -256,7 +256,7 @@ export default async function BookingPage({
               <div className="mt-6 pt-6 border-t border-[color:var(--border-soft)]">
                 <h4 className="font-semibold mb-3 text-[color:var(--fg-default)]">{t.booking?.whatsIncluded}</h4>
                 <AmenitiesList 
-                  amenities={villaContent.amenities}
+                  amenities={apartmentContent.amenities}
                   maxInitialItems={6}
                 />
               </div>

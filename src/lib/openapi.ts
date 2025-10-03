@@ -459,7 +459,7 @@ export const openApiSpec = {
                 single: {
                   summary: 'Single event',
                   value: {
-                    path: '/en/villa',
+                    path: '/en/apartment',
                     ts: 1695648000000,
                     locale: 'en',
                   },
@@ -467,7 +467,7 @@ export const openApiSpec = {
                 batch: {
                   summary: 'Multiple events',
                   value: [
-                    { path: '/en/villa', ts: 1695648000000 },
+                    { path: '/en/apartment', ts: 1695648000000 },
                     { path: '/en/amenities', ts: 1695648060000 },
                   ],
                 },
@@ -530,7 +530,7 @@ export const openApiSpec = {
               example: {
                 name: 'LCP',
                 value: 2500,
-                path: '/en/villa',
+                path: '/en/apartment',
                 ts: 1695648000000,
                 id: 'unique-metric-id',
               },

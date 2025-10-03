@@ -1,11 +1,42 @@
 "use client";
 import React, { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
 import internalFetch from '@/lib/internalFetchClient';
+import MapLoadingSkeleton from '@/components/MapLoadingSkeleton';
+import { MAP_DEFAULTS } from '@/lib/mapConstants';
 
-export default function CheckInInfo({ locale }: { locale: string }) {
+type NearbyCategoryItem = {
+  id: string;
+  name: string;
+  summary?: string;
+  slug?: string;
+  rating?: number;
+  priceLevel?: number;
+  location?: { lat: number; lng: number };
+};
+
+const DynamicApartmentLocationMap = dynamic(() => import('@/components/ApartmentLocationMap'), {
+  ssr: false,
+  loading: () => <MapLoadingSkeleton height={MAP_DEFAULTS.HEIGHT.COMPACT} />,
+});
+
+interface CheckInInfoProps {
+  locale: string;
+  nearbyRestaurants?: NearbyCategoryItem[];
+  nearbyServices?: NearbyCategoryItem[];
+  nearbyAttractions?: NearbyCategoryItem[];
+}
+
+export default function CheckInInfo({
+  locale,
+  nearbyRestaurants = [],
+  nearbyServices = [],
+  nearbyAttractions = [],
+}: CheckInInfoProps) {
   const t = getDictionary((locale as Locale) ?? 'en');
+  const checkinStrings = (t.checkinInfo ?? {}) as Record<string, string | undefined>;
   const [copiedWifi, setCopiedWifi] = useState(false);
   const [checkInTime, setCheckInTime] = useState('15:00');
   const [checkOutTime, setCheckOutTime] = useState('11:00');
@@ -93,7 +124,7 @@ export default function CheckInInfo({ locale }: { locale: string }) {
       {/* Welcome Message */}
       <section className="card p-6 bg-gradient-to-br from-[color:var(--brand-primary)] to-[color:var(--brand-secondary)]">
         <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:!text-white">
-          {t.checkinInfo?.welcome || '🎉 Welcome to Our Villa!'}
+          {t.checkinInfo?.welcome || '🎉 Welcome to Our Apartment!'}
         </h2>
         <p className="text-gray-800 dark:!text-white">
           {t.checkinInfo?.welcomeMessage || 'We\'re delighted to have you here. Below you\'ll find everything you need for a comfortable stay.'}
@@ -189,9 +220,9 @@ export default function CheckInInfo({ locale }: { locale: string }) {
           <div className="p-4 rounded-lg bg-[color:var(--layer-surface)] border border-[color:var(--border-soft)]">
             <div className="text-sm text-[color:var(--fg-muted)] mb-1">{t.checkinInfo?.wifiNetwork || 'Network Name'}</div>
             <div className="flex items-center justify-between">
-              <span className="font-mono font-semibold text-lg">VillaGuest_5G</span>
+              <span className="font-mono font-semibold text-lg">ApartmentGuest_5G</span>
               <button
-                onClick={() => copyToClipboard('VillaGuest_5G')}
+                onClick={() => copyToClipboard('ApartmentGuest_5G')}
                 className="text-xs px-3 py-1 rounded-full bg-[color:var(--brand-primary)] text-white hover:opacity-80 transition"
               >
                 {copiedWifi ? '✓ ' + (t.checkinInfo?.copied || 'Copied') : t.checkinInfo?.copy || 'Copy'}
@@ -307,6 +338,73 @@ export default function CheckInInfo({ locale }: { locale: string }) {
             <span>{t.checkinInfo?.tip4 || 'Need a taxi? Call +30 2721 023456 or use the Taxi app'}</span>
           </li>
         </ul>
+      </section>
+
+      <section className="card p-5 mt-6 space-y-5">
+        <div className="flex items-center gap-3">
+          <span className="text-3xl" aria-hidden>📍</span>
+          <h3 className="text-xl font-semibold" style={{ color: 'var(--text-accent)' }}>
+            {checkinStrings.locationTitle || 'Location & Nearby'}
+          </h3>
+        </div>
+        <p className="text-sm text-[color:var(--fg-muted)] max-w-2xl">
+          {checkinStrings.locationDescription || 'Discover your apartment’s prime location in Kalamata and explore local restaurants, services, and sights within minutes.'}
+        </p>
+        <div className="rounded-xl overflow-hidden border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] shadow-sm">
+          <DynamicApartmentLocationMap
+            locale={locale}
+            height={MAP_DEFAULTS.HEIGHT.COMPACT}
+            zoom={12}
+            showNearbyAttractions
+            className="min-h-[260px]"
+            nearbyRestaurants={nearbyRestaurants}
+            nearbyServices={nearbyServices}
+            nearbyAttractions={nearbyAttractions}
+          />
+        </div>
+        {(t.house?.distances?.length ?? 0) > 0 && (
+          <div className="grid sm:grid-cols-2 gap-3">
+            {(t.house?.distances || []).map((distance, i) => (
+              <div
+                key={`${distance}-${i}`}
+                className="flex items-start gap-3 p-3 rounded-lg bg-[color:var(--layer-surface)] border border-[color:var(--border-soft)] shadow-sm"
+              >
+                <span className="text-lg" aria-hidden>📍</span>
+                <span className="text-sm text-[color:var(--fg-muted)]">{distance}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="grid sm:grid-cols-3 gap-4">
+          {[
+            {
+              icon: '🏛️',
+              title: checkinStrings.locationTownTitle || 'Town Center',
+              description: checkinStrings.locationTownDescription || '50m to Town Hall & services',
+            },
+            {
+              icon: '🏖️',
+              title: checkinStrings.locationBeachTitle || 'Beach Access',
+              description: checkinStrings.locationBeachDescription || '5 min drive to the coast',
+            },
+            {
+              icon: '🚗',
+              title: checkinStrings.locationTransportTitle || 'Transportation',
+              description: checkinStrings.locationTransportDescription || 'Free parking & airport 15 min',
+            },
+          ].map((feature) => (
+            <div
+              key={feature.title || feature.icon}
+              className="rounded-lg border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] p-4 text-center shadow-sm"
+            >
+              <div className="text-2xl mb-2" aria-hidden>{feature.icon}</div>
+              <h4 className="text-sm font-semibold" style={{ color: 'var(--fg-default)' }}>
+                {feature.title}
+              </h4>
+              <p className="text-xs text-[color:var(--fg-muted)]">{feature.description}</p>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* Additional Info */}

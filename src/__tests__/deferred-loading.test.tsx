@@ -103,7 +103,7 @@ describe('Deferred loading guardrails', () => {
     const BookingBar = (await import('@/components/SearchBar')).default;
     const user = userEvent.setup();
 
-    render(<BookingBar propertyName="Villa" />);
+  render(<BookingBar propertyName="Apartment" />);
 
     expect(dynamicLoaderCalls).toHaveLength(0);
   await user.click(screen.getByRole('button', { name: /arrival/i }));

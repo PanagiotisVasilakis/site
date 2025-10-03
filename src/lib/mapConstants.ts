@@ -7,7 +7,7 @@ export const MAP_DEFAULTS = {
     COMPACT: '260px', 
     LARGE: '500px',
     BOOKING: '260px',
-    VILLA_PAGE: '500px'
+  APARTMENT_PAGE: '500px'
   },
   
   // Standard zoom levels

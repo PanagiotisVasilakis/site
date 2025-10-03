@@ -32,7 +32,7 @@ export default function StaticLocationMap({
       <section className="bg-white/70 rounded-lg p-4">
         <header className="flex items-center gap-2 mb-2">
           <span aria-hidden>🏡</span>
-          <strong>{lp?.villaTitle}</strong>
+          <strong>{lp?.apartmentTitle}</strong>
         </header>
         <p className="text-gray-700 text-sm leading-snug">{lp?.city}</p>
         <p className="text-gray-600 whitespace-pre-wrap break-words leading-snug mt-1">{lp?.blurb}</p>

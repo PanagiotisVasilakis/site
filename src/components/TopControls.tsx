@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import ThemeToggle from './ThemeToggle';
 import LocaleSwitcher from './LocaleSwitcher';
 import Link from 'next/link';
@@ -23,6 +23,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
   const [isSignedIn, setIsSignedIn] = useState(!!showCheckIn); // Track if user is signed in
   const checkerRef = useRef<number | null>(null);
   const inFlight = useRef<AbortController | null>(null);
+  const dictionary = useMemo(() => getDictionary(locale as Locale), [locale]);
 
   const refreshCheckIn = useCallback(async () => {
     try {
@@ -94,6 +95,59 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
       .then(m => m.trackEvent(eventName, props))
       .catch(() => {}); // Silent fail for analytics
   }, []);
+
+  const mobileMenuLinks = useMemo(() => {
+    const links = [
+      {
+        href: `/${locale}/house`,
+        label: dictionary.house?.navLabel ?? dictionary.house?.title ?? 'House Guide',
+        icon: '📘',
+        event: 'mobile_nav_house',
+      },
+      {
+        href: `/${locale}/property`,
+        label: dictionary.details ?? 'Property',
+        icon: '🏖️',
+        event: 'mobile_nav_property',
+      },
+      {
+        href: `/${locale}/book`,
+        label: dictionary.cta?.reserve ?? 'Book stay',
+        icon: '🗓️',
+        event: 'mobile_nav_book',
+      },
+      {
+        href: `/${locale}/favorites`,
+        label: dictionary.labels?.favorites ?? 'Favorites',
+        icon: '⭐',
+        event: 'mobile_nav_favorites',
+      },
+      {
+        href: `/${locale}?category=restaurants`,
+        label: dictionary.categories?.restaurants ?? 'Restaurants',
+        icon: '🍽️',
+        event: 'mobile_nav_restaurants',
+      },
+      {
+        href: `/${locale}?category=phones`,
+        label: dictionary.categories?.phones ?? 'Important Phones',
+        icon: '📞',
+        event: 'mobile_nav_phones',
+      },
+    ];
+
+    // Add Check-in link when user is signed in
+    if (isSignedIn && checkInVisible) {
+      links.push({
+        href: `/${locale}/check-in`,
+        label: 'Check‑in',
+        icon: '✓',
+        event: 'mobile_nav_checkin',
+      });
+    }
+
+    return links.filter(link => Boolean(link.label));
+  }, [locale, dictionary, isSignedIn, checkInVisible]);
 
   // Hydrate visibility from server flag, fire analytics once on change
   useEffect(() => {
@@ -197,8 +251,8 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
                 Install
               </button>
             </div>
-            {/* Mobile menu trigger */}
-            <div className="md:hidden flex items-center">
+            {/* Menu trigger - visible on all screen sizes */}
+            <div className="flex items-center">
               <button aria-label="Menu" aria-expanded={open} onClick={() => setOpen(o => !o)} className={`h-7 w-7 rounded-full flex items-center justify-center bg-white/30 dark:bg-white/40 hover:bg-white/60 dark:hover:bg-white/60 transition border border-white/30 dark:border-white/40 text-sm shadow-sm ${open ? 'ring-2 ring-brand-400' : ''}`}>
                 <span aria-hidden>{open ? '×' : '☰'}</span>
               </button>
@@ -206,36 +260,54 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
           </div>
         </div>
         {/* Mobile panel */}
-        <div className={`md:hidden fixed top-12 right-3 z-40 w-60 rounded-xl mobile-menu-panel backdrop-blur shadow-lg p-4 flex flex-col gap-3 transition-transform origin-top-right ${open ? 'scale-100 opacity-100' : 'scale-90 opacity-0 pointer-events-none'}`} role="menu" aria-label="Quick settings">
-          <div className="flex items-center justify-between pb-1 border-b border-slate-200/50 dark:border-white/20">
-            <span className="text-xs font-semibold tracking-wide uppercase opacity-70 text-slate-800 dark:text-white">Quick Access</span>
+        <div className={`fixed top-12 right-3 z-40 w-60 rounded-2xl mobile-menu-panel shadow-lg p-4 flex flex-col gap-4 transition-transform origin-top-right ${open ? 'scale-100 opacity-100' : 'scale-95 opacity-0 pointer-events-none'} bg-white text-slate-900 dark:bg-black dark:text-white`} role="menu" aria-label="Main menu">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-zinc-700/60">
+            <span className="text-xs font-bold tracking-wide uppercase">Menu</span>
             <ThemeToggle />
           </div>
-          {isSignedIn ? (
-            <button
-              onClick={() => { handleSignOut(); setOpen(false); }}
-              className={`${primaryNavButtonClasses} w-full justify-start py-2.5 px-3 gap-3`}
-            >
-              <span aria-hidden className="text-base leading-none">👤</span>
-              <span className="flex-1 text-left">{getDictionary(locale as Locale).ui?.signOut || "Sign out"}</span>
-            </button>
-          ) : (
-            <Link 
-              href={`/${locale}/guest?mode=signin`}
-              className={`${primaryNavButtonClasses} w-full justify-start py-2.5 px-3 gap-3`}
-              onClick={() => setOpen(false)}
-            >
-              <span aria-hidden className="text-base leading-none">👤</span>
-              <span className="flex-1 text-left">{getDictionary(locale as Locale).ui?.signIn || "Sign in"}</span>
-            </Link>
-          )}
-          <div className="h-10 rounded-full flex items-center justify-start px-3 mobile-menu-item"><LocaleSwitcher fullText={true} showGlobeIcon={true} /></div>
-          {checkInVisible ? (
-            <Link href={`/${locale}/check-in`} className="h-10 rounded-full flex items-center justify-center px-3 mobile-menu-item text-xs font-medium transition"
-              onClick={() => trackAnalyticsEvent('checkin_nav_clicked')}>
-              Check‑in
-            </Link>
-          ) : null}
+          <nav className="flex flex-col gap-2" aria-label="Primary pages">
+            {mobileMenuLinks.map(link => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="inline-flex items-center gap-3 w-full rounded-full text-[11px] font-semibold tracking-wide leading-none transition duration-150 px-3 py-2.5 justify-start mobile-menu-item bg-slate-100 hover:bg-white text-slate-900 shadow-sm border border-slate-300 dark:bg-zinc-800 dark:hover:bg-zinc-900 dark:text-white dark:border-zinc-700"
+                onClick={() => {
+                  if (link.event) {
+                    trackAnalyticsEvent(link.event, { destination: link.href });
+                  }
+                  setOpen(false);
+                }}
+              >
+                <span aria-hidden className="text-base leading-none">{link.icon}</span>
+                <span className="flex-1 text-left">{link.label}</span>
+              </Link>
+            ))}
+          </nav>
+          <div className="md:hidden flex flex-col gap-2 pt-3 border-t border-slate-200 dark:border-zinc-700/60">
+            {isSignedIn ? (
+              <button
+                onClick={() => { handleSignOut(); setOpen(false); }}
+                className="inline-flex items-center gap-3 w-full rounded-full text-[11px] font-semibold tracking-wide leading-none transition duration-150 px-3 py-2.5 justify-start mobile-menu-item bg-slate-100 hover:bg-white text-slate-900 shadow-sm border border-slate-300 dark:bg-zinc-800 dark:hover:bg-zinc-900 dark:text-white dark:border-zinc-700"
+              >
+                <span aria-hidden className="text-base leading-none">👤</span>
+                <span className="flex-1 text-left">{dictionary.ui?.signOut || "Sign out"}</span>
+              </button>
+            ) : (
+              <Link 
+                href={`/${locale}/guest?mode=signin`}
+                className="inline-flex items-center gap-3 w-full rounded-full text-[11px] font-semibold tracking-wide leading-none transition duration-150 px-3 py-2.5 justify-start mobile-menu-item bg-slate-100 hover:bg-white text-slate-900 shadow-sm border border-slate-300 dark:bg-zinc-800 dark:hover:bg-zinc-900 dark:text-white dark:border-zinc-700"
+                onClick={() => setOpen(false)}
+              >
+                <span aria-hidden className="text-base leading-none">👤</span>
+                <span className="flex-1 text-left">{dictionary.ui?.signIn || "Sign in"}</span>
+              </Link>
+            )}
+            <LocaleSwitcher
+              fullText={true}
+              showGlobeIcon={true}
+              className="inline-flex items-center gap-3 w-full rounded-full text-[11px] font-semibold tracking-wide leading-none transition duration-150 px-3 py-2.5 justify-start mobile-menu-item bg-slate-100 hover:bg-white text-slate-900 shadow-sm border border-slate-300 dark:bg-zinc-800 dark:hover:bg-zinc-900 dark:text-white dark:border-zinc-700"
+            />
+          </div>
         </div>
       </div>
     </div>

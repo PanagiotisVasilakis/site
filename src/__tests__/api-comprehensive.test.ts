@@ -464,7 +464,7 @@ export const MockData = {
   ],
 
   analyticsEvent: {
-    path: '/en/villa',
+  path: '/en/apartment',
     ts: Date.now(),
     locale: 'en',
   },
@@ -472,7 +472,7 @@ export const MockData = {
   webVital: {
     name: 'LCP' as const,
     value: 2500,
-    path: '/en/villa',
+  path: '/en/apartment',
     ts: Date.now(),
     id: 'test-metric-id',
   },

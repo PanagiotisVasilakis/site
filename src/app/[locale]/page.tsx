@@ -44,14 +44,14 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           departurePlaceholder: t.search?.departurePlaceholder
         }}
       />
-      {/* Villa Features */}
+  {/* Apartment Features */}
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
         <Link
-          href={`/${eff}/villa`}
+          href={`/${eff}/apartment`}
           className="card p-6 flex flex-col items-center text-center transition-colors hover:bg-white/90 group"
         >
           <div className="text-4xl mb-3 group-hover:scale-110 transition-transform" aria-hidden>🏡</div>
-          <div className="text-lg font-medium mb-2" style={{color:'var(--text-accent)'}}>{t.house?.navLabel || 'Villa Photos'}</div>
+          <div className="text-lg font-medium mb-2" style={{color:'var(--text-accent)'}}>{t.house?.navLabel || 'Apartment Photos'}</div>
         </Link>
 
         <Link

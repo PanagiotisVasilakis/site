@@ -8,8 +8,8 @@ import BookingForm from '@/components/BookingForm';
 type MockComponent<T = Record<string, unknown>> = React.FC<T>;
 
 // Properly typed mock components
-vi.mock('@/components/VillaLocationMap', () => ({
-  default: ((props: { locale?: string }) => <div data-testid="mock-villa-map">Map mock locale={props.locale}</div>) as MockComponent<{ locale?: string }>
+vi.mock('@/components/ApartmentLocationMap', () => ({
+  default: ((props: { locale?: string }) => <div data-testid="mock-apartment-map">Map mock locale={props.locale}</div>) as MockComponent<{ locale?: string }>
 }));
 
 vi.mock('next/image', () => ({

@@ -77,7 +77,7 @@ export interface LeafletMapProps {
 }
 
 const CATEGORY_ICON: Record<string, string> = {
-  villa: 'M12 2 2 7l10 5 10-5-10-5Zm8 9-8 4-8-4v6l8 4 8-4v-6Z',
+  apartment: 'M12 2 2 7l10 5 10-5-10-5Zm8 9-8 4-8-4v6l8 4 8-4v-6Z',
   restaurant: 'M6 2v8.5a3.5 3.5 0 1 0 7 0V2h-2v8.5a1.5 1.5 0 1 1-3 0V2H6Zm9 0v14h2v-6h2V8h-2V2h-2Z',
   service: 'M12 2a5 5 0 0 0-5 5v3H5l1 12h12l1-12h-2V7a5 5 0 0 0-5-5Zm0 2a3 3 0 0 1 3 3v3H9V7a3 3 0 0 1 3-3Z',
   attraction: 'M12 2 3 9h6v13h6V9h6L12 2Z'
@@ -87,7 +87,7 @@ function svgIcon(path: string, color: string) {
   return `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='20' height='20' fill='${color}'><path d='${path}'/></svg>`;
 }
 
-function buildIcon(type = 'villa') {
+function buildIcon(type = 'apartment') {
   const path = CATEGORY_ICON[type] || CATEGORY_ICON['attraction'];
   return L.divIcon({
     className: 'leaflet-custom-marker',
@@ -106,7 +106,7 @@ export default function LeafletMap({
   onMarkerClick,
   darkTiles,
   clusterMin = 5,
-  persistKey = 'leaflet:villa-map',
+  persistKey = 'leaflet:apartment-map',
   showFitButton = true,
   animateMarkers = true,
   origin,
@@ -173,12 +173,12 @@ export default function LeafletMap({
       map._originMarker = L.marker([origin[1], origin[0]], {
         icon: L.divIcon({
           className: 'leaflet-origin-marker',
-          html: '<div class="lmk" data-type="villa" title="Villa location">🏠</div>',
+          html: '<div class="lmk" data-type="apartment" title="Apartment location">🏠</div>',
           iconSize: [42,42], iconAnchor:[21,40]
         })
       }).addTo(map);
       if(originPopup){
-        const title = originPopup.name || 'Villa';
+  const title = originPopup.name || 'Apartment';
         const address = originPopup.address ? `<div style='margin-top:2px;font-size:12px;'>${originPopup.address}</div>` : '';
         const desc = originPopup.description ? `<div style='margin-top:4px;font-size:12px;line-height:1.3;'>${originPopup.description}</div>` : '';
         map._originMarker.bindPopup(`<div style='font-weight:600;margin-bottom:4px;'>${title}</div>${address}${desc}`);

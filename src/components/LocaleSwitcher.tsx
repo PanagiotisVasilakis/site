@@ -6,6 +6,7 @@ import { Suspense } from "react";
 interface LocaleSwitcherProps {
   fullText?: boolean;
   showGlobeIcon?: boolean;
+  className?: string;
 }
 
 function swapLocale(pathname: string, next: string, searchParams?: URLSearchParams | null) {
@@ -27,7 +28,9 @@ function swapLocale(pathname: string, next: string, searchParams?: URLSearchPara
   return newPath;
 }
 
-function LocaleSwitcherContent({ fullText = false, showGlobeIcon = false }: LocaleSwitcherProps) {
+const BASE_CLASS = "locale-switcher inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold tracking-wide bg-black/10 hover:bg-black/20 text-slate-800 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/70 dark:!text-white transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60 dark:focus-visible:ring-brand-400/50";
+
+function LocaleSwitcherContent({ fullText = false, showGlobeIcon = false, className }: LocaleSwitcherProps) {
   const pathname = usePathname() || "/en";
   const searchParams = useSearchParams();
   const isEL = pathname.startsWith("/el");
@@ -39,10 +42,12 @@ function LocaleSwitcherContent({ fullText = false, showGlobeIcon = false }: Loca
     ? (isEL ? "English" : "Ελληνικά")
     : (isEL ? "EN" : "EL");
   
+  const appliedClass = className ? `${className} locale-switcher` : BASE_CLASS;
+
   return (
     <Link
       href={href}
-      className="locale-switcher inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold tracking-wide bg-black/10 hover:bg-black/20 text-slate-800 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/70 dark:!text-white transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60 dark:focus-visible:ring-brand-400/50"
+      className={appliedClass}
     >
       {showGlobeIcon && <span aria-hidden className="text-sm">🌐</span>}
       {displayText}
@@ -50,15 +55,17 @@ function LocaleSwitcherContent({ fullText = false, showGlobeIcon = false }: Loca
   );
 }
 
-export default function LocaleSwitcher({ fullText = false, showGlobeIcon = false }: LocaleSwitcherProps) {
+export default function LocaleSwitcher({ fullText = false, showGlobeIcon = false, className }: LocaleSwitcherProps) {
+  const fallbackClass = className ? `${className} locale-switcher` : BASE_CLASS;
+
   return (
     <Suspense fallback={
-      <div className="inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold tracking-wide bg-black/10 text-slate-800 dark:bg-zinc-800/60 dark:!text-white">
+      <div className={fallbackClass}>
         {showGlobeIcon && <span aria-hidden className="text-sm">🌐</span>}
         --
       </div>
     }>
-      <LocaleSwitcherContent fullText={fullText} showGlobeIcon={showGlobeIcon} />
+      <LocaleSwitcherContent fullText={fullText} showGlobeIcon={showGlobeIcon} className={className} />
     </Suspense>
   );
 }
