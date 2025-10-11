@@ -14,11 +14,11 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const refresh = req.cookies.get('guest_rt')?.value;
   if (!refresh) throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Missing refresh token');
 
-  const rec = guestStore.verifyRefreshToken(refresh);
+  const rec = await guestStore.verifyRefreshToken(refresh);
   if (!rec) throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Invalid refresh token');
 
   // Rotate on use
-  const rotated = guestStore.rotateRefreshToken(refresh);
+  const rotated = await guestStore.rotateRefreshToken(refresh);
   const rt = rotated.token;
   if (rotated.old && rotated.rec) {
     elogger.info('refresh_token.rotated', { correlationId: elogger.getContext()?.correlationId, user_id: rotated.old.user_id, old_id: rotated.old.id, new_id: rotated.rec.id, family_id: rotated.rec.family_id });
@@ -26,8 +26,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
 
   // Check if user has any current/future booking; in dev store, pick any linked booking via access table
-  const u = guestStore.findUserById(rec.user_id);
-  const b = u ? guestStore.findEligibleBookingForUser(u.id) : undefined;
+  const u = await guestStore.findUserById(rec.user_id);
+  const b = u ? await guestStore.findEligibleBookingForUser(u.id) : undefined;
   const payload: GuestSessionPayload = {
     user: u ? { id: u.id } : undefined,
     booking: b ? { id: b.id } : undefined,
@@ -43,8 +43,16 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
   // If next is provided, perform a redirect after setting cookies
   if (nextParam) {
-    const origin = req.nextUrl.origin;
-    return NextResponse.redirect(`${origin}${nextParam}`, { headers: res.headers });
+    const redirectResponse = new NextResponse(null, { status: 302 });
+    redirectResponse.headers.set('Location', nextParam);
+    res.headers.forEach((value, key) => {
+      if (key.toLowerCase() === 'set-cookie') {
+        redirectResponse.headers.append(key, value);
+      } else {
+        redirectResponse.headers.set(key, value);
+      }
+    });
+    return redirectResponse;
   }
   return res;
 });
@@ -58,29 +66,31 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   const nextParam = isSafePath(nextRaw) ? nextRaw! : undefined;
   const failureParam = isSafePath(failureRaw) ? failureRaw! : undefined;
   
-  // Helper to convert relative path to absolute URL
-  const toAbsoluteUrl = (path: string) => {
-    const origin = req.nextUrl.origin;
-    return `${origin}${path}`;
-  };
-  
   if (!refresh) {
-    if (failureParam) return NextResponse.redirect(toAbsoluteUrl(failureParam));
+    if (failureParam) {
+      const failureResponse = new NextResponse(null, { status: 302 });
+      failureResponse.headers.set('Location', failureParam);
+      return failureResponse;
+    }
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Missing refresh token');
   }
-  const rec = guestStore.verifyRefreshToken(refresh);
+  const rec = await guestStore.verifyRefreshToken(refresh);
   if (!rec) {
-    if (failureParam) return NextResponse.redirect(toAbsoluteUrl(failureParam));
+    if (failureParam) {
+      const failureResponse = new NextResponse(null, { status: 302 });
+      failureResponse.headers.set('Location', failureParam);
+      return failureResponse;
+    }
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Invalid refresh token');
   }
-  const rotated = guestStore.rotateRefreshToken(refresh);
+  const rotated = await guestStore.rotateRefreshToken(refresh);
   const rt = rotated.token;
   if (rotated.old && rotated.rec) {
     elogger.info('refresh_token.rotated', { correlationId: elogger.getContext()?.correlationId, user_id: rotated.old.user_id, old_id: rotated.old.id, new_id: rotated.rec.id, family_id: rotated.rec.family_id });
     metrics.counter('refresh_token.rotated', 1);
   }
-  const u = guestStore.findUserById(rec.user_id);
-  const b = u ? guestStore.findEligibleBookingForUser(u.id) : undefined;
+  const u = await guestStore.findUserById(rec.user_id);
+  const b = u ? await guestStore.findEligibleBookingForUser(u.id) : undefined;
   const payload: GuestSessionPayload = {
     user: u ? { id: u.id } : undefined,
     booking: b ? { id: b.id } : undefined,
@@ -94,8 +104,16 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     headers.append('Set-Cookie', `${refreshCookie.name}=${refreshCookie.value}; Path=${refreshCookie.options.path}; HttpOnly; SameSite=Lax; Max-Age=${refreshCookie.options.maxAge};${refreshCookie.options.secure ? ' Secure;' : ''}`);
   }
   if (nextParam) {
-    const absoluteUrl = toAbsoluteUrl(nextParam);
-    return new NextResponse(null, { status: 302, headers: new Headers([...headers, ['Location', absoluteUrl]]) });
+    const redirectResponse = new NextResponse(null, { status: 302 });
+    redirectResponse.headers.set('Location', nextParam);
+    headers.forEach((value, key) => {
+      if (key.toLowerCase() === 'set-cookie') {
+        redirectResponse.headers.append(key, value);
+      } else {
+        redirectResponse.headers.set(key, value);
+      }
+    });
+    return redirectResponse;
   }
   return new NextResponse(null, { status: 204, headers });
 });

@@ -1,8 +1,15 @@
-import fs from 'node:fs';
-import crypto from 'node:crypto';
-import path from 'node:path';
-import { encryptJSON, decryptJSON, hashSensitive, maskLast4, verifySensitive, encryptString, decryptString, hmacDeterministic } from '@/lib/crypto';
+import { initializeDatabase, getDatabase } from '@/lib/database';
+import {
+  userRepository,
+  identityRepository,
+  bookingRepository,
+  accessRepository,
+  checkinRepository,
+  refreshTokenRepository
+} from '@/lib/repositories';
+import { hashSensitive, maskLast4, hmacDeterministic, verifySensitive } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
+import crypto from 'node:crypto';
 
 export type IdentityType = 'AFM' | 'PASSPORT';
 export type BookingSource = 'ONSITE' | 'EXTERNAL';
@@ -13,18 +20,6 @@ export interface User {
   email?: string;
   phone_e164: string;
   password_hash?: string; // bcrypt hash
-  country_origin: 'GR' | 'ABROAD';
-  created_at: number;
-  updated_at: number;
-}
-
-// Persisted variant with encrypted phone and HMAC for lookup
-interface PersistedUser {
-  id: string;
-  email?: string;
-  phone_enc: string; // AES-GCM base64
-  phone_hmac: string; // deterministic HMAC-SHA256
-  password_hash?: string; // bcrypt hash (already secure, no need to encrypt)
   country_origin: 'GR' | 'ABROAD';
   created_at: number;
   updated_at: number;
@@ -70,8 +65,6 @@ export interface AuthSessionRec {
   revoked_at?: number;
 }
 
-// Legacy codepath removed
-
 export interface CheckinCompletionRec {
   booking_id: string;
   arrival_time: string; // HH:mm
@@ -94,338 +87,337 @@ export interface GuestRefreshTokenRec {
   ip_hint?: string;
 }
 
-// Persisted JSON shape (phone encrypted)
-interface DBShapePersisted {
-  users: PersistedUser[];
-  identities: Identity[];
-  bookings: Booking[];
-  access: BookingAccess[];
-  sessions: AuthSessionRec[];
-  checkins: CheckinCompletionRec[];
-  refreshTokens: GuestRefreshTokenRec[];
-  _v: number;
-}
-
-// Runtime in-memory shape (phone plaintext, used within process only)
-interface RuntimeDB {
-  users: User[];
-  identities: Identity[];
-  bookings: Booking[];
-  access: BookingAccess[];
-  sessions: AuthSessionRec[];
-  checkins: CheckinCompletionRec[];
-  refreshTokens: GuestRefreshTokenRec[];
-  _v: number;
-}
-
-const FILE = path.join(process.cwd(), 'secure-data.enc.json');
-
-function readDB(): RuntimeDB {
-  if (!fs.existsSync(FILE)) return { users: [], identities: [], bookings: [], access: [], sessions: [], checkins: [], refreshTokens: [], _v: 1 } as RuntimeDB;
-  try {
-    const raw = fs.readFileSync(FILE, 'utf-8');
-    const pdb = decryptJSON<DBShapePersisted>(raw);
-    // Map persisted users to runtime users with decrypted phone
-    const users: User[] = (pdb.users || []).map((pu) => ({
-      id: pu.id,
-      email: pu.email,
-      phone_e164: safeDecryptPhone(pu.phone_enc),
-      password_hash: pu.password_hash,
-      country_origin: pu.country_origin,
-      created_at: pu.created_at,
-      updated_at: pu.updated_at,
-    }));
-    // Backfill booking tokens from legacy normalized plaintext if present
-    const bookings: Booking[] = (pdb.bookings || []).map((raw) => {
-      const b = { ...raw } as Partial<Booking> & { last_name_plain_lower?: string; last_name_plain_lower_nows?: string };
-      if (!b.last_name_token && b.last_name_plain_lower) {
-        b.last_name_token = hmacDeterministic(b.last_name_plain_lower);
-      }
-      if (!b.last_name_token_nows && b.last_name_plain_lower_nows) {
-        b.last_name_token_nows = hmacDeterministic(b.last_name_plain_lower_nows);
-      }
-      delete b.last_name_plain_lower;
-      delete b.last_name_plain_lower_nows;
-      return b as Booking;
-    });
-
-    const runtime: RuntimeDB = {
-      users,
-      identities: pdb.identities || [],
-      bookings,
-      access: pdb.access || [],
-      sessions: pdb.sessions || [],
-      checkins: pdb.checkins || [],
-      refreshTokens: pdb.refreshTokens || [],
-      _v: pdb._v || 1,
-    };
-    // Backfill for older versions without checkins
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-  if (!runtime.checkins) (runtime as unknown as RuntimeDB).checkins = [];
-    // Backfill for older versions without refresh tokens
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    if (!runtime.refreshTokens) (runtime as unknown as RuntimeDB).refreshTokens = [];
-    return runtime;
-  } catch (err) {
-    logger.error('guestDataStore: failed to read DB', err);
-    return { users: [], identities: [], bookings: [], access: [], sessions: [], checkins: [], refreshTokens: [], _v: 1 } as RuntimeDB;
-  }
-}
-
-function writeDB(db: RuntimeDB) {
-  // Convert runtime DB to persisted JSON (encrypt phone)
-  const toWrite: DBShapePersisted = {
-    ...db,
-    users: (db.users || []).map((u) => ({
-      id: u.id,
-      email: u.email,
-      phone_enc: encryptString(u.phone_e164),
-      phone_hmac: hmacDeterministic(u.phone_e164),
-      password_hash: u.password_hash,
-      country_origin: u.country_origin,
-      created_at: u.created_at,
-      updated_at: u.updated_at,
-    })),
-  } as DBShapePersisted;
-  const b64 = encryptJSON(toWrite);
-  fs.writeFileSync(FILE, b64, 'utf-8');
-}
-
-function id(prefix: string = 'id'): string {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-}
+// Initialize database on module load
+initializeDatabase().catch((error) => {
+  logger.error('Failed to initialize database', { error });
+});
 
 export const guestStore = {
   // Users
-  createUser(input: Omit<User, 'id' | 'created_at' | 'updated_at'>): User {
-    const db = readDB();
-    const u: User = { id: id('usr'), created_at: Date.now(), updated_at: Date.now(), ...input };
-    db.users.push(u);
-    writeDB(db);
-    return u;
+  async createUser(input: Omit<User, 'id' | 'created_at' | 'updated_at'>): Promise<User> {
+    try {
+      return await userRepository.create(input);
+    } catch (error) {
+      logger.error('guestStore: failed to create user', error);
+      throw error;
+    }
   },
-  findUserByPhone(phone: string): User | undefined {
-    const db = readDB();
-    return db.users.find(u => u.phone_e164 === phone);
+  
+  async findUserByPhone(phone: string): Promise<User | undefined> {
+    try {
+      return await userRepository.findByPhone(phone);
+    } catch (error) {
+      logger.error('guestStore: failed to find user by phone', error);
+      return undefined;
+    }
   },
-  findUserById(user_id: string): User | undefined {
-    const db = readDB();
-    return db.users.find(u => u.id === user_id);
+  
+  async findUserById(user_id: string): Promise<User | undefined> {
+    try {
+      return await userRepository.findById(user_id);
+    } catch (error) {
+      logger.error('guestStore: failed to find user by ID', error);
+      return undefined;
+    }
   },
-  updateUserPassword(user_id: string, password_hash: string): User | undefined {
-    const db = readDB();
-    const user = db.users.find(u => u.id === user_id);
-    if (!user) return undefined;
-    user.password_hash = password_hash;
-    user.updated_at = Date.now();
-    writeDB(db);
-    return user;
+  
+  async updateUserPassword(user_id: string, password_hash: string): Promise<User | undefined> {
+    try {
+      return await userRepository.updatePassword(user_id, password_hash);
+    } catch (error) {
+      logger.error('guestStore: failed to update user password', error);
+      return undefined;
+    }
   },
 
   // Identity
-  upsertIdentity(user_id: string, type: IdentityType, rawValue: string): Identity {
-    const db = readDB();
-    const { hash, salt } = hashSensitive(rawValue);
-    const last4 = maskLast4(rawValue);
-    const existing = db.identities.find(i => i.user_id === user_id && i.type === type);
-    if (existing) {
-      existing.value_hash = hash; existing.salt = salt; existing.last4_mask = last4; existing.verified_at = Date.now();
-      writeDB(db);
-      return existing;
+  async upsertIdentity(user_id: string, type: IdentityType, rawValue: string): Promise<Identity> {
+    try {
+      const { hash, salt } = hashSensitive(rawValue);
+      const last4 = maskLast4(rawValue);
+      return await identityRepository.upsert(user_id, type, hash, salt, last4);
+    } catch (error) {
+      logger.error('guestStore: failed to upsert identity', error);
+      throw error;
     }
-    const rec: Identity = { user_id, type, value_hash: hash, salt, last4_mask: last4, verified_at: Date.now() };
-    db.identities.push(rec);
-    writeDB(db);
-    return rec;
   },
 
   // Booking
-  linkOrCreateBooking(params: Omit<Booking, 'id' | 'created_at' | 'last_name_hash' | 'last_name_salt' | 'last_name_plain_lower' | 'last_name_plain_lower_nows'> & { last_name?: string }): Booking {
-    const db = readDB();
-    const existing = params.reference ? db.bookings.find(b => b.reference === params.reference) : undefined;
-    if (existing) return existing;
-    let last_name_hash: string | undefined; let last_name_salt: string | undefined;
-    if (params.last_name) { const r = hashSensitive(params.last_name); last_name_hash = r.hash; last_name_salt = r.salt; }
-  const lnLower = params.last_name?.toLowerCase();
-  const lnNowhitespace = lnLower?.replace(/\s+/g, '');
-  const rec: Booking = { id: id('bkg'), created_at: Date.now(), source: params.source, reference: params.reference, start_date: params.start_date, end_date: params.end_date, user_id: params.user_id, last_name_hash, last_name_salt, last_name_token: lnLower ? hmacDeterministic(lnLower) : undefined, last_name_token_nows: lnNowhitespace ? hmacDeterministic(lnNowhitespace) : undefined };
-    db.bookings.push(rec);
-    writeDB(db);
-    return rec;
+  async linkOrCreateBooking(params: Omit<Booking, 'id' | 'created_at' | 'last_name_hash' | 'last_name_salt' | 'last_name_token' | 'last_name_token_nows'> & { last_name?: string }): Promise<Booking> {
+    try {
+      // Check if booking already exists
+      if (params.reference) {
+        const lnLower = params.last_name?.toLowerCase() || '';
+        const lnNowhitespace = lnLower.replace(/\s+/g, '');
+        const tokenLower = lnLower ? hmacDeterministic(lnLower) : '';
+        const tokenNoWs = lnNowhitespace ? hmacDeterministic(lnNowhitespace) : '';
+        
+        const existing = await bookingRepository.findByReferenceAndLastName(
+          params.reference,
+          tokenLower,
+          tokenNoWs
+        );
+        if (existing) return existing;
+      }
+      
+      let last_name_hash: string | undefined;
+      let last_name_salt: string | undefined;
+      
+      if (params.last_name) {
+        const r = hashSensitive(params.last_name);
+        last_name_hash = r.hash;
+        last_name_salt = r.salt;
+      }
+      
+      const lnLower = params.last_name?.toLowerCase();
+      const lnNowhitespace = lnLower?.replace(/\s+/g, '');
+      
+      return await bookingRepository.create({
+        source: params.source,
+        reference: params.reference,
+        start_date: params.start_date,
+        end_date: params.end_date,
+        user_id: params.user_id,
+        last_name_hash,
+        last_name_salt,
+        last_name_token: lnLower ? hmacDeterministic(lnLower) : undefined,
+        last_name_token_nows: lnNowhitespace ? hmacDeterministic(lnNowhitespace) : undefined
+      });
+    } catch (error) {
+      logger.error('guestStore: failed to link or create booking', error);
+      throw error;
+    }
   },
-  findBookingByReferenceAndLastName(reference: string, lastName: string): Booking | undefined {
-    const db = readDB();
-    const ln = lastName.toLowerCase();
-    const lnNows = ln.replace(/\s+/g, '');
-    const tokenLower = hmacDeterministic(ln);
-    const tokenNoWs = hmacDeterministic(lnNows);
-    // Accept matches where either stored token equals either input token variant
-    const cand = db.bookings.find((b) =>
-      b.reference === reference && (
-        b.last_name_token === tokenLower ||
-        b.last_name_token === tokenNoWs ||
-        b.last_name_token_nows === tokenLower ||
-        b.last_name_token_nows === tokenNoWs
-      )
-    );
-    return cand;
+  
+  async findBookingByReferenceAndLastName(reference: string, lastName: string): Promise<Booking | undefined> {
+    try {
+      const ln = lastName.toLowerCase();
+      const lnNows = ln.replace(/\s+/g, '');
+      const tokenLower = hmacDeterministic(ln);
+      const tokenNoWs = hmacDeterministic(lnNows);
+      
+      // Accept matches where either stored token equals either input token variant
+      return await bookingRepository.findByReferenceAndLastName(
+        reference,
+        tokenLower,
+        tokenNoWs
+      );
+    } catch (error) {
+      logger.error('guestStore: failed to find booking by reference and last name', error);
+      return undefined;
+    }
   },
-  findBookingById(id: string): Booking | undefined {
-    const db = readDB();
-    return db.bookings.find(b => b.id === id);
+  
+  async findBookingById(id: string): Promise<Booking | undefined> {
+    try {
+      return await bookingRepository.findById(id);
+    } catch (error) {
+      logger.error('guestStore: failed to find booking by ID', error);
+      return undefined;
+    }
   },
-  findEligibleBookingForUser(user_id: string, nowDateISO: string = new Date().toISOString().slice(0,10)): Booking | undefined {
-    const db = readDB();
-    const candidates = db.bookings.filter(b => b.user_id === user_id && b.end_date >= nowDateISO);
-    if (candidates.length === 0) return undefined;
-    // Prefer the nearest upcoming by start_date
-    candidates.sort((a, b) => (a.start_date.localeCompare(b.start_date)));
-    return candidates[0];
+  
+  async findEligibleBookingForUser(user_id: string, nowDateISO: string = new Date().toISOString().slice(0,10)): Promise<Booking | undefined> {
+    try {
+      return await bookingRepository.findEligibleForUser(user_id, nowDateISO);
+    } catch (error) {
+      logger.error('guestStore: failed to find eligible booking for user', error);
+      return undefined;
+    }
   },
 
   // Access
-  setAccess(user_id: string, booking_id: string, status: AccessStatus): BookingAccess {
-    const db = readDB();
-    const existing = db.access.find(a => a.user_id === user_id && a.booking_id === booking_id);
-    if (existing) { existing.status = status; existing.updated_at = Date.now(); writeDB(db); return existing; }
-    const rec: BookingAccess = { user_id, booking_id, status, created_at: Date.now(), updated_at: Date.now() };
-    db.access.push(rec); writeDB(db); return rec;
+  async setAccess(user_id: string, booking_id: string, status: AccessStatus): Promise<BookingAccess> {
+    try {
+      return await accessRepository.set(user_id, booking_id, status);
+    } catch (error) {
+      logger.error('guestStore: failed to set access', error);
+      throw error;
+    }
   },
 
   // Check-in completion (development store only)
-  upsertCheckinCompletion(booking_id: string, data: { arrival_time: string; special_requests?: string }): CheckinCompletionRec {
-    const db = readDB();
-    const existing = db.checkins.find(c => c.booking_id === booking_id);
-    if (existing) {
-      existing.arrival_time = data.arrival_time;
-      existing.special_requests = data.special_requests;
-      existing.accepted_at = Date.now();
-      writeDB(db);
-      return existing;
+  async upsertCheckinCompletion(booking_id: string, data: { arrival_time: string; special_requests?: string }): Promise<CheckinCompletionRec> {
+    try {
+      return await checkinRepository.upsert(booking_id, data.arrival_time, data.special_requests);
+    } catch (error) {
+      logger.error('guestStore: failed to upsert checkin completion', error);
+      throw error;
     }
-    const rec: CheckinCompletionRec = {
-      booking_id,
-      arrival_time: data.arrival_time,
-      special_requests: data.special_requests,
-      accepted_at: Date.now(),
-    };
-    db.checkins.push(rec);
-    writeDB(db);
-    return rec;
   },
-  getCheckinCompletionByBooking(booking_id: string): CheckinCompletionRec | undefined {
-    const db = readDB();
-    return db.checkins.find(c => c.booking_id === booking_id);
+  
+  async getCheckinCompletionByBooking(booking_id: string): Promise<CheckinCompletionRec | undefined> {
+    try {
+      return await checkinRepository.getByBookingId(booking_id);
+    } catch (error) {
+      logger.error('guestStore: failed to get checkin completion by booking', error);
+      return undefined;
+    }
   },
 
   // Refresh tokens (development store only)
-  issueRefreshToken(user_id: string, ttlDays = 60, opts?: { family_id?: string; device_hint?: string; ip_hint?: string }): { rec: GuestRefreshTokenRec; token: string } {
-    const db = readDB();
-    const token = crypto.randomBytes(32).toString('base64url');
-    const { hash, salt } = hashSensitive(token);
-    const family_id = opts?.family_id || id('rtfam');
-    const rec: GuestRefreshTokenRec = {
-      id: id('rt'),
-      user_id,
-      token_hash: hash,
-      salt,
-      family_id,
-      created_at: Date.now(),
-      expires_at: Date.now() + ttlDays * 24 * 60 * 60 * 1000,
-      device_hint: opts?.device_hint,
-      ip_hint: opts?.ip_hint,
-    };
-    db.refreshTokens.push(rec);
-    writeDB(db);
-    return { rec, token };
-  },
-  verifyRefreshToken(token: string): GuestRefreshTokenRec | undefined {
-    const db = readDB();
-    const now = Date.now();
-    for (const rec of db.refreshTokens) {
-      if (rec.revoked_at) continue;
-      if (rec.expires_at <= now) continue;
-      if (verifySensitive(token, rec.salt, rec.token_hash)) {
-        rec.last_used_at = now;
-        writeDB(db);
-        return rec;
-      }
+  async issueRefreshToken(user_id: string, ttlDays = 60, opts?: { family_id?: string; device_hint?: string; ip_hint?: string }): Promise<{ rec: GuestRefreshTokenRec; token: string }> {
+    try {
+      const token = crypto.randomBytes(32).toString('base64url');
+      const { hash, salt } = hashSensitive(token);
+      const family_id = opts?.family_id || `rtfam_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+      
+      const rec = await refreshTokenRepository.create(
+        user_id,
+        hash,
+        salt,
+        family_id,
+        Date.now() + ttlDays * 24 * 60 * 60 * 1000,
+        {
+          deviceId: opts?.device_hint,
+          ipHint: opts?.ip_hint
+        }
+      );
+      
+      return { rec, token };
+    } catch (error) {
+      logger.error('guestStore: failed to issue refresh token', error);
+      throw error;
     }
-    return undefined;
   },
-  revokeRefreshToken(idOrToken: string): boolean {
-    const db = readDB();
-    const now = Date.now();
-    let changed = false;
-    const byId = db.refreshTokens.find(r => r.id === idOrToken);
-    if (byId && !byId.revoked_at) { byId.revoked_at = now; changed = true; }
-    if (!byId) {
-      // try by plain token match
-      for (const rec of db.refreshTokens) {
-        if (rec.revoked_at) continue;
-        if (verifySensitive(idOrToken, rec.salt, rec.token_hash)) { rec.revoked_at = now; changed = true; break; }
+  
+  async verifyRefreshToken(token: string): Promise<GuestRefreshTokenRec | undefined> {
+    try {
+      const db = await getDatabase();
+      const now = Date.now();
+      const rows = await db.all(
+        'SELECT * FROM refresh_tokens WHERE revoked_at IS NULL AND expires_at > ?',
+        now
+      );
+      for (const row of rows as GuestRefreshTokenRec[]) {
+        if (verifySensitive(token, row.salt, row.token_hash)) {
+          await db.run('UPDATE refresh_tokens SET last_used_at = ? WHERE id = ?', now, row.id);
+          return row;
+        }
       }
+      return undefined;
+    } catch (error) {
+      logger.error('guestStore: failed to verify refresh token', error);
+      return undefined;
     }
-    if (changed) writeDB(db);
-    return changed;
   },
-  rotateRefreshToken(oldToken: string, ttlDays = 60): { old?: GuestRefreshTokenRec; rec?: GuestRefreshTokenRec; token?: string } {
-    const db = readDB();
-    const old = this.verifyRefreshToken(oldToken);
-    if (!old) return {};
-    old.revoked_at = Date.now();
-    writeDB(db);
-    const { rec, token } = this.issueRefreshToken(old.user_id, ttlDays, { family_id: old.family_id, device_hint: old.device_hint, ip_hint: old.ip_hint });
-    rec.rotated_from_id = old.id;
-    const db2 = readDB();
-    const idx = db2.refreshTokens.findIndex(r => r.id === rec.id);
-    if (idx >= 0) { db2.refreshTokens[idx] = rec; writeDB(db2); }
-    return { old, rec, token };
+  
+  async revokeRefreshToken(idOrToken: string): Promise<boolean> {
+    try {
+      // Try to revoke by ID first
+      const byIdResult = await refreshTokenRepository.revoke(idOrToken);
+      if (byIdResult) return true;
+      
+      // If that fails, try by token hash
+      const { hash } = hashSensitive(idOrToken);
+      const db = await getDatabase();
+      const row = await db.get('SELECT id FROM refresh_tokens WHERE token_hash = ?', hash);
+      
+      if (row) {
+        return await refreshTokenRepository.revoke(row.id);
+      }
+      
+      return false;
+    } catch (error) {
+      logger.error('guestStore: failed to revoke refresh token', error);
+      return false;
+    }
   },
-  purgeExpiredRefreshTokens(maxAgeDaysPastExpiry = 30): number {
-    const db = readDB();
-    const cutoff = Date.now() - maxAgeDaysPastExpiry * 24 * 60 * 60 * 1000;
-    const before = db.refreshTokens.length;
-    db.refreshTokens = db.refreshTokens.filter(r => r.expires_at > cutoff);
-    const removed = before - db.refreshTokens.length;
-    if (removed > 0) writeDB(db);
-    return removed;
+  
+  async rotateRefreshToken(oldToken: string, ttlDays = 60): Promise<{ old?: GuestRefreshTokenRec; rec?: GuestRefreshTokenRec; token?: string }> {
+    try {
+      const old = await this.verifyRefreshToken(oldToken);
+      if (!old) return {};
+      
+      // Revoke the old token
+      await refreshTokenRepository.revoke(old.id);
+      
+      // Issue a new token
+      const { rec, token } = await this.issueRefreshToken(old.user_id, ttlDays, { 
+        family_id: old.family_id, 
+        device_hint: old.device_hint, 
+        ip_hint: old.ip_hint 
+      });
+      
+      rec.rotated_from_id = old.id;
+      
+      // Update the new token record
+      const db = await getDatabase();
+      await db.run(
+        'UPDATE refresh_tokens SET rotated_from_id = ? WHERE id = ?',
+        old.id,
+        rec.id
+      );
+      
+      return { old, rec, token };
+    } catch (error) {
+      logger.error('guestStore: failed to rotate refresh token', error);
+      return {};
+    }
   },
+  
+  async purgeExpiredRefreshTokens(maxAgeDaysPastExpiry = 30): Promise<number> {
+    try {
+      return await refreshTokenRepository.purgeExpired(maxAgeDaysPastExpiry);
+    } catch (error) {
+      logger.error('guestStore: failed to purge expired refresh tokens', error);
+      return 0;
+    }
+  },
+  
   // DSAR helpers (read-only)
-  listAccessByUser(user_id: string): BookingAccess[] {
-    const db = readDB();
-    return db.access.filter(a => a.user_id === user_id);
+  async listAccessByUser(user_id: string): Promise<BookingAccess[]> {
+    try {
+      return await accessRepository.listByUser(user_id);
+    } catch (error) {
+      logger.error('guestStore: failed to list access by user', error);
+      return [];
+    }
   },
 
   // Admin helpers - get all data for export/analysis
-  getAllBookings(): Booking[] {
-    const db = readDB();
-    return db.bookings || [];
+  async getAllBookings(): Promise<Booking[]> {
+    try {
+      return await bookingRepository.getAll();
+    } catch (error) {
+      logger.error('guestStore: failed to get all bookings', error);
+      return [];
+    }
   },
 
-  getAllUsers(): User[] {
-    const db = readDB();
-    return db.users || [];
+  async getAllUsers(): Promise<User[]> {
+    try {
+      return await userRepository.getAll();
+    } catch (error) {
+      logger.error('guestStore: failed to get all users', error);
+      return [];
+    }
   },
 
-  getAllIdentities(): Identity[] {
-    const db = readDB();
-    return db.identities || [];
+  async getAllIdentities(): Promise<Identity[]> {
+    try {
+      return await identityRepository.getAll();
+    } catch (error) {
+      logger.error('guestStore: failed to get all identities', error);
+      return [];
+    }
   },
 
-  getAllCheckins(): CheckinCompletionRec[] {
-    const db = readDB();
-    return db.checkins || [];
+  async getAllCheckins(): Promise<CheckinCompletionRec[]> {
+    try {
+      return await checkinRepository.getAll();
+    } catch (error) {
+      logger.error('guestStore: failed to get all checkins', error);
+      return [];
+    }
   },
 
-  getAllAccess(): BookingAccess[] {
-    const db = readDB();
-    return db.access || [];
+  async getAllAccess(): Promise<BookingAccess[]> {
+    try {
+      return await accessRepository.getAll();
+    } catch (error) {
+      logger.error('guestStore: failed to get all access records', error);
+      return [];
+    }
   },
 };
-
-function safeDecryptPhone(enc: string): string {
-  try { return decryptString(enc); } catch { return ''; }
-}

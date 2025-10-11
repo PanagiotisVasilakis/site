@@ -14,10 +14,10 @@ describe('Booking lookup service', () => {
   });
 
   it('finds booking by reference + last name (case/spacing resilient)', async () => {
-    const user = guestStore.createUser({ phone_e164: '+306981234567', country_origin: 'GR' });
+  const user = await guestStore.createUser({ phone_e164: '+306981234567', country_origin: 'GR' });
     const start = today(5); const end = today(10);
     const uniqueRef = 'ABC' + Math.random().toString(36).slice(2, 8).toUpperCase();
-    const booking = guestStore.linkOrCreateBooking({ source: 'EXTERNAL', reference: uniqueRef, start_date: start, end_date: end, user_id: user.id, last_name: 'Papadopoulos' });
+  const booking = await guestStore.linkOrCreateBooking({ source: 'EXTERNAL', reference: uniqueRef, start_date: start, end_date: end, user_id: user.id, last_name: 'Papadopoulos' });
 
     const found1 = await bookingLookup.lookupByReference({ bookingRef: uniqueRef, lastName: 'papadopoulos' });
     expect(found1?.id).toBe(booking.id);
@@ -28,11 +28,11 @@ describe('Booking lookup service', () => {
 
   it('finds booking by phone + upcoming window', async () => {
     const uniquePhone = '+1' + Math.floor(Math.random() * 1e10).toString().padStart(10, '0');
-    const user = guestStore.createUser({ phone_e164: uniquePhone, country_origin: 'ABROAD' });
+  const user = await guestStore.createUser({ phone_e164: uniquePhone, country_origin: 'ABROAD' });
     const upcomingStart = today(1); const upcomingEnd = today(3);
     const pastStart = today(-10); const pastEnd = today(-5);
-    guestStore.linkOrCreateBooking({ source: 'ONSITE', start_date: pastStart, end_date: pastEnd, user_id: user.id });
-    const incoming = guestStore.linkOrCreateBooking({ source: 'ONSITE', start_date: upcomingStart, end_date: upcomingEnd, user_id: user.id });
+  await guestStore.linkOrCreateBooking({ source: 'ONSITE', start_date: pastStart, end_date: pastEnd, user_id: user.id });
+  const incoming = await guestStore.linkOrCreateBooking({ source: 'ONSITE', start_date: upcomingStart, end_date: upcomingEnd, user_id: user.id });
 
     const found = await bookingLookup.lookupByPhone({ phone: uniquePhone });
     expect(found?.id).toBe(incoming.id);

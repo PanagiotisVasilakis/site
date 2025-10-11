@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import crypto from 'node:crypto';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
-import { withErrorHandler, validateRequestBody, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
+import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode, ValidationError } from '@/lib/apiErrorHandler';
 import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import { isValidAFM } from '@/lib/afm';
 import { guestStore } from '@/lib/guestDataStore';
@@ -28,7 +29,7 @@ const baseSignUpSchema = z.object({
   mode: z.literal('signup'),
   origin: originEnum,
   phone: phoneE164,
-  password: passwordSchema,
+  password: passwordSchema.optional(),
   bookingRef: z.string().trim().min(3).max(64).optional(),
   lastName: z.string().trim().min(1).max(100).optional(),
   remember: z.boolean().optional(),
@@ -36,7 +37,10 @@ const baseSignUpSchema = z.object({
 
 const signUpSchemaGR = baseSignUpSchema.extend({
   origin: z.literal('GR'),
-  afm: z.string().regex(/^\d{9}$/),
+  afm: z
+    .string()
+    .regex(/^\d{9}$/, 'AFM must contain exactly 9 digits')
+    .refine((value) => isValidAFM(value), 'Invalid AFM checksum'),
 });
 
 const signUpSchemaAbroad = baseSignUpSchema.extend({
@@ -45,7 +49,6 @@ const signUpSchemaAbroad = baseSignUpSchema.extend({
 });
 
 const signUpSchema = z.union([signUpSchemaGR, signUpSchemaAbroad]);
-const unionSchema = z.union([signInSchema, signUpSchema]);
 
 export const dynamic = 'force-dynamic';
 
@@ -59,8 +62,21 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   const early = guard(request);
   if (early) return early;
 
-  const parseBody = validateRequestBody(unionSchema);
-  const body = await parseBody(request);
+  let rawBody: unknown;
+  try {
+    rawBody = await request.json();
+  } catch {
+    throw new ApiError(ApiErrorCode.BAD_REQUEST, 'Invalid JSON in request body');
+  }
+
+  const rawRecord = typeof rawBody === 'object' && rawBody !== null ? rawBody as Record<string, unknown> : {};
+  const mode = rawRecord.mode === 'signin' ? 'signin' : 'signup';
+  const schema = mode === 'signin' ? signInSchema : signUpSchema;
+  const parseResult = schema.safeParse({ ...rawRecord, mode });
+  if (!parseResult.success) {
+    throw new ValidationError(parseResult.error.issues);
+  }
+  const body = parseResult.data;
 
   const lang = request.cookies.get('lang')?.value;
   const effLocale = lang && (locales as readonly string[]).includes(lang) ? lang : (defaultLocale as string);
@@ -68,9 +84,9 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   // **SIGN-IN MODE**: Only phone + password
   if (body.mode === 'signin') {
     // Find user by phone
-    const user = guestStore.findUserByPhone(body.phone);
+    const user = await guestStore.findUserByPhone(body.phone);
     if (!user || !user.password_hash) {
-      throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Invalid phone number or password', { 
+      throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Invalid phone number or password', {
         fields: { phone: 'No account found with this phone number' }
       });
     }
@@ -84,7 +100,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     }
 
     // Find an eligible booking for this user
-    const booking = guestStore.findEligibleBookingForUser(user.id);
+    const booking = await guestStore.findEligibleBookingForUser(user.id);
     if (!booking) {
       throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'No active booking found for this account');
     }
@@ -94,7 +110,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     const cookie = createSessionCookie(token);
     elogger.info('session.issued', { correlationId: elogger.getContext()?.correlationId, user_id: user.id, booking_id: booking.id, source: 'signin', remember: !!body.remember });
     metrics.counter('session.issued', 1, { source: 'signin' });
-    
+
     const res = createSuccessResponse({ redirect: `/${effLocale}/check-in`, bookingId: booking.id });
     res.cookies.set('portal_last_signin', '1', {
       path: '/',
@@ -104,57 +120,63 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       maxAge: 5 * 24 * 60 * 60,
     });
     res.cookies.set(cookie.name, cookie.value, cookie.options);
-    
+
     // Handle Remember Me with longer refresh token
     if (body.remember) {
-      const issued = guestStore.issueRefreshToken(user.id, 30); // 30 days
+      const issued = await guestStore.issueRefreshToken(user.id, 30); // 30 days
       const rtCookie = createRefreshCookie(issued.token);
       res.cookies.set(rtCookie.name, rtCookie.value, rtCookie.options);
     }
-    
-    return res as NextResponse;
+
+    return res;
   }
 
   // **SIGN-UP MODE**: All fields + password
-  // Check if user already exists
-  let user = guestStore.findUserByPhone(body.phone);
-  if (user && user.password_hash) {
-    throw new ApiError(ApiErrorCode.CONFLICT, 'Account already exists with this phone number', {
-      fields: { phone: 'This phone number is already registered. Please sign in instead.' }
-    });
-  }
+  // Resolve existing user and reconcile password state
+  let user = await guestStore.findUserByPhone(body.phone);
 
-  // Hash the password
-  const saltRounds = 10;
-  const password_hash = await bcrypt.hash(body.password, saltRounds);
-
-  // Create or update user
   if (!user) {
-    user = guestStore.createUser({
+    const saltRounds = 10;
+    const passwordToStore = body.password ?? crypto.randomBytes(12).toString('base64url');
+    const password_hash = await bcrypt.hash(passwordToStore, saltRounds);
+    user = await guestStore.createUser({
       phone_e164: body.phone,
       country_origin: body.origin,
       password_hash,
     });
-  } else {
-    // Update existing user with password
-    user = guestStore.updateUserPassword(user.id, password_hash)!;
+  } else if (!user.password_hash) {
+    const saltRounds = 10;
+    const passwordToStore = body.password ?? crypto.randomBytes(12).toString('base64url');
+    const password_hash = await bcrypt.hash(passwordToStore, saltRounds);
+    const updatedUser = await guestStore.updateUserPassword(user.id, password_hash);
+    if (!updatedUser) {
+      throw new ApiError(ApiErrorCode.INTERNAL_ERROR, 'Unable to update user password');
+    }
+    user = updatedUser;
+  } else if (body.password) {
+    const matches = await bcrypt.compare(body.password, user.password_hash);
+    if (!matches) {
+      throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Incorrect password for existing account', {
+        fields: { password: 'Password does not match existing account. Please sign in or reset your password.' }
+      });
+    }
   }
 
   // Upsert identity
   if (body.origin === 'GR') {
-    guestStore.upsertIdentity(user.id, 'AFM', body.afm);
+    await guestStore.upsertIdentity(user.id, 'AFM', body.afm);
   } else {
-    guestStore.upsertIdentity(user.id, 'PASSPORT', body.passport);
+    await guestStore.upsertIdentity(user.id, 'PASSPORT', body.passport);
   }
 
   // Booking lookup/link
   const nowISO = new Date().toISOString().slice(0, 10);
-  const endDate = new Date(Date.now() + 2*24*60*60*1000).toISOString().slice(0, 10);
+  const endDate = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   let booking = body.bookingRef && body.lastName
-    ? guestStore.findBookingByReferenceAndLastName(body.bookingRef, body.lastName)
+    ? await guestStore.findBookingByReferenceAndLastName(body.bookingRef, body.lastName)
     : undefined;
   if (!booking) {
-    booking = guestStore.linkOrCreateBooking({
+    booking = await guestStore.linkOrCreateBooking({
       source: body.bookingRef ? 'EXTERNAL' : 'ONSITE',
       reference: body.bookingRef,
       start_date: nowISO,
@@ -165,14 +187,14 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   }
 
   // Grant access
-  guestStore.setAccess(user.id, booking.id, 'VERIFIED');
+  await guestStore.setAccess(user.id, booking.id, 'VERIFIED');
 
   // Issue session
   const token = signGuestSession({ user: { id: user.id }, booking: { id: booking.id } });
   const cookie = createSessionCookie(token);
   elogger.info('session.issued', { correlationId: elogger.getContext()?.correlationId, user_id: user.id, booking_id: booking.id, source: booking.source, remember: !!body.remember });
   metrics.counter('session.issued', 1, { source: booking.source });
-  
+
   const res = createSuccessResponse({ redirect: `/${effLocale}/check-in`, bookingId: booking.id });
   res.cookies.set('portal_last_signin', '1', {
     path: '/',
@@ -182,13 +204,13 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     maxAge: 5 * 24 * 60 * 60,
   });
   res.cookies.set(cookie.name, cookie.value, cookie.options);
-  
+
   // Handle Remember Me with longer refresh token
   if (body.remember) {
-    const issued = guestStore.issueRefreshToken(user.id, 30); // 30 days
+    const issued = await guestStore.issueRefreshToken(user.id, 30); // 30 days
     const rtCookie = createRefreshCookie(issued.token);
     res.cookies.set(rtCookie.name, rtCookie.value, rtCookie.options);
   }
-  
-  return res as NextResponse;
+
+  return res;
 });

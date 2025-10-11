@@ -47,12 +47,13 @@ export class GuestDataExport {
   /**
    * Get all bookings with full details
    */
-  getAllBookings(): BookingExport[] {
+  async getAllBookings(): Promise<BookingExport[]> {
     try {
-      const bookings = this.getAllBookingsRaw();
-      return bookings
-        .map((booking) => this.getBookingDetails(booking.id))
-        .filter(isDefined);
+      const bookings = await this.getAllBookingsRaw();
+      const detailed = await Promise.all(
+        bookings.map((booking) => this.getBookingDetails(booking.id))
+      );
+      return detailed.filter(isDefined);
     } catch (error) {
       logger.error('Failed to get all bookings', { error });
       return [];
@@ -62,15 +63,15 @@ export class GuestDataExport {
   /**
    * Get booking by reference number
    */
-  getBookingByReference(reference: string, lastName: string): BookingExport | null {
+  async getBookingByReference(reference: string, lastName: string): Promise<BookingExport | null> {
     try {
-      const booking = guestStore.findBookingByReferenceAndLastName(reference, lastName);
+      const booking = await guestStore.findBookingByReferenceAndLastName(reference, lastName);
       if (!booking) {
         logger.info('Booking not found', { reference, lastName: lastName.substring(0, 2) + '***' });
         return null;
       }
 
-      return this.getBookingDetails(booking.id);
+      return await this.getBookingDetails(booking.id);
     } catch (error) {
       logger.error('Failed to get booking by reference', { error, reference });
       return null;
@@ -80,15 +81,15 @@ export class GuestDataExport {
   /**
    * Get booking by booking ID
    */
-  getBookingById(bookingId: string): BookingExport | null {
+  async getBookingById(bookingId: string): Promise<BookingExport | null> {
     try {
-      const booking = guestStore.findBookingById(bookingId);
+      const booking = await guestStore.findBookingById(bookingId);
       if (!booking) {
         logger.info('Booking not found', { bookingId });
         return null;
       }
 
-      return this.getBookingDetails(bookingId);
+      return await this.getBookingDetails(bookingId);
     } catch (error) {
       logger.error('Failed to get booking by ID', { error, bookingId });
       return null;
@@ -98,12 +99,13 @@ export class GuestDataExport {
   /**
    * Get all bookings for a specific user
    */
-  getBookingsByUser(userId: string): BookingExport[] {
+  async getBookingsByUser(userId: string): Promise<BookingExport[]> {
     try {
-      const bookings = this.getAllBookingsRaw().filter((b) => b.user_id === userId);
-      return bookings
-        .map((booking) => this.getBookingDetails(booking.id))
-        .filter(isDefined);
+      const bookings = (await this.getAllBookingsRaw()).filter((b) => b.user_id === userId);
+      const detailed = await Promise.all(
+        bookings.map((booking) => this.getBookingDetails(booking.id))
+      );
+      return detailed.filter(isDefined);
     } catch (error) {
       logger.error('Failed to get bookings by user', { error, userId });
       return [];
@@ -113,15 +115,15 @@ export class GuestDataExport {
   /**
    * Get booking by user phone number
    */
-  getBookingsByPhone(phone: string): BookingExport[] {
+  async getBookingsByPhone(phone: string): Promise<BookingExport[]> {
     try {
-      const user = guestStore.findUserByPhone(phone);
+      const user = await guestStore.findUserByPhone(phone);
       if (!user) {
         logger.info('User not found by phone', { phone: phone.substring(0, 3) + '***' });
         return [];
       }
 
-      return this.getBookingsByUser(user.id);
+      return await this.getBookingsByUser(user.id);
     } catch (error) {
       logger.error('Failed to get bookings by phone', { error });
       return [];
@@ -131,28 +133,29 @@ export class GuestDataExport {
   /**
    * Get detailed booking information
    */
-  getBookingDetails(bookingId: string): BookingExport | null {
+  async getBookingDetails(bookingId: string): Promise<BookingExport | null> {
     try {
-      const booking = guestStore.findBookingById(bookingId);
+      const booking = await guestStore.findBookingById(bookingId);
       if (!booking) return null;
 
-      const user = booking.user_id ? guestStore.findUserById(booking.user_id) : null;
+      const user = booking.user_id ? await guestStore.findUserById(booking.user_id) : null;
       if (!user) return null;
 
       // Get identities
-      const identities = this.getUserIdentities(user.id);
+      const identities = await this.getUserIdentities(user.id);
 
       // Get access records
-      const access = guestStore.listAccessByUser(user.id)
-        .filter(a => a.booking_id === bookingId)
-        .map(a => ({
-          status: a.status,
-          createdAt: new Date(a.created_at),
-          updatedAt: new Date(a.updated_at),
+      const accessRecords = await guestStore.listAccessByUser(user.id);
+      const access = accessRecords
+        .filter((record) => record.booking_id === bookingId)
+        .map((record) => ({
+          status: record.status,
+          createdAt: new Date(record.created_at),
+          updatedAt: new Date(record.updated_at),
         }));
 
       // Get checkin completion
-      const checkin = guestStore.getCheckinCompletionByBooking(bookingId);
+      const checkin = await guestStore.getCheckinCompletionByBooking(bookingId);
 
       const result: BookingExport = {
         booking: {
@@ -190,9 +193,9 @@ export class GuestDataExport {
   /**
    * Export booking data to JSON file
    */
-  exportBookingToFile(bookingId: string, filePath?: string): string | null {
+  async exportBookingToFile(bookingId: string, filePath?: string): Promise<string | null> {
     try {
-      const bookingData = this.getBookingDetails(bookingId);
+      const bookingData = await this.getBookingDetails(bookingId);
       if (!bookingData) {
         logger.error('Booking not found for export', { bookingId });
         return null;
@@ -220,9 +223,9 @@ export class GuestDataExport {
   /**
    * Search bookings by date range
    */
-  searchBookingsByDateRange(startDate: string, endDate?: string): BookingExport[] {
+  async searchBookingsByDateRange(startDate: string, endDate?: string): Promise<BookingExport[]> {
     try {
-      const bookings = this.getAllBookingsRaw().filter((booking) => {
+      const bookings = (await this.getAllBookingsRaw()).filter((booking) => {
         const bookingStart = booking.start_date;
         const bookingEnd = booking.end_date;
         
@@ -234,9 +237,11 @@ export class GuestDataExport {
         }
       });
 
-      return bookings
-        .map((booking) => this.getBookingDetails(booking.id))
-        .filter(isDefined);
+      const detailed = await Promise.all(
+        bookings.map((booking) => this.getBookingDetails(booking.id))
+      );
+
+      return detailed.filter(isDefined);
     } catch (error) {
       logger.error('Failed to search bookings by date', { error, startDate, endDate });
       return [];
@@ -246,19 +251,21 @@ export class GuestDataExport {
   /**
    * Get summary statistics
    */
-  getStatistics(): {
+  async getStatistics(): Promise<{
     totalBookings: number;
     totalUsers: number;
     totalIdentities: number;
     totalCheckins: number;
     bookingsBySource: Record<string, number>;
     bookingsByStatus: Record<string, number>;
-  } {
+  }> {
     try {
-      const bookings = this.getAllBookingsRaw();
-      const users = this.getAllUsersRaw();
-      const identities = this.getAllIdentitiesRaw();
-      const checkins = this.getAllCheckinsRaw();
+      const [bookings, users, identities, checkins] = await Promise.all([
+        this.getAllBookingsRaw(),
+        this.getAllUsersRaw(),
+        this.getAllIdentitiesRaw(),
+        this.getAllCheckinsRaw(),
+      ]);
 
       const bookingsBySource: Record<string, number> = {};
       const bookingsByStatus: Record<string, number> = {};
@@ -302,40 +309,41 @@ export class GuestDataExport {
   }
 
   // Private helper methods
-  private getAllBookingsRaw(): Booking[] {
+  private async getAllBookingsRaw(): Promise<Booking[]> {
     try {
-      return guestStore.getAllBookings() || [];
+      return await guestStore.getAllBookings();
     } catch {
       return [];
     }
   }
 
-  private getAllUsersRaw(): User[] {
+  private async getAllUsersRaw(): Promise<User[]> {
     try {
-      return guestStore.getAllUsers() || [];
+      return await guestStore.getAllUsers();
     } catch {
       return [];
     }
   }
 
-  private getAllIdentitiesRaw(): Identity[] {
+  private async getAllIdentitiesRaw(): Promise<Identity[]> {
     try {
-      return guestStore.getAllIdentities() || [];
+      return await guestStore.getAllIdentities();
     } catch {
       return [];
     }
   }
 
-  private getAllCheckinsRaw(): CheckinCompletionRec[] {
+  private async getAllCheckinsRaw(): Promise<CheckinCompletionRec[]> {
     try {
-      return guestStore.getAllCheckins() || [];
+      return await guestStore.getAllCheckins();
     } catch {
       return [];
     }
   }
 
-  private getUserIdentities(userId: string): BookingExport['identities'] {
-    return this.getAllIdentitiesRaw()
+  private async getUserIdentities(userId: string): Promise<BookingExport['identities']> {
+    const identities = await this.getAllIdentitiesRaw();
+    return identities
       .filter((identity) => identity.user_id === userId)
       .map((identity) => ({
         type: identity.type,

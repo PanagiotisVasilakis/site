@@ -13,18 +13,21 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 
   const session = await getGuestSessionFromCookies();
   const sessionUserId = session?.user?.id;
-  const sessionUser = sessionUserId ? guestStore.findUserById(sessionUserId) : undefined;
+  const sessionUser = sessionUserId ? await guestStore.findUserById(sessionUserId) : undefined;
 
   // Allow admin to query specific user by user_id or by phone
   const url = new URL(req.url);
   const userIdQuery = url.searchParams.get('user_id') || undefined;
   const phoneQuery = url.searchParams.get('phone') || undefined;
 
-  const subject = userIdQuery
-    ? guestStore.findUserById(userIdQuery)
-    : phoneQuery
-      ? guestStore.findUserByPhone(phoneQuery)
-      : sessionUser;
+  let subject;
+  if (userIdQuery) {
+    subject = await guestStore.findUserById(userIdQuery);
+  } else if (phoneQuery) {
+    subject = await guestStore.findUserByPhone(phoneQuery);
+  } else {
+    subject = sessionUser;
+  }
 
   if (!subject) {
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'No subject found (missing session or invalid query)', undefined, correlationId);
@@ -36,11 +39,16 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   }
 
   // Collect footprint
-  const eligible = guestStore.findEligibleBookingForUser(subject.id);
+  const eligible = await guestStore.findEligibleBookingForUser(subject.id);
   const bookings = [eligible].filter(Boolean) as NonNullable<typeof eligible>[];
 
   // Access records for this user (store helper)
-  const subjectAccess = guestStore.listAccessByUser(subject.id).map(a => ({ booking_id: a.booking_id, status: a.status, updated_at: a.updated_at }));
+  const subjectAccessRecords = await guestStore.listAccessByUser(subject.id);
+  const subjectAccess = subjectAccessRecords.map(a => ({ 
+    booking_id: a.booking_id, 
+    status: a.status, 
+    updated_at: a.updated_at 
+  }));
 
   // Sessions for user
   // guestDataStore exposes sessions array through DB, but no direct getter; skip listing raw tokens here
@@ -53,7 +61,13 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
       origin: subject.country_origin,
     },
     // Minimal booking footprint (IDs that can be referenced elsewhere)
-    bookings: bookings.map(b => ({ id: b.id, source: b.source, start_date: b.start_date, end_date: b.end_date, reference: b.reference })),
+    bookings: bookings.map(b => ({ 
+      id: b.id, 
+      source: b.source, 
+      start_date: b.start_date, 
+      end_date: b.end_date, 
+      reference: b.reference 
+    })),
     access: subjectAccess,
     generated_at: new Date().toISOString(),
   };

@@ -17,10 +17,10 @@ describe('crypto utils', () => {
 });
 
 describe('guest data store (dev)', () => {
-  it('creates user and links identity', () => {
-    const user = guestStore.createUser({ phone_e164: '+3000000000', country_origin: 'GR' });
-    const id = guestStore.upsertIdentity(user.id, 'AFM', '123456789');
+  it('creates user and links identity', async () => {
+    const user = await guestStore.createUser({ phone_e164: '+3000000000', country_origin: 'GR' });
+    const id = await guestStore.upsertIdentity(user.id, 'AFM', '123456789');
     expect(id.user_id).toBe(user.id);
-    expect(id.last4_mask.endsWith('6789')).toBe(true);
+    expect(id.last4_mask?.endsWith('6789')).toBe(true);
   });
 });

@@ -1,5 +1,3 @@
-import { describe, it, expect, vi, expectTypeOf } from 'vitest';
-
 import React from 'react';
 import { validateOpenAPISpec } from '@/lib/openapi';
 import { DevStoreBookingLookup, type Booking, type LookupByPhoneParams, type LookupByRefParams, type BookingLookupProvider } from '@/lib/bookingLookup';
@@ -94,7 +92,8 @@ describe('public API surface remains reachable', () => {
     expect(locales.includes(defaultLocale)).toBe(true);
 
   const exporter = new GuestDataExport();
-  expect(Array.isArray(exporter.getAllBookings())).toBe(true);
+  const exportedBookings = await exporter.getAllBookings();
+  expect(Array.isArray(exportedBookings)).toBe(true);
     resetFunnel();
     expect(typeof categorizeReason).toBe('function');
   tracker.portalOpened('test');

@@ -1,6 +1,6 @@
 import { locales, type Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
-import { housePhotos, housePhotosByRoom, type HousePhotoRoomKey } from '@/data/housePhotos';
+import { housePhotosByRoom, type HousePhotoRoomKey } from '@/data/housePhotos';
 import ApartmentCinematic from '@/components/ApartmentCinematic';
 import type { ApartmentPhotoWithAlt } from '@/types/apartment';
 

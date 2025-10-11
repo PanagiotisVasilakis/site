@@ -197,6 +197,8 @@ export type Dictionary = {
     tvDetail?: string;
   };
   portal?: {
+    introTitle?: string;
+    introSubtitle?: string;
     signInTitle: string;
     signUpTitle?: string;
     originQuestion: string;
@@ -398,6 +400,8 @@ const dict: Record<Locale, Dictionary> = {
       travelPrompt: "Tap a marker to calculate travel time."
     },
     portal: {
+      introTitle: "How can we help with your stay?",
+      introSubtitle: "Choose what you would like to do next.",
       signInTitle: "Sign‑in",
       signUpTitle: "Sign‑up",
       originQuestion: "Where are you coming from?",
@@ -666,6 +670,8 @@ const dict: Record<Locale, Dictionary> = {
       travelPrompt: "Πατήστε έναν δείκτη για να υπολογίσουμε τον χρόνο διαδρομής."
     },
     portal: {
+      introTitle: "Πώς μπορούμε να βοηθήσουμε με τη διαμονή σας;",
+      introSubtitle: "Επιλέξτε τι θέλετε να κάνετε στη συνέχεια.",
       signInTitle: "Σύνδεση",
       signUpTitle: "Εγγραφή",
       originQuestion: "Από πού έρχεστε;",

@@ -20,11 +20,11 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   let booking: { id?: string; reference?: string; start_date?: string; end_date?: string; source?: Booking['source'] } | undefined = session?.booking as { id?: string } | undefined;
   let completion: { arrivalTime: string; specialRequests?: string; acceptedAt: number } | null = null;
   if (booking?.id) {
-    const b = guestStore.findBookingById(booking.id as string);
+    const b = await guestStore.findBookingById(booking.id as string);
     if (b) {
       booking = { ...booking, reference: b.reference, start_date: b.start_date, end_date: b.end_date, source: b.source };
     }
-  const c = guestStore.getCheckinCompletionByBooking(booking.id as string);
+  const c = await guestStore.getCheckinCompletionByBooking(booking.id as string);
     if (c) completion = { arrivalTime: c.arrival_time, specialRequests: c.special_requests, acceptedAt: c.accepted_at };
   }
   const payload = { user: session?.user, booking, completion };

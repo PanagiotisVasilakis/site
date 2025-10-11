@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { withErrorHandler, validateRequestBody, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
+import { withErrorHandler, validateRequestBody, createSuccessResponse } from '@/lib/apiErrorHandler';
 import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -50,7 +50,8 @@ export const dynamic = 'force-dynamic';
 // GET: Retrieve current preferences
 export const GET = withErrorHandler(async (request: NextRequest) => {
   const prefs = readPreferences();
-  return createSuccessResponse(prefs);
+  const correlationId = request.headers.get('x-correlation-id') ?? undefined;
+  return createSuccessResponse(prefs, undefined, correlationId);
 });
 
 // POST: Update preferences (no auth required - user-friendly)
@@ -71,8 +72,10 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   writePreferences(prefs);
 
+  const correlationId = request.headers.get('x-correlation-id') ?? undefined;
+
   return createSuccessResponse({
     message: 'Check-in preferences updated successfully',
     preferences: prefs,
-  });
+  }, undefined, correlationId);
 });

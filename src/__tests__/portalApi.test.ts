@@ -32,7 +32,7 @@ describe('Portal API flow', () => {
       lastName: 'Doe',
       remember: false,
     });
-  const res = await POST(req as any, { params: Promise.resolve({}) } as any);
+  const res = await POST(req as any, { params: {} } as any);
     expect(res.status).toBe(422);
     const json = await res.json();
     expect(json?.error?.code || json?.error).toBeDefined();
@@ -52,7 +52,7 @@ describe('Portal API flow', () => {
       lastName: 'Papadopoulos',
       remember: true,
     });
-  const res1 = await verifyMod.POST(req1 as any, { params: Promise.resolve({}) } as any);
+  const res1 = await verifyMod.POST(req1 as any, { params: {} } as any);
     expect(res1.status).toBe(200);
     const cookies: string[] = [];
     res1.headers.forEach((value: string, key: string) => { if (key.toLowerCase() === 'set-cookie') cookies.push(value); });
@@ -68,7 +68,7 @@ describe('Portal API flow', () => {
     // Refresh GET with redirect
   const { GET: refreshGET } = await import('../app/api/portal/refresh/route');
   const req3 = makeReq('/api/portal/refresh?next=/en/check-in', { cookies: { guest_rt: refreshToken } });
-  const res3 = await refreshGET(req3 as any, { params: Promise.resolve({}) } as any);
+  const res3 = await refreshGET(req3 as any, { params: {} } as any);
     expect([302, 307, 308]).toContain(res3.status);
     const loc = res3.headers.get('location') || res3.headers.get('Location');
     expect(loc).toBe('/en/check-in');
@@ -76,7 +76,7 @@ describe('Portal API flow', () => {
     // Logout clears cookies
   const { POST: logout } = await import('../app/api/portal/logout/route');
     const req4 = makeReq('/api/portal/logout', { method: 'POST', cookies: { guest_rt: refreshToken } });
-  const res4 = await logout(req4 as any, { params: Promise.resolve({}) } as any);
+  const res4 = await logout(req4 as any, { params: {} } as any);
     expect(res4.status).toBe(204);
     const clear = res4.headers.get('set-cookie') || '';
     expect(clear).toContain('guest_session=;');
@@ -93,7 +93,7 @@ describe.sequential('Check-in API guard', () => {
     vi.resetModules();
   const { GET } = await import('../app/api/check-in/route');
     const req = makeReq('/api/check-in');
-  const res = await GET(req as any, { params: Promise.resolve({}) } as any);
+  const res = await GET(req as any, { params: {} } as any);
     expect(res.status).toBe(401);
   });
 
@@ -109,7 +109,7 @@ describe.sequential('Check-in API guard', () => {
     });
   const { GET } = await import('../app/api/check-in/route');
     const req = makeReq('/api/check-in');
-  const res = await GET(req as any, { params: Promise.resolve({}) } as any);
+  const res = await GET(req as any, { params: {} } as any);
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json?.data?.booking?.status).toBe('VERIFIED');

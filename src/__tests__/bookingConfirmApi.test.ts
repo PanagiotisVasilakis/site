@@ -37,8 +37,8 @@ describe.sequential('POST /api/bookings/[id]/confirm', () => {
 
   it('returns 404 for unknown booking id', async () => {
     const { POST } = await import('../app/api/bookings/[id]/confirm/route');
-    const req = makeReq('/api/bookings/does_not_exist/confirm', { cookies: { lang: 'en' } });
-    const res = await (POST as any)(req, { params: Promise.resolve({ id: 'does_not_exist' }) });
+  const req = makeReq('/api/bookings/does_not_exist/confirm', { cookies: { lang: 'en' } });
+  const res = await (POST as any)(req, { params: { id: 'does_not_exist' } });
     expect(res.status).toBe(404);
     const json = await res.json();
     expect(json?.error || json?.error?.code).toBeDefined();
@@ -53,7 +53,7 @@ describe.sequential('POST /api/bookings/[id]/confirm', () => {
     const { POST } = await import('../app/api/bookings/[id]/confirm/route');
 
     const req = makeReq(`/api/bookings/${booking.id}/confirm`, { cookies: { lang: 'el' } });
-    const res = await (POST as any)(req, { params: Promise.resolve({ id: booking.id }) });
+  const res = await (POST as any)(req, { params: { id: booking.id } });
     expect(res.status).toBe(303);
   const loc = res.headers.get('location') || res.headers.get('Location');
   expect(loc).toMatch(/\/el\/check-in\?bookingId=/);
@@ -69,14 +69,14 @@ describe.sequential('POST /api/bookings/[id]/confirm', () => {
     memStore.bookings.set(booking.id, booking);
     const { POST } = await import('../app/api/bookings/[id]/confirm/route');
     const req1 = makeReq(`/api/bookings/${booking.id}/confirm`, { cookies: { lang: 'en' } });
-    const res1 = await (POST as any)(req1, { params: Promise.resolve({ id: booking.id }) });
+  const res1 = await (POST as any)(req1, { params: { id: booking.id } });
     expect(res1.status).toBe(303);
     const cookie1 = res1.headers.get('set-cookie') || '';
     expect(cookie1).toContain('guest_session=');
 
     // Second call with existing session cookie should still redirect 303
     const req2 = makeReq(`/api/bookings/${booking.id}/confirm`, { cookies: { lang: 'en', guest_session: (cookie1.match(/guest_session=([^;]+)/)?.[1] || '') } });
-    const res2 = await (POST as any)(req2, { params: Promise.resolve({ id: booking.id }) });
+  const res2 = await (POST as any)(req2, { params: { id: booking.id } });
     expect(res2.status).toBe(303);
   });
 });

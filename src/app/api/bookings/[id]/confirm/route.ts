@@ -1,57 +1,121 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withErrorHandler, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
-import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import { guestStore } from '@/lib/guestDataStore';
-import { createSessionCookieWithMaxAge, signGuestSession, hasVerifiedBookingSession, getGuestSessionFromCookies } from '@/lib/guestSession';
+import { createRefreshCookie, createSessionCookie, signGuestSession } from '@/lib/guestSession';
+import { logger } from '@/lib/logger';
 import { locales, defaultLocale } from '@/i18n/config';
 
-export const dynamic = 'force-dynamic';
+type ConfirmBody = {
+  lastName?: string;
+  remember?: boolean;
+  userId?: string;
+};
 
-// POST /api/bookings/:id/confirm
-// On success: mint booking-scoped session (HttpOnly, Secure), 303 to /{locale}/check-in?bookingId=:id
-// Idempotent: if already confirmed or session exists for this booking, still 303.
-export const POST = withErrorHandler(async (request: NextRequest, { params }: { params: Promise<Record<string, string>> }) => {
-  const guard = createAPISecurityMiddleware();
-  const early = guard(request);
-  if (early) return early;
-
-  const { id } = await params;
-  const bookingId = typeof id === 'string' ? id.trim() : '';
-  if (!bookingId || bookingId.length > 128 || /[^a-zA-Z0-9_\-]/.test(bookingId)) {
-    throw new ApiError(ApiErrorCode.VALIDATION_ERROR, 'Invalid booking id');
-  }
-
-  // Lookup booking
-  const booking = guestStore.findBookingById(bookingId);
-  if (!booking) {
-    throw new ApiError(ApiErrorCode.NOT_FOUND, 'Booking not found');
-  }
-
-  // Determine effective locale from cookie
+function resolveLocale(request: NextRequest): string {
   const lang = request.cookies.get('lang')?.value;
-  const effLocale = lang && (locales as readonly string[]).includes(lang) ? lang : (defaultLocale as string);
-  const origin = `${request.nextUrl.protocol}//${request.nextUrl.host}`;
-  const location = new URL(`/${effLocale}/check-in?bookingId=${encodeURIComponent(bookingId)}`, origin).toString();
+  if (lang && (locales as readonly string[]).includes(lang)) {
+    return lang;
+  }
+  return defaultLocale as string;
+}
 
-  // If we already have a verified session, just redirect idempotently
-  const existing = await getGuestSessionFromCookies();
-  if (hasVerifiedBookingSession(existing)) {
-    const res = NextResponse.redirect(location, 303);
-    return res;
+async function parseBody(request: NextRequest): Promise<ConfirmBody> {
+  const contentType = request.headers.get('content-type')?.toLowerCase() ?? '';
+  if (contentType.includes('application/json')) {
+    try {
+      const parsed = await request.json();
+      return typeof parsed === 'object' && parsed !== null ? parsed as ConfirmBody : {};
+    } catch {
+      return {};
+    }
   }
 
-  // Ensure we have a user linked to booking to grant access; if not, keep idempotent behavior but skip session.
-  if (!booking.user_id) {
-    // No user to bind session; still redirect to check-in where guard will handle authorization.
-    return NextResponse.redirect(location, 303);
+  if (contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart/form-data')) {
+    try {
+      const form = await request.formData();
+      const get = (key: string) => form.get(key);
+      return {
+        lastName: typeof get('lastName') === 'string' ? String(get('lastName')) : undefined,
+        userId: typeof get('userId') === 'string' ? String(get('userId')) : undefined,
+        remember: (() => {
+          const raw = get('remember');
+          if (typeof raw === 'string') {
+            const v = raw.toLowerCase();
+            if (v === 'true' || v === '1' || v === 'on') return true;
+            if (v === 'false' || v === '0' || v === 'off') return false;
+          }
+          return undefined;
+        })(),
+      };
+    } catch {
+      return {};
+    }
   }
 
-  // Grant access and mint a short-lived session (e.g., 30 minutes)
-  guestStore.setAccess(booking.user_id, booking.id, 'VERIFIED');
-  const jwt = signGuestSession({ user: { id: booking.user_id }, booking: { id: booking.id } }, '30m');
-  const cookie = createSessionCookieWithMaxAge(jwt, 30 * 60);
+  return {};
+}
 
-  const res = NextResponse.redirect(location, 303);
-  res.cookies.set(cookie.name, cookie.value, cookie.options);
-  return res;
-});
+type RouteParams = Record<string, string | string[] | undefined>;
+type NextAppRouteContext = {
+  params: Promise<unknown>;
+};
+
+export async function POST(request: NextRequest, context: NextAppRouteContext) {
+  const params = await context.params;
+  const rawBookingId = (params as RouteParams | undefined)?.id;
+  const bookingId = Array.isArray(rawBookingId) ? rawBookingId[0] : rawBookingId;
+
+  if (!bookingId) {
+    return NextResponse.json({ error: 'Booking ID is required' }, { status: 400 });
+  }
+
+  try {
+    const body = await parseBody(request);
+    const booking = await guestStore.findBookingById(bookingId);
+
+    if (!booking) {
+      return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
+    }
+
+    if (body.lastName && booking.reference) {
+      const matching = await guestStore.findBookingByReferenceAndLastName(booking.reference, body.lastName);
+      if (!matching || matching.id !== booking.id) {
+        return NextResponse.json({ error: 'Booking details do not match' }, { status: 403 });
+      }
+    }
+
+    const userId = body.userId ?? booking.user_id;
+
+    if (!userId) {
+      return NextResponse.json({ error: 'Booking is not linked to a user' }, { status: 409 });
+    }
+
+    try {
+      await guestStore.setAccess(userId, booking.id, 'VERIFIED');
+    } catch (error) {
+      logger.warn('Failed to set booking access during confirmation', { error, bookingId, userId });
+    }
+
+    const token = signGuestSession({ user: { id: userId }, booking: { id: booking.id } });
+    const sessionCookie = createSessionCookie(token);
+    const locale = resolveLocale(request);
+    const redirectUrl = `/${locale}/check-in?bookingId=${encodeURIComponent(booking.id)}`;
+    const response = new NextResponse(null, { status: 303 });
+    response.headers.set('Location', redirectUrl);
+    response.cookies.set(sessionCookie.name, sessionCookie.value, sessionCookie.options);
+
+    if (body.remember) {
+      try {
+        const issued = await guestStore.issueRefreshToken(userId, 60);
+        const refreshCookie = createRefreshCookie(issued.token);
+        response.cookies.set(refreshCookie.name, refreshCookie.value, refreshCookie.options);
+      } catch (error) {
+        logger.warn('Failed to issue refresh token during booking confirmation', { error, bookingId, userId });
+      }
+    }
+
+    return response;
+  } catch (error) {
+    logger.error('Failed to confirm booking', { error, bookingId });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

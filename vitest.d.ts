@@ -28,4 +28,5 @@ declare global {
   const afterEach: typeof import('vitest').afterEach;
   const beforeAll: typeof import('vitest').beforeAll;
   const afterAll: typeof import('vitest').afterAll;
+  const expectTypeOf: typeof import('vitest').expectTypeOf;
 }

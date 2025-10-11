@@ -11,7 +11,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   if (!hasVerifiedBookingSession(session) || !session?.booking?.id) {
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Not authorized');
   }
-  const rec = guestStore.getCheckinCompletionByBooking(session.booking.id);
+  const rec = await guestStore.getCheckinCompletionByBooking(session.booking.id);
   return createSuccessResponse({
     completion: rec ? { arrivalTime: rec.arrival_time, specialRequests: rec.special_requests, acceptedAt: rec.accepted_at } : null,
   }) as NextResponse;

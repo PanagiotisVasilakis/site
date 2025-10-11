@@ -4,6 +4,9 @@ import crypto from 'node:crypto';
 const PEPPER = process.env.SECURITY_PEPPER || 'dev-pepper-change-me';
 const ENC_KEY_HEX = process.env.SECURITY_ENC_KEY_HEX; // 32 bytes hex for AES-256
 
+// Key rotation support
+const ENC_KEY_HEX_PREVIOUS = process.env.SECURITY_ENC_KEY_HEX_PREVIOUS; // Previous key for decryption during rotation
+
 function getEncKey(): Buffer {
   if (!ENC_KEY_HEX) {
     if (process.env.NODE_ENV === 'production') {
@@ -14,6 +17,15 @@ function getEncKey(): Buffer {
   }
   const buf = Buffer.from(ENC_KEY_HEX, 'hex');
   if (buf.length !== 32) throw new Error('SECURITY_ENC_KEY_HEX must be 32 bytes (64 hex chars)');
+  return buf;
+}
+
+function getPreviousEncKey(): Buffer | undefined {
+  if (!ENC_KEY_HEX_PREVIOUS) {
+    return undefined;
+  }
+  const buf = Buffer.from(ENC_KEY_HEX_PREVIOUS, 'hex');
+  if (buf.length !== 32) throw new Error('SECURITY_ENC_KEY_HEX_PREVIOUS must be 32 bytes (64 hex chars)');
   return buf;
 }
 
@@ -39,15 +51,35 @@ export function encryptJSON<T>(obj: T): string {
 }
 
 export function decryptJSON<T = unknown>(b64: string): T {
-  const key = getEncKey();
   const buf = Buffer.from(b64, 'base64');
   const iv = buf.subarray(0, 12);
   const tag = buf.subarray(12, 28);
   const ciphertext = buf.subarray(28);
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-  decipher.setAuthTag(tag);
-  const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-  return JSON.parse(plaintext.toString('utf8')) as T;
+  
+  // Try current key first
+  try {
+    const key = getEncKey();
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(tag);
+    const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    return JSON.parse(plaintext.toString('utf8')) as T;
+  } catch (primaryError) {
+    // If current key fails, try previous key for backward compatibility during rotation
+    const prevKey = getPreviousEncKey();
+    if (prevKey) {
+      try {
+        const decipher = crypto.createDecipheriv('aes-256-gcm', prevKey, iv);
+        decipher.setAuthTag(tag);
+        const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+        return JSON.parse(plaintext.toString('utf8')) as T;
+      } catch {
+        // Both keys failed, rethrow original error
+        throw primaryError;
+      }
+    }
+    // No previous key, rethrow original error
+    throw primaryError;
+  }
 }
 
 export function maskLast4(value: string): string {
@@ -71,13 +103,51 @@ export function encryptString(value: string): string {
 }
 
 export function decryptString(b64: string): string {
-  const key = getEncKey();
   const buf = Buffer.from(b64, 'base64');
   const iv = buf.subarray(0, 12);
   const tag = buf.subarray(12, 28);
   const ciphertext = buf.subarray(28);
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-  decipher.setAuthTag(tag);
-  const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-  return plaintext.toString('utf8');
+  
+  // Try current key first
+  try {
+    const key = getEncKey();
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(tag);
+    const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    return plaintext.toString('utf8');
+  } catch (primaryError) {
+    // If current key fails, try previous key for backward compatibility during rotation
+    const prevKey = getPreviousEncKey();
+    if (prevKey) {
+      try {
+        const decipher = crypto.createDecipheriv('aes-256-gcm', prevKey, iv);
+        decipher.setAuthTag(tag);
+        const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+        return plaintext.toString('utf8');
+      } catch {
+        // Both keys failed, rethrow original error
+        throw primaryError;
+      }
+    }
+    // No previous key, rethrow original error
+    throw primaryError;
+  }
+}
+
+// Key management utilities
+export function rotateEncryptionKey(): { newKeyHex: string; oldKeyHex?: string } {
+  // Generate new key
+  const newKey = crypto.randomBytes(32);
+  const newKeyHex = newKey.toString('hex');
+  
+  // Return new key and current key (if exists)
+  return {
+    newKeyHex,
+    oldKeyHex: ENC_KEY_HEX
+  };
+}
+
+export function validateKeyFormat(keyHex: string): boolean {
+  if (keyHex.length !== 64) return false;
+  return /^[0-9a-fA-F]+$/.test(keyHex);
 }

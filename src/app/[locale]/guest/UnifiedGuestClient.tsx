@@ -40,6 +40,7 @@ export default function UnifiedGuestClient() {
   // Custom dropdown state
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [showAuthFlow, setShowAuthFlow] = useState(false);
   
   // Optional section collapse state
   const [isOptionalExpanded, setIsOptionalExpanded] = useState(false);
@@ -413,7 +414,27 @@ export default function UnifiedGuestClient() {
 
   return (
     <div className="mx-auto max-w-md p-4">
-  <div className="main-glass-container card p-5">
+      <div className="main-glass-container card p-5">
+        {!showAuthFlow ? (
+          <div className="space-y-6 text-center" role="presentation">
+            <h2 className="text-2xl font-semibold" style={{ color: 'var(--fg-default)' }}>
+              {dict.portal?.introTitle || 'How can we help with your stay?'}
+            </h2>
+            <p className="text-sm" style={{ color: 'var(--fg-muted)' }}>
+              {dict.portal?.introSubtitle || 'Choose what you would like to do next.'}
+            </p>
+            <div className="grid gap-3">
+              <button
+                type="button"
+                className="btn-primary w-full"
+                onClick={() => setShowAuthFlow(true)}
+              >
+                {dict.portal?.alreadyBooked || 'Booking & Check-in Details'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
             <motion.div
               role="tablist"
               aria-label="Authentication mode"
@@ -617,7 +638,7 @@ export default function UnifiedGuestClient() {
                             )}
                           </div>
 
-                          {mode === 'signup' && origin === 'GR' && (
+                                          {mode === 'signup' && origin === 'GR' && (
                             <div>
                               <label className="block text-sm mb-1" style={{ color: 'var(--fg-default)' }}>{dict.portal?.afmLabel || 'AFM (9 digits)'} *</label>
                               <input 
@@ -802,6 +823,8 @@ export default function UnifiedGuestClient() {
                 </motion.div>
               </AnimatePresence>
             </motion.div>
+          </>
+        )}
       </div>
     </div>
   );

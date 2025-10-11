@@ -7,7 +7,7 @@ import { metrics } from '@/lib/metrics-collector';
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const refresh = req.cookies.get('guest_rt')?.value;
   if (refresh) {
-    const revoked = guestStore.revokeRefreshToken(refresh);
+    const revoked = await guestStore.revokeRefreshToken(refresh);
     if (revoked) {
       elogger.info('refresh_token.revoked', { correlationId: elogger.getContext()?.correlationId });
       metrics.counter('refresh_token.revoked', 1);

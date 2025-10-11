@@ -1,6 +1,8 @@
 import { sign, verify, JwtPayload, SignOptions } from 'jsonwebtoken';
 import { cookies } from 'next/headers';
 import { guestStore } from '@/lib/guestDataStore';
+import { logger } from '@/lib/logger';
+import { rateLimiter } from '@/lib/rateLimiter';
 
 export type BookingSource = 'ONSITE' | 'EXTERNAL';
 export type BookingStatus = 'PENDING' | 'VERIFIED' | 'NONE';
@@ -30,7 +32,8 @@ export function parseGuestSession(token: string | undefined | null): GuestSessio
   if (!token) return null;
   try {
     return verify(token, getGuestJwtSecret()) as GuestSessionPayload;
-  } catch {
+  } catch (error) {
+    logger.warn('Failed to parse guest session token', { error });
     return null;
   }
 }
@@ -40,7 +43,8 @@ export async function getGuestSessionFromCookies(): Promise<GuestSessionPayload 
     const jar = await cookies();
     const token = jar.get(COOKIE_NAME)?.value;
     return parseGuestSession(token || null);
-  } catch {
+  } catch (error) {
+    logger.warn('Failed to get guest session from cookies', { error });
     return null;
   }
 }
@@ -121,6 +125,130 @@ export function clearRefreshCookie(): { name: string; value: string; options: { 
   };
 }
 
+// Session management with token revocation
+export class SessionManager {
+  async createSession(userId: string, bookingId?: string, ttlHours: number = 2): Promise<{ sessionToken: string; refreshToken: string; sessionCookie: ReturnType<typeof createSessionCookie>; refreshCookie: ReturnType<typeof createRefreshCookie> }> {
+    try {
+      // Rate limit session creation
+      const rateLimitKey = `session:create:${userId}`;
+      const rateLimitResult = await rateLimiter.isRateLimited(rateLimitKey, 10, 60 * 60 * 1000); // 10 sessions per hour
+      if (!rateLimitResult.allowed) {
+        throw new Error('Rate limit exceeded for session creation');
+      }
+      
+      // Create session payload
+      const payload: GuestSessionPayload = {
+        user: { id: userId },
+        booking: bookingId ? { id: bookingId } : undefined,
+      };
+      
+      // Sign session token
+      const sessionToken = signGuestSession(payload, `${ttlHours}h`);
+      
+      // Issue refresh token
+      const { rec: refreshTokenRec, token: refreshToken } = await guestStore.issueRefreshToken(userId, 60, {
+        family_id: `sess_${userId}_${Date.now()}`,
+        device_hint: 'web',
+        ip_hint: 'unknown'
+      });
+      
+      // Create cookies
+      const sessionCookie = createSessionCookie(sessionToken);
+      const refreshCookie = createRefreshCookie(refreshToken);
+      
+      logger.info('Session created', { userId, bookingId, sessionId: refreshTokenRec.id });
+      
+      return {
+        sessionToken,
+        refreshToken,
+        sessionCookie,
+        refreshCookie
+      };
+    } catch (error) {
+      logger.error('Failed to create session', { error, userId, bookingId });
+      throw error;
+    }
+  }
+  
+  async validateSession(token: string): Promise<GuestSessionPayload | null> {
+    try {
+      return parseGuestSession(token);
+    } catch (error) {
+      logger.warn('Failed to validate session', { error });
+      return null;
+    }
+  }
+  
+  async revokeSession(sessionId: string): Promise<boolean> {
+    try {
+      // Revoke refresh token
+      const result = await guestStore.revokeRefreshToken(sessionId);
+      
+      if (result) {
+        logger.info('Session revoked', { sessionId });
+      }
+      
+      return result;
+    } catch (error) {
+      logger.error('Failed to revoke session', { error, sessionId });
+      return false;
+    }
+  }
+  
+  async rotateSession(oldRefreshToken: string): Promise<{ sessionToken?: string; refreshToken?: string; sessionCookie?: ReturnType<typeof createSessionCookie>; refreshCookie?: ReturnType<typeof createRefreshCookie> } | null> {
+    try {
+      // Rotate refresh token
+      const { rec: newRefreshTokenRec, token: newRefreshToken } = await guestStore.rotateRefreshToken(oldRefreshToken);
+      
+      if (!newRefreshTokenRec || !newRefreshToken) {
+        return null;
+      }
+      
+      // Create new session token
+      const payload: GuestSessionPayload = {
+        user: { id: newRefreshTokenRec.user_id },
+      };
+      
+      const sessionToken = signGuestSession(payload, '2h');
+      
+      // Create cookies
+      const sessionCookie = createSessionCookie(sessionToken);
+      const refreshCookie = createRefreshCookie(newRefreshToken);
+      
+      logger.info('Session rotated', { oldTokenId: newRefreshTokenRec.rotated_from_id, newTokenId: newRefreshTokenRec.id });
+      
+      return {
+        sessionToken,
+        refreshToken: newRefreshToken,
+        sessionCookie,
+        refreshCookie
+      };
+    } catch (error) {
+      logger.error('Failed to rotate session', { error });
+      return null;
+    }
+  }
+  
+  async cleanupExpiredSessions(): Promise<number> {
+    try {
+      // Purge expired refresh tokens
+      const removed = await guestStore.purgeExpiredRefreshTokens(30);
+      
+      if (removed > 0) {
+        logger.info('Expired sessions cleaned up', { count: removed });
+      }
+      
+      return removed;
+    } catch (error) {
+      logger.error('Failed to cleanup expired sessions', { error });
+      return 0;
+    }
+  }
+}
+
+// Export singleton instance
+export const sessionManager = new SessionManager();
+
 // SSR auto-refresh: if no valid guest_session, try guest_rt to mint a new session JWT and set cookie.
 export async function tryAutoMintSessionFromRefresh(): Promise<{ session: GuestSessionPayload | null; responseHeaders?: HeadersInit; cookies?: Array<{ name: string; value: string; options: { httpOnly: boolean; sameSite: 'lax'; secure: boolean; path: string; maxAge: number } }> }> {
   const jar = await cookies();
@@ -131,13 +259,13 @@ export async function tryAutoMintSessionFromRefresh(): Promise<{ session: GuestS
   }
   const refresh = jar.get(REFRESH_COOKIE)?.value;
   if (!refresh) return { session: current };
-  const rec = guestStore.verifyRefreshToken(refresh);
+  const rec = await guestStore.verifyRefreshToken(refresh);
   if (!rec) return { session: current };
   // Rotation on use
-  const rotated = guestStore.rotateRefreshToken(refresh);
+  const rotated = await guestStore.rotateRefreshToken(refresh);
   const rt = rotated.token;
   // Build a minimal session; in full flow, refresh API would attach booking context. Here we only restore user identity.
-  const u = guestStore.findUserById(rec.user_id);
+  const u = await guestStore.findUserById(rec.user_id);
   const payload: GuestSessionPayload = {
     user: u ? { id: u.id } : undefined,
   };

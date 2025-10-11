@@ -67,19 +67,27 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   }
 
   // Find or create user by phone
-  const user = guestStore.findUserByPhone(body.phone) || guestStore.createUser({
-    phone_e164: body.phone,
-    country_origin: body.origin || 'GR',
-    // created_at, updated_at set in store
-  });
+  let user = await guestStore.findUserByPhone(body.phone);
+  if (!user) {
+    user = await guestStore.createUser({
+      phone_e164: body.phone,
+      country_origin: body.origin || 'GR',
+      // created_at, updated_at set in store
+    });
+  }
 
   // If an id/reference provided, try to find; else link/create booking
-  let booking = (body.booking.id ? guestStore.findBookingById(body.booking.id) : undefined);
-  if (!booking && body.booking.reference && body.booking.lastName) {
-    booking = guestStore.findBookingByReferenceAndLastName(body.booking.reference, body.booking.lastName);
+  let booking;
+  if (body.booking.id) {
+    booking = await guestStore.findBookingById(body.booking.id);
   }
+  
+  if (!booking && body.booking.reference && body.booking.lastName) {
+    booking = await guestStore.findBookingByReferenceAndLastName(body.booking.reference, body.booking.lastName);
+  }
+  
   if (!booking) {
-    booking = guestStore.linkOrCreateBooking({
+    booking = await guestStore.linkOrCreateBooking({
       source: 'ONSITE',
       reference: body.booking.reference,
       start_date: body.booking.start_date,
@@ -90,7 +98,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   }
 
   // Grant access and mint session
-  guestStore.setAccess(user.id, booking.id, 'VERIFIED');
+  await guestStore.setAccess(user.id, booking.id, 'VERIFIED');
 
   const jwt = signGuestSession({ user: { id: user.id }, booking: { id: booking.id } });
   const sess = createSessionCookie(jwt);
@@ -99,7 +107,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   res.cookies.set(sess.name, sess.value, sess.options);
 
   if (body.remember) {
-    const issued = guestStore.issueRefreshToken(user.id);
+    const issued = await guestStore.issueRefreshToken(user.id);
     const rtCookie = createRefreshCookie(issued.token);
     res.cookies.set(rtCookie.name, rtCookie.value, rtCookie.options);
   }

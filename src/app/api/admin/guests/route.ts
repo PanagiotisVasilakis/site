@@ -39,7 +39,7 @@ const handler = async (request: NextRequest) => {
   try {
     switch (params.action) {
       case 'list':
-        const allBookings = guestDataExport.getAllBookings();
+  const allBookings = await guestDataExport.getAllBookings();
         return createSuccessResponse({
           bookings: allBookings,
           total: allBookings.length,
@@ -52,7 +52,7 @@ const handler = async (request: NextRequest) => {
             'Missing required parameters: reference and lastName'
           );
         }
-        const booking = guestDataExport.getBookingByReference(params.reference, params.lastName);
+  const booking = await guestDataExport.getBookingByReference(params.reference, params.lastName);
         if (!booking) {
           throw new ApiError(
             ApiErrorCode.NOT_FOUND,
@@ -68,7 +68,7 @@ const handler = async (request: NextRequest) => {
             'Missing required parameter: bookingId'
           );
         }
-        const bookingById = guestDataExport.getBookingById(params.bookingId);
+  const bookingById = await guestDataExport.getBookingById(params.bookingId);
         if (!bookingById) {
           throw new ApiError(
             ApiErrorCode.NOT_FOUND,
@@ -84,7 +84,7 @@ const handler = async (request: NextRequest) => {
             'Missing required parameter: phone'
           );
         }
-        const phoneBookings = guestDataExport.getBookingsByPhone(params.phone);
+  const phoneBookings = await guestDataExport.getBookingsByPhone(params.phone);
         return createSuccessResponse({
           bookings: phoneBookings,
           total: phoneBookings.length,
@@ -97,7 +97,7 @@ const handler = async (request: NextRequest) => {
             'Missing required parameter: startDate'
           );
         }
-        const searchResults = guestDataExport.searchBookingsByDateRange(
+        const searchResults = await guestDataExport.searchBookingsByDateRange(
           params.startDate,
           params.endDate
         );
@@ -111,7 +111,7 @@ const handler = async (request: NextRequest) => {
         });
 
       case 'stats':
-        const statistics = guestDataExport.getStatistics();
+  const statistics = await guestDataExport.getStatistics();
         return createSuccessResponse({ statistics });
 
       case 'export':
@@ -121,7 +121,7 @@ const handler = async (request: NextRequest) => {
             'Missing required parameter: bookingId'
           );
         }
-        const exportData = guestDataExport.exportBookingToFile(params.bookingId);
+  const exportData = await guestDataExport.exportBookingToFile(params.bookingId);
         if (!exportData) {
           throw new ApiError(
             ApiErrorCode.NOT_FOUND,
