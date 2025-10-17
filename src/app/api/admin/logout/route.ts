@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { withErrorHandler } from '@/lib/apiErrorHandler';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 
 // No body validation needed for logout (it's a simple POST)
 export const POST = withErrorHandler(async () => {

@@ -6,7 +6,7 @@ import { bookingRepository, type BookingRecord } from '@/lib/prisma-repositories
 import { refreshTokenRepository, type GuestRefreshTokenRec as PrismaGuestRefreshTokenRec } from '@/lib/prisma-repositories/refreshTokenRepository';
 import type { SessionRecord } from '@/lib/prisma-repositories/sessionRepository';
 import { hashSensitive, maskLast4, hmacDeterministic } from '@/lib/crypto';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 import { prisma } from '@/lib/prisma';
 import crypto from 'node:crypto';
 

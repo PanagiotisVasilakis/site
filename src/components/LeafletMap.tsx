@@ -6,7 +6,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import 'leaflet.markercluster';
 import { formatTravelChip } from '@/lib/travelFormat';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 
 type TravelMode = 'driving' | 'foot' | 'cycling';
 

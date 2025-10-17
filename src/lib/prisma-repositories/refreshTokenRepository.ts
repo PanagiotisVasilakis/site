@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 
 import { verifySensitive } from '@/lib/crypto';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 import { prisma } from '@/lib/prisma';
 
 export type GuestRefreshTokenRec = {

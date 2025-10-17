@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getItemsByCategory } from '@/lib/data';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 
 export const dynamic = 'force-dynamic';
 

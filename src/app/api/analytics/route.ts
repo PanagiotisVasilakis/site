@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { addHits, getHits, vitalsRecent } from '@/lib/analyticsStore';
 import fs from 'node:fs';
 import path from 'node:path';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 
 // Rate limiting configuration
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute

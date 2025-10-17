@@ -1,7 +1,7 @@
 import { vitalsSummary, vitalsRecent } from '@/lib/analyticsStore';
 import { verifyAdmin } from '@/lib/auth';
 import { NextRequest } from 'next/server';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 
 export const dynamic = 'force-dynamic';
 

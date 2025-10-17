@@ -338,12 +338,42 @@ class EnterpriseLogger {
     this.output(this.createLogEntry('info', message, metadata));
   }
 
-  warn(message: string, metadata?: Record<string, unknown>, error?: unknown): void {
-    this.output(this.createLogEntry('warn', message, metadata, error));
+  // Overloads for backward compatibility with old logger
+  warn(message: string): void;
+  warn(message: string, error: unknown): void;
+  warn(message: string, metadata: Record<string, unknown>, error?: unknown): void;
+  warn(message: string, metadataOrError?: Record<string, unknown> | unknown, error?: unknown): void {
+    // No second argument - simple message only
+    if (metadataOrError === undefined) {
+      this.output(this.createLogEntry('warn', message));
+      return;
+    }
+    // If second arg looks like an Error/unknown and third arg is undefined, it's the old signature
+    if (error === undefined && metadataOrError !== undefined && 
+        (metadataOrError instanceof Error || typeof metadataOrError !== 'object' || metadataOrError === null || Array.isArray(metadataOrError))) {
+      this.output(this.createLogEntry('warn', message, undefined, metadataOrError));
+    } else {
+      this.output(this.createLogEntry('warn', message, metadataOrError as Record<string, unknown>, error));
+    }
   }
 
-  error(message: string, metadata?: Record<string, unknown>, error?: unknown): void {
-    this.output(this.createLogEntry('error', message, metadata, error));
+  // Overloads for backward compatibility with old logger
+  error(message: string): void;
+  error(message: string, error: unknown): void;
+  error(message: string, metadata: Record<string, unknown>, error?: unknown): void;
+  error(message: string, metadataOrError?: Record<string, unknown> | unknown, error?: unknown): void {
+    // No second argument - simple message only
+    if (metadataOrError === undefined) {
+      this.output(this.createLogEntry('error', message));
+      return;
+    }
+    // If second arg looks like an Error/unknown and third arg is undefined, it's the old signature
+    if (error === undefined && metadataOrError !== undefined && 
+        (metadataOrError instanceof Error || typeof metadataOrError !== 'object' || metadataOrError === null || Array.isArray(metadataOrError))) {
+      this.output(this.createLogEntry('error', message, undefined, metadataOrError));
+    } else {
+      this.output(this.createLogEntry('error', message, metadataOrError as Record<string, unknown>, error));
+    }
   }
 
   fatal(message: string, metadata?: Record<string, unknown>, error?: unknown): void {

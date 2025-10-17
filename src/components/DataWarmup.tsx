@@ -1,7 +1,7 @@
 "use client";
 import { useEffect } from 'react';
 import internalFetch from '@/lib/internalFetchClient';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 
 /**
  * DataWarmup triggers an initial fetch of core JSON endpoints so the service worker

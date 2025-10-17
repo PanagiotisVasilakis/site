@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 import type { AnalyticsHit, Vital } from './analyticsStore';
 
 export interface AnalyticsPersistenceData {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getCategoriesWithCounts } from '@/lib/data';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 
 // Force dynamic so data reflects any file changes without a full rebuild (dev/edge friendly)
 export const dynamic = 'force-dynamic';

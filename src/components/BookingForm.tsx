@@ -3,7 +3,7 @@ import React, { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { DateRange, formatDateRange, getNights } from '@/lib/dateUtils';
 import { trackEvent } from '@/lib/analyticsClient';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 
 interface BookingFormProps {
   dateRange: DateRange;

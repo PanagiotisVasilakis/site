@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { NextRequest } from 'next/server';
 import { verifyAdmin } from '@/lib/auth';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 
 export const dynamic = 'force-dynamic';
 

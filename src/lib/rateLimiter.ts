@@ -3,7 +3,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 
 export class RateLimiter {
   async initialize(): Promise<void> {

@@ -77,7 +77,7 @@ export class ExternalServiceError extends AppError {
 }
 
 // Structured logging with context
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 
 export interface LogContext {
   userId?: string;

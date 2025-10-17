@@ -1,6 +1,6 @@
 "use client";
 import { useEffect } from 'react';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 
 export default function LocaleError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 
 // Simple, session-scoped funnel id that persists across pages in a session
 // Namespaced so we can have multiple funnels if needed; default is 'portal'

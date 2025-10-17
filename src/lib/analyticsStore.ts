@@ -2,7 +2,7 @@
 
 import crypto from 'node:crypto';
 import { createStorageAdapter } from './storageAdapter';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 
 export interface AnalyticsHit { path: string; ts: number; ua: string | null; locale?: string }
 

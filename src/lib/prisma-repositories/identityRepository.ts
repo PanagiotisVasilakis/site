@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 
 export type IdentityRecord = {
   user_id: string;

@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 import crypto from 'node:crypto';
 import type { User as PrismaUser, CountryOrigin } from '@prisma/client';
 

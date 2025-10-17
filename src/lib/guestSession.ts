@@ -1,7 +1,7 @@
 import { sign, verify, JwtPayload, SignOptions } from 'jsonwebtoken';
 import { cookies } from 'next/headers';
 import { guestStore } from '@/lib/guestDataStore';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 import { rateLimiter } from '@/lib/rateLimiter';
 
 export type BookingSource = 'ONSITE' | 'EXTERNAL';

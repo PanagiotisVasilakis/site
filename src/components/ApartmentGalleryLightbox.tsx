@@ -3,7 +3,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import type { CSSProperties, TouchEvent as ReactTouchEvent } from 'react';
 import Image from 'next/image';
 import type { ApartmentPhotoWithAlt } from '@/types/apartment';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 
 // Single tiny transparent blur placeholder
 const GENERIC_BLUR = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDABALDA4MChAODQ4SERATGCgaGBYWGh4iJiQiJi4qOjY2OjY2OjY2OjY2OjY2OjY2OjY2OjY2OjY2OjY2OjY2OjY2OjY2/2wBDARESEh4aJiYaJiY2OjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2/3QAEAAP/2gAMAwEAAhEDEQA/AMf/AP/Z';

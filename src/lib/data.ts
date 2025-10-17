@@ -3,7 +3,7 @@ import path from "node:path";
 import { ItemSchema, type Item } from "../data/schemas";
 import { categories } from "../data/categories";
 import type { Locale } from "@/i18n/config";
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 
 const dataRoot = path.join(process.cwd(), "src", "data", "items");
 

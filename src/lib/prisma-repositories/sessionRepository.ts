@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 
 import type { Session } from '@prisma/client';
 
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 import { prisma } from '@/lib/prisma';
 
 export type SessionRecord = {

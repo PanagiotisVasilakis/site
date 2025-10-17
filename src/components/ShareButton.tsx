@@ -1,6 +1,6 @@
 "use client";
 import { useState } from 'react';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 
 export default function ShareButton({ title, text }: { title: string; text?: string }) {
 	const [copied, setCopied] = useState(false);

@@ -1,6 +1,6 @@
 // Thin client-side wrapper to satisfy internal-fetch lint rule and allow
 // consistent future enhancements (auth headers, logging, etc.)
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 
 export const ADMIN_SECRET_STORAGE_KEY = 'admin_secret';
 

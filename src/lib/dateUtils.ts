@@ -1,5 +1,5 @@
 import { format, parse, isValid, isSameDay, isAfter, isBefore, startOfDay } from 'date-fns';
-import { logger } from './logger';
+import { logger } from './logger-enterprise';
 
 export interface DateRange {
   from?: Date | undefined;

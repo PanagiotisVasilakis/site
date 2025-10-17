@@ -17,7 +17,7 @@ export async function internalPost<T>(path: string, body: unknown, init?: Reques
   if (!res.ok) throw new Error(`Request failed: ${res.status}`);
   return res.json() as Promise<T>;
 }
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 
 export async function internalFetch(input: RequestInfo | URL, init?: RequestInit) {
   try {

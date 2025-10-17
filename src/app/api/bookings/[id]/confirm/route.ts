@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guestStore } from '@/lib/guestDataStore';
 import { createRefreshCookie, createSessionCookie, signGuestSession } from '@/lib/guestSession';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/logger-enterprise';
 import { locales, defaultLocale } from '@/i18n/config';
 
 type ConfirmBody = {
