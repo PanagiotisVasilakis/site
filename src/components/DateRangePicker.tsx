@@ -8,7 +8,7 @@ import {
   validateDateRange, 
   getNights
 } from '@/lib/dateUtils';
-import { logger } from '@/lib/logger-enterprise';
+import { logger } from '@/lib/logger-client';
 import BottomSheet from './BottomSheet';
 
 // Import styles

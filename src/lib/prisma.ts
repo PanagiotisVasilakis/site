@@ -15,6 +15,7 @@ type PrismaClientWithEvents = PrismaClient & {
 };
 
 const globalThisWithPrisma = globalThis as ExtendedGlobal;
+let prismaInitLogged = false;
 
 function assertDatabaseUrl(): void {
   if (!process.env.DATABASE_URL) {
@@ -182,12 +183,15 @@ function createPrismaClient(): PrismaClient {
   
   // Log recommended pool config (actual config is in DATABASE_URL)
   const poolConfig = getRecommendedPoolConfig();
-  logger.info('Prisma client initialization', {
-    environment: process.env.NODE_ENV,
-    recommendedConnectionLimit: poolConfig.connectionLimit,
-    recommendedPoolTimeout: poolConfig.poolTimeout,
-    note: 'Configure via DATABASE_URL: ?connection_limit=N&pool_timeout=N',
-  });
+  if (!prismaInitLogged) {
+      logger.info('Prisma client initialization', {
+        environment: process.env.NODE_ENV,
+        recommendedConnectionLimit: poolConfig.connectionLimit,
+        recommendedPoolTimeout: poolConfig.poolTimeout,
+        note: 'Configure via DATABASE_URL: ?connection_limit=N&pool_timeout=N',
+      });
+      prismaInitLogged = true;
+    }
   
   const client = new PrismaClient({
     log: [
@@ -202,11 +206,11 @@ function createPrismaClient(): PrismaClient {
   return client;
 }
 
-export const prisma: PrismaClient = globalThisWithPrisma.__prisma__ ?? createPrismaClient();
-
-if (process.env.NODE_ENV !== 'production') {
-  globalThisWithPrisma.__prisma__ = prisma;
+if (!globalThisWithPrisma.__prisma__) {
+  globalThisWithPrisma.__prisma__ = createPrismaClient();
 }
+
+export const prisma: PrismaClient = globalThisWithPrisma.__prisma__;
 
 function registerPrismaShutdownHooks(client: PrismaClient): void {
   if (typeof process === 'undefined') {

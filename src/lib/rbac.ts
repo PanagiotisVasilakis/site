@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { verifyAdmin } from '@/lib/auth';
+import { verifyAdmin } from '@/lib/auth/admin';
 
 export type Role = 'admin' | 'guest';
 

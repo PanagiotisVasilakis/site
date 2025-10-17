@@ -1,6 +1,8 @@
 // Thin client-side wrapper to satisfy internal-fetch lint rule and allow
 // consistent future enhancements (auth headers, logging, etc.)
-import { logger } from '@/lib/logger-enterprise';
+import { logger } from '@/lib/logger-client';
+
+const CORRELATION_STORAGE_KEY = 'correlation_id';
 
 export const ADMIN_SECRET_STORAGE_KEY = 'admin_secret';
 
@@ -15,10 +17,31 @@ export const ADMIN_SECRET_STORAGE_KEY = 'admin_secret';
  * TODO: Consider adding correlation ID to response headers and storing
  * in browser context for subsequent requests.
  */
+function readStoredCorrelationId(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  try {
+    return window.sessionStorage?.getItem(CORRELATION_STORAGE_KEY) || undefined;
+  } catch (err) {
+    logger.warn('internalFetch correlation read failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return undefined;
+  }
+}
+
+function writeStoredCorrelationId(id: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage?.setItem(CORRELATION_STORAGE_KEY, id);
+  } catch (err) {
+    logger.warn('internalFetch correlation write failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 function getCorrelationId(): string | undefined {
-  // Correlation ID propagation is server-side only
-  // Handled by middleware for API routes
-  return undefined;
+  return readStoredCorrelationId();
 }
 
 function getAdminSecret(): string | null {
@@ -49,10 +72,9 @@ function buildHeaders(init?: RequestInit, adminSecret?: string): HeadersInit | u
     headers.set('x-admin-secret', adminSecret);
   }
   
-  // Propagate correlation ID for request tracing (server-side only)
+  // Propagate correlation ID for request tracing (client-side stored)
   if (correlationId) {
-    headers.set('X-Correlation-ID', correlationId);
-    headers.set('X-Request-ID', correlationId);
+    headers.set('X-Parent-Correlation-ID', correlationId);
   }
   
   return headers;
@@ -74,6 +96,13 @@ async function internalFetch(input: string, init?: RequestInit) {
 
   try {
     const res = await fetch(input, finalInit);
+
+    if (typeof window !== 'undefined') {
+      const headerId = res.headers.get('x-correlation-id') || res.headers.get('X-Correlation-ID');
+      if (headerId) {
+        writeStoredCorrelationId(headerId);
+      }
+    }
     if (!res.ok) {
       // Log minimal but meaningful context
       logger.warn('internalFetch non-OK response', {

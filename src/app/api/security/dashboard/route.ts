@@ -9,7 +9,7 @@ import {
   getSecurityHealthStatus,
   securityReportGenerator 
 } from '@/lib/security-monitoring';
-import { verifyAdmin } from '@/lib/auth';
+import { verifyAdmin } from '@/lib/auth/admin';
 
 function getClientIP(request: NextRequest): string {
   const forwardedFor = request.headers.get('x-forwarded-for');

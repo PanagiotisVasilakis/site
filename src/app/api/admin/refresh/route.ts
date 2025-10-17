@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAdmin, signAdmin } from '@/lib/auth';
+import { verifyAdmin, signAdmin } from '@/lib/auth/admin';
 import { withErrorHandler } from '@/lib/apiErrorHandler';
 import { logger } from '@/lib/logger-enterprise';
 import crypto from 'node:crypto';

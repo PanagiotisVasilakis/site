@@ -70,12 +70,4 @@ export * from './admin';
 // Guest authentication
 export * from './guest';
 
-// Legacy re-exports for backwards compatibility
-// TODO: Update all imports to use new auth module, then remove these
-export { signAdmin, verifyAdmin } from './admin';
-export { 
-  signGuestSession,
-  parseGuestSession,
-  getGuestSessionFromCookies,
-  sessionManager,
-} from './guest';
+// Legacy re-exports removed now that callers import from concrete modules

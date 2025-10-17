@@ -17,17 +17,20 @@ export async function internalPost<T>(path: string, body: unknown, init?: Reques
   if (!res.ok) throw new Error(`Request failed: ${res.status}`);
   return res.json() as Promise<T>;
 }
-import { logger } from '@/lib/logger-enterprise';
 
+// Note: This file can be imported by both server and client components
+// Only using console logging to avoid Node.js dependencies
 export async function internalFetch(input: RequestInfo | URL, init?: RequestInit) {
   try {
     const res = await fetch(input, init);
-    if (!res.ok) {
-      logger.warn('internalFetch non-OK response (server)', { input: String(input), status: res.status });
+    if (!res.ok && typeof console !== 'undefined') {
+      console.warn('[internalFetch] non-OK response', { input: String(input), status: res.status });
     }
     return res;
   } catch (err) {
-    logger.error('internalFetch failed (server)', { input: String(input), error: err });
+    if (typeof console !== 'undefined') {
+      console.error('[internalFetch] failed', { input: String(input), error: err });
+    }
     throw err;
   }
 }

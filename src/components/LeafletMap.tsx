@@ -6,7 +6,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import 'leaflet.markercluster';
 import { formatTravelChip } from '@/lib/travelFormat';
-import { logger } from '@/lib/logger-enterprise';
+import { logger } from '@/lib/logger-client';
 
 type TravelMode = 'driving' | 'foot' | 'cycling';
 
@@ -424,7 +424,7 @@ export default function LeafletMap({
               routeLayerRef.current = L.polyline(latlngs, { color: routeColor, weight: 4, opacity: 0.85 }).addTo(mapRef.current);
               mapRef.current.fitBounds(routeLayerRef.current.getBounds().pad(0.15));
             } catch (err) {
-              logger.warn('Route fetch failed', err);
+              logger.warn('Route fetch failed', err instanceof Error ? err : { error: String(err) });
             }
           })();
         }

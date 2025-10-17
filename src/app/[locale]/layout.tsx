@@ -8,8 +8,6 @@ import { ToastProvider } from "@/components/Toast";
 import Analytics from "@/components/Analytics";
 import JsonFetchHud from "@/components/JsonFetchHud";
 import TopControls from "@/components/TopControls";
-import { getGuestSessionFromCookies, hasVerifiedBookingSession } from "@/lib/guestSession";
-import { getFeatureFlags } from "@/lib/featureFlags";
 
 // Removed font variable placeholders.
 
@@ -36,13 +34,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   const { locale } = await params;
   const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : "en";
   const t = getDictionary(eff);
-  // Read current session from cookie
-  // Note: In Next.js 15+, cookies can only be modified in Server Actions or Route Handlers.
-  // The session refresh logic is handled by /api/portal/refresh endpoint instead.
-  const session = await getGuestSessionFromCookies();
-  const ff = getFeatureFlags();
-  const hasBookingSession = hasVerifiedBookingSession(session);
-  const showCheckIn = ff.checkinEnabled && hasBookingSession;
+  // Avoid reading cookies server-side so the route can stay fully static; client components fetch session state.
   return (
   <div data-locale={eff}>
   <a href="#main-content" className="skip-link">{t.skipLink || 'Skip to content'}</a>
@@ -50,7 +42,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
       <PwaManager />
       <Analytics />
   <JsonFetchHud />
-  <TopControls locale={eff} appTitle={t.appTitle} showCheckIn={showCheckIn} />
+  <TopControls locale={eff} appTitle={t.appTitle} />
       {/* Update banner: light surface uses dark brand text; buttons tinted; dismiss available */}
       <div
         id="update-banner"

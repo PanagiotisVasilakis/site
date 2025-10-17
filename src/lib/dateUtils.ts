@@ -1,5 +1,5 @@
 import { format, parse, isValid, isSameDay, isAfter, isBefore, startOfDay } from 'date-fns';
-import { logger } from './logger-enterprise';
+import { logger } from './logger-client';
 
 export interface DateRange {
   from?: Date | undefined;
@@ -45,7 +45,11 @@ export function parseDate(dateString: string, formatString: string = 'yyyy-MM-dd
     const parsed = parse(dateString, formatString, new Date());
     return isValid(parsed) ? parsed : undefined;
   } catch (err) {
-    logger.warn('Failed to parse date', { dateString, formatString, err });
+    logger.warn('Failed to parse date', {
+      dateString,
+      formatString,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return undefined;
   }
 }

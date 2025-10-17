@@ -3,7 +3,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import type { CSSProperties, TouchEvent as ReactTouchEvent } from 'react';
 import Image from 'next/image';
 import type { ApartmentPhotoWithAlt } from '@/types/apartment';
-import { logger } from '@/lib/logger-enterprise';
+import { logger } from '@/lib/logger-client';
 
 // Single tiny transparent blur placeholder
 const GENERIC_BLUR = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDABALDA4MChAODQ4SERATGCgaGBYWGh4iJiQiJi4qOjY2OjY2OjY2OjY2OjY2OjY2OjY2OjY2OjY2OjY2OjY2OjY2OjY2/2wBDARESEh4aJiYaJiY2OjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2/3QAEAAP/2gAMAwEAAhEDEQA/AMf/AP/Z';
@@ -39,7 +39,7 @@ export default function ApartmentGalleryLightbox({ photos, alts, springPreset='m
   const [reduceMotion,setReduceMotion]=useState(false);
   useEffect(()=>{ const mq=window.matchMedia('(prefers-reduced-motion: reduce)'); const apply=()=>setReduceMotion(mq.matches); apply(); mq.addEventListener('change',apply); return ()=> mq.removeEventListener('change',apply); },[]);
   const [open,setOpen]=useState(false); const [index,setIndex]=useState(0); const [fadeFrom,setFadeFrom]=useState<number|null>(null); const lastPersistedIndex=useRef(0);
-  const triggerHaptic=(pattern:number|number[]=8)=>{ if(!enableHaptics||typeof navigator==='undefined'||reduceMotion) return; try { const nav=navigator as Navigator & { vibrate?: (p:number|number[])=>boolean }; nav.vibrate?.(pattern); } catch(err){ logger.warn('Haptics vibrate failed',err);} };
+  const triggerHaptic=(pattern:number|number[]=8)=>{ if(!enableHaptics||typeof navigator==='undefined'||reduceMotion) return; try { const nav=navigator as Navigator & { vibrate?: (p:number|number[])=>boolean }; nav.vibrate?.(pattern); } catch(err){ logger.warn('Haptics vibrate failed', err instanceof Error ? err : { error: String(err) }); } };
   const startX=useRef<number|null>(null); const startY=useRef<number|null>(null); const originX=useRef<number|null>(null); const originY=useRef<number|null>(null);
   const panX=useRef(0); const panY=useRef(0); const scale=useRef(1); const pinchStartDist=useRef<number|null>(null); const pinchStartScale=useRef(1); const pinchMidImgX=useRef(0); const pinchMidImgY=useRef(0);
   const velocityX=useRef(0); const velocityY=useRef(0); const inertiaFrame=useRef<number|null>(null);
@@ -125,10 +125,10 @@ export default function ApartmentGalleryLightbox({ photos, alts, springPreset='m
       fadeTimeoutRef.current = null;
     },320); 
   },[index,total]);
-  const hide=useCallback(()=>{ setOpen(false); const globalIndex=activeSequenceRef.current[index] ?? 0; try{ localStorage.setItem('apartmentGalleryLastIndex',String(globalIndex)); }catch(err){ logger.warn('Persist last gallery index failed',err);} },[index]);
+  const hide=useCallback(()=>{ setOpen(false); const globalIndex=activeSequenceRef.current[index] ?? 0; try{ localStorage.setItem('apartmentGalleryLastIndex',String(globalIndex)); }catch(err){ logger.warn('Persist last gallery index failed', err instanceof Error ? err : { error: String(err) }); } },[index]);
   const next=useCallback(()=>{ if(scale.current>1.05) zoomedNavigate(1); else show(index+1); },[index,show,zoomedNavigate]);
   const prevRef=useRef<(()=>void)|null>(null); prevRef.current=()=>{ if(scale.current>1.05) zoomedNavigate(-1); else show(index-1); };
-  useEffect(()=>{ if(typeof window!=='undefined'){ try{ const v=localStorage.getItem('apartmentGalleryLastIndex'); if(v!=null){ const n=parseInt(v,10); if(!Number.isNaN(n)) { lastPersistedIndex.current=n; const seq=defaultSequenceRef.current; const pos=seq.indexOf(n); if(pos>=0) setIndex(pos); } } }catch(err){ logger.warn('Read last gallery index failed',err);} } },[]);
+  useEffect(()=>{ if(typeof window!=='undefined'){ try{ const v=localStorage.getItem('apartmentGalleryLastIndex'); if(v!=null){ const n=parseInt(v,10); if(!Number.isNaN(n)) { lastPersistedIndex.current=n; const seq=defaultSequenceRef.current; const pos=seq.indexOf(n); if(pos>=0) setIndex(pos); } } }catch(err){ logger.warn('Read last gallery index failed', err instanceof Error ? err : { error: String(err) }); } } },[]);
   useEffect(()=>{ const handler=(e:Event)=>{ const event=e as CustomEvent<number | { startIndex?: number; subset?: number[] }>; const detail=event.detail; let startIndex: number | undefined; let subset: number[] | undefined; if(typeof detail==='number'){ startIndex=detail; } else if(detail && typeof detail==='object'){ if(typeof detail.startIndex==='number') startIndex=detail.startIndex; if(Array.isArray(detail.subset)) subset=detail.subset; }
     const sanitizedSubset = Array.isArray(subset)
       ? subset

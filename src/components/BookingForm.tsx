@@ -3,7 +3,7 @@ import React, { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { DateRange, formatDateRange, getNights } from '@/lib/dateUtils';
 import { trackEvent } from '@/lib/analyticsClient';
-import { logger } from '@/lib/logger-enterprise';
+import { logger } from '@/lib/logger-client';
 
 interface BookingFormProps {
   dateRange: DateRange;
@@ -118,7 +118,7 @@ export default function BookingForm({ dateRange, guests, total, locale, submissi
       setSubmitted(true);
       
     } catch (err) {
-      logger.error('Booking submission failed', err);
+      logger.error('Booking submission failed', err instanceof Error ? err : { error: String(err) });
     } finally {
       setIsSubmitting(false);
     }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from 'react';
-import { logger } from '@/lib/logger-enterprise';
+import { logger } from '@/lib/logger-client';
 
 export interface Favorite {
   id: string;
@@ -13,11 +13,22 @@ const KEY = 'favorites:v1';
 
 function readSet(): Set<string> {
   if (typeof window === 'undefined') return new Set();
-  try { const raw = localStorage.getItem(KEY); if (!raw) return new Set(); return new Set(JSON.parse(raw)); } catch (err) { logger.warn('Favorites read failed', err); return new Set(); }
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return new Set();
+    return new Set(JSON.parse(raw));
+  } catch (err) {
+    logger.warn('Favorites read failed', err instanceof Error ? err : { error: String(err) });
+    return new Set();
+  }
 }
 
 function writeSet(s: Set<string>) {
-  try { localStorage.setItem(KEY, JSON.stringify(Array.from(s))); } catch (err) { logger.warn('Favorites write failed', err); }
+  try {
+    localStorage.setItem(KEY, JSON.stringify(Array.from(s)));
+  } catch (err) {
+    logger.warn('Favorites write failed', err instanceof Error ? err : { error: String(err) });
+  }
 }
 
 export function useFavorites() {

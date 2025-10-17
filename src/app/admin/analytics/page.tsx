@@ -1,6 +1,6 @@
 import { topPaths, hourBuckets, dayBuckets, rollingAverage, percentile, vitalsSummary, stats, dailyNewPaths, vitalsRecent } from '@/lib/analyticsStore';
 import AdminSessionManager from '@/components/AdminSessionManager';
-import { verifyAdmin } from '@/lib/auth';
+import { verifyAdmin } from '@/lib/auth/admin';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 

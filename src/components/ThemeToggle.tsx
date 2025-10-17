@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { logger } from '@/lib/logger-enterprise';
+import { logger } from '@/lib/logger-client';
 
 export default function ThemeToggle() {
   const [theme, setTheme] = useState<"light" | "dark">('light');
@@ -15,7 +15,7 @@ export default function ThemeToggle() {
       } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
         setTheme('dark');
       }
-    } catch (err) { logger.warn('ThemeToggle read localStorage failed', err); }
+    } catch (err) { logger.warn('ThemeToggle read localStorage failed', err instanceof Error ? err : { error: String(err) }); }
   }, []);
   // Apply theme side effects
   useEffect(() => {
@@ -28,7 +28,7 @@ export default function ThemeToggle() {
       root.removeAttribute('data-theme');
       root.classList.remove('dark');
     }
-    try { localStorage.setItem('theme', theme); } catch (err) { logger.warn('ThemeToggle write localStorage failed', err); }
+    try { localStorage.setItem('theme', theme); } catch (err) { logger.warn('ThemeToggle write localStorage failed', err instanceof Error ? err : { error: String(err) }); }
   }, [theme, mounted]);
   // Listen to system changes only if user hasn't chosen explicitly
   useEffect(() => {

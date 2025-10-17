@@ -1,5 +1,5 @@
 import { vitalsSummary, vitalsRecent } from '@/lib/analyticsStore';
-import { verifyAdmin } from '@/lib/auth';
+import { verifyAdmin } from '@/lib/auth/admin';
 import { NextRequest } from 'next/server';
 import { logger } from '@/lib/logger-enterprise';
 

@@ -52,9 +52,19 @@ const METRIC_DESCRIPTIONS = {
 // Send metrics to analytics endpoint
 function sendMetric(metric: { name: string; value: number; id: string; rating: string }) {
   try {
-    const envEnabled = typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_ENABLE_PERF_TELEMETRY === 'true' : false;
-    const isProd = typeof process !== 'undefined' ? process.env.NODE_ENV === 'production' : false;
-    if (!isProd && !envEnabled) return;
+    let shouldSend = false;
+    if (typeof process !== 'undefined') {
+      const flag = process.env.NEXT_PUBLIC_ENABLE_PERF_TELEMETRY;
+      const normalized = typeof flag === 'string' ? flag.toLowerCase() : undefined;
+      if (normalized === 'true') {
+        shouldSend = true;
+      } else if (normalized === 'false') {
+        shouldSend = false;
+      } else if (process.env.NODE_ENV === 'production') {
+        shouldSend = true;
+      }
+    }
+    if (!shouldSend) return;
     // Use sendBeacon for reliable reporting
     if (navigator.sendBeacon) {
       navigator.sendBeacon('/api/performance', JSON.stringify({
@@ -68,6 +78,7 @@ function sendMetric(metric: { name: string; value: number; id: string; rating: s
           id: metric.id,
           url: window.location.href,
           userAgent: navigator.userAgent,
+          connection: (navigator as unknown as { connection?: { effectiveType?: string; downlink?: number; rtt?: number } }).connection,
         },
       }));
     } else {
@@ -83,6 +94,7 @@ function sendMetric(metric: { name: string; value: number; id: string; rating: s
           id: metric.id,
           url: window.location.href,
           userAgent: navigator.userAgent,
+          connection: (navigator as unknown as { connection?: { effectiveType?: string; downlink?: number; rtt?: number } }).connection,
         },
       }).catch(err => {
         console.warn('Failed to send web vital metric', { metric, error: err });

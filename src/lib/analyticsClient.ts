@@ -1,4 +1,4 @@
-import { logger } from '@/lib/logger-enterprise';
+import { logger } from '@/lib/logger-client';
 
 // Simple, session-scoped funnel id that persists across pages in a session
 // Namespaced so we can have multiple funnels if needed; default is 'portal'
@@ -53,7 +53,7 @@ async function post(body: unknown) {
       if (ok) return;
     }
   } catch (err) {
-    logger.warn('sendBeacon analytics failed', err);
+    logger.warn('sendBeacon analytics failed', err instanceof Error ? err : { error: String(err) });
   }
   try {
     await fetch(endpoint, { method: 'POST', body: json, headers: { 'content-type': 'application/json' }, keepalive: true });
@@ -64,9 +64,9 @@ async function post(body: unknown) {
         return;
       }
     } catch (e2) {
-      logger.warn('SW queue analytics failed', e2);
+      logger.warn('SW queue analytics failed', e2 instanceof Error ? e2 : { error: String(e2) });
     }
-    logger.error('Analytics POST failed', err);
+    logger.error('Analytics POST failed', err instanceof Error ? err : { error: String(err) });
   }
 }
 

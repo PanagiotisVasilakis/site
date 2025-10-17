@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { signAdmin } from '@/lib/auth';
+import { signAdmin } from '@/lib/auth/admin';
 import { logger } from '@/lib/logger-enterprise';
 import { withErrorHandler, validateRequestBody } from '@/lib/apiErrorHandler';
 import crypto from 'node:crypto';
