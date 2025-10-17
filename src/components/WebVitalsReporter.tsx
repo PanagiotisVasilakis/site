@@ -7,7 +7,6 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { onCLS, onFID, onLCP, onINP, onTTFB } from 'web-vitals';
-import { logger } from '@/lib/logger-enterprise';
 import { internalPost } from '@/lib/internalFetch';
 
 interface WebVitalMetric {
@@ -86,11 +85,11 @@ function sendMetric(metric: { name: string; value: number; id: string; rating: s
           userAgent: navigator.userAgent,
         },
       }).catch(err => {
-        logger.warn('Failed to send web vital metric', { metric, error: err });
+        console.warn('Failed to send web vital metric', { metric, error: err });
       });
     }
   } catch (err) {
-    logger.warn('sendBeacon vitals failed', { metric, error: err });
+    console.warn('sendBeacon vitals failed', { metric, error: err });
   }
 }
 

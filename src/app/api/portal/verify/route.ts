@@ -162,32 +162,20 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     }
   }
 
-  // Upsert identity
-  if (body.origin === 'GR') {
-    await guestStore.upsertIdentity(user.id, 'AFM', body.afm);
-  } else {
-    await guestStore.upsertIdentity(user.id, 'PASSPORT', body.passport);
-  }
-
-  // Booking lookup/link
+  // Atomically link user to booking with identity verification and access grant
   const nowISO = new Date().toISOString().slice(0, 10);
   const endDate = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  let booking = body.bookingRef && body.lastName
-    ? await guestStore.findBookingByReferenceAndLastName(body.bookingRef, body.lastName)
-    : undefined;
-  if (!booking) {
-    booking = await guestStore.linkOrCreateBooking({
-      source: body.bookingRef ? 'EXTERNAL' : 'ONSITE',
-      reference: body.bookingRef,
-      start_date: nowISO,
-      end_date: endDate,
-      user_id: user.id,
-      last_name: body.lastName,
-    });
-  }
-
-  // Grant access
-  await guestStore.setAccess(user.id, booking.id, 'VERIFIED');
+  const identityValue = body.origin === 'GR' ? body.afm : body.passport;
+  
+  const { booking } = await guestStore.linkUserToBookingWithAccess({
+    userId: user.id,
+    origin: body.origin,
+    identityValue,
+    bookingRef: body.bookingRef,
+    lastName: body.lastName,
+    startDate: nowISO,
+    endDate,
+  });
 
   // Issue session
   const token = signGuestSession({ user: { id: user.id }, booking: { id: booking.id } });

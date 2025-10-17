@@ -83,7 +83,9 @@ export class SecurityHeadersMiddleware {
   private getSecurityHeaders(nonce?: string): Record<string, string> {
     const now = Date.now();
     
-    // Use cache if still valid and no nonce (nonce requires fresh generation)
+    // IMPORTANT: Never cache headers when a nonce is provided
+    // CSP nonces MUST be unique per request to prevent security issues
+    // Only static headers (without nonces) are cached for performance
     if (!nonce && securityHeadersCache && (now - cacheTimestamp) < CACHE_DURATION) {
       return securityHeadersCache;
     }
@@ -123,7 +125,8 @@ export class SecurityHeadersMiddleware {
     securityHeaders['X-Download-Options'] = 'noopen';
     securityHeaders['X-Permitted-Cross-Domain-Policies'] = 'none';
 
-    // Cache headers if no nonce
+    // IMPORTANT: Only cache static headers (no nonce)
+    // Never cache when nonce is present - nonces must be unique per request
     if (!nonce) {
       securityHeadersCache = securityHeaders;
       cacheTimestamp = now;
@@ -229,73 +232,143 @@ export class SecurityHeadersMiddleware {
   }
 }
 
-// Rate limiting middleware
-interface RateLimitStore {
-  [key: string]: {
-    count: number;
-    resetTime: number;
-  };
-}
-
+// Rate limiting middleware - Database-backed for persistence and scalability
 export class RateLimitMiddleware {
-  private store: RateLimitStore = {};
   private config = getSecurityConfig().rateLimit;
+  private lastCleanup = Date.now();
+  private cleanupInterval = 5 * 60 * 1000; // Clean every 5 minutes
+  
+  // In-memory fallback for Edge runtime (where Prisma doesn't work)
+  private memoryStore = new Map<string, { count: number; resetTime: number }>();
 
-  public handle(request: NextRequest): NextResponse | null {
+  public async handle(request: NextRequest): Promise<NextResponse | null> {
     if (!this.config.enabled) return null;
 
     const key = this.generateKey(request);
     const now = Date.now();
+    const resetTime = now + this.config.windowMs;
     
-    // Clean expired entries
-    this.cleanExpiredEntries(now);
-    
-    // Get or create rate limit entry
-    const entry = this.store[key] || { count: 0, resetTime: now + this.config.windowMs };
-    
-    // Reset if window has expired
-    if (now > entry.resetTime) {
-      entry.count = 0;
-      entry.resetTime = now + this.config.windowMs;
+    try {
+      // Check if we're in Edge runtime (middleware) - use in-memory store
+      // In Node runtime (API routes), we could use Prisma but middleware is Edge
+      // Edge runtime check: process.env.NEXT_RUNTIME is set by Next.js
+      const isEdgeRuntime = process.env.NEXT_RUNTIME === 'edge' || 
+                            typeof process.versions?.node === 'undefined';
+      
+      if (isEdgeRuntime) {
+        // Use in-memory rate limiting for Edge runtime
+        return this.handleInMemory(request, key, now, resetTime);
+      }
+      
+      // Try Prisma for Node runtime (though middleware is typically Edge)
+      const { prisma } = await import('@/lib/prisma');
+      
+      // Try to find existing rate limit entry
+      const existing = await prisma.rateLimit.findUnique({
+        where: { key }
+      });
+      
+      // If entry exists and hasn't expired, increment count
+      if (existing && existing.resetTime.getTime() > now) {
+        const newCount = existing.count + 1;
+        
+        // Check if limit exceeded BEFORE updating
+        if (existing.count >= this.config.maxRequests) {
+          const event: SecurityEvent = {
+            type: 'rate_limit_exceeded',
+            severity: 'medium',
+            timestamp: new Date().toISOString(),
+            ip: this.getClientIP(request),
+            userAgent: request.headers.get('user-agent') || undefined,
+            url: request.nextUrl.toString(),
+            details: {
+              limit: this.config.maxRequests,
+              windowMs: this.config.windowMs,
+              currentCount: existing.count,
+            },
+          };
+
+          logSecurityEvent(event);
+
+          const response = new NextResponse('Too Many Requests', { status: 429 });
+          
+          if (this.config.standardHeaders) {
+            response.headers.set('RateLimit-Limit', this.config.maxRequests.toString());
+            response.headers.set('RateLimit-Remaining', '0');
+            response.headers.set('RateLimit-Reset', Math.ceil(existing.resetTime.getTime() / 1000).toString());
+          }
+          
+          if (this.config.legacyHeaders) {
+            response.headers.set('X-RateLimit-Limit', this.config.maxRequests.toString());
+            response.headers.set('X-RateLimit-Remaining', '0');
+            response.headers.set('X-RateLimit-Reset', Math.ceil(existing.resetTime.getTime() / 1000).toString());
+          }
+          
+          return response;
+        }
+        
+        // Update count
+        await prisma.rateLimit.update({
+          where: { key },
+          data: { count: newCount }
+        });
+      } else {
+        // Create new entry or reset expired one
+        await prisma.rateLimit.upsert({
+          where: { key },
+          create: {
+            key,
+            count: 1,
+            resetTime: new Date(resetTime)
+          },
+          update: {
+            count: 1,
+            resetTime: new Date(resetTime)
+          }
+        });
+      }
+      
+      // Periodically clean up expired entries
+      await this.cleanupExpiredEntries();
+      
+      return null;
+    } catch (error) {
+      // If database rate limiting fails, log but don't block request
+      // This provides graceful degradation
+      console.error('Rate limiting database error:', error);
+      return null;
+    }
+  }
+  
+  private handleInMemory(request: NextRequest, key: string, now: number, resetTime: number): NextResponse | null {
+    // Clean expired entries from memory
+    for (const [k, v] of this.memoryStore.entries()) {
+      if (v.resetTime <= now) {
+        this.memoryStore.delete(k);
+      }
     }
     
-    // Increment counter
-    entry.count++;
-    this.store[key] = entry;
+    const existing = this.memoryStore.get(key);
     
-    // Check if limit exceeded
-    if (entry.count > this.config.maxRequests) {
-      const event: SecurityEvent = {
-        type: 'rate_limit_exceeded',
-        severity: 'medium',
-        timestamp: new Date().toISOString(),
-        ip: this.getClientIP(request),
-        userAgent: request.headers.get('user-agent') || undefined,
-        url: request.nextUrl.toString(),
-        details: {
-          limit: this.config.maxRequests,
-          windowMs: this.config.windowMs,
-          currentCount: entry.count,
-        },
-      };
-
-      logSecurityEvent(event);
-
-      const response = new NextResponse('Too Many Requests', { status: 429 });
-      
-      if (this.config.standardHeaders) {
-        response.headers.set('RateLimit-Limit', this.config.maxRequests.toString());
-        response.headers.set('RateLimit-Remaining', '0');
-        response.headers.set('RateLimit-Reset', Math.ceil(entry.resetTime / 1000).toString());
+    if (existing && existing.resetTime > now) {
+      // Check if limit exceeded
+      if (existing.count >= this.config.maxRequests) {
+        const response = new NextResponse('Too Many Requests', { status: 429 });
+        
+        if (this.config.standardHeaders) {
+          response.headers.set('RateLimit-Limit', this.config.maxRequests.toString());
+          response.headers.set('RateLimit-Remaining', '0');
+          response.headers.set('RateLimit-Reset', Math.ceil(existing.resetTime / 1000).toString());
+        }
+        
+        return response;
       }
       
-      if (this.config.legacyHeaders) {
-        response.headers.set('X-RateLimit-Limit', this.config.maxRequests.toString());
-        response.headers.set('X-RateLimit-Remaining', '0');
-        response.headers.set('X-RateLimit-Reset', Math.ceil(entry.resetTime / 1000).toString());
-      }
-      
-      return response;
+      // Increment count
+      existing.count++;
+    } else {
+      // Create new entry
+      this.memoryStore.set(key, { count: 1, resetTime });
     }
     
     return null;
@@ -318,15 +391,33 @@ export class RateLimitMiddleware {
     return realIP || 'unknown';
   }
 
-  private cleanExpiredEntries(now: number): void {
-    // Periodically clean expired entries to prevent memory leaks
-    const keys = Object.keys(this.store);
-    if (keys.length > 10000) { // Clean when store gets large
-      Object.keys(this.store).forEach(key => {
-        if (now > this.store[key].resetTime) {
-          delete this.store[key];
+  private async cleanupExpiredEntries(): Promise<void> {
+    const now = Date.now();
+    
+    // Only cleanup every 5 minutes
+    if (now - this.lastCleanup < this.cleanupInterval) {
+      return;
+    }
+    
+    this.lastCleanup = now;
+    
+    try {
+      const { prisma } = await import('@/lib/prisma');
+      
+      // Delete expired entries
+      const result = await prisma.rateLimit.deleteMany({
+        where: {
+          resetTime: {
+            lt: new Date(now)
+          }
         }
       });
+      
+      if (result.count > 0) {
+        console.log(`[Rate Limit] Cleaned up ${result.count} expired entries`);
+      }
+    } catch (error) {
+      console.error('Failed to cleanup expired rate limit entries:', error);
     }
   }
 }
@@ -403,13 +494,13 @@ export function createSecurityMiddleware(options?: SecurityMiddlewareOptions) {
   const rateLimit = new RateLimitMiddleware();
   const cors = new CORSMiddleware();
 
-  return (request: NextRequest): NextResponse => {
+  return async (request: NextRequest): Promise<NextResponse> => {
     // Check CORS first
     const corsResponse = cors.handle(request);
     if (corsResponse) return corsResponse;
 
-    // Check rate limiting
-    const rateLimitResponse = rateLimit.handle(request);
+    // Check rate limiting (now async)
+    const rateLimitResponse = await rateLimit.handle(request);
     if (rateLimitResponse) return rateLimitResponse;
 
     // Apply security headers

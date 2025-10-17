@@ -1,129 +1,51 @@
-import { getDatabase } from './database';
+/**
+ * Rate Limiter - Prisma-based implementation
+ */
+
+import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 
-interface RateLimitEntry {
-  key: string;
-  count: number;
-  reset_time: number;
-}
-
 export class RateLimiter {
-  private db: Awaited<ReturnType<typeof getDatabase>> | null = null;
-  
   async initialize(): Promise<void> {
-    try {
-      this.db = await getDatabase();
-      
-      // Create rate limits table if it doesn't exist
-      await this.db.exec(`
-        CREATE TABLE IF NOT EXISTS rate_limits (
-          key TEXT PRIMARY KEY,
-          count INTEGER NOT NULL,
-          reset_time INTEGER NOT NULL
-        )
-      `);
-      
-      // Create index for better performance
-      await this.db.exec(`
-        CREATE INDEX IF NOT EXISTS idx_rate_limits_reset_time ON rate_limits(reset_time)
-      `);
-      
-      logger.info('Rate limiter initialized');
-    } catch (error) {
-      logger.error('Failed to initialize rate limiter', error);
-      throw error;
-    }
+    logger.info('Rate limiter initialized');
   }
   
-  async isRateLimited(key: string, limit: number, windowMs: number): Promise<{ allowed: boolean; remaining: number; resetTime: number }> {
-    if (!this.db) {
-      await this.initialize();
-    }
-    
-    const now = Date.now();
-    const resetTime = now + windowMs;
+  async isRateLimited(
+    key: string,
+    limit: number,
+    windowMs: number
+  ): Promise<{ allowed: boolean; remaining: number; resetTime: number }> {
+    const now = new Date();
+    const resetTime = new Date(now.getTime() + windowMs);
     
     try {
-      // Get existing entry
-      const entry = await this.db!.get(
-        'SELECT * FROM rate_limits WHERE key = ?',
-        key
-      ) as RateLimitEntry | undefined;
+      const entry = await prisma.rateLimit.findUnique({ where: { key } });
       
       if (!entry) {
-        // Create new entry
-        await this.db!.run(
-          'INSERT INTO rate_limits (key, count, reset_time) VALUES (?, ?, ?)',
-          key,
-          1,
-          resetTime
-        );
-        
-        return {
-          allowed: true,
-          remaining: limit - 1,
-          resetTime
-        };
+        await prisma.rateLimit.create({ data: { key, count: 1, resetTime } });
+        return { allowed: true, remaining: limit - 1, resetTime: resetTime.getTime() };
       }
       
-      // Check if window has expired
-      if (entry.reset_time <= now) {
-        // Reset counter
-        await this.db!.run(
-          'UPDATE rate_limits SET count = 1, reset_time = ? WHERE key = ?',
-          resetTime,
-          key
-        );
-        
-        return {
-          allowed: true,
-          remaining: limit - 1,
-          resetTime
-        };
+      if (entry.resetTime <= now) {
+        await prisma.rateLimit.update({ where: { key }, data: { count: 1, resetTime } });
+        return { allowed: true, remaining: limit - 1, resetTime: resetTime.getTime() };
       }
       
-      // Check if limit exceeded
       if (entry.count >= limit) {
-        return {
-          allowed: false,
-          remaining: 0,
-          resetTime: entry.reset_time
-        };
+        return { allowed: false, remaining: 0, resetTime: entry.resetTime.getTime() };
       }
       
-      // Increment counter
-      await this.db!.run(
-        'UPDATE rate_limits SET count = count + 1 WHERE key = ?',
-        key
-      );
-      
-      return {
-        allowed: true,
-        remaining: limit - entry.count - 1,
-        resetTime: entry.reset_time
-      };
+      await prisma.rateLimit.update({ where: { key }, data: { count: entry.count + 1 } });
+      return { allowed: true, remaining: limit - entry.count - 1, resetTime: entry.resetTime.getTime() };
     } catch (error) {
       logger.error('Rate limiter check failed', { error, key });
-      // Fail open - allow request if rate limiter fails
-      return {
-        allowed: true,
-        remaining: limit,
-        resetTime
-      };
+      return { allowed: true, remaining: limit, resetTime: resetTime.getTime() };
     }
   }
   
   async resetRateLimit(key: string): Promise<void> {
-    if (!this.db) {
-      await this.initialize();
-    }
-    
     try {
-      await this.db!.run(
-        'DELETE FROM rate_limits WHERE key = ?',
-        key
-      );
-      
+      await prisma.rateLimit.delete({ where: { key } });
       logger.info('Rate limit reset', { key });
     } catch (error) {
       logger.error('Rate limiter reset failed', { error, key });
@@ -131,22 +53,13 @@ export class RateLimiter {
   }
   
   async cleanupExpiredEntries(): Promise<number> {
-    if (!this.db) {
-      await this.initialize();
-    }
-    
     try {
-      const now = Date.now();
-      const result = await this.db!.run(
-        'DELETE FROM rate_limits WHERE reset_time < ?',
-        now
-      );
-      
-  const removed = result.changes ?? 0;
+      const now = new Date();
+      const result = await prisma.rateLimit.deleteMany({ where: { resetTime: { lt: now } } });
+      const removed = result.count;
       if (removed > 0) {
         logger.info('Expired rate limit entries cleaned up', { count: removed });
       }
-      
       return removed;
     } catch (error) {
       logger.error('Rate limiter cleanup failed', { error });
@@ -155,5 +68,4 @@ export class RateLimiter {
   }
 }
 
-// Export singleton instance
 export const rateLimiter = new RateLimiter();

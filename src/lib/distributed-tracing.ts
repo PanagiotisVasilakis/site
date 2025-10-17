@@ -167,35 +167,56 @@ class DistributedTracer {
   public finishSpan(span: Span, status: SpanStatus = SpanStatus.OK): void {
     if (!this.isEnabled) return;
 
-    const endTime = Date.now();
-    span.endTime = endTime;
-    span.duration = endTime - span.startTime;
-    span.status = status;
+    try {
+      const endTime = Date.now();
+      span.endTime = endTime;
+      span.duration = endTime - span.startTime;
+      span.status = status;
 
-    // Update span in storage
-    this.spans.set(span.spanId, span);
+      // Update span in storage
+      this.spans.set(span.spanId, span);
 
-    // Track span completion
-    metrics.timer('tracing.span_duration', span.duration, {
-      operation: span.operationName,
-      component: span.component,
-      status,
-    });
+      // Track span completion - graceful degradation if metrics fail
+      try {
+        metrics.timer('tracing.span_duration', span.duration, {
+          operation: span.operationName,
+          component: span.component,
+          status,
+        });
+      } catch (metricsError) {
+        // Silently fail - don't let metrics errors break the app
+        if (process.env.NODE_ENV === 'development') {
+          console.error('[Tracing] Metrics error in finishSpan:', metricsError);
+        }
+      }
 
-    // Log slow operations
-    if (span.duration > 1000) {
-      this.addLog(span, 'warn', 'Slow operation detected', {
-        duration: span.duration,
-        threshold: 1000,
-      });
-    }
+      // Log slow operations
+      if (span.duration > 1000) {
+        this.addLog(span, 'warn', 'Slow operation detected', {
+          duration: span.duration,
+          threshold: 1000,
+        });
+      }
 
-    // Track errors
-    if (status === SpanStatus.ERROR) {
-      metrics.counter('tracing.span_errors', 1, {
-        operation: span.operationName,
-        component: span.component,
-      });
+      // Track errors
+      if (status === SpanStatus.ERROR) {
+        try {
+          metrics.counter('tracing.span_errors', 1, {
+            operation: span.operationName,
+            component: span.component,
+          });
+        } catch (metricsError) {
+          // Silently fail - don't let metrics errors break the app
+          if (process.env.NODE_ENV === 'development') {
+            console.error('[Tracing] Metrics error in finishSpan (error tracking):', metricsError);
+          }
+        }
+      }
+    } catch (error) {
+      // Graceful degradation - don't let tracing failures break the application
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Tracing] Failed to finish span:', error);
+      }
     }
 
     logger.debug('Span finished', {

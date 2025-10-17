@@ -16,7 +16,7 @@ const securityMiddleware = createSecurityMiddleware({
   enableNonce: true,
 });
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const startTime = Date.now();
   const { pathname } = req.nextUrl;
   
@@ -43,8 +43,8 @@ export function middleware(req: NextRequest) {
       method: req.method,
     });
 
-    // Apply security headers first (will skip if path is in skipPaths)
-    const response = securityMiddleware(req);
+    // Apply security headers first (will skip if path is in skipPaths) - now async
+    const response = await securityMiddleware(req);
     
     // Add tracing headers to response
     const traceHeaders = tracer.injectTraceContext({

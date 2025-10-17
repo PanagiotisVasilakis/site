@@ -4,6 +4,23 @@ import { logger } from '@/lib/logger';
 
 export const ADMIN_SECRET_STORAGE_KEY = 'admin_secret';
 
+/**
+ * Get correlation ID from server-side logger context if available
+ * Falls back to undefined in browser context
+ * 
+ * For now, correlation ID propagation is handled at the API route level
+ * via middleware. Client-side internal fetches don't have access to
+ * server-side AsyncLocalStorage context.
+ * 
+ * TODO: Consider adding correlation ID to response headers and storing
+ * in browser context for subsequent requests.
+ */
+function getCorrelationId(): string | undefined {
+  // Correlation ID propagation is server-side only
+  // Handled by middleware for API routes
+  return undefined;
+}
+
 function getAdminSecret(): string | null {
   if (typeof window === 'undefined') return null;
   try {
@@ -18,12 +35,26 @@ function getAdminSecret(): string | null {
 
 function buildHeaders(init?: RequestInit, adminSecret?: string): HeadersInit | undefined {
   const shouldAttachSecret = Boolean(adminSecret);
-  if (!shouldAttachSecret && !init?.headers) return init?.headers;
+  const correlationId = getCorrelationId();
+  
+  // Only create headers if we have something to add
+  if (!shouldAttachSecret && !correlationId && !init?.headers) {
+    return init?.headers;
+  }
 
   const headers = new Headers(init?.headers as HeadersInit | undefined);
+  
+  // Attach admin secret for admin API calls
   if (shouldAttachSecret && adminSecret) {
     headers.set('x-admin-secret', adminSecret);
   }
+  
+  // Propagate correlation ID for request tracing (server-side only)
+  if (correlationId) {
+    headers.set('X-Correlation-ID', correlationId);
+    headers.set('X-Request-ID', correlationId);
+  }
+  
   return headers;
 }
 

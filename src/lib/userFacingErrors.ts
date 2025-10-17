@@ -1,4 +1,4 @@
-import { ApiErrorCode } from '@/lib/apiErrorHandler';
+import { ApiErrorCode } from '@/lib/apiErrorTypes';
 
 type UIError = {
   summary: string;

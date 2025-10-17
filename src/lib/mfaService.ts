@@ -1,10 +1,10 @@
 import crypto from 'node:crypto';
-import { getDatabase } from '@/lib/database';
-import { logger } from '@/lib/logger';
+import { mfaRepository, type MFAFactorRecord, type MfaFactorType, type MfaFactorStatus } from '@/lib/prisma-repositories/mfaRepository';
+import { logger } from '@/lib/logger-enterprise';
 import { hashSensitive, verifySensitive } from '@/lib/crypto';
 
-export type MFAType = 'TOTP' | 'SMS' | 'EMAIL' | 'BACKUP_CODE';
-export type MFAStatus = 'ACTIVE' | 'INACTIVE' | 'PENDING';
+export type MFAType = MfaFactorType;
+export type MFAStatus = MfaFactorStatus;
 
 export interface MFAFactor {
   id: string;
@@ -38,6 +38,25 @@ interface BackupCodeDigest {
   salt: string;
 }
 
+// Helper to convert Prisma records to legacy format
+function toPrismaRecord(record: MFAFactorRecord): MFAFactor {
+  return {
+    id: record.id,
+    user_id: record.userId,
+    type: record.type,
+    secret_hash: record.secretHash,
+    secret_salt: record.secretSalt,
+    backup_codes_hash: record.backupCodesHash ?? undefined,
+    backup_codes_salt: record.backupCodesSalt ?? undefined,
+    phone_number_enc: record.phoneNumberEnc ?? undefined,
+    email_enc: record.emailEnc ?? undefined,
+    status: record.status,
+    created_at: record.createdAt.getTime(),
+    activated_at: record.activatedAt?.getTime(),
+    last_used_at: record.lastUsedAt?.getTime(),
+  };
+}
+
 export class MFAService {
   async enrollUserInMFA(
     userId: string,
@@ -49,10 +68,6 @@ export class MFAService {
       backupCodes?: string[];
     }
   ): Promise<MFAFactor> {
-    const db = await getDatabase();
-    const id = this.generateId('mfa');
-    const now = Date.now();
-    
     // Hash the secret
     const { hash: secretHash, salt: secretSalt } = hashSensitive(secret);
     
@@ -66,185 +81,112 @@ export class MFAService {
       backupCodesSalt = undefined;
     }
     
-    await db.run(
-      `INSERT INTO mfa_factors (
-        id, user_id, type, secret_hash, secret_salt, backup_codes_hash, 
-        backup_codes_salt, phone_number_enc, email_enc, status, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      id,
+    const factor = await mfaRepository.createFactor({
       userId,
       type,
       secretHash,
       secretSalt,
       backupCodesHash,
       backupCodesSalt,
-      opts?.phoneNumber,
-      opts?.email,
-      'PENDING',
-      now
-    );
+      phoneNumberEnc: opts?.phoneNumber,
+      emailEnc: opts?.email,
+    });
     
-    logger.info('User enrolled in MFA', { userId, type, factorId: id });
+    logger.info('User enrolled in MFA', { userId, type, factorId: factor.id });
     
-    return {
-      id,
-      user_id: userId,
-      type,
-      secret_hash: secretHash,
-      secret_salt: secretSalt,
-      backup_codes_hash: backupCodesHash,
-      backup_codes_salt: backupCodesSalt,
-      phone_number_enc: opts?.phoneNumber,
-      email_enc: opts?.email,
-      status: 'PENDING',
-      created_at: now
-    };
+    return toPrismaRecord(factor);
   }
   
   async activateMFA(factorId: string): Promise<MFAFactor | undefined> {
-    const db = await getDatabase();
-    const now = Date.now();
-    
-    const result = await db.run(
-      'UPDATE mfa_factors SET status = ?, activated_at = ? WHERE id = ? AND status = ?',
-      'ACTIVE',
-      now,
-      factorId,
-      'PENDING'
-    );
-    
-    if (result.changes === 0) {
-      return undefined;
-    }
-    
-    const row = await db.get('SELECT * FROM mfa_factors WHERE id = ?', factorId);
-    logger.info('MFA factor activated', { factorId });
-    
-    return row as MFAFactor;
-  }
-  
-  async getUserMFAFactors(userId: string): Promise<MFAFactor[]> {
-    const db = await getDatabase();
-    const rows = await db.all(
-      'SELECT * FROM mfa_factors WHERE user_id = ? AND status = ? ORDER BY created_at DESC',
-      userId,
-      'ACTIVE'
-    );
-    
-    return rows as MFAFactor[];
-  }
-  
-  async createChallenge(userId: string, factorId: string): Promise<{ challenge: MFAChallenge; code: string } | undefined> {
-    const db = await getDatabase();
-    const now = Date.now();
-    
-    // Check if factor exists and is active
-    const factor = await db.get(
-      'SELECT * FROM mfa_factors WHERE id = ? AND user_id = ? AND status = ?',
-      factorId,
-      userId,
-      'ACTIVE'
-    );
+    const factor = await mfaRepository.activateFactor(factorId);
     
     if (!factor) {
       return undefined;
     }
     
+    logger.info('MFA factor activated', { factorId });
+    return toPrismaRecord(factor);
+  }
+  
+  async getUserMFAFactors(userId: string): Promise<MFAFactor[]> {
+    const factors = await mfaRepository.getActiveFactorsByUserId(userId);
+    return factors.map(toPrismaRecord);
+  }
+  
+  async createChallenge(userId: string, factorId: string): Promise<{ challenge: MFAChallenge; code: string } | undefined> {
+    // Check if factor exists and is active
+    const factor = await mfaRepository.getFactorById(factorId);
+    
+    if (!factor || factor.userId !== userId || factor.status !== 'ACTIVE') {
+      return undefined;
+    }
+    
     // Generate a random 6-digit code
-  const code = crypto.randomInt(100000, 1000000).toString();
+    const code = crypto.randomInt(100000, 1000000).toString();
     const { hash: codeHash, salt: codeSalt } = hashSensitive(code);
     
-    const challengeId = this.generateId('mfac');
-    const expiresAt = now + 5 * 60 * 1000; // 5 minutes
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
     
-    await db.run(
-      `INSERT INTO mfa_challenges (
-        id, user_id, factor_id, challenge_code_hash, challenge_code_salt, 
-        expires_at, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      challengeId,
+    const challenge = await mfaRepository.createChallenge({
       userId,
       factorId,
-      codeHash,
-      codeSalt,
+      challengeCodeHash: codeHash,
+      challengeCodeSalt: codeSalt,
       expiresAt,
-      now
-    );
+    });
     
-    logger.info('MFA challenge created', { userId, factorId, challengeId });
+    logger.info('MFA challenge created', { userId, factorId, challengeId: challenge.id });
     
     return {
       challenge: {
-        id: challengeId,
-        user_id: userId,
-        factor_id: factorId,
-        challenge_code_hash: codeHash,
-        challenge_code_salt: codeSalt,
-        expires_at: expiresAt,
-        created_at: now
+        id: challenge.id,
+        user_id: challenge.userId,
+        factor_id: challenge.factorId,
+        challenge_code_hash: challenge.challengeCodeHash,
+        challenge_code_salt: challenge.challengeCodeSalt,
+        expires_at: challenge.expiresAt.getTime(),
+        created_at: challenge.createdAt.getTime(),
       },
       code
     };
   }
   
   async verifyChallenge(challengeId: string, code: string): Promise<boolean> {
-    const db = await getDatabase();
-    const now = Date.now();
-    
     // Get the challenge
-    const challenge = await db.get(
-      'SELECT * FROM mfa_challenges WHERE id = ? AND expires_at > ? AND completed_at IS NULL',
-      challengeId,
-      now
-    ) as MFAChallenge | undefined;
+    const challenge = await mfaRepository.getActiveChallenge(challengeId);
     
     if (!challenge) {
       return false;
     }
     
     // Verify the code
-    const isValid = verifySensitive(code, challenge.challenge_code_salt, challenge.challenge_code_hash);
+    const isValid = verifySensitive(code, challenge.challengeCodeSalt, challenge.challengeCodeHash);
     
     if (isValid) {
       // Mark challenge as completed
-      await db.run(
-        'UPDATE mfa_challenges SET completed_at = ? WHERE id = ?',
-        now,
-        challengeId
-      );
+      await mfaRepository.completeChallenge(challengeId);
       
       // Update factor's last used timestamp
-      await db.run(
-        'UPDATE mfa_factors SET last_used_at = ? WHERE id = ?',
-        now,
-        challenge.factor_id
-      );
+      await mfaRepository.updateLastUsed(challenge.factorId);
       
-      logger.info('MFA challenge verified', { challengeId, factorId: challenge.factor_id });
+      logger.info('MFA challenge verified', { challengeId, factorId: challenge.factorId });
     } else {
-      logger.warn('MFA challenge verification failed', { challengeId, factorId: challenge.factor_id });
+      logger.warn('MFA challenge verification failed', { challengeId, factorId: challenge.factorId });
     }
     
     return isValid;
   }
   
   async verifyBackupCode(userId: string, code: string): Promise<boolean> {
-    const db = await getDatabase();
-    
     // Get all active MFA factors for the user that have backup codes
-    const factors = await db.all(
-      `SELECT * FROM mfa_factors 
-       WHERE user_id = ? AND status = ? AND backup_codes_hash IS NOT NULL AND backup_codes_salt IS NOT NULL`,
-      userId,
-      'ACTIVE'
-    ) as MFAFactor[];
+    const factors = await mfaRepository.getFactorsWithBackupCodes(userId);
     
     // Try to verify against each factor's backup codes
     for (const factor of factors) {
-      if (factor.backup_codes_hash) {
+      if (factor.backupCodesHash) {
         let digests: BackupCodeDigest[] = [];
         try {
-          const parsed = JSON.parse(factor.backup_codes_hash) as BackupCodeDigest[];
+          const parsed = JSON.parse(factor.backupCodesHash) as BackupCodeDigest[];
           if (Array.isArray(parsed)) {
             digests = parsed;
           }
@@ -255,13 +197,7 @@ export class MFAService {
 
         for (const digest of digests) {
           if (verifySensitive(code, digest.salt, digest.hash)) {
-            const now = Date.now();
-            await db.run(
-              'UPDATE mfa_factors SET last_used_at = ? WHERE id = ?',
-              now,
-              factor.id
-            );
-
+            await mfaRepository.updateLastUsed(factor.id);
             logger.info('Backup code verified', { userId, factorId: factor.id });
             return true;
           }
@@ -274,43 +210,11 @@ export class MFAService {
   }
   
   async disableMFA(userId: string, factorId: string): Promise<boolean> {
-    const db = await getDatabase();
-    
-    const result = await db.run(
-      'UPDATE mfa_factors SET status = ? WHERE id = ? AND user_id = ? AND status = ?',
-      'INACTIVE',
-      factorId,
-      userId,
-      'ACTIVE'
-    );
-    
-  const disabled = (result.changes ?? 0) > 0;
-    if (disabled) {
-      logger.info('MFA factor disabled', { userId, factorId });
-    }
-    
-    return disabled;
+    return await mfaRepository.disableFactor(userId, factorId);
   }
   
   async cleanupExpiredChallenges(maxAgeMinutes: number = 60): Promise<number> {
-    const db = await getDatabase();
-    const cutoff = Date.now() - maxAgeMinutes * 60 * 60 * 1000;
-    
-    const result = await db.run(
-      'DELETE FROM mfa_challenges WHERE created_at < ?',
-      cutoff
-    );
-    
-  const removed = result.changes ?? 0;
-  if (removed > 0) {
-      logger.info('Expired MFA challenges cleaned up', { count: removed });
-    }
-    
-  return removed;
-  }
-  
-  private generateId(prefix: string = 'id'): string {
-    return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    return await mfaRepository.cleanupExpiredChallenges(maxAgeMinutes);
   }
 }
 

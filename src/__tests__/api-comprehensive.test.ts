@@ -4,7 +4,7 @@
  */
 
 import { NextRequest } from 'next/server';
-import type { z } from 'zod';
+import { z } from 'zod';
 import { apiValidator, ApiSchemas } from '../lib/api-validation';
 import { openApiSpec } from '../lib/openapi';
 
@@ -296,7 +296,7 @@ class APITestFramework {
     // Validate against schema
     const validation = apiValidator.validateResponse(
       data,
-      ApiSchemas.Category.array().transform((categories: Array<z.infer<typeof ApiSchemas.Category>>) => ({ categories })),
+      z.object({ categories: ApiSchemas.Category.array() }),
       { method: 'GET', url: '/api/categories', status: 200 }
     );
 
@@ -327,8 +327,12 @@ class APITestFramework {
     }
 
     const getData = await getResponse.json();
-    if (typeof getData.count !== 'number') {
-      errors.push('GET analytics: Response should contain numeric count');
+    // Analytics API returns { hits: [], vitals: [] }
+    if (!Array.isArray(getData.hits)) {
+      errors.push('GET analytics: Response should contain hits array');
+    }
+    if (!Array.isArray(getData.vitals)) {
+      errors.push('GET analytics: Response should contain vitals array');
     }
 
     // Test POST /api/analytics with valid payload

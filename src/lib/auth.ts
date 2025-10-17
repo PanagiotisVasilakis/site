@@ -1,31 +1,13 @@
-import { sign, verify, JwtPayload, SignOptions } from 'jsonwebtoken';
+/**
+ * @deprecated This file is kept for backwards compatibility.
+ * Please import from '@/lib/auth' (the auth/ directory) instead.
+ * 
+ * New structure:
+ * - '@/lib/auth' or '@/lib/auth/admin' for admin auth
+ * - '@/lib/auth/guest' for guest auth
+ * - '@/lib/auth/common' for shared utilities
+ */
 
-// Lazy JWT secret initialization to avoid build-time issues
-function getJwtSecret(): string {
-  const secret = process.env.ADMIN_JWT_SECRET;
-  
-  // In production, we must have a secure secret
-  if (process.env.NODE_ENV === 'production' && !secret) {
-    throw new Error('ADMIN_JWT_SECRET environment variable is required in production');
-  }
-  
-  // In development, warn if using default secret
-  if (!secret && process.env.NODE_ENV !== 'production') {
-    console.warn('⚠️  Using default JWT secret in development. Set ADMIN_JWT_SECRET for production.');
-    return 'dev-secret-change-me';
-  }
-  
-  return secret!;
-}
-
-export function signAdmin(payload: Record<string, unknown>, expiresIn: NonNullable<SignOptions['expiresIn']> = '2h'): string {
-  return sign(payload, getJwtSecret(), { expiresIn });
-}
-
-export function verifyAdmin(token: string): (JwtPayload & Record<string, unknown>) | null {
-  try {
-    return verify(token, getJwtSecret()) as JwtPayload & Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
+// Re-export everything from the new auth module
+export * from '@/lib/auth/admin';
+export * from '@/lib/auth/common';

@@ -53,6 +53,10 @@ describe('Portal API flow', () => {
       remember: true,
     });
   const res1 = await verifyMod.POST(req1 as any, { params: {} } as any);
+    if (res1.status !== 200) {
+      const errorBody = await res1.text();
+      console.error('Portal verify failed:', res1.status, errorBody);
+    }
     expect(res1.status).toBe(200);
     const cookies: string[] = [];
     res1.headers.forEach((value: string, key: string) => { if (key.toLowerCase() === 'set-cookie') cookies.push(value); });

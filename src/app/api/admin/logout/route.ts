@@ -1,11 +1,21 @@
-export async function POST() {
-  const res = new Response('ok', { status: 200 });
+import { NextResponse } from 'next/server';
+import { withErrorHandler } from '@/lib/apiErrorHandler';
+import { logger } from '@/lib/logger';
+
+// No body validation needed for logout (it's a simple POST)
+export const POST = withErrorHandler(async () => {
+  const res = NextResponse.json({ success: true }, { status: 200 });
   
-  // Properly expire cookie with all security flags and explicit expiration
-  const cookieFlags = `Path=/; HttpOnly; SameSite=Strict; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT${
-    process.env.NODE_ENV === 'production' ? '; Secure' : ''
-  }`;
+  // Properly expire cookie with all security flags
+  res.cookies.set('admin_jwt', '', {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'strict',
+    maxAge: 0,
+    expires: new Date(0),
+    secure: process.env.NODE_ENV === 'production',
+  });
   
-  res.headers.append('Set-Cookie', `admin_jwt=; ${cookieFlags}`);
+  logger.info('Admin logout successful');
   return res;
-}
+});

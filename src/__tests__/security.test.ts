@@ -147,22 +147,28 @@ describe('Rate Limiting Middleware', () => {
     middleware = new RateLimitMiddleware();
   });
 
-  test('should allow requests within limit', () => {
+  test('should allow requests within limit', async () => {
     const request = new NextRequest('https://example.com/api/test');
-    const response = middleware.handle(request);
+    const response = await middleware.handle(request);
 
     expect(response).toBeNull(); // No blocking response
   });
 
-  test('should block requests exceeding limit', () => {
+  test('should block requests exceeding limit', async () => {
+    // Temporarily set NODE_ENV to production for stricter limits (100 req/min)
+    const originalEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    const strictMiddleware = new RateLimitMiddleware();
+    process.env.NODE_ENV = originalEnv;
+    
     const request = new NextRequest('https://example.com/api/test');
 
-    // Simulate multiple requests
-    for (let i = 0; i < 100; i++) {
-      middleware.handle(request);
+    // Simulate multiple requests exceeding the production limit
+    for (let i = 0; i < 101; i++) {
+      await strictMiddleware.handle(request);
     }
 
-    const response = middleware.handle(request);
+    const response = await strictMiddleware.handle(request);
     expect(response?.status).toBe(429);
   });
 });
@@ -301,9 +307,18 @@ describe('XSS Protection', () => {
 
 describe('API Key Authentication', () => {
   let middleware: APIKeyAuthMiddleware;
+  let originalEnv: string | undefined;
 
   beforeEach(() => {
+    // Enable API key auth for tests by setting NODE_ENV to production temporarily
+    originalEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
     middleware = new APIKeyAuthMiddleware();
+  });
+
+  afterEach(() => {
+    // Restore original NODE_ENV
+    process.env.NODE_ENV = originalEnv;
   });
 
   test('should require API key when enabled', () => {
@@ -427,11 +442,11 @@ describe('Combined Security Middleware', () => {
     expect(typeof middleware).toBe('function');
   });
 
-  test('should apply all security checks in sequence', () => {
+  test('should apply all security checks in sequence', async () => {
     const middleware = createSecurityMiddleware();
     const request = new NextRequest('https://example.com/api/test');
 
-    const response = middleware(request);
+    const response = await middleware(request);
     expect(response).toBeDefined();
     
     // Should have security headers

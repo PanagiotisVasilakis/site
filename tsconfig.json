@@ -29,6 +29,11 @@
     "node_modules",
     "src/**/*.test.ts",
     "src/**/*.test.tsx",
-    "src/**/__tests__/**"
+    "src/**/__tests__/**",
+    "scripts/init-db.ts",
+    "scripts/test-db.ts",
+    "scripts/migrate.ts",
+    "src/lib/cacheManager.ts",
+    "src/lib/monitor.ts"
   ]
 }

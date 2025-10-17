@@ -1,19 +1,51 @@
 import crypto from 'node:crypto';
 
+// Cache generated dev secrets to persist across requests in same process
+let generatedDevPepper: string | null = null;
+let generatedDevEncKey: Buffer | null = null;
+
 // Env keys: keep short, documented names
-const PEPPER = process.env.SECURITY_PEPPER || 'dev-pepper-change-me';
+const PEPPER = getPepper();
 const ENC_KEY_HEX = process.env.SECURITY_ENC_KEY_HEX; // 32 bytes hex for AES-256
 
 // Key rotation support
 const ENC_KEY_HEX_PREVIOUS = process.env.SECURITY_ENC_KEY_HEX_PREVIOUS; // Previous key for decryption during rotation
+
+function getPepper(): string {
+  const envPepper = process.env.SECURITY_PEPPER;
+  
+  if (envPepper) {
+    return envPepper;
+  }
+  
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('SECURITY_PEPPER environment variable is required in production');
+  }
+  
+  // Generate cryptographically strong random pepper for development
+  if (!generatedDevPepper) {
+    generatedDevPepper = crypto.randomBytes(32).toString('hex');
+    console.warn('⚠️  Generated random SECURITY_PEPPER for development session');
+    console.warn(`⚠️  Pepper preview: ${generatedDevPepper.slice(0, 16)}...`);
+    console.warn('⚠️  Set SECURITY_PEPPER in .env to persist across restarts');
+  }
+  
+  return generatedDevPepper;
+}
 
 function getEncKey(): Buffer {
   if (!ENC_KEY_HEX) {
     if (process.env.NODE_ENV === 'production') {
       throw new Error('SECURITY_ENC_KEY_HEX must be set to a 64-char hex (32 bytes) in production');
     }
-    // Derive a deterministic 32-byte key from pepper as dev fallback
-    return crypto.createHash('sha256').update(PEPPER).digest();
+    // Generate cryptographically strong random encryption key for development
+    if (!generatedDevEncKey) {
+      generatedDevEncKey = crypto.randomBytes(32);
+      console.warn('⚠️  Generated random SECURITY_ENC_KEY for development session');
+      console.warn(`⚠️  Key preview: ${generatedDevEncKey.toString('hex').slice(0, 16)}...`);
+      console.warn('⚠️  Set SECURITY_ENC_KEY_HEX in .env to persist across restarts');
+    }
+    return generatedDevEncKey;
   }
   const buf = Buffer.from(ENC_KEY_HEX, 'hex');
   if (buf.length !== 32) throw new Error('SECURITY_ENC_KEY_HEX must be 32 bytes (64 hex chars)');

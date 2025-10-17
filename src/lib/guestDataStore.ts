@@ -1,96 +1,26 @@
-import { initializeDatabase, getDatabase } from '@/lib/database';
-import {
-  userRepository,
-  identityRepository,
-  bookingRepository,
-  accessRepository,
-  checkinRepository,
-  refreshTokenRepository
-} from '@/lib/repositories';
-import { hashSensitive, maskLast4, hmacDeterministic, verifySensitive } from '@/lib/crypto';
+import { accessRepository, type AccessRecord } from '@/lib/prisma-repositories/accessRepository';
+import { checkinRepository, type CheckinRecord } from '@/lib/prisma-repositories/checkinRepository';
+import { userRepository, type UserRecord } from '@/lib/prisma-repositories/userRepository';
+import { identityRepository, type IdentityRecord } from '@/lib/prisma-repositories/identityRepository';
+import { bookingRepository, type BookingRecord } from '@/lib/prisma-repositories/bookingRepository';
+import { refreshTokenRepository, type GuestRefreshTokenRec as PrismaGuestRefreshTokenRec } from '@/lib/prisma-repositories/refreshTokenRepository';
+import type { SessionRecord } from '@/lib/prisma-repositories/sessionRepository';
+import { hashSensitive, maskLast4, hmacDeterministic } from '@/lib/crypto';
 import { logger } from '@/lib/logger';
+import { prisma } from '@/lib/prisma';
 import crypto from 'node:crypto';
 
 export type IdentityType = 'AFM' | 'PASSPORT';
 export type BookingSource = 'ONSITE' | 'EXTERNAL';
 export type AccessStatus = 'PENDING' | 'VERIFIED';
 
-export interface User {
-  id: string;
-  email?: string;
-  phone_e164: string;
-  password_hash?: string; // bcrypt hash
-  country_origin: 'GR' | 'ABROAD';
-  created_at: number;
-  updated_at: number;
-}
-
-export interface Identity {
-  user_id: string;
-  type: IdentityType;
-  value_hash: string;
-  salt: string;
-  last4_mask: string;
-  verified_at?: number;
-}
-
-export interface Booking {
-  id: string;
-  source: BookingSource;
-  reference?: string;
-  last_name_hash?: string;
-  last_name_salt?: string;
-  // Deterministic tokens derived from normalized last name
-  last_name_token?: string; // hmac(lowercase)
-  last_name_token_nows?: string; // hmac(lowercase without whitespace)
-  start_date: string; // ISO
-  end_date: string;   // ISO
-  user_id?: string;
-  created_at: number;
-}
-
-export interface BookingAccess {
-  user_id: string;
-  booking_id: string;
-  status: AccessStatus;
-  created_at: number;
-  updated_at: number;
-}
-
-export interface AuthSessionRec {
-  id: string;
-  user_id: string;
-  booking_id: string;
-  expires_at: number;
-  revoked_at?: number;
-}
-
-export interface CheckinCompletionRec {
-  booking_id: string;
-  arrival_time: string; // HH:mm
-  special_requests?: string;
-  accepted_at: number; // ms epoch
-}
-
-export interface GuestRefreshTokenRec {
-  id: string;
-  user_id: string;
-  token_hash: string;
-  salt: string;
-  family_id: string; // rotation family
-  created_at: number;
-  expires_at: number;
-  revoked_at?: number;
-  rotated_from_id?: string;
-  last_used_at?: number;
-  device_hint?: string;
-  ip_hint?: string;
-}
-
-// Initialize database on module load
-initializeDatabase().catch((error) => {
-  logger.error('Failed to initialize database', { error });
-});
+export type User = UserRecord;
+export type Identity = IdentityRecord;
+export type Booking = BookingRecord;
+export type BookingAccess = AccessRecord;
+export type AuthSessionRec = SessionRecord;
+export type CheckinCompletionRec = CheckinRecord;
+export type GuestRefreshTokenRec = PrismaGuestRefreshTokenRec;
 
 export const guestStore = {
   // Users
@@ -269,7 +199,7 @@ export const guestStore = {
         family_id,
         Date.now() + ttlDays * 24 * 60 * 60 * 1000,
         {
-          deviceId: opts?.device_hint,
+          deviceHint: opts?.device_hint,
           ipHint: opts?.ip_hint
         }
       );
@@ -283,19 +213,7 @@ export const guestStore = {
   
   async verifyRefreshToken(token: string): Promise<GuestRefreshTokenRec | undefined> {
     try {
-      const db = await getDatabase();
-      const now = Date.now();
-      const rows = await db.all(
-        'SELECT * FROM refresh_tokens WHERE revoked_at IS NULL AND expires_at > ?',
-        now
-      );
-      for (const row of rows as GuestRefreshTokenRec[]) {
-        if (verifySensitive(token, row.salt, row.token_hash)) {
-          await db.run('UPDATE refresh_tokens SET last_used_at = ? WHERE id = ?', now, row.id);
-          return row;
-        }
-      }
-      return undefined;
+      return await refreshTokenRepository.verify(token);
     } catch (error) {
       logger.error('guestStore: failed to verify refresh token', error);
       return undefined;
@@ -308,16 +226,11 @@ export const guestStore = {
       const byIdResult = await refreshTokenRepository.revoke(idOrToken);
       if (byIdResult) return true;
       
-      // If that fails, try by token hash
-      const { hash } = hashSensitive(idOrToken);
-      const db = await getDatabase();
-      const row = await db.get('SELECT id FROM refresh_tokens WHERE token_hash = ?', hash);
-      
-      if (row) {
-        return await refreshTokenRepository.revoke(row.id);
-      }
-      
-      return false;
+      // If that fails, try verifying the token to locate the record
+      const record = await refreshTokenRepository.verify(idOrToken);
+      if (!record) return false;
+
+      return await refreshTokenRepository.revoke(record.id);
     } catch (error) {
       logger.error('guestStore: failed to revoke refresh token', error);
       return false;
@@ -342,12 +255,7 @@ export const guestStore = {
       rec.rotated_from_id = old.id;
       
       // Update the new token record
-      const db = await getDatabase();
-      await db.run(
-        'UPDATE refresh_tokens SET rotated_from_id = ? WHERE id = ?',
-        old.id,
-        rec.id
-      );
+      await refreshTokenRepository.updateRotatedFromId(rec.id, old.id);
       
       return { old, rec, token };
     } catch (error) {
@@ -418,6 +326,301 @@ export const guestStore = {
     } catch (error) {
       logger.error('guestStore: failed to get all access records', error);
       return [];
+    }
+  },
+
+  // ============================================================================
+  // TRANSACTION METHODS - Atomic multi-step operations
+  // ============================================================================
+
+  /**
+   * Links a user to a booking with identity verification and access grant.
+   * All operations are atomic - if any fails, all are rolled back.
+   * 
+   * Used by: portal/verify/route.ts after user authentication
+   * 
+   * @param params - User linkage parameters
+   * @returns Booking and access records (snake_case)
+   */
+  async linkUserToBookingWithAccess(params: {
+    userId: string;
+    origin: string;
+    identityValue: string; // AFM or PASSPORT value
+    bookingRef?: string;
+    lastName?: string;
+    startDate: string;
+    endDate: string;
+  }): Promise<{ booking: Booking; access: BookingAccess }> {
+    try {
+      const result = await prisma.$transaction(async (tx) => {
+        // 1. Upsert identity
+        const identityType: IdentityType = params.origin === 'GR' ? 'AFM' : 'PASSPORT';
+        const { hash: valueHash, salt: valueSalt } = hashSensitive(params.identityValue);
+        const last4Mask = maskLast4(params.identityValue);
+        
+        await tx.identity.upsert({
+          where: {
+            userId_type: {
+              userId: params.userId,
+              type: identityType,
+            },
+          },
+          create: {
+            userId: params.userId,
+            type: identityType,
+            valueHash,
+            salt: valueSalt,
+            last4Mask,
+            verifiedAt: new Date(),
+          },
+          update: {
+            valueHash,
+            salt: valueSalt,
+            last4Mask,
+            verifiedAt: new Date(),
+          },
+        });
+
+        // 2. Find or create booking
+        let bookingDb = null;
+        
+        if (params.bookingRef && params.lastName) {
+          // Search by reference - use same logic as repositories
+          const lastNameLower = params.lastName.toLowerCase();
+          bookingDb = await tx.booking.findFirst({
+            where: {
+              reference: params.bookingRef,
+              OR: [
+                { lastNameToken: lastNameLower },
+                { lastNameTokenNoWs: lastNameLower.replace(/\s+/g, '') },
+              ],
+            },
+          });
+        }
+
+        if (!bookingDb) {
+          // PostgreSQL UUID column requires pure UUID format (no prefix)
+          const id = crypto.randomUUID();
+          const lastNameLower = params.lastName?.toLowerCase();
+          const lastNameHashed = params.lastName ? hashSensitive(params.lastName) : null;
+          bookingDb = await tx.booking.create({
+            data: {
+              id,
+              source: params.bookingRef ? 'EXTERNAL' : 'ONSITE',
+              reference: params.bookingRef ?? null,
+              lastNameHash: lastNameHashed?.hash ?? null,
+              lastNameSalt: lastNameHashed?.salt ?? null,
+              lastNameToken: lastNameLower ?? null,
+              lastNameTokenNoWs: lastNameLower?.replace(/\s+/g, '') ?? null,
+              startDate: new Date(params.startDate),
+              endDate: new Date(params.endDate),
+              userId: params.userId,
+            },
+          });
+        }
+
+        // 3. Grant access
+        const accessDb = await tx.access.upsert({
+          where: {
+            userId_bookingId: {
+              userId: params.userId,
+              bookingId: bookingDb.id,
+            },
+          },
+          create: {
+            userId: params.userId,
+            bookingId: bookingDb.id,
+            status: 'VERIFIED',
+          },
+          update: {
+            status: 'VERIFIED',
+          },
+        });
+
+        // Map to snake_case types
+        const booking: Booking = {
+          id: bookingDb.id,
+          source: bookingDb.source,
+          reference: bookingDb.reference ?? undefined,
+          last_name_hash: bookingDb.lastNameHash ?? undefined,
+          last_name_salt: bookingDb.lastNameSalt ?? undefined,
+          last_name_token: bookingDb.lastNameToken ?? undefined,
+          last_name_token_nows: bookingDb.lastNameTokenNoWs ?? undefined,
+          start_date: bookingDb.startDate.toISOString(),
+          end_date: bookingDb.endDate.toISOString(),
+          user_id: bookingDb.userId ?? undefined,
+          created_at: bookingDb.createdAt.getTime(),
+        };
+
+        const access: BookingAccess = {
+          user_id: accessDb.userId,
+          booking_id: accessDb.bookingId,
+          status: accessDb.status,
+          created_at: accessDb.createdAt.getTime(),
+          updated_at: accessDb.updatedAt.getTime(),
+        };
+
+        return { booking, access };
+      });
+
+      logger.info('guestStore: linkUserToBookingWithAccess completed', {
+        userId: params.userId,
+        bookingId: result.booking.id,
+      });
+
+      return result;
+    } catch (error) {
+      logger.error('guestStore: failed to link user to booking with access (transaction rolled back)', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Registers an onsite guest with booking and access in one atomic operation.
+   * All operations succeed or fail together.
+   * 
+   * Used by: portal/onsite/confirm/route.ts
+   * 
+   * @param params - Guest registration parameters
+   * @returns User, booking, and access records (snake_case)
+   */
+  async registerOnsiteGuest(params: {
+    phone: string;
+    origin: string;
+    booking: {
+      id?: string;
+      reference?: string;
+      lastName?: string;
+      startDate: string;
+      endDate: string;
+    };
+  }): Promise<{ user: User; booking: Booking; access: BookingAccess }> {
+    try {
+      const result = await prisma.$transaction(async (tx) => {
+        // 1. Find or create user
+        let userDb = await tx.user.findFirst({
+          where: { phoneE164: params.phone },
+        });
+
+        if (!userDb) {
+          // PostgreSQL UUID column requires pure UUID format (no prefix)
+          const id = crypto.randomUUID();
+          userDb = await tx.user.create({
+            data: {
+              id,
+              phoneE164: params.phone,
+              countryOrigin: params.origin as 'GR' | 'ABROAD',
+              passwordHash: null,
+            },
+          });
+        }
+
+        // 2. Find or create booking
+        let bookingDb = null;
+
+        if (params.booking.id) {
+          bookingDb = await tx.booking.findUnique({
+            where: { id: params.booking.id },
+          });
+        }
+
+        if (!bookingDb && params.booking.reference && params.booking.lastName) {
+          const lastNameLower = params.booking.lastName.toLowerCase();
+          bookingDb = await tx.booking.findFirst({
+            where: {
+              reference: params.booking.reference,
+              OR: [
+                { lastNameToken: lastNameLower },
+                { lastNameTokenNoWs: lastNameLower.replace(/\s+/g, '') },
+              ],
+            },
+          });
+        }
+
+        if (!bookingDb) {
+          // PostgreSQL UUID column requires pure UUID format (no prefix)
+          const id = crypto.randomUUID();
+          const lastNameLower = params.booking.lastName?.toLowerCase();
+          const lastNameHashed = params.booking.lastName ? hashSensitive(params.booking.lastName) : null;
+          bookingDb = await tx.booking.create({
+            data: {
+              id,
+              source: 'ONSITE',
+              reference: params.booking.reference ?? null,
+              lastNameHash: lastNameHashed?.hash ?? null,
+              lastNameSalt: lastNameHashed?.salt ?? null,
+              lastNameToken: lastNameLower ?? null,
+              lastNameTokenNoWs: lastNameLower?.replace(/\s+/g, '') ?? null,
+              startDate: new Date(params.booking.startDate),
+              endDate: new Date(params.booking.endDate),
+              userId: userDb.id,
+            },
+          });
+        }
+
+        // 3. Grant access
+        const accessDb = await tx.access.upsert({
+          where: {
+            userId_bookingId: {
+              userId: userDb.id,
+              bookingId: bookingDb.id,
+            },
+          },
+          create: {
+            userId: userDb.id,
+            bookingId: bookingDb.id,
+            status: 'VERIFIED',
+          },
+          update: {
+            status: 'VERIFIED',
+          },
+        });
+
+        // Map to snake_case types
+        const user: User = {
+          id: userDb.id,
+          email: userDb.email ?? undefined,
+          phone_e164: userDb.phoneE164,
+          password_hash: userDb.passwordHash ?? undefined,
+          country_origin: userDb.countryOrigin,
+          created_at: userDb.createdAt.getTime(),
+          updated_at: userDb.updatedAt.getTime(),
+        };
+
+        const booking: Booking = {
+          id: bookingDb.id,
+          source: bookingDb.source,
+          reference: bookingDb.reference ?? undefined,
+          last_name_hash: bookingDb.lastNameHash ?? undefined,
+          last_name_salt: bookingDb.lastNameSalt ?? undefined,
+          last_name_token: bookingDb.lastNameToken ?? undefined,
+          last_name_token_nows: bookingDb.lastNameTokenNoWs ?? undefined,
+          start_date: bookingDb.startDate.toISOString(),
+          end_date: bookingDb.endDate.toISOString(),
+          user_id: bookingDb.userId ?? undefined,
+          created_at: bookingDb.createdAt.getTime(),
+        };
+
+        const access: BookingAccess = {
+          user_id: accessDb.userId,
+          booking_id: accessDb.bookingId,
+          status: accessDb.status,
+          created_at: accessDb.createdAt.getTime(),
+          updated_at: accessDb.updatedAt.getTime(),
+        };
+
+        return { user, booking, access };
+      });
+
+      logger.info('guestStore: registerOnsiteGuest completed', {
+        userId: result.user.id,
+        bookingId: result.booking.id,
+      });
+
+      return result;
+    } catch (error) {
+      logger.error('guestStore: failed to register onsite guest (transaction rolled back)', error);
+      throw error;
     }
   },
 };

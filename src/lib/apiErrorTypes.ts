@@ -1,0 +1,45 @@
+/**
+ * API Error Types
+ * Type definitions for API errors (client-safe, no server dependencies)
+ */
+
+export const ApiErrorCode = {
+  // Client errors
+  BAD_REQUEST: 'BAD_REQUEST',
+  UNAUTHORIZED: 'UNAUTHORIZED',
+  FORBIDDEN: 'FORBIDDEN',
+  NOT_FOUND: 'NOT_FOUND',
+  METHOD_NOT_ALLOWED: 'METHOD_NOT_ALLOWED',
+  CONFLICT: 'CONFLICT',
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
+  RATE_LIMITED: 'RATE_LIMITED', // Alias
+  PAYLOAD_TOO_LARGE: 'PAYLOAD_TOO_LARGE',
+  
+  // Server errors
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+  NOT_IMPLEMENTED: 'NOT_IMPLEMENTED',
+  SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
+  DATABASE_ERROR: 'DATABASE_ERROR',
+  EXTERNAL_SERVICE_ERROR: 'EXTERNAL_SERVICE_ERROR',
+  GATEWAY_TIMEOUT: 'GATEWAY_TIMEOUT',
+} as const;
+
+export type ApiErrorCode = typeof ApiErrorCode[keyof typeof ApiErrorCode];
+
+export interface ApiErrorDetails {
+  validationErrors?: Array<{ path: string; message: string }>;
+  fields?: Record<string, string>;
+  hints?: string[];
+  [key: string]: unknown;
+}
+
+export interface ApiErrorResponse {
+  error: {
+    code: ApiErrorCode;
+    message: string;
+    details?: ApiErrorDetails;
+  };
+  correlationId?: string;
+  timestamp?: string;
+}

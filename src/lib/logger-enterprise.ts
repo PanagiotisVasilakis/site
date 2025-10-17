@@ -3,16 +3,11 @@
  * Features: Correlation IDs, Performance monitoring, Error context, Sanitization
  */
 
-// Edge Runtime compatible async context storage
-// Use simple fallback implementation to avoid Node.js specific APIs
-const asyncLocalStorage = {
-  getStore: (): LogContext | null => null,
-  run: <T>(context: Partial<LogContext>, callback: () => T): T => callback(),
-  enterWith: (context: Partial<LogContext>) => {
-    // No-op in Edge Runtime fallback
-    void context;
-  },
-};
+import { AsyncLocalStorage } from 'node:async_hooks';
+
+// AsyncLocalStorage for proper context propagation across async operations
+// Note: This requires Node.js runtime (not Edge). For Edge routes, use fallback.
+const asyncLocalStorage = new AsyncLocalStorage<Partial<LogContext>>();
 
 export interface LogContext {
   correlationId: string;
@@ -31,7 +26,7 @@ export interface LogEntry {
   timestamp: string;
   level: LogLevel;
   message: string;
-  context?: LogContext;
+  context?: Partial<LogContext>;
   metadata?: Record<string, unknown>;
   error?: {
     name: string;
@@ -120,8 +115,8 @@ class EnterpriseLogger {
   /**
    * Get current logging context
    */
-  getContext(): LogContext | undefined {
-    return asyncLocalStorage.getStore() || undefined;
+  getContext(): Partial<LogContext> | undefined {
+    return asyncLocalStorage.getStore();
   }
 
   /**

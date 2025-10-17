@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect } from 'react';
-import { logger } from '@/lib/logger-enterprise';
 import { useErrorHandler } from '@/lib/errorBoundary';
 import { useErrorReporting } from '@/lib/errorReporting';
 
@@ -16,7 +15,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
 
   useEffect(() => {
     // Report error with full context
-    logger.error('Global unhandled UI error', {
+    console.error('Global unhandled UI error', {
       errorDetails: {
         name: error.name,
         message: error.message,
@@ -51,7 +50,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
   }, [error, reportError, addBreadcrumb, boundaryReportError]);
 
   const handleReset = () => {
-    logger.info('Global error recovery attempted', {
+    console.info('Global error recovery attempted', {
       errorDigest: error.digest,
       context: 'global-error-boundary',
     });
@@ -59,7 +58,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
   };
 
   const handleReload = () => {
-    logger.info('Page reload requested from global error', {
+    console.info('Page reload requested from global error', {
       errorDigest: error.digest,
       context: 'global-error-boundary',
     });
@@ -67,7 +66,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
   };
 
   const handleGoHome = () => {
-    logger.info('Homepage navigation from global error', {
+    console.info('Homepage navigation from global error', {
       errorDigest: error.digest,
       context: 'global-error-boundary',
     });

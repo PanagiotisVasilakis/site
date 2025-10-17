@@ -6,7 +6,6 @@
 'use client';
 
 import { useCallback } from 'react';
-import { logger } from './logger-enterprise';
 import { errorReporter } from './errorReporting';
 
 /**
@@ -14,7 +13,7 @@ import { errorReporter } from './errorReporting';
  */
 export function useErrorHandler() {
   const reportError = useCallback((error: Error, context?: string, metadata?: Record<string, unknown>) => {
-    logger.error('Manual error report', { context, ...metadata }, error);
+    console.error('Manual error report', { context, ...metadata }, error);
 
     try {
       void errorReporter.reportError(error, {
@@ -23,7 +22,7 @@ export function useErrorHandler() {
         metadata,
       });
     } catch (reportingError) {
-      logger.warn('Error reporting failed', { reportingError });
+      console.warn('Error reporting failed', { reportingError });
     }
   }, []);
 

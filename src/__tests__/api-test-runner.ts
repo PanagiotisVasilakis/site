@@ -157,7 +157,9 @@ class APITestRunner {
 }
 
 // CLI interface
-if (require.main === module) {
+// Check if this module is being run directly (ES module compatible)
+const isMainModule = import.meta.url === `file://${process.argv[1]}`;
+if (isMainModule) {
   const args = process.argv.slice(2);
   const config: TestConfig = {};
 

@@ -66,39 +66,18 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     body = await parseBody(request);
   }
 
-  // Find or create user by phone
-  let user = await guestStore.findUserByPhone(body.phone);
-  if (!user) {
-    user = await guestStore.createUser({
-      phone_e164: body.phone,
-      country_origin: body.origin || 'GR',
-      // created_at, updated_at set in store
-    });
-  }
-
-  // If an id/reference provided, try to find; else link/create booking
-  let booking;
-  if (body.booking.id) {
-    booking = await guestStore.findBookingById(body.booking.id);
-  }
-  
-  if (!booking && body.booking.reference && body.booking.lastName) {
-    booking = await guestStore.findBookingByReferenceAndLastName(body.booking.reference, body.booking.lastName);
-  }
-  
-  if (!booking) {
-    booking = await guestStore.linkOrCreateBooking({
-      source: 'ONSITE',
+  // Atomically register onsite guest with booking and access
+  const { user, booking } = await guestStore.registerOnsiteGuest({
+    phone: body.phone,
+    origin: body.origin || 'GR',
+    booking: {
+      id: body.booking.id,
       reference: body.booking.reference,
-      start_date: body.booking.start_date,
-      end_date: body.booking.end_date,
-      user_id: user.id,
-      last_name: body.booking.lastName,
-    });
-  }
-
-  // Grant access and mint session
-  await guestStore.setAccess(user.id, booking.id, 'VERIFIED');
+      lastName: body.booking.lastName,
+      startDate: body.booking.start_date,
+      endDate: body.booking.end_date,
+    },
+  });
 
   const jwt = signGuestSession({ user: { id: user.id }, booking: { id: booking.id } });
   const sess = createSessionCookie(jwt);

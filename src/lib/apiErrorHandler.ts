@@ -6,28 +6,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from './logger-enterprise';
 import { z } from 'zod';
+import type { ApiErrorCode, ApiErrorDetails, ApiErrorResponse } from './apiErrorTypes';
+import { ApiErrorCode as ErrorCodes } from './apiErrorTypes';
 
-// Standard API error codes
-export enum ApiErrorCode {
-  // Client errors (4xx)
-  BAD_REQUEST = 'BAD_REQUEST',
-  UNAUTHORIZED = 'UNAUTHORIZED',
-  FORBIDDEN = 'FORBIDDEN',
-  NOT_FOUND = 'NOT_FOUND',
-  METHOD_NOT_ALLOWED = 'METHOD_NOT_ALLOWED',
-  CONFLICT = 'CONFLICT',
-  VALIDATION_ERROR = 'VALIDATION_ERROR',
-  RATE_LIMITED = 'RATE_LIMITED',
-  PAYLOAD_TOO_LARGE = 'PAYLOAD_TOO_LARGE',
-  
-  // Server errors (5xx)
-  INTERNAL_ERROR = 'INTERNAL_ERROR',
-  NOT_IMPLEMENTED = 'NOT_IMPLEMENTED',
-  SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE',
-  GATEWAY_TIMEOUT = 'GATEWAY_TIMEOUT',
-  DATABASE_ERROR = 'DATABASE_ERROR',
-  EXTERNAL_SERVICE_ERROR = 'EXTERNAL_SERVICE_ERROR',
-}
+// Re-export for backward compatibility
+export { ErrorCodes as ApiErrorCode };
+export type { ApiErrorDetails, ApiErrorResponse };
 
 // Standard HTTP status codes
 const HttpStatusCodes = {
@@ -53,21 +37,22 @@ const HttpStatusCodes = {
 
 // Error code to HTTP status mapping
 const ERROR_STATUS_MAP: Record<ApiErrorCode, number> = {
-  [ApiErrorCode.BAD_REQUEST]: HttpStatusCodes.BAD_REQUEST,
-  [ApiErrorCode.UNAUTHORIZED]: HttpStatusCodes.UNAUTHORIZED,
-  [ApiErrorCode.FORBIDDEN]: HttpStatusCodes.FORBIDDEN,
-  [ApiErrorCode.NOT_FOUND]: HttpStatusCodes.NOT_FOUND,
-  [ApiErrorCode.METHOD_NOT_ALLOWED]: HttpStatusCodes.METHOD_NOT_ALLOWED,
-  [ApiErrorCode.CONFLICT]: HttpStatusCodes.CONFLICT,
-  [ApiErrorCode.VALIDATION_ERROR]: HttpStatusCodes.UNPROCESSABLE_ENTITY,
-  [ApiErrorCode.RATE_LIMITED]: HttpStatusCodes.TOO_MANY_REQUESTS,
-  [ApiErrorCode.PAYLOAD_TOO_LARGE]: HttpStatusCodes.PAYLOAD_TOO_LARGE,
-  [ApiErrorCode.INTERNAL_ERROR]: HttpStatusCodes.INTERNAL_SERVER_ERROR,
-  [ApiErrorCode.NOT_IMPLEMENTED]: HttpStatusCodes.NOT_IMPLEMENTED,
-  [ApiErrorCode.SERVICE_UNAVAILABLE]: HttpStatusCodes.SERVICE_UNAVAILABLE,
-  [ApiErrorCode.GATEWAY_TIMEOUT]: HttpStatusCodes.GATEWAY_TIMEOUT,
-  [ApiErrorCode.DATABASE_ERROR]: HttpStatusCodes.INTERNAL_SERVER_ERROR,
-  [ApiErrorCode.EXTERNAL_SERVICE_ERROR]: HttpStatusCodes.BAD_GATEWAY,
+  [ErrorCodes.BAD_REQUEST]: HttpStatusCodes.BAD_REQUEST,
+  [ErrorCodes.UNAUTHORIZED]: HttpStatusCodes.UNAUTHORIZED,
+  [ErrorCodes.FORBIDDEN]: HttpStatusCodes.FORBIDDEN,
+  [ErrorCodes.NOT_FOUND]: HttpStatusCodes.NOT_FOUND,
+  [ErrorCodes.METHOD_NOT_ALLOWED]: HttpStatusCodes.METHOD_NOT_ALLOWED,
+  [ErrorCodes.CONFLICT]: HttpStatusCodes.CONFLICT,
+  [ErrorCodes.VALIDATION_ERROR]: HttpStatusCodes.UNPROCESSABLE_ENTITY,
+  [ErrorCodes.RATE_LIMITED]: HttpStatusCodes.TOO_MANY_REQUESTS,
+  [ErrorCodes.RATE_LIMIT_EXCEEDED]: HttpStatusCodes.TOO_MANY_REQUESTS,
+  [ErrorCodes.PAYLOAD_TOO_LARGE]: HttpStatusCodes.PAYLOAD_TOO_LARGE,
+  [ErrorCodes.INTERNAL_ERROR]: HttpStatusCodes.INTERNAL_SERVER_ERROR,
+  [ErrorCodes.NOT_IMPLEMENTED]: HttpStatusCodes.NOT_IMPLEMENTED,
+  [ErrorCodes.SERVICE_UNAVAILABLE]: HttpStatusCodes.SERVICE_UNAVAILABLE,
+  [ErrorCodes.GATEWAY_TIMEOUT]: HttpStatusCodes.GATEWAY_TIMEOUT,
+  [ErrorCodes.DATABASE_ERROR]: HttpStatusCodes.INTERNAL_SERVER_ERROR,
+  [ErrorCodes.EXTERNAL_SERVICE_ERROR]: HttpStatusCodes.BAD_GATEWAY,
 };
 
 // Structured API error class
@@ -125,7 +110,7 @@ export class ValidationError extends ApiError {
     };
 
     super(
-      ApiErrorCode.VALIDATION_ERROR,
+      ErrorCodes.VALIDATION_ERROR,
       'Validation failed',
       details,
       correlationId
@@ -148,7 +133,7 @@ export class RateLimitError extends ApiError {
     };
 
     super(
-      ApiErrorCode.RATE_LIMITED,
+      ErrorCodes.RATE_LIMITED,
       `Rate limit exceeded. Limit: ${limit} requests per ${windowMs}ms`,
       details,
       correlationId
@@ -160,7 +145,7 @@ export class RateLimitError extends ApiError {
 export class TimeoutError extends ApiError {
   constructor(timeoutMs: number, correlationId?: string) {
     super(
-      ApiErrorCode.GATEWAY_TIMEOUT,
+      ErrorCodes.GATEWAY_TIMEOUT,
       `Request timeout after ${timeoutMs}ms`,
       { timeoutMs },
       correlationId
@@ -256,7 +241,7 @@ export function withErrorHandler(
       const contentLength = request.headers.get('content-length');
       if (contentLength && parseInt(contentLength) > mergedConfig.maxRequestBodySize) {
         throw new ApiError(
-          ApiErrorCode.PAYLOAD_TOO_LARGE,
+          ErrorCodes.PAYLOAD_TOO_LARGE,
           `Request body too large. Maximum size: ${mergedConfig.maxRequestBodySize} bytes`,
           { contentLength: parseInt(contentLength), maxSize: mergedConfig.maxRequestBodySize },
           correlationId
@@ -350,7 +335,7 @@ export function withErrorHandler(
 
       // Handle unexpected errors
       const internalError = new ApiError(
-        ApiErrorCode.INTERNAL_ERROR,
+        ErrorCodes.INTERNAL_ERROR,
         process.env.NODE_ENV === 'production' 
           ? 'An internal server error occurred'
           : error instanceof Error ? error.message : String(error),
@@ -426,7 +411,7 @@ export function validateRequestBody<T>(schema: z.ZodSchema<T>) {
       }
       
       throw new ApiError(
-        ApiErrorCode.BAD_REQUEST,
+        ErrorCodes.BAD_REQUEST,
         'Invalid JSON in request body',
         undefined,
         correlationId
