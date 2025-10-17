@@ -61,7 +61,7 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
     <div className="page-container mx-auto max-w-3xl">
       <CheckinViewed locale={eff} />
       <div className="mb-6 text-center">
-        <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--text-accent)' }}>
+        <h1 className="text-3xl font-bold mb-2">
           House Guide
         </h1>
         <p className="text-[color:var(--fg-muted)]">

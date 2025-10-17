@@ -208,6 +208,103 @@ code, pre, kbd, samp {
   width: 100%; /* Let pages control max-width (e.g., max-w-3xl/6xl) */
 }
 
+/* Responsive typography - adapts to screen size */
+@media (max-width: 640px) {
+  /* Mobile: smaller text */
+  h1 { font-size: clamp(1.5rem, 5vw, 2rem); }
+  h2 { font-size: clamp(1.25rem, 4vw, 1.75rem); }
+  h3 { font-size: clamp(1.125rem, 3.5vw, 1.5rem); }
+  p { font-size: clamp(0.875rem, 2.5vw, 1rem); }
+  
+  /* Adjust card padding for mobile */
+  .card { padding: clamp(1rem, 3vw, 1.5rem); }
+  
+  /* Stack grids on mobile */
+  .grid { grid-template-columns: 1fr !important; }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  /* Tablet: medium text */
+  h1 { font-size: clamp(1.75rem, 4vw, 2.5rem); }
+  h2 { font-size: clamp(1.5rem, 3.5vw, 2rem); }
+  h3 { font-size: clamp(1.25rem, 3vw, 1.75rem); }
+  
+  /* Two columns for grids on tablets */
+  .grid:not(.grid-cols-1) { grid-template-columns: repeat(2, 1fr) !important; }
+}
+
+@media (min-width: 1025px) {
+  /* Desktop: optimal text sizing */
+  h1 { font-size: clamp(2rem, 3vw, 3rem); }
+  h2 { font-size: clamp(1.5rem, 2.5vw, 2.25rem); }
+  h3 { font-size: clamp(1.25rem, 2vw, 1.875rem); }
+}
+
+/* Ensure touch targets are at least 44x44px on mobile */
+@media (max-width: 640px) {
+  button, a, [role="button"], [tabindex="0"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Better spacing on mobile */
+  .page-container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+  
+  /* Make cards more compact on mobile */
+  .card {
+    padding: 1rem;
+    border-radius: 12px;
+  }
+  
+  /* Better button sizes on mobile */
+  .btn-primary, .btn-secondary, .btn-outline {
+    font-size: 0.875rem;
+    padding: 0.625rem 1rem;
+  }
+  
+  /* Optimize grid gaps for mobile */
+  .grid {
+    gap: 1rem;
+  }
+}
+
+/* Tablet optimizations */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .page-container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+  
+  .card {
+    padding: 1.25rem;
+  }
+  
+  .grid {
+    gap: 1.25rem;
+  }
+}
+
+/* Desktop optimizations */
+@media (min-width: 1025px) {
+  .page-container {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+  
+  .card {
+    padding: 1.5rem;
+  }
+  
+  .grid {
+    gap: 1.5rem;
+  }
+}
+
 /* Top menu bar dark mode: match menu item color */
 [data-theme="dark"] .fixed.top-0.left-0.right-0 .flex.items-center {
   color: inherit;
@@ -306,6 +403,21 @@ code, pre, kbd, samp {
   --action-bg: var(--brand-300);
   --action-bg-hover: var(--brand-400);
   --action-fg: #042c28;
+}
+
+/* Force dark teal background on all pages in dark mode */
+[data-theme="dark"] body {
+  background: var(--layer-bg-subtle) !important;
+}
+
+/* Ensure page containers inherit the dark background */
+[data-theme="dark"] .page-container {
+  background: transparent !important;
+}
+
+/* Make sure min-h-screen elements use the correct background */
+[data-theme="dark"] .min-h-screen {
+  background: transparent !important;
 }
 
 /* Button primitives (moved outside dark theme block) */
@@ -449,12 +561,13 @@ input, textarea { color: inherit; }
 }
 
 [data-theme="dark"] .card {
-  background: rgba(23, 35, 37, 0.75);
+  background: var(--layer-surface);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 
-              0 1px 0 rgba(255, 255, 255, 0.1) inset;
+  border: 1px solid var(--border-soft);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 
+              0 1px 0 rgba(255, 255, 255, 0.08) inset;
+  color: var(--fg-default);
 }
 
 /* Elevated hero card with soft glow */
@@ -1310,94 +1423,234 @@ button[role="tab"] {
   color: #ffffff !important;
 }
 
-/* Villa page dark mode styles */
-.villa-cinematic-container {
-  --villa-ink: #1c1c20;
-  --villa-muted: #6e727a;
-  --villa-border: #e6e8ee;
+/* Universal page dark mode styles - applies apartment color scheme to ALL pages */
+.page-container,
+.villa-cinematic-container,
+.apartment-cinematic-container {
+  --page-ink: #1c1c20;
+  --page-muted: #6e727a;
+  --page-border: #e6e8ee;
 }
 
-[data-theme="dark"] .villa-cinematic-container {
-  --villa-ink: var(--fg-default);
-  --villa-muted: var(--fg-muted);
-  --villa-border: var(--border-soft);
+[data-theme="dark"] .page-container,
+[data-theme="dark"] .villa-cinematic-container,
+[data-theme="dark"] .apartment-cinematic-container {
+  --page-ink: var(--fg-default);
+  --page-muted: var(--fg-muted);
+  --page-border: var(--border-soft);
 }
 
-.villa-content-section {
+/* Content sections - applies to all pages */
+.page-container,
+.villa-content-section,
+.apartment-content-section {
   background: #ffffff;
-  color: var(--villa-ink);
+  color: var(--page-ink);
 }
 
-[data-theme="dark"] .villa-content-section {
-  background: var(--layer-bg-subtle);
+[data-theme="dark"] .page-container,
+[data-theme="dark"] .villa-content-section,
+[data-theme="dark"] .apartment-content-section {
+  background: transparent;
   color: var(--fg-default);
 }
 
-.villa-section-title {
-  color: var(--villa-ink);
+/* Ensure all divs inside page containers use proper background */
+[data-theme="dark"] .page-container > div {
+  background: transparent;
 }
 
-[data-theme="dark"] .villa-section-title {
+/* Cards and panels in dark mode should stand out slightly from background */
+[data-theme="dark"] .page-container .card,
+[data-theme="dark"] .page-container .panel {
+  background: var(--layer-surface);
+}
+
+/* Section titles - applies to all pages */
+h1, h2, h3, h4, h5, h6,
+.villa-section-title,
+.apartment-section-title {
+  color: var(--page-ink);
+}
+
+[data-theme="dark"] h1,
+[data-theme="dark"] h2,
+[data-theme="dark"] h3,
+[data-theme="dark"] h4,
+[data-theme="dark"] h5,
+[data-theme="dark"] h6,
+[data-theme="dark"] .villa-section-title,
+[data-theme="dark"] .apartment-section-title {
   color: var(--fg-default);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-.villa-description-text {
-  color: var(--villa-muted);
+/* Description text - applies to all pages */
+p,
+.villa-description-text,
+.apartment-description-text {
+  color: var(--page-muted);
 }
 
-[data-theme="dark"] .villa-description-text {
+[data-theme="dark"] p,
+[data-theme="dark"] .villa-description-text,
+[data-theme="dark"] .apartment-description-text {
   color: var(--fg-muted);
 }
 
-.villa-spec-badge {
-  border: 1px solid var(--villa-border);
+/* Ensure all text elements have proper contrast in dark mode */
+[data-theme="dark"] span,
+[data-theme="dark"] div,
+[data-theme="dark"] label,
+[data-theme="dark"] a:not(.btn-primary):not(.btn-secondary) {
+  color: inherit;
+}
+
+/* Links should be visible in dark mode */
+[data-theme="dark"] a {
+  color: var(--brand-400);
+}
+
+[data-theme="dark"] a:hover {
+  color: var(--brand-300);
+}
+
+/* Spec badges - applies to all pages */
+.villa-spec-badge,
+.apartment-spec-badge {
+  border: 1px solid var(--page-border);
   background: #ffffff;
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
-[data-theme="dark"] .villa-spec-badge {
+[data-theme="dark"] .villa-spec-badge,
+[data-theme="dark"] .apartment-spec-badge {
   border: 1px solid var(--border-soft);
   background: var(--layer-surface);
   color: var(--fg-default);
   box-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
 
-.villa-btn-primary {
+/* Primary buttons - applies to all pages */
+.villa-btn-primary,
+.apartment-btn-primary {
   background: #000000;
   color: #ffffff;
+  padding: clamp(0.5rem, 2vw, 0.75rem) clamp(1rem, 3vw, 1.5rem);
+  border-radius: 20px;
+  font-weight: 600;
+  transition: all 0.3s ease;
 }
 
-[data-theme="dark"] .villa-btn-primary {
+.villa-btn-primary--depth,
+.apartment-btn-primary--depth {
+  box-shadow: 0 20px 36px -22px rgba(12, 20, 28, 0.6);
+  transition: box-shadow 0.25s ease, transform 0.2s ease;
+}
+
+.villa-btn-primary--depth:hover,
+.apartment-btn-primary--depth:hover {
+  box-shadow: 0 24px 44px -22px rgba(12, 20, 28, 0.64);
+  transform: translateY(-2px);
+}
+
+.villa-btn-primary--depth:active,
+.apartment-btn-primary--depth:active {
+  box-shadow: 0 16px 32px -24px rgba(12, 20, 28, 0.68);
+  transform: translateY(0);
+}
+
+[data-theme="dark"] .villa-btn-primary,
+[data-theme="dark"] .apartment-btn-primary {
   background: var(--brand-500);
   color: #042c28;
+  font-weight: 700;
 }
 
-.villa-btn-secondary {
+[data-theme="dark"] .villa-btn-primary--depth,
+[data-theme="dark"] .apartment-btn-primary--depth {
+  box-shadow: 0 18px 36px -22px rgba(18, 179, 164, 0.65), 
+              0 4px 12px -2px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .villa-btn-primary--depth:hover,
+[data-theme="dark"] .apartment-btn-primary--depth:hover {
+  box-shadow: 0 24px 48px -24px rgba(18, 179, 164, 0.75), 
+              0 6px 16px -2px rgba(0, 0, 0, 0.4);
+  background: var(--brand-400);
+}
+
+/* Secondary buttons - applies to all pages */
+.villa-btn-secondary,
+.apartment-btn-secondary {
   background: #ffffff;
-  border: 1px solid var(--villa-border);
-  color: var(--villa-ink);
+  border: 1px solid var(--page-border);
+  color: var(--page-ink);
+  padding: clamp(0.5rem, 2vw, 0.75rem) clamp(1rem, 3vw, 1.5rem);
+  border-radius: 20px;
+  font-weight: 600;
+  transition: all 0.3s ease;
 }
 
-[data-theme="dark"] .villa-btn-secondary {
+.villa-btn-secondary--depth,
+.apartment-btn-secondary--depth {
+  box-shadow: 0 12px 28px -20px rgba(12, 20, 28, 0.45);
+  transition: box-shadow 0.25s ease, transform 0.2s ease;
+}
+
+.villa-btn-secondary--depth:hover,
+.apartment-btn-secondary--depth:hover {
+  box-shadow: 0 16px 34px -22px rgba(12, 20, 28, 0.5);
+  transform: translateY(-2px);
+}
+
+.villa-btn-secondary--depth:active,
+.apartment-btn-secondary--depth:active {
+  box-shadow: 0 10px 24px -24px rgba(12, 20, 28, 0.55);
+  transform: translateY(0);
+}
+
+[data-theme="dark"] .villa-btn-secondary,
+[data-theme="dark"] .apartment-btn-secondary {
   background: var(--layer-surface);
   border: 1px solid var(--border-soft);
   color: var(--fg-default);
+  font-weight: 600;
 }
 
-.villa-footer-text {
-  color: var(--villa-muted);
+[data-theme="dark"] .villa-btn-secondary--depth,
+[data-theme="dark"] .apartment-btn-secondary--depth {
+  box-shadow: 0 14px 36px -24px rgba(18, 179, 164, 0.35), 
+              0 4px 12px -2px rgba(0, 0, 0, 0.3);
 }
 
-[data-theme="dark"] .villa-footer-text {
+[data-theme="dark"] .villa-btn-secondary--depth:hover,
+[data-theme="dark"] .apartment-btn-secondary--depth:hover {
+  background: var(--layer-surface-alt);
+  box-shadow: 0 18px 42px -24px rgba(18, 179, 164, 0.45), 
+              0 6px 16px -2px rgba(0, 0, 0, 0.4);
+}
+
+/* Footer text - applies to all pages */
+.villa-footer-text,
+.apartment-footer-text {
+  color: var(--page-muted);
+}
+
+[data-theme="dark"] .villa-footer-text,
+[data-theme="dark"] .apartment-footer-text {
   color: var(--fg-muted);
 }
 
-.villa-photo-card {
-  border: 1px solid var(--villa-border);
+/* Photo cards - applies to all pages */
+.villa-photo-card,
+.apartment-photo-card {
+  border: 1px solid var(--page-border);
   background: #ffffff;
 }
 
-[data-theme="dark"] .villa-photo-card {
+[data-theme="dark"] .villa-photo-card,
+[data-theme="dark"] .apartment-photo-card {
   border: 1px solid var(--border-soft);
   background: var(--layer-surface);
 }

@@ -48,30 +48,30 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
         <Link
           href={`/${eff}/apartment`}
-          className="card p-6 flex flex-col items-center text-center transition-colors hover:bg-white/90 group"
+          className="card p-6 flex flex-col items-center text-center transition-all group hover:shadow-lg"
         >
           <div className="text-4xl mb-3 group-hover:scale-110 transition-transform" aria-hidden>🏡</div>
-          <div className="text-lg font-medium mb-2" style={{color:'var(--text-accent)'}}>{t.house?.navLabel || 'Apartment Photos'}</div>
+          <div className="text-lg font-medium mb-2">{t.house?.navLabel || 'Apartment Photos'}</div>
         </Link>
 
         <Link
           href={`/${eff}/check-in`}
-          className="card p-6 flex flex-col items-center text-center transition-colors hover:bg-white/90 group"
+          className="card p-6 flex flex-col items-center text-center transition-all group hover:shadow-lg"
         >
           <div className="text-4xl mb-3 group-hover:scale-110 transition-transform" aria-hidden>✅</div>
-          <div className="text-lg font-medium mb-2" style={{color:'var(--text-accent)'}}>Check-In Info</div>
+          <div className="text-lg font-medium mb-2">Check-In Info</div>
         </Link>
 
         {cats.slice(0, 2).map((c) => (
           <Link
             key={c.id}
             href={`/${eff}/${c.slug}`}
-            className="card p-6 flex flex-col items-center text-center transition-colors hover:bg-white/90 group"
+            className="card p-6 flex flex-col items-center text-center transition-all group hover:shadow-lg"
           >
             <div className="text-4xl mb-3 group-hover:scale-110 transition-transform" aria-hidden>
               {c.icon ?? "📋"}
             </div>
-            <div className="text-lg font-medium mb-2" style={{color:'var(--text-accent)'}}>
+            <div className="text-lg font-medium mb-2">
               {t.categories[c.slug as "phones" | "restaurants" | "sightseeing"] ?? (pickCategoryLocale(c, "title", eff) ?? c.title)}
             </div>
           </Link>

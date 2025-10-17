@@ -35,7 +35,7 @@ export default async function FavoritesPage({ params }: { params: Promise<{ loca
         locale={eff}
       />
       <nav className="pt-6">
-  <Link href={`/${eff}`} className="text-sm" style={{color:'var(--text-accent-subtle)'}}>{t.backHome}</Link>
+  <Link href={`/${eff}`} className="text-sm text-brand-700 hover:text-brand-800 transition-colors">{t.backHome}</Link>
       </nav>
     </div>
   );

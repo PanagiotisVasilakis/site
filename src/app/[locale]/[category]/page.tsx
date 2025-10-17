@@ -18,8 +18,8 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
   return (
   <div className="page-container mx-auto max-w-3xl safe-bottom">
       <header className="mb-4">
-  <h1 className="text-2xl font-semibold" style={{color:'var(--text-accent)'}}>{t.categories[cat.slug as "phones" | "restaurants" | "sightseeing"] ?? (pickCategoryLocale(cat, "title", eff) ?? cat.title)}</h1>
-  {(pickCategoryLocale(cat, "description", eff) ?? cat.description) && <p className="text-sm text-gray-600">{pickCategoryLocale(cat, "description", eff) ?? cat.description}</p>}
+  <h1 className="text-2xl font-semibold">{t.categories[cat.slug as "phones" | "restaurants" | "sightseeing"] ?? (pickCategoryLocale(cat, "title", eff) ?? cat.title)}</h1>
+  {(pickCategoryLocale(cat, "description", eff) ?? cat.description) && <p className="text-sm opacity-80">{pickCategoryLocale(cat, "description", eff) ?? cat.description}</p>}
       </header>
 
       {items.length === 0 && (
@@ -30,7 +30,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
           </div>
           <div className="text-xs text-gray-500">Content updating – please check again later.</div>
           <div>
-            <Link href={`/${locale}`} className="underline" style={{color:'var(--text-accent-subtle)'}}>{t.cta.home}</Link>
+            <Link href={`/${locale}`} className="underline text-brand-700 hover:text-brand-800 transition-colors">{t.cta.home}</Link>
           </div>
         </div>
       )}
@@ -55,7 +55,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
   />
 
       <nav className="pt-2">
-  <Link href={`/${eff}`} className="text-sm" style={{color:'var(--text-accent-subtle)'}}>{t.backHome}</Link>
+  <Link href={`/${eff}`} className="text-sm text-brand-700 hover:text-brand-800 transition-colors">{t.backHome}</Link>
       </nav>
     </div>
   );
