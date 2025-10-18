@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 // Mock next/navigation router hooks deterministically
@@ -41,10 +41,7 @@ describe('UnifiedGuestClient', () => {
     const user = userEvent.setup();
     render(<UnifiedGuestClient />);
 
-    // Entry gate: reveal tabs by choosing existing booking
-  await user.click(screen.getByRole('button', { name: /Booking & Check-in Details/i }));
-
-  // Initial mode is signin per mocked search params
+    // Auth form is now shown directly (no intro gate), initial mode is signin per mocked search params
     const signinTab = document.getElementById('tab-signin') as HTMLButtonElement;
     expect(signinTab.getAttribute('aria-selected')).toBe('true');
     // Panel should be present and associated to the active tab

@@ -11,13 +11,11 @@ interface HouseText {
   location?: string;
   intro?: string;
   photoAlts?: Record<string,string>;
-  heroScrollHint?: string;
-  skipIntro?: string;
   glanceTitle?: string;
   specs?: string[];
   ctaPrimary?: string;
   ctaSecondary?: string;
-  rooms?: Partial<Record<'living_room' | 'kitchen' | 'bedroom' | 'balcony' | 'bathroom', { title?: string; description?: string }>>;
+  rooms?: Partial<Record<'living_room' | 'kitchen' | 'bedroom' | 'bedroom_2' | 'balcony' | 'bathroom', { title?: string; description?: string }>>;
   photoViewer?: {
     instructions?: string;
     counter?: string;
@@ -33,8 +31,7 @@ export default function ApartmentCinematic({ locale, houseText, photos }: Props)
   const ht = React.useMemo(() => houseText || {}, [houseText]);
   const introStr = typeof ht?.intro === 'string' ? ht.intro : '';
   const isGreek = /[Α-Ωα-ω]/.test(introStr);
-  const scrollHint = typeof ht?.heroScrollHint === 'string' ? ht.heroScrollHint : (isGreek ? 'Κύλιση ↓' : 'Scroll ↓');
-  const skipIntroLabel = typeof ht?.skipIntro === 'string' ? ht.skipIntro : (isGreek ? 'Παράλειψη εισαγωγής' : 'Skip intro');
+  // hero scroll hint and skip intro labels were removed from the UI; keep properties available in `ht` for completeness
   const glanceTitle = typeof ht?.glanceTitle === 'string' ? ht.glanceTitle : (isGreek ? 'Με μια Ματιά' : 'At a Glance');
   const specsList = Array.isArray(ht?.specs) && ht.specs.length > 0
     ? ht.specs
@@ -57,6 +54,7 @@ export default function ApartmentCinematic({ locale, houseText, photos }: Props)
       living: [] as GalleryEntry[],
       kitchen: [] as GalleryEntry[],
       bedroom: [] as GalleryEntry[],
+      bedroom_2: [] as GalleryEntry[],
       balcony: [] as GalleryEntry[],
       bathroom: [] as GalleryEntry[],
     });
@@ -88,6 +86,15 @@ export default function ApartmentCinematic({ locale, houseText, photos }: Props)
       fallbackDescription: {
         en: 'A calming retreat with plush bedding, blackout shades, and built-in storage for long stays.',
         el: 'Ήρεμο δωμάτιο με αναπαυτικό στρώμα, συσκότιση και ευρύχωρες ντουλάπες για μεγαλύτερες διαμονές.'
+      }
+    },
+    {
+      dictKey: 'bedroom_2' as const,
+      bucket: 'bedroom_2' as const,
+      fallbackTitle: { en: 'Second Bedroom', el: 'Δεύτερο Υπνοδωμάτιο' },
+      fallbackDescription: {
+        en: 'Comfortable second bedroom with ample space, perfect for families or groups.',
+        el: 'Άνετο δεύτερο υπνοδωμάτιο με ευρύχωρο χώρο, ιδανικό για οικογένειες ή παρέες.'
       }
     },
     {
@@ -142,12 +149,7 @@ export default function ApartmentCinematic({ locale, houseText, photos }: Props)
           <h1 className="text-4xl md:text-6xl font-semibold drop-shadow">{ht?.title || 'Seaside Modern Apartment'}</h1>
           <p className="mt-4 max-w-md text-lg opacity-90">{ht?.location || 'Aegean Bay, Greece'}</p>
           <p className="mt-6 max-w-lg text-base md:text-lg opacity-90">{ht?.intro || 'A cinematic coastal retreat with seamless indoor-outdoor living.'}</p>
-          <div className="mt-10 flex items-center gap-5 text-xs tracking-wide uppercase opacity-80">
-            <span className="animate-pulse">{scrollHint}</span>
-            <button className="btn-outline btn-sm bg-white/10 hover:bg-white/20" onClick={()=>{
-              const anchor=document.getElementById('apartment-content-start'); anchor?.scrollIntoView({behavior:'smooth'});
-            }}>{skipIntroLabel}</button>
-          </div>
+          {/* Scroll hint and Skip intro removed as per design request */}
         </div>
         <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-b from-transparent to-white" aria-hidden="true" />
       </section>

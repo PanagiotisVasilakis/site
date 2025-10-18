@@ -104,13 +104,22 @@ async function internalFetch(input: string, init?: RequestInit) {
       }
     }
     if (!res.ok) {
-      // Log minimal but meaningful context
-      logger.warn('internalFetch non-OK response', {
-        input,
-        status: res.status,
-        statusText: res.statusText,
-        url: res.url,
-      });
+      // Treat common auth failures as debug to prevent log spam (they are often expected from unauthenticated clients)
+      if (res.status === 401) {
+        logger.debug('internalFetch unauthorized response', {
+          input,
+          status: res.status,
+          url: res.url,
+        });
+      } else {
+        // Log minimal but meaningful context for other non-OK responses
+        logger.warn('internalFetch non-OK response', {
+          input,
+          status: res.status,
+          statusText: res.statusText,
+          url: res.url,
+        });
+      }
     }
     return res;
   } catch (err: unknown) {

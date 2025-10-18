@@ -11,9 +11,9 @@
   --layer-surface-alt: #f0f4f4;
 
   /* Semantic foreground tokens */
-  --fg-default: #1e2a2c; /* darker for 4.5:1 contrast on light layers */
-  --fg-muted: #546366;   /* muted text (labels, meta) */
-  --fg-inverse: #ffffff; /* text on dark / brand solid backgrounds */
+  --fg-default: #000000;
+  --fg-muted: #1f2937;
+  --fg-inverse: #ffffff;
 
   /* Calmed brand palette (slightly desaturated & lightened for comfort) */
   --brand-50:  #e9f8f5;
@@ -33,7 +33,7 @@
   --border-accent: var(--brand-300);
 
   /* Semantic text accent tokens (light) */
-  --text-accent: var(--brand-800);
+  --text-accent: #111827;
   --text-accent-subtle: var(--brand-700);
   --text-strong: var(--brand-900);
 
@@ -83,58 +83,6 @@
   --radius-xl: 20px;
   --radius-full: 9999px;
 
-/* Self-hosted font faces (developers: add actual woff2 files in public/fonts) */
-@font-face {
-  font-family: 'GeistLocal';
-  src: url('/fonts/geist-regular.woff2') format('woff2');
-  font-weight: 400;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'GeistLocal';
-  src: url('/fonts/geist-medium.woff2') format('woff2');
-  font-weight: 500;
-  font-display: swap;
-}
-
-/* Optional self-hosted modern sans display font */
-@font-face {
-  font-family: 'BrandDisplaySans';
-  src: url('/fonts/brand-display-sans.woff2') format('woff2');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
-/* High-end display font (self-hosted) */
-@font-face {
-  font-family: 'BrandDisplay';
-  src: url('/fonts/brand-display.woff2') format('woff2');
-  font-weight: 300 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'GeistLocal';
-  src: url('/fonts/geist-semibold.woff2') format('woff2');
-  font-weight: 600;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'GeistLocal';
-  src: url('/fonts/geist-mono-regular.woff2') format('woff2');
-  font-weight: 400;
-  font-display: swap;
-  font-style: normal;
-}
-
-body {
-  font-family: 'GeistLocal', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-}
-code, pre, kbd, samp {
-  font-family: 'GeistLocal', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-}
-
   /* Shadow tokens */
   --shadow-xs: 0 1px 2px rgba(0,0,0,0.06);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px -1px rgba(0,0,0,0.06);
@@ -160,17 +108,26 @@ code, pre, kbd, samp {
   /* Transitions */
   --transition-fast: 120ms cubic-bezier(.4,0,.2,1);
   --transition-normal: 200ms cubic-bezier(.4,0,.2,1);
+
   /* Form placeholder color (accessible contrast on white surfaces) */
   --placeholder-color: #64737a;
   --placeholder-color-soft: rgba(100,115,122,0.6);
+
+  /* Font stacks fall back to system fonts now that self-hosted files were removed */
+  --font-sans-stack: "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono-stack: "JetBrains Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+code, pre, kbd, samp {
+  font-family: var(--font-mono-stack);
 }
 
 /* Tailwind v4 inline theme variables (without @theme to avoid build errors) */
 :root {
   --color-background: var(--background);
   --color-foreground: var(--fg-default);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-sans-stack);
+  --font-mono: var(--font-mono-stack);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -405,26 +362,63 @@ code, pre, kbd, samp {
   --action-fg: #042c28;
 }
 
-/* Force dark teal background on all pages in dark mode */
+/* Force apartment-style dark background on all pages and containers in dark mode */
 [data-theme="dark"] body {
-  background: var(--layer-bg-subtle) !important;
+  background: linear-gradient(180deg, #0a0f10 0%, #0d1416 35%, #101a1b 100%);
+  background-attachment: fixed;
+  position: relative;
 }
 
-/* Ensure page containers inherit the dark background */
+/* Subtle grid pattern overlay */
+[data-theme="dark"] body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    linear-gradient(rgba(18, 179, 164, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(18, 179, 164, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.4;
+}
+
+/* Ensure page containers inherit the dark background with subtle depth */
 [data-theme="dark"] .page-container {
-  background: transparent !important;
+  background: transparent;
+  position: relative;
+  z-index: 1;
+}
+
+/* Elegant radial glow overlay for depth */
+[data-theme="dark"] .page-container::before {
+  content: "";
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(100%, 1200px);
+  height: 800px;
+  background: radial-gradient(ellipse at top center, rgba(18, 179, 164, 0.08) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: -1;
 }
 
 /* Make sure min-h-screen elements use the correct background */
 [data-theme="dark"] .min-h-screen {
-  background: transparent !important;
+  background: transparent;
+  position: relative;
+  z-index: 1;
 }
 
 /* Button primitives (moved outside dark theme block) */
 .btn-primary { display:inline-flex; align-items:center; justify-content:center; font-weight:500; border-radius:16px; padding:0.75rem 1.5rem; font-size:1rem; line-height:1.3; min-height:52px; transition:background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast); background: var(--action-bg); color: var(--action-fg); box-shadow: 0 2px 6px -2px rgba(0,0,0,0.25); }
 .btn-primary:hover { background: var(--action-bg-hover); }
 .btn-primary:active { transform: translateY(1px); }
-.btn-outline { display:inline-flex; align-items:center; justify-content:center; font-weight:500; border-radius:16px; padding:0.75rem 1.5rem; font-size:1rem; line-height:1.3; min-height:52px; transition:background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast); background: var(--layer-surface); color: var(--text-accent); border:none; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), 0 1px 0 rgba(255, 255, 255, 0.2) inset; }
+.btn-outline { display:inline-flex; align-items:center; justify-content:center; font-weight:500; border-radius:16px; padding:0.75rem 1.5rem; font-size:1rem; line-height:1.3; min-height:52px; transition:background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast); background:#ffffff; color: var(--text-accent); border:1px solid #d1d5db; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), 0 1px 0 rgba(255, 255, 255, 0.2) inset; }
 .btn-outline:hover { background: var(--layer-surface-alt); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 1px 0 rgba(255, 255, 255, 0.3) inset; }
 [data-theme="dark"] .btn-outline { color: var(--brand-400); border:none; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 1px 0 rgba(255, 255, 255, 0.1) inset; }
 [data-theme="dark"] .btn-outline:hover { background: rgba(255,255,255,0.06); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.15) inset; }
@@ -465,6 +459,30 @@ code, pre, kbd, samp {
 @keyframes toast-in { 0% { transform: translateY(8px) scale(.96); opacity:0; } 100% { transform: translateY(0) scale(1); opacity:1; } }
 .toast-item { animation: toast-in .35s var(--transition-fast) forwards; }
 
+/* Floating animation for particles */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+    opacity: 0.3;
+  }
+  25% {
+    transform: translateY(-20px) translateX(10px);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(-40px) translateX(-10px);
+    opacity: 0.8;
+  }
+  75% {
+    transform: translateY(-20px) translateX(5px);
+    opacity: 0.5;
+  }
+}
+
+.animate-float {
+  animation: float 10s ease-in-out infinite;
+}
+
 /* Iconography: normalize stroke width for consistent rendering */
 .icon { width: 1em; height: 1em; display: inline-block; stroke: currentColor; fill: none; stroke-width: 1.75; vector-effect: non-scaling-stroke; }
 .icon[data-thick="true"] { stroke-width: 2; }
@@ -473,12 +491,18 @@ code, pre, kbd, samp {
 
 
 body {
-  background: linear-gradient(160deg, var(--sand-50) 0%, var(--sea-50) 55%, var(--sea-100) 100%);
+  background: var(--sand-50);
   color: var(--fg-default);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans-stack);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   transition: background-color .4s, color .4s;
+}
+
+/* Ensure the outermost containers inherit the pale background in light mode so pages appear uniform.
+   This keeps card/panel surfaces (white or glass) unchanged, but removes stray gradients/white canvas. */
+html:not([data-theme="dark"]), html:not([data-theme="dark"]) #__next, html:not([data-theme="dark"]) .min-h-screen {
+  background: var(--sand-50);
 }
 
 /* Form & input placeholders */
@@ -506,8 +530,7 @@ input, textarea { color: inherit; }
 
 
 [data-theme="dark"] body, body[data-theme="dark"] {
-  background: radial-gradient(circle at 30% 20%, rgba(18,179,164,0.15), transparent 60%),
-              linear-gradient(180deg, var(--sand-50) 0%, var(--sea-50) 100%);
+  background: var(--layer-bg-subtle);
 }
 
 /* Focus ring */
@@ -541,6 +564,12 @@ input, textarea { color: inherit; }
 /* Gradient utilities */
 .bg-app-gradient { background: linear-gradient(160deg, var(--sand-50) 0%, var(--sea-50) 55%, var(--sea-100) 100%); }
 .bg-app-vertical { background: linear-gradient(180deg,var(--sand-50),var(--sea-50)); }
+
+/* Light-mode: treat the app-level gradient utilities as the pale background to avoid two-tone pages */
+html:not([data-theme="dark"]) .bg-app-gradient,
+html:not([data-theme="dark"]) .bg-app-vertical {
+  background: var(--sand-50);
+}
 .bg-panel-soft { background: linear-gradient(135deg,rgba(255,255,255,0.85),rgba(255,255,255,0.75)); }
 [data-theme="dark"] .bg-panel-soft { background: linear-gradient(135deg,rgba(23,35,37,0.85),rgba(23,35,37,0.65)); }
 
@@ -561,16 +590,28 @@ input, textarea { color: inherit; }
 }
 
 [data-theme="dark"] .card {
-  background: var(--layer-surface);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--border-soft);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 
-              0 1px 0 rgba(255, 255, 255, 0.08) inset;
+  background: linear-gradient(135deg, rgba(23, 35, 37, 0.75) 0%, rgba(17, 25, 26, 0.85) 100%);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.5), 
+    0 1px 0 rgba(255, 255, 255, 0.05) inset,
+    0 0 60px rgba(18, 179, 164, 0.08) inset;
   color: var(--fg-default);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Elevated hero card with soft glow */
+[data-theme="dark"] .card:hover {
+  border-color: rgba(18, 179, 164, 0.25);
+  box-shadow: 
+    0 12px 48px rgba(0, 0, 0, 0.6), 
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 0 80px rgba(18, 179, 164, 0.12) inset;
+  transform: translateY(-2px);
+}
+
+/* Elevated hero card with soft glow - now for background image */
 .hero-card {
   box-shadow:
     0 6px 24px -8px rgba(0,0,0,0.20),
@@ -578,9 +619,70 @@ input, textarea { color: inherit; }
     0 0 0 1px rgba(54,185,171,0.08);
 }
 [data-theme="dark"] .hero-card {
+  /* Simplified for background image - focus on subtle border and shadow */
+  border: 1px solid rgba(255, 255, 255, 0.15);
   box-shadow:
-    0 12px 48px -12px rgba(0,0,0,0.65),
-    0 0 0 1px rgba(255,255,255,0.06);
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Hero background image */
+.hero-background-image {
+  background-image: url('/house/balcony/balcony_1.jpeg');
+}
+
+/* Animated gradient overlay for hero in dark mode - simplified for image background */
+[data-theme="dark"] .hero-card::after {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(ellipse at center,
+    rgba(18, 179, 164, 0.08) 0%,
+    rgba(48, 213, 196, 0.04) 30%,
+    rgba(25, 199, 182, 0.06) 60%,
+    transparent 80%);
+  animation: hero-pulse 12s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Add a subtle inner pattern overlay - simplified */
+[data-theme="dark"] .hero-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image:
+    radial-gradient(circle at 20% 80%, rgba(18, 179, 164, 0.02) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(48, 213, 196, 0.01) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+@keyframes hero-pulse {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 0.4;
+  }
+  25% {
+    transform: scale(1.05) rotate(45deg);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.1) rotate(90deg);
+    opacity: 0.8;
+  }
+  75% {
+    transform: scale(1.05) rotate(135deg);
+    opacity: 0.5;
+  }
 }
 
 /* Soft glass panel: backdrop blur + translucent surface using color-mix */
@@ -608,7 +710,7 @@ input, textarea { color: inherit; }
 }
 /* Optional modern sans display alternative */
 .display-sans {
-  font-family: 'BrandDisplaySans', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'Liberation Sans', sans-serif;
+  font-family: var(--font-sans-stack);
   letter-spacing: 0.01em;
   font-weight: 700;
 }
@@ -633,10 +735,38 @@ input, textarea { color: inherit; }
 }
 
 [data-theme="dark"] .italian-title {
-  text-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.18),
-    0 3px 8px rgba(0, 0, 0, 0.55),
-    0 12px 30px rgba(54, 185, 171, 0.35);
+  background: linear-gradient(135deg, #e6f7f5 0%, #30d5c4 35%, #19c7b6 65%, #e6f7f5 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: none;
+  position: relative;
+  animation: subtle-shimmer 6s ease-in-out infinite;
+}
+
+/* Add shimmer effect */
+@keyframes subtle-shimmer {
+  0%, 100% {
+    filter: brightness(1) saturate(1);
+  }
+  50% {
+    filter: brightness(1.15) saturate(1.2);
+  }
+}
+
+/* Elegant glow behind the text */
+[data-theme="dark"] .italian-title::before {
+  content: attr(data-text);
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: -1;
+  background: linear-gradient(135deg, rgba(48, 213, 196, 0.4) 0%, rgba(25, 199, 182, 0.3) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: blur(20px);
+  opacity: 0.6;
 }
 
 @supports (font-variation-settings: normal) {
@@ -699,7 +829,14 @@ input, textarea { color: inherit; }
   mask-repeat: no-repeat;
 }
 [data-theme="dark"] .title-ornament::after {
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    rgba(18, 179, 164, 0.3) 15%, 
+    rgba(48, 213, 196, 0.8) 50%, 
+    rgba(18, 179, 164, 0.3) 85%, 
+    transparent 100%);
+  box-shadow: 0 0 20px rgba(48, 213, 196, 0.5);
+  height: 3px;
 }
 
 /* On larger screens, center and widen the underline */
@@ -833,8 +970,20 @@ input, textarea { color: inherit; }
   max-width: min(100%, 720px);
   margin: 0 auto;
 }
-[data-theme="dark"] .search-bar { background: rgba(17,25,26,0.75); border-color: var(--border-soft); }
-[data-theme="dark"] .booking-bar { background: rgba(17,25,26,0.75); border-color: var(--border-soft); }
+[data-theme="dark"] .search-bar { 
+  background: linear-gradient(135deg, rgba(23, 35, 37, 0.85) 0%, rgba(17, 25, 26, 0.9) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 60px rgba(18, 179, 164, 0.08) inset;
+}
+[data-theme="dark"] .booking-bar { 
+  background: linear-gradient(135deg, rgba(23, 35, 37, 0.85) 0%, rgba(17, 25, 26, 0.9) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 60px rgba(18, 179, 164, 0.08) inset;
+}
 .search-bar:focus-within { box-shadow: var(--shadow-glow); }
 .booking-bar:focus-within { box-shadow: var(--shadow-glow); }
 .search-seg { position: relative; padding: 0.5rem 1.75rem; display: flex; flex-direction: column; justify-content: center; min-width: 150px; }
@@ -1279,80 +1428,52 @@ input, textarea { color: inherit; }
   overflow: hidden;
 }
 
-/* Light mode text visibility improvements */
-html:not([data-theme="dark"]) {
-  --fg-muted: #1f2937; /* Dark text for labels */
-  --text-accent: #111827; /* Dark text for accents */
-  --fg-default: #000000 !important; /* Black text */
-}
-
-/* Light mode input and placeholder background fixes */
-html:not([data-theme="dark"]) .input,
-html:not([data-theme="dark"]) input,
-html:not([data-theme="dark"]) textarea,
-html:not([data-theme="dark"]) select {
-  background: #ffffff !important; /* White background for inputs */
-  color: #000000 !important; /* Black text in inputs */
-}
-
-/* Light mode button fixes */
-html:not([data-theme="dark"]) .btn-outline {
-  background: #ffffff !important; /* White background for back button */
-  color: #000000 !important; /* Black text for back button */
-  border-color: #d1d5db !important; /* Light gray border */
-}
-
-/* Light mode layer surface override */
-html:not([data-theme="dark"]) {
-  --layer-surface: #ffffff !important; /* White background for tabs and surfaces */
-}
-
 /* Enhanced liquid glass effect for main container */
-html:not([data-theme="dark"]) .main-glass-container {
-  background: rgba(255, 255, 255, 0.75) !important; /* More transparent */
-  backdrop-filter: blur(24px) saturate(200%) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
-  border: 2px solid transparent !important;
-  background-clip: padding-box !important;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12), 
+.main-glass-container {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12),
               0 2px 0 rgba(255, 255, 255, 0.9) inset,
               0 8px 32px rgba(255, 255, 255, 0.1) inset,
               0 0 0 1px rgba(255, 255, 255, 0.4),
-              0 1px 3px rgba(0, 0, 0, 0.05) !important;
-  border-radius: 24px !important;
-  position: relative !important;
+              0 1px 3px rgba(0, 0, 0, 0.05);
+  border-radius: 24px;
+  position: relative;
 }
 
-html:not([data-theme="dark"]) .main-glass-container::before {
-  content: '' !important;
-  position: absolute !important;
-  top: -2px !important;
-  left: -2px !important;
-  right: -2px !important;
-  bottom: -2px !important;
-  background: linear-gradient(45deg, 
-    rgba(255, 255, 255, 0.6), 
-    rgba(255, 255, 255, 0.2), 
+.main-glass-container::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(45deg,
+    rgba(255, 255, 255, 0.6),
+    rgba(255, 255, 255, 0.2),
     rgba(255, 255, 255, 0.4),
-    rgba(255, 255, 255, 0.1)) !important;
-  border-radius: 26px !important;
-  z-index: -1 !important;
+    rgba(255, 255, 255, 0.1));
+  border-radius: 26px;
+  z-index: -1;
 }
 
 [data-theme="dark"] .main-glass-container {
-  background: rgba(23, 35, 37, 0.95) !important; /* Much more solid like before */
-  backdrop-filter: blur(6px) saturate(100%) !important;
-  -webkit-backdrop-filter: blur(6px) saturate(100%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  background-clip: border-box !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 
-              0 1px 0 rgba(255, 255, 255, 0.1) inset !important;
-  border-radius: 12px !important;
-  position: relative !important;
+  background: rgba(23, 35, 37, 0.95);
+  backdrop-filter: blur(6px) saturate(100%);
+  -webkit-backdrop-filter: blur(6px) saturate(100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-clip: border-box;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3),
+              0 1px 0 rgba(255, 255, 255, 0.1) inset;
+  border-radius: 12px;
+  position: relative;
 }
 
 [data-theme="dark"] .main-glass-container::before {
-  display: none !important;
+  display: none;
 }
 
 /* Enhanced tab button visibility in dark mode */
@@ -1371,22 +1492,6 @@ button[role="tab"] {
   color: var(--fg-muted) !important;
   background: transparent !important;
   border: none !important;
-}
-
-[data-theme="dark"] .main-glass-container::before {
-  content: '' !important;
-  position: absolute !important;
-  top: -2px !important;
-  left: -2px !important;
-  right: -2px !important;
-  bottom: -2px !important;
-  background: linear-gradient(45deg, 
-    rgba(255, 255, 255, 0.3), 
-    rgba(255, 255, 255, 0.1), 
-    rgba(255, 255, 255, 0.2),
-    rgba(255, 255, 255, 0.05)) !important;
-  border-radius: 26px !important;
-  z-index: -1 !important;
 }
 
 /* CRITICAL FIX: Force menu bar navigation text to be white in dark mode */
@@ -1444,14 +1549,15 @@ button[role="tab"] {
 .page-container,
 .villa-content-section,
 .apartment-content-section {
-  background: #ffffff;
+  /* Use the pale site background so pages appear as a single light color */
+  background: var(--sand-50);
   color: var(--page-ink);
 }
 
 [data-theme="dark"] .page-container,
 [data-theme="dark"] .villa-content-section,
 [data-theme="dark"] .apartment-content-section {
-  background: transparent;
+  background: var(--layer-bg-subtle);
   color: var(--fg-default);
 }
 

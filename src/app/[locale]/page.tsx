@@ -5,6 +5,7 @@ import { getDictionary } from "@/i18n/dictionaries";
 import { locales, type Locale } from "@/i18n/config";
 import HomeHero from "@/components/HomeHero";
 import HomeInteractiveBar from "@/components/HomeInteractiveBar";
+import ContactSection from "@/components/ContactSection";
 
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -12,22 +13,25 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   const t = getDictionary(eff);
   const cats: CategoryWithCount[] = getCategoriesWithCounts();
   return (
+  <>
+  <script
+    type="application/ld+json"
+    suppressHydrationWarning
+    dangerouslySetInnerHTML={{ __html: JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'Organization',
+      name: t.appTitle,
+      url: siteUrl,
+      logo: absUrl('/favicon.ico')
+    }) }}
+  />
+  <div className="cancel-top-gap">
+    <HomeHero
+      title={t.homeTitle}
+      subtitle={t.homeSubtitle}
+    />
+  </div>
   <div className="page-container home-typography mx-auto max-w-4xl">
-      <script
-        type="application/ld+json"
-        suppressHydrationWarning
-        dangerouslySetInnerHTML={{ __html: JSON.stringify({
-          '@context': 'https://schema.org',
-          '@type': 'Organization',
-          name: t.appTitle,
-          url: siteUrl,
-          logo: absUrl('/favicon.ico')
-        }) }}
-      />
-      <HomeHero
-        title={t.homeTitle}
-        subtitle={t.homeSubtitle}
-      />
       <HomeInteractiveBar
         locale={eff}
         subline={eff === 'el' ? 'Πολυτελές διαμέρισμα στην Καλαμάτα' : 'Luxury apartment in Kalamata, Greece'}
@@ -78,5 +82,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         ))}
       </section>
   </div>
+  <ContactSection locale={eff} />
+  </>
   );
 }

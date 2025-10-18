@@ -276,18 +276,29 @@ export function withErrorHandler(
       const duration = performance.now() - startTime;
       
       // Handle known API errors
-  if (error instanceof ApiError) {
+      if (error instanceof ApiError) {
         if (mergedConfig.enableErrorLogging) {
-          logger.warn('API error occurred', {
-            method,
-            url,
-            error: {
-              code: error.code,
-              message: error.message,
-              details: error.details,
-            },
-            duration: Math.round(duration * 100) / 100,
-          });
+          // Reduce noisy warnings for common auth failures (401)
+          if (error.statusCode === HttpStatusCodes.UNAUTHORIZED || error.code === ErrorCodes.UNAUTHORIZED) {
+            // Log at debug level with minimal context to avoid spamming WARNs
+            logger.debug('API unauthorized', {
+              method,
+              url,
+              status: error.statusCode,
+              duration: Math.round(duration * 100) / 100,
+            });
+          } else {
+            logger.warn('API error occurred', {
+              method,
+              url,
+              error: {
+                code: error.code,
+                message: error.message,
+                details: error.details,
+              },
+              duration: Math.round(duration * 100) / 100,
+            });
+          }
         }
 
         const headers: Record<string, string> = {

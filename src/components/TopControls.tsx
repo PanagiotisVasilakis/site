@@ -25,23 +25,6 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
   const inFlight = useRef<AbortController | null>(null);
   const dictionary = useMemo(() => getDictionary(locale as Locale), [locale]);
 
-  const refreshCheckIn = useCallback(async () => {
-    try {
-      // Avoid overlapping calls
-      inFlight.current?.abort();
-      const ac = new AbortController();
-      inFlight.current = ac;
-      const res = await internalFetch('/api/check-in', { method: 'GET', signal: ac.signal, headers: { 'cache-control': 'no-cache' } });
-      const ok = res.ok; // 200 when session verified; 401 otherwise via handler
-      setCheckInVisible(ok);
-      setIsSignedIn(ok);
-    } catch {
-      // Network or aborted -> treat as not visible
-      setCheckInVisible(false);
-      setIsSignedIn(false);
-    }
-  }, []);
-
   const handleSignOut = useCallback(async () => {
     try {
       // Call logout API to clear cookies
@@ -57,6 +40,30 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
 
   // Refresh on route changes too for instant feedback
   const pathname: string | null = usePathname?.() ?? null;
+
+  const refreshCheckIn = useCallback(async () => {
+    // Only check authentication when on check-in page or trying to access it
+    if (!pathname?.includes('/check-in')) {
+      setCheckInVisible(false);
+      setIsSignedIn(false);
+      return;
+    }
+    
+    try {
+      // Avoid overlapping calls
+      inFlight.current?.abort();
+      const ac = new AbortController();
+      inFlight.current = ac;
+      const res = await internalFetch('/api/check-in', { method: 'GET', signal: ac.signal, headers: { 'cache-control': 'no-cache' } });
+      const ok = res.ok; // 200 when session verified; 401 otherwise via handler
+      setCheckInVisible(ok);
+      setIsSignedIn(ok);
+    } catch {
+      // Network or aborted -> treat as not visible
+      setCheckInVisible(false);
+      setIsSignedIn(false);
+    }
+  }, [pathname]);
   useEffect(() => {
     if (pathname != null) refreshCheckIn();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -124,7 +131,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
       },
       {
         href: `/${locale}?category=restaurants`,
-        label: dictionary.categories?.restaurants ?? 'Restaurants',
+        label: dictionary.categories?.restaurants ?? 'Kalamata Moments',
         icon: '🍽️',
         event: 'mobile_nav_restaurants',
       },
@@ -149,18 +156,27 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
     return links.filter(link => Boolean(link.label));
   }, [locale, dictionary, isSignedIn, checkInVisible]);
 
-  // Hydrate visibility from server flag, fire analytics once on change
+  // Hydrate visibility from server flag; keep client state in sync with SSR hint
   useEffect(() => {
-    if (checkInVisible !== !!showCheckIn) {
-      setCheckInVisible(!!showCheckIn);
-      setIsSignedIn(!!showCheckIn);
-      const name = showCheckIn ? 'checkin_nav_shown' : 'checkin_nav_hidden';
-      trackAnalyticsEvent(name, { reason: 'server_session', locale });
+    const serverCheckInVisible = !!showCheckIn;
+    setCheckInVisible(serverCheckInVisible);
+    setIsSignedIn(serverCheckInVisible);
+    const name = serverCheckInVisible ? 'checkin_nav_shown' : 'checkin_nav_hidden';
+    trackAnalyticsEvent(name, { reason: 'server_session', locale });
+    
+    // Only call refreshCheckIn if we're on the check-in page
+    if (pathname?.includes('/check-in')) {
+      refreshCheckIn();
     }
-  }, [showCheckIn, checkInVisible, locale, trackAnalyticsEvent]);
+  }, [showCheckIn, locale, trackAnalyticsEvent, pathname, refreshCheckIn]);
 
-  // Update on page visibility/focus and periodically to reflect session changes
+  // Update on page visibility/focus and periodically to reflect session changes (only when on check-in page)
   useEffect(() => {
+    // Only set up polling and event listeners when on check-in page
+    if (!pathname?.includes('/check-in')) {
+      return;
+    }
+
     function onVisibility() {
       if (document.visibilityState === 'visible') refreshCheckIn();
     }
@@ -174,7 +190,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
     });
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('focus', onFocus);
-    // Periodic poll (lightweight) to catch silent expiry
+    // Periodic poll (lightweight) to catch silent expiry - only when on check-in page
     checkerRef.current = window.setInterval(refreshCheckIn, 30_000);
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
@@ -183,7 +199,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
       if (checkerRef.current) window.clearInterval(checkerRef.current);
       inFlight.current?.abort();
     };
-  }, [refreshCheckIn]);
+  }, [refreshCheckIn, pathname]);
 
   // Close menu on outside click (mobile)
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -263,7 +279,6 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
         <div className={`fixed top-12 right-3 z-40 w-60 rounded-2xl mobile-menu-panel shadow-lg p-4 flex flex-col gap-4 transition-transform origin-top-right ${open ? 'scale-100 opacity-100' : 'scale-95 opacity-0 pointer-events-none'} bg-white text-slate-900 dark:bg-black dark:text-white`} role="menu" aria-label="Main menu">
           <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-zinc-700/60">
             <span className="text-xs font-bold tracking-wide uppercase">Menu</span>
-            <ThemeToggle />
           </div>
           <nav className="flex flex-col gap-2" aria-label="Primary pages">
             {mobileMenuLinks.map(link => (

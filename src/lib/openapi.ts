@@ -327,11 +327,11 @@ export const openApiSpec = {
                   },
                 },
                 example: {
-                  categories: [
+                    categories: [
                     {
                       id: 'restaurants',
                       slug: 'restaurants',
-                      title: 'Restaurants',
+                      title: 'Kalamata Moments',
                       count: 25,
                     },
                   ],

@@ -80,9 +80,7 @@ export type Dictionary = {
     amenityList: string[]; // pre-translated bullet list
     rulesList: string[];   // house rules bullets
     distances?: string[]; // nearby distances list
-    photoAlts?: { living: string; bedroom: string; kitchen: string; balcony?: string; bathroom?: string; };
-    heroScrollHint?: string;
-    skipIntro?: string;
+  photoAlts?: { living: string; bedroom: string; kitchen: string; balcony?: string; bathroom?: string; };
     glanceTitle?: string;
     specs?: string[];
     ctaPrimary?: string;
@@ -269,7 +267,7 @@ const dict: Record<Locale, Dictionary> = {
   labels: { updated: "Updated", save: "Save", saved: "Saved", favorites: "Favorites", networkOnline: "Online", networkOffline: "Offline", networkSlow: "Slow network", networkReconnected: "Reconnected", syncPending: "Sync pending", syncIdle: "Synced" },
     categories: {
       phones: "Important Phones",
-      restaurants: "Restaurants",
+      restaurants: "Kalamata Moments",
       sightseeing: "Sightseeing",
     },
     house: {
@@ -277,9 +275,7 @@ const dict: Record<Locale, Dictionary> = {
       navSubtitle: "Photo tour & location",
       title: "2-Bedroom Apartment with Mountain & Sea Views",
       location: "Kalamata, Greece",
-      intro: "A spacious apartment with large sunny terraces and beautiful views, in a quiet neighborhood near the Town Hall.",
-      heroScrollHint: "Scroll ↓",
-      skipIntro: "Skip intro",
+  intro: "A spacious apartment with large sunny terraces and beautiful views, in a quiet neighborhood near the Town Hall.",
       overview: "Overview",
       amenities: "Amenities",
       rules: "House Rules",
@@ -539,7 +535,7 @@ const dict: Record<Locale, Dictionary> = {
   labels: { updated: "Ενημερώθηκε", save: "Αποθήκευση", saved: "Αποθηκεύτηκε", favorites: "Αγαπημένα", networkOnline: "Συνδεδεμένο", networkOffline: "Εκτός σύνδεσης", networkSlow: "Αργή σύνδεση", networkReconnected: "Επανασυνδέθηκε", syncPending: "Εκκρεμεί συγχρονισμός", syncIdle: "Συγχρονίστηκε" },
     categories: {
       phones: "Σημαντικά Τηλέφωνα",
-      restaurants: "Εστιατόρια",
+      restaurants: "Η Καλαματα μας",
       sightseeing: "Αξιοθέατα",
     },
     house: {
@@ -547,9 +543,7 @@ const dict: Record<Locale, Dictionary> = {
       navSubtitle: "Φωτογραφική περιήγηση & τοποθεσία",
       title: "Διαμέρισμα 2 Υπνοδωματίων με Θέα Βουνό & Θάλασσα",
       location: "Καλαμάτα, Ελλάδα", 
-      intro: "Ένα ευρύχωρο διαμέρισμα με μεγάλες ηλιόλουστες βεράντες και όμορφη θέα, σε ήσυχη γειτονιά κοντά στο Δημαρχείο.",
-      heroScrollHint: "Κύλιση ↓",
-      skipIntro: "Παράλειψη εισαγωγής",
+  intro: "Ένα ευρύχωρο διαμέρισμα με μεγάλες ηλιόλουστες βεράντες και όμορφη θέα, σε ήσυχη γειτονιά κοντά στο Δημαρχείο.",
       overview: "Επισκόπηση",
       amenities: "Παροχές",
       rules: "Κανόνες Σπιτιού",

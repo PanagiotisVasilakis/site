@@ -13,17 +13,24 @@ export default async function ApartmentPage({ params }: { params: Promise<{ loca
   const t = getDictionary(eff);
   const ht = t.house; // reuse existing dictionary namespace
 
-  const roomOrder: HousePhotoRoomKey[] = ['living','kitchen','bedroom','balcony','bathroom'];
+  const roomOrder: HousePhotoRoomKey[] = ['living','kitchen','bedroom','bedroom_2','balcony','bathroom'];
   const photos: ApartmentPhotoWithAlt[] = roomOrder.flatMap((room) =>
-    housePhotosByRoom[room].map((photo) => ({
-      ...photo,
+    housePhotosByRoom[room].map((src) => ({
+      src,
       altKey: room,
     }))
   );
 
+  // Custom hero image for the apartment page (balcony view)
+  const heroPhoto: ApartmentPhotoWithAlt = {
+    src: '/house/balcony/balcony_1.jpeg',
+    altKey: 'balcony',
+  };
+  const photosWithHero = [heroPhoto, ...photos];
+
   return (
     <div className="cancel-top-gap">
-      <ApartmentCinematic locale={eff} t={t} houseText={ht} photos={photos} />
+      <ApartmentCinematic locale={eff} t={t} houseText={ht} photos={photosWithHero} />
     </div>
   );
 }

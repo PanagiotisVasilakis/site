@@ -63,7 +63,7 @@ describe('BookingPage (server component harness)', () => {
         class="space-y-3"
       >
         <h4
-          class="font-semibold text-[color:var(--fg-default)]"
+          class="font-semibold"
         >
           Price breakdown
         </h4>
@@ -71,7 +71,7 @@ describe('BookingPage (server component harness)', () => {
           class="space-y-2 text-sm"
         >
           <div
-            class="flex justify-between text-[color:var(--fg-muted)]"
+            class="flex justify-between opacity-80"
           >
             <span>
               €
@@ -87,7 +87,7 @@ describe('BookingPage (server component harness)', () => {
             </span>
           </div>
           <div
-            class="flex justify-between text-[color:var(--fg-muted)]"
+            class="flex justify-between opacity-80"
           >
             <span>
               Cleaning fee
@@ -98,7 +98,7 @@ describe('BookingPage (server component harness)', () => {
             </span>
           </div>
           <div
-            class="flex justify-between text-[color:var(--fg-muted)]"
+            class="flex justify-between opacity-80"
           >
             <span>
               Service fee
@@ -113,7 +113,7 @@ describe('BookingPage (server component harness)', () => {
           class="border-t border-[color:var(--border-soft)] pt-3"
         >
           <div
-            class="flex justify-between font-semibold text-lg text-[color:var(--fg-default)]"
+            class="flex justify-between font-semibold text-lg"
           >
             <span>
               Total

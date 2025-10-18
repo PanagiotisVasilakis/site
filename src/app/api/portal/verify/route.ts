@@ -4,7 +4,6 @@ import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode, ValidationError } from '@/lib/apiErrorHandler';
 import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
-import { isValidAFM } from '@/lib/afm';
 import { guestStore } from '@/lib/guestDataStore';
 import { signGuestSession, createSessionCookie, createRefreshCookie } from '@/lib/guestSession';
 import { locales, defaultLocale } from '@/i18n/config';
@@ -39,8 +38,7 @@ const signUpSchemaGR = baseSignUpSchema.extend({
   origin: z.literal('GR'),
   afm: z
     .string()
-    .regex(/^\d{9}$/, 'AFM must contain exactly 9 digits')
-    .refine((value) => isValidAFM(value), 'Invalid AFM checksum'),
+    .regex(/^\d{9}$/, 'AFM must contain exactly 9 digits'),
 });
 
 const signUpSchemaAbroad = baseSignUpSchema.extend({

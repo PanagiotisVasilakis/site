@@ -444,7 +444,7 @@ export const MockData = {
     {
       id: 'restaurants',
       slug: 'restaurants',
-      title: 'Restaurants',
+      title: 'Kalamata Moments',
       count: 25,
     },
     {

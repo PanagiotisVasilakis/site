@@ -1,8 +1,23 @@
 import crypto from 'node:crypto';
 
-// Cache generated dev secrets to persist across requests in same process
-let generatedDevPepper: string | null = null;
-let generatedDevEncKey: Buffer | null = null;
+// Cache generated dev secrets across requests and module reloads
+type DevSecretGlobal = typeof globalThis & {
+  __devSecurityPepper?: string;
+  __devSecurityEncKey?: Buffer;
+  __devPepperWarned?: boolean;
+  __devEncKeyWarned?: boolean;
+};
+
+const devSecretGlobal = globalThis as DevSecretGlobal;
+
+let generatedDevPepper: string | null = devSecretGlobal.__devSecurityPepper ?? null;
+let generatedDevEncKey: Buffer | null = devSecretGlobal.__devSecurityEncKey ?? null;
+let loggedDevPepperWarning = devSecretGlobal.__devPepperWarned ?? false;
+let loggedDevEncKeyWarning = devSecretGlobal.__devEncKeyWarned ?? false;
+
+const currentNextPhase = process.env.NEXT_PHASE;
+const isBuildPhase = currentNextPhase === 'phase-production-build' || currentNextPhase === 'phase-export';
+const shouldLogDevWarnings = !isBuildPhase;
 
 // Env keys: keep short, documented names
 const PEPPER = getPepper();
@@ -11,6 +26,21 @@ const ENC_KEY_HEX = process.env.SECURITY_ENC_KEY_HEX; // 32 bytes hex for AES-25
 // Key rotation support
 const ENC_KEY_HEX_PREVIOUS = process.env.SECURITY_ENC_KEY_HEX_PREVIOUS; // Previous key for decryption during rotation
 
+function isRuntimeProduction(): boolean {
+  if (process.env.NODE_ENV !== 'production') {
+    return false;
+  }
+
+  // During `next build`, Next.js sets NEXT_PHASE=phase-production-build.
+  // In that phase we allow fallbacks so the build can complete without production secrets.
+  const nextPhase = process.env.NEXT_PHASE;
+  if (nextPhase === 'phase-production-build' || nextPhase === 'phase-export') {
+    return false;
+  }
+
+  return true;
+}
+
 function getPepper(): string {
   const envPepper = process.env.SECURITY_PEPPER;
   
@@ -18,16 +48,25 @@ function getPepper(): string {
     return envPepper;
   }
   
-  if (process.env.NODE_ENV === 'production') {
+  if (isRuntimeProduction()) {
     throw new Error('SECURITY_PEPPER environment variable is required in production');
   }
   
   // Generate cryptographically strong random pepper for development
   if (!generatedDevPepper) {
     generatedDevPepper = crypto.randomBytes(32).toString('hex');
-    console.warn('⚠️  Generated random SECURITY_PEPPER for development session');
-    console.warn(`⚠️  Pepper preview: ${generatedDevPepper.slice(0, 16)}...`);
-    console.warn('⚠️  Set SECURITY_PEPPER in .env to persist across restarts');
+    devSecretGlobal.__devSecurityPepper = generatedDevPepper;
+    if (!loggedDevPepperWarning && shouldLogDevWarnings) {
+      loggedDevPepperWarning = true;
+      devSecretGlobal.__devPepperWarned = true;
+      console.warn('⚠️  Generated random SECURITY_PEPPER for development session');
+      console.warn(`⚠️  Pepper preview: ${generatedDevPepper.slice(0, 16)}...`);
+      console.warn('⚠️  Set SECURITY_PEPPER in .env to persist across restarts');
+    }
+  } else if (!loggedDevPepperWarning && shouldLogDevWarnings) {
+    loggedDevPepperWarning = true;
+    devSecretGlobal.__devPepperWarned = true;
+    console.warn('⚠️  Using cached development SECURITY_PEPPER (set SECURITY_PEPPER in .env to persist)');
   }
   
   return generatedDevPepper;
@@ -35,15 +74,24 @@ function getPepper(): string {
 
 function getEncKey(): Buffer {
   if (!ENC_KEY_HEX) {
-    if (process.env.NODE_ENV === 'production') {
+    if (isRuntimeProduction()) {
       throw new Error('SECURITY_ENC_KEY_HEX must be set to a 64-char hex (32 bytes) in production');
     }
     // Generate cryptographically strong random encryption key for development
     if (!generatedDevEncKey) {
       generatedDevEncKey = crypto.randomBytes(32);
-      console.warn('⚠️  Generated random SECURITY_ENC_KEY for development session');
-      console.warn(`⚠️  Key preview: ${generatedDevEncKey.toString('hex').slice(0, 16)}...`);
-      console.warn('⚠️  Set SECURITY_ENC_KEY_HEX in .env to persist across restarts');
+      devSecretGlobal.__devSecurityEncKey = generatedDevEncKey;
+      if (!loggedDevEncKeyWarning && shouldLogDevWarnings) {
+        loggedDevEncKeyWarning = true;
+        devSecretGlobal.__devEncKeyWarned = true;
+        console.warn('⚠️  Generated random SECURITY_ENC_KEY for development session');
+        console.warn(`⚠️  Key preview: ${generatedDevEncKey.toString('hex').slice(0, 16)}...`);
+        console.warn('⚠️  Set SECURITY_ENC_KEY_HEX in .env to persist across restarts');
+      }
+    } else if (!loggedDevEncKeyWarning && shouldLogDevWarnings) {
+      loggedDevEncKeyWarning = true;
+      devSecretGlobal.__devEncKeyWarned = true;
+      console.warn('⚠️  Using cached development SECURITY_ENC_KEY (set SECURITY_ENC_KEY_HEX in .env to persist)');
     }
     return generatedDevEncKey;
   }

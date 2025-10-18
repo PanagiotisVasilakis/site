@@ -206,8 +206,15 @@ function createPrismaClient(): PrismaClient {
   return client;
 }
 
+// Only initialize the Prisma client if a DATABASE_URL is present or we're running tests.
+// This avoids throwing during Next.js build-time data collection when env vars are not available.
 if (!globalThisWithPrisma.__prisma__) {
-  globalThisWithPrisma.__prisma__ = createPrismaClient();
+  if (process.env.NODE_ENV === 'test' || process.env.DATABASE_URL) {
+    globalThisWithPrisma.__prisma__ = createPrismaClient();
+  } else {
+    // Leave undefined during build/time when no DATABASE_URL is configured.
+    globalThisWithPrisma.__prisma__ = undefined as unknown as PrismaClient;
+  }
 }
 
 export const prisma: PrismaClient = globalThisWithPrisma.__prisma__;
@@ -254,7 +261,11 @@ function registerPrismaShutdownHooks(client: PrismaClient): void {
 
     try {
       logger.info('Disconnecting Prisma client', { trigger });
-      await client.$disconnect();
+      if (client && typeof client.$disconnect === 'function') {
+        await client.$disconnect();
+      } else {
+        logger.debug('Prisma client not initialized; skipping disconnect', { trigger });
+      }
     } catch (disconnectError) {
       logger.error('Failed to disconnect Prisma client cleanly', { trigger }, disconnectError);
     }
@@ -292,8 +303,10 @@ function registerPrismaShutdownHooks(client: PrismaClient): void {
       scheduleIdleDisconnect();
     };
 
-    clientWithEvents.$on('query', markActivity);
-    clientWithEvents.$on('error', markActivity);
+    if (client && typeof clientWithEvents.$on === 'function') {
+      clientWithEvents.$on('query', markActivity);
+      clientWithEvents.$on('error', markActivity);
+    }
   }
 
   // Only register process shutdown hooks if not in command line execution

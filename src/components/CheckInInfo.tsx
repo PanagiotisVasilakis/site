@@ -331,7 +331,7 @@ export default function CheckInInfo({
           </li>
           <li className="flex items-start gap-2">
             <span className="mt-1">🍽️</span>
-            <span>{t.checkinInfo?.tip3 || 'Check our restaurant recommendations in the main menu'}</span>
+          <span>{t.checkinInfo?.tip3 || 'Check our Kalamata Moments recommendations in the main menu'}</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="mt-1">🚕</span>
@@ -348,7 +348,7 @@ export default function CheckInInfo({
           </h3>
         </div>
         <p className="text-sm text-[color:var(--fg-muted)] max-w-2xl">
-          {checkinStrings.locationDescription || 'Discover your apartment’s prime location in Kalamata and explore local restaurants, services, and sights within minutes.'}
+         {checkinStrings.locationDescription || 'Discover your apartment’s prime location in Kalamata and explore Kalamata Moments, services, and sights within minutes.'}
         </p>
         <div className="rounded-xl overflow-hidden border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] shadow-sm">
           <DynamicApartmentLocationMap
