@@ -505,6 +505,11 @@ html:not([data-theme="dark"]), html:not([data-theme="dark"]) #__next, html:not([
   background: var(--sand-50);
 }
 
+/* Exception: Hero sections with images should not have background color */
+html:not([data-theme="dark"]) .min-h-screen.bg-transparent {
+  background: transparent !important;
+}
+
 /* Form & input placeholders */
 ::placeholder { color: var(--placeholder-color-soft); opacity:1; }
 [data-theme="dark"] ::placeholder { color: rgba(200,220,225,0.55); }
@@ -630,7 +635,32 @@ html:not([data-theme="dark"]) .bg-app-vertical {
 
 /* Hero background image */
 .hero-background-image {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
   background-image: url('/house/balcony/balcony_1.jpeg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.hero-background-image > span {
+  position: absolute !important;
+  inset: 0 !important;
+}
+
+.hero-background-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  pointer-events: none;
+  user-select: none;
+  transition: filter 0.4s ease;
+}
+
+[data-theme="dark"] .hero-background-image img {
+  filter: brightness(0.85);
 }
 
 /* Animated gradient overlay for hero in dark mode - simplified for image background */
@@ -723,11 +753,13 @@ html:not([data-theme="dark"]) .bg-app-vertical {
   font-feature-settings: "liga" 1, "dlig" 1, "swsh" 1, "cswh" 1;
   text-rendering: optimizeLegibility;
   font-weight: 300; /* Delicate Italian calligraphic touch */
-  /* Layered shadowing for graceful depth without harsh glow */
+  color: #000000 !important;
+  /* Layered shadowing for maximum depth and visibility */
   text-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.65),
-    0 3px 6px rgba(15, 23, 42, 0.18),
-    0 10px 24px rgba(54, 185, 171, 0.18);
+    0 2px 4px rgba(255,255,255,0.9),
+    0 4px 8px rgba(255,255,255,0.8),
+    0 0 0 2px rgba(0,0,0,0.1),
+    0 0 0 4px rgba(0,0,0,0.05);
   /* font-size removed - controlled by inline Tailwind clamp() */
   line-height: 1.28; /* Slightly more air for readability */
   word-spacing: 0.02em; /* Tighter calligraphic word separation */
@@ -735,13 +767,24 @@ html:not([data-theme="dark"]) .bg-app-vertical {
 }
 
 [data-theme="dark"] .italian-title {
-  background: linear-gradient(135deg, #e6f7f5 0%, #30d5c4 35%, #19c7b6 65%, #e6f7f5 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  text-shadow: none;
-  position: relative;
-  animation: subtle-shimmer 6s ease-in-out infinite;
+  background: none;
+  -webkit-background-clip: border-box;
+  -webkit-text-fill-color: currentColor;
+  background-clip: border-box;
+  color: #000000 !important;
+  text-shadow: 0 2px 4px rgba(255,255,255,0.9), 0 4px 8px rgba(255,255,255,0.8), 0 0 0 2px rgba(0,0,0,0.1), 0 0 0 4px rgba(0,0,0,0.05);
+  position: static;
+  animation: none;
+}
+
+/* Home subtitle - force black color in both themes */
+.home-subtitle {
+  color: #000000 !important;
+}
+
+/* Apartment hero title - white in light mode, white in dark mode */
+.apartment-hero-title {
+  color: #ffffff !important;
 }
 
 /* Add shimmer effect */
@@ -756,17 +799,7 @@ html:not([data-theme="dark"]) .bg-app-vertical {
 
 /* Elegant glow behind the text */
 [data-theme="dark"] .italian-title::before {
-  content: attr(data-text);
-  position: absolute;
-  left: 0;
-  top: 0;
-  z-index: -1;
-  background: linear-gradient(135deg, rgba(48, 213, 196, 0.4) 0%, rgba(25, 199, 182, 0.3) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  filter: blur(20px);
-  opacity: 0.6;
+  display: none;
 }
 
 @supports (font-variation-settings: normal) {
@@ -814,7 +847,7 @@ html:not([data-theme="dark"]) .bg-app-vertical {
   bottom: -0.4rem;
   width: clamp(34%, 44vw, 44%);
   height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(54,185,171,0.65), transparent);
+  background: linear-gradient(90deg, transparent, rgba(0,0,0,0.8), transparent);
   border-radius: 9999px; /* rounded, brush-like ends */
   /* Tapered ends using masks */
   -webkit-mask-image: radial-gradient(120% 100% at 0% 50%, black 60%, transparent 100%),
@@ -829,14 +862,8 @@ html:not([data-theme="dark"]) .bg-app-vertical {
   mask-repeat: no-repeat;
 }
 [data-theme="dark"] .title-ornament::after {
-  background: linear-gradient(90deg, 
-    transparent 0%, 
-    rgba(18, 179, 164, 0.3) 15%, 
-    rgba(48, 213, 196, 0.8) 50%, 
-    rgba(18, 179, 164, 0.3) 85%, 
-    transparent 100%);
-  box-shadow: 0 0 20px rgba(48, 213, 196, 0.5);
-  height: 3px;
+  background: linear-gradient(90deg, transparent, rgba(0,0,0,0.8), transparent);
+  box-shadow: none;
 }
 
 /* On larger screens, center and widen the underline */
@@ -857,11 +884,11 @@ html:not([data-theme="dark"]) .bg-app-vertical {
 /* Gradient text accent for hero titles (cross-browser with fallback) */
 .title-gradient {
   /* Fallback solid color for browsers without background-clip:text */
-  color: #111111;
+  color: #000000;
   display: inline-block; /* improves clipping reliability across engines */
 }
 [data-theme="dark"] .title-gradient {
-  color: var(--brand-300);
+  color: #000000;
 }
 
 /* Enable luxurious Italian-inspired gradient fill when supported */
@@ -870,42 +897,25 @@ html:not([data-theme="dark"]) .bg-app-vertical {
     background: none;
     -webkit-background-clip: border-box;
     background-clip: border-box;
-    color: #111111;
+    color: #000000;
     -webkit-text-fill-color: currentColor;
     transition: color 0.3s ease;
   }
 
   [data-theme="dark"] .title-gradient {
-    /* Luminous gradient exclusively for dark mode */
-    background: linear-gradient(
-      120deg,
-      var(--brand-200) 0%,
-      var(--brand-300) 30%,
-      var(--brand-400) 50%,
-      var(--accent-400) 75%,
-      var(--accent-300) 100%
-    );
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    -webkit-text-fill-color: transparent;
-    background-size: 200% 100%;
-    transition: background-position 0.8s ease;
-    /* Keep the elegant text shadow for dark mode */
-    text-shadow:
-      0 1px 3px rgba(0, 0, 0, 0.5),
-      0 2px 12px rgba(18, 71, 66, 0.25);
+    color: #000000;
+    -webkit-text-fill-color: currentColor;
+    background: none !important;
+    text-shadow: 0 2px 4px rgba(255,255,255,0.9), 0 4px 8px rgba(255,255,255,0.8), 0 0 0 2px rgba(0,0,0,0.1), 0 0 0 4px rgba(0,0,0,0.05);
   }
 
   [data-theme="dark"] .title-gradient:hover {
     background-position: 100% 0;
   }
 }
-
-/* When inside a blurred backdrop in dark mode, fall back to solid color to avoid glow artifacts */
 [data-theme="dark"] .backdrop-blur .title-gradient {
   background: none !important;
-  color: var(--brand-300) !important;
+  color: #000000 !important;
   -webkit-text-fill-color: currentColor !important;
 }
 
@@ -1089,12 +1099,26 @@ html:not([data-theme="dark"]) .bg-app-vertical {
 [data-theme="dark"] .chip-cat:hover { background: rgba(17,25,26,0.85); }
 [data-theme="dark"] .chip-cat[data-active="true"] { background: var(--brand-400); color: #042c28; }
 
-/* Listing card */
-.listing-card { position: relative; background: white; border-radius: var(--radius-lg); border: 1px solid var(--border-soft); overflow: hidden; box-shadow: var(--shadow-float-soft); display: flex; flex-direction: column; }
-[data-theme="dark"] .listing-card { background: rgba(17,25,26,0.75); border-color: var(--border-soft); }
-.listing-card img { object-fit: cover; width: 100%; aspect-ratio: 3/2; background: #edf6f5; }
-.listing-info { padding: .75rem .85rem 1rem; display: flex; flex-direction: column; gap: .25rem; font-size: .8rem; }
-.wishlist-btn { position: absolute; top: .55rem; right: .55rem; background: var(--brand-tint); color: var(--text-strong); border: 1px solid var(--border-soft); padding: .55rem .65rem; min-width:44px; min-height:44px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: var(--shadow-float-soft); transition: background var(--transition-fast), transform var(--transition-fast); }
+.listing-card { position: relative; background: var(--layer-surface); border-radius: 10px; border: 1px solid var(--border-soft); overflow: hidden; box-shadow: 0 4px 12px rgba(16,24,24,0.05), 0 1px 0 rgba(255,255,255,0.7) inset; display: flex; flex-direction: column; transition: transform 140ms var(--transition-fast), box-shadow 140ms var(--transition-fast); }
+[data-theme="dark"] .listing-card { background: linear-gradient(135deg, rgba(30,45,50,0.95), rgba(20,30,35,0.9)); border-color: rgba(18,179,164,0.15); box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 4px 16px rgba(18,179,164,0.1); }
+.listing-card img { object-fit: cover; width: 100%; aspect-ratio: 4/3; background: #edf6f5; }
+.listing-info { padding: .35rem .45rem .5rem; display: flex; flex-direction: column; gap: .15rem; font-size: .74rem; }
+
+/* Subtle beveled/depth edge using inset highlight and outer shadow */
+.listing-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.7), inset 0 -6px 20px rgba(0,0,0,0.02);
+}
+[data-theme="dark"] .listing-card::after {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -8px 24px rgba(0,0,0,0.4), 0 0 20px rgba(18,179,164,0.05);
+}
+.listing-card:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(2,6,23,0.08), 0 1px 0 rgba(255,255,255,0.6) inset; }
+[data-theme="dark"] .listing-card:hover { box-shadow: 0 12px 36px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.03) inset; }
+.wishlist-btn { position: absolute; top: .45rem; right: .45rem; background: var(--brand-tint); color: var(--text-strong); border: 1px solid var(--border-soft); padding: .45rem .5rem; min-width:36px; min-height:36px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: var(--shadow-float-soft); transition: background var(--transition-fast), transform var(--transition-fast); }
 .wishlist-btn:hover { background: #d3eeec; }
 .wishlist-btn:active { transform: translateY(1px); }
 [data-theme="dark"] .wishlist-btn { background: rgba(0,0,0,0.5); color: #fff; }

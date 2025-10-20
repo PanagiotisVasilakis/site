@@ -217,7 +217,30 @@ if (!globalThisWithPrisma.__prisma__) {
   }
 }
 
-export const prisma: PrismaClient = globalThisWithPrisma.__prisma__;
+function getActivePrismaClient(): PrismaClient {
+  const client = globalThisWithPrisma.__prisma__;
+  if (!client || typeof client.$disconnect !== 'function') {
+    const hint = process.env.NODE_ENV === 'production'
+      ? 'DATABASE_URL must be configured on the server.'
+      : 'Set DATABASE_URL in your environment or run `docker-compose up pg` for the development database.';
+    logger.error('Prisma client requested but no DATABASE_URL is configured', { hint });
+    throw new Error(`Prisma client is not initialized. ${hint}`);
+  }
+  return client;
+}
+
+export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_target, prop, receiver) {
+    const client = getActivePrismaClient();
+    const value = Reflect.get(client as unknown as object, prop, receiver);
+    return typeof value === 'function' ? value.bind(client) : value;
+  },
+  set(_target, prop, value) {
+    const client = getActivePrismaClient();
+    Reflect.set(client as unknown as object, prop, value);
+    return true;
+  },
+});
 
 function registerPrismaShutdownHooks(client: PrismaClient): void {
   if (typeof process === 'undefined') {
@@ -338,8 +361,15 @@ function registerPrismaShutdownHooks(client: PrismaClient): void {
 }
 
 if (!globalThisWithPrisma.__prismaShutdownHooksRegistered__) {
-  registerPrismaShutdownHooks(prisma);
-  globalThisWithPrisma.__prismaShutdownHooksRegistered__ = true;
+  // Only register shutdown hooks when a real Prisma client instance is present.
+  // During build/generate steps DATABASE_URL may be missing and prisma is left undefined.
+  // Guarding avoids attempting to disconnect a non-initialized client on SIGINT during build.
+  const possiblePrisma = globalThisWithPrisma.__prisma__ as unknown;
+  const hasClient = Boolean(possiblePrisma && typeof (possiblePrisma as { $disconnect?: unknown })?.$disconnect === 'function');
+  if (hasClient) {
+    registerPrismaShutdownHooks(prisma);
+    globalThisWithPrisma.__prismaShutdownHooksRegistered__ = true;
+  }
 }
 
 export type PrismaClientType = PrismaClient;

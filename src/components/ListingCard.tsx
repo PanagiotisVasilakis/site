@@ -30,7 +30,7 @@ function ListingCardComponent({ id, title, subtitle, image, rating, price, href 
     describedby: `desc-${id}`
   }), [id]);
   return (
-    <a href={href} className="listing-card group" data-id={id} aria-labelledby={aria.labelledby} aria-describedby={aria.describedby}> 
+    <a href={href} className="listing-card group h-full flex flex-col" data-id={id} aria-labelledby={aria.labelledby} aria-describedby={aria.describedby}> 
       <div className="relative">
         {image ? (
           <Image src={image} alt="" width={600} height={400} className="w-full h-auto" />
@@ -43,8 +43,8 @@ function ListingCardComponent({ id, title, subtitle, image, rating, price, href 
           <span aria-hidden>{wish ? '❤️' : '🤍'}</span>
         </button>
       </div>
-      <div className="listing-info">
-        <div className="flex items-start justify-between gap-3">
+  <div className="listing-info mt-auto text-center">
+        <div className="flex items-start justify-center gap-3">
           <h3 id={`title-${id}`} className="font-medium text-[0.84rem] leading-snug line-clamp-2 flex-1">{title}</h3>
           {rating && (
             <div className="text-[0.7rem] font-semibold flex items-center gap-1">

@@ -17,8 +17,8 @@ export default function ContactSection({ locale }: ContactSectionProps) {
     email: isGreek ? 'Email' : 'Email',
     connectWithUs: isGreek ? 'Συνδεθείτε μαζί μας' : 'Connect with us',
     description: isGreek 
-      ? 'Μείνετε συνδεδεμένοι και ακολουθήστε το ταξίδι μας μέσα από τα όμορφα τοπία της Ελλάδας. Ανακαλύψτε αποκλειστικές ενημερώσεις, στιγμές πίσω από τις κάμερες και έμπνευση για την επόμενη απόδρασή σας.'
-      : 'Stay connected and follow our journey through the beautiful landscapes of Greece. Discover exclusive updates, behind-the-scenes moments, and inspiration for your next escape.',
+      ? 'Μείνετε συνδεδεμένοι και ακολουθήστε το ταξίδι μας μέσα από την όμορφη Καλαμάτα. Ανακαλύψτε νέους τόπους και ζήστε εμπνευσμένες στιγμές σε ένα ευρύχωρο διαμέρισμα με μεγάλες ηλιόλουστες βεράντες και υπέροχη θέα, σε μια ήσυχη γειτονιά κοντά στο κέντρο της πόλης (13 λεπτά με τα πόδια, 4 λεπτά με αυτοκίνητο).'
+      : 'Stay connected and follow our journey through the beautiful Kalamata. Discover new places and live inspirational moments on a spacious apartment with large sunny terraces and beautiful views, in a quiet neighborhood near the City Center (13 min by walk, 4 min by car).',
     streetCity: isGreek ? 'Αρχιμήδους 21 Καλαμάτα' : 'Archimidous 21 Kalamata',
     countryPostal: isGreek ? 'Ελλάδα 24100' : 'Greece 24100'
   };

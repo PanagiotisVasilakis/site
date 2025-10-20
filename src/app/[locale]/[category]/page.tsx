@@ -15,12 +15,14 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
   const items = getItemsByCategory(cat.id);
   // Filtering & segmentation handled client-side now
 
+  const isPhones = cat.slug === 'phones';
+
   return (
-  <div className="page-container mx-auto max-w-3xl safe-bottom">
-      <header className="mb-4">
+  <div className={isPhones ? "page-container mx-0 max-w-full safe-bottom px-4" : "page-container mx-auto max-w-3xl safe-bottom"}>
+    <header className={isPhones ? "mb-4 text-center" : "mb-4"}>
   <h1 className="text-2xl font-semibold">{t.categories[cat.slug as "phones" | "restaurants" | "sightseeing"] ?? (pickCategoryLocale(cat, "title", eff) ?? cat.title)}</h1>
   {(pickCategoryLocale(cat, "description", eff) ?? cat.description) && <p className="text-sm opacity-80">{pickCategoryLocale(cat, "description", eff) ?? cat.description}</p>}
-      </header>
+    </header>
 
       {items.length === 0 && (
         <div className="card p-6 text-sm text-gray-700 flex flex-col gap-3">
@@ -50,13 +52,11 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
     }))}
     locale={eff}
     categorySlug={cat.slug}
+    phonesLayout={isPhones}
     emptyLabel={t.emptyState}
     ui={t.ui}
   />
 
-      <nav className="pt-2">
-  <Link href={`/${eff}`} className="text-sm text-brand-700 hover:text-brand-800 transition-colors">{t.backHome}</Link>
-      </nav>
     </div>
   );
 }

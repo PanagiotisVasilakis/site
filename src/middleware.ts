@@ -235,3 +235,6 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: ["/((?!_next|.*\..*).*)"],
 };
+
+// Use Node.js runtime for middleware to allow server-only modules (like Prisma) and Node APIs
+export const runtime = 'nodejs';

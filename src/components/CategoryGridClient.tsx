@@ -34,10 +34,11 @@ interface Props {
   locale: string;
   emptyLabel: string;
   categorySlug: string;
+  phonesLayout?: boolean;
   ui?: { filters: string; map: string; list: string; resetAll: string; activeTags: string; none: string; };
 }
 
-function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, ui }: Props) {
+function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, ui, phonesLayout }: Props) {
   const [active, setActive] = useState<string[]>([]);
   const [showMap, setShowMap] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -107,15 +108,40 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
   }, [visibleCount, locale, categorySlug]);
   return (
     <div>
-      <div className="flex items-center gap-2 mb-3">
-        <div className="flex-1">
-          <TagFilters items={items.map(i => ({ tags: i.tags }))} active={active} onChange={setActive} />
-        </div>
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <div className="flex-1" />
         <div className="flex items-center gap-2">
           <button onClick={() => setFiltersOpen(true)} className="btn-tint btn-sm">{ui?.filters || 'Filters'}</button>
           <button onClick={() => setShowMap(m => !m)} className="btn-tint btn-sm">{showMap ? (ui?.list || 'List') : (ui?.map || 'Map')}</button>
         </div>
       </div>
+
+      <div className="mb-3">
+        <TagFilters items={items.map(i => ({ tags: i.tags }))} active={active} onChange={setActive} />
+      </div>
+
+      {/* Phones layout: responsive grid that wraps to next row when needed */}
+      {categorySlug === 'phones' && phonesLayout && !showMap ? (
+        <div className="max-w-5xl mx-auto px-4 mb-6">
+          <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(70px,1fr))] mx-auto">
+            {items.map(i => (
+              <div key={i.id} className="h-full">
+                <ListingCard
+                  id={i.id}
+                  title={i.name}
+                  subtitle={i.summary}
+                  rating={i.rating}
+                  icon={i.icon}
+                  href={`/${locale}/${categorySlug}/${i.slug}`}
+                  favoriteId={`${categorySlug}:${i.id}`}
+                  favLabelAdd="Add to favorites"
+                  favLabelRemove="Remove favorite"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {showMap && (
         <div className="mb-6">
           <ApartmentLocationMap 
@@ -141,38 +167,43 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
           {Array.from({length:6}).map((_,i)=><ListingCardSkeleton key={i}/>)}
         </div>
       )}
-      {featured.length > 0 && (
-        <section>
-          <h2 className="text-xs font-semibold tracking-wide uppercase mb-2 text-small-strong">Featured</h2>
-          {renderGroup(featured)}
-        </section>
+      {/* For non-phones categories, render Featured/other groups and FilterDrawer as before */}
+      {!(categorySlug === 'phones' && phonesLayout) && (
+        <>
+          {featured.length > 0 && (
+            <section>
+              <h2 className="text-xs font-semibold tracking-wide uppercase mb-2 text-small-strong">Featured</h2>
+              {renderGroup(featured)}
+            </section>
+          )}
+          {renderGroup(rest, true)}
+          {filtered.length === 0 && (
+            <div className="text-xs text-gray-600 px-2">{emptyLabel}</div>
+          )}
+          <FilterDrawer open={filtersOpen} onClose={() => setFiltersOpen(false)} title={ui?.filters || 'Filters'}>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-xs font-semibold uppercase mb-1 text-small-strong">{ui?.activeTags || 'Active Tags'}</h3>
+                {active.length === 0 && <div className="text-xs opacity-50">{ui?.none || 'None'}</div>}
+                {active.length > 0 && (
+                  <ul className="flex flex-wrap gap-1">
+                    {active.map(t => (
+                      <li key={t} className="tag-filter is-on flex items-center gap-1">{t}<button aria-label={`Remove ${t}`} onClick={() => setActive(prev => prev.filter(x => x !== t))}>✕</button></li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div>
+                <h3 className="text-xs font-semibold uppercase mb-1 text-small-strong">Stub Controls</h3>
+                <p className="text-xs text-small-strong" style={{fontWeight:400}}>Add price range, rating slider, open now, etc.</p>
+              </div>
+              <div>
+                <button onClick={() => { setActive([]); }} className="text-xs underline">{ui?.resetAll || 'Reset All'}</button>
+              </div>
+            </div>
+          </FilterDrawer>
+        </>
       )}
-  {renderGroup(rest, true)}
-      {filtered.length === 0 && (
-        <div className="text-xs text-gray-600 px-2">{emptyLabel}</div>
-      )}
-  <FilterDrawer open={filtersOpen} onClose={() => setFiltersOpen(false)} title={ui?.filters || 'Filters'}>
-        <div className="space-y-4">
-          <div>
-  <h3 className="text-xs font-semibold uppercase mb-1 text-small-strong">{ui?.activeTags || 'Active Tags'}</h3>
-    {active.length === 0 && <div className="text-xs opacity-50">{ui?.none || 'None'}</div>}
-            {active.length > 0 && (
-              <ul className="flex flex-wrap gap-1">
-                {active.map(t => (
-                  <li key={t} className="tag-filter is-on flex items-center gap-1">{t}<button aria-label={`Remove ${t}`} onClick={() => setActive(prev => prev.filter(x => x !== t))}>✕</button></li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <div>
-            <h3 className="text-xs font-semibold uppercase mb-1 text-small-strong">Stub Controls</h3>
-            <p className="text-xs text-small-strong" style={{fontWeight:400}}>Add price range, rating slider, open now, etc.</p>
-          </div>
-          <div>
-    <button onClick={() => { setActive([]); }} className="text-xs underline">{ui?.resetAll || 'Reset All'}</button>
-          </div>
-        </div>
-      </FilterDrawer>
     </div>
   );
 }

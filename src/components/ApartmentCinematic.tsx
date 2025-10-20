@@ -146,9 +146,7 @@ export default function ApartmentCinematic({ locale, houseText, photos }: Props)
         <Image src={photos[0].src} alt={ht?.title || 'Hero'} fill priority fetchPriority="high" decoding="async" sizes="100vw" className="object-cover hero-ken-burns" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/35 to-black/15" aria-hidden="true" />
   <div className="absolute inset-x-0 top-0 flex h-full flex-col justify-center px-6 md:px-14 pt-20 md:pt-24 text-white max-w-5xl">
-          <h1 className="text-4xl md:text-6xl font-semibold drop-shadow">{ht?.title || 'Seaside Modern Apartment'}</h1>
-          <p className="mt-4 max-w-md text-lg opacity-90">{ht?.location || 'Aegean Bay, Greece'}</p>
-          <p className="mt-6 max-w-lg text-base md:text-lg opacity-90">{ht?.intro || 'A cinematic coastal retreat with seamless indoor-outdoor living.'}</p>
+          <h1 className="text-4xl md:text-6xl font-semibold apartment-hero-title" style={{textShadow: '0 2px 4px rgba(0,0,0,0.3), 0 4px 8px rgba(0,0,0,0.2), 0 8px 16px rgba(0,0,0,0.1), 0 16px 32px rgba(0,0,0,0.05)'}}>{ht?.title || 'Seaside Modern Apartment'}</h1>
           {/* Scroll hint and Skip intro removed as per design request */}
         </div>
         <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-b from-transparent to-white" aria-hidden="true" />
