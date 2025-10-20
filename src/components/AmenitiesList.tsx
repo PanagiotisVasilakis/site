@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from 'react';
-import { SimpleChevronDown, SimpleChevronUp } from './ExpandableText';
+import { SimpleChevronDown, SimpleChevronUp } from './icons/Chevrons';
 
 interface AmenitiesListProps {
   amenities: string[];

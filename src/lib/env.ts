@@ -37,8 +37,7 @@ const envSchema = z.object({
   TEST_DATABASE_URL: z.string().url().optional(),
 });
 
-// Export validated environment variables
-export type Env = z.infer<typeof envSchema>;
+type Env = z.infer<typeof envSchema>;
 
 let validatedEnv: Env | null = null;
 
@@ -65,24 +64,3 @@ export function validateEnv(): Env {
     throw error;
   }
 }
-
-/**
- * Get validated environment variables
- * Must call validateEnv() first during startup
- */
-export function getEnv(): Env {
-  if (!validatedEnv) {
-    throw new Error('Environment not validated. Call validateEnv() during application startup.');
-  }
-  return validatedEnv;
-}
-
-// Export for convenience (validates on first access)
-export const env = new Proxy({} as Env, {
-  get(_target, prop) {
-    if (!validatedEnv) {
-      validatedEnv = validateEnv();
-    }
-    return validatedEnv[prop as keyof Env];
-  },
-});

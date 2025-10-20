@@ -4,7 +4,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { ApartmentPhotoWithAlt } from '@/types/apartment';
 import ApartmentGalleryLightbox from '@/components/ApartmentGalleryLightbox';
-import ExpandableText from '@/components/ExpandableText';
 
 interface HouseText {
   title?: string;
@@ -162,17 +161,9 @@ export default function ApartmentCinematic({ locale, houseText, photos }: Props)
               <article key={label} className="grid gap-8 lg:gap-16 xl:gap-24 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] items-start scroll-mt-24" aria-labelledby={anchorId}>
                 <div>
                   <h2 id={anchorId} className="text-2xl font-semibold apartment-section-title">{label}</h2>
-                  <ExpandableText
-                    maxLines={4}
-                    className="mt-3"
-                    expandText={isGreek ? 'Περισσότερα' : 'Read more'}
-                    collapseText={isGreek ? 'Λιγότερα' : 'Read less'}
-                    disableClamp={isGreek}
-                  >
-                    <p className="text-[15px] leading-relaxed apartment-description-text">
-                      {description}
-                    </p>
-                  </ExpandableText>
+                  <p className="mt-3 text-[15px] leading-relaxed apartment-description-text whitespace-pre-wrap break-words">
+                    {description}
+                  </p>
                 </div>
                 <div
                   className="apartment-photo-stack-wrapper"

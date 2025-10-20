@@ -251,7 +251,6 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
                   <span>{getDictionary(locale as Locale).ui?.signIn || "Sign in"}</span>
                 </Link>
               )}
-              <ThemeToggle />
               <LocaleSwitcher />
               {checkInVisible ? (
                 <Link href={`/${locale}/check-in`} className={secondaryNavButtonClasses}
@@ -266,6 +265,10 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
               >
                 Install
               </button>
+            </div>
+            {/* Always visible buttons */}
+            <div className="flex items-center gap-1.5">
+              <ThemeToggle />
             </div>
             {/* Menu trigger - visible on all screen sizes */}
             <div className="flex items-center">

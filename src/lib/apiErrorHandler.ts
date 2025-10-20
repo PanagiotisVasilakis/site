@@ -6,12 +6,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from './logger-enterprise';
 import { z } from 'zod';
-import type { ApiErrorCode, ApiErrorDetails, ApiErrorResponse } from './apiErrorTypes';
+import type { ApiErrorCode } from './apiErrorTypes';
 import { ApiErrorCode as ErrorCodes } from './apiErrorTypes';
 
 // Re-export for backward compatibility
 export { ErrorCodes as ApiErrorCode };
-export type { ApiErrorDetails, ApiErrorResponse };
 
 // Standard HTTP status codes
 const HttpStatusCodes = {

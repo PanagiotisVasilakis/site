@@ -1,5 +1,4 @@
-// Image metadata for villa gallery (previously auto-generated).
-export interface HousePhoto { src: string; }
+export {};
 
 export type HousePhotoRoomKey = 'living' | 'kitchen' | 'bedroom' | 'bedroom_2' | 'balcony' | 'bathroom';
 
@@ -48,7 +47,3 @@ export const housePhotosByRoom: Record<HousePhotoRoomKey, string[]> = {
     '/house/bathroom/bathroom_8.jpeg',
   ],
 };
-
-export const housePhotos: HousePhoto[] = Object.values(housePhotosByRoom)
-  .flat()
-  .map(src => ({ src }));

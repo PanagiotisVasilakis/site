@@ -372,5 +372,3 @@ if (!globalThisWithPrisma.__prismaShutdownHooksRegistered__) {
   }
 }
 
-export type PrismaClientType = PrismaClient;
-

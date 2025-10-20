@@ -25,7 +25,7 @@ function mapSession(session: Session): SessionRecord {
   };
 }
 
-async function create(userId: string, bookingId: string, expiresAt: number): Promise<SessionRecord> {
+export async function create(userId: string, bookingId: string, expiresAt: number): Promise<SessionRecord> {
   try {
     const id = crypto.randomUUID();
     const session = await prisma.session.create({
@@ -45,7 +45,7 @@ async function create(userId: string, bookingId: string, expiresAt: number): Pro
   }
 }
 
-async function revoke(id: string): Promise<boolean> {
+export async function revoke(id: string): Promise<boolean> {
   try {
     const result = await prisma.session.updateMany({
       where: {
@@ -68,8 +68,3 @@ async function revoke(id: string): Promise<boolean> {
     throw error;
   }
 }
-
-export const sessionRepository = {
-  create,
-  revoke,
-};

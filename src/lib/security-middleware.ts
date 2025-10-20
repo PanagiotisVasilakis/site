@@ -12,6 +12,7 @@ import {
   logSecurityEvent,
   type SecurityEvent 
 } from '@/lib/security-config';
+import { metrics } from '@/lib/metrics-collector';
 
 // Security headers cache to avoid recalculating on every request
 let securityHeadersCache: Record<string, string> | null = null;
@@ -235,108 +236,58 @@ export class SecurityHeadersMiddleware {
 // Rate limiting middleware - Database-backed for persistence and scalability
 export class RateLimitMiddleware {
   private config = getSecurityConfig().rateLimit;
-  private lastCleanup = Date.now();
-  private cleanupInterval = 5 * 60 * 1000; // Clean every 5 minutes
-  
-  // In-memory fallback for Edge runtime (where Prisma doesn't work)
+  // In-memory fallback for Edge runtime
   private memoryStore = new Map<string, { count: number; resetTime: number }>();
-
   public async handle(request: NextRequest): Promise<NextResponse | null> {
     if (!this.config.enabled) return null;
 
     const key = this.generateKey(request);
     const now = Date.now();
     const resetTime = now + this.config.windowMs;
-    
+
     try {
-      // Check if we're in Edge runtime (middleware) - use in-memory store
-      // In Node runtime (API routes), we could use Prisma but middleware is Edge
-      // Edge runtime check: process.env.NEXT_RUNTIME is set by Next.js
-      const isEdgeRuntime = process.env.NEXT_RUNTIME === 'edge' || 
-                            typeof process.versions?.node === 'undefined';
-      
-      if (isEdgeRuntime) {
-        // Use in-memory rate limiting for Edge runtime
-        return this.handleInMemory(request, key, now, resetTime);
-      }
-      
-      // Try Prisma for Node runtime (though middleware is typically Edge)
-      const { prisma } = await import('@/lib/prisma');
-      
-      // Try to find existing rate limit entry
-      const existing = await prisma.rateLimit.findUnique({
-        where: { key }
-      });
-      
-      // If entry exists and hasn't expired, increment count
-      if (existing && existing.resetTime.getTime() > now) {
-        const newCount = existing.count + 1;
-        
-        // Check if limit exceeded BEFORE updating
-        if (existing.count >= this.config.maxRequests) {
-          const event: SecurityEvent = {
-            type: 'rate_limit_exceeded',
-            severity: 'medium',
-            timestamp: new Date().toISOString(),
-            ip: this.getClientIP(request),
-            userAgent: request.headers.get('user-agent') || undefined,
-            url: request.nextUrl.toString(),
-            details: {
-              limit: this.config.maxRequests,
-              windowMs: this.config.windowMs,
-              currentCount: existing.count,
-            },
-          };
+      // Prefer Redis (Upstash) when configured or when running in Edge
+      const isEdgeRuntime = process.env.NEXT_RUNTIME === 'edge' || typeof process.versions?.node === 'undefined';
+      const backend = process.env.RATE_LIMIT_BACKEND || '';
 
-          logSecurityEvent(event);
+      if (backend === 'redis' || isEdgeRuntime) {
+        try {
+          const upstash = await import('@/lib/upstash');
+          const count = await upstash.incrWithExpire(key, this.config.windowMs);
+          if (count > this.config.maxRequests) {
+            // Blocked by Redis
+            metrics.counter('rate_limit.blocked', 1, { backend: 'redis' });
+            const response = new NextResponse('Too Many Requests', { status: 429 });
+            if (this.config.standardHeaders) {
+              response.headers.set('RateLimit-Limit', this.config.maxRequests.toString());
+              response.headers.set('RateLimit-Remaining', '0');
+              response.headers.set('RateLimit-Reset', Math.ceil((now + this.config.windowMs) / 1000).toString());
+            }
+            if (this.config.legacyHeaders) {
+              response.headers.set('X-RateLimit-Limit', this.config.maxRequests.toString());
+              response.headers.set('X-RateLimit-Remaining', '0');
+              response.headers.set('X-RateLimit-Reset', Math.ceil((now + this.config.windowMs) / 1000).toString());
+            }
+            return response;
+          }
 
-          const response = new NextResponse('Too Many Requests', { status: 429 });
-          
-          if (this.config.standardHeaders) {
-            response.headers.set('RateLimit-Limit', this.config.maxRequests.toString());
-            response.headers.set('RateLimit-Remaining', '0');
-            response.headers.set('RateLimit-Reset', Math.ceil(existing.resetTime.getTime() / 1000).toString());
-          }
-          
-          if (this.config.legacyHeaders) {
-            response.headers.set('X-RateLimit-Limit', this.config.maxRequests.toString());
-            response.headers.set('X-RateLimit-Remaining', '0');
-            response.headers.set('X-RateLimit-Reset', Math.ceil(existing.resetTime.getTime() / 1000).toString());
-          }
-          
-          return response;
+          // Allowed by Redis
+          metrics.counter('rate_limit.allowed', 1, { backend: 'redis' });
+          return null;
+        } catch (err) {
+          // Upstash failed - fall back to in-memory gracefully
+          console.error('Upstash rate limit error:', err);
+          // Record fallback occurrence
+          metrics.counter('rate_limit.fallback_in_memory', 1, { backend: 'redis' });
+          return this.handleInMemory(request, key, now, resetTime);
         }
-        
-        // Update count
-        await prisma.rateLimit.update({
-          where: { key },
-          data: { count: newCount }
-        });
-      } else {
-        // Create new entry or reset expired one
-        await prisma.rateLimit.upsert({
-          where: { key },
-          create: {
-            key,
-            count: 1,
-            resetTime: new Date(resetTime)
-          },
-          update: {
-            count: 1,
-            resetTime: new Date(resetTime)
-          }
-        });
       }
-      
-      // Periodically clean up expired entries
-      await this.cleanupExpiredEntries();
-      
-      return null;
+
+      // If Redis isn't configured and we're not in Edge, still fall back to in-memory
+      return this.handleInMemory(request, key, now, resetTime);
     } catch (error) {
-      // If database rate limiting fails, log but don't block request
-      // This provides graceful degradation
-      console.error('Rate limiting database error:', error);
-      return null;
+      console.error('Rate limiting error:', error);
+      return this.handleInMemory(request, key, now, resetTime);
     }
   }
   
@@ -391,35 +342,7 @@ export class RateLimitMiddleware {
     return realIP || 'unknown';
   }
 
-  private async cleanupExpiredEntries(): Promise<void> {
-    const now = Date.now();
-    
-    // Only cleanup every 5 minutes
-    if (now - this.lastCleanup < this.cleanupInterval) {
-      return;
-    }
-    
-    this.lastCleanup = now;
-    
-    try {
-      const { prisma } = await import('@/lib/prisma');
-      
-      // Delete expired entries
-      const result = await prisma.rateLimit.deleteMany({
-        where: {
-          resetTime: {
-            lt: new Date(now)
-          }
-        }
-      });
-      
-      if (result.count > 0) {
-        console.log(`[Rate Limit] Cleaned up ${result.count} expired entries`);
-      }
-    } catch (error) {
-      console.error('Failed to cleanup expired rate limit entries:', error);
-    }
-  }
+  // cleanupExpiredEntries removed — Redis + in-memory approach does not rely on DB cleanup
 }
 
 // CORS middleware

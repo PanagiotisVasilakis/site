@@ -3,12 +3,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { logger } from '@/lib/logger-client';
 
-export interface Favorite {
-  id: string;
-  name?: string;
-  addedAt?: Date;
-}
-
 const KEY = 'favorites:v1';
 
 function readSet(): Set<string> {

@@ -5,6 +5,8 @@ import ListingCard from '@/components/ListingCard';
 import FilterDrawer from '@/components/FilterDrawer';
 import { ListingCardSkeleton } from '@/components/ListingCardSkeleton';
 import dynamic from 'next/dynamic';
+import { useFavorites } from '@/lib/favorites';
+import { useToast } from '@/components/Toast';
 
 // Dynamic import for map component - only loads when needed
 const ApartmentLocationMap = dynamic(() => import('@/components/ApartmentLocationMap'), {
@@ -42,6 +44,8 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
   const [active, setActive] = useState<string[]>([]);
   const [showMap, setShowMap] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const { isFavorite, toggle } = useFavorites();
+  const { push } = useToast();
   // URL persistence
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -123,22 +127,24 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
       {/* Phones layout: responsive grid that wraps to next row when needed */}
       {categorySlug === 'phones' && phonesLayout && !showMap ? (
         <div className="max-w-5xl mx-auto px-4 mb-6">
-          <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(70px,1fr))] mx-auto">
-            {items.map(i => (
-              <div key={i.id} className="h-full">
-                <ListingCard
-                  id={i.id}
-                  title={i.name}
-                  subtitle={i.summary}
-                  rating={i.rating}
-                  icon={i.icon}
-                  href={`/${locale}/${categorySlug}/${i.slug}`}
-                  favoriteId={`${categorySlug}:${i.id}`}
-                  favLabelAdd="Add to favorites"
-                  favLabelRemove="Remove favorite"
-                />
-              </div>
-            ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mx-auto">
+            {items.map(i => {
+              const fid = `${categorySlug}:${i.id}`;
+              const wish = isFavorite(fid);
+              const toggleLocal = () => { const before = isFavorite(fid); toggle(fid); if (!before) push('Added to favorites'); else push('Removed from favorites'); };
+              return (
+                <div key={i.id} className="relative">
+                  <a href={`/${locale}/${categorySlug}/${i.slug}`} className="card p-6 flex flex-col items-center text-center transition-all group hover:shadow-lg">
+                    <div className="text-4xl mb-3 group-hover:scale-110 transition-transform" aria-hidden>{i.icon || '📋'}</div>
+                    <div className="text-lg font-medium mb-2">{i.name}</div>
+                    {i.summary && <p className="text-sm opacity-80">{i.summary}</p>}
+                  </a>
+                  <button type="button" aria-label={wish ? 'Remove favorite' : 'Add to favorites'} className="wishlist-btn" onClick={toggleLocal}>
+                    <span aria-hidden>{wish ? '❤️' : '🤍'}</span>
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       ) : null}
