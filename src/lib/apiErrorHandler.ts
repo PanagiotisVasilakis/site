@@ -11,7 +11,6 @@ import { ApiErrorCode as ErrorCodes } from './apiErrorTypes';
 
 // Re-export for backward compatibility
 export { ErrorCodes as ApiErrorCode };
-export type { ApiErrorDetails, ApiErrorResponse };
 
 // Standard HTTP status codes
 const HttpStatusCodes = {

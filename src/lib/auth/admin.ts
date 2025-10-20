@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import { sign, verify, JwtPayload, SignOptions } from 'jsonwebtoken';
 import { BaseAuthPayload } from './common';
 
-export interface AdminAuthPayload extends BaseAuthPayload {
+interface AdminAuthPayload extends BaseAuthPayload {
   type: 'admin';
   role: 'admin';
   jti?: string;
@@ -76,22 +76,3 @@ export function verifyAdmin(token: string): (JwtPayload & AdminAuthPayload) | nu
   }
 }
 
-/**
- * Create a clean admin JWT payload for new sessions
- */
-export function createAdminPayload(): Omit<AdminAuthPayload, 'type' | 'role' | 'iat' | 'exp'> {
-  return {
-    jti: crypto.randomUUID(),
-    login_at: Math.floor(Date.now() / 1000),
-  };
-}
-
-/**
- * Create a clean admin JWT payload for refreshed sessions
- */
-export function createRefreshedAdminPayload(): Omit<AdminAuthPayload, 'type' | 'role' | 'iat' | 'exp'> {
-  return {
-    jti: crypto.randomUUID(),
-    refreshed_at: Math.floor(Date.now() / 1000),
-  };
-}

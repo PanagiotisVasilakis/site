@@ -68,8 +68,3 @@ async function revoke(id: string): Promise<boolean> {
     throw error;
   }
 }
-
-export const sessionRepository = {
-  create,
-  revoke,
-};

@@ -16,6 +16,7 @@
     "BSD-3-Clause",
     "ISC",
     "Unlicense",
-    "WTFPL"
+    "WTFPL",
+    "license-checker"
   ]
 }

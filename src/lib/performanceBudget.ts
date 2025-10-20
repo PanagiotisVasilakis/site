@@ -306,6 +306,3 @@ export class PerformanceBudgetValidator {
     }
   }
 }
-
-// Export for use in build pipelines
-export { PerformanceBudgetValidator as default };

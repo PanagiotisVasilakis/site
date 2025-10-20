@@ -6,7 +6,7 @@
 import { z } from 'zod';
 
 // Security configuration schema
-export const SecurityConfigSchema = z.object({
+const SecurityConfigSchema = z.object({
   csp: z.object({
     enabled: z.boolean(),
     reportOnly: z.boolean(),
