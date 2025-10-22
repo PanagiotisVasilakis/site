@@ -112,16 +112,22 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
         event: 'mobile_nav_house',
       },
       {
-        href: `/${locale}/property`,
-        label: dictionary.details ?? 'Property',
-        icon: '🏖️',
-        event: 'mobile_nav_property',
-      },
-      {
         href: `/${locale}/book`,
         label: dictionary.cta?.reserve ?? 'Book stay',
         icon: '🗓️',
         event: 'mobile_nav_book',
+      },
+      {
+        href: `/${locale}/booking-details`,
+        label: dictionary.bookingDetails ?? 'Booking Details',
+        icon: '📋',
+        event: 'mobile_nav_booking_details',
+      },
+      {
+        href: `/${locale}/about`,
+        label: dictionary.aboutUs ?? 'About Us',
+        icon: 'ℹ️',
+        event: 'mobile_nav_about',
       },
       {
         href: `/${locale}/favorites`,

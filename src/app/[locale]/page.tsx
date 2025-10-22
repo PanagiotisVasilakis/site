@@ -55,7 +55,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           className="card p-6 flex flex-col items-center text-center transition-all group hover:shadow-lg"
         >
           <div className="text-4xl mb-3 group-hover:scale-110 transition-transform" aria-hidden>🏡</div>
-          <div className="text-lg font-medium mb-2">{t.house?.navLabel || 'Apartment Photos'}</div>
+          <div className="text-lg font-serif italic font-bold mb-2">{t.house?.navLabel || 'Apartment Photos'}</div>
         </Link>
 
         <Link
@@ -63,7 +63,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           className="card p-6 flex flex-col items-center text-center transition-all group hover:shadow-lg"
         >
           <div className="text-4xl mb-3 group-hover:scale-110 transition-transform" aria-hidden>✅</div>
-          <div className="text-lg font-medium mb-2">Check-In Info</div>
+          <div className="text-lg font-serif italic font-bold mb-2">{t.checkin?.navInfoLabel || 'Check-In Info'}</div>
         </Link>
 
         {cats.slice(0, 2).map((c) => (
@@ -75,7 +75,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
             <div className="text-4xl mb-3 group-hover:scale-110 transition-transform" aria-hidden>
               {c.icon ?? "📋"}
             </div>
-            <div className="text-lg font-medium mb-2">
+            <div className="text-lg font-serif italic font-bold mb-2">
               {t.categories[c.slug as "phones" | "restaurants" | "sightseeing"] ?? (pickCategoryLocale(c, "title", eff) ?? c.title)}
             </div>
           </Link>

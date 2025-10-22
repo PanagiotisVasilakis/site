@@ -236,7 +236,7 @@ export default function BookingBar({
         {showPropertyHeader && (
           <h2 className="text-lg font-semibold text-brand-800">{propertyName || apartmentContent.shortName}</h2>
         )}
-        <p className="text-sm text-muted">
+        <p className="text-sm font-serif italic font-bold text-muted mt-3">
           {subline ?? `${apartmentContent.location.city}, ${apartmentContent.location.country} • €${basePrice}/night`}
         </p>
       </div>

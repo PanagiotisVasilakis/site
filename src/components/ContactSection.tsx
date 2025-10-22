@@ -114,16 +114,16 @@ export default function ContactSection({ locale }: ContactSectionProps) {
         </div>
 
         <div className="relative z-10 py-6 md:py-8">
-          {/* Headings Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+          {/* Headings Row - Only visible on medium screens and up */}
+          <div className="hidden md:grid md:grid-cols-2 gap-8 mb-6">
             <div className="text-center group">
-              <h2 className="text-3xl md:text-4xl font-semibold text-white mb-4 tracking-wider group-hover:scale-105 transition-transform duration-500">
+              <h2 className="text-3xl md:text-4xl font-serif italic font-bold text-white mb-4 tracking-wider group-hover:scale-105 transition-transform duration-500">
                 {translations.contactUs}
               </h2>
               <div className="w-20 h-1 bg-gradient-to-r from-transparent via-gray-400 to-transparent mx-auto rounded-full"></div>
             </div>
             <div className="text-center group">
-              <h2 className="text-3xl md:text-4xl font-semibold text-white mb-4 tracking-wider group-hover:scale-105 transition-transform duration-500">
+              <h2 className="text-3xl md:text-4xl font-serif italic font-bold text-white mb-4 tracking-wider group-hover:scale-105 transition-transform duration-500">
                 {translations.followUs}
               </h2>
               <div className="w-20 h-1 bg-gradient-to-r from-transparent via-gray-400 to-transparent mx-auto rounded-full"></div>
@@ -134,12 +134,20 @@ export default function ContactSection({ locale }: ContactSectionProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Contact Us Content */}
           <div className="backdrop-blur-sm bg-white/5 rounded-2xl p-6 border border-white/10 shadow-2xl">
+            <div className="text-center mb-6 block md:hidden">
+              <h2 className="text-2xl md:text-3xl font-serif italic font-bold text-white mb-2 tracking-wider">
+                {translations.contactUs}
+              </h2>
+              <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-gray-400 to-transparent mx-auto rounded-full"></div>
+            </div>
             <div className="space-y-4 text-center">
               <div className="flex flex-col items-center space-y-3">
                 <div className="group flex items-start space-x-4 w-full max-w-xs">
                   <div className="text-3xl group-hover:scale-110 transition-transform duration-200 flex-shrink-0">📍</div>
                   <div className="text-left flex-1">
-                    <h3 className="font-semibold text-white mb-1 text-base">{translations.address}</h3>
+                    <h3 className="font-serif italic font-medium text-white mb-1 text-base">
+                      {translations.address}
+                    </h3>
                     <a href="https://maps.app.goo.gl/9vqnjXJqQeakxdBx8" target="_blank" rel="noopener noreferrer" className="text-white/80 hover:text-white transition-colors text-xs block">
                       {translations.streetCity}<br/>
                       {translations.countryPostal}
@@ -150,7 +158,9 @@ export default function ContactSection({ locale }: ContactSectionProps) {
                 <div className="group flex items-start space-x-4 w-full max-w-xs">
                   <div className="text-3xl group-hover:scale-110 transition-transform duration-200 flex-shrink-0">📞</div>
                   <div className="text-left flex-1">
-                    <h3 className="font-semibold text-white mb-1 text-base">{translations.phone}</h3>
+                    <h3 className="font-serif italic font-medium text-white mb-1 text-base">
+                      {translations.phone}
+                    </h3>
                     <a href="tel:+306955810051" className="text-white/80 hover:text-white transition-colors text-xs">
                       +30 695 581 0051
                     </a>
@@ -160,7 +170,9 @@ export default function ContactSection({ locale }: ContactSectionProps) {
                 <div className="group flex items-start space-x-4 w-full max-w-xs">
                   <div className="text-3xl group-hover:scale-110 transition-transform duration-200 flex-shrink-0">✉️</div>
                   <div className="text-left flex-1">
-                    <h3 className="font-semibold text-white mb-1 text-base">{translations.email}</h3>
+                    <h3 className="font-serif italic font-medium text-white mb-1 text-base">
+                      {translations.email}
+                    </h3>
                     <a href="mailto:dolcefarnienteapartments@gmail.com" className="text-white/80 hover:text-white transition-colors text-xs">
                       dolcefarnienteapartments@gmail.com
                     </a>
@@ -170,6 +182,12 @@ export default function ContactSection({ locale }: ContactSectionProps) {
             </div>
           </div>            {/* Follow Us Content */}
             <div className="backdrop-blur-sm bg-white/5 rounded-2xl p-6 border border-white/10 shadow-2xl">
+              <div className="text-center mb-6 block md:hidden">
+                <h2 className="text-2xl md:text-3xl font-serif italic font-bold text-white mb-2 tracking-wider">
+                  {translations.followUs}
+                </h2>
+                <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-gray-400 to-transparent mx-auto rounded-full"></div>
+              </div>
               <div className="space-y-4 text-center">
                 <p className="text-white/90 leading-relaxed text-sm italic">
                   {translations.description}
@@ -177,7 +195,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
 
                 {/* Social Media Links */}
                 <div className="space-y-3">
-                  <h3 className="text-xl font-semibold text-white tracking-wide">{translations.connectWithUs}</h3>
+                  <h3 className="text-xl font-serif italic font-medium text-white tracking-wide">{translations.connectWithUs}</h3>
                   <div className="flex flex-col items-center gap-2">
                     {socialLinks.map((social) => (
                       <a
@@ -263,16 +281,16 @@ export default function ContactSection({ locale }: ContactSectionProps) {
       </div>
 
       <div className="relative z-10 py-6 md:py-8">
-        {/* Headings Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+        {/* Headings Row - Only visible on medium screens and up */}
+        <div className="hidden md:grid md:grid-cols-2 gap-8 mb-6">
           <div className="text-center group">
-            <h2 className="text-3xl md:text-4xl font-semibold text-slate-800 mb-4 tracking-wider group-hover:scale-105 transition-transform duration-500">
+            <h2 className="text-3xl md:text-4xl font-serif italic font-bold text-slate-800 mb-4 tracking-wider group-hover:scale-105 transition-transform duration-500">
               {translations.contactUs}
             </h2>
             <div className="w-20 h-1 bg-gradient-to-r from-transparent via-slate-400 to-transparent mx-auto rounded-full"></div>
           </div>
           <div className="text-center group">
-            <h2 className="text-3xl md:text-4xl font-semibold text-slate-800 mb-4 tracking-wider group-hover:scale-105 transition-transform duration-500">
+            <h2 className="text-3xl md:text-4xl font-serif italic font-bold text-slate-800 mb-4 tracking-wider group-hover:scale-105 transition-transform duration-500">
               {translations.followUs}
             </h2>
             <div className="w-20 h-1 bg-gradient-to-r from-transparent via-slate-400 to-transparent mx-auto rounded-full"></div>
@@ -283,12 +301,18 @@ export default function ContactSection({ locale }: ContactSectionProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Contact Us Content */}
           <div className="backdrop-blur-sm bg-white/70 rounded-2xl p-6 border border-slate-200/50 shadow-xl">
+            <div className="text-center mb-6 block md:hidden">
+              <h2 className="text-2xl md:text-3xl font-serif italic font-bold text-slate-800 mb-2 tracking-wider">
+                {translations.contactUs}
+              </h2>
+              <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-slate-400 to-transparent mx-auto rounded-full"></div>
+            </div>
             <div className="space-y-4 text-center">
               <div className="flex flex-col items-center space-y-3">
                 <div className="group flex items-start space-x-4 w-full max-w-xs">
                   <div className="text-3xl group-hover:scale-110 transition-transform duration-200 flex-shrink-0">📍</div>
                   <div className="text-left flex-1">
-                    <h3 className="font-semibold text-slate-700 mb-1 text-base">{translations.address}</h3>
+                    <h3 className="font-serif italic font-medium text-slate-700 mb-1 text-base">{translations.address}</h3>
                     <a href="https://maps.app.goo.gl/9vqnjXJqQeakxdBx8" target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:text-slate-800 transition-colors text-xs block">
                       {translations.streetCity}<br/>
                       {translations.countryPostal}
@@ -299,7 +323,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
                 <div className="group flex items-start space-x-4 w-full max-w-xs">
                   <div className="text-3xl group-hover:scale-110 transition-transform duration-200 flex-shrink-0">📞</div>
                   <div className="text-left flex-1">
-                    <h3 className="font-semibold text-slate-700 mb-1 text-base">{translations.phone}</h3>
+                    <h3 className="font-serif italic font-medium text-slate-700 mb-1 text-base">{translations.phone}</h3>
                     <a href="tel:+306955810051" className="text-slate-600 hover:text-slate-800 transition-colors text-xs">
                       +30 695 581 0051
                     </a>
@@ -309,7 +333,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
                 <div className="group flex items-start space-x-4 w-full max-w-xs">
                   <div className="text-3xl group-hover:scale-110 transition-transform duration-200 flex-shrink-0">✉️</div>
                   <div className="text-left flex-1">
-                    <h3 className="font-semibold text-slate-700 mb-1 text-base">{translations.email}</h3>
+                    <h3 className="font-serif italic font-medium text-slate-700 mb-1 text-base">{translations.email}</h3>
                     <a href="mailto:dolcefarnienteapartments@gmail.com" className="text-slate-600 hover:text-slate-800 transition-colors text-xs">
                       dolcefarnienteapartments@gmail.com
                     </a>
@@ -321,6 +345,12 @@ export default function ContactSection({ locale }: ContactSectionProps) {
 
           {/* Follow Us Content */}
           <div className="backdrop-blur-sm bg-white/70 rounded-2xl p-6 border border-slate-200/50 shadow-xl">
+            <div className="text-center mb-6 block md:hidden">
+              <h2 className="text-2xl md:text-3xl font-serif italic font-bold text-slate-800 mb-2 tracking-wider">
+                {translations.followUs}
+              </h2>
+              <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-slate-400 to-transparent mx-auto rounded-full"></div>
+            </div>
             <div className="space-y-4 text-center">
               <p className="text-slate-700 leading-relaxed text-sm italic">
                 {translations.description}
@@ -328,7 +358,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
 
               {/* Social Media Links */}
               <div className="space-y-3">
-                <h3 className="text-xl font-semibold text-slate-800 tracking-wide">{translations.connectWithUs}</h3>
+                <h3 className="text-xl font-serif italic font-medium text-slate-800 tracking-wide">{translations.connectWithUs}</h3>
                 <div className="flex flex-col items-center gap-2">
                   {socialLinks.map((social) => (
                     <a

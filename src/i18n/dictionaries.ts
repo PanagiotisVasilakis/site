@@ -7,6 +7,8 @@ export type Dictionary = {
   backHome: string;
   skipLink?: string;
   details: string;
+  bookingDetails?: string;
+  aboutUs?: string;
   emptyState: string;
   itemSingular: string;
   itemPlural: string;
@@ -132,6 +134,7 @@ export type Dictionary = {
   };
   checkin?: {
     navLabel?: string;
+    navInfoLabel?: string;
     title?: string;
     summary?: string;
     bookingId?: string;
@@ -238,6 +241,8 @@ const dict: Record<Locale, Dictionary> = {
     backHome: "← Back home",
   skipLink: "Skip to content",
     details: "Details →",
+    bookingDetails: "Booking Details",
+    aboutUs: "About Us",
   emptyState: "No items yet.",
   itemSingular: "item",
   itemPlural: "items",
@@ -436,6 +441,7 @@ const dict: Record<Locale, Dictionary> = {
     }
     ,checkin: {
       navLabel: "Check-in",
+      navInfoLabel: "Check-In Info",
       title: "Check-in",
       summary: "Booking summary",
       bookingId: "Booking ID",
@@ -506,6 +512,8 @@ const dict: Record<Locale, Dictionary> = {
     backHome: "← Πίσω στην αρχική",
   skipLink: "Μετάβαση στο περιεχόμενο",
     details: "Λεπτομέρειες →",
+    bookingDetails: "Στοιχεία Κράτησης",
+    aboutUs: "Σχετικά με Εμάς",
   emptyState: "Δεν υπάρχουν στοιχεία ακόμη.",
   itemSingular: "στοιχείο",
   itemPlural: "στοιχεία",
@@ -534,7 +542,7 @@ const dict: Record<Locale, Dictionary> = {
     },
   labels: { updated: "Ενημερώθηκε", save: "Αποθήκευση", saved: "Αποθηκεύτηκε", favorites: "Αγαπημένα", networkOnline: "Συνδεδεμένο", networkOffline: "Εκτός σύνδεσης", networkSlow: "Αργή σύνδεση", networkReconnected: "Επανασυνδέθηκε", syncPending: "Εκκρεμεί συγχρονισμός", syncIdle: "Συγχρονίστηκε" },
     categories: {
-      phones: "Σημαντικά Τηλέφωνα",
+      phones: "Χρήσιμα Τηλέφωνα",
       restaurants: "Η Καλαματα μας",
       sightseeing: "Αξιοθέατα",
     },
@@ -704,6 +712,7 @@ const dict: Record<Locale, Dictionary> = {
     }
     ,checkin: {
       navLabel: "Άφιξη",
+      navInfoLabel: "Πληροφορίες Check-In",
       title: "Άφιξη",
       summary: "Σύνοψη κράτησης",
       bookingId: "Κωδικός κράτησης",
