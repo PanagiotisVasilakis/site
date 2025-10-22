@@ -35,5 +35,6 @@ MORE INFO:
 - docs/NEXT_STEPS.md          - This guide expanded
 - docs/INSTALL_POSTGRESQL.md  - Manual installation steps
 - docs/TEST_DATABASE_SETUP.md - Complete reference
+- docs/testing/db-lookup.md   - CI database testing guide and lookup smoke test
 
 ═══════════════════════════════════════════════════════════════════

@@ -110,7 +110,7 @@ npx tsx -e "import { PrismaClient } from '@prisma/client'; const p=new PrismaCli
 
 If you see `[{ ok: 1 }]` (or similar) the DB is reachable.
 
-Need the exact lookup workflow from Issue 1 (including migrations and env vars)? See [`docs/testing/db-lookup.md`](docs/testing/db-lookup.md) for the scripted command that targets the `docker-compose.test-db.yml` service and interprets the results.
+Need the exact lookup workflow from Issue 1 (including migrations and env vars)? The **[CI Database Testing Guide](docs/testing/db-lookup.md)** covers the scripted command that targets the `docker-compose.test-db.yml` service and explains how to interpret the results.
 
 ## Troubleshooting
 
