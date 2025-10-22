@@ -8,6 +8,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:migrate:deploy:all": "tsx scripts/run-prisma-migrations.ts",
     "prisma:format": "prisma format",
     "dev": "next dev -H 0.0.0.0",
     "dev:clean": "rm -rf .next/cache && next dev -H 0.0.0.0",
