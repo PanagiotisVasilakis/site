@@ -142,6 +142,8 @@ docker-compose -f docker-compose.test-db.yml logs -f
 
 ## Continuous Integration
 
+> 📘 **New!** Follow the [CI Database Testing Guide](./testing/db-lookup.md) for the end-to-end lookup smoke test that our pipeline runs before Vitest. It walks through service startup, migrations, and verification commands.
+
 For CI/CD, add the test database to your workflow:
 
 ```yaml

@@ -11,6 +11,10 @@
 - **[NEXT_STEPS.md](./NEXT_STEPS.md)** - Start here! Current status and setup options
 - **[TEST_DATABASE_QUICK_START.md](./TEST_DATABASE_QUICK_START.md)** - Quick reference guide
 
+### CI pipelines
+
+- **[CI Database Testing Guide](./testing/db-lookup.md)** - Step-by-step lookup test for the Docker-hosted CI database
+
 ### Installation
 
 - **[INSTALL_POSTGRESQL.md](./INSTALL_POSTGRESQL.md)** - PostgreSQL installation for Ubuntu/Debian
