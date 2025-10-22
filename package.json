@@ -36,6 +36,7 @@
     "ci:a11y": "AXE_JSON=timestamp tsx scripts/axe-a11y.ts",
     "ci:contrast": "AXE_JSON=timestamp tsx scripts/axe-contrast.ts",
     "ci:accessibility": "npm run ci:contrast && npm run ci:a11y && npm run reports:prune",
+    "ci:test:db": "NODE_ENV=test vitest run --reporter=default",
     "reports:prune": "tsx scripts/prune-reports.ts",
     "fonts:download": "tsx scripts/download-fonts.ts",
     "lighthouse:mobile": "tsx scripts/run-lighthouse.ts",
