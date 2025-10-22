@@ -10,6 +10,7 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:migrate:deploy:all": "tsx scripts/run-prisma-migrations.ts",
     "prisma:format": "prisma format",
+    "prisma:smoketest": "tsx scripts/prisma-smoketest.ts",
     "dev": "next dev -H 0.0.0.0",
     "dev:clean": "rm -rf .next/cache && next dev -H 0.0.0.0",
     "build": "tsx scripts/generate-precache.ts && tsx scripts/validate-content.ts && tsx scripts/generate-version.ts && next build",
