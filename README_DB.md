@@ -2,6 +2,8 @@
 
 This document explains how to bring up a local PostgreSQL database for development and testing, how to run Prisma migrations, and how to perform a quick connectivity smoke test. It also includes notes for production Docker Compose usage.
 
+> **Using the managed Neon instance?** See [`docs/NEON_MANAGED_DB.md`](docs/NEON_MANAGED_DB.md) for the provisioned production/staging/test databases, connection-string conventions, and rotation procedures. The local Docker instructions below still apply if you want an offline development database.
+
 ## Files added
 
 - `docker-compose.yml` — development-friendly compose file exposing Postgres on host port `5433` as service `db`.

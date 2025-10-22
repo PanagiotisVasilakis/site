@@ -8,6 +8,7 @@ import type { SessionRecord } from '@/lib/prisma-repositories/sessionRepository'
 import { hashSensitive, maskLast4, hmacDeterministic } from '@/lib/crypto';
 import { logger } from '@/lib/logger-enterprise';
 import { prisma } from '@/lib/prisma';
+import { guestDataCache } from '@/lib/guestDataCache';
 import crypto from 'node:crypto';
 
 export type IdentityType = 'AFM' | 'PASSPORT';
@@ -26,7 +27,9 @@ export const guestStore = {
   // Users
   async createUser(input: Omit<User, 'id' | 'created_at' | 'updated_at'>): Promise<User> {
     try {
-      return await userRepository.create(input);
+      const user = await userRepository.create(input);
+      guestDataCache.invalidate(['users']);
+      return user;
     } catch (error) {
       logger.error('guestStore: failed to create user', error);
       throw error;
@@ -53,7 +56,9 @@ export const guestStore = {
   
   async updateUserPassword(user_id: string, password_hash: string): Promise<User | undefined> {
     try {
-      return await userRepository.updatePassword(user_id, password_hash);
+      const user = await userRepository.updatePassword(user_id, password_hash);
+      guestDataCache.invalidate(['users']);
+      return user;
     } catch (error) {
       logger.error('guestStore: failed to update user password', error);
       return undefined;
@@ -65,7 +70,9 @@ export const guestStore = {
     try {
       const { hash, salt } = hashSensitive(rawValue);
       const last4 = maskLast4(rawValue);
-      return await identityRepository.upsert(user_id, type, hash, salt, last4);
+      const identity = await identityRepository.upsert(user_id, type, hash, salt, last4);
+      guestDataCache.invalidate(['identities']);
+      return identity;
     } catch (error) {
       logger.error('guestStore: failed to upsert identity', error);
       throw error;
@@ -102,7 +109,7 @@ export const guestStore = {
       const lnLower = params.last_name?.toLowerCase();
       const lnNowhitespace = lnLower?.replace(/\s+/g, '');
       
-      return await bookingRepository.create({
+      const booking = await bookingRepository.create({
         source: params.source,
         reference: params.reference,
         start_date: params.start_date,
@@ -113,6 +120,8 @@ export const guestStore = {
         last_name_token: lnLower ? hmacDeterministic(lnLower) : undefined,
         last_name_token_nows: lnNowhitespace ? hmacDeterministic(lnNowhitespace) : undefined
       });
+      guestDataCache.invalidate(['bookings']);
+      return booking;
     } catch (error) {
       logger.error('guestStore: failed to link or create booking', error);
       throw error;
@@ -159,7 +168,9 @@ export const guestStore = {
   // Access
   async setAccess(user_id: string, booking_id: string, status: AccessStatus): Promise<BookingAccess> {
     try {
-      return await accessRepository.set(user_id, booking_id, status);
+      const access = await accessRepository.set(user_id, booking_id, status);
+      guestDataCache.invalidate(['access']);
+      return access;
     } catch (error) {
       logger.error('guestStore: failed to set access', error);
       throw error;
@@ -169,7 +180,9 @@ export const guestStore = {
   // Check-in completion (development store only)
   async upsertCheckinCompletion(booking_id: string, data: { arrival_time: string; special_requests?: string }): Promise<CheckinCompletionRec> {
     try {
-      return await checkinRepository.upsert(booking_id, data.arrival_time, data.special_requests);
+      const checkin = await checkinRepository.upsert(booking_id, data.arrival_time, data.special_requests);
+      guestDataCache.invalidate(['checkins']);
+      return checkin;
     } catch (error) {
       logger.error('guestStore: failed to upsert checkin completion', error);
       throw error;
@@ -286,7 +299,7 @@ export const guestStore = {
   // Admin helpers - get all data for export/analysis
   async getAllBookings(): Promise<Booking[]> {
     try {
-      return await bookingRepository.getAll();
+      return await guestDataCache.get('bookings', () => bookingRepository.getAll());
     } catch (error) {
       logger.error('guestStore: failed to get all bookings', error);
       return [];
@@ -295,7 +308,7 @@ export const guestStore = {
 
   async getAllUsers(): Promise<User[]> {
     try {
-      return await userRepository.getAll();
+      return await guestDataCache.get('users', () => userRepository.getAll());
     } catch (error) {
       logger.error('guestStore: failed to get all users', error);
       return [];
@@ -304,7 +317,7 @@ export const guestStore = {
 
   async getAllIdentities(): Promise<Identity[]> {
     try {
-      return await identityRepository.getAll();
+      return await guestDataCache.get('identities', () => identityRepository.getAll());
     } catch (error) {
       logger.error('guestStore: failed to get all identities', error);
       return [];
@@ -313,7 +326,7 @@ export const guestStore = {
 
   async getAllCheckins(): Promise<CheckinCompletionRec[]> {
     try {
-      return await checkinRepository.getAll();
+      return await guestDataCache.get('checkins', () => checkinRepository.getAll());
     } catch (error) {
       logger.error('guestStore: failed to get all checkins', error);
       return [];
@@ -322,7 +335,7 @@ export const guestStore = {
 
   async getAllAccess(): Promise<BookingAccess[]> {
     try {
-      return await accessRepository.getAll();
+      return await guestDataCache.get('access', () => accessRepository.getAll());
     } catch (error) {
       logger.error('guestStore: failed to get all access records', error);
       return [];
@@ -468,6 +481,7 @@ export const guestStore = {
         bookingId: result.booking.id,
       });
 
+      guestDataCache.invalidate(['identities', 'bookings', 'access']);
       return result;
     } catch (error) {
       logger.error('guestStore: failed to link user to booking with access (transaction rolled back)', error);
@@ -617,6 +631,7 @@ export const guestStore = {
         bookingId: result.booking.id,
       });
 
+      guestDataCache.invalidate(['users', 'bookings', 'access']);
       return result;
     } catch (error) {
       logger.error('guestStore: failed to register onsite guest (transaction rolled back)', error);
