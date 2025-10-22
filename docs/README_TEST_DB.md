@@ -13,7 +13,7 @@
 
 ### CI pipelines
 
-- **[CI Database Testing Guide](./testing/db-lookup.md)** - Step-by-step lookup test for the Docker-hosted CI database
+- **[CI Database Testing Guide](./ci/db-tests.md)** - Complete instructions for provisioning Postgres, applying migrations, and running blocking Vitest suites in CI
 
 ### Installation
 
