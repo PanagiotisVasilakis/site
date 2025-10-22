@@ -100,6 +100,24 @@ docker ps --filter "name=postgres" --filter "status=running"
 docker logs site-dev-db  # or site-test-db
 ```
 
+### Automated multi-environment deployments
+
+For production rollouts you can run all three environments (production, staging, and test) in one shot via:
+
+```bash
+npm run prisma:migrate:deploy:all
+```
+
+The script expects these connection strings to be present in the shell environment:
+
+- `PROD_DATABASE_URL` (or `DATABASE_URL_PROD`)
+- `STAGING_DATABASE_URL` (or `DATABASE_URL_STAGING`)
+- `TEST_DATABASE_URL` (or `CI_TEST_DATABASE_URL` / `DATABASE_URL_TEST`)
+
+Each invocation writes timestamped Prisma output to `logs/prisma-migrate-<env>-<timestamp>.log` and creates an adjacent `.summary.json`
+file with the detected last applied migration. Failed attempts automatically retry up to three times with exponential backoff, and the
+retry budget/backoff interval can be tuned with `PRISMA_MIGRATE_MAX_ATTEMPTS` and `PRISMA_MIGRATE_INITIAL_BACKOFF_MS`.
+
 ## 5) Smoke test Prisma connectivity
 
 Use a tiny Node one-liner (tsx) to confirm Prisma can run a query:
