@@ -2,6 +2,15 @@
 
 This guide documents how our continuous integration jobs provision PostgreSQL, configure the `TEST_DATABASE_URL` Prisma relies on, run migrations, and execute the Vitest suite that verifies database-backed features. The intent is to make the workflow reproducible whether your pipeline uses ephemeral Docker services or a long-lived managed instance.
 
+## Zero-to-green checklist
+
+1. Provision or connect to a PostgreSQL instance that is dedicated to CI (see options below).
+2. Export `TEST_DATABASE_URL` so Prisma, migration tooling, and Vitest all point to the same database.
+3. Execute `npx prisma migrate deploy` **against the test URL** to bring the schema up to date.
+4. Run `npm run ci:test:db` and fail the pipeline immediately if the command exits non-zero.
+
+The remaining sections expand on each step with provider-specific commands and troubleshooting tips.
+
 ## 1. Provisioning PostgreSQL for CI
 
 We support two provisioning models. Pick the option that matches your provider and cost envelope.
@@ -167,6 +176,12 @@ Secure handling of database credentials is mandatory. Follow these practices per
    ```
 
 4. Prefer secret stores (AWS SSM, Vault, Doppler) over inline pipeline YAML to keep credentials out of git.
+
+### Other CI providers
+
+- **GitLab CI/CD:** Store the URL in a [masked variable](https://docs.gitlab.com/ee/ci/variables/#add-a-cicd-variable-to-the-ui) named `TEST_DATABASE_URL` and reference it via the `variables` block on the job. When using the shared Docker executor, add a service container definition that matches the Docker Compose example above.
+- **CircleCI:** Use [Context secrets](https://circleci.com/docs/contexts/) or project-level environment variables. Add the Postgres service through the `docker` executor stanza and run the same migrate/test commands in the `steps` list.
+- Regardless of provider, confine test credentials to least privilege, rotate them regularly, and avoid persisting them to logs or artifact uploads.
 
 ## 6. Troubleshooting
 
