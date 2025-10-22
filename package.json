@@ -24,6 +24,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:security": "vitest run --config vitest.security.config.ts",
+    "test:db:lookup": "vitest run src/__tests__/bookingLookup.test.ts",
     "test:api": "tsx src/__tests__/api-test-runner.ts",
     "test:api:load": "tsx src/__tests__/api-load-test.ts",
     "test:api:load:normal": "tsx src/__tests__/api-load-test.ts normal",
