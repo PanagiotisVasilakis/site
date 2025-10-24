@@ -76,6 +76,21 @@ Those values keep at most two pooled connections per environment and make Prisma
 
 **Deployment tip:** store the URLs in your platform’s secret manager (GitHub Actions, Vercel, Fly.io, etc.). For GitHub Actions add them as repository secrets and reference them in the workflow.
 
+For local development in this repository the pooled Prisma URLs have been captured in committed environment files so they are easy to source:
+
+```bash
+# Production (main branch)
+source .env.production
+
+# Staging
+source .env.staging
+
+# Automated tests / CI dry-runs
+source .env.test
+```
+
+Each file already includes the conservative pooling parameters (`pool_timeout=15&connection_limit=2`). Adjust them only if you observe saturation under load tests.
+
 ### Local Prisma CLI helper
 
 Create or update `prisma/.env` **locally** (the repository already ignores `.env*` files) with the string you want to target:

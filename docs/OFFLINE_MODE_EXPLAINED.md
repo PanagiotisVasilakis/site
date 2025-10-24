@@ -84,6 +84,39 @@ Offline fallback pages live at `src/app/[locale]/offline/page.tsx` and provide r
 - When adding new routes or assets, confirm they appear in the `generate-precache` output.
 - Update CSP directives (`src/lib/security-config.ts`) for any new remote origins used while offline.
 - Test offline behavior with Chrome DevTools → Application → Service Workers → "Offline".
+- Review the [Manual refresh playbook](#manual-refresh-playbook) before release to confirm operators know the recovery steps.
+
+## Manual refresh playbook
+
+Operators can use the following sequence when the service worker (SW) needs to be refreshed outside of an automated deployment. Each action lists prerequisites so teams can select the least disruptive option first.
+
+1. **Trigger the SW update prompt from the PWA Manager**
+   - **Prerequisites:** Update has shipped to production, and `public/version.json` on the CDN reflects the new build number.
+   - Open the app in an authenticated session and wait for the update toast. If it does not appear within 60 seconds, proceed to step 2.
+
+2. **Manually re-fetch `version.json`**
+   - **Prerequisites:** Operator has browser DevTools access.
+   - In DevTools → Console, run `fetch('/version.json', { cache: 'reload' }).then(res => res.json())` to confirm the version matches the release tag.
+   - If the response matches the desired version but the page is still stale, continue to step 3.
+
+3. **Hard reload to bypass HTTP caches**
+   - **Prerequisites:** User can safely refresh the current page without losing data.
+   - Use hard reload shortcuts (Chrome: `Shift` + `Cmd/Ctrl` + `R`; Firefox: `Cmd/Ctrl` + `Shift` + `R`) or open DevTools → Network tab → enable "Disable cache" → refresh.
+   - After reload, check the Application → Service Workers panel to verify the new SW is "activated and running".
+
+4. **Append a cache-busting query**
+   - **Prerequisites:** Link sharing and deep links allow query parameters.
+   - Navigate to the page with a `?cache-bust=<timestamp>` query string to force a network fetch of HTML and JSON payloads.
+   - If the new SW takes control, remove the query string and reload once more to ensure standard URLs work.
+
+5. **Temporarily disable the SW registration**
+   - **Prerequisites:** Issue is blocking, and the operator has permission to run scripts in the browser console.
+   - In DevTools Console run: `navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(reg => reg.unregister()));` then refresh the page.
+   - Once the fresh content loads, re-enable offline support by running `PwaManager.register()` from the same console session or by signing out and back in (registration occurs on load).
+
+6. **Escalate to cache eviction**
+   - **Prerequisites:** CDN/hosting admin access and confirmation that the build artifacts are correct.
+   - Purge the `version.json`, `sw.js`, and precache manifests (`precache.json`, `critical-precache.json`) from the CDN cache. After propagation, revisit step 1 to validate the update sequence.
 
 ### Troubleshooting
 
