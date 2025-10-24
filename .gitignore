@@ -50,3 +50,5 @@ public/version.json
 public/version.json
 //wsl.localhost/
 
+.github/copilot-instructions.md
+public/version.json
