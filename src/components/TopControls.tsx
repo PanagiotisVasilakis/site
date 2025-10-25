@@ -221,8 +221,9 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
   }, [open]);
 
   const baseNavButtonClasses = "inline-flex items-center justify-center gap-1 px-3 py-1 rounded-full text-[11px] font-semibold tracking-wide leading-none transition";
-  const primaryNavButtonClasses = `${baseNavButtonClasses} shadow-md bg-black/10 hover:bg-black/20 text-slate-800 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/70 [&]:dark:!text-white [&>*]:dark:!text-white`;
-  const secondaryNavButtonClasses = `${baseNavButtonClasses} border border-white/30 dark:border-white/40 bg-white/30 hover:bg-white/60 dark:bg-white/40 dark:hover:bg-white/60 text-slate-800 [&]:dark:!text-white [&>*]:dark:!text-white font-medium shadow-sm`;
+  // Use the reusable utility so we can control white-in-dark centrally
+  const primaryNavButtonClasses = `${baseNavButtonClasses} shadow-md bg-black/10 hover:bg-black/20 text-slate-800 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/70 white-in-dark`;
+  const secondaryNavButtonClasses = `${baseNavButtonClasses} border border-white/30 dark:border-white/40 bg-white/30 hover:bg-white/60 dark:bg-white/40 dark:hover:bg-white/60 text-slate-800 white-in-dark font-medium shadow-sm`;
 
   return (
     <div className={`fixed top-0 left-0 right-0 z-40 flex justify-center pointer-events-none transition-transform duration-300 ${hidden ? '-translate-y-full' : 'translate-y-0'}`} aria-hidden={hidden}>
@@ -294,7 +295,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
               <Link
                 key={link.href}
                 href={link.href}
-                className="inline-flex items-center gap-3 w-full rounded-full text-[11px] font-semibold tracking-wide leading-none transition duration-150 px-3 py-2.5 justify-start mobile-menu-item bg-slate-100 hover:bg-white text-slate-900 shadow-sm border border-slate-300 dark:bg-zinc-800 dark:hover:bg-zinc-900 dark:text-white dark:border-zinc-700"
+                className="inline-flex items-center gap-3 w-full rounded-full text-[11px] font-semibold tracking-wide leading-none transition duration-150 px-3 py-2.5 justify-start mobile-menu-item bg-slate-100 hover:bg-white text-slate-900 shadow-sm border border-slate-300 dark:bg-zinc-800 dark:hover:bg-zinc-900 dark:text-white dark:border-zinc-700 white-in-dark"
                 onClick={() => {
                   if (link.event) {
                     trackAnalyticsEvent(link.event, { destination: link.href });
@@ -311,7 +312,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
             {isSignedIn ? (
               <button
                 onClick={() => { handleSignOut(); setOpen(false); }}
-                className="inline-flex items-center gap-3 w-full rounded-full text-[11px] font-semibold tracking-wide leading-none transition duration-150 px-3 py-2.5 justify-start mobile-menu-item bg-slate-100 hover:bg-white text-slate-900 shadow-sm border border-slate-300 dark:bg-zinc-800 dark:hover:bg-zinc-900 dark:text-white dark:border-zinc-700"
+                className="inline-flex items-center gap-3 w-full rounded-full text-[11px] font-semibold tracking-wide leading-none transition duration-150 px-3 py-2.5 justify-start mobile-menu-item bg-slate-100 hover:bg-white text-slate-900 shadow-sm border border-slate-300 dark:bg-zinc-800 dark:hover:bg-zinc-900 dark:text-white dark:border-zinc-700 white-in-dark"
               >
                 <span aria-hidden className="text-base leading-none">👤</span>
                 <span className="flex-1 text-left">{dictionary.ui?.signOut || "Sign out"}</span>
@@ -319,7 +320,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
             ) : (
               <Link 
                 href={`/${locale}/guest?mode=signin`}
-                className="inline-flex items-center gap-3 w-full rounded-full text-[11px] font-semibold tracking-wide leading-none transition duration-150 px-3 py-2.5 justify-start mobile-menu-item bg-slate-100 hover:bg-white text-slate-900 shadow-sm border border-slate-300 dark:bg-zinc-800 dark:hover:bg-zinc-900 dark:text-white dark:border-zinc-700"
+                className="inline-flex items-center gap-3 w-full rounded-full text-[11px] font-semibold tracking-wide leading-none transition duration-150 px-3 py-2.5 justify-start mobile-menu-item bg-slate-100 hover:bg-white text-slate-900 shadow-sm border border-slate-300 dark:bg-zinc-800 dark:hover:bg-zinc-900 dark:text-white dark:border-zinc-700 white-in-dark"
                 onClick={() => setOpen(false)}
               >
                 <span aria-hidden className="text-base leading-none">👤</span>

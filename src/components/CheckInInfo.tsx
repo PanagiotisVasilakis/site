@@ -123,10 +123,10 @@ export default function CheckInInfo({
     <div className="space-y-6">
       {/* Welcome Message */}
       <section className="card p-6 bg-gradient-to-br from-[color:var(--brand-primary)] to-[color:var(--brand-secondary)]">
-        <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:!text-white">
+        <h2 className="text-2xl font-serif italic font-bold mb-2" style={{ color: 'var(--text-accent)' }}>
           {t.checkinInfo?.welcome || '🎉 Welcome to Our Apartment!'}
         </h2>
-        <p className="text-gray-800 dark:!text-white">
+        <p className="white-in-dark" style={{ color: 'var(--text-accent)' }}>
           {t.checkinInfo?.welcomeMessage || 'We\'re delighted to have you here. Below you\'ll find everything you need for a comfortable stay.'}
         </p>
       </section>
@@ -136,7 +136,7 @@ export default function CheckInInfo({
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <span className="text-3xl" aria-hidden>🕐</span>
-            <h3 className="text-xl font-semibold" style={{ color: 'var(--text-accent)' }}>
+            <h3 className="text-xl font-serif italic font-bold" style={{ color: 'var(--text-accent)' }}>
               {t.checkinInfo?.checkInOutTitle || 'Check-in & Check-out'}
             </h3>
           </div>
@@ -212,13 +212,13 @@ export default function CheckInInfo({
       <section className="card p-5">
         <div className="flex items-center gap-3 mb-4">
           <span className="text-3xl" aria-hidden>📶</span>
-          <h3 className="text-xl font-semibold" style={{ color: 'var(--text-accent)' }}>
+          <h3 className="text-xl font-serif italic font-bold" style={{ color: 'var(--text-accent)' }}>
             {t.checkinInfo?.wifiTitle || 'WiFi Connection'}
           </h3>
         </div>
         <div className="space-y-3">
           <div className="p-4 rounded-lg bg-[color:var(--layer-surface)] border border-[color:var(--border-soft)]">
-            <div className="text-sm text-[color:var(--fg-muted)] mb-1">{t.checkinInfo?.wifiNetwork || 'Network Name'}</div>
+            <div className="text-sm font-serif italic font-medium text-[color:var(--fg-muted)] mb-1">{t.checkinInfo?.wifiNetwork || 'Network Name'}</div>
             <div className="flex items-center justify-between">
               <span className="font-mono font-semibold text-lg">ApartmentGuest_5G</span>
               <button
@@ -230,7 +230,7 @@ export default function CheckInInfo({
             </div>
           </div>
           <div className="p-4 rounded-lg bg-[color:var(--layer-surface)] border border-[color:var(--border-soft)]">
-            <div className="text-sm text-[color:var(--fg-muted)] mb-1">{t.checkinInfo?.wifiPassword || 'Password'}</div>
+            <div className="text-sm font-serif italic font-medium text-[color:var(--fg-muted)] mb-1">{t.checkinInfo?.wifiPassword || 'Password'}</div>
             <div className="flex items-center justify-between">
               <span className="font-mono font-semibold text-lg">Welcome2024!</span>
               <button
@@ -248,7 +248,7 @@ export default function CheckInInfo({
       <section className="card p-5">
         <div className="flex items-center gap-3 mb-4">
           <span className="text-3xl" aria-hidden>📋</span>
-          <h3 className="text-xl font-semibold" style={{ color: 'var(--text-accent)' }}>
+          <h3 className="text-xl font-serif italic font-bold" style={{ color: 'var(--text-accent)' }}>
             {t.checkinInfo?.houseRulesTitle || 'House Rules'}
           </h3>
         </div>
@@ -280,7 +280,7 @@ export default function CheckInInfo({
       <section className="card p-5">
         <div className="flex items-center gap-3 mb-4">
           <span className="text-3xl" aria-hidden>⭐</span>
-          <h3 className="text-xl font-semibold" style={{ color: 'var(--text-accent)' }}>
+          <h3 className="text-xl font-serif italic font-bold" style={{ color: 'var(--text-accent)' }}>
             {t.checkinInfo?.amenitiesTitle || 'Key Amenities'}
           </h3>
         </div>
@@ -316,7 +316,7 @@ export default function CheckInInfo({
       <section className="card p-5 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20">
         <div className="flex items-center gap-3 mb-4">
           <span className="text-3xl" aria-hidden>💡</span>
-          <h3 className="text-xl font-semibold" style={{ color: 'var(--text-accent)' }}>
+          <h3 className="text-xl font-serif italic font-bold" style={{ color: 'var(--text-accent)' }}>
             {t.checkinInfo?.tipsTitle || 'Local Tips'}
           </h3>
         </div>
@@ -343,13 +343,13 @@ export default function CheckInInfo({
       <section className="card p-5 mt-6 space-y-5">
         <div className="flex items-center gap-3">
           <span className="text-3xl" aria-hidden>📍</span>
-          <h3 className="text-xl font-semibold" style={{ color: 'var(--text-accent)' }}>
+          <h3 className="text-xl font-serif italic font-bold" style={{ color: 'var(--text-accent)' }}>
             {checkinStrings.locationTitle || 'Location & Nearby'}
           </h3>
         </div>
-        <p className="text-sm text-[color:var(--fg-muted)] max-w-2xl">
-         {checkinStrings.locationDescription || 'Discover your apartment’s prime location in Kalamata and explore Kalamata Moments, services, and sights within minutes.'}
-        </p>
+  <p className="text-sm text-[color:var(--fg-muted)] max-w-2xl white-in-dark">
+   {checkinStrings.locationDescription || 'Discover your apartment’s prime location in Kalamata and explore Kalamata Moments, services, and sights within minutes.'}
+  </p>
         <div className="rounded-xl overflow-hidden border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] shadow-sm">
           <DynamicApartmentLocationMap
             locale={locale}
@@ -363,24 +363,46 @@ export default function CheckInInfo({
           />
         </div>
         {(t.house?.distances?.length ?? 0) > 0 && (
-          <div className="grid sm:grid-cols-2 gap-3">
-            {(t.house?.distances || []).map((distance, i) => (
-              <div
-                key={`${distance}-${i}`}
-                className="flex items-start gap-3 p-3 rounded-lg bg-[color:var(--layer-surface)] border border-[color:var(--border-soft)] shadow-sm"
-              >
-                <span className="text-lg" aria-hidden>📍</span>
-                <span className="text-sm text-[color:var(--fg-muted)]">{distance}</span>
-              </div>
-            ))}
+          <div className="grid sm:grid-cols-3 gap-4">
+            {(t.house?.distances || []).filter(d => !/nearest beach/i.test(String(d))).map((distance, i) => {
+              // distance is expected like "Town Hall: 50m (1 min walk)"
+              const parts = String(distance).split(':');
+              const title = parts[0]?.trim() || distance;
+              const desc = parts.slice(1).join(':').trim();
+              const icon =
+                /town|hall/i.test(title)
+                  ? '🏛️'
+                  : /library|gallery|book/i.test(title)
+                  ? '📚'
+                  : /archaeo|museum|ancient|archaeological/i.test(title)
+                  ? '🏺'
+                  : /beach|sea|coast/i.test(title)
+                  ? '🏖️'
+                  : /airport|flight|aero/i.test(title)
+                  ? '✈️'
+                  : '📍';
+
+              return (
+                <div
+                  key={`${distance}-${i}`}
+                  className="rounded-lg border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] p-4 text-center shadow-sm"
+                >
+                  <div className="text-2xl mb-2" aria-hidden>{icon}</div>
+                  <h4 className="text-sm font-serif italic font-medium" style={{ color: 'var(--text-accent)' }}>
+                    {title}
+                  </h4>
+                  <p className="text-xs text-[color:var(--fg-muted)] mt-1">{desc}</p>
+                </div>
+              );
+            })}
           </div>
         )}
         <div className="grid sm:grid-cols-3 gap-4">
           {[
             {
               icon: '🏛️',
-              title: checkinStrings.locationTownTitle || 'Town Center',
-              description: checkinStrings.locationTownDescription || '50m to Town Hall & services',
+              title: checkinStrings.locationTownTitle || 'City Center',
+              description: checkinStrings.locationTownDescription || '1,5 km to City Center 14 min by foot / 4 min by car',
             },
             {
               icon: '🏖️',
@@ -398,7 +420,15 @@ export default function CheckInInfo({
               className="rounded-lg border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] p-4 text-center shadow-sm"
             >
               <div className="text-2xl mb-2" aria-hidden>{feature.icon}</div>
-              <h4 className="text-sm font-semibold" style={{ color: 'var(--fg-default)' }}>
+              <h4
+                className={
+                  "text-sm " +
+                  (["Transportation", "Beach Access", "Town Center"].includes(feature.title)
+                    ? "font-serif italic font-medium white-in-dark"
+                    : "font-semibold")
+                }
+                style={{ color: 'var(--text-accent)' }}
+              >
                 {feature.title}
               </h4>
               <p className="text-xs text-[color:var(--fg-muted)]">{feature.description}</p>
@@ -411,15 +441,15 @@ export default function CheckInInfo({
       <section className="card p-5">
         <div className="flex items-center gap-3 mb-4">
           <span className="text-3xl" aria-hidden>ℹ️</span>
-          <h3 className="text-xl font-semibold" style={{ color: 'var(--text-accent)' }}>
+          <h3 className="text-xl font-serif italic font-bold" style={{ color: 'var(--text-accent)' }}>
             {t.checkinInfo?.additionalTitle || 'Good to Know'}
           </h3>
         </div>
-        <div className="space-y-2 text-sm text-[color:var(--fg-muted)]">
-          <p>🔑 <strong>{t.checkinInfo?.keysInfo || 'Keys:'}</strong> {t.checkinInfo?.keysDetail || 'Please leave keys in the lockbox when checking out'}</p>
-          <p>🗑️ <strong>{t.checkinInfo?.trashInfo || 'Trash:'}</strong> {t.checkinInfo?.trashDetail || 'Recycling bins are located near the main entrance'}</p>
-          <p>💧 <strong>{t.checkinInfo?.waterInfo || 'Water:'}</strong> {t.checkinInfo?.waterDetail || 'Tap water is safe to drink'}</p>
-          <p>📺 <strong>{t.checkinInfo?.tvInfo || 'Entertainment:'}</strong> {t.checkinInfo?.tvDetail || 'Smart TV with Netflix and YouTube available'}</p>
+          <div className="space-y-2 text-sm text-[color:var(--fg-muted)]">
+          <p className="white-in-dark">🔑 <strong className="font-serif italic font-medium" style={{ color: 'var(--text-accent)' }}>{t.checkinInfo?.keysInfo || 'Keys:'}</strong> {t.checkinInfo?.keysDetail || 'Please leave keys in the lockbox when checking out'}</p>
+          <p className="white-in-dark">🗑️ <strong className="font-serif italic font-medium" style={{ color: 'var(--text-accent)' }}>{t.checkinInfo?.trashInfo || 'Trash:'}</strong> {t.checkinInfo?.trashDetail || 'Recycling bins are located near the main entrance'}</p>
+          <p className="white-in-dark">💧 <strong className="font-serif italic font-medium" style={{ color: 'var(--text-accent)' }}>{t.checkinInfo?.waterInfo || 'Water:'}</strong> {t.checkinInfo?.waterDetail || 'Tap water is safe to drink'}</p>
+          <p className="white-in-dark">📺 <strong className="font-serif italic font-medium" style={{ color: 'var(--text-accent)' }}>{t.checkinInfo?.tvInfo || 'Entertainment:'}</strong> {t.checkinInfo?.tvDetail || 'Smart TV with Netflix and YouTube available'}</p>
         </div>
       </section>
     </div>

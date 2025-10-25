@@ -12,6 +12,7 @@
     "prisma:format": "prisma format",
     "prisma:smoketest": "tsx scripts/prisma-smoketest.ts",
     "dev": "next dev -H 0.0.0.0",
+  "predev": "node scripts/check-pepper.js",
     "dev:clean": "rm -rf .next/cache && next dev -H 0.0.0.0",
     "build": "tsx scripts/generate-precache.ts && tsx scripts/validate-content.ts && tsx scripts/generate-version.ts && next build",
     "build:turbopack": "tsx scripts/generate-precache.ts && tsx scripts/validate-content.ts && tsx scripts/generate-version.ts && next build --turbopack",
@@ -52,6 +53,8 @@
     "docker:security-test": "docker run --rm -v \"$PWD\":/app -w /app aquasec/trivy fs .",
     "validate:security": "tsx scripts/validate-security.ts",
     "query-guests": "tsx scripts/query-guests.ts"
+    ,
+    "ensure-pepper": "node scripts/ensure-pepper.js"
   },
   "dependencies": {
     "@prisma/client": "^6.17.1",

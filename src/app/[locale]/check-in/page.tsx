@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { locales, type Locale } from '@/i18n/config';
-import { getDictionary } from '@/i18n';
+import { /* getDictionary */ } from '@/i18n';
 import { getItemsByCategory } from '@/lib/data';
 import type { Item } from '@/data/schemas';
 import { getGuestSessionFromCookies, hasVerifiedBookingSession } from '@/lib/guestSession';
@@ -21,7 +21,7 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
   if (!flags.checkinEnabled) return notFound();
   const { locale } = await params;
   const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : 'en';
-  const dict = getDictionary(eff);
+  // Welcome message is intentionally not rendered here; CheckInInfo handles its own welcome copy.
 
   const pickLocalized = (item: Item, baseKey: 'name' | 'summary'): string => {
     const localeKey = `${baseKey}_${eff}` as keyof Item;
@@ -61,12 +61,9 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
     <div className="page-container mx-auto max-w-3xl">
       <CheckinViewed locale={eff} />
       <div className="mb-6 text-center">
-        <h1 className="text-3xl font-bold mb-2">
+        <h1 className="text-3xl font-serif italic font-bold mb-2 tracking-wider">
           House Guide
         </h1>
-        <p className="text-[color:var(--fg-muted)]">
-          {dict.checkinInfo?.welcomeMessage || 'Everything you need to know for your stay'}
-        </p>
       </div>
       <CheckInInfo
         locale={eff}

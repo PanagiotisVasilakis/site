@@ -1,0 +1,28 @@
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import child_process from 'child_process';
+
+test('ensure-pepper creates .env.local with SECURITY_PEPPER when missing and is idempotent', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pepper-test-'));
+  const script = path.resolve(process.cwd(), 'scripts/ensure-pepper.js');
+
+  // First run: should create .env.local with SECURITY_PEPPER
+  const r1 = child_process.spawnSync(process.execPath, [script], { cwd: tmp, encoding: 'utf8' });
+  expect(r1.status === 0 || r1.status === null).toBeTruthy();
+  const envPath = path.join(tmp, '.env.local');
+  const content = fs.readFileSync(envPath, 'utf8');
+  expect(/SECURITY_PEPPER=[0-9a-f]{64}/.test(content)).toBeTruthy();
+
+  // Second run: should be idempotent and mention already present
+  const r2 = child_process.spawnSync(process.execPath, [script], { cwd: tmp, encoding: 'utf8' });
+  // r2.stdout may contain 'already present' message
+  expect(r2.stdout + r2.stderr).toMatch(/already present|Generated SECURITY_PEPPER/);
+
+  // cleanup
+  try {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  } catch {
+    // ignore
+  }
+});

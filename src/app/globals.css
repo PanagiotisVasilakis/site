@@ -566,6 +566,11 @@ input, textarea { color: inherit; }
 .text-brand-800 { color: var(--brand-800); }
 .text-brand-900 { color: var(--brand-900); }
 
+/* Utility: make text white in dark mode while preserving light-mode color/inheritance.
+  Use this on specific elements that should become white when the site is in dark theme. */
+.white-in-dark { color: inherit; }
+[data-theme="dark"] .white-in-dark { color: var(--fg-inverse) !important; }
+
 /* Gradient utilities */
 .bg-app-gradient { background: linear-gradient(160deg, var(--sand-50) 0%, var(--sea-50) 55%, var(--sea-100) 100%); }
 .bg-app-vertical { background: linear-gradient(180deg,var(--sand-50),var(--sea-50)); }
@@ -784,7 +789,8 @@ html:not([data-theme="dark"]) .bg-app-vertical {
 
 /* Apartment hero title - white in light mode, white in dark mode */
 .apartment-hero-title {
-  color: #ffffff !important;
+  /* Controlled via utility classes (e.g. `white-in-dark`) on the element. Keep inherit as default to avoid forcing white globally. */
+  color: inherit;
 }
 
 /* Add shimmer effect */
@@ -1518,14 +1524,17 @@ button[role="tab"] {
   border: none !important;
 }
 
-/* CRITICAL FIX: Force menu bar navigation text to be white in dark mode */
+/* NOTE: Header / menu white text was previously forced globally here. Prefer applying
+   the `.white-in-dark` utility to specific header elements in components (e.g. TopControls,
+   LocaleSwitcher) instead of forcing global selectors. Keep these selectors neutral to avoid
+   unintended overrides across components. */
 .dark a[href*="guest"],
 .dark button[aria-label*="Sign"],
 .dark .locale-switcher,
 [data-theme="dark"] a[href*="guest"],
 [data-theme="dark"] button[aria-label*="Sign"],
 [data-theme="dark"] .locale-switcher {
-  color: #ffffff !important;
+  color: inherit !important;
 }
 
 .dark a[href*="guest"] span,
@@ -1534,22 +1543,22 @@ button[role="tab"] {
 [data-theme="dark"] a[href*="guest"] span,
 [data-theme="dark"] button[aria-label*="Sign"] span,
 [data-theme="dark"] .locale-switcher span {
-  color: #ffffff !important;
+  color: inherit !important;
 }
 
-/* Force the home link (Guest Guide) text to be white */
+/* Home link overrides (legacy) — neutral now; apply `white-in-dark` directly where needed. */
 .dark a[href$="/en"],
 .dark a[href$="/el"],
 [data-theme="dark"] a[href$="/en"],
 [data-theme="dark"] a[href$="/el"] {
-  color: #ffffff !important;
+  color: inherit !important;
 }
 
 .dark a[href$="/en"] span,
 .dark a[href$="/el"] span,
 [data-theme="dark"] a[href$="/en"] span,
 [data-theme="dark"] a[href$="/el"] span {
-  color: #ffffff !important;
+  color: inherit !important;
 }
 
 /* Universal page dark mode styles - applies apartment color scheme to ALL pages */
