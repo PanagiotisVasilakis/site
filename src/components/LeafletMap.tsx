@@ -46,8 +46,6 @@ export interface LeafletMapProps {
   originPopup?: { name?: string; address?: string; description?: string };
   /** Refit bounds (origin + markers) whenever marker list changes */
   refitOnMarkerChange?: boolean;
-  /** Show a dedicated control button to fit origin + markers */
-  showRefitAllControl?: boolean;
   /** Travel modes to compute (OSRM profiles). Supported: driving, foot */
   travelModes?: TravelMode[];
   /** Allow user to toggle travel modes client-side */
@@ -77,10 +75,18 @@ export interface LeafletMapProps {
 }
 
 const CATEGORY_ICON: Record<string, string> = {
-  apartment: 'M12 2 2 7l10 5 10-5-10-5Zm8 9-8 4-8-4v6l8 4 8-4v-6Z',
-  restaurant: 'M6 2v8.5a3.5 3.5 0 1 0 7 0V2h-2v8.5a1.5 1.5 0 1 1-3 0V2H6Zm9 0v14h2v-6h2V8h-2V2h-2Z',
-  service: 'M12 2a5 5 0 0 0-5 5v3H5l1 12h12l1-12h-2V7a5 5 0 0 0-5-5Zm0 2a3 3 0 0 1 3 3v3H9V7a3 3 0 0 1 3-3Z',
-  attraction: 'M12 2 3 9h6v13h6V9h6L12 2Z'
+  apartment: 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8h5z',
+  restaurant: 'M11 1v10.08H9.62c-1.04 0-1.9.83-1.9 2.26v.04c0 .73.43 1.33 1.05 1.61L10 16v6H8v-6L6.95 14.99c.62-.28 1.05-.88 1.05-1.61v-.04C8 11.91 7.04 11.08 6 11.08H4.92V1h2.16v10.08h.5c1.04 0 1.9-.83 1.9-2.26v-.04c0-.73-.43-1.33-1.05-1.61L7.08 6V1h2.16v5L10.5 6.5 14 1v10.08h-.5c-1.04 0-1.9.83-1.9 2.26v.04c0 .73.43 1.33 1.05 1.61L14 16v6h-2v-6l-1.05-1.01c.62-.28 1.05-.88 1.05-1.61v-.04c0-1.43-.96-2.26-2-2.26h-.5V1h2.16z',
+  service: 'M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z',
+  attraction: 'M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z',
+  sightseeing: 'M4 4h3l2-2h6l2 2h3v16H4V4zm8 3a5 5 0 00-5 5 5 5 0 005 5 5 5 0 005-5 5 5 0 00-5-5zm0 8a3 3 0 01-3-3 3 3 0 013-3 3 3 0 013 3 3 3 0 01-3 3z',
+  beach: 'M18 20H6v-4l5-5 3 3 4-4zM6 14v-2.5l5-5 3 3 4-4V14z',
+  shop: 'M12 18H6v-4h6v4zm6-4h-4v4h4v-4zm-6-4H6v4h6v-4zm6-4h-4v4h4V6zM6 6H4v14h16V6h-2v2h-2V6H8v2H6V6z',
+  cafe: 'M2 21h18v-2H2v2zm2-4h14v-3H4v3zm14-13v10h2V4h-2z',
+  bar: 'M11 13.83l-3.83 3.83L6 16.51l3.83-3.83L6 8.83 7.17 7.66 11 11.5l3.83-3.84L16 8.83l-3.83 3.83L16 16.51l-1.17 1.17L11 13.83zM12 2a9 9 0 00-9 9c0 2.3.86 4.4 2.28 6L12 23.72 18.72 17A9 9 0 0012 2z',
+  park: 'M12 2L9.5 5.5 11 6l-2 4-1-1-2 4h12l-2-4-1 1-2-4 1.5-.5L12 2z',
+  police: 'M13.5,13H12V8h1.5a2.5,2.5,0,0,1,2.5,2.5h0A2.5,2.5,0,0,1,13.5,13Z M21.94,10.29l-1.2-2.4A1,1,0,0,0,19.88,7H17V4a1,1,0,0,0-1-1H8A1,1,0,0,0,7,4V7H4.12a1,1,0,0,0-.86.49l-1.2,2.4A1,1,0,0,0,2,10.5V16a1,1,0,0,0,1,1H4v2a1,1,0,0,0,1,1H6a1,1,0,0,0,1-1V17H17v2a1,1,0,0,0,1,1h1a1,1,0,0,0,1-1V17h1a1,1,0,0,0,1-1V10.5A1,1,0,0,0,21.94,10.29ZM8,5H16V7H8ZM6,15a2,2,0,1,1,2-2A2,2,0,0,1,6,15Zm12,0a2,2,0,1,1,2-2A2,2,0,0,1,18,15Z',
+  'city-center': 'M15 11V5l-3-3-3 3v2H3v14h18V11h-6zm-8 8H5v-2h2v2zm0-4H5v-2h2v2zm0-4H5V9h2v2zm6 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V9h2v2zm0-4h-2V5h2v2zm6 8h-2v-2h2v2zm0-4h-2v-2h2v2z'
 };
 
 function svgIcon(path: string, color: string) {
@@ -114,7 +120,6 @@ export default function LeafletMap({
   autoFitToOriginAndMarkers = false,
   originPopup,
   refitOnMarkerChange = false,
-  showRefitAllControl = false,
   travelModes = ['driving','foot'],
   enableTravelModeToggle = false,
   osrmBaseUrl,
@@ -173,7 +178,7 @@ export default function LeafletMap({
       map._originMarker = L.marker([origin[1], origin[0]], {
         icon: L.divIcon({
           className: 'leaflet-origin-marker',
-          html: '<div class="lmk" data-type="apartment" title="Apartment location">🏠</div>',
+          html: `<div class="lmk" data-type="apartment" title="Apartment location">${svgIcon(CATEGORY_ICON['apartment'], '#fff')}</div>`,
           iconSize: [42,42], iconAnchor:[21,40]
         })
       }).addTo(map);
@@ -609,14 +614,6 @@ export default function LeafletMap({
   return (
     <div className={`${className} relative`} style={{ height }}>
       <div ref={containerRef} className="w-full h-full rounded-lg overflow-hidden leaflet-container-custom" />
-      {showRefitAllControl && (
-        <button
-          type="button"
-          onClick={fitOriginAndMarkers}
-          className="absolute top-2 left-12 z-[5000] bg-white/80 dark:bg-zinc-800/80 backdrop-blur px-3 py-1 rounded-full text-xs font-medium shadow hover:bg-white dark:hover:bg-zinc-700 transition"
-          aria-label="Fit villa and markers"
-        >↺ Fit All</button>
-      )}
       {enableRouting && routeLayerRef.current && (
         <button
           type="button"

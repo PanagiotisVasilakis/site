@@ -28,7 +28,7 @@ function swapLocale(pathname: string, next: string, searchParams?: URLSearchPara
   return newPath;
 }
 
-const BASE_CLASS = "locale-switcher inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold tracking-wide bg-black/10 hover:bg-black/20 text-slate-800 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/70 white-in-dark transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60 dark:focus-visible:ring-brand-400/50";
+const BASE_CLASS = "w-12 locale-switcher inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold tracking-wide bg-black/10 hover:bg-black/20 text-slate-800 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/70 white-in-dark transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60 dark:focus-visible:ring-brand-400/50";
 
 function LocaleSwitcherContent({ fullText = false, showGlobeIcon = false, className }: LocaleSwitcherProps) {
   const pathname = usePathname() || "/en";

@@ -68,12 +68,13 @@ export type Dictionary = {
     restaurants: string;
     sightseeing: string;
   };
-  house?: {
+    house?: {
     navLabel: string;
     navSubtitle: string;
     title: string;
     location?: string;
     intro: string;
+    guideTitle?: string;
     overview: string;
     amenities: string;
     rules: string;
@@ -81,7 +82,7 @@ export type Dictionary = {
     emergency: string;
     amenityList: string[]; // pre-translated bullet list
     rulesList: string[];   // house rules bullets
-    distances?: string[]; // nearby distances list
+    // distances (legacy) removed; use `locationPanel.highlights` instead
   photoAlts?: { living: string; bedroom: string; kitchen: string; balcony?: string; bathroom?: string; };
     glanceTitle?: string;
     specs?: string[];
@@ -112,13 +113,27 @@ export type Dictionary = {
   whatsIncluded?: string;
   completeDetailsHint?: string;
   };
-  locationPanel?: {
+    locationPanel?: {
     title: string;
     apartmentTitle: string;
     city: string;
     blurb: string;
     nearby: string;
-    attractions: string[];
+    locationDescription?: string;
+    locationTitle?: string;
+    highlights?: Array<{
+      icon?: string;
+      title: string;
+      description: string;
+    }>;
+    // attractions (legacy string lists) removed: use `highlights` instead
+    /* Optional convenience keys for localized feature card titles/descriptions */
+    locationTownTitle?: string;
+    locationTownDescription?: string;
+    locationBeachTitle?: string;
+    locationBeachDescription?: string;
+    locationTransportTitle?: string;
+    locationTransportDescription?: string;
     howToEnableMapTitle: string;
     howToEnableSteps: string[];
   };
@@ -236,32 +251,32 @@ export type Dictionary = {
 const dict: Record<Locale, Dictionary> = {
   en: {
     appTitle: "Guest Guide",
-  homeTitle: "Dolce Far Niente",
-  homeSubtitle: "The luxury of a Lazy Afternoon",
+    homeTitle: "Dolce Far Niente",
+    homeSubtitle: "Your personal guide to a relaxing stay.",
     backHome: "← Back home",
-  skipLink: "Skip to content",
+    skipLink: "Skip to content",
     details: "Details →",
     bookingDetails: "Booking Details",
     aboutUs: "About Us",
-  emptyState: "No items yet.",
-  itemSingular: "item",
-  itemPlural: "items",
-  search: {
-    where: "Where",
-    addLocation: "Add location",
-    dates: "Dates",
-    addDates: "Add dates",
-    guestsLabel: "Guests",
-    guestSingular: "guest",
-    guestPlural: "guests",
-    search: "Search",
-    arrivalLabel: "Arrival",
-    departureLabel: "Departure",
-    arrivalPlaceholder: "Select arrival",
-    departurePlaceholder: "Select departure"
-  },
-  ui: { filters: "Filters", map: "Map", list: "List", resetAll: "Reset All", activeTags: "Active Tags", none: "None", back: "Back", signIn: "Sign in", signOut: "Sign out" },
-  updates: { updateAvailable: "New version available", refresh: "Refresh", dismiss: "Dismiss", fromTo: "Update available: {old} → {new}", assetsFromTo: "Assets updated: {old} → {new}" },
+    emptyState: "No items yet.",
+    itemSingular: "item",
+    itemPlural: "items",
+    search: {
+      where: "Where",
+      addLocation: "Choose a location",
+      dates: "Dates",
+      addDates: "Select your dates",
+      guestsLabel: "Guests",
+      guestSingular: "guest",
+      guestPlural: "guests",
+      search: "Search",
+      arrivalLabel: "Arrival",
+      departureLabel: "Departure",
+      arrivalPlaceholder: "Select arrival",
+      departurePlaceholder: "Select departure"
+    },
+    ui: { filters: "Filters", map: "Map", list: "List", resetAll: "Reset filters", activeTags: "Applied filters", none: "None", back: "Back", signIn: "Sign in", signOut: "Sign out" },
+    updates: { updateAvailable: "An update is available", refresh: "Refresh", dismiss: "Dismiss", fromTo: "A new version is ready: {old} → {new}", assetsFromTo: "Local guide updated: {old} → {new}" },
     cta: {
       call: "Call",
       directions: "Directions",
@@ -269,18 +284,18 @@ const dict: Record<Locale, Dictionary> = {
       reserve: "Reserve",
       home: "Home",
     },
-  labels: { updated: "Updated", save: "Save", saved: "Saved", favorites: "Favorites", networkOnline: "Online", networkOffline: "Offline", networkSlow: "Slow network", networkReconnected: "Reconnected", syncPending: "Sync pending", syncIdle: "Synced" },
+    labels: { updated: "Updated", save: "Save", saved: "Saved", favorites: "Favorites", networkOnline: "Online", networkOffline: "Offline", networkSlow: "Your connection is slow", networkReconnected: "Reconnected", syncPending: "Syncing...", syncIdle: "Up to date" },
     categories: {
       phones: "Important Phones",
       restaurants: "Kalamata Moments",
       sightseeing: "Sightseeing",
     },
     house: {
-  navLabel: "Apartment Photos",
-      navSubtitle: "Photo tour & location",
-      title: "2-Bedroom Apartment with Mountain & Sea Views",
+      navLabel: "Photo Gallery",
+      navSubtitle: "Explore the apartment and its location",
+      title: "Your 2-Bedroom Apartment with Mountain & Sea Views",
       location: "Kalamata, Greece",
-  intro: "A spacious apartment with large sunny terraces and beautiful views, in a quiet neighborhood near the Town Hall.",
+      intro: "Welcome to your spacious apartment, featuring large sunny terraces and beautiful views in a quiet neighborhood near the Town Hall.",
       overview: "Overview",
       amenities: "Amenities",
       rules: "House Rules",
@@ -297,6 +312,7 @@ const dict: Record<Locale, Dictionary> = {
       ],
       ctaPrimary: "Book",
       ctaSecondary: "Contact Us",
+      guideTitle: "Your Apartment Guide",
       amenityList: [
         "Free Wi-Fi",
         "Air conditioning", 
@@ -315,7 +331,7 @@ const dict: Record<Locale, Dictionary> = {
         "Check-out: 11:00",
         "Families with children welcome"
       ],
-  photoAlts: { living: 'Living area', bedroom: 'Bedroom', kitchen: 'Kitchen', balcony: 'Balcony', bathroom: 'Bathroom' },
+      photoAlts: { living: 'Living area', bedroom: 'Bedroom', kitchen: 'Kitchen', balcony: 'Balcony', bathroom: 'Bathroom' },
       rooms: {
         living_room: {
           title: "Living Room",
@@ -345,78 +361,73 @@ const dict: Record<Locale, Dictionary> = {
         next: "Next image",
         close: "Close viewer"
       },
-      distances: [
-        "Town Hall: 50m (1 min walk)",
-        "Public Library & Gallery: 1.8km (15 min walk)",
-        "Archaeological Museum: 2km (15 min walk)", 
-        "Nearest beach: 5 min drive",
-        "Kalamata Airport: 6km (15 min drive)"
-      ]
     },
     booking: {
-  locationDesc: "Quiet neighborhood near the Town Hall",
-  completeTitle: "Complete your booking",
-  yourDetails: "Your booking details",
-  datesLabel: "Dates",
-  guestsLabel: "Guests",
-  durationLabel: "Duration",
-  notSelected: "Not selected",
-  selectDatesPrompt: "Please complete your booking details above to continue.",
-  priceBreakdown: "Price breakdown",
-  cleaningFee: "Cleaning fee",
-  serviceFee: "Service fee",
-  total: "Total",
-  whatsIncluded: "What's included",
-  completeDetailsHint: "Select dates to see pricing"
-    }
-    ,locationPanel: {
-  title: "Apartment Location & Nearby Attractions",
+      locationDesc: "Quiet neighborhood near the Town Hall",
+      completeTitle: "Complete your booking",
+      yourDetails: "Your booking details",
+      datesLabel: "Dates",
+      guestsLabel: "Guests",
+      durationLabel: "Duration",
+      notSelected: "Not selected",
+      selectDatesPrompt: "Please complete your booking details above to continue.",
+      priceBreakdown: "Price breakdown",
+      cleaningFee: "Cleaning fee",
+      serviceFee: "Service fee",
+      total: "Total",
+      whatsIncluded: "What's included",
+      completeDetailsHint: "Select dates to see pricing"
+    },
+    locationPanel: {
+      title: "Explore the Neighborhood",
       apartmentTitle: "2-Bedroom Apartment with Views",
       city: "Kalamata, Greece",
-      blurb: "Quiet neighborhood, 50m from Town Hall with mountain & sea views",
-      nearby: "Nearby Attractions",
-      attractions: [
-        "🏛️ Town Hall (50m walk)",
-        "📚 Public Library & Gallery (1.8km)",
-        "🏺 Archaeological Museum (2km)",
-        "🏖️ Beach (5 min drive)",
-        "✈️ Kalamata Airport (6km)",
-        "🚗 Free private parking"
+      blurb: "A quiet neighborhood just 50m from the Town Hall, with stunning mountain and sea views.",
+      nearby: "What's Nearby?",
+      locationDescription: "Discover your apartment's prime location in Kalamata and explore Kalamata Moments, services, and sights within minutes.",
+      locationTitle: "Explore the Neighborhood",
+      highlights: [
+        { icon: "🏛️", title: "Town Hall", description: "50m (1 min walk)" },
+        { icon: "🏺", title: "Archaeological Museum", description: "2km (15 min walk)" },
+        { icon: "✈️", title: "Kalamata Airport", description: "6km (15 min drive)" },
+        { icon: "🏙️", title: "City Center", description: "1.5 km (14' walk / 4' drive)" },
+        { icon: "🏖️", title: "Beach Access", description: "1km (5' drive to the coast)" },
+        { icon: "🚗", title: "Transportation", description: "Free parking & airport 15'" },
       ],
-      howToEnableMapTitle: "To enable interactive map:",
+      howToEnableMapTitle: "How to use the interactive map:",
       howToEnableSteps: [
         "Make sure JavaScript is enabled in your browser",
         "Pan or zoom the map to explore the neighborhood",
         "Tap a marker to open details and travel times"
       ]
-    }
-    ,map: {
+    },
+    map: {
       loading: "Loading map...",
-  apartmentMarkerTitle: "Seaside Modern Apartment",
-      apartmentMarkerDesc: "Your accommodation",
+      apartmentMarkerTitle: "Your Apartment",
+      apartmentMarkerDesc: "You are here",
       viewDetails: "View details",
       failed: "Map failed to load",
       tokenMissing: "Interactive map temporarily unavailable",
-      deferredInteractiveLabel: "Interactive map loads once it's in view to keep things speedy.",
+      deferredInteractiveLabel: "The interactive map will load here to keep things speedy.",
       travelPrompt: "Tap a marker to calculate travel time."
     },
     portal: {
-      introTitle: "How can we help with your stay?",
-      introSubtitle: "Choose what you would like to do next.",
+      introTitle: "Welcome! How can we help?",
+      introSubtitle: "What would you like to do?",
       signInTitle: "Sign‑in",
       signUpTitle: "Sign‑up",
-      originQuestion: "Where are you coming from?",
+      originQuestion: "Where are you traveling from?",
       originGR: "Greece",
       originAbroad: "World",
-  phoneLabel: "Phone Number",
+      phoneLabel: "Phone Number",
       afmLabel: "AFM (9 digits)",
-  passportLabel: "Passport Number",
+      passportLabel: "Passport Number",
       bookingRefLabel: "Booking reference (optional)",
       lastNameLabel: "Last name (optional)",
       continueBtn: "Continue",
       or: "or",
-      noBookingYet: "No booking yet?",
-      alreadyBooked: "Booking & Check-in Details",
+      noBookingYet: "Don't have a booking yet?",
+      alreadyBooked: "View My Booking & Check-in",
       ctaStartBooking: "Start here",
       goHome: "Go to Home",
       rememberMe: "Remember me on this device",
@@ -438,12 +449,12 @@ const dict: Record<Locale, Dictionary> = {
         passportRequired: "Passport number is required",
         passportInvalid: "Use 5–20 letters or numbers"
       }
-    }
-    ,checkin: {
+    },
+    checkin: {
       navLabel: "Check-in",
       navInfoLabel: "Check-In Info",
       title: "Check-in",
-      summary: "Booking summary",
+      summary: "Your Booking",
       bookingId: "Booking ID",
       reference: "Reference",
       source: "Source",
@@ -453,26 +464,26 @@ const dict: Record<Locale, Dictionary> = {
       arrivalTime: "Arrival time",
       arrivalTimeInvalid: "Please enter a valid time (HH:mm)",
       specialRequests: "Special requests",
-      acceptTerms: "I confirm my details are correct and accept the terms",
+      acceptTerms: "I confirm my details are correct and I accept the terms.",
       submit: "Complete Check-in",
       submitted: "Check-in completed",
       saving: "Saving…",
       loading: "Loading booking…",
-    }
-    ,checkinInfo: {
-  welcome: "🎉 Welcome to Our Apartment!",
-      welcomeMessage: "We're delighted to have you here. Below you'll find everything you need for a comfortable stay.",
+    },
+    checkinInfo: {
+      welcome: "🎉 Welcome!",
+      welcomeMessage: "We're so glad you're here! Below is some helpful information for your stay.",
       checkInOutTitle: "Check-in & Check-out",
       checkInTime: "Check-in",
       checkOutTime: "Check-out",
-      wifiTitle: "WiFi Connection",
+      wifiTitle: "Internet Access",
       wifiNetwork: "Network Name",
       wifiPassword: "Password",
       copy: "Copy",
       copied: "Copied",
       emergencyTitle: "Emergency Contacts",
-      hostContact: "Host (24/7)",
-      hostName: "Available anytime",
+      hostContact: "Your Host (24/7)",
+      hostName: "Available 24/7",
       emergencyServices: "Emergency Services",
       police: "Police, Fire, Ambulance",
       localHospital: "Local Hospital",
@@ -496,9 +507,9 @@ const dict: Record<Locale, Dictionary> = {
       tip4: "Need a taxi? Call +30 2721 023456 or use the Taxi app",
       additionalTitle: "Good to Know",
       keysInfo: "Keys:",
-      keysDetail: "Please leave keys in the lockbox when checking out",
+      keysDetail: "Please leave your keys in the lockbox upon checkout.",
       trashInfo: "Trash:",
-      trashDetail: "Recycling bins are located near the main entrance",
+      trashDetail: "You'll find the recycling bins near the main entrance.",
       waterInfo: "Water:",
       waterDetail: "Tap water is safe to drink",
       tvInfo: "Entertainment:",
@@ -508,31 +519,31 @@ const dict: Record<Locale, Dictionary> = {
   el: {
     appTitle: "Οδηγός Επισκεπτών",
     homeTitle: "Dolce Far Niente",
-    homeSubtitle: "Η πολυτέλεια ενός χαλαρού απογεύματος",
+    homeSubtitle: "Ο προσωπικός σας οδηγός για μια χαλαρωτική διαμονή.",
     backHome: "← Πίσω στην αρχική",
-  skipLink: "Μετάβαση στο περιεχόμενο",
+    skipLink: "Μετάβαση στο περιεχόμενο",
     details: "Λεπτομέρειες →",
     bookingDetails: "Στοιχεία Κράτησης",
     aboutUs: "Σχετικά με Εμάς",
-  emptyState: "Δεν υπάρχουν στοιχεία ακόμη.",
-  itemSingular: "στοιχείο",
-  itemPlural: "στοιχεία",
-  search: {
-    where: "Προορισμός",
-    addLocation: "Προσθήκη τοποθεσίας",
-    dates: "Ημερομηνίες",
-    addDates: "Προσθήκη ημερομηνιών",
-    guestsLabel: "Επισκέπτες",
-    guestSingular: "επισκέπτης",
-    guestPlural: "επισκέπτες",
-    search: "Αναζήτηση",
-    arrivalLabel: "Άφιξη",
-    departureLabel: "Αναχώρηση",
-    arrivalPlaceholder: "Επιλογή άφιξης",
-    departurePlaceholder: "Επιλογή αναχώρησης"
-  },
-  ui: { filters: "Φίλτρα", map: "Χάρτης", list: "Λίστα", resetAll: "Επαναφορά", activeTags: "Ενεργές Ετικέτες", none: "Κανένα", back: "Πίσω", signIn: "Σύνδεση", signOut: "Αποσύνδεση" },
-  updates: { updateAvailable: "Νέα έκδοση διαθέσιμη", refresh: "Ανανέωση", dismiss: "Κλείσιμο", fromTo: "Διαθέσιμη ενημέρωση: {old} → {new}", assetsFromTo: "Ενημερωμένα αρχεία: {old} → {new}" },
+    emptyState: "Δεν υπάρχουν στοιχεία ακόμη.",
+    itemSingular: "στοιχείο",
+    itemPlural: "στοιχεία",
+    search: {
+      where: "Προορισμός",
+      addLocation: "Επιλέξτε τοποθεσία",
+      dates: "Ημερομηνίες",
+      addDates: "Επιλέξτε ημερομηνίες",
+      guestsLabel: "Επισκέπτες",
+      guestSingular: "επισκέπτης",
+      guestPlural: "επισκέπτες",
+      search: "Αναζήτηση",
+      arrivalLabel: "Άφιξη",
+      departureLabel: "Αναχώρηση",
+      arrivalPlaceholder: "Επιλογή άφιξης",
+      departurePlaceholder: "Επιλογή αναχώρησης"
+    },
+    ui: { filters: "Φίλτρα", map: "Χάρτης", list: "Λίστα", resetAll: "Επαναφορά φίλτρων", activeTags: "Ενεργά φίλτρα", none: "Κανένα", back: "Πίσω", signIn: "Σύνδεση", signOut: "Αποσύνδεση" },
+    updates: { updateAvailable: "Μια ενημέρωση είναι διαθέσιμη", refresh: "Ανανέωση", dismiss: "Κλείσιμο", fromTo: "Μια νέα έκδοση είναι έτοιμη: {old} → {new}", assetsFromTo: "Ο τοπικός οδηγός ενημερώθηκε: {old} → {new}" },
     cta: {
       call: "Κλήση",
       directions: "Οδηγίες",
@@ -540,18 +551,18 @@ const dict: Record<Locale, Dictionary> = {
       reserve: "Κράτηση",
       home: "Αρχική",
     },
-  labels: { updated: "Ενημερώθηκε", save: "Αποθήκευση", saved: "Αποθηκεύτηκε", favorites: "Αγαπημένα", networkOnline: "Συνδεδεμένο", networkOffline: "Εκτός σύνδεσης", networkSlow: "Αργή σύνδεση", networkReconnected: "Επανασυνδέθηκε", syncPending: "Εκκρεμεί συγχρονισμός", syncIdle: "Συγχρονίστηκε" },
+    labels: { updated: "Ενημερώθηκε", save: "Αποθήκευση", saved: "Αποθηκεύτηκε", favorites: "Αγαπημένα", networkOnline: "Συνδεδεμένο", networkOffline: "Εκτός σύνδεσης", networkSlow: "Η σύνδεσή σας είναι αργή", networkReconnected: "Επανασυνδέθηκε", syncPending: "Συγχρονισμός...", syncIdle: "Ενημερωμένο" },
     categories: {
       phones: "Χρήσιμα Τηλέφωνα",
       restaurants: "Η Καλαματα μας",
       sightseeing: "Αξιοθέατα",
     },
     house: {
-      navLabel: "Φωτογραφίες Διαμερίσματος",
-      navSubtitle: "Φωτογραφική περιήγηση & τοποθεσία",
-      title: "Διαμέρισμα 2 Υπνοδωματίων με Θέα Βουνό & Θάλασσα",
+      navLabel: "Συλλογή Φωτογραφιών",
+      navSubtitle: "Εξερευνήστε το διαμέρισμα και την τοποθεσία του",
+      title: "Το 2-υπνοδωματίων διαμέρισμά σας με θέα σε βουνό & θάλασσα",
       location: "Καλαμάτα, Ελλάδα", 
-  intro: "Ένα ευρύχωρο διαμέρισμα με μεγάλες ηλιόλουστες βεράντες και όμορφη θέα, σε ήσυχη γειτονιά κοντά στο Δημαρχείο.",
+      intro: "Καλώς ήρθατε στο ευρύχωρο διαμέρισμά σας, με μεγάλες ηλιόλουστες βεράντες και όμορφη θέα σε μια ήσυχη γειτονιά κοντά στο Δημαρχείο.",
       overview: "Επισκόπηση",
       amenities: "Παροχές",
       rules: "Κανόνες Σπιτιού",
@@ -568,6 +579,7 @@ const dict: Record<Locale, Dictionary> = {
       ],
       ctaPrimary: "Κράτηση",
       ctaSecondary: "Επικοινωνία",
+      guideTitle: "Ο Οδηγός του Διαμερίσματός σας",
       amenityList: [
         "Δωρεάν Wi-Fi",
         "Κλιματισμός",
@@ -586,7 +598,7 @@ const dict: Record<Locale, Dictionary> = {
         "Αναχώρηση: 11:00",
         "Οικογένειες με παιδιά καλοδεχούμενες"
       ],
-  photoAlts: { living: 'Καθιστικό', bedroom: 'Υπνοδωμάτιο', kitchen: 'Κουζίνα', balcony: 'Μπαλκόνι', bathroom: 'Μπάνιο' },
+      photoAlts: { living: 'Καθιστικό', bedroom: 'Υπνοδωμάτιο', kitchen: 'Κουζίνα', balcony: 'Μπαλκόνι', bathroom: 'Μπάνιο' },
       rooms: {
         living_room: {
           title: "Καθιστικό",
@@ -610,84 +622,85 @@ const dict: Record<Locale, Dictionary> = {
         }
       },
       photoViewer: {
-        instructions: "Χειρισμός προβολής: Χρησιμοποιήστε τα βελάκια για εναλλαγή εικόνων, Home/End για μετάβαση στην πρώτη/τελευταία, Escape για κλείσιμο.",
+        instructions: "Χειρισμός προβολής: Χρησιμοποιήστε τα βελάκια για εναλλαγή εικόνων, τα πλήκτρα Home/End για μετάβαση στην πρώτη/τελευταία εικόνα, και το πλήκτρο Escape για κλείσιμο.",
         counter: "Προβάλλεται η εικόνα {current} από {total}.",
         prev: "Προηγούμενη εικόνα",
         next: "Επόμενη εικόνα",
         close: "Κλείσιμο προβολής"
       },
-      distances: [
-        "Δημαρχείο: 50μ (1 λεπτό με τα πόδια)",
-        "Δημόσια Βιβλιοθήκη–Πινακοθήκη: 1,8 χλμ (15 λεπτά με τα πόδια)",
-        "Μπενάκειο Αρχαιολογικό Μουσείο: 2 χλμ (15 λεπτά με τα πόδια)",
-        "Κοντινότερη παραλία: 5 λεπτά με αυτοκίνητο", 
-        "Αεροδρόμιο Καλαμάτας: 6 χλμ (15 λεπτά οδήγηση)"
-      ]
     },
     booking: {
-  locationDesc: "Ήσυχη γειτονιά κοντά στο Δημαρχείο",
-  completeTitle: "Ολοκληρώστε την κράτηση",
-  yourDetails: "Στοιχεία κράτησης",
-  datesLabel: "Ημερομηνίες",
-  guestsLabel: "Επισκέπτες",
-  durationLabel: "Διάρκεια",
-  notSelected: "Δεν έχει επιλεγεί",
-  selectDatesPrompt: "Συμπληρώστε τα στοιχεία κράτησης παραπάνω για να συνεχίσετε.",
-  priceBreakdown: "Ανάλυση τιμής",
-  cleaningFee: "Τέλος καθαρισμού",
-  serviceFee: "Τέλος υπηρεσίας",
-  total: "Σύνολο",
-  whatsIncluded: "Τι περιλαμβάνεται",
-  completeDetailsHint: "Επιλέξτε ημερομηνίες για να δείτε τιμή"
-    }
-    ,locationPanel: {
-      title: "Τοποθεσία & Κοντινά Αξιοθέατα",
-  apartmentTitle: "Διαμέρισμα 2 Υπνοδωματίων με Θέα",
+      locationDesc: "Ήσυχη γειτονιά κοντά στο Δημαρχείο",
+      completeTitle: "Ολοκληρώστε την κράτηση",
+      yourDetails: "Στοιχεία κράτησης",
+      datesLabel: "Ημερομηνίες",
+      guestsLabel: "Επισκέπτες",
+      durationLabel: "Διάρκεια",
+      notSelected: "Δεν έχει επιλεγεί",
+      selectDatesPrompt: "Συμπληρώστε τα στοιχεία κράτησης παραπάνω για να συνεχίσετε.",
+      priceBreakdown: "Ανάλυση τιμής",
+      cleaningFee: "Τέλος καθαρισμού",
+      serviceFee: "Τέλος υπηρεσίας",
+      total: "Σύνολο",
+      whatsIncluded: "Τι περιλαμβάνεται",
+      completeDetailsHint: "Επιλέξτε ημερομηνίες για να δείτε τιμή"
+    },
+    locationPanel: {
+      title: "Τοποθεσία & Κοντινά",
+      apartmentTitle: "Διαμέρισμα 2 Υπνοδωματίων με Θέα",
       city: "Καλαμάτα, Ελλάδα",
-      blurb: "Ήσυχη γειτονιά, 50μ από το Δημαρχείο με θέα βουνό & θάλασσα",
-      nearby: "Κοντινά Σημεία",
-      attractions: [
-        "🏛️ Δημαρχείο (50μ περπάτημα)",
-        "📚 Δημόσια Βιβλιοθήκη & Πινακοθήκη (1,8χλμ)",
-        "🏺 Αρχαιολογικό Μουσείο (2χλμ)",
-        "🏖️ Παραλία (5 λεπτά με αυτοκίνητο)",
-        "✈️ Αεροδρόμιο Καλαμάτας (6χλμ)",
-        "🚗 Δωρεάν ιδιωτικό πάρκινγκ"
+      blurb: "Μια ήσυχη γειτονιά μόλις 50μ από το Δημαρχείο, με εκπληκτική θέα σε βουνό και θάλασσα.",
+      nearby: "Τι υπάρχει κοντά;",
+      locationDescription: "Ανακαλύψτε την εξαιρετική τοποθεσία του διαμερίσματός σας στην Καλαμάτα και εξερευνήστε τις Στιγμές Καλαμάτας, υπηρεσίες και αξιοθέατα μέσα σε λίγα λεπτά.",
+      locationTitle: "Εξερευνήστε τη Γειτονιά",
+      locationTownTitle: "Κέντρο Πόλης",
+      locationTownDescription: "1,5 χλμ (14' περπάτημα / 4' οδήγηση)",
+      locationBeachTitle: "Πρόσβαση στην Παραλία",
+      locationBeachDescription: "1 χλμ (5' με αυτοκίνητο)",
+      locationTransportTitle: "Μεταφορές",
+      locationTransportDescription: "Δωρεάν πάρκινγκ & αεροδρόμιο 15'",
+      highlights: [
+        { icon: "🏛️", title: "Δημαρχείο", description: "50μ (1\' με τα πόδια)" },
+        { icon: "🏺", title: "Μπενάκειο Αρχαιολογικό Μουσείο", description: "2 χλμ (15\' με τα πόδια)" },
+        { icon: "✈️", title: "Αεροδρόμιο Καλαμάτας", description: "6 χλμ (15\' οδήγηση)" },
+        { icon: "🏙️", title: "Κέντρο Πόλης", description: "1,5 χλμ (14' περπάτημα / 4' οδήγηση)" },
+        { icon: "🏖️", title: "Πρόσβαση στην Παραλία", description: "1 χλμ (5' με αυτοκίνητο)" },
+        { icon: "🚗", title: "Μεταφορές", description: "Δωρεάν πάρκινγκ & αεροδρόμιο 15'" },
       ],
-      howToEnableMapTitle: "Για ενεργοποίηση διαδραστικού χάρτη:",
+      howToEnableMapTitle: "Πώς να χρησιμοποιήσετε τον διαδραστικό χάρτη:",
       howToEnableSteps: [
         "Βεβαιωθείτε ότι η JavaScript είναι ενεργοποιημένη στο πρόγραμμα περιήγησης",
         "Μετακινήστε ή μεγεθύνετε τον χάρτη για να εξερευνήσετε τη γειτονιά",
         "Πατήστε έναν δείκτη για να δείτε λεπτομέρειες και χρόνους διαδρομής"
       ]
-    }
-    ,map: {
+    },
+    map: {
       loading: "Φόρτωση χάρτη...",
-    apartmentMarkerTitle: "Σύγχρονο Διαμέρισμα κοντά στη Θάλασσα",
-        apartmentMarkerDesc: "Το κατάλυμά σας",
+      apartmentMarkerTitle: "Το Διαμέρισμά σας",
+      apartmentMarkerDesc: "Βρίσκεστε εδώ",
       viewDetails: "Προβολή λεπτομερειών",
       failed: "Αποτυχία φόρτωσης χάρτη",
       tokenMissing: "Ο διαδραστικός χάρτης είναι προσωρινά μη διαθέσιμος",
-      deferredInteractiveLabel: "Ο διαδραστικός χάρτης φορτώνει όταν εμφανιστεί για καλύτερη απόδοση.",
+      deferredInteractiveLabel: "Ο διαδραστικός χάρτης θα φορτώσει εδώ για να διατηρηθεί η ταχύτητα.",
       travelPrompt: "Πατήστε έναν δείκτη για να υπολογίσουμε τον χρόνο διαδρομής."
     },
     portal: {
-      introTitle: "Πώς μπορούμε να βοηθήσουμε με τη διαμονή σας;",
-      introSubtitle: "Επιλέξτε τι θέλετε να κάνετε στη συνέχεια.",
+      introTitle: "Καλώς ήρθατε! Πώς μπορούμε να βοηθήσουμε;",
+      introSubtitle: "Τι θα θέλατε να κάνετε;",
       signInTitle: "Σύνδεση",
       signUpTitle: "Εγγραφή",
-      originQuestion: "Από πού έρχεστε;",
+      originQuestion: "Από πού ταξιδεύετε;",
       originGR: "Ελλάδα",
       originAbroad: "Κόσμος",
-  phoneLabel: "Αριθμός Τηλεφώνου",
+      phoneLabel: "Αριθμός Τηλεφώνου",
       afmLabel: "ΑΦΜ (9 ψηφία)",
-  passportLabel: "Αριθμός Διαβατηρίου",
+      passportLabel: "Αριθμός Διαβατηρίου",
       bookingRefLabel: "Κωδικός κράτησης (προαιρετικό)",
       lastNameLabel: "Επώνυμο<br/>(προαιρετικό)",
       continueBtn: "Συνέχεια",
       or: "ή",
-      noBookingYet: "Δεν έχετε κράτηση;",
-      alreadyBooked: "Κράτηση & Στοιχεία Check-in",
+      noBookingYet: "Δεν έχετε κάνει ακόμα κράτηση;",
+      alreadyBooked: "Δείτε την Κράτηση & το Check-in μου",
       ctaStartBooking: "Ξεκινήστε εδώ",
       goHome: "Μετάβαση στην Αρχική",
       rememberMe: "Να με θυμάσαι σε αυτή τη συσκευή",
@@ -709,12 +722,12 @@ const dict: Record<Locale, Dictionary> = {
         passportRequired: "Απαιτείται αριθμός διαβατηρίου",
         passportInvalid: "Χρησιμοποιήστε 5–20 γράμματα ή αριθμούς"
       }
-    }
-    ,checkin: {
+    },
+    checkin: {
       navLabel: "Άφιξη",
-      navInfoLabel: "Πληροφορίες Check-In",
+      navInfoLabel: "Πληροφορίες άφιξης",
       title: "Άφιξη",
-      summary: "Σύνοψη κράτησης",
+      summary: "Η Κράτησή σας",
       bookingId: "Κωδικός κράτησης",
       reference: "Αναφορά",
       source: "Πηγή",
@@ -724,26 +737,26 @@ const dict: Record<Locale, Dictionary> = {
       arrivalTime: "Ώρα άφιξης",
       arrivalTimeInvalid: "Παρακαλώ εισάγετε έγκυρη ώρα (ΩΩ:λλ)",
       specialRequests: "Ειδικά αιτήματα",
-      acceptTerms: "Επιβεβαιώνω ότι τα στοιχεία είναι σωστά και αποδέχομαι τους όρους",
+      acceptTerms: "Επιβεβαιώνω ότι τα στοιχεία μου είναι σωστά και αποδέχομαι τους όρους.",
       submit: "Ολοκλήρωση Άφιξης",
       submitted: "Η άφιξη ολοκληρώθηκε",
       saving: "Γίνεται αποθήκευση…",
       loading: "Φόρτωση κράτησης…",
-    }
-    ,checkinInfo: {
-  welcome: "🎉 Καλώς Ήρθατε στο Διαμέρισμά μας!",
-      welcomeMessage: "Χαιρόμαστε που είστε εδώ. Παρακάτω θα βρείτε όλα όσα χρειάζεστε για μια άνετη διαμονή.",
+    },
+    checkinInfo: {
+      welcome: "🎉 Καλώς ήρθατε!",
+      welcomeMessage: "Χαιρόμαστε που είστε εδώ! Παρακάτω θα βρείτε μερικές χρήσιμες πληροφορίες για τη διαμονή σας.",
       checkInOutTitle: "Άφιξη & Αναχώρηση",
       checkInTime: "Άφιξη",
       checkOutTime: "Αναχώρηση",
-      wifiTitle: "Σύνδεση WiFi",
+      wifiTitle: "Πρόσβαση στο Internet",
       wifiNetwork: "Όνομα Δικτύου",
       wifiPassword: "Κωδικός",
       copy: "Αντιγραφή",
       copied: "Αντιγράφηκε",
       emergencyTitle: "Επαφές Έκτακτης Ανάγκης",
-      hostContact: "Οικοδεσπότης (24/7)",
-      hostName: "Διαθέσιμος ανά πάσα στιγμή",
+      hostContact: "Ο Οικοδεσπότης σας (24/7)",
+      hostName: "Διαθέσιμος 24/7",
       emergencyServices: "Υπηρεσίες Έκτακτης Ανάγκης",
       police: "Αστυνομία, Πυροσβεστική, Ασθενοφόρο",
       localHospital: "Τοπικό Νοσοκομείο",
@@ -761,23 +774,29 @@ const dict: Record<Locale, Dictionary> = {
       parking: "Δωρεάν Πάρκινγκ",
       pool: "Πισίνα",
       tipsTitle: "Τοπικές Συμβουλές",
-      tip1: "Η πλησιέστερη παραλία απέχει μόλις 5 λεπτά με τα πόδια",
+      tip1: "Η πλησιέστερη παραλία απέχει μόλις 5' με τα πόδια",
       tip2: "Το σούπερ μάρκετ \"AB Βασιλόπουλος\" απέχει 300μ, ανοιχτό 8:00-21:00",
       tip3: "Δείτε τις προτάσεις μας για εστιατόρια στο κύριο μενού",
       tip4: "Χρειάζεστε ταξί; Καλέστε +30 2721 023456 ή χρησιμοποιήστε την εφαρμογή Taxi",
       additionalTitle: "Καλό να Γνωρίζετε",
       keysInfo: "Κλειδιά:",
-      keysDetail: "Παρακαλούμε αφήστε τα κλειδιά στο lockbox κατά την αναχώρηση",
+      keysDetail: "Παρακαλούμε αφήστε τα κλειδιά σας στο κουτί κλειδώματος κατά την αναχώρηση.",
       trashInfo: "Σκουπίδια:",
-      trashDetail: "Οι κάδοι ανακύκλωσης βρίσκονται κοντά στην κεντρική είσοδο",
+      trashDetail: "Θα βρείτε τους κάδους ανακύκλωσης κοντά στην κεντρική είσοδο.",
       waterInfo: "Νερό:",
       waterDetail: "Το νερό της βρύσης είναι πόσιμο",
       tvInfo: "Ψυχαγωγία:",
-      tvDetail: "Smart TV με Netflix και YouTube διαθέσιμα"
+      tvDetail: "Έξυπνη τηλεόραση — διαθέσιμα Netflix και YouTube"
     }
   },
 };
 
 export function getDictionary(locale: Locale): Dictionary {
-  return dict[locale] ?? dict.en;
+  // Return a copy so callers can mutate without affecting the canonical source.
+  const base = dict[locale] ?? dict.en;
+  // dictionaries contain only strings/arrays/objects; a JSON clone is safe and simple here.
+  const copy = JSON.parse(JSON.stringify(base)) as Dictionary;
+
+  // Structured `locationPanel.highlights` is the canonical source for nearby items.
+  return copy;
 }

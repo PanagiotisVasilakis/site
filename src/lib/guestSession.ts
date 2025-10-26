@@ -65,6 +65,20 @@ export function createSessionCookie(token: string): { name: string; value: strin
   };
 }
 
+export function clearSessionCookie(): { name: string; value: string; options: { httpOnly: boolean; sameSite: 'lax'; secure: boolean; path: string; maxAge: number } } {
+  return {
+    name: COOKIE_NAME,
+    value: '',
+    options: {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 0,
+    },
+  };
+}
+
 // Refresh cookie helpers
 export function createRefreshCookie(token: string, maxAgeDays = 60): { name: string; value: string; options: { httpOnly: boolean; sameSite: 'lax'; secure: boolean; path: string; maxAge: number } } {
   return {

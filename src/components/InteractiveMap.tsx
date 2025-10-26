@@ -126,7 +126,6 @@ export default function InteractiveMap({
           showOriginMarker={false}
           autoFitToOriginAndMarkers
           refitOnMarkerChange
-          showRefitAllControl
           lazyTravelMetrics
         />
       ) : (

@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { locales, type Locale } from '@/i18n/config';
-import { /* getDictionary */ } from '@/i18n';
+import { getDictionary } from '@/i18n/dictionaries';
 import { getItemsByCategory } from '@/lib/data';
 import type { Item } from '@/data/schemas';
 import { getGuestSessionFromCookies, hasVerifiedBookingSession } from '@/lib/guestSession';
@@ -62,7 +62,7 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
       <CheckinViewed locale={eff} />
       <div className="mb-6 text-center">
         <h1 className="text-3xl font-serif italic font-bold mb-2 tracking-wider">
-          House Guide
+          {getDictionary(eff).house?.guideTitle ?? 'House Guide'}
         </h1>
       </div>
       <CheckInInfo

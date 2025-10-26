@@ -41,6 +41,7 @@ tail -n 200 /tmp/dockerd.log
 ```
 
 Common WSL notes:
+
 - If `nohup`/job-control causes `dockerd` to be stopped, use `sudo setsid dockerd >/tmp/dockerd.log 2>&1 &`.
 - Running `dockerd` as root is expected; use the `docker` CLI as your normal user after the daemon starts.
 
@@ -141,14 +142,14 @@ docker logs --tail 200 site-dev-db
 ```
 
 - Common issues:
-   - Locale warnings on Alpine (`sh: locale: not found`) — usually harmless.
-   - Permission issues — ensure Docker process had permissions to create mounted volumes.
+  - Locale warnings on Alpine (`sh: locale: not found`) — usually harmless.
+  - Permission issues — ensure Docker process had permissions to create mounted volumes.
 
 3) Prisma / DATABASE_URL errors
 
 - If `npx prisma db pull` says "Environment variable not found: DATABASE_URL":
-   - Add `DATABASE_URL` to `.env` or export it in the shell you're running Prisma from.
-   - Confirm `echo $DATABASE_URL` prints the expected value.
+  - Add `DATABASE_URL` to `.env` or export it in the shell you're running Prisma from.
+  - Confirm `echo $DATABASE_URL` prints the expected value.
 
 - If Prisma introspects an empty DB, apply migrations: `npx prisma migrate deploy`.
 
@@ -188,10 +189,24 @@ npm run dev
 - If you prefer automation, the repository includes `./scripts/install-postgres-and-setup.sh` which attempts to install and configure PostgreSQL on the host — that script requires systemd and may fail under WSL2; prefer the Docker approach described above for WSL2.
 - For CI, use `docker-compose.test-db.yml` and `TEST_DATABASE_URL` to isolate test DBs.
 
+Quick helper script
+
+A small helper script is available at `scripts/db-check.sh`. It automates starting the Docker daemon (when necessary), bringing up the `db` service from the repository `docker-compose.yml`, waiting for the container to become ready (or healthy), and printing useful logs for debugging.
+
+Usage (from the repo root):
+
+```bash
+./scripts/db-check.sh
+```
+
+The script is convenient on WSL2 distributions where `dockerd` is not started automatically — it will attempt to start `dockerd` (using `setsid`/`nohup`) and then run `docker-compose up -d db` for you.
+
 ---
 
 If you want, I can also:
+
 - Add the succinct `npm` scripts suggested (db:start/db:stop/db:logs) to `package.json` for one-line convenience.
+
 - Create a tiny `scripts/db-check.sh` that runs the verification steps and prints a summary status.
 
 Tell me which of those you'd like and I'll apply the change.

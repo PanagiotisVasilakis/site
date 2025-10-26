@@ -220,23 +220,24 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
     return () => document.removeEventListener('mousedown', handleClick);
   }, [open]);
 
-  const baseNavButtonClasses = "inline-flex items-center justify-center gap-1 px-3 py-1 rounded-full text-[11px] font-semibold tracking-wide leading-none transition";
+  // Use desktop sizing everywhere: keep the same look as large screens on all viewports
+  const baseNavButtonClasses = "inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold tracking-wide leading-none transition whitespace-nowrap";
   // Use the reusable utility so we can control white-in-dark centrally
   const primaryNavButtonClasses = `${baseNavButtonClasses} shadow-md bg-black/10 hover:bg-black/20 text-slate-800 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/70 white-in-dark`;
   const secondaryNavButtonClasses = `${baseNavButtonClasses} border border-white/30 dark:border-white/40 bg-white/30 hover:bg-white/60 dark:bg-white/40 dark:hover:bg-white/60 text-slate-800 white-in-dark font-medium shadow-sm`;
 
   return (
     <div className={`fixed top-0 left-0 right-0 z-40 flex justify-center pointer-events-none transition-transform duration-300 ${hidden ? '-translate-y-full' : 'translate-y-0'}`} aria-hidden={hidden}>
-    <div ref={containerRef} className="w-full px-4 pt-2 pointer-events-auto">
-  <div className={`flex items-center justify-between gap-1.5 rounded-full px-1.5 py-0.5 backdrop-blur bg-white/12 dark:bg-white/25 border ${scrolled ? 'shadow-md border-[color:var(--border-soft,#e5e7eb)]' : 'shadow-sm border-transparent'} transition-colors`}>
-          <Link href={`/${locale}`} className={`group shrink min-w-0 ${primaryNavButtonClasses} focus:outline-none focus-visible:ring-2 ring-brand-400/60 dark:focus-visible:ring-brand-400/50`} aria-label="Home">
-            <span className="text-sm leading-none" aria-hidden>🏠</span>
-            <span className="truncate max-w-[120px]" title={appTitle}>{appTitle}</span>
-            <small id="current-version" className="hidden sm:inline text-[10px] font-normal opacity-60" style={{ color: 'var(--text-accent-subtle)' }}></small>
+      <div ref={containerRef} className="top-controls-compact w-full px-4 pt-2 pointer-events-auto">
+        <div className={`flex items-center justify-between gap-1 rounded-full px-1.5 py-0.5 h-auto overflow-hidden backdrop-blur bg-white/12 dark:bg-white/25 border ${scrolled ? 'shadow-md border-[color:var(--border-soft,#e5e7eb)]' : 'shadow-sm border-transparent'} transition-colors`}>
+          <Link href={`/${locale}`} className={`group min-w-0 max-w-fit ${primaryNavButtonClasses} focus:outline-none focus-visible:ring-2 ring-brand-400/60 dark:focus-visible:ring-brand-400/50`} aria-label="Home">
+            <span className="text-sm leading-none flex-shrink-0" aria-hidden>🏠</span>
+            <span className="truncate max-w-[200px] text-[11px]" title={appTitle}>{appTitle}</span>
+            <small id="current-version" className="hidden sm:inline text-[10px] font-normal opacity-60 flex-shrink-0" style={{ color: 'var(--text-accent-subtle)' }}></small>
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             {/* Desktop buttons */}
-            <div className="hidden md:flex items-center gap-1.5">
+            <div className="hidden md:flex items-center gap-0.5 lg:gap-1">
               {isSignedIn ? (
                 <button
                   onClick={handleSignOut}
@@ -244,8 +245,8 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
                   aria-label={getDictionary(locale as Locale).ui?.signOut || "Sign out"}
                   title={getDictionary(locale as Locale).ui?.signOut || "Sign out"}
                 >
-                  <span aria-hidden className="text-sm leading-none">👤</span>
-                  <span>{getDictionary(locale as Locale).ui?.signOut || "Sign out"}</span>
+                  <span aria-hidden className="text-sm leading-none flex-shrink-0">👤</span>
+                  <span className="text-[11px]">{getDictionary(locale as Locale).ui?.signOut || "Sign out"}</span>
                 </button>
               ) : (
                 <Link 
@@ -254,11 +255,10 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
                   aria-label={getDictionary(locale as Locale).ui?.signIn || "Sign in"}
                   title={getDictionary(locale as Locale).ui?.signIn || "Sign in"}
                 >
-                  <span aria-hidden className="text-sm leading-none">👤</span>
-                  <span>{getDictionary(locale as Locale).ui?.signIn || "Sign in"}</span>
+                  <span aria-hidden className="text-sm leading-none flex-shrink-0">👤</span>
+                  <span className="text-[11px]">{getDictionary(locale as Locale).ui?.signIn || "Sign in"}</span>
                 </Link>
               )}
-              <LocaleSwitcher />
               {checkInVisible ? (
                 <Link href={`/${locale}/check-in`} className={secondaryNavButtonClasses}
                   onClick={() => trackAnalyticsEvent('checkin_nav_clicked')}>
@@ -273,13 +273,9 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
                 Install
               </button>
             </div>
-            {/* Always visible buttons */}
-            <div className="flex items-center gap-1.5">
-              <ThemeToggle />
-            </div>
             {/* Menu trigger - visible on all screen sizes */}
             <div className="flex items-center">
-              <button aria-label="Menu" aria-expanded={open} onClick={() => setOpen(o => !o)} className={`h-7 w-7 rounded-full flex items-center justify-center bg-white/30 dark:bg-white/40 hover:bg-white/60 dark:hover:bg-white/60 transition border border-white/30 dark:border-white/40 text-sm shadow-sm ${open ? 'ring-2 ring-brand-400' : ''}`}>
+              <button aria-label="Menu" aria-expanded={open} onClick={() => setOpen(o => !o)} className={`h-7 w-7 rounded-full flex items-center justify-center bg-white/30 dark:bg-white/40 hover:bg-white/60 dark:hover:bg-white/60 transition border border-white/30 dark:border-white/40 text-sm shadow-sm flex-shrink-0 ${open ? 'ring-2 ring-brand-400' : ''}`}>
                 <span aria-hidden>{open ? '×' : '☰'}</span>
               </button>
             </div>
@@ -289,6 +285,14 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
         <div className={`fixed top-12 right-3 z-40 w-60 rounded-2xl mobile-menu-panel shadow-lg p-4 flex flex-col gap-4 transition-transform origin-top-right ${open ? 'scale-100 opacity-100' : 'scale-95 opacity-0 pointer-events-none'} bg-white text-slate-900 dark:bg-black dark:text-white`} role="menu" aria-label="Main menu">
           <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-zinc-700/60">
             <span className="text-xs font-bold tracking-wide uppercase">Menu</span>
+            <div className="flex items-center gap-2">
+              <div className="dark:border dark:border-zinc-700/60 rounded-full">
+                <ThemeToggle />
+              </div>
+              <div className="dark:border dark:border-zinc-700/60 rounded-full">
+                <LocaleSwitcher />
+              </div>
+            </div>
           </div>
           <nav className="flex flex-col gap-2" aria-label="Primary pages">
             {mobileMenuLinks.map(link => (
@@ -303,7 +307,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
                   setOpen(false);
                 }}
               >
-                <span aria-hidden className="text-base leading-none">{link.icon}</span>
+                <span aria-hidden className="text-base leading-none w-6 text-center">{link.icon}</span>
                 <span className="flex-1 text-left">{link.label}</span>
               </Link>
             ))}
@@ -327,11 +331,6 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
                 <span className="flex-1 text-left">{dictionary.ui?.signIn || "Sign in"}</span>
               </Link>
             )}
-            <LocaleSwitcher
-              fullText={true}
-              showGlobeIcon={true}
-              className="inline-flex items-center gap-3 w-full rounded-full text-[11px] font-semibold tracking-wide leading-none transition duration-150 px-3 py-2.5 justify-start mobile-menu-item bg-slate-100 hover:bg-white text-slate-900 shadow-sm border border-slate-300 dark:bg-zinc-800 dark:hover:bg-zinc-900 dark:text-white dark:border-zinc-700"
-            />
           </div>
         </div>
       </div>

@@ -10,7 +10,7 @@ export interface MarkerData {
   name: string;
   description?: string;
   coordinates: [number, number]; // [lng, lat]
-  type: 'apartment' | 'restaurant' | 'service' | 'attraction';
+  type: 'apartment' | 'restaurant' | 'service' | 'attraction' | 'sightseeing' | 'beach' | 'shop' | 'cafe' | 'bar' | 'park' | 'police' | 'city-center';
   price?: string;
   rating?: number;
   category?: string;
@@ -36,13 +36,29 @@ export function createMarkerFromItem(item: GenericCategoryItem, categorySlug: st
       APARTMENT_LOCATION[1] + (Math.random() - 0.5) * 0.02
     ];
 
+  let type: MarkerData['type'] = 'attraction';
+  if (categorySlug === 'restaurants') {
+    type = 'restaurant';
+  } else if (categorySlug === 'phones') {
+    if (item.name.toLowerCase().includes('police')) {
+      type = 'police';
+    } else {
+      type = 'service';
+    }
+  } else if (categorySlug === 'sightseeing') {
+    if (item.name.toLowerCase().includes('city center')) {
+      type = 'city-center';
+    } else {
+      type = 'sightseeing';
+    }
+  }
+
   return {
     id: item.id,
     name: item.name,
     description: item.summary,
     coordinates: coords,
-    type: categorySlug === 'restaurants' ? 'restaurant' : 
-          categorySlug === 'phones' ? 'service' : 'attraction',
+    type,
     rating: item.rating,
     price: item.priceLevel ? '€'.repeat(item.priceLevel) : undefined,
     category: categorySlug,

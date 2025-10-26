@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+// vitest provides globals (describe, it, expect, vi) via its types; no import required here
 import {
   SmokeTestError,
   parseCliArgs,
@@ -41,7 +41,7 @@ describe('parseCliArgs', () => {
 
 describe('runSmokeTest', () => {
   const baseDependencies: SmokeTestDependencies = {
-    env: { DATABASE_URL: 'postgres://example' },
+    env: { NODE_ENV: 'test', DATABASE_URL: 'postgres://example' },
     logger: {
       info: vi.fn(),
       error: vi.fn(),
@@ -85,7 +85,7 @@ describe('runSmokeTest', () => {
   });
 
   it('throws when DATABASE_URL is missing', async () => {
-    await expect(runSmokeTest({}, { ...baseDependencies, env: {} })).rejects.toThrowError(
+    await expect(runSmokeTest({}, { ...baseDependencies, env: { NODE_ENV: 'test' } } as any)).rejects.toThrowError(
       'DATABASE_URL is not set. Prisma smoke test cannot run.',
     );
   });

@@ -13,6 +13,7 @@ interface StaticLocationMapProps {
 
 // Fallback component when JavaScript or tiles are unavailable
 import { getDictionary } from '@/i18n/dictionaries';
+import { getLocationHighlights } from '@/lib/locationUtils';
 import type { Locale } from '@/i18n/config';
 
 export default function StaticLocationMap({ 
@@ -27,6 +28,7 @@ export default function StaticLocationMap({
   const eff: Locale = locale === 'el' ? 'el' : 'en';
   const t = getDictionary(eff);
   const lp = t.locationPanel;
+  const highlights = getLocationHighlights(t);
   const Panel = () => (
     <div className="space-y-3 text-sm">
       <section className="bg-white/70 rounded-lg p-4">
@@ -40,9 +42,26 @@ export default function StaticLocationMap({
       {!compact && (
         <section className="bg-white/70 rounded-lg p-4">
           <div className="text-xs font-semibold text-brand-700 uppercase mb-2">{lp?.nearby}</div>
-          <ul className="space-y-1 text-gray-700 list-none m-0 p-0">
-            {lp?.attractions?.map(a => <li key={a}>{a}</li>)}
-          </ul>
+          {highlights.length > 0 ? (
+            <ul className="space-y-2 text-gray-700 list-none m-0 p-0">
+              {highlights.map(({ icon, title, description }) => (
+                <li key={`${title}-${description}`} className="flex items-start gap-3">
+                  {icon && (
+                    <span className="text-lg leading-tight" aria-hidden>
+                      {icon}
+                    </span>
+                  )}
+                  <div className="leading-tight">
+                    <div className="font-medium text-gray-900">{title}</div>
+                    <div className="text-xs text-gray-600 mt-0.5">{description}</div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            // No structured highlights provided - intentionally render nothing.
+            <div />
+          )}
         </section>
       )}
       {!compact && (

@@ -6,6 +6,7 @@ import type { Locale } from '@/i18n/config';
 import internalFetch from '@/lib/internalFetchClient';
 import MapLoadingSkeleton from '@/components/MapLoadingSkeleton';
 import { MAP_DEFAULTS } from '@/lib/mapConstants';
+import { getLocationHighlights, LocationHighlight } from '@/lib/locationUtils';
 
 type NearbyCategoryItem = {
   id: string;
@@ -36,7 +37,9 @@ export default function CheckInInfo({
   nearbyAttractions = [],
 }: CheckInInfoProps) {
   const t = getDictionary((locale as Locale) ?? 'en');
-  const checkinStrings = (t.checkinInfo ?? {}) as Record<string, string | undefined>;
+  // Combine checkinInfo and locationPanel so location-related strings are available
+  const checkinStrings = ({ ...(t.checkinInfo ?? {}), ...(t.locationPanel ?? {}) }) as Record<string, string | undefined>;
+  const locationHighlights: LocationHighlight[] = getLocationHighlights(t);
   const [copiedWifi, setCopiedWifi] = useState(false);
   const [checkInTime, setCheckInTime] = useState('15:00');
   const [checkOutTime, setCheckOutTime] = useState('11:00');
@@ -157,8 +160,8 @@ export default function CheckInInfo({
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="flex flex-col p-4 rounded-lg bg-[color:var(--layer-surface)] border border-[color:var(--border-soft)]">
+        <div className="flex gap-4">
+          <div className="flex flex-col p-4 rounded-lg bg-[color:var(--layer-surface)] border border-[color:var(--border-soft)] flex-1">
             <span className="text-sm text-[color:var(--fg-muted)] mb-1">{t.checkinInfo?.checkInTime || 'Check-in'}</span>
             {isEditingTimes ? (
               <input
@@ -172,7 +175,7 @@ export default function CheckInInfo({
               <span className="text-2xl font-bold" style={{ color: 'var(--text-accent)' }}>{checkInTime}</span>
             )}
           </div>
-          <div className="flex flex-col p-4 rounded-lg bg-[color:var(--layer-surface)] border border-[color:var(--border-soft)]">
+          <div className="flex flex-col p-4 rounded-lg bg-[color:var(--layer-surface)] border border-[color:var(--border-soft)] flex-1">
             <span className="text-sm text-[color:var(--fg-muted)] mb-1">{t.checkinInfo?.checkOutTime || 'Check-out'}</span>
             {isEditingTimes ? (
               <input
@@ -213,14 +216,14 @@ export default function CheckInInfo({
         <div className="flex items-center gap-3 mb-4">
           <span className="text-3xl" aria-hidden>📶</span>
           <h3 className="text-xl font-serif italic font-bold" style={{ color: 'var(--text-accent)' }}>
-            {t.checkinInfo?.wifiTitle || 'WiFi Connection'}
+            {t.checkinInfo?.wifiTitle || 'Internet Access'}
           </h3>
         </div>
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="p-4 rounded-lg bg-[color:var(--layer-surface)] border border-[color:var(--border-soft)]">
             <div className="text-sm font-serif italic font-medium text-[color:var(--fg-muted)] mb-1">{t.checkinInfo?.wifiNetwork || 'Network Name'}</div>
             <div className="flex items-center justify-between">
-              <span className="font-mono font-semibold text-lg">ApartmentGuest_5G</span>
+              <span className="font-mono font-semibold text-lg grey-in-dark">ApartmentGuest_5G</span>
               <button
                 onClick={() => copyToClipboard('ApartmentGuest_5G')}
                 className="text-xs px-3 py-1 rounded-full bg-[color:var(--brand-primary)] text-white hover:opacity-80 transition"
@@ -232,7 +235,7 @@ export default function CheckInInfo({
           <div className="p-4 rounded-lg bg-[color:var(--layer-surface)] border border-[color:var(--border-soft)]">
             <div className="text-sm font-serif italic font-medium text-[color:var(--fg-muted)] mb-1">{t.checkinInfo?.wifiPassword || 'Password'}</div>
             <div className="flex items-center justify-between">
-              <span className="font-mono font-semibold text-lg">Welcome2024!</span>
+              <span className="font-mono font-semibold text-lg grey-in-dark">Welcome2024!</span>
               <button
                 onClick={() => copyToClipboard('Welcome2024!')}
                 className="text-xs px-3 py-1 rounded-full bg-[color:var(--brand-primary)] text-white hover:opacity-80 transition"
@@ -284,7 +287,7 @@ export default function CheckInInfo({
             {t.checkinInfo?.amenitiesTitle || 'Key Amenities'}
           </h3>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 amenities-grid">
           <div className="flex flex-col items-center p-3 rounded-lg bg-[color:var(--layer-surface)] border border-[color:var(--border-soft)] text-center">
             <span className="text-2xl mb-2">❄️</span>
             <span className="text-sm">{t.checkinInfo?.ac || 'Air Conditioning'}</span>
@@ -344,7 +347,7 @@ export default function CheckInInfo({
         <div className="flex items-center gap-3">
           <span className="text-3xl" aria-hidden>📍</span>
           <h3 className="text-xl font-serif italic font-bold" style={{ color: 'var(--text-accent)' }}>
-            {checkinStrings.locationTitle || 'Location & Nearby'}
+            {checkinStrings.locationTitle || 'Explore the Neighborhood'}
           </h3>
         </div>
   <p className="text-sm text-[color:var(--fg-muted)] max-w-2xl white-in-dark">
@@ -362,79 +365,62 @@ export default function CheckInInfo({
             nearbyAttractions={nearbyAttractions}
           />
         </div>
-        {(t.house?.distances?.length ?? 0) > 0 && (
-          <div className="grid sm:grid-cols-3 gap-4">
-            {(t.house?.distances || []).filter(d => !/nearest beach/i.test(String(d))).map((distance, i) => {
-              // distance is expected like "Town Hall: 50m (1 min walk)"
-              const parts = String(distance).split(':');
-              const title = parts[0]?.trim() || distance;
-              const desc = parts.slice(1).join(':').trim();
-              const icon =
-                /town|hall/i.test(title)
-                  ? '🏛️'
-                  : /library|gallery|book/i.test(title)
-                  ? '📚'
-                  : /archaeo|museum|ancient|archaeological/i.test(title)
-                  ? '🏺'
-                  : /beach|sea|coast/i.test(title)
-                  ? '🏖️'
-                  : /airport|flight|aero/i.test(title)
-                  ? '✈️'
-                  : '📍';
-
-              return (
+        {locationHighlights.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 location-grid">
+            {locationHighlights.map(({ icon, title, description }) => (
+              <div
+                key={`${title}-${description}`}
+                className="rounded-lg border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] p-4 text-center shadow-sm"
+              >
+                {icon && (
+                  <div className="text-2xl mb-2" aria-hidden>
+                    {icon}
+                  </div>
+                )}
+                <h4
+                  className="text-sm font-serif italic font-medium white-in-dark"
+                  style={{ color: 'var(--text-accent)' }}
+                >
+                  {title}
+                </h4>
+                <p className="text-xs text-[color:var(--fg-muted)] mt-1">{description}</p>
+              </div>
+            ))}
+          </div>
+          ) : (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 location-grid">
+              {[ 
+                {
+                  icon: '🏛️',
+                  title: checkinStrings.locationTownTitle || 'City Center',
+                  description: checkinStrings.locationTownDescription || '1,5 km to City Center 14 min by foot / 4 min by car',
+                },
+                {
+                  icon: '🏖️',
+                  title: checkinStrings.locationBeachTitle || 'Beach Access',
+                  description: checkinStrings.locationBeachDescription || '5 min drive to the coast',
+                },
+                {
+                  icon: '🚗',
+                  title: checkinStrings.locationTransportTitle || 'Transportation',
+                  description: checkinStrings.locationTransportDescription || 'Free parking & airport 15 min',
+                },
+              ].map((feature) => (
                 <div
-                  key={`${distance}-${i}`}
+                  key={feature.title || feature.icon}
                   className="rounded-lg border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] p-4 text-center shadow-sm"
                 >
-                  <div className="text-2xl mb-2" aria-hidden>{icon}</div>
-                  <h4 className="text-sm font-serif italic font-medium" style={{ color: 'var(--text-accent)' }}>
-                    {title}
+                  <div className="text-2xl mb-2" aria-hidden>{feature.icon}</div>
+                  <h4 className="text-sm font-serif italic font-medium white-in-dark" style={{ color: 'var(--text-accent)' }}>
+                    {feature.title}
                   </h4>
-                  <p className="text-xs text-[color:var(--fg-muted)] mt-1">{desc}</p>
+                  <p className="text-xs text-[color:var(--fg-muted)]">{feature.description}</p>
                 </div>
-              );
-            })}
-          </div>
-        )}
-        <div className="grid sm:grid-cols-3 gap-4">
-          {[
-            {
-              icon: '🏛️',
-              title: checkinStrings.locationTownTitle || 'City Center',
-              description: checkinStrings.locationTownDescription || '1,5 km to City Center 14 min by foot / 4 min by car',
-            },
-            {
-              icon: '🏖️',
-              title: checkinStrings.locationBeachTitle || 'Beach Access',
-              description: checkinStrings.locationBeachDescription || '5 min drive to the coast',
-            },
-            {
-              icon: '🚗',
-              title: checkinStrings.locationTransportTitle || 'Transportation',
-              description: checkinStrings.locationTransportDescription || 'Free parking & airport 15 min',
-            },
-          ].map((feature) => (
-            <div
-              key={feature.title || feature.icon}
-              className="rounded-lg border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] p-4 text-center shadow-sm"
-            >
-              <div className="text-2xl mb-2" aria-hidden>{feature.icon}</div>
-              <h4
-                className={
-                  "text-sm " +
-                  (["Transportation", "Beach Access", "Town Center"].includes(feature.title)
-                    ? "font-serif italic font-medium white-in-dark"
-                    : "font-semibold")
-                }
-                style={{ color: 'var(--text-accent)' }}
-              >
-                {feature.title}
-              </h4>
-              <p className="text-xs text-[color:var(--fg-muted)]">{feature.description}</p>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        )}
       </section>
 
       {/* Additional Info */}

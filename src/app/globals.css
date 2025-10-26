@@ -178,6 +178,11 @@ code, pre, kbd, samp {
   
   /* Stack grids on mobile */
   .grid { grid-template-columns: 1fr !important; }
+
+  .amenities-grid,
+  .location-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
 }
 
 @media (min-width: 641px) and (max-width: 1024px) {
@@ -199,7 +204,7 @@ code, pre, kbd, samp {
 
 /* Ensure touch targets are at least 44x44px on mobile */
 @media (max-width: 640px) {
-  button, a, [role="button"], [tabindex="0"] {
+  :where(button, a, [role="button"], [tabindex="0"]):not(.top-controls-compact *):not(.mobile-menu-panel *) {
     min-height: 44px;
     min-width: 44px;
   }
@@ -277,6 +282,16 @@ code, pre, kbd, samp {
   background: #050b11;
   border-color: rgba(148, 163, 184, 0.35);
   color: #ffffff;
+}
+
+[data-theme="dark"] .mobile-menu-panel .locale-switcher,
+[data-theme="dark"] .mobile-menu-panel button {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-theme="dark"] .mobile-menu-panel .locale-switcher:hover,
+[data-theme="dark"] .mobile-menu-panel button:hover {
+  background-color: rgba(255, 255, 255, 0.2) !important;
 }
 
 .mobile-menu-item {
@@ -570,6 +585,11 @@ input, textarea { color: inherit; }
   Use this on specific elements that should become white when the site is in dark theme. */
 .white-in-dark { color: inherit; }
 [data-theme="dark"] .white-in-dark { color: var(--fg-inverse) !important; }
+
+/* Utility: make text grey (muted) in dark mode while preserving light-mode color/inheritance.
+   Use this for values that should be less prominent in dark theme (e.g. passwords, network names). */
+.grey-in-dark { color: inherit; }
+[data-theme="dark"] .grey-in-dark { color: var(--fg-muted) !important; }
 
 /* Gradient utilities */
 .bg-app-gradient { background: linear-gradient(160deg, var(--sand-50) 0%, var(--sea-50) 55%, var(--sea-100) 100%); }
@@ -1145,6 +1165,9 @@ html:not([data-theme="dark"]) .bg-app-vertical {
 
 /* Hit target utility */
 .hit-target { min-width:44px; min-height:44px; display:inline-flex; align-items:center; justify-content:center; }
+
+/* NOTE: top-controls-compact override removed to keep desktop sizing consistently applied
+   across viewports (user requested same blueprint size on small screens). */
 
 /* React Day Picker Custom Styles */
 .custom-day-picker {

@@ -52,9 +52,14 @@
     "docker:scan": "docker scout cves villa-app:latest || trivy image villa-app:latest",
     "docker:security-test": "docker run --rm -v \"$PWD\":/app -w /app aquasec/trivy fs .",
     "validate:security": "tsx scripts/validate-security.ts",
-    "query-guests": "tsx scripts/query-guests.ts"
-    ,
-    "ensure-pepper": "node scripts/ensure-pepper.js"
+  "query-guests": "tsx scripts/query-guests.ts",
+  "db:start": "bash ./scripts/db-check.sh",
+  "db:check": "bash ./scripts/db-check.sh",
+  "db:logs": "docker logs --follow site-dev-db",
+  "db:studio": "bash ./scripts/db-check.sh studio",
+  "db:migrate": "bash ./scripts/db-check.sh migrate",
+  "db:generate": "bash ./scripts/db-check.sh generate",
+  "ensure-pepper": "node scripts/ensure-pepper.js"
   },
   "dependencies": {
     "@prisma/client": "^6.17.1",

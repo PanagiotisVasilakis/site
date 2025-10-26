@@ -85,7 +85,6 @@ const apartmentData = {
   distances: {
     en: [
       { place: 'Town Hall', distance: '50m', time: '1 min walk' },
-      { place: 'Public Library & Gallery', distance: '1.8km', time: '15 min walk / 5 min drive' },
       { place: 'Benakeio Archaeological Museum', distance: '2km', time: '15 min walk / 5 min drive' },
       { place: 'Nearest Beach', distance: '3km', time: '5 min drive' },
       { place: 'Kalamata Airport', distance: '6km', time: '15 min drive' },
@@ -94,14 +93,13 @@ const apartmentData = {
       { place: 'Bus Stop', distance: '100m', time: '2 min walk' }
     ],
     el: [
-      { place: 'Δημαρχείο', distance: '50μ', time: '1 λεπτό με τα πόδια' },
-      { place: 'Δημόσια Βιβλιοθήκη–Πινακοθήκη', distance: '1,8 χλμ', time: '15 λεπτά με τα πόδια / 5 λεπτά με αυτοκίνητο' },
-      { place: 'Μπενάκειο Αρχαιολογικό Μουσείο', distance: '2 χλμ', time: '15 λεπτά με τα πόδια / 5 λεπτά με αυτοκίνητο' },
-      { place: 'Κοντινότερη παραλία', distance: '3 χλμ', time: '5 λεπτά με αυτοκίνητο' },
-      { place: 'Αεροδρόμιο Καλαμάτας', distance: '6 χλμ', time: '15 λεπτά οδήγηση' },
-      { place: 'Σούπερ μάρκετ', distance: '100μ', time: '2 λεπτά με τα πόδια' },
-      { place: 'Φούρνος', distance: '150μ', time: '3 λεπτά με τα πόδια' },
-      { place: 'Στάση λεωφορείου', distance: '100μ', time: '2 λεπτά με τα πόδια' }
+      { place: 'Δημαρχείο', distance: '50μ', time: '1\' με τα πόδια' },
+      { place: 'Μπενάκειο Αρχαιολογικό Μουσείο', distance: '2 χλμ', time: '15\' με τα πόδια / 5\' με αυτοκίνητο' },
+      { place: 'Κοντινότερη παραλία', distance: '3 χλμ', time: '5\' με αυτοκίνητο' },
+      { place: 'Αεροδρόμιο Καλαμάτας', distance: '6 χλμ', time: '15\' οδήγηση' },
+      { place: 'Σούπερ μάρκετ', distance: '100μ', time: '2\' με τα πόδια' },
+      { place: 'Φούρνος', distance: '150μ', time: '3\' με τα πόδια' },
+      { place: 'Στάση λεωφορείου', distance: '100μ', time: '2\' με τα πόδια' }
     ]
   },
 
