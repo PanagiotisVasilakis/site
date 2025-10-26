@@ -1341,6 +1341,26 @@ html:not([data-theme="dark"]) .bg-app-vertical {
   border-spacing: 0;
 }
 
+/* Compact variant for small screens */
+.custom-day-picker.compact {
+  --rdp-day-size: 1.75rem;
+}
+
+.custom-day-picker.compact .rdp-day {
+  min-width: 1.75rem;
+  height: 1.75rem;
+  font-size: 0.75rem;
+}
+
+.custom-day-picker.compact .rdp-caption_label {
+  font-size: 0.8rem;
+}
+
+.custom-day-picker.compact .rdp-nav_button {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
 /* Dark theme overrides */
 [data-theme="dark"] .custom-day-picker {
   --rdp-accent-color: var(--brand-400);
@@ -1360,6 +1380,62 @@ html:not([data-theme="dark"]) .bg-app-vertical {
 [data-theme="dark"] .custom-day-picker .rdp-day:hover:not([disabled]) {
   background-color: var(--brand-900);
   color: var(--brand-200);
+}
+
+/* Dark mode styles for date picker popover */
+[data-theme="dark"] .date-picker-popover {
+  background: var(--layer-surface);
+  border-color: var(--border-soft);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .date-picker-popover .date-picker-arrow {
+  background: var(--layer-surface);
+  border-color: var(--border-soft);
+}
+
+/* Dark mode text colors for date picker */
+[data-theme="dark"] .date-picker-popover button[class*="text-gray"] {
+  color: var(--fg-muted);
+}
+
+[data-theme="dark"] .date-picker-popover button[class*="hover:text-gray"]:hover {
+  color: var(--fg-default);
+}
+
+[data-theme="dark"] .date-picker-popover .text-gray-600 {
+  color: var(--fg-muted);
+}
+
+[data-theme="dark"] .date-picker-popover .text-brand-800 {
+  color: var(--brand-200);
+}
+
+/* Dark mode colors for day picker buttons */
+[data-theme="dark"] .custom-day-picker .rdp-day {
+  color: var(--fg-default);
+}
+
+[data-theme="dark"] .custom-day-picker .rdp-day_today:not(.rdp-day_selected) {
+  background-color: var(--layer-surface-alt);
+  color: var(--fg-default);
+}
+
+/* Dark mode styles for navigation buttons */
+[data-theme="dark"] .date-picker-popover button[class*="text-gray"] {
+  color: var(--fg-muted);
+}
+
+[data-theme="dark"] .date-picker-popover button[class*="hover:text-gray"]:hover {
+  color: var(--fg-default);
+}
+
+[data-theme="dark"] .date-picker-popover button[class*="hover:bg-gray-50"]:hover {
+  background-color: var(--layer-surface-alt);
+}
+
+[data-theme="dark"] .date-picker-popover button[class*="border-gray-200"] {
+  border-color: var(--border-soft);
 }
 
 /* Responsive calendar styles for all screen sizes */
@@ -1815,4 +1891,81 @@ p,
 [data-theme="dark"] .apartment-photo-card {
   border: 1px solid var(--border-soft);
   background: var(--layer-surface);
+}
+
+/* Responsive booking bar for small screens */
+@media (max-width: 640px) {
+  .booking-bar {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 1rem;
+    max-width: 100%;
+  }
+  
+  .search-seg {
+    min-width: auto;
+    flex-basis: calc(50% - 0.25rem);
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-soft);
+    background: rgba(255, 255, 255, 0.5);
+  }
+  
+  /* Adults and kids fields take full width on small screens */
+  .search-seg:nth-child(3),
+  .search-seg:nth-child(4) {
+    flex-basis: calc(50% - 0.25rem);
+    margin-bottom: 0;
+  }
+  
+  .search-seg:not(:last-child)::after {
+    display: none;
+  }
+  
+  .search-action {
+    margin: 0;
+    width: 100%;
+    flex-basis: 100%;
+  }
+  
+  .booking-button {
+    width: 100%;
+    min-width: auto;
+    margin: 0;
+    padding: 1rem 2rem;
+    font-size: 1rem;
+  }
+  
+  [data-theme="dark"] .search-seg {
+    background: rgba(23, 35, 37, 0.3);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* Compact date picker for small screens */
+.compact-datepicker {
+  padding: 2rem 1rem 1rem !important;
+}
+
+.compact-datepicker .custom-day-picker {
+  --rdp-day-size: 2rem;
+}
+
+.compact-datepicker .custom-day-picker .rdp-day {
+  min-width: 2rem;
+  height: 2rem;
+  font-size: 0.8rem;
+}
+
+.compact-datepicker .custom-day-picker .rdp-caption_label {
+  font-size: 0.875rem;
+}
+
+.compact-datepicker .space-y-1\.5 > * + * {
+  margin-top: 0.5rem;
+}
+
+.compact-datepicker button[class*="absolute"] {
+  width: 1.5rem;
+  height: 1.5rem;
 }

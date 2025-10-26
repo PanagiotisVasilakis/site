@@ -17,7 +17,7 @@ test('ensure-pepper creates .env.local with SECURITY_PEPPER when missing and is 
   // Second run: should be idempotent and mention already present
   const r2 = child_process.spawnSync(process.execPath, [script], { cwd: tmp, encoding: 'utf8' });
   // r2.stdout may contain 'already present' message
-  expect(r2.stdout + r2.stderr).toMatch(/already present|Generated SECURITY_PEPPER/);
+  expect(r2.stdout + r2.stderr).toMatch(/All expected secrets present/);
 
   // cleanup
   try {

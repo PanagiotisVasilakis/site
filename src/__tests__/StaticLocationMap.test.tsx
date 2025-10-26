@@ -7,7 +7,7 @@ import StaticLocationMap from '@/components/StaticLocationMap';
 describe('StaticLocationMap', () => {
   it('renders English content', () => {
     const { container } = render(<StaticLocationMap locale="en" compact />);
-    expect(screen.getByTestId('static-map-title')).toHaveTextContent(/Location|Attractions/i);
+    expect(screen.getByTestId('static-map-title')).toHaveTextContent(/Explore the Neighborhood/i);
     expect(screen.getByText(/Kalamata/)).toBeInTheDocument();
     expect(container.firstChild).toMatchInlineSnapshot(`
       <div
@@ -33,7 +33,7 @@ describe('StaticLocationMap', () => {
                 class="text-lg sm:text-xl font-semibold text-brand-800"
                 data-testid="static-map-title"
               >
-                Apartment Location & Nearby Attractions
+                Explore the Neighborhood
               </h3>
             </div>
             <div
@@ -62,7 +62,7 @@ describe('StaticLocationMap', () => {
                 <p
                   class="text-gray-600 whitespace-pre-wrap break-words leading-snug mt-1"
                 >
-                  Quiet neighborhood, 50m from Town Hall with mountain & sea views
+                  A quiet neighborhood just 50m from the Town Hall, with stunning mountain and sea views.
                 </p>
               </section>
             </div>
@@ -75,7 +75,7 @@ describe('StaticLocationMap', () => {
   it('renders Greek content', () => {
     render(<StaticLocationMap locale="el" compact />);
     const title = screen.getByTestId('static-map-title');
-    expect(title).toHaveTextContent(/Τοποθεσία|Αξιοθέατα/i);
+    expect(title).toHaveTextContent(/Εξερεύνηση της Πόλης μας/i);
     expect(screen.getByText(/Καλαμάτα/)).toBeInTheDocument();
     // Snapshot the Greek instance
     expect(title.parentElement?.parentElement?.parentElement?.parentElement).toMatchInlineSnapshot(`
@@ -102,7 +102,7 @@ describe('StaticLocationMap', () => {
                 class="text-lg sm:text-xl font-semibold text-brand-800"
                 data-testid="static-map-title"
               >
-                Τοποθεσία & Κοντινά Αξιοθέατα
+                Εξερεύνηση της Πόλης μας
               </h3>
             </div>
             <div
@@ -131,7 +131,7 @@ describe('StaticLocationMap', () => {
                 <p
                   class="text-gray-600 whitespace-pre-wrap break-words leading-snug mt-1"
                 >
-                  Ήσυχη γειτονιά, 50μ από το Δημαρχείο με θέα βουνό & θάλασσα
+                  Μια ήσυχη γειτονιά μόλις 50μ από το Δημαρχείο, με εκπληκτική θέα σε βουνό και θάλασσα.
                 </p>
               </section>
             </div>

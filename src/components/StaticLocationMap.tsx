@@ -13,7 +13,8 @@ interface StaticLocationMapProps {
 
 // Fallback component when JavaScript or tiles are unavailable
 import { getDictionary } from '@/i18n/dictionaries';
-import { getLocationHighlights } from '@/lib/locationUtils';
+// Local type for highlights and prefer the structured dictionary source.
+type LocationHighlight = { icon?: string; title: string; description: string };
 import type { Locale } from '@/i18n/config';
 
 export default function StaticLocationMap({ 
@@ -28,7 +29,7 @@ export default function StaticLocationMap({
   const eff: Locale = locale === 'el' ? 'el' : 'en';
   const t = getDictionary(eff);
   const lp = t.locationPanel;
-  const highlights = getLocationHighlights(t);
+  const highlights: LocationHighlight[] = (lp?.highlights ?? []) as LocationHighlight[];
   const Panel = () => (
     <div className="space-y-3 text-sm">
       <section className="bg-white/70 rounded-lg p-4">

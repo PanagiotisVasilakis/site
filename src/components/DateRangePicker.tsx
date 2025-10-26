@@ -9,13 +9,13 @@ import {
   getNights
 } from '@/lib/dateUtils';
 import { logger } from '@/lib/logger-client';
-import BottomSheet from './BottomSheet';
 
 // Import styles
 import 'react-day-picker/dist/style.css';
 
 // Constants
 const MOBILE_BREAKPOINT = 768;
+const COMPACT_BREAKPOINT = 640;
 
 interface DateRangePickerProps {
   value?: DateRange;
@@ -43,6 +43,7 @@ export default function DateRangePicker({
   const [selectedRange, setSelectedRange] = useState<DateRange>(value || { from: undefined, to: undefined });
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [isMobile, setIsMobile] = useState(false);
+  const [isCompact, setIsCompact] = useState(false);
   const popoverRef = useRef<HTMLDivElement | null>(null);
 
   // Check if mobile on mount
@@ -50,6 +51,7 @@ export default function DateRangePicker({
     const checkViewport = () => {
       const w = window.innerWidth;
       setIsMobile(w < MOBILE_BREAKPOINT);
+      setIsCompact(w < COMPACT_BREAKPOINT);
     };
     checkViewport();
     window.addEventListener('resize', checkViewport);
@@ -171,7 +173,7 @@ export default function DateRangePicker({
   }, [selectedRange, showPricing]);
 
 
-  const popoverWidth = 360;
+  const popoverWidth = isCompact ? 320 : 360;
 
   const anchorLeft = useMemo(() => {
     if (isMobile || !anchor) return 0;
@@ -187,7 +189,7 @@ export default function DateRangePicker({
   }, [anchor, anchorLeft, isMobile, popoverWidth]);
 
   useEffect(() => {
-    if (!isOpen || isMobile) return;
+    if (!isOpen) return;
 
     const handlePointerDown = (event: MouseEvent | TouchEvent) => {
       if (!popoverRef.current) return;
@@ -204,51 +206,47 @@ export default function DateRangePicker({
       document.removeEventListener('mousedown', handlePointerDown);
       document.removeEventListener('touchstart', handlePointerDown);
     };
-  }, [isOpen, isMobile, onClose]);
+  }, [isOpen, onClose]);
 
   const DatePickerContent = () => (
-  <div className="space-y-1.5">
+    <div className={isCompact ? "space-y-1" : "space-y-1.5"}>
       {/* Calendar with inline controls */}
       <div className="relative" role="application" aria-label="Date picker calendar">
         {/* Clear button positioned top-right, only show when dates selected */}
         {(selectedRange?.from || selectedRange?.to) && (
           <button
             onClick={handleClear}
-            className="absolute top-0 right-0 z-10 p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+            className={`absolute top-0 right-0 z-10 p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors ${isCompact ? 'p-1' : 'p-1.5'}`}
             aria-label="Clear selected dates"
             title="Clear dates"
           >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <svg width={isCompact ? "14" : "16"} height={isCompact ? "14" : "16"} viewBox="0 0 16 16" fill="currentColor">
               <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L8 6.586l2.293-2.293a1 1 0 111.414 1.414L9.414 8l2.293 2.293a1 1 0 01-1.414 1.414L8 9.414l-2.293 2.293a1 1 0 01-1.414-1.414L6.586 8 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
             </svg>
           </button>
         )}
 
-        {/* Custom navigation buttons for desktop streamlined layout */}
-        {!isMobile && (
-          <>
-            <button
-              onClick={handlePreviousMonth}
-              className="absolute left-4 top-0 z-20 w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-md transition-colors border border-gray-200"
-              aria-label="Previous month"
-              style={{ top: '0rem' }}
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                <path fillRule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
-              </svg>
-            </button>
-            <button
-              onClick={handleNextMonth}
-              className="absolute right-4 top-0 z-20 w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-md transition-colors border border-gray-200"
-              aria-label="Next month"
-              style={{ top: '0rem' }}
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                <path fillRule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
-              </svg>
-            </button>
-          </>
-        )}
+        {/* Custom navigation buttons for all screen sizes */}
+        <button
+          onClick={handlePreviousMonth}
+          className={`absolute left-4 top-0 z-20 w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-md transition-colors border border-gray-200 ${isCompact ? 'w-6 h-6 left-2' : 'w-7 h-7 left-4'}`}
+          aria-label="Previous month"
+          style={{ top: '0rem' }}
+        >
+          <svg width={isCompact ? "12" : "14"} height={isCompact ? "12" : "14"} viewBox="0 0 16 16" fill="currentColor">
+            <path fillRule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+          </svg>
+        </button>
+        <button
+          onClick={handleNextMonth}
+          className={`absolute right-4 top-0 z-20 w-7 h-7 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-md transition-colors border border-gray-200 ${isCompact ? 'w-6 h-6 right-2' : 'w-7 h-7 right-4'}`}
+          aria-label="Next month"
+          style={{ top: '0rem' }}
+        >
+          <svg width={isCompact ? "12" : "14"} height={isCompact ? "12" : "14"} viewBox="0 0 16 16" fill="currentColor">
+            <path fillRule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+          </svg>
+        </button>
         
         <DayPicker
           mode="range"
@@ -257,18 +255,18 @@ export default function DateRangePicker({
           disabled={disabledDays}
           numberOfMonths={1}
           showOutsideDays={false}
-          className={`custom-day-picker ${!isMobile ? 'streamlined compact' : ''}`}
+          className={`custom-day-picker ${!isMobile ? 'streamlined' : ''} ${isCompact ? 'compact' : ''}`}
           aria-label="Select check-in and check-out dates"
           month={currentMonth}
           onMonthChange={setCurrentMonth}
-          hideNavigation={!isMobile}
+          hideNavigation={true}
         />
       </div>
 
       {/* Compact pricing summary - only when both dates selected */}
       {pricingInfo && selectedRange?.from && selectedRange?.to && (
-        <div className="bg-brand-50 border border-brand-200 rounded-md px-3 py-1.5" role="region" aria-label="Booking summary">
-          <div className="flex justify-between items-center text-xs">
+        <div className={`bg-brand-50 border border-brand-200 rounded-md px-3 py-1.5 ${isCompact ? 'px-2 py-1' : 'px-3 py-1.5'}`} role="region" aria-label="Booking summary">
+          <div className={`flex justify-between items-center ${isCompact ? 'text-xs' : 'text-xs'}`}>
             <span className="text-gray-600">{pricingInfo.nights} night{pricingInfo.nights !== 1 ? 's' : ''}</span>
             <span className="font-semibold text-brand-800">€{pricingInfo.total}</span>
           </div>
@@ -279,7 +277,7 @@ export default function DateRangePicker({
       {selectedRange?.from && selectedRange?.to && (
         <button
           onClick={handleApply}
-          className="w-full px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-md hover:bg-brand-700 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:ring-offset-1 transition-colors"
+          className={`w-full px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-md hover:bg-brand-700 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:ring-offset-1 transition-colors ${isCompact ? 'px-3 py-1.5 text-sm' : 'px-4 py-2 text-sm'}`}
           aria-label="Apply selected date range"
         >
           Apply dates
@@ -288,31 +286,23 @@ export default function DateRangePicker({
     </div>
   );
 
-  if (isMobile) {
-    return (
-      <BottomSheet
-        isOpen={isOpen}
-        onClose={onClose || (() => {})}
-        title="Select dates"
-        maxHeight="75vh"
-      >
-        <DatePickerContent />
-      </BottomSheet>
-    );
-  }
-
-  // Desktop popover - streamlined and responsive
+  // Desktop popover - streamlined and responsive, now used on all screen sizes
   return isOpen ? (
     <div 
       ref={popoverRef}
-      className="absolute top-full left-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 p-3 z-50"
+      className={`absolute top-full left-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 p-3 z-50 date-picker-popover ${isCompact ? 'compact-datepicker' : ''}`}
       role="dialog"
       aria-modal="true"
       aria-label="Date range picker"
-  style={{ width: 'min(92vw, 360px)', maxHeight: 'min(80vh, 450px)', overflow: 'visible', left: anchorLeft }}
+      style={{ 
+        width: isCompact ? 'min(90vw, 320px)' : 'min(92vw, 360px)', 
+        maxHeight: isCompact ? 'min(70vh, 380px)' : 'min(80vh, 450px)', 
+        overflow: 'visible', 
+        left: anchorLeft 
+      }}
     >
       <div
-        className="absolute -top-2 w-4 h-4 bg-white border-l border-t border-gray-200 transform rotate-45"
+        className="absolute -top-2 w-4 h-4 bg-white border-l border-t border-gray-200 transform rotate-45 date-picker-arrow"
         style={{ left: arrowLeft }}
       />
       <DatePickerContent />

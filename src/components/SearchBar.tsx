@@ -9,7 +9,8 @@ import { getApartmentContent } from "@/data/apartmentData";
 
 interface BookingState {
   dateRange: DateRange;
-  guests: number;
+  adults: number;
+  kids: number;
 }
 
 type DateField = "arrival" | "departure";
@@ -29,6 +30,8 @@ interface Props {
     dates: string;
     addDates: string;
     guestsLabel: string;
+    adultsLabel?: string;
+    kidsLabel?: string;
     guestSingular: string;
     guestPlural: string;
     checkAvailability: string;
@@ -76,7 +79,8 @@ export default function BookingBar({
   const [isHydrated, setIsHydrated] = useState(false);
   const [state, setState] = useState<BookingState>(() => ({
     dateRange: { from: undefined, to: undefined },
-    guests: initial?.guests || 1,
+    adults: initial?.adults || 1,
+    kids: initial?.kids || 0,
   }));
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [shouldLoadDatePicker, setShouldLoadDatePicker] = useState(false);
@@ -101,8 +105,11 @@ export default function BookingBar({
     params.delete("checkout");
     dateParams.forEach((value, key) => params.set(key, value));
 
-    if (state.guests > 1) params.set("guests", state.guests.toString());
-    else params.delete("guests");
+    if (state.adults > 1) params.set("adults", state.adults.toString());
+    else params.delete("adults");
+
+    if (state.kids > 0) params.set("kids", state.kids.toString());
+    else params.delete("kids");
 
     const newUrl = params.toString()
       ? `${window.location.pathname}?${params}`
@@ -202,14 +209,20 @@ export default function BookingBar({
       params.set("checkout", format(state.dateRange.to, "yyyy-MM-dd"));
     }
 
-    if (state.guests > 1) {
-      params.set("guests", state.guests.toString());
+    if (state.adults > 1) {
+      params.set("adults", state.adults.toString());
+    }
+
+    if (state.kids > 0) {
+      params.set("kids", state.kids.toString());
     }
 
     trackEvent("booking_check_availability", {
       property: propertyName,
       hasDates: !!(state.dateRange?.from && state.dateRange?.to),
-      guests: state.guests,
+      adults: state.adults,
+      kids: state.kids,
+      totalGuests: state.adults + state.kids,
       nights: getNights(state.dateRange),
     });
 
@@ -274,25 +287,48 @@ export default function BookingBar({
           </button>
         </div>
 
-        <div className="search-seg text-left min-w-[120px]">
-          <span className="search-label">{labels?.guestsLabel || "Guests"}</span>
+        <div className="search-seg text-left min-w-[100px]">
+          <span className="search-label">{labels?.adultsLabel || "Adults"}</span>
           <span className="search-value flex items-center gap-1">
             <input
-              aria-label={labels?.guestsLabel || "Guests"}
+              aria-label={labels?.adultsLabel || "Adults"}
               type="number"
               min={1}
-              max={apartmentContent.specs.maxGuests}
-              value={state.guests}
+              max={apartmentContent.specs.maxGuests - state.kids}
+              value={state.adults}
               onChange={(e) =>
                 updateState(
-                  "guests",
-                  Math.max(1, Math.min(apartmentContent.specs.maxGuests, Number(e.target.value) || 1))
+                  "adults",
+                  Math.max(1, Math.min(apartmentContent.specs.maxGuests - state.kids, Number(e.target.value) || 1))
                 )
               }
-              className="guest-input bg-transparent w-14 focus:outline-none"
+              className="guest-input bg-transparent w-10 focus:outline-none"
             />
             <span className="opacity-70">
-              {state.guests === 1 ? labels?.guestSingular || "guest" : labels?.guestPlural || "guests"}
+              {state.adults === 1 ? "adult" : "adults"}
+            </span>
+          </span>
+        </div>
+
+        <div className="search-seg text-left min-w-[100px]">
+          <span className="search-label">{labels?.kidsLabel || "Kids"}</span>
+          <span className="search-value flex items-center gap-1">
+            <input
+              aria-label={labels?.kidsLabel || "Kids"}
+              type="number"
+              min={0}
+              max={apartmentContent.specs.maxGuests - state.adults}
+              value={state.kids}
+              onChange={(e) =>
+                updateState(
+                  "kids",
+                  Math.max(0, Math.min(apartmentContent.specs.maxGuests - state.adults, Number(e.target.value) || 0))
+                )
+              }
+              className="guest-input bg-transparent w-10 focus:outline-none"
+            />
+            <span className="opacity-70">
+              {state.kids === 1 ? "kid" : "kids"}
             </span>
           </span>
         </div>

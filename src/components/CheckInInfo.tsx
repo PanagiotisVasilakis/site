@@ -6,7 +6,8 @@ import type { Locale } from '@/i18n/config';
 import internalFetch from '@/lib/internalFetchClient';
 import MapLoadingSkeleton from '@/components/MapLoadingSkeleton';
 import { MAP_DEFAULTS } from '@/lib/mapConstants';
-import { getLocationHighlights, LocationHighlight } from '@/lib/locationUtils';
+// Local type for highlights (kept in-file to avoid an extra util dependency)
+type LocationHighlight = { icon?: string; title: string; description: string };
 
 type NearbyCategoryItem = {
   id: string;
@@ -39,7 +40,21 @@ export default function CheckInInfo({
   const t = getDictionary((locale as Locale) ?? 'en');
   // Combine checkinInfo and locationPanel so location-related strings are available
   const checkinStrings = ({ ...(t.checkinInfo ?? {}), ...(t.locationPanel ?? {}) }) as Record<string, string | undefined>;
-  const locationHighlights: LocationHighlight[] = getLocationHighlights(t);
+  // Prefer the structured dictionary `locationPanel.highlights` when present
+  // (this ensures the Explore box and this panel stay in sync). If the
+  // dictionary doesn't include structured highlights, fall back to the
+  // existing helper which may pull from other sources (or return []).
+  const panelHighlights = (t.locationPanel?.highlights ?? []) as Array<{
+    icon?: string;
+    title: string;
+    description: string;
+  }>;
+  // Only use structured highlights from the dictionary. If none are
+  // present, render nothing for highlights.
+  const locationHighlights: LocationHighlight[] =
+    panelHighlights.length > 0
+      ? panelHighlights.map((h) => ({ icon: h.icon, title: h.title, description: h.description }))
+      : [];
   const [copiedWifi, setCopiedWifi] = useState(false);
   const [checkInTime, setCheckInTime] = useState('15:00');
   const [checkOutTime, setCheckOutTime] = useState('11:00');
@@ -365,7 +380,7 @@ export default function CheckInInfo({
             nearbyAttractions={nearbyAttractions}
           />
         </div>
-        {locationHighlights.length > 0 ? (
+        {locationHighlights.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 location-grid">
             {locationHighlights.map(({ icon, title, description }) => (
               <div
@@ -387,39 +402,6 @@ export default function CheckInInfo({
               </div>
             ))}
           </div>
-          ) : (
-          <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 location-grid">
-              {[ 
-                {
-                  icon: '🏛️',
-                  title: checkinStrings.locationTownTitle || 'City Center',
-                  description: checkinStrings.locationTownDescription || '1,5 km to City Center 14 min by foot / 4 min by car',
-                },
-                {
-                  icon: '🏖️',
-                  title: checkinStrings.locationBeachTitle || 'Beach Access',
-                  description: checkinStrings.locationBeachDescription || '5 min drive to the coast',
-                },
-                {
-                  icon: '🚗',
-                  title: checkinStrings.locationTransportTitle || 'Transportation',
-                  description: checkinStrings.locationTransportDescription || 'Free parking & airport 15 min',
-                },
-              ].map((feature) => (
-                <div
-                  key={feature.title || feature.icon}
-                  className="rounded-lg border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] p-4 text-center shadow-sm"
-                >
-                  <div className="text-2xl mb-2" aria-hidden>{feature.icon}</div>
-                  <h4 className="text-sm font-serif italic font-medium white-in-dark" style={{ color: 'var(--text-accent)' }}>
-                    {feature.title}
-                  </h4>
-                  <p className="text-xs text-[color:var(--fg-muted)]">{feature.description}</p>
-                </div>
-              ))}
-            </div>
-          </>
         )}
       </section>
 
