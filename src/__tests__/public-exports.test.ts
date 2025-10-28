@@ -20,7 +20,7 @@ import { emitGuestSessionChanged } from '@/lib/sessionSignals';
 import { type Origin } from '@/lib/phone';
 import { type LogContext, type LogLevel, type LogEntry } from '@/lib/logger-enterprise';
 import { type Logger } from '@/lib/logger';
-import { type IdentityType, type BookingSource, type AccessStatus, type BookingAccess, type AuthSessionRec, type GuestRefreshTokenRec } from '@/lib/guestDataStore';
+import { type IdentityType, type BookingSource, type AccessStatus, type BookingAccess, type GuestRefreshTokenRec } from '@/lib/guestDataStore';
 import { type VillaPhoto } from '@/types/villa';
 import { type AppConfig } from '@/lib/config';
 import { type Role } from '@/lib/rbac';
@@ -120,7 +120,7 @@ describe('public API surface remains reachable', () => {
     expectTypeOf<BookingSource>().toMatchTypeOf<'ONSITE' | 'EXTERNAL'>();
     expectTypeOf<AccessStatus>().toMatchTypeOf<'granted' | 'denied' | 'pending'>();
     expectTypeOf<BookingAccess>().toMatchTypeOf<{ status: AccessStatus }>();
-    expectTypeOf<AuthSessionRec>().toMatchTypeOf<{ id: string }>();
+
     expectTypeOf<GuestRefreshTokenRec>().toMatchTypeOf<{ id: string }>();
     expectTypeOf<InteractiveMarkerData>().toMatchTypeOf<{ id: string }>();
     expectTypeOf<SessionBookingSource>().toMatchTypeOf<'ONSITE' | 'EXTERNAL'>();

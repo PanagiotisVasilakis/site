@@ -27,19 +27,4 @@ export const ApiErrorCode = {
 
 export type ApiErrorCode = typeof ApiErrorCode[keyof typeof ApiErrorCode];
 
-export interface ApiErrorDetails {
-  validationErrors?: Array<{ path: string; message: string }>;
-  fields?: Record<string, string>;
-  hints?: string[];
-  [key: string]: unknown;
-}
 
-export interface ApiErrorResponse {
-  error: {
-    code: ApiErrorCode;
-    message: string;
-    details?: ApiErrorDetails;
-  };
-  correlationId?: string;
-  timestamp?: string;
-}

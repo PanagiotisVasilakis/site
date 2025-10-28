@@ -4,7 +4,6 @@ import { userRepository, type UserRecord } from '@/lib/prisma-repositories/userR
 import { identityRepository, type IdentityRecord } from '@/lib/prisma-repositories/identityRepository';
 import { bookingRepository, type BookingRecord } from '@/lib/prisma-repositories/bookingRepository';
 import { refreshTokenRepository, type GuestRefreshTokenRec as PrismaGuestRefreshTokenRec } from '@/lib/prisma-repositories/refreshTokenRepository';
-import type { SessionRecord } from '@/lib/prisma-repositories/sessionRepository';
 import { hashSensitive, maskLast4, hmacDeterministic } from '@/lib/crypto';
 import { logger } from '@/lib/logger-enterprise';
 import { prisma } from '@/lib/prisma';
@@ -19,7 +18,7 @@ export type User = UserRecord;
 export type Identity = IdentityRecord;
 export type Booking = BookingRecord;
 export type BookingAccess = AccessRecord;
-export type AuthSessionRec = SessionRecord;
+
 export type CheckinCompletionRec = CheckinRecord;
 export type GuestRefreshTokenRec = PrismaGuestRefreshTokenRec;
 
