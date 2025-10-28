@@ -101,7 +101,7 @@
     "@types/spdx-expression-parse": "^3.0.1",
     "@types/uuid": "^10.0.0",
     "@vitest/coverage-v8": "^3.2.4",
-    "axe-core": "^4.10.0",
+    "axe-core": "^4.11.0",
     "chrome-launcher": "^1.0.0",
     "eslint": "^9.36.0",
     "eslint-config-next": "15.5.0",
