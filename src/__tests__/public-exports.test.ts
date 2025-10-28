@@ -25,7 +25,7 @@ import { type VillaPhoto } from '@/types/villa';
 import { type AppConfig } from '@/lib/config';
 import { type Role } from '@/lib/rbac';
 import { type LeafletMapProps } from '@/components/LeafletMap';
-import { type MarkerData as LazyMapMarkerData } from '@/components/LazyInteractiveMap';
+import { type MarkerData as LazyMapMarkerData } from '@/components/InteractiveMap';
 import { type TravelMode } from '@/lib/travelFormat';
 import { type AnalyticsPersistenceData, type AnalyticsStorageAdapter } from '@/lib/storageAdapter';
 import { SpanStatus } from '@/lib/distributed-tracing';

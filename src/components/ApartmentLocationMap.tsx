@@ -1,6 +1,6 @@
 "use client";
 import React, { useMemo } from 'react';
-import LazyInteractiveMap from './LazyInteractiveMap';
+import InteractiveMap from './InteractiveMap';
 import { createMarkerFromItem, type MarkerData, APARTMENT_LOCATION } from '@/lib/mapUtils';
 import StaticLocationMap from './StaticLocationMap';
 
@@ -88,7 +88,7 @@ export default function ApartmentLocationMap({
   // Single responsibility: delegate fallback to InteractiveMap; add dedicated static panel for no-JS via <noscript>
   return (
     <div className={className}>
-      <LazyInteractiveMap
+      <InteractiveMap
         markers={nearbyMarkers}
   center={APARTMENT_DATA.coordinates}
         zoom={zoom}
