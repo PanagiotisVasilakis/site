@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { locales, defaultLocale } from "@/i18n/config";
-import { createSecurityMiddleware } from '@/lib/security-middleware';
-import { tracer, SpanStatus } from '@/lib/distributed-tracing';
-import { metrics } from '@/lib/metrics-collector';
+import { createSecurityMiddleware } from '@/lib/security-middleware-edge';
+import { tracer, SpanStatus } from '@/lib/distributed-tracing-lite';
+import { metrics } from '@/lib/metrics-lite';
 // Guest session auto-mint is handled in page routes (Node runtime) rather than middleware (Edge)
 
 function hasLocale(pathname: string) {
@@ -236,5 +236,3 @@ export const config = {
   matcher: ["/((?!_next|.*\..*).*)"],
 };
 
-// Use Node.js runtime for middleware to allow server-only modules (like Prisma) and Node APIs
-export const runtime = 'nodejs';
