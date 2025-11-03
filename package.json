@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "migrate": "tsx scripts/migrate.ts",
+    "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
