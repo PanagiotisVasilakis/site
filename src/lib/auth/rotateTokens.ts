@@ -7,6 +7,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { SignJWT } from 'jose';
+import { logger } from '@/lib/logger-enterprise';
 
 /**
  * Refresh token record

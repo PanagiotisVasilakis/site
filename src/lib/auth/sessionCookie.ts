@@ -188,14 +188,19 @@ export async function getSessionFromCookies(
   cookieName = 'session',
   secret?: string
 ): Promise<SessionPayload | null> {
-  const cookieStore = cookies();
-  const sessionCookie = cookieStore.get(cookieName)?.value;
-  
-  if (!sessionCookie) {
+  try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get(cookieName)?.value;
+    
+    if (!sessionCookie) {
+      return null;
+    }
+    
+    return parseSessionCookie(sessionCookie, secret);
+  } catch (error) {
+    logger.warn('Failed to access session cookie', { error });
     return null;
   }
-  
-  return parseSessionCookie(sessionCookie, secret);
 }
 
 /**
