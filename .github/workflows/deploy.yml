@@ -215,7 +215,7 @@ jobs:
           EOF
 
       - name: Upload deployment artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: deployment-artifacts-${{ github.sha }}
           path: deployment-artifacts/

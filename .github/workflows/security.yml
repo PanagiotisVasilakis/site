@@ -56,7 +56,7 @@ jobs:
 
       - name: Upload audit artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: security-audit-reports
           path: |
@@ -119,7 +119,7 @@ jobs:
 
       - name: Upload container security artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: container-security-reports
           path: |
@@ -166,7 +166,7 @@ jobs:
 
       - name: Upload static analysis artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: static-analysis-reports
           path: |
@@ -200,7 +200,7 @@ jobs:
 
       - name: Upload license report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: license-compliance-report
           path: license-report.json
