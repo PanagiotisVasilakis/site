@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { logger } from '@/lib/logger-client';
 
-export default function ShareButton({ title, text }: { title: string; text?: string }) {
+export default function ShareButton({ title, text, className = "fav-btn" }: { title: string; text?: string; className?: string }) {
 	const [copied, setCopied] = useState(false);
 	const share = async () => {
 		const url = window.location.href;
@@ -17,9 +17,9 @@ export default function ShareButton({ title, text }: { title: string; text?: str
 		} catch (err) { logger.warn('Clipboard copy failed', err instanceof Error ? err : { error: String(err) }); }
 	};
 	return (
-		<button onClick={share} className="fav-btn">
+		<button onClick={share} className={className}>
 			<span>{copied ? '✅' : '🔗'}</span>
-			<span className="hidden sm:inline">{copied ? 'Copied' : 'Share'}</span>
+			<span>{copied ? 'Copied' : 'Share'}</span>
 		</button>
 	);
 }

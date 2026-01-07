@@ -174,7 +174,7 @@ export default function GuestDataViewer() {
           animate={{ opacity: 1, y: 0 }}
           className="surface-card rounded-xl shadow-lg p-6 mb-6"
         >
-          <h1 className="text-3xl page-title mb-2">
+          <h1 className="text-3xl font-serif italic font-bold page-title mb-2">
             🏠 Guest Data Viewer
           </h1>
           <p className="text-body">
@@ -216,7 +216,7 @@ export default function GuestDataViewer() {
           transition={{ delay: 0.2 }}
           className="surface-card rounded-lg shadow p-6 mb-6"
         >
-          <h2 className="text-xl section-title mb-4">Search Bookings</h2>
+          <h2 className="text-xl font-serif italic font-bold section-title mb-4">Search Bookings</h2>
           <div className="flex flex-col sm:flex-row gap-4">
             <select
               value={searchType}
@@ -283,7 +283,7 @@ export default function GuestDataViewer() {
           ) : bookings.length === 0 ? (
             <div className="surface-card rounded-lg shadow p-8 text-center">
               <div className="text-6xl mb-4">📭</div>
-              <h3 className="text-xl section-title mb-2">No Bookings Found</h3>
+              <h3 className="text-xl font-serif italic font-bold section-title mb-2">No Bookings Found</h3>
               <p className="text-body">
                 Bookings will appear here after guests complete the check-in process.
               </p>
@@ -299,7 +299,7 @@ export default function GuestDataViewer() {
               >
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h3 className="text-xl section-title">
+                    <h3 className="text-xl font-serif italic font-bold section-title">
                       Booking {booking.booking.reference || booking.booking.id}
                     </h3>
                     <p className="text-body">

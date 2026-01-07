@@ -17,8 +17,8 @@ import { getDictionary } from '@/i18n/dictionaries';
 type LocationHighlight = { icon?: string; title: string; description: string };
 import type { Locale } from '@/i18n/config';
 
-export default function StaticLocationMap({ 
-  height = "400px", 
+export default function StaticLocationMap({
+  height = "400px",
   className = "",
   title,
   locale = 'en',
@@ -84,7 +84,7 @@ export default function StaticLocationMap({
     return (
       <div className={className}>
         {showHeading && (
-          <h3 className="text-lg font-semibold text-[color:var(--fg-default)] mb-3" data-testid="static-map-title">{title || lp?.title}</h3>
+          <h3 className="text-lg font-serif italic font-bold text-[color:var(--fg-default)] mb-3" data-testid="static-map-title">{title || lp?.title}</h3>
         )}
         <Panel />
       </div>
@@ -98,7 +98,7 @@ export default function StaticLocationMap({
           {showHeading && (
             <div className="flex flex-col items-center mb-4">
               <div className="text-5xl mb-2" aria-hidden>🏖️</div>
-              <h3 className="text-lg sm:text-xl font-semibold text-brand-800" data-testid="static-map-title">{title || lp?.title}</h3>
+              <h3 className="text-lg sm:text-xl font-serif italic font-bold text-brand-800" data-testid="static-map-title">{title || lp?.title}</h3>
             </div>
           )}
           <Panel />

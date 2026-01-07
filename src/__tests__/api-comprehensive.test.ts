@@ -49,7 +49,7 @@ class APITestFramework {
 
     const operation = spec[method.toLowerCase()];
     const responseSpec = operation.responses[statusCode.toString()];
-    
+
     if (!responseSpec) {
       return {
         valid: false,
@@ -59,7 +59,7 @@ class APITestFramework {
 
     // Basic validation - in a real implementation, we'd use a proper OpenAPI validator
     const errors: string[] = [];
-    
+
     try {
       if (responseSpec.content?.['application/json']?.schema) {
         // Validate JSON response structure
@@ -89,7 +89,7 @@ class APITestFramework {
 
     for (let i = 0; i < iterations; i++) {
       const start = performance.now();
-      
+
       try {
         await operation();
         const duration = performance.now() - start;
@@ -99,9 +99,9 @@ class APITestFramework {
       }
     }
 
-    const avg = measurements.length > 0 ? 
+    const avg = measurements.length > 0 ?
       measurements.reduce((a, b) => a + b, 0) / measurements.length : 0;
-    
+
     const min = measurements.length > 0 ? Math.min(...measurements) : 0;
     const max = measurements.length > 0 ? Math.max(...measurements) : 0;
 
@@ -132,8 +132,8 @@ class APITestFramework {
     for (const payload of sqlPayloads) {
       try {
         const testUrl = `${endpoint}?param=${encodeURIComponent(payload)}`;
-  void this.createRequest(testUrl);
-        
+        void this.createRequest(testUrl);
+
         // Note: This would call the actual handler in a real test
         tests.push({
           type: 'sql_injection',
@@ -161,8 +161,8 @@ class APITestFramework {
     for (const payload of xssPayloads) {
       try {
         const testUrl = `${endpoint}?param=${encodeURIComponent(payload)}`;
-  void this.createRequest(testUrl);
-        
+        void this.createRequest(testUrl);
+
         tests.push({
           type: 'xss',
           payload,
@@ -196,7 +196,7 @@ class APITestFramework {
   // Run comprehensive test suite
   public async runTestSuite(): Promise<TestSuiteResult> {
     console.log('🧪 Starting comprehensive API test suite...');
-    
+
     const startTime = performance.now();
     const results: TestResult[] = [];
 
@@ -442,8 +442,8 @@ interface TestSuiteResult {
 export const MockData = {
   categories: [
     {
-      id: 'restaurants',
-      slug: 'restaurants',
+      id: 'moments',
+      slug: 'moments',
       title: 'Kalamata Moments',
       count: 25,
     },
@@ -463,12 +463,12 @@ export const MockData = {
       summary: 'A great restaurant for testing',
       address: '123 Test St',
       phone: '+1234567890',
-      categoryId: 'restaurants',
+      categoryId: 'moments',
     },
   ],
 
   analyticsEvent: {
-  path: '/en/apartment',
+    path: '/en/apartment',
     ts: Date.now(),
     locale: 'en',
   },
@@ -476,7 +476,7 @@ export const MockData = {
   webVital: {
     name: 'LCP' as const,
     value: 2500,
-  path: '/en/apartment',
+    path: '/en/apartment',
     ts: Date.now(),
     id: 'test-metric-id',
   },
@@ -510,13 +510,13 @@ export const TestUtils = {
   // Validate API response structure
   validateResponseStructure: (response: any, expectedKeys: string[]) => {
     const errors: string[] = [];
-    
+
     for (const key of expectedKeys) {
       if (!(key in response)) {
         errors.push(`Missing required key: ${key}`);
       }
     }
-    
+
     return { valid: errors.length === 0, errors };
   },
 

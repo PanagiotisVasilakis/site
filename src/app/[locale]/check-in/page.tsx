@@ -45,7 +45,7 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
     location: item.location,
   });
 
-  const nearbyRestaurants = getItemsByCategory('restaurants').slice(0, 5).map(mapItem);
+  const nearbyRestaurants = getItemsByCategory('moments').slice(0, 5).map(mapItem);
   const nearbyServices = getItemsByCategory('phones').slice(0, 3).map(mapItem);
   const nearbyAttractions = getItemsByCategory('sightseeing').slice(0, 4).map(mapItem);
 

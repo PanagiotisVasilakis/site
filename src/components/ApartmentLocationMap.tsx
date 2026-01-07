@@ -37,9 +37,9 @@ const APARTMENT_DATA = {
   price: '€65/night'
 };
 
-export default function ApartmentLocationMap({ 
-  locale, 
-  height = "300px", 
+export default function ApartmentLocationMap({
+  locale,
+  height = "300px",
   zoom = 14,
   showNearbyAttractions = true,
   className = "",
@@ -47,7 +47,7 @@ export default function ApartmentLocationMap({
   nearbyServices = [],
   nearbyAttractions = []
 }: ApartmentLocationMapProps) {
-  
+
   // Get nearby attractions from props
   const nearbyMarkers: MarkerData[] = useMemo(() => {
     const markers: MarkerData[] = [{
@@ -58,12 +58,12 @@ export default function ApartmentLocationMap({
       type: 'apartment',
       price: APARTMENT_DATA.price
     }];
-    
+
     if (!showNearbyAttractions) return markers;
-    
+
     // Add restaurants from props
     nearbyRestaurants.slice(0, 5).forEach(item => {
-      markers.push(createMarkerFromItem(item, 'restaurants', locale));
+      markers.push(createMarkerFromItem(item, 'moments', locale));
     });
 
     // Add services from props
@@ -90,7 +90,7 @@ export default function ApartmentLocationMap({
     <div className={className}>
       <InteractiveMap
         markers={nearbyMarkers}
-  center={APARTMENT_DATA.coordinates}
+        center={APARTMENT_DATA.coordinates}
         zoom={zoom}
         height={height}
         onMarkerClick={handleMarkerClick}

@@ -25,16 +25,16 @@ describe('pickLocale', () => {
 
 describe('getItem', () => {
   it('finds item by slug', () => {
-    const items = getItemsByCategory('restaurants');
+    const items = getItemsByCategory('moments');
     if (items.length === 0) {
       // Skip gracefully if dataset trimmed
       return;
     }
     const first = items[0]!;
-    const found = getItem('restaurants', first.slug || '');
+    const found = getItem('moments', first.slug || '');
     expect(found?.id).toBe(first.id);
   });
   it('returns null for missing', () => {
-    expect(getItem('restaurants', 'non-existent-slug')).toBeNull();
+    expect(getItem('moments', 'non-existent-slug')).toBeNull();
   });
 });

@@ -16,11 +16,12 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
   // Filtering & segmentation handled client-side now
 
   const isPhones = cat.slug === 'phones';
+  const isMoments = cat.slug === 'moments';
 
   return (
-    <div className={isPhones ? "page-container mx-0 max-w-full safe-bottom px-4" : "page-container mx-auto max-w-3xl safe-bottom"}>
-      <header className={isPhones ? "mb-4 text-center" : "mb-4"}>
-        <h1 className="text-2xl font-semibold page-title">{t.categories[cat.slug as "phones" | "restaurants" | "sightseeing"] ?? (pickCategoryLocale(cat, "title", eff) ?? cat.title)}</h1>
+    <div className={(isPhones || isMoments) ? "page-container mx-0 max-w-full safe-bottom px-4" : "page-container mx-auto max-w-3xl safe-bottom"}>
+      <header className={(isPhones || isMoments) ? "mb-4 text-center" : "mb-4"}>
+        <h1 className="text-2xl font-serif italic font-bold page-title">{t.categories[cat.slug as "phones" | "moments"] ?? (pickCategoryLocale(cat, "title", eff) ?? cat.title)}</h1>
         {(pickCategoryLocale(cat, "description", eff) ?? cat.description) && <p className="text-sm opacity-80 text-body">{pickCategoryLocale(cat, "description", eff) ?? cat.description}</p>}
       </header>
 
@@ -49,10 +50,12 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
           rating: i.rating,
           price: i.priceLevel ? '€'.repeat(i.priceLevel) : undefined,
           icon: cat.icon,
+          image: i.image,
         }))}
         locale={eff}
         categorySlug={cat.slug}
         phonesLayout={isPhones}
+        momentsLayout={isMoments}
         emptyLabel={t.emptyState}
         ui={t.ui}
       />

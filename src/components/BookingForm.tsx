@@ -87,7 +87,7 @@ export default function BookingForm({ dateRange, guests, total, locale, submissi
       <div className="text-center py-12 space-y-4">
         <div className="text-6xl" aria-hidden>🎉</div>
         <div>
-          <h2 className="text-2xl font-bold text-green-600 mb-2">Booking Confirmed!</h2>
+          <h2 className="text-2xl font-serif italic font-bold text-green-600 mb-2">Booking Confirmed!</h2>
           <p className="text-gray-600 mb-4">
             Thank you! Your booking request has been sent.
           </p>
@@ -130,7 +130,7 @@ export default function BookingForm({ dateRange, guests, total, locale, submissi
       </div>
 
       <div>
-        <h3 className="text-lg font-semibold mb-4 text-[color:var(--fg-default)]">Guest information</h3>
+        <h3 className="text-lg font-serif italic font-bold mb-4 text-[color:var(--fg-default)]">Guest information</h3>
 
         <div className="grid md:grid-cols-2 gap-4">
           <div>

@@ -15,7 +15,7 @@ export default async function AboutPage({ params }: AboutPageProps) {
     <div className="min-h-screen" style={{ background: 'var(--sand-50)' }}>
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="surface-card rounded-2xl shadow-lg p-8">
-          <h1 className="text-3xl page-title mb-6 font-serif italic">
+          <h1 className="text-3xl page-title mb-6 font-serif italic font-bold">
             {dictionary.aboutUs || 'About Us'}
           </h1>
 
@@ -29,7 +29,7 @@ export default async function AboutPage({ params }: AboutPageProps) {
 
             <div className="grid md:grid-cols-2 gap-8">
               <div className="surface-subtle p-6">
-                <h2 className="text-xl section-title mb-4 font-serif italic">
+                <h2 className="text-xl section-title mb-4 font-serif italic font-bold">
                   Our Story
                 </h2>
                 <p className="text-body leading-relaxed">
@@ -39,7 +39,7 @@ export default async function AboutPage({ params }: AboutPageProps) {
               </div>
 
               <div className="surface-subtle p-6">
-                <h2 className="text-xl section-title mb-4 font-serif italic">
+                <h2 className="text-xl section-title mb-4 font-serif italic font-bold">
                   Our Commitment
                 </h2>
                 <p className="text-body leading-relaxed">
@@ -50,30 +50,30 @@ export default async function AboutPage({ params }: AboutPageProps) {
             </div>
 
             <div className="surface-subtle p-6">
-              <h2 className="text-xl section-title mb-4 font-serif italic">
+              <h2 className="text-xl section-title mb-4 font-serif italic font-bold">
                 Why Choose Us
               </h2>
               <div className="grid md:grid-cols-3 gap-4">
                 <div className="text-center">
                   <div className="text-2xl mb-2">🏖️</div>
-                  <h3 className="font-medium section-title mb-2">Prime Location</h3>
+                  <h3 className="font-serif italic font-bold section-title mb-2">Prime Location</h3>
                   <p className="text-sm text-body">Steps from the beach and town center</p>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl mb-2">🏠</div>
-                  <h3 className="font-medium section-title mb-2">Luxury Amenities</h3>
+                  <h3 className="font-serif italic font-bold section-title mb-2">Luxury Amenities</h3>
                   <p className="text-sm text-body">Modern comforts with Greek charm</p>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl mb-2">🤝</div>
-                  <h3 className="font-medium section-title mb-2">Personal Service</h3>
+                  <h3 className="font-serif italic font-bold section-title mb-2">Personal Service</h3>
                   <p className="text-sm text-body">Dedicated support throughout your stay</p>
                 </div>
               </div>
             </div>
 
             <div className="surface-subtle p-6 border border-soft" style={{ borderColor: 'var(--brand-200)' }}>
-              <h2 className="text-xl section-title mb-4 font-serif italic" style={{ color: 'var(--brand-700)' }}>
+              <h2 className="text-xl section-title mb-4 font-serif italic font-bold" style={{ color: 'var(--brand-700)' }}>
                 Experience Kalamata
               </h2>
               <p className="text-body mb-4">

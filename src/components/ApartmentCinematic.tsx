@@ -145,7 +145,7 @@ export default function ApartmentCinematic({ locale, houseText, photos }: Props)
         <Image src={photos[0].src} alt={ht?.title || 'Hero'} fill priority fetchPriority="high" decoding="async" sizes="100vw" className="object-cover hero-ken-burns" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/35 to-black/15" aria-hidden="true" />
         <div className="absolute inset-x-0 top-0 flex h-full flex-col justify-center px-6 md:px-14 pt-20 md:pt-24 max-w-5xl">
-          <h1 className="text-4xl md:text-6xl font-semibold apartment-hero-title white-in-dark" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.3), 0 4px 8px rgba(0,0,0,0.2), 0 8px 16px rgba(0,0,0,0.1), 0 16px 32px rgba(0,0,0,0.05)' }}>{ht?.title || 'Seaside Modern Apartment'}</h1>
+          <h1 className="text-4xl md:text-6xl font-serif italic font-bold apartment-hero-title white-in-dark" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.3), 0 4px 8px rgba(0,0,0,0.2), 0 8px 16px rgba(0,0,0,0.1), 0 16px 32px rgba(0,0,0,0.05)' }}>{ht?.title || 'Seaside Modern Apartment'}</h1>
           {/* Scroll hint and Skip intro removed as per design request */}
         </div>
         <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-b from-transparent to-white" aria-hidden="true" />
@@ -160,7 +160,7 @@ export default function ApartmentCinematic({ locale, houseText, photos }: Props)
             return (
               <article key={label} className="grid gap-8 lg:gap-16 xl:gap-24 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] items-start scroll-mt-24" aria-labelledby={anchorId}>
                 <div>
-                  <h2 id={anchorId} className="text-2xl font-semibold apartment-section-title">{label}</h2>
+                  <h2 id={anchorId} className="text-2xl font-serif italic font-bold apartment-section-title">{label}</h2>
                   <p className="mt-3 text-[15px] leading-relaxed apartment-description-text whitespace-pre-wrap break-words">
                     {description}
                   </p>
@@ -217,7 +217,7 @@ export default function ApartmentCinematic({ locale, houseText, photos }: Props)
             );
           })}
           <section aria-label={specsSectionLabel} className="space-y-6">
-            <h2 className="text-2xl font-semibold apartment-section-title">{glanceTitle}</h2>
+            <h2 className="text-2xl font-serif italic font-bold apartment-section-title">{glanceTitle}</h2>
             <ul className="flex flex-wrap gap-2 text-sm">
               {specsList.map(spec => <li key={spec} className="px-3 py-1 rounded-full apartment-spec-badge">{spec}</li>)}
             </ul>

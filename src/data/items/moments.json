@@ -1,0 +1,118 @@
+[
+  {
+    "id": "viktoria-karelia-museum",
+    "categoryId": "moments",
+    "name": "Viktoria Karelia Greek Costumes Collection",
+    "name_el": "Συλλογή Ελληνικών Ενδυμασιών \"Βικτώρια Καρέλια\"",
+    "image": "/moments/viktoria-karelia.png",
+    "location": {
+      "lat": 37.04217,
+      "lng": 22.1076
+    },
+    "website": "https://www.vgkareliascollection.com/",
+    "directionsUrl": "https://maps.app.goo.gl/JgePE7feL4y9EuFv7",
+    "descriptionTitle_en": "A charming journey into history and aesthetics.",
+    "descriptionTitle_el": "Ένα γοητευτικό ταξίδι στην ιστορία και την αισθητική.",
+    "description_en": "More than just an exhibition, an experiential journey into culture. Hosting one of the most complete collections of Greek regional costumes, we have created a space where history meets high aesthetics through an inventive and modern perspective.",
+    "description_el": "Περισσότερο από μια έκθεση, ένα βιωματικό ταξίδι στον πολιτισμό. Φιλοξενώντας μία από τις πληρέστερες συλλογές ελληνικών τοπικών ενδυμασιών, δημιουργήσαμε έναν χώρο όπου η ιστορία συναντά την υψηλή αισθητική μέσα από μια ευρηματική και σύγχρονη ματιά.",
+    "tags": [
+      "museum",
+      "culture"
+    ],
+    "featured": true
+  },
+  {
+    "id": "historical-folklore-museum",
+    "categoryId": "moments",
+    "name": "Historical and Folklore Museum of Kalamata",
+    "name_el": "Ιστορικό και Λαογραφικό Μουσείο Καλαμάτας",
+    "image": "/moments/folklore-museum.png",
+    "location": {
+      "lat": 37.0391,
+      "lng": 22.1121
+    },
+    "phone": "+30 27210 28449",
+    "website": "https://www.kalamata.gr/el/katoikoi/politismos/mouseia/istoriko-kai-laografiko-mouseio-kalamatas",
+    "directionsUrl": "https://maps.app.goo.gl/15ybUKio3XSFHfVcA",
+    "descriptionTitle_en": "A living testament to local heritage.",
+    "descriptionTitle_el": "Μια ζωντανή μαρτυρία της τοπικής κληρονομιάς.",
+    "description_en": "Discover the rich history and traditions of Kalamata through authentic artifacts, traditional costumes, and everyday objects that tell the story of life in Messinia through the centuries.",
+    "description_el": "Ανακαλύψτε την πλούσια ιστορία και τις παραδόσεις της Καλαμάτας μέσα από αυθεντικά αντικείμενα, παραδοσιακές ενδυμασίες και καθημερινά αντικείμενα που αφηγούνται την ιστορία της ζωής στη Μεσσηνία ανά τους αιώνες.",
+    "tags": [
+      "museum",
+      "culture",
+      "history"
+    ],
+    "featured": true
+  },
+  {
+    "id": "archaeological-museum-messinia",
+    "categoryId": "moments",
+    "name": "Archaeological Museum of Messinia",
+    "name_el": "Αρχαιολογικό Μουσείο Μεσσηνίας",
+    "image": "/moments/archaeological-museum.png",
+    "location": {
+      "lat": 37.0438,
+      "lng": 22.1135
+    },
+    "phone": "+30 27210 83485",
+    "website": "https://archaeologicalmuseums.gr/el/museum/5df34af3deca5e2d79e8c1d4/archaeological-museum-of-messinia",
+    "directionsUrl": "https://maps.app.goo.gl/nS8grsEyqAmWdiXe7",
+    "descriptionTitle_en": "A journey through 7,000 years of history.",
+    "descriptionTitle_el": "Ένα ταξίδι μέσα σε 7.000 χρόνια ιστορίας.",
+    "description_en": "Housed in the renovated Old Municipal Market, the museum presents representative findings depicting the cultural journey of Messinia from the 5th millennium BC to 1453, organized into geographic sections: Kalamata, Messene, Trifylia, and Pylos.",
+    "description_el": "Στεγασμένο στην ανακατασκευασμένη Παλαιά Δημοτική Αγορά, το μουσείο παρουσιάζει αντιπροσωπευτικά ευρήματα που απεικονίζουν την πολιτισμική διαδρομή της Μεσσηνίας από την 5η χιλιετία π.Χ. έως το 1453, οργανωμένα σε γεωγραφικές ενότητες: Καλαμάτα, Μεσσήνη, Τριφυλία και Πύλος.",
+    "tags": [
+      "museum",
+      "archaeology",
+      "history"
+    ],
+    "featured": true
+  },
+  {
+    "id": "war-museum-kalamata",
+    "categoryId": "moments",
+    "name": "War Museum Kalamata Branch",
+    "name_el": "Πολεμικό Μουσείο Καλαμάτας",
+    "image": "/moments/war-museum.png",
+    "location": {
+      "lat": 37.0432,
+      "lng": 22.1156
+    },
+    "website": "https://warmuseum.gr/",
+    "directionsUrl": "https://maps.app.goo.gl/Ld1Xftw2Lq5K2Z2QA",
+    "descriptionTitle_en": "Greek military history from 1821 to Korea.",
+    "descriptionTitle_el": "Ελληνική στρατιωτική ιστορία από το 1821 έως την Κορέα.",
+    "description_en": "Established in 2023, this branch of the War Museum is housed in the Old Episcopal Palace of the Metropolis of Messinia. The exhibition covers the period from the Greek Revolution of 1821 to the Greek Expeditionary Force in Korea (1950-1953).",
+    "description_el": "Ιδρύθηκε το 2023 και στεγάζεται στο κτίριο του Παλαιού Επισκοπείου της Μητρόπολης Μεσσηνίας. Η θεματολογία της έκθεσης περιλαμβάνει την ιστορική περίοδο από την Ελληνική Επανάσταση του 1821 έως την αποστολή του Ελληνικού Εκστρατευτικού Σώματος στην Κορέα (1950-1953).",
+    "tags": [
+      "museum",
+      "military",
+      "history"
+    ],
+    "featured": true
+  },
+  {
+    "id": "railway-park-kalamata",
+    "categoryId": "moments",
+    "name": "Kalamata Railway Park",
+    "name_el": "Σιδηροδρομικό Πάρκο Καλαμάτας",
+    "image": "/moments/railway-museum.png",
+    "location": {
+      "lat": 37.0355,
+      "lng": 22.1095
+    },
+    "website": "https://www.kalamata.gr/el/component/gmapfp/28:mouseio-sidirodromon?view=gmapfp",
+    "directionsUrl": "https://maps.app.goo.gl/Xos4UFNAqU1FWD8d8",
+    "descriptionTitle_en": "A tribute to Greek railway heritage.",
+    "descriptionTitle_el": "Ένας φόρος τιμής στην ελληνική σιδηροδρομική κληρονομιά.",
+    "description_en": "An open-air museum showcasing historic locomotives, carriages, and railway equipment. A unique destination for families and railway enthusiasts, preserving the memory of Peloponnese's narrow-gauge railway network.",
+    "description_el": "Ένα υπαίθριο μουσείο που παρουσιάζει ιστορικές ατμομηχανές, βαγόνια και σιδηροδρομικό εξοπλισμό. Ένας μοναδικός προορισμός για οικογένειες και λάτρεις των τρένων, διατηρώντας τη μνήμη του δικτύου στενών γραμμών της Πελοποννήσου.",
+    "tags": [
+      "museum",
+      "railway",
+      "outdoor"
+    ],
+    "featured": true
+  }
+]

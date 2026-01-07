@@ -63,13 +63,13 @@ export default function PropertyPage() {
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-black/25 to-black/10 pointer-events-none" aria-hidden="true" />
         <div className="absolute inset-x-0 top-0 flex h-full flex-col justify-center px-6 md:px-[56px] text-white">
-          <h1 className="text-4xl md:text-6xl font-semibold drop-shadow">Seaside Modern Villa</h1>
+          <h1 className="text-4xl md:text-6xl font-serif italic font-bold drop-shadow">Seaside Modern Villa</h1>
           <p className="mt-4 max-w-md text-lg opacity-90">Aegean Bay, Greece</p>
           <p className="mt-6 max-w-lg text-base md:text-lg opacity-90">A cinematic coastal retreat. Thoughtful spatial flow, restrained material palette, and seamless indoor‑outdoor living crafted for slow Mediterranean days.</p>
           <div className="mt-10 flex items-center gap-4 text-xs tracking-wide uppercase opacity-80">
             <span className="animate-pulse">Scroll ↓</span>
-            <button className="btn-outline btn-sm bg-white/10 hover:bg-white/20 focus:outline-none" onClick={()=>{
-              const main=document.getElementById('story-start'); if(main) main.scrollIntoView({behavior:'smooth'});
+            <button className="btn-outline btn-sm bg-white/10 hover:bg-white/20 focus:outline-none" onClick={() => {
+              const main = document.getElementById('story-start'); if (main) main.scrollIntoView({ behavior: 'smooth' });
             }}>Skip intro</button>
           </div>
         </div>
@@ -83,19 +83,19 @@ export default function PropertyPage() {
         <div className="h-[12svh] -mt-[12svh]" aria-hidden="true" />
         <div className="mx-auto max-w-6xl px-6 md:px-[56px] py-16 lg:py-24 grid lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] gap-12">
           <div className="space-y-14">
-            {SECTIONS.map((s)=>(
-              <article key={s.key} className="scroll-mt-24 article-chunk" aria-labelledby={`sec-${s.key}`}> 
+            {SECTIONS.map((s) => (
+              <article key={s.key} className="scroll-mt-24 article-chunk" aria-labelledby={`sec-${s.key}`}>
                 <header>
-                  <h2 id={`sec-${s.key}`} className="text-2xl font-semibold">{s.title}</h2>
+                  <h2 id={`sec-${s.key}`} className="text-2xl font-serif italic font-bold">{s.title}</h2>
                   <p className="mt-3 text-[15px] leading-relaxed text-[color:var(--muted)]">{s.body}</p>
                 </header>
               </article>
             ))}
             {/* Specs & CTAs */}
             <section aria-label="Specifications and actions" className="space-y-6">
-              <h2 className="text-2xl font-semibold">At a Glance</h2>
+              <h2 className="text-2xl font-serif italic font-bold">At a Glance</h2>
               <ul className="flex flex-wrap gap-2 text-sm">
-                {['4 beds','3 baths','245 m²'].map(spec => <li key={spec} className="px-3 py-1 rounded-full border border-[color:var(--border)] bg-white shadow-sm">{spec}</li>)}
+                {['4 beds', '3 baths', '245 m²'].map(spec => <li key={spec} className="px-3 py-1 rounded-full border border-[color:var(--border)] bg-white shadow-sm">{spec}</li>)}
               </ul>
               <div className="flex flex-wrap gap-4 pt-2">
                 <button className="px-6 py-3 rounded-[20px] bg-black text-white text-sm font-medium shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-black/50">Book a Viewing</button>
@@ -107,13 +107,13 @@ export default function PropertyPage() {
 
           {/* Right Rail Cards */}
           <div className="relative space-y-12" role="region" aria-label="Property photo gallery right rail">
-            {SECTIONS.map((s)=>(
+            {SECTIONS.map((s) => (
               <div
                 key={s.key}
                 role="region"
                 aria-label={`${s.title} photo`}
                 className="right-rail-card opacity-0 translate-x-[15vw] will-change-transform overflow-hidden rounded-[24px] border border-[color:var(--border)] bg-white shadow-sm"
-                style={{ contentVisibility:'auto', containIntrinsicSize:'360px 320px' }}
+                style={{ contentVisibility: 'auto', containIntrinsicSize: '360px 320px' }}
               >
                 <div className="aspect-[4/3] relative">
                   <Image src={s.img} alt={s.alt} fill sizes="(max-width:1024px) 100vw, 480px" loading="lazy" className="object-cover" />
@@ -153,7 +153,8 @@ export default function PropertyPage() {
       `}</style>
       <ScriptSetups />
       {/* Idle enhancements: demote will-change & decode images early once network idle */}
-      <script dangerouslySetInnerHTML={{__html:`(function(){
+      <script dangerouslySetInnerHTML={{
+        __html: `(function(){
         if('requestIdleCallback' in window){
           requestIdleCallback(function(){
             document.querySelectorAll('.right-rail-card').forEach(function(c){
@@ -170,9 +171,10 @@ export default function PropertyPage() {
 }
 
 // Separate component to attach IntersectionObserver fallback after hydration
-function ScriptSetups(){
+function ScriptSetups() {
   return <>
-    <script dangerouslySetInnerHTML={{__html:`(function(){
+    <script dangerouslySetInnerHTML={{
+      __html: `(function(){
       if(!('IntersectionObserver' in window)) return; 
       if(CSS && CSS.supports && CSS.supports('animation-timeline: scroll()')) return; // native scroll timeline supported
       var cards=[].slice.call(document.querySelectorAll('.right-rail-card'));

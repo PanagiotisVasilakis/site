@@ -15,13 +15,13 @@ export default async function BookingDetailsPage({ params }: BookingDetailsPageP
     <div className="min-h-screen" style={{ background: 'var(--sand-50)' }}>
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="surface-card rounded-2xl shadow-lg p-8">
-          <h1 className="text-3xl page-title mb-6 font-serif italic">
+          <h1 className="text-3xl page-title mb-6 font-serif italic font-bold">
             {dictionary.bookingDetails || 'Booking Details'}
           </h1>
 
           <div className="space-y-6">
             <div className="surface-subtle p-6">
-              <h2 className="text-xl section-title mb-4 font-serif italic">
+              <h2 className="text-xl section-title mb-4 font-serif italic font-bold">
                 How to Book
               </h2>
               <div className="space-y-3 text-body">
@@ -33,7 +33,7 @@ export default async function BookingDetailsPage({ params }: BookingDetailsPageP
             </div>
 
             <div className="surface-subtle p-6">
-              <h2 className="text-xl section-title mb-4 font-serif italic">
+              <h2 className="text-xl section-title mb-4 font-serif italic font-bold">
                 Pricing Information
               </h2>
               <div className="space-y-3 text-body">
@@ -45,7 +45,7 @@ export default async function BookingDetailsPage({ params }: BookingDetailsPageP
             </div>
 
             <div className="surface-subtle p-6">
-              <h2 className="text-xl section-title mb-4 font-serif italic">
+              <h2 className="text-xl section-title mb-4 font-serif italic font-bold">
                 Cancellation Policy
               </h2>
               <div className="space-y-3 text-body">
@@ -57,7 +57,7 @@ export default async function BookingDetailsPage({ params }: BookingDetailsPageP
             </div>
 
             <div className="surface-subtle p-6 border border-soft" style={{ borderColor: 'var(--brand-200)' }}>
-              <h2 className="text-xl section-title mb-4 font-serif italic" style={{ color: 'var(--brand-700)' }}>
+              <h2 className="text-xl section-title mb-4 font-serif italic font-bold" style={{ color: 'var(--brand-700)' }}>
                 Contact Us
               </h2>
               <p className="text-body mb-4">

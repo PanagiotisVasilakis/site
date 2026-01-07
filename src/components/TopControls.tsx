@@ -103,7 +103,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
       { href: `/${locale}/booking-details`, label: dictionary.bookingDetails ?? 'Booking Details', icon: '📋', event: 'mobile_nav_booking_details' },
       { href: `/${locale}/about`, label: dictionary.aboutUs ?? 'About Us', icon: 'ℹ️', event: 'mobile_nav_about' },
       { href: `/${locale}/favorites`, label: dictionary.labels?.favorites ?? 'Favorites', icon: '⭐', event: 'mobile_nav_favorites' },
-      { href: `/${locale}?category=restaurants`, label: dictionary.categories?.restaurants ?? 'Kalamata Moments', icon: '🍽️', event: 'mobile_nav_restaurants' },
+      { href: `/${locale}?category=moments`, label: dictionary.categories?.moments ?? 'Kalamata Moments', icon: '🍽️', event: 'mobile_nav_moments' },
       { href: `/${locale}?category=phones`, label: dictionary.categories?.phones ?? 'Important Phones', icon: '📞', event: 'mobile_nav_phones' },
     ];
 

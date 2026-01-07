@@ -49,9 +49,9 @@ interface DashboardProps {
 
 type DashboardTab = 'overview' | 'health' | 'metrics' | 'analytics' | 'traces';
 
-export default function ObservabilityDashboard({ 
+export default function ObservabilityDashboard({
   refreshInterval = 15000,
-  autoRefresh = true 
+  autoRefresh = true
 }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
@@ -71,7 +71,7 @@ export default function ObservabilityDashboard({
       type AnalyticsVital = { name: 'FCP' | 'LCP' | 'FID' | 'CLS' | 'TTFB'; value: number };
       const analytics = await internalGet<{ hits?: AnalyticsHit[]; vitals?: AnalyticsVital[] }>('/api/analytics');
       if (analytics) {
-        
+
         // Transform analytics data
         setAnalyticsData({
           totalHits: analytics.hits?.length || 0,
@@ -186,7 +186,7 @@ export default function ObservabilityDashboard({
             </div>
           </>
         )}
-        
+
         {systemMetrics && (
           <>
             <div className="bg-white rounded-lg border p-6">
@@ -214,7 +214,7 @@ export default function ObservabilityDashboard({
       {/* System Health Overview */}
       {systemMetrics && (
         <div className="bg-white rounded-lg border p-6">
-          <h3 className="text-lg font-semibold mb-4">System Resources</h3>
+          <h3 className="text-lg font-serif italic font-bold mb-4">System Resources</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <div className="flex justify-between items-center mb-2">
@@ -224,7 +224,7 @@ export default function ObservabilityDashboard({
                 </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
+                <div
                   className="bg-blue-600 h-2 rounded-full transition-all"
                   style={{ width: `${Math.min(systemMetrics.cpu, 100)}%` }}
                 ></div>
@@ -238,7 +238,7 @@ export default function ObservabilityDashboard({
                 </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
+                <div
                   className="bg-green-600 h-2 rounded-full transition-all"
                   style={{ width: `${Math.min(systemMetrics.memory, 100)}%` }}
                 ></div>
@@ -251,7 +251,7 @@ export default function ObservabilityDashboard({
       {/* Core Web Vitals */}
       {analyticsData && (
         <div className="bg-white rounded-lg border p-6">
-          <h3 className="text-lg font-semibold mb-4">Core Web Vitals</h3>
+          <h3 className="text-lg font-serif italic font-bold mb-4">Core Web Vitals</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">{analyticsData.vitals.fcp.toFixed(0)}ms</div>
@@ -280,7 +280,7 @@ export default function ObservabilityDashboard({
       {/* Recent Traces */}
       <div className="bg-white rounded-lg border overflow-hidden">
         <div className="px-6 py-4 border-b bg-gray-50">
-          <h3 className="text-lg font-semibold">Recent Traces</h3>
+          <h3 className="text-lg font-serif italic font-bold">Recent Traces</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -306,9 +306,8 @@ export default function ObservabilityDashboard({
                     {trace.operations}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                      trace.status === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${trace.status === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}>
                       {trace.status}
                     </span>
                   </td>
@@ -365,7 +364,7 @@ export default function ObservabilityDashboard({
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Observability Dashboard</h1>
+            <h1 className="text-3xl font-serif italic font-bold text-gray-900">Observability Dashboard</h1>
             <p className="text-gray-600 mt-1">Real-time monitoring and analytics</p>
           </div>
           <div className="flex items-center space-x-4">
@@ -391,11 +390,10 @@ export default function ObservabilityDashboard({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === tab.id
+                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                  }`}
               >
                 <span className="mr-2">{tab.icon}</span>
                 {tab.label}

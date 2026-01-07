@@ -92,7 +92,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
 
             {/* Error Message */}
             <div className="space-y-2">
-              <h1 className="text-2xl font-bold page-title">Oops! Something went wrong</h1>
+              <h1 className="text-2xl font-serif italic font-bold page-title">Oops! Something went wrong</h1>
               <p className="text-body">
                 We encountered an unexpected error. Our team has been notified and is working on a fix.
               </p>

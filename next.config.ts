@@ -27,6 +27,15 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   eslint: { ignoreDuringBuilds: true },
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'www.vgkareliascollection.com' },
+      { protocol: 'https', hostname: 'www.kalamata.gr' },
+      { protocol: 'https', hostname: 'archaeologicalmuseums.gr' },
+      { protocol: 'https', hostname: 'warmuseum.gr' },
+      { protocol: 'https', hostname: 'upload.wikimedia.org' },
+    ],
+  },
   turbopack: {
     // Explicit root to silence multiple lockfile inference warning
     root: __dirname,

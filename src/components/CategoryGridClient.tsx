@@ -7,6 +7,8 @@ import { ListingCardSkeleton } from '@/components/ListingCardSkeleton';
 import dynamic from 'next/dynamic';
 import { useFavorites } from '@/lib/favorites';
 import { useToast } from '@/components/Toast';
+import { MomentsListCard } from '@/components/moments';
+import { momentsLayoutConfig } from '@/config/momentsLayoutConfig';
 
 // Dynamic import for map component - only loads when needed
 const ApartmentLocationMap = dynamic(() => import('@/components/ApartmentLocationMap'), {
@@ -28,6 +30,7 @@ interface Item {
   tags?: string[];
   featured?: boolean;
   icon?: string;
+  image?: string;
   categorySlug: string;
 }
 
@@ -37,10 +40,11 @@ interface Props {
   emptyLabel: string;
   categorySlug: string;
   phonesLayout?: boolean;
+  momentsLayout?: boolean;
   ui?: { filters: string; map: string; list: string; resetAll: string; activeTags: string; none: string; };
 }
 
-function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, ui, phonesLayout }: Props) {
+function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, ui, phonesLayout, momentsLayout }: Props) {
   const [active, setActive] = useState<string[]>([]);
   const [showMap, setShowMap] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -115,14 +119,18 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="flex-1" />
         <div className="flex items-center gap-2">
-          <button onClick={() => setFiltersOpen(true)} className="btn-tint btn-sm">{ui?.filters || 'Filters'}</button>
+          {!(phonesLayout || momentsLayout) && (
+            <button onClick={() => setFiltersOpen(true)} className="btn-tint btn-sm">{ui?.filters || 'Filters'}</button>
+          )}
           <button onClick={() => setShowMap(m => !m)} className="btn-tint btn-sm">{showMap ? (ui?.list || 'List') : (ui?.map || 'Map')}</button>
         </div>
       </div>
 
-      <div className="mb-3">
-        <TagFilters items={items.map(i => ({ tags: i.tags }))} active={active} onChange={setActive} />
-      </div>
+      {!(phonesLayout || momentsLayout) && (
+        <div className="mb-3">
+          <TagFilters items={items.map(i => ({ tags: i.tags }))} active={active} onChange={setActive} />
+        </div>
+      )}
 
       {/* Phones layout: responsive grid that wraps to next row when needed */}
       {categorySlug === 'phones' && phonesLayout && !showMap ? (
@@ -148,6 +156,28 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
           </div>
         </div>
       ) : null}
+      {/* Moments layout: using centralized MomentsListCard component */}
+      {categorySlug === 'moments' && momentsLayout && !showMap ? (
+        <div className={momentsLayoutConfig.grid.containerClass}>
+          <div className={momentsLayoutConfig.grid.gridClass}>
+            {items.map(i => (
+              <MomentsListCard
+                key={i.id}
+                id={i.id}
+                slug={i.slug}
+                name={i.name}
+                summary={i.summary}
+                rating={i.rating}
+                price={i.price}
+                icon={i.icon}
+                image={i.image}
+                categorySlug={categorySlug}
+                locale={locale}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
       {showMap && (
         <div className="mb-6">
           <ApartmentLocationMap
@@ -156,7 +186,7 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
             zoom={13}
             showNearbyAttractions={true}
             className="rounded-lg overflow-hidden shadow-sm"
-            nearbyRestaurants={categorySlug === 'restaurants' ? items : []}
+            nearbyRestaurants={categorySlug === 'moments' ? items : []}
             nearbyServices={categorySlug === 'phones' ? items : []}
             nearbyAttractions={categorySlug === 'sightseeing' ? items : []}
           />
@@ -173,12 +203,12 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
           {Array.from({ length: 6 }).map((_, i) => <ListingCardSkeleton key={i} />)}
         </div>
       )}
-      {/* For non-phones categories, render Featured/other groups and FilterDrawer as before */}
-      {!(categorySlug === 'phones' && phonesLayout) && (
+      {/* For non-phones and non-moments categories, render Featured/other groups and FilterDrawer as before */}
+      {!(categorySlug === 'phones' && phonesLayout) && !(categorySlug === 'moments' && momentsLayout) && (
         <>
           {featured.length > 0 && (
             <section>
-              <h2 className="text-xs font-semibold tracking-wide uppercase mb-2 text-small-strong">Featured</h2>
+              <h2 className="text-sm font-serif italic font-bold tracking-wide mb-2 text-small-strong">Featured</h2>
               {renderGroup(featured)}
             </section>
           )}
@@ -189,7 +219,7 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
           <FilterDrawer open={filtersOpen} onClose={() => setFiltersOpen(false)} title={ui?.filters || 'Filters'}>
             <div className="space-y-4">
               <div>
-                <h3 className="text-xs font-semibold uppercase mb-1 text-small-strong">{ui?.activeTags || 'Active Tags'}</h3>
+                <h3 className="text-sm font-serif italic font-bold mb-1 text-small-strong">{ui?.activeTags || 'Active Tags'}</h3>
                 {active.length === 0 && <div className="text-xs opacity-50">{ui?.none || 'None'}</div>}
                 {active.length > 0 && (
                   <ul className="flex flex-wrap gap-1">
@@ -200,7 +230,7 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
                 )}
               </div>
               <div>
-                <h3 className="text-xs font-semibold uppercase mb-1 text-small-strong">Stub Controls</h3>
+                <h3 className="text-sm font-serif italic font-bold mb-1 text-small-strong">Stub Controls</h3>
                 <p className="text-xs text-small-strong" style={{ fontWeight: 400 }}>Add price range, rating slider, open now, etc.</p>
               </div>
               <div>

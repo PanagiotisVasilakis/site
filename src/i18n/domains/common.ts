@@ -74,8 +74,7 @@ export interface CommonDictionary {
     };
     categories: {
         phones: string;
-        restaurants: string;
-        sightseeing: string;
+        moments: string;
     };
     map?: {
         loading: string;
@@ -159,8 +158,7 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
         },
         categories: {
             phones: "Important Phones",
-            restaurants: "Kalamata Moments",
-            sightseeing: "Sightseeing",
+            moments: "Kalamata Moments",
         },
         map: {
             loading: "Loading map...",
@@ -238,8 +236,7 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
         },
         categories: {
             phones: "Χρήσιμα Τηλέφωνα",
-            restaurants: "Η Καλαματα μας",
-            sightseeing: "Αξιοθέατα",
+            moments: "Η Καλαματα μας",
         },
         map: {
             loading: "Φόρτωση χάρτη...",

@@ -55,7 +55,7 @@ export interface AnalyticsEventMap {
     mobile_nav_booking_details: NavigationPayload;
     mobile_nav_about: NavigationPayload;
     mobile_nav_favorites: NavigationPayload;
-    mobile_nav_restaurants: NavigationPayload;
+    mobile_nav_moments: NavigationPayload;
     mobile_nav_phones: NavigationPayload;
     mobile_nav_checkin: NavigationPayload;
     checkin_nav_clicked: Record<string, never>; // No payload

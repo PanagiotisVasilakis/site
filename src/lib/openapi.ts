@@ -327,10 +327,10 @@ export const openApiSpec = {
                   },
                 },
                 example: {
-                    categories: [
+                  categories: [
                     {
-                      id: 'restaurants',
-                      slug: 'restaurants',
+                      id: 'moments',
+                      slug: 'moments',
                       title: 'Kalamata Moments',
                       count: 25,
                     },
@@ -732,10 +732,10 @@ export function validateOpenAPISpec(): boolean {
       throw new Error('Invalid OpenAPI version format');
     }
 
-  console.log('✅ OpenAPI specification validated successfully');
+    console.log('✅ OpenAPI specification validated successfully');
     return true;
   } catch (error) {
-  console.error('❌ OpenAPI specification validation failed:', error);
+    console.error('❌ OpenAPI specification validation failed:', error);
     return false;
   }
 }

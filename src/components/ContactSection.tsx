@@ -96,7 +96,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
           {/* Content Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Contact Us Content */}
-            <div className="backdrop-blur-sm bg-white/5 rounded-2xl p-6 border border-white/10 shadow-2xl">
+            <div className="backdrop-blur-sm bg-gradient-to-br from-gray-700/30 to-gray-800/30 rounded-2xl p-6 border border-white/10 shadow-2xl transition-all duration-700">
               <div className="text-center mb-6 block md:hidden">
                 <h2 className="text-2xl md:text-3xl font-serif italic font-bold text-white mb-2 tracking-wider">
                   {translations.contactUs}
@@ -111,7 +111,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
                       <h3 className="font-serif italic font-medium text-white mb-1 text-base">
                         {translations.address}
                       </h3>
-                      <a href="https://maps.app.goo.gl/9vqnjXJqQeakxdBx8" target="_blank" rel="noopener noreferrer" className="text-white/80 hover:text-white transition-colors text-xs block">
+                      <a href="https://maps.app.goo.gl/9vqnjXJqQeakxdBx8" target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-white transition-colors text-xs block">
                         {translations.streetCity}<br />
                         {translations.countryPostal}
                       </a>
@@ -124,7 +124,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
                       <h3 className="font-serif italic font-medium text-white mb-1 text-base">
                         {translations.phone}
                       </h3>
-                      <a href="tel:+306955810051" className="text-white/80 hover:text-white transition-colors text-xs">
+                      <a href="tel:+306955810051" className="text-gray-300 hover:text-white transition-colors text-xs">
                         +30 695 581 0051
                       </a>
                     </div>
@@ -136,7 +136,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
                       <h3 className="font-serif italic font-medium text-white mb-1 text-base">
                         {translations.email}
                       </h3>
-                      <a href="mailto:dolcefarnienteapartments@gmail.com" className="text-white/80 hover:text-white transition-colors text-xs">
+                      <a href="mailto:dolcefarnienteapartments@gmail.com" className="text-gray-300 hover:text-white transition-colors text-xs">
                         dolcefarnienteapartments@gmail.com
                       </a>
                     </div>
@@ -144,7 +144,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
                 </div>
               </div>
             </div>            {/* Follow Us Content */}
-            <div className="backdrop-blur-sm bg-white/5 rounded-2xl p-6 border border-white/10 shadow-2xl">
+            <div className="backdrop-blur-sm bg-gradient-to-br from-gray-700/30 to-gray-800/30 rounded-2xl p-6 border border-white/10 shadow-2xl transition-all duration-700">
               <div className="text-center mb-6 block md:hidden">
                 <h2 className="text-2xl md:text-3xl font-serif italic font-bold text-white mb-2 tracking-wider">
                   {translations.followUs}
@@ -152,7 +152,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
                 <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-gray-400 to-transparent mx-auto rounded-full"></div>
               </div>
               <div className="space-y-4 text-center">
-                <p className="text-white/90 leading-relaxed text-sm italic">
+                <p className="text-gray-300 leading-relaxed text-sm italic">
                   {translations.description}
                 </p>
 
@@ -166,7 +166,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
                         href={social.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="group flex items-center justify-between w-full max-w-xs p-4 bg-gradient-to-r from-gray-800/50 to-gray-700/30 border border-gray-600/30 rounded-2xl hover:from-gray-700/60 hover:to-gray-600/40 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl backdrop-blur-sm"
+                        className="group flex items-center justify-between w-full max-w-xs p-4 bg-gradient-to-r from-gray-700/40 to-gray-600/20 border border-gray-600/30 rounded-2xl hover:from-gray-600/50 hover:to-gray-500/30 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl backdrop-blur-sm"
                       >
                         <div className="flex items-center space-x-3">
                           <div className="text-3xl group-hover:scale-125 transition-transform duration-300">
@@ -176,7 +176,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
                             <div className="text-white font-semibold group-hover:text-white transition-colors text-base">
                               {social.name}
                             </div>
-                            <div className="text-white/70 text-xs">
+                            <div className="text-gray-400 text-xs">
                               @{social.name.toLowerCase()}/dolcefar niente
                             </div>
                           </div>

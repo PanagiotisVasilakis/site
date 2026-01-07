@@ -29,15 +29,15 @@ interface GenericCategoryItem {
 
 export function createMarkerFromItem(item: GenericCategoryItem, categorySlug: string, locale: string): MarkerData {
   // Extract coordinates from item or use default location near villa
-  const coords: [number, number] = item.location ? 
-    [item.location.lng, item.location.lat] : 
+  const coords: [number, number] = item.location ?
+    [item.location.lng, item.location.lat] :
     [
       APARTMENT_LOCATION[0] + (Math.random() - 0.5) * 0.02, // Small random offset
       APARTMENT_LOCATION[1] + (Math.random() - 0.5) * 0.02
     ];
 
   let type: MarkerData['type'] = 'attraction';
-  if (categorySlug === 'restaurants') {
+  if (categorySlug === 'moments') {
     type = 'restaurant';
   } else if (categorySlug === 'phones') {
     if (item.name.toLowerCase().includes('police')) {

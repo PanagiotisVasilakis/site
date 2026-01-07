@@ -118,7 +118,7 @@ class LoadTester {
     }
 
     const responseTimes: Map<string, number[]> = new Map();
-    
+
     // Initialize response times tracking
     this.config.endpoints.forEach(endpoint => {
       responseTimes.set(`${endpoint.method} ${endpoint.path}`, []);
@@ -129,19 +129,19 @@ class LoadTester {
         // Select random endpoint based on weights
         const endpoint = this.selectRandomEndpoint();
         const key = `${endpoint.method} ${endpoint.path}`;
-        
+
         const startTime = performance.now();
-        
+
         // Make request
         const response = await this.makeRequest(endpoint);
-        
+
         const endTime = performance.now();
         const responseTime = endTime - startTime;
 
         // Update results
         const result = this.results.get(key)!;
         result.totalRequests++;
-        
+
         if (response.ok) {
           result.successfulRequests++;
         } else {
@@ -168,20 +168,20 @@ class LoadTester {
   private selectRandomEndpoint(): LoadTestEndpoint {
     const totalWeight = this.config.endpoints.reduce((sum, ep) => sum + ep.weight, 0);
     let random = Math.random() * totalWeight;
-    
+
     for (const endpoint of this.config.endpoints) {
       random -= endpoint.weight;
       if (random <= 0) {
         return endpoint;
       }
     }
-    
+
     return this.config.endpoints[0]; // fallback
   }
 
   private async makeRequest(endpoint: LoadTestEndpoint): Promise<Response> {
     const url = `${this.config.baseUrl}${endpoint.path}`;
-    
+
     const options: RequestInit = {
       method: endpoint.method,
       headers: {
@@ -208,14 +208,14 @@ class LoadTester {
 
   private updateAverages(responseTimes: Map<string, number[]>): void {
     const duration = (performance.now() - this.startTime) / 1000;
-    
+
     for (const [key, times] of responseTimes) {
       const result = this.results.get(key)!;
-      
+
       if (times.length > 0) {
         result.averageResponseTime = times.reduce((a, b) => a + b, 0) / times.length;
       }
-      
+
       result.requestsPerSecond = result.totalRequests / duration;
       result.errorRate = (result.failedRequests / result.totalRequests) * 100;
     }
@@ -224,12 +224,12 @@ class LoadTester {
   private generateSummary(): LoadTestSummary {
     const endTime = performance.now();
     const totalDuration = (endTime - this.startTime) / 1000;
-    
+
     const results = Array.from(this.results.values());
     const totalRequests = results.reduce((sum, r) => sum + r.totalRequests, 0);
     const totalSuccessful = results.reduce((sum, r) => sum + r.successfulRequests, 0);
     const totalFailed = results.reduce((sum, r) => sum + r.failedRequests, 0);
-    
+
     const overallRPS = totalRequests / totalDuration;
     const averageResponseTime = results.reduce((sum, r) => sum + r.averageResponseTime, 0) / results.length;
 
@@ -237,20 +237,20 @@ class LoadTester {
     console.log('=====================');
     console.log(`Total Duration: ${totalDuration.toFixed(2)}s`);
     console.log(`Total Requests: ${totalRequests}`);
-    console.log(`Successful: ${totalSuccessful} (${((totalSuccessful/totalRequests)*100).toFixed(1)}%)`);
-    console.log(`Failed: ${totalFailed} (${((totalFailed/totalRequests)*100).toFixed(1)}%)`);
+    console.log(`Successful: ${totalSuccessful} (${((totalSuccessful / totalRequests) * 100).toFixed(1)}%)`);
+    console.log(`Failed: ${totalFailed} (${((totalFailed / totalRequests) * 100).toFixed(1)}%)`);
     console.log(`Overall RPS: ${overallRPS.toFixed(2)}`);
     console.log(`Average Response Time: ${averageResponseTime.toFixed(2)}ms`);
-    
+
     console.log('\n📈 Endpoint Results:');
     results.forEach(result => {
       console.log(`\n${result.endpoint}:`);
       console.log(`  • Requests: ${result.totalRequests}`);
-      console.log(`  • Success Rate: ${((result.successfulRequests/result.totalRequests)*100).toFixed(1)}%`);
+      console.log(`  • Success Rate: ${((result.successfulRequests / result.totalRequests) * 100).toFixed(1)}%`);
       console.log(`  • RPS: ${result.requestsPerSecond.toFixed(2)}`);
       console.log(`  • Avg Response: ${result.averageResponseTime.toFixed(2)}ms`);
       console.log(`  • Min/Max: ${result.minResponseTime.toFixed(2)}ms / ${result.maxResponseTime.toFixed(2)}ms`);
-      
+
       if (result.errors.length > 0) {
         console.log(`  • Errors:`);
         result.errors.forEach(error => {
@@ -295,7 +295,7 @@ const LoadTestConfigs = {
     rampUp: 20,
     endpoints: [
       { path: '/api/categories', method: 'GET' as const, weight: 15 },
-      { path: '/api/categories/restaurants/items', method: 'GET' as const, weight: 10 },
+      { path: '/api/categories/moments/items', method: 'GET' as const, weight: 10 },
       { path: '/api/analytics', method: 'GET' as const, weight: 8 },
       { path: '/api/analytics', method: 'POST' as const, weight: 5, payload: MockData.analyticsEvent },
       { path: '/api/vitals', method: 'GET' as const, weight: 5 },
@@ -312,7 +312,7 @@ const LoadTestConfigs = {
     rampUp: 30,
     endpoints: [
       { path: '/api/categories', method: 'GET' as const, weight: 20 },
-      { path: '/api/categories/restaurants/items', method: 'GET' as const, weight: 15 },
+      { path: '/api/categories/moments/items', method: 'GET' as const, weight: 15 },
       { path: '/api/categories/hotels/items', method: 'GET' as const, weight: 15 },
       { path: '/api/analytics', method: 'GET' as const, weight: 10 },
       { path: '/api/analytics', method: 'POST' as const, weight: 8, payload: MockData.analyticsEvent },
@@ -328,13 +328,13 @@ const LoadTestConfigs = {
 if (require.main === module) {
   const testType = process.argv[2] || 'light';
   const config = LoadTestConfigs[testType as keyof typeof LoadTestConfigs];
-  
+
   if (!config) {
     console.error(`Unknown test type: ${testType}`);
     console.log('Available types: light, normal, stress');
     process.exit(1);
   }
-  
+
   const loadTester = new LoadTester(config);
   loadTester.runLoadTest().catch(console.error);
 }

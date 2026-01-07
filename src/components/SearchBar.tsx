@@ -47,7 +47,7 @@ interface Props {
 const LazyDateRangePicker = dynamic(() => import("@/components/DateRangePicker"), {
   ssr: false,
   loading: () => (
-  <div className="absolute top-full left-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 p-3 z-40 w-[min(92vw,360px)] max-h-[min(80vh,450px)]">
+    <div className="absolute top-full left-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 p-3 z-40 w-[min(92vw,360px)] max-h-[min(80vh,450px)]">
       <div className="animate-pulse space-y-3">
         <div className="h-6 bg-gray-100 rounded w-1/3" />
         <div className="grid grid-cols-2 gap-2">
@@ -165,8 +165,8 @@ export default function BookingBar({
       const nextField: DateField | null = dateRange.from && !dateRange.to
         ? "departure"
         : dateRange.from && dateRange.to
-        ? null
-        : activeDateField;
+          ? null
+          : activeDateField;
       setActiveDateField(nextField);
       if (nextField) {
         if (typeof window !== "undefined") {
@@ -247,7 +247,7 @@ export default function BookingBar({
     <div className="relative" ref={containerRef}>
       <div className="mb-4 text-center">
         {showPropertyHeader && (
-          <h2 className="text-lg font-semibold text-brand-800">{propertyName || apartmentContent.shortName}</h2>
+          <h2 className="text-lg font-serif italic font-bold text-brand-800">{propertyName || apartmentContent.shortName}</h2>
         )}
         <p className="text-sm font-serif italic font-bold text-muted mt-3">
           {subline ?? `${apartmentContent.location.city}, ${apartmentContent.location.country} • €${basePrice}/night`}
@@ -259,9 +259,8 @@ export default function BookingBar({
           <button
             ref={arrivalButtonRef}
             type="button"
-            className={`search-trigger flex h-full w-full flex-col text-left gap-1 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
-              activeDateField === "arrival" ? "is-active" : ""
-            }`}
+            className={`search-trigger flex h-full w-full flex-col text-left gap-1 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${activeDateField === "arrival" ? "is-active" : ""
+              }`}
             onClick={() => handleDatePickerOpen("arrival")}
             aria-expanded={isDatePickerOpen && activeDateField === "arrival"}
             aria-haspopup="dialog"
@@ -275,9 +274,8 @@ export default function BookingBar({
           <button
             ref={departureButtonRef}
             type="button"
-            className={`search-trigger flex h-full w-full flex-col text-left gap-1 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${
-              activeDateField === "departure" ? "is-active" : ""
-            }`}
+            className={`search-trigger flex h-full w-full flex-col text-left gap-1 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 focus-visible:ring-offset-2 focus-visible:ring-offset-white ${activeDateField === "departure" ? "is-active" : ""
+              }`}
             onClick={() => handleDatePickerOpen("departure")}
             aria-expanded={isDatePickerOpen && activeDateField === "departure"}
             aria-haspopup="dialog"
