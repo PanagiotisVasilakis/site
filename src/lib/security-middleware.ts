@@ -4,15 +4,16 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { 
-  getSecurityConfig, 
-  buildCSPDirective, 
-  buildPermissionsPolicy, 
+import {
+  getSecurityConfig,
+  buildCSPDirective,
+  buildPermissionsPolicy,
   generateNonce,
   logSecurityEvent,
-  type SecurityEvent 
+  type SecurityEvent
 } from '@/lib/security-config';
 import { metrics } from '@/lib/metrics-collector';
+import { getClientIP } from '@/lib/requestUtils';
 
 // Security headers cache to avoid recalculating on every request
 let securityHeadersCache: Record<string, string> | null = null;
@@ -39,7 +40,7 @@ export class SecurityHeadersMiddleware {
 
   public handle(request: NextRequest): NextResponse {
     const response = NextResponse.next();
-    
+
     // Skip security headers for certain paths
     if (this.shouldSkipPath(request.nextUrl.pathname)) {
       return response;
@@ -47,28 +48,28 @@ export class SecurityHeadersMiddleware {
 
     // Generate nonce for this request
     const nonce = this.options.enableNonce ? generateNonce() : undefined;
-    
+
     // Apply security headers
     this.applySecurityHeaders(response, nonce);
-    
+
     // Add CSP headers
     this.applyCSPHeaders(response, nonce);
-    
+
     // Log security events if monitoring is enabled
     this.logSecurityContext(request);
-    
+
     return response;
   }
 
   private shouldSkipPath(pathname: string): boolean {
-    return this.options.skipPaths?.some(path => 
+    return this.options.skipPaths?.some(path =>
       pathname.startsWith(path) || pathname === path
     ) || false;
   }
 
   private applySecurityHeaders(response: NextResponse, nonce?: string): void {
     const headers = this.getSecurityHeaders(nonce);
-    
+
     Object.entries(headers).forEach(([key, value]) => {
       response.headers.set(key, value);
     });
@@ -83,7 +84,7 @@ export class SecurityHeadersMiddleware {
 
   private getSecurityHeaders(nonce?: string): Record<string, string> {
     const now = Date.now();
-    
+
     // IMPORTANT: Never cache headers when a nonce is provided
     // CSP nonces MUST be unique per request to prevent security issues
     // Only static headers (without nonces) are cached for performance
@@ -140,7 +141,7 @@ export class SecurityHeadersMiddleware {
     if (!this.config.csp.enabled) return;
 
     const cspDirective = buildCSPDirective(this.config.csp.directives, this.config.csp.useNonce);
-    
+
     // Add nonce to CSP if provided
     let finalCSP = cspDirective;
     if (nonce && this.config.csp.useNonce) {
@@ -156,7 +157,7 @@ export class SecurityHeadersMiddleware {
     }
 
     // Use Content-Security-Policy-Report-Only in development or when configured
-    const headerName = this.config.csp.reportOnly 
+    const headerName = this.config.csp.reportOnly
       ? 'Content-Security-Policy-Report-Only'
       : 'Content-Security-Policy';
 
@@ -186,7 +187,7 @@ export class SecurityHeadersMiddleware {
     const referer = request.headers.get('referer') || '';
 
     // Check for suspicious patterns in URL
-    const hasSuspiciousContent = suspiciousPatterns.some(pattern => 
+    const hasSuspiciousContent = suspiciousPatterns.some(pattern =>
       pattern.test(url) || pattern.test(userAgent) || pattern.test(referer)
     );
 
@@ -195,7 +196,7 @@ export class SecurityHeadersMiddleware {
         type: 'suspicious_activity',
         severity: 'medium',
         timestamp: new Date().toISOString(),
-        ip: this.getClientIP(request),
+        ip: getClientIP(request),
         userAgent,
         url,
         details: {
@@ -211,26 +212,7 @@ export class SecurityHeadersMiddleware {
     }
   }
 
-  private getClientIP(request: NextRequest): string {
-    // Try various headers for client IP
-    const forwardedFor = request.headers.get('x-forwarded-for');
-    const realIP = request.headers.get('x-real-ip');
-    const cfConnectingIP = request.headers.get('cf-connecting-ip');
-    
-    if (forwardedFor) {
-      return forwardedFor.split(',')[0].trim();
-    }
-    
-    if (realIP) {
-      return realIP;
-    }
-    
-    if (cfConnectingIP) {
-      return cfConnectingIP;
-    }
-    
-    return 'unknown';
-  }
+
 }
 
 // Rate limiting middleware - Database-backed for persistence and scalability
@@ -290,7 +272,7 @@ export class RateLimitMiddleware {
       return this.handleInMemory(request, key, now, resetTime);
     }
   }
-  
+
   private handleInMemory(request: NextRequest, key: string, now: number, resetTime: number): NextResponse | null {
     // Clean expired entries from memory
     for (const [k, v] of this.memoryStore.entries()) {
@@ -298,49 +280,40 @@ export class RateLimitMiddleware {
         this.memoryStore.delete(k);
       }
     }
-    
+
     const existing = this.memoryStore.get(key);
-    
+
     if (existing && existing.resetTime > now) {
       // Check if limit exceeded
       if (existing.count >= this.config.maxRequests) {
         const response = new NextResponse('Too Many Requests', { status: 429 });
-        
+
         if (this.config.standardHeaders) {
           response.headers.set('RateLimit-Limit', this.config.maxRequests.toString());
           response.headers.set('RateLimit-Remaining', '0');
           response.headers.set('RateLimit-Reset', Math.ceil(existing.resetTime / 1000).toString());
         }
-        
+
         return response;
       }
-      
+
       // Increment count
       existing.count++;
     } else {
       // Create new entry
       this.memoryStore.set(key, { count: 1, resetTime });
     }
-    
+
     return null;
   }
 
   private generateKey(request: NextRequest): string {
-    const ip = this.getClientIP(request);
+    const ip = getClientIP(request);
     const path = request.nextUrl.pathname;
     return `${ip}:${path}`;
   }
 
-  private getClientIP(request: NextRequest): string {
-    const forwardedFor = request.headers.get('x-forwarded-for');
-    const realIP = request.headers.get('x-real-ip');
-    
-    if (forwardedFor) {
-      return forwardedFor.split(',')[0].trim();
-    }
-    
-    return realIP || 'unknown';
-  }
+
 
   // cleanupExpiredEntries removed — Redis + in-memory approach does not rely on DB cleanup
 }
@@ -366,7 +339,7 @@ export class CORSMiddleware {
         type: 'cors_violation',
         severity: 'medium',
         timestamp: new Date().toISOString(),
-        ip: this.getClientIP(request),
+        ip: getClientIP(request),
         userAgent: request.headers.get('user-agent') || undefined,
         url: request.nextUrl.toString(),
         details: {
@@ -405,10 +378,7 @@ export class CORSMiddleware {
     return this.config.origins.includes(origin) || this.config.origins.includes('*');
   }
 
-  private getClientIP(request: NextRequest): string {
-    const forwardedFor = request.headers.get('x-forwarded-for');
-    return forwardedFor ? forwardedFor.split(',')[0].trim() : 'unknown';
-  }
+
 }
 
 // Export middleware factory

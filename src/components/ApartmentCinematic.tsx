@@ -9,7 +9,7 @@ interface HouseText {
   title?: string;
   location?: string;
   intro?: string;
-  photoAlts?: Record<string,string>;
+  photoAlts?: Record<string, string>;
   glanceTitle?: string;
   specs?: string[];
   ctaPrimary?: string;
@@ -26,17 +26,17 @@ interface HouseText {
 }
 interface Props { locale: string; t: unknown; houseText: HouseText | undefined; photos: ApartmentPhotoWithAlt[]; }
 
-export default function ApartmentCinematic({ locale, houseText, photos }: Props){
+export default function ApartmentCinematic({ locale, houseText, photos }: Props) {
   const ht = React.useMemo(() => houseText || {}, [houseText]);
-  const introStr = typeof ht?.intro === 'string' ? ht.intro : '';
-  const isGreek = /[Α-Ωα-ω]/.test(introStr);
+  // Use locale directly instead of fragile Greek character detection
+  const isGreek = locale === 'el';
   // hero scroll hint and skip intro labels were removed from the UI; keep properties available in `ht` for completeness
   const glanceTitle = typeof ht?.glanceTitle === 'string' ? ht.glanceTitle : (isGreek ? 'Με μια Ματιά' : 'At a Glance');
   const specsList = Array.isArray(ht?.specs) && ht.specs.length > 0
     ? ht.specs
     : (isGreek
-      ? ['2 υπνοδωμάτια','1 μπάνιο','2ος όροφος','75 τ.μ.','Θέα βουνό & θάλασσα','Δωρεάν πάρκινγκ']
-      : ['2 bedrooms','1 bathroom','2nd floor','75 m²','Mountain & sea views','Free parking']);
+      ? ['2 υπνοδωμάτια', '1 μπάνιο', '2ος όροφος', '75 τ.μ.', 'Θέα βουνό & θάλασσα', 'Δωρεάν πάρκινγκ']
+      : ['2 bedrooms', '1 bathroom', '2nd floor', '75 m²', 'Mountain & sea views', 'Free parking']);
   const ctaPrimaryText = typeof ht?.ctaPrimary === 'string' ? ht.ctaPrimary : (isGreek ? 'Κράτηση' : 'Book');
   const ctaSecondaryText = typeof ht?.ctaSecondary === 'string' ? ht.ctaSecondary : (isGreek ? 'Επικοινωνία' : 'Contact Us');
   const footerNote = typeof ht?.footerNote === 'string' ? ht.footerNote : (isGreek ? '© Διαμέρισμα Καλαμάτας' : '© Kalamata Apartment');
@@ -140,19 +140,19 @@ export default function ApartmentCinematic({ locale, houseText, photos }: Props)
     window.dispatchEvent(new CustomEvent('open-apartment-lightbox', { detail: { startIndex: index, subset } }));
   }, []);
   return (
-  <div className="relative apartment-cinematic-container">
-  <section className="relative h-[90svh] md:h-[100svh] overflow-hidden" aria-label="Apartment hero">
+    <div className="relative apartment-cinematic-container">
+      <section className="relative h-[90svh] md:h-[100svh] overflow-hidden" aria-label="Apartment hero">
         <Image src={photos[0].src} alt={ht?.title || 'Hero'} fill priority fetchPriority="high" decoding="async" sizes="100vw" className="object-cover hero-ken-burns" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/35 to-black/15" aria-hidden="true" />
-  <div className="absolute inset-x-0 top-0 flex h-full flex-col justify-center px-6 md:px-14 pt-20 md:pt-24 max-w-5xl">
-    <h1 className="text-4xl md:text-6xl font-semibold apartment-hero-title white-in-dark" style={{textShadow: '0 2px 4px rgba(0,0,0,0.3), 0 4px 8px rgba(0,0,0,0.2), 0 8px 16px rgba(0,0,0,0.1), 0 16px 32px rgba(0,0,0,0.05)'}}>{ht?.title || 'Seaside Modern Apartment'}</h1>
+        <div className="absolute inset-x-0 top-0 flex h-full flex-col justify-center px-6 md:px-14 pt-20 md:pt-24 max-w-5xl">
+          <h1 className="text-4xl md:text-6xl font-semibold apartment-hero-title white-in-dark" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.3), 0 4px 8px rgba(0,0,0,0.2), 0 8px 16px rgba(0,0,0,0.1), 0 16px 32px rgba(0,0,0,0.05)' }}>{ht?.title || 'Seaside Modern Apartment'}</h1>
           {/* Scroll hint and Skip intro removed as per design request */}
         </div>
         <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-b from-transparent to-white" aria-hidden="true" />
       </section>
-  <div id="apartment-content-start" className="relative apartment-content-section">
+      <div id="apartment-content-start" className="relative apartment-content-section">
         <div className="h-10" aria-hidden="true" />
-  <div className="mx-auto max-w-6xl px-6 md:px-14 py-14 lg:py-20 space-y-16" aria-label={photosRegionLabel} data-apartment-gallery-root>
+        <div className="mx-auto max-w-6xl px-6 md:px-14 py-14 lg:py-20 space-y-16" aria-label={photosRegionLabel} data-apartment-gallery-root>
           {roomSections.map(({ label, dictKey, description, stack, stackIndices }) => {
             const anchorId = `sec-${label.replace(/\s+/g, '-')}`;
             const firstIndex = stackIndices[0] ?? 0;
@@ -238,7 +238,7 @@ export default function ApartmentCinematic({ locale, houseText, photos }: Props)
           </section>
           <footer className="pt-20 text-xs apartment-footer-text">{footerNote}</footer>
         </div>
-  <ApartmentGalleryLightbox
+        <ApartmentGalleryLightbox
           photos={photos}
           alts={ht?.photoAlts ? {
             living: ht.photoAlts.living || 'living',

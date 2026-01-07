@@ -4,11 +4,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { 
-  getSecurityConfig, 
+import {
+  getSecurityConfig,
   logSecurityEvent,
-  type SecurityEvent 
+  type SecurityEvent
 } from '@/lib/security-config';
+import { getClientIP } from '@/lib/requestUtils';
 
 // Input validation middleware
 export class APIInputValidationMiddleware {
@@ -19,7 +20,7 @@ export class APIInputValidationMiddleware {
 
     const contentType = request.headers.get('content-type') || '';
     const contentLength = request.headers.get('content-length');
-    
+
     // Check content length limits
     if (contentLength) {
       const length = parseInt(contentLength, 10);
@@ -28,7 +29,7 @@ export class APIInputValidationMiddleware {
           contentLength: length,
           maxAllowed: this.config.apiSecurity.inputValidation.maxPayloadSize,
         });
-        
+
         return new NextResponse('Payload too large', { status: 413 });
       }
     }
@@ -36,7 +37,7 @@ export class APIInputValidationMiddleware {
     // Validate content types for POST/PUT/PATCH requests
     if (['POST', 'PUT', 'PATCH'].includes(request.method)) {
       const allowedTypes = this.config.apiSecurity.inputValidation.allowedContentTypes;
-      const isValidContentType = allowedTypes.some(type => 
+      const isValidContentType = allowedTypes.some(type =>
         contentType.toLowerCase().includes(type.toLowerCase())
       );
 
@@ -45,7 +46,7 @@ export class APIInputValidationMiddleware {
           contentType,
           allowedTypes,
         });
-        
+
         return new NextResponse('Invalid content type', { status: 415 });
       }
     }
@@ -66,7 +67,7 @@ export class APIInputValidationMiddleware {
     const userAgent = request.headers.get('user-agent') || '';
     const referer = request.headers.get('referer') || '';
 
-    const hasSuspiciousContent = suspiciousPatterns.some(pattern => 
+    const hasSuspiciousContent = suspiciousPatterns.some(pattern =>
       pattern.test(url) || pattern.test(userAgent) || pattern.test(referer)
     );
 
@@ -87,15 +88,15 @@ export class APIInputValidationMiddleware {
   }
 
   private logSecurityViolation(
-    request: NextRequest, 
-    violationType: string, 
+    request: NextRequest,
+    violationType: string,
     details: Record<string, unknown>
   ): void {
     const event: SecurityEvent = {
       type: 'api_security_violation',
       severity: 'medium',
       timestamp: new Date().toISOString(),
-      ip: this.getClientIP(request),
+      ip: getClientIP(request),
       userAgent: request.headers.get('user-agent') || undefined,
       url: request.nextUrl.toString(),
       details: {
@@ -108,16 +109,7 @@ export class APIInputValidationMiddleware {
     logSecurityEvent(event);
   }
 
-  private getClientIP(request: NextRequest): string {
-    const forwardedFor = request.headers.get('x-forwarded-for');
-    const realIP = request.headers.get('x-real-ip');
-    
-    if (forwardedFor) {
-      return forwardedFor.split(',')[0].trim();
-    }
-    
-    return realIP || 'unknown';
-  }
+
 }
 
 // SQL Injection protection middleware
@@ -129,7 +121,7 @@ export class SQLInjectionProtectionMiddleware {
 
     const url = request.nextUrl.toString();
     const searchParams = request.nextUrl.searchParams;
-    
+
     // SQL injection patterns
     const sqlPatterns = [
       /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION|OR|AND)\b)/i,
@@ -164,15 +156,15 @@ export class SQLInjectionProtectionMiddleware {
   }
 
   private logSQLInjectionAttempt(
-    request: NextRequest, 
-    source: string, 
+    request: NextRequest,
+    source: string,
     details: Record<string, unknown>
   ): void {
     const event: SecurityEvent = {
       type: 'sql_injection_attempt',
       severity: 'high',
       timestamp: new Date().toISOString(),
-      ip: this.getClientIP(request),
+      ip: getClientIP(request),
       userAgent: request.headers.get('user-agent') || undefined,
       url: request.nextUrl.toString(),
       details: {
@@ -185,10 +177,7 @@ export class SQLInjectionProtectionMiddleware {
     logSecurityEvent(event);
   }
 
-  private getClientIP(request: NextRequest): string {
-    const forwardedFor = request.headers.get('x-forwarded-for');
-    return forwardedFor ? forwardedFor.split(',')[0].trim() : 'unknown';
-  }
+
 }
 
 // XSS protection middleware
@@ -200,7 +189,7 @@ export class XSSProtectionMiddleware {
 
     const url = request.nextUrl.toString();
     const searchParams = request.nextUrl.searchParams;
-    
+
     // XSS patterns
     const xssPatterns = [
       /<script[^>]*>.*?<\/script>/gi,
@@ -244,15 +233,15 @@ export class XSSProtectionMiddleware {
   }
 
   private logXSSAttempt(
-    request: NextRequest, 
-    source: string, 
+    request: NextRequest,
+    source: string,
     details: Record<string, unknown>
   ): void {
     const event: SecurityEvent = {
       type: 'xss_attempt',
       severity: 'high',
       timestamp: new Date().toISOString(),
-      ip: this.getClientIP(request),
+      ip: getClientIP(request),
       userAgent: request.headers.get('user-agent') || undefined,
       url: request.nextUrl.toString(),
       details: {
@@ -265,10 +254,7 @@ export class XSSProtectionMiddleware {
     logSecurityEvent(event);
   }
 
-  private getClientIP(request: NextRequest): string {
-    const forwardedFor = request.headers.get('x-forwarded-for');
-    return forwardedFor ? forwardedFor.split(',')[0].trim() : 'unknown';
-  }
+
 }
 
 // API Key authentication middleware
@@ -279,10 +265,10 @@ export class APIKeyAuthMiddleware {
     if (!this.config.apiSecurity.apiKeyAuth.enabled) return null;
 
     const apiKey = this.extractAPIKey(request);
-    
+
     if (!apiKey) {
       this.logAuthFailure(request, 'missing_api_key');
-      return new NextResponse('API key required', { 
+      return new NextResponse('API key required', {
         status: 401,
         headers: {
           'WWW-Authenticate': 'ApiKey',
@@ -306,9 +292,9 @@ export class APIKeyAuthMiddleware {
     if (requiredScopes && requiredScopes.length > 0) {
       const keyScopes = this.getAPIKeyScopes(apiKey);
       const hasRequiredScopes = requiredScopes.every(scope => keyScopes.includes(scope));
-      
+
       if (!hasRequiredScopes) {
-        this.logAuthFailure(request, 'insufficient_scope', { 
+        this.logAuthFailure(request, 'insufficient_scope', {
           required: requiredScopes,
           available: keyScopes,
         });
@@ -361,15 +347,15 @@ export class APIKeyAuthMiddleware {
   }
 
   private logAuthFailure(
-    request: NextRequest, 
-    reason: string, 
+    request: NextRequest,
+    reason: string,
     details?: Record<string, unknown>
   ): void {
     const event: SecurityEvent = {
       type: 'api_auth_failure',
       severity: 'medium',
       timestamp: new Date().toISOString(),
-      ip: this.getClientIP(request),
+      ip: getClientIP(request),
       userAgent: request.headers.get('user-agent') || undefined,
       url: request.nextUrl.toString(),
       details: {
@@ -382,15 +368,12 @@ export class APIKeyAuthMiddleware {
     logSecurityEvent(event);
   }
 
-  private getClientIP(request: NextRequest): string {
-    const forwardedFor = request.headers.get('x-forwarded-for');
-    return forwardedFor ? forwardedFor.split(',')[0].trim() : 'unknown';
-  }
+
 }
 
 // Combined API security middleware
-export function createAPISecurityMiddleware(options?: { 
-  requireAPIKey?: boolean; 
+export function createAPISecurityMiddleware(options?: {
+  requireAPIKey?: boolean;
   requiredScopes?: string[];
 }) {
   const inputValidation = new APIInputValidationMiddleware();

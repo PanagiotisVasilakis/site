@@ -1,5 +1,51 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   GLOBALS.CSS — Design System & Theme Definitions
+   ==========================================================================
+   
+   TABLE OF CONTENTS
+   ------------------
+   1. DESIGN TOKENS (Line ~20)
+      - Color palette (brand, accent, neutrals)
+      - Spacing scale
+      - Typography scale
+      - Radius, shadows, transitions
+   
+   2. DARK THEME OVERRIDES (Line ~327)
+      - Token remappings for dark mode
+      - Body/page backgrounds
+   
+   3. LAYOUT UTILITIES (Line ~143)
+      - Page container
+      - Responsive breakpoints
+      - Safe-area helpers
+   
+   4. COMPONENT STYLES (Line ~432)
+      - Buttons (.btn-primary, .btn-outline, .btn-accent)
+      - Panels & cards
+      - Inputs & forms
+      - Badges
+      - Search/booking bars
+   
+   5. TYPOGRAPHY UTILITIES (Line ~577)
+      - Text colors
+      - Display fonts
+      - Italian title styling
+   
+   6. ANIMATIONS (Line ~473)
+      - Toast, float, hero-pulse keyframes
+   
+   7. THIRD-PARTY OVERRIDES (Line ~1172)
+      - React Day Picker
+      - Leaflet maps
+   
+   8. PAGE-SPECIFIC STYLES (Line ~1663)
+      - Universal dark mode page styles
+      - Villa/apartment sections
+   
+   ========================================================================== */
+
 :root {
   /* Base (soft neutral rather than stark white) */
   --background: #faf8f5;

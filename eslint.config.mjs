@@ -10,14 +10,14 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
-  { ignores: ["**/node_modules/**","**/.next/**","out/**","build/**","next-env.d.ts"] },
+  { ignores: ["**/node_modules/**", "**/.next/**", "out/**", "build/**", "next-env.d.ts", "**/jscpd-report/**"] },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
     rules: { 'internal-fetch/no-internal-fetch': 'warn' }
   },
   // Test file specific overrides (relax strictness, allow mocks)
   {
-    files: ['**/__tests__/**/*.{js,jsx,ts,tsx}','**/*.test.{js,jsx,ts,tsx}'],
+    files: ['**/__tests__/**/*.{js,jsx,ts,tsx}', '**/*.test.{js,jsx,ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/triple-slash-reference': 'off',

@@ -4,7 +4,6 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { rotateRefreshToken, hashToken, generateToken } from '@/lib/auth/rotateTokens';
-import { logger } from '@/lib/logger-enterprise';
 
 describe('rotateTokens', () => {
   beforeEach(() => {
@@ -14,14 +13,14 @@ describe('rotateTokens', () => {
   describe('hashToken', () => {
     it('should hash token with provided salt', () => {
       const result = hashToken('test-token', 'test-salt');
-      
+
       expect(result.hash).toContain('hashed_');
       expect(result.salt).toBe('test-salt');
     });
 
     it('should generate salt when not provided', () => {
       const result = hashToken('test-token');
-      
+
       expect(result.hash).toContain('hashed_');
       expect(result.salt).toBeDefined();
       expect(result.salt).not.toBe('');
@@ -32,7 +31,7 @@ describe('rotateTokens', () => {
     it('should generate unique tokens', () => {
       const token1 = generateToken();
       const token2 = generateToken();
-      
+
       expect(token1).not.toBe(token2);
       expect(token1).toContain('-');
     });

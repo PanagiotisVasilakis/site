@@ -13,15 +13,16 @@ type MetricsLite = {
 };
 
 function noop(): void {
-  // Intentionally empty for Edge runtime compatibility.
+  // No-op implementation for Lite version
 }
 
 const metricsLite: MetricsLite = {
-  counter: (_name: string, _value: number = 1, _tags?: MetricTags) => noop(),
-  gauge: (_name: string, _value: number, _tags?: MetricTags) => noop(),
-  histogram: (_name: string, _value: number, _tags?: MetricTags) => noop(),
-  timer: (_name: string, _duration: number, _tags?: MetricTags) => noop(),
+  counter: () => noop(),
+  gauge: () => noop(),
+  histogram: () => noop(),
+  timer: () => noop(),
 };
 
 export const metrics = metricsLite;
 export type { MetricsLite };
+

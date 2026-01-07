@@ -6,7 +6,6 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
-import { SignJWT } from 'jose';
 import { logger } from '@/lib/logger-enterprise';
 
 /**
@@ -69,17 +68,17 @@ export interface TokenStorageAdapter {
    * Find token by hash
    */
   findByHash(hash: string): Promise<RefreshTokenRecord | null>;
-  
+
   /**
    * Create new token record
    */
   create(record: Omit<RefreshTokenRecord, 'id'>): Promise<RefreshTokenRecord>;
-  
+
   /**
    * Revoke token by ID
    */
   revoke(id: string): Promise<boolean>;
-  
+
   /**
    * Update token record
    */
@@ -98,7 +97,7 @@ export function hashToken(token: string, salt?: string): { hash: string; salt: s
   // For now, we'll simulate this behavior
   const actualSalt = salt || uuidv4();
   const hash = `hashed_${token.substring(0, 8)}_${actualSalt.substring(0, 8)}`;
-  
+
   return { hash, salt: actualSalt };
 }
 
@@ -133,21 +132,21 @@ export async function rotateRefreshToken(
   options?: RotateTokenOptions
 ): Promise<RotateTokenResult> {
   const { ttlDays = 30, deviceHint, ipHint } = options || {};
-  
+
   try {
     // Hash the incoming token for lookup
     const { hash: oldTokenHash } = hashToken(oldTokenValue);
-    
+
     // Look up the old token
     const oldTokenRecord = await storage.findByHash(oldTokenHash);
-    
+
     // If token doesn't exist, it's invalid
     if (!oldTokenRecord) {
       // In a real implementation, you might want to log this
       // For now, we'll just return an empty result
       return {};
     }
-    
+
     // Check if token is expired
     const now = Date.now();
     if (oldTokenRecord.expiresAt < now) {
@@ -155,21 +154,21 @@ export async function rotateRefreshToken(
       // For now, we'll just return the old token record
       return { old: oldTokenRecord };
     }
-    
+
     // Check if token is already revoked
     if (oldTokenRecord.revokedAt && oldTokenRecord.revokedAt < now) {
       // In a real implementation, you might want to log this
       // For now, we'll just return the old token record
       return { old: oldTokenRecord };
     }
-    
+
     // Generate new token
     const newTokenValue = generateToken();
     const { hash: newTokenHash, salt: newTokenSalt } = hashToken(newTokenValue);
-    
+
     // Calculate expiration
     const expiresAt = now + ttlDays * 24 * 60 * 60 * 1000;
-    
+
     // Create new token record
     const newTokenRecord: Omit<RefreshTokenRecord, 'id'> = {
       userId,
@@ -182,24 +181,24 @@ export async function rotateRefreshToken(
       ipHint,
       lastUsedAt: now
     };
-    
+
     // Save new token
     const newRecord = await storage.create(newTokenRecord);
-    
+
     // Revoke old token
     await storage.revoke(oldTokenRecord.id);
-    
+
     // In a real implementation, you might want to log this
     // For now, we'll just return the result
-    
+
     return {
       old: oldTokenRecord,
       rec: newRecord,
       token: newTokenValue
     };
-    
+
   } catch (error) {
-    logger.error('Failed to rotate refresh token', { 
+    logger.error('Failed to rotate refresh token', {
       error: error instanceof Error ? error.message : String(error),
       userId
     });
@@ -218,7 +217,8 @@ export async function rotateRefreshToken(
  */
 export async function detectReplayAttack(
   tokenRecord: RefreshTokenRecord,
-  storage: TokenStorageAdapter
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _storage: TokenStorageAdapter
 ): Promise<boolean> {
   // If token is revoked and we have a rotated-from ID, check if newer tokens exist
   if (tokenRecord.revokedAt && tokenRecord.rotatedFromId) {
@@ -231,6 +231,6 @@ export async function detectReplayAttack(
     // });
     return true;
   }
-  
+
   return false;
 }
