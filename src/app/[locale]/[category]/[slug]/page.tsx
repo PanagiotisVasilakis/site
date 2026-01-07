@@ -46,6 +46,8 @@ export default async function ItemPage({ params }: { params: Promise<{ locale: s
           name,
           summary,
           image: item.image,
+          heroImage: item.heroImage,
+          heroImagePosition: item.heroImagePosition,
           tags: item.tags,
           descriptionTitle,
           description,

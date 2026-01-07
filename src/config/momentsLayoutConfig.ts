@@ -29,7 +29,7 @@ export const momentsLayoutConfig = {
         headerClass: 'flex flex-col gap-2 pt-6',
         titleClass: 'text-2xl font-serif italic font-bold flex items-center gap-2',
         summaryClass: 'text-sm opacity-80',
-        imageClass: 'w-full',
+        imageClass: 'w-full max-h-80',
         /** CTA buttons to show - order matters */
         ctaButtons: ['call', 'directions', 'website', 'reserve'] as const,
         ctaGridClass: 'grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2',

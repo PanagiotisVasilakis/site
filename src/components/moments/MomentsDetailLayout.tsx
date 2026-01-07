@@ -12,6 +12,8 @@ interface MomentsItem {
     name: string;
     summary?: string;
     image?: string;
+    heroImage?: string;
+    heroImagePosition?: string;
     tags?: string[];
     descriptionTitle?: string;
     description?: string;
@@ -92,14 +94,16 @@ export function MomentsDetailLayout({
             </header>
 
             {/* Hero Image */}
-            {item.image && (
+            {(item.heroImage || item.image) && (
                 <Suspense fallback={<Skeleton className="w-full h-60" />}>
                     <ResponsiveImage
-                        src={item.image}
+                        src={item.heroImage || item.image!}
                         alt={item.name}
-                        width={800}
-                        height={500}
+                        width={1200}
+                        height={800}
+                        sizes="(max-width: 1280px) 100vw, 1280px"
                         className={config.imageClass}
+                        objectPosition={item.heroImagePosition}
                         priority
                     />
                 </Suspense>

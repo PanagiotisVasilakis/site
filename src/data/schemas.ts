@@ -44,6 +44,8 @@ export const ItemSchema = z.object({
   rating: z.number().min(0).max(5).optional(),
   tags: z.array(z.string()).optional(),
   image: z.string().optional(),
+  heroImage: z.string().optional(),
+  heroImagePosition: z.string().optional(),
   hours: z
     .array(
       z.object({

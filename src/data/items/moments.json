@@ -5,6 +5,7 @@
     "name": "Viktoria Karelia Greek Costumes Collection",
     "name_el": "Συλλογή Ελληνικών Ενδυμασιών \"Βικτώρια Καρέλια\"",
     "image": "/moments/viktoria-karelia.png",
+    "heroImage": "/moments/viktoria-karelia-hero.jpg",
     "location": {
       "lat": 37.04217,
       "lng": 22.1076
@@ -27,6 +28,7 @@
     "name": "Historical and Folklore Museum of Kalamata",
     "name_el": "Ιστορικό και Λαογραφικό Μουσείο Καλαμάτας",
     "image": "/moments/folklore-museum.png",
+    "heroImage": "/moments/folklore-museum-hero.jpg",
     "location": {
       "lat": 37.0391,
       "lng": 22.1121
@@ -51,6 +53,8 @@
     "name": "Archaeological Museum of Messinia",
     "name_el": "Αρχαιολογικό Μουσείο Μεσσηνίας",
     "image": "/moments/archaeological-museum.png",
+    "heroImage": "/moments/archaeological-museum-hero.jpg",
+    "heroImagePosition": "center 77%",
     "location": {
       "lat": 37.0438,
       "lng": 22.1135
@@ -75,6 +79,7 @@
     "name": "War Museum Kalamata Branch",
     "name_el": "Πολεμικό Μουσείο Καλαμάτας",
     "image": "/moments/war-museum.png",
+    "heroImage": "/moments/war-museum-hero.jpg",
     "location": {
       "lat": 37.0432,
       "lng": 22.1156
@@ -98,6 +103,7 @@
     "name": "Kalamata Railway Park",
     "name_el": "Σιδηροδρομικό Πάρκο Καλαμάτας",
     "image": "/moments/railway-museum.png",
+    "heroImage": "/moments/railway-museum-hero.jpg",
     "location": {
       "lat": 37.0355,
       "lng": 22.1095
