@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+
 import { pickLocale, toSlug, getItem, getItemsByCategory } from './data';
 
 // Assumes data files present as in repo

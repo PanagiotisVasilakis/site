@@ -2,12 +2,12 @@
  * Tests for data mappers
  */
 
-import { describe, it, expect } from 'vitest';
-import { 
-  mapBookingFromDb, 
-  mapAccessFromDb, 
-  mapUserFromDb, 
-  mapCheckinFromDb 
+
+import {
+  mapBookingFromDb,
+  mapAccessFromDb,
+  mapUserFromDb,
+  mapCheckinFromDb
 } from '@/lib/mappers/domainMappers';
 
 describe('domainMappers', () => {
@@ -78,7 +78,7 @@ describe('domainMappers', () => {
       const now = new Date();
       const createdAt = new Date(now.getTime() - 3600000); // 1 hour ago
       const updatedAt = new Date(now.getTime() - 1800000); // 30 minutes ago
-      
+
       const accessDb = {
         userId: 'user-123',
         bookingId: 'booking-123',
@@ -104,7 +104,7 @@ describe('domainMappers', () => {
       const now = new Date();
       const createdAt = new Date(now.getTime() - 86400000); // 1 day ago
       const updatedAt = new Date(now.getTime() - 3600000); // 1 hour ago
-      
+
       const userDb = {
         id: 'user-123',
         email: 'test@example.com',
@@ -132,7 +132,7 @@ describe('domainMappers', () => {
       const now = new Date();
       const createdAt = new Date(now.getTime() - 86400000); // 1 day ago
       const updatedAt = new Date(now.getTime() - 3600000); // 1 hour ago
-      
+
       const userDb = {
         id: 'user-123',
         email: null,
@@ -159,7 +159,7 @@ describe('domainMappers', () => {
     it('should map database check-in to domain check-in', () => {
       const now = new Date();
       const acceptedAt = new Date(now.getTime() - 3600000); // 1 hour ago
-      
+
       const checkinDb = {
         bookingId: 'booking-123',
         arrivalTime: '14:30',
@@ -180,7 +180,7 @@ describe('domainMappers', () => {
     it('should handle null special requests gracefully', () => {
       const now = new Date();
       const acceptedAt = new Date(now.getTime() - 3600000); // 1 hour ago
-      
+
       const checkinDb = {
         bookingId: 'booking-123',
         arrivalTime: '14:30',

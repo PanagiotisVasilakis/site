@@ -200,11 +200,11 @@ export default function ContactSection({ locale }: ContactSectionProps) {
   return (
     <section className="relative w-full px-4 py-6 overflow-hidden rounded-3xl transition-all duration-700 ease-in-out"
       style={{
-        background: 'linear-gradient(135deg, #ffffff 0%, #faf8f5 25%, #f7f9f9 50%, #f0f4f4 75%, #e9f8f5 100%)',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05) inset, 0 0 100px rgba(54, 185, 171, 0.08) inset'
+        background: 'linear-gradient(135deg, #faf9f6 0%, #f5f5f0 25%, #f2f2ed 50%, #faf9f6 75%, #fdfbf7 100%)',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05) inset, 0 0 100px rgba(200, 200, 190, 0.1) inset'
       }}>
       {/* Decorative wave pattern overlay */}
-      <div className="absolute inset-0 opacity-3">
+      < div className="absolute inset-0 opacity-3" >
         <svg className="w-full h-full" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
           <defs>
             <pattern id="wavePatternLight" x="0" y="0" width="150" height="150" patternUnits="userSpaceOnUse">
@@ -215,14 +215,14 @@ export default function ContactSection({ locale }: ContactSectionProps) {
           </defs>
           <rect width="100%" height="100%" fill="url(#wavePatternLight)" />
         </svg>
-      </div>
+      </div >
 
       {/* Floating geometric shapes */}
-      <div className="absolute top-16 left-8 w-24 h-24 opacity-6 animate-pulse text-slate-400" style={{ animationDuration: '4s' }}>
+      < div className="absolute top-16 left-8 w-24 h-24 opacity-6 animate-pulse text-slate-400" style={{ animationDuration: '4s' }}>
         <svg viewBox="0 0 100 100" className="w-full h-full">
           <polygon points="50,5 90,25 90,75 50,95 10,75 10,25" fill="currentColor" />
         </svg>
-      </div>
+      </div >
       <div className="absolute bottom-16 right-8 w-20 h-20 opacity-4 animate-pulse text-slate-400" style={{ animationDuration: '6s' }}>
         <svg viewBox="0 0 100 100" className="w-full h-full">
           <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="2" />
@@ -263,7 +263,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
         {/* Content Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Contact Us Content */}
-          <div className="backdrop-blur-sm bg-white/70 rounded-2xl p-6 border border-slate-200/50 shadow-xl">
+          <div className="backdrop-blur-sm bg-white/80 rounded-2xl p-6 border border-white/50 shadow-lg shadow-stone-200/20">
             <div className="text-center mb-6 block md:hidden">
               <h2 className="text-2xl md:text-3xl font-serif italic font-bold text-slate-800 mb-2 tracking-wider">
                 {translations.contactUs}
@@ -307,7 +307,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
           </div>
 
           {/* Follow Us Content */}
-          <div className="backdrop-blur-sm bg-white/70 rounded-2xl p-6 border border-slate-200/50 shadow-xl">
+          <div className="backdrop-blur-sm bg-white/80 rounded-2xl p-6 border border-white/50 shadow-lg shadow-stone-200/20">
             <div className="text-center mb-6 block md:hidden">
               <h2 className="text-2xl md:text-3xl font-serif italic font-bold text-slate-800 mb-2 tracking-wider">
                 {translations.followUs}
@@ -329,7 +329,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
                       href={social.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group flex items-center justify-between w-full max-w-xs p-4 bg-gradient-to-r from-slate-50 to-white border border-slate-200/60 rounded-2xl hover:from-white hover:to-slate-50 transition-all duration-500 transform hover:scale-105 hover:shadow-xl backdrop-blur-sm"
+                      className="group flex items-center justify-between w-full max-w-xs p-4 bg-gradient-to-r from-[#f5f5f0] to-[#faf9f6] border border-stone-200 border-b-2 border-b-stone-300/50 rounded-2xl shadow-md shadow-stone-200/50 hover:from-[#faf9f6] hover:to-[#f5f5f0] transition-all duration-500 transform hover:scale-105 hover:shadow-xl backdrop-blur-sm"
                     >
                       <div className="flex items-center space-x-3">
                         <div className="text-3xl group-hover:scale-125 transition-transform duration-300">
@@ -355,6 +355,6 @@ export default function ContactSection({ locale }: ContactSectionProps) {
           </div>
         </div>
       </div>
-    </section>
+    </section >
   );
 }

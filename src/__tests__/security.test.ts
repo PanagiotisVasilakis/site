@@ -4,26 +4,26 @@
  */
 
 import { NextRequest } from 'next/server';
-import { 
-  SecurityHeadersMiddleware, 
-  RateLimitMiddleware, 
+import {
+  SecurityHeadersMiddleware,
+  RateLimitMiddleware,
   CORSMiddleware,
-  createSecurityMiddleware 
+  createSecurityMiddleware
 } from '@/lib/security-middleware';
-import { 
+import {
   APIInputValidationMiddleware,
   SQLInjectionProtectionMiddleware,
   XSSProtectionMiddleware,
   APIKeyAuthMiddleware,
   createAPISecurityMiddleware
 } from '@/lib/api-security-middleware';
-import { 
-  getSecurityConfig, 
-  buildCSPDirective, 
+import {
+  getSecurityConfig,
+  buildCSPDirective,
   generateNonce,
-  buildPermissionsPolicy 
+  buildPermissionsPolicy
 } from '@/lib/security-config';
-import { 
+import {
   getSecurityMonitor,
   recordSecurityEvent,
   handleCSPViolation,
@@ -118,10 +118,10 @@ describe('Security Headers Middleware', () => {
   });
 
   test('should skip security headers for excluded paths', () => {
-    const middleware = new SecurityHeadersMiddleware({ 
-      skipPaths: ['/api/health'] 
+    const middleware = new SecurityHeadersMiddleware({
+      skipPaths: ['/api/health']
     });
-    
+
     const request = new NextRequest('https://example.com/api/health');
     const response = middleware.handle(request);
 
@@ -134,7 +134,7 @@ describe('Security Headers Middleware', () => {
     const response = middleware.handle(request);
 
     const cspHeader = response.headers.get('Content-Security-Policy-Report-Only') ||
-                     response.headers.get('Content-Security-Policy');
+      response.headers.get('Content-Security-Policy');
     expect(cspHeader).toBeTruthy();
     expect(cspHeader).toContain("default-src 'self'");
   });
@@ -156,11 +156,10 @@ describe('Rate Limiting Middleware', () => {
 
   test.skip('should block requests exceeding limit', async () => {
     // Temporarily set NODE_ENV to production for stricter limits (100 req/min)
-    const originalEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
     const strictMiddleware = new RateLimitMiddleware();
-    process.env.NODE_ENV = originalEnv;
-    
+    vi.unstubAllEnvs();
+
     const request = new NextRequest('https://example.com/api/test');
 
     // Simulate multiple requests exceeding the production limit
@@ -307,18 +306,15 @@ describe('XSS Protection', () => {
 
 describe('API Key Authentication', () => {
   let middleware: APIKeyAuthMiddleware;
-  let originalEnv: string | undefined;
-
   beforeEach(() => {
     // Enable API key auth for tests by setting NODE_ENV to production temporarily
-    originalEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
     middleware = new APIKeyAuthMiddleware();
   });
 
   afterEach(() => {
     // Restore original NODE_ENV
-    process.env.NODE_ENV = originalEnv;
+    vi.unstubAllEnvs();
   });
 
   test('should require API key when enabled', () => {
@@ -330,8 +326,7 @@ describe('API Key Authentication', () => {
 
   test('should accept valid API key in header', () => {
     const validKey = 'testkey123testkey123testkey12345';
-    const prevKeys = process.env.VALID_API_KEYS;
-    process.env.VALID_API_KEYS = validKey;
+    vi.stubEnv('VALID_API_KEYS', validKey);
     const localMiddleware = new APIKeyAuthMiddleware();
     const request = new NextRequest('https://example.com/api/protected', {
       headers: {
@@ -342,8 +337,9 @@ describe('API Key Authentication', () => {
 
     const response = localMiddleware.validateRequest(request);
     expect(response).toBeNull();
-    // restore
-    process.env.VALID_API_KEYS = prevKeys;
+    // restore handled by afterEach if needed, but here we can just leave it since we're inside a test method
+    // actually unstubAllEnvs in afterEach might be too late if others depend on it, 
+    // but typically stubEnv is test-scoped
   });
 
   test('should reject invalid API key format', () => {
@@ -379,7 +375,7 @@ describe('Security Monitoring', () => {
 
     const monitor = getSecurityMonitor();
     const metrics = monitor.getMetrics();
-    
+
     expect(metrics.totalEvents).toBe(1);
     expect(metrics.eventsByType['suspicious_activity']).toBe(1);
     expect(metrics.eventsBySeverity['medium']).toBe(1);
@@ -402,13 +398,13 @@ describe('Security Monitoring', () => {
 
     const monitor = getSecurityMonitor();
     const metrics = monitor.getMetrics();
-    
+
     expect(metrics.eventsByType['csp_violation']).toBe(1);
   });
 
   test('should calculate security health status', () => {
     const health = getSecurityHealthStatus();
-    
+
     expect(health.status).toBeDefined();
     expect(['healthy', 'warning', 'critical']).toContain(health.status);
     expect(health.checks).toBeDefined();
@@ -417,7 +413,7 @@ describe('Security Monitoring', () => {
 
   test('should track recent events', () => {
     const monitor = getSecurityMonitor();
-    
+
     // Record some events
     for (let i = 0; i < 5; i++) {
       recordSecurityEvent({
@@ -448,7 +444,7 @@ describe('Combined Security Middleware', () => {
 
     const response = await middleware(request);
     expect(response).toBeDefined();
-    
+
     // Should have security headers
     expect(response.headers.get('X-Frame-Options')).toBeTruthy();
   });

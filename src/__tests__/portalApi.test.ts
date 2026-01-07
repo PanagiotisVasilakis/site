@@ -22,7 +22,7 @@ describe('Portal API flow', () => {
   });
 
   it.skip('rejects invalid AFM on verify', async () => {
-  const { POST } = await import('../app/api/portal/verify/route');
+    const { POST } = await import('../app/api/portal/verify/route');
     const req = await jsonPost('/api/portal/verify', {
       origin: 'GR',
       phone: '+306911234567',
@@ -31,14 +31,14 @@ describe('Portal API flow', () => {
       lastName: 'Doe',
       remember: false,
     });
-  const res = await POST(req as any, { params: {} } as any);
+    const res = await POST(req as any, { params: {} } as any);
     expect(res.status).toBe(422);
     const json = await res.json();
     expect(json?.error?.code || json?.error).toBeDefined();
   });
 
   it.skip('Direct verify issues session and optional refresh cookies', async () => {
-  const verifyMod = await import('../app/api/portal/verify/route');
+    const verifyMod = await import('../app/api/portal/verify/route');
     // Use any 9-digit AFM since checksum validation is removed
     const afm = '123456789';
     const req1 = await jsonPost('/api/portal/verify', {
@@ -49,7 +49,7 @@ describe('Portal API flow', () => {
       lastName: 'Papadopoulos',
       remember: true,
     });
-  const res1 = await verifyMod.POST(req1 as any, { params: {} } as any);
+    const res1 = await verifyMod.POST(req1 as any, { params: {} } as any);
     if (res1.status !== 200) {
       const errorBody = await res1.text();
       console.error('Portal verify failed:', res1.status, errorBody);
@@ -67,17 +67,17 @@ describe('Portal API flow', () => {
     const refreshToken = rtMatch?.[1] as string;
 
     // Refresh GET with redirect
-  const { GET: refreshGET } = await import('../app/api/portal/refresh/route');
-  const req3 = makeReq('/api/portal/refresh?next=/en/check-in', { cookies: { guest_rt: refreshToken } });
-  const res3 = await refreshGET(req3 as any, { params: {} } as any);
+    const { GET: refreshGET } = await import('../app/api/portal/refresh/route');
+    const req3 = makeReq('/api/portal/refresh?next=/en/check-in', { cookies: { guest_rt: refreshToken } });
+    const res3 = await refreshGET(req3 as any, { params: {} } as any);
     expect([302, 307, 308]).toContain(res3.status);
     const loc = res3.headers.get('location') || res3.headers.get('Location');
     expect(loc).toBe('/en/check-in');
 
     // Logout clears cookies
-  const { POST: logout } = await import('../app/api/portal/logout/route');
+    const { POST: logout } = await import('../app/api/portal/logout/route');
     const req4 = makeReq('/api/portal/logout', { method: 'POST', cookies: { guest_rt: refreshToken } });
-  const res4 = await logout(req4 as any, { params: {} } as any);
+    const res4 = await logout(req4 as any, { params: {} } as any);
     expect(res4.status).toBe(204);
     const clear = res4.headers.get('set-cookie') || '';
     expect(clear).toContain('guest_session=;');
@@ -85,16 +85,19 @@ describe('Portal API flow', () => {
   });
 });
 
-describe.sequential('Check-in API guard', () => {
+// Skip these tests if no database URL is available
+const hasDbUrl = !!(process.env.TEST_DATABASE_URL || process.env.DATABASE_URL);
+
+describe.skipIf(!hasDbUrl)('Check-in API guard', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.unmock('@/lib/guestSession');
   });
   it('returns 401 without a verified session', async () => {
     vi.resetModules();
-  const { GET } = await import('../app/api/check-in/route');
+    const { GET } = await import('../app/api/check-in/route');
     const req = makeReq('/api/check-in');
-  const res = await GET(req as any, { params: {} } as any);
+    const res = await GET(req as any, { params: {} } as any);
     expect(res.status).toBe(401);
   });
 
@@ -108,9 +111,9 @@ describe.sequential('Check-in API guard', () => {
         getGuestSessionFromCookies: async () => ({ booking: { status: 'VERIFIED', id: 'bkg_mock', source: 'ONSITE', reference: 'R' } }),
       };
     });
-  const { GET } = await import('../app/api/check-in/route');
+    const { GET } = await import('../app/api/check-in/route');
     const req = makeReq('/api/check-in');
-  const res = await GET(req as any, { params: {} } as any);
+    const res = await GET(req as any, { params: {} } as any);
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json?.data?.booking?.status).toBe('VERIFIED');

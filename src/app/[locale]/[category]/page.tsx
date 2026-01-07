@@ -18,44 +18,44 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
   const isPhones = cat.slug === 'phones';
 
   return (
-  <div className={isPhones ? "page-container mx-0 max-w-full safe-bottom px-4" : "page-container mx-auto max-w-3xl safe-bottom"}>
-    <header className={isPhones ? "mb-4 text-center" : "mb-4"}>
-  <h1 className="text-2xl font-semibold">{t.categories[cat.slug as "phones" | "restaurants" | "sightseeing"] ?? (pickCategoryLocale(cat, "title", eff) ?? cat.title)}</h1>
-  {(pickCategoryLocale(cat, "description", eff) ?? cat.description) && <p className="text-sm opacity-80">{pickCategoryLocale(cat, "description", eff) ?? cat.description}</p>}
-    </header>
+    <div className={isPhones ? "page-container mx-0 max-w-full safe-bottom px-4" : "page-container mx-auto max-w-3xl safe-bottom"}>
+      <header className={isPhones ? "mb-4 text-center" : "mb-4"}>
+        <h1 className="text-2xl font-semibold page-title">{t.categories[cat.slug as "phones" | "restaurants" | "sightseeing"] ?? (pickCategoryLocale(cat, "title", eff) ?? cat.title)}</h1>
+        {(pickCategoryLocale(cat, "description", eff) ?? cat.description) && <p className="text-sm opacity-80 text-body">{pickCategoryLocale(cat, "description", eff) ?? cat.description}</p>}
+      </header>
 
       {items.length === 0 && (
-        <div className="card p-6 text-sm text-gray-700 flex flex-col gap-3">
+        <div className="surface-card p-6 text-sm text-body flex flex-col gap-3 rounded-lg shadow-sm">
           <div className="flex items-center gap-3">
             <span aria-hidden>🗒️</span>
             <span>{t.emptyState}</span>
           </div>
-          <div className="text-xs text-gray-500">Content updating – please check again later.</div>
+          <div className="text-xs text-subtle">Content updating – please check again later.</div>
           <div>
             <Link href={`/${locale}`} className="underline text-brand-700 hover:text-brand-800 transition-colors">{t.cta.home}</Link>
           </div>
         </div>
       )}
 
-  <CategoryGridClient
-    items={items.map(i => ({
-      id: i.id,
-      slug: i.slug ?? toSlug(i.name),
-      name: pickLocale(i, 'name', eff) ?? i.name,
-      summary: pickLocale(i, 'summary', eff) ?? i.summary,
-      tags: i.tags,
-      featured: i.featured,
-      categorySlug: cat.slug,
-      rating: i.rating,
-      price: i.priceLevel ? '€'.repeat(i.priceLevel) : undefined,
-      icon: cat.icon,
-    }))}
-    locale={eff}
-    categorySlug={cat.slug}
-    phonesLayout={isPhones}
-    emptyLabel={t.emptyState}
-    ui={t.ui}
-  />
+      <CategoryGridClient
+        items={items.map(i => ({
+          id: i.id,
+          slug: i.slug ?? toSlug(i.name),
+          name: pickLocale(i, 'name', eff) ?? i.name,
+          summary: pickLocale(i, 'summary', eff) ?? i.summary,
+          tags: i.tags,
+          featured: i.featured,
+          categorySlug: cat.slug,
+          rating: i.rating,
+          price: i.priceLevel ? '€'.repeat(i.priceLevel) : undefined,
+          icon: cat.icon,
+        }))}
+        locale={eff}
+        categorySlug={cat.slug}
+        phonesLayout={isPhones}
+        emptyLabel={t.emptyState}
+        ui={t.ui}
+      />
 
     </div>
   );

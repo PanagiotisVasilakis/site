@@ -20,7 +20,7 @@ const navButton = cva(
       intent: {
         primary: "shadow-md bg-black/10 hover:bg-black/20 text-slate-800 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/70",
         secondary: "border border-white/30 dark:border-white/40 bg-white/30 hover:bg-white/60 dark:bg-white/40 dark:hover:bg-white/60 text-slate-800 shadow-sm font-medium",
-        mobileItem: "w-full px-3 py-2.5 justify-start bg-slate-100 hover:bg-white text-slate-900 shadow-sm border border-slate-300 dark:bg-zinc-800 dark:hover:bg-zinc-900 dark:text-white dark:border-zinc-700"
+        mobileItem: "w-full px-3 py-2.5 justify-start bg-slate-100 hover:bg-white text-slate-900 shadow-sm border border-slate-300 dark:bg-white/10 dark:backdrop-blur-md dark:hover:bg-white/20 dark:text-white dark:border-white/10"
       },
       active: {
         true: "ring-2 ring-brand-400"

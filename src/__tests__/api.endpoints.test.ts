@@ -34,10 +34,11 @@ describe('API endpoints (lightweight)', () => {
   });
 
   it('returns a single item detail', async () => {
-    const res = await getItem(makeReq('/api/categories/phones/items/police-emergency'), { params: Promise.resolve({ category: 'phones', slug: 'police-emergency' }) });
+    // Note: the actual slug is 'police' not 'police-emergency'
+    const res = await getItem(makeReq('/api/categories/phones/items/police'), { params: Promise.resolve({ category: 'phones', slug: 'police' }) });
     expect(res.status).toBe(200);
     const json = await res.json();
-    expect(json.item.slug).toBe('police-emergency');
+    expect(json.item.slug).toBe('police');
   });
 
   it('404 for missing item', async () => {

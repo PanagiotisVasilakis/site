@@ -1,4 +1,4 @@
-import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
+
 
 const BASE = 'https://example.upstash.io';
 
@@ -13,7 +13,7 @@ describe('Upstash wrapper', () => {
 
     originalFetch = globalThis.fetch;
     fetchMock = vi.fn();
-  (globalThis as any).fetch = fetchMock;
+    (globalThis as any).fetch = fetchMock;
   });
 
   afterEach(() => {

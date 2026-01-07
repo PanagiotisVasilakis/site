@@ -2,7 +2,7 @@
  * Tests for token rotation utilities
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import { rotateRefreshToken, hashToken, generateToken } from '@/lib/auth/rotateTokens';
 
 describe('rotateTokens', () => {

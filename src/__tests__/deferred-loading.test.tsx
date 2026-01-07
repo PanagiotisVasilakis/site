@@ -76,7 +76,7 @@ class MockIntersectionObserver {
       observerInstances.splice(index, 1);
     }
   }
-  unobserve() {}
+  unobserve() { }
   takeRecords(): IntersectionObserverEntry[] { return []; }
 }
 
@@ -103,10 +103,10 @@ describe('Deferred loading guardrails', () => {
     const BookingBar = (await import('@/components/SearchBar')).default;
     const user = userEvent.setup();
 
-  render(<BookingBar propertyName="Apartment" />);
+    render(<BookingBar propertyName="Apartment" />);
 
     expect(dynamicLoaderCalls).toHaveLength(0);
-  await user.click(screen.getByRole('button', { name: /arrival/i }));
+    await user.click(screen.getByRole('button', { name: /arrival/i }));
 
     await waitFor(() => expect(dynamicLoaderCalls).toHaveLength(1));
     expect(await screen.findByTestId('date-picker')).toBeInTheDocument();
@@ -117,7 +117,9 @@ describe('Deferred loading guardrails', () => {
 
     render(<InteractiveMap locale="en" markers={[]} />);
 
-    expect(screen.getByText(/interactive map loads once/i)).toBeInTheDocument();
+    // Matches either dictionary value "The interactive map will load here..." 
+    // or fallback "Interactive map loads once it is in view..."
+    expect(screen.getByText(/interactive map.*load/i)).toBeInTheDocument();
     expect(dynamicLoaderCalls).toHaveLength(0);
     expect(screen.queryByTestId('leaflet-map')).not.toBeInTheDocument();
 

@@ -42,7 +42,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
     });
 
     // Report to external error tracking
-        // Report using boundary error handler
+    // Report using boundary error handler
     boundaryReportError(error, 'global-error-boundary', {
       digest: error.digest,
       route: typeof window !== 'undefined' ? window.location.pathname : 'unknown',
@@ -76,28 +76,28 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
   return (
     <html>
       <body>
-        <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
-          <div className="max-w-md w-full text-center space-y-6 bg-white rounded-lg shadow-lg p-8">
+        <div className="min-h-screen flex items-center justify-center p-6" style={{ background: 'var(--sand-50)' }}>
+          <div className="max-w-md w-full text-center space-y-6 surface-card rounded-lg shadow-lg p-8">
             {/* Error Icon */}
             <div className="text-red-500 mb-4">
               <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  strokeWidth={1.5} 
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" 
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
                 />
               </svg>
             </div>
 
             {/* Error Message */}
             <div className="space-y-2">
-              <h1 className="text-2xl font-bold text-gray-900">Oops! Something went wrong</h1>
-              <p className="text-gray-600">
+              <h1 className="text-2xl font-bold page-title">Oops! Something went wrong</h1>
+              <p className="text-body">
                 We encountered an unexpected error. Our team has been notified and is working on a fix.
               </p>
               {error.digest && (
-                <p className="text-xs text-gray-500 font-mono bg-gray-100 p-2 rounded">
+                <p className="text-xs text-subtle font-mono surface-subtle p-2 rounded">
                   Error ID: {error.digest}
                 </p>
               )}
@@ -111,17 +111,19 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
               >
                 Try Again
               </button>
-              
+
               <button
                 onClick={handleReload}
-                className="w-full px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                className="w-full px-6 py-3 border border-gray-300 text-body surface-interactive rounded-lg transition-colors"
+                style={{ borderColor: 'var(--border-soft)' }}
               >
                 Reload Page
               </button>
-              
+
               <button
                 onClick={handleGoHome}
-                className="w-full px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                className="w-full px-6 py-3 border border-gray-300 text-body surface-interactive rounded-lg transition-colors"
+                style={{ borderColor: 'var(--border-soft)' }}
               >
                 Go to Homepage
               </button>
@@ -129,7 +131,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
 
             {/* Development Error Details */}
             {process.env.NODE_ENV === 'development' && (
-              <details className="text-left text-xs text-gray-500 bg-gray-50 p-3 rounded">
+              <details className="text-left text-xs text-subtle surface-subtle p-3 rounded">
                 <summary className="cursor-pointer font-medium mb-2">Error Details (Development)</summary>
                 <div className="space-y-2">
                   <div>
@@ -157,7 +159,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
 
             {/* Contact Support */}
             <div className="pt-4 border-t border-gray-200">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-subtle">
                 Need help? Contact our{' '}
                 <a href="mailto:support@villa-app.com" className="text-blue-600 hover:underline">
                   support team
@@ -173,5 +175,3 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
     </html>
   );
 }
-
-

@@ -2,7 +2,7 @@
  * Tests for IP extraction utilities
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
 import { NextRequest } from 'next/server';
 import { getClientIp } from '@/lib/net/getClientIp';
 

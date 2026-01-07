@@ -12,8 +12,8 @@ import { useToast } from '@/components/Toast';
 const ApartmentLocationMap = dynamic(() => import('@/components/ApartmentLocationMap'), {
   ssr: false,
   loading: () => (
-    <div className="h-[400px] bg-gray-100 rounded-lg flex items-center justify-center">
-      <div className="text-sm text-gray-500">Loading map...</div>
+    <div className="h-[400px] surface-subtle rounded-lg flex items-center justify-center">
+      <div className="text-sm text-subtle">Loading map...</div>
     </div>
   )
 });
@@ -150,7 +150,7 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
       ) : null}
       {showMap && (
         <div className="mb-6">
-          <ApartmentLocationMap 
+          <ApartmentLocationMap
             locale={locale}
             height="400px"
             zoom={13}
@@ -161,7 +161,7 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
             nearbyAttractions={categorySlug === 'sightseeing' ? items : []}
           />
           <div className="mt-3 text-center">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-subtle">
               🏡 Apartment location and nearby {categorySlug} • Zoom and click markers for details
             </p>
           </div>
@@ -170,7 +170,7 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
       {/* Skeleton while no items loaded (initial mount) */}
       {items.length === 0 && (
         <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(170px,1fr))] mb-8">
-          {Array.from({length:6}).map((_,i)=><ListingCardSkeleton key={i}/>)}
+          {Array.from({ length: 6 }).map((_, i) => <ListingCardSkeleton key={i} />)}
         </div>
       )}
       {/* For non-phones categories, render Featured/other groups and FilterDrawer as before */}
@@ -184,7 +184,7 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
           )}
           {renderGroup(rest, true)}
           {filtered.length === 0 && (
-            <div className="text-xs text-gray-600 px-2">{emptyLabel}</div>
+            <div className="text-xs text-subtle px-2">{emptyLabel}</div>
           )}
           <FilterDrawer open={filtersOpen} onClose={() => setFiltersOpen(false)} title={ui?.filters || 'Filters'}>
             <div className="space-y-4">
@@ -201,7 +201,7 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
               </div>
               <div>
                 <h3 className="text-xs font-semibold uppercase mb-1 text-small-strong">Stub Controls</h3>
-                <p className="text-xs text-small-strong" style={{fontWeight:400}}>Add price range, rating slider, open now, etc.</p>
+                <p className="text-xs text-small-strong" style={{ fontWeight: 400 }}>Add price range, rating slider, open now, etc.</p>
               </div>
               <div>
                 <button onClick={() => { setActive([]); }} className="text-xs underline">{ui?.resetAll || 'Reset All'}</button>

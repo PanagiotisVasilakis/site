@@ -54,7 +54,7 @@ export default function GuestDataViewer() {
       const params = new URLSearchParams(window.location.search)
       const token = params.get('token')?.trim()
       if (token) {
-  window.sessionStorage?.setItem(ADMIN_SECRET_STORAGE_KEY, token)
+        window.sessionStorage?.setItem(ADMIN_SECRET_STORAGE_KEY, token)
         params.delete('token')
         const url = new URL(window.location.href)
         url.search = params.toString()
@@ -101,7 +101,7 @@ export default function GuestDataViewer() {
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return
-    
+
     setLoading(true)
     setError('')
     try {
@@ -123,7 +123,7 @@ export default function GuestDataViewer() {
 
       const response = await internalFetch(url)
       const data = await response.json()
-      
+
       if (response.ok && data.success) {
         const resultBookings = searchType === 'reference' ? [data.data.booking] : data.data.bookings
         setBookings(resultBookings || [])
@@ -167,17 +167,17 @@ export default function GuestDataViewer() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
+    <div className="min-h-screen p-6" style={{ background: 'var(--sand-50)' }}>
       <div className="max-w-7xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl shadow-lg p-6 mb-6"
+          className="surface-card rounded-xl shadow-lg p-6 mb-6"
         >
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl page-title mb-2">
             🏠 Guest Data Viewer
           </h1>
-          <p className="text-gray-600">
+          <p className="text-body">
             View and manage guest bookings and check-in information
           </p>
         </motion.div>
@@ -188,23 +188,23 @@ export default function GuestDataViewer() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6"
+            className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 text-center"
           >
-            <div className="bg-white p-4 rounded-lg shadow">
+            <div className="surface-card p-4 rounded-lg shadow">
               <div className="text-2xl font-bold text-blue-600">{stats.totalBookings}</div>
-              <div className="text-sm text-gray-600">Total Bookings</div>
+              <div className="text-sm text-subtle">Total Bookings</div>
             </div>
-            <div className="bg-white p-4 rounded-lg shadow">
+            <div className="surface-card p-4 rounded-lg shadow">
               <div className="text-2xl font-bold text-green-600">{stats.totalUsers}</div>
-              <div className="text-sm text-gray-600">Total Users</div>
+              <div className="text-sm text-subtle">Total Users</div>
             </div>
-            <div className="bg-white p-4 rounded-lg shadow">
+            <div className="surface-card p-4 rounded-lg shadow">
               <div className="text-2xl font-bold text-purple-600">{stats.totalIdentities}</div>
-              <div className="text-sm text-gray-600">Verified IDs</div>
+              <div className="text-sm text-subtle">Verified IDs</div>
             </div>
-            <div className="bg-white p-4 rounded-lg shadow">
+            <div className="surface-card p-4 rounded-lg shadow">
               <div className="text-2xl font-bold text-orange-600">{stats.totalCheckins}</div>
-              <div className="text-sm text-gray-600">Check-ins</div>
+              <div className="text-sm text-subtle">Check-ins</div>
             </div>
           </motion.div>
         )}
@@ -214,14 +214,15 @@ export default function GuestDataViewer() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-white rounded-lg shadow p-6 mb-6"
+          className="surface-card rounded-lg shadow p-6 mb-6"
         >
-          <h2 className="text-xl font-semibold mb-4">Search Bookings</h2>
+          <h2 className="text-xl section-title mb-4">Search Bookings</h2>
           <div className="flex flex-col sm:flex-row gap-4">
             <select
               value={searchType}
               onChange={(e) => setSearchType(e.target.value as 'reference' | 'phone' | 'date')}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent surface-interactive"
+              style={{ borderColor: 'var(--border-soft)' }}
             >
               <option value="reference">Reference + Last Name</option>
               <option value="phone">Phone Number</option>
@@ -233,10 +234,11 @@ export default function GuestDataViewer() {
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={
                 searchType === 'reference' ? 'ABC123 Smith' :
-                searchType === 'phone' ? '+306912345678' :
-                '2024-12-25'
+                  searchType === 'phone' ? '+306912345678' :
+                    '2024-12-25'
               }
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent surface-interactive"
+              style={{ borderColor: 'var(--border-soft)' }}
             />
             <button
               onClick={handleSearch}
@@ -260,7 +262,7 @@ export default function GuestDataViewer() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded mb-6"
+            className="bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded mb-6 dark:bg-red-900/40 dark:text-red-300 dark:border-red-900"
           >
             {error}
           </motion.div>
@@ -276,13 +278,13 @@ export default function GuestDataViewer() {
           {loading ? (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="mt-4 text-gray-600">Loading bookings...</p>
+              <p className="mt-4 text-body">Loading bookings...</p>
             </div>
           ) : bookings.length === 0 ? (
-            <div className="bg-white rounded-lg shadow p-8 text-center">
+            <div className="surface-card rounded-lg shadow p-8 text-center">
               <div className="text-6xl mb-4">📭</div>
-              <h3 className="text-xl font-semibold text-gray-700 mb-2">No Bookings Found</h3>
-              <p className="text-gray-600">
+              <h3 className="text-xl section-title mb-2">No Bookings Found</h3>
+              <p className="text-body">
                 Bookings will appear here after guests complete the check-in process.
               </p>
             </div>
@@ -293,28 +295,27 @@ export default function GuestDataViewer() {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.1 * index }}
-                className="bg-white rounded-lg shadow p-6"
+                className="surface-panel rounded-lg shadow p-6"
               >
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h3 className="text-xl font-semibold text-gray-900">
+                    <h3 className="text-xl section-title">
                       Booking {booking.booking.reference || booking.booking.id}
                     </h3>
-                    <p className="text-gray-600">
+                    <p className="text-body">
                       {booking.booking.startDate} to {booking.booking.endDate}
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <span className={`px-3 py-1 rounded-full text-sm ${
-                      booking.checkin 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
+                    <span className={`px-3 py-1 rounded-full text-sm ${booking.checkin
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+                      : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300'
+                      }`}>
                       {booking.checkin ? 'Checked In' : 'Pending'}
                     </span>
                     <button
                       onClick={() => exportBooking(booking.booking.id)}
-                      className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm hover:bg-blue-200"
+                      className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300"
                     >
                       Export
                     </button>
@@ -323,36 +324,36 @@ export default function GuestDataViewer() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
-                    <h4 className="font-medium text-gray-700">Guest Info</h4>
-                    <p className="text-sm text-gray-600">📱 {booking.user.phone}</p>
-                    <p className="text-sm text-gray-600">📧 {booking.user.email || 'Not provided'}</p>
-                    <p className="text-sm text-gray-600">🌍 {booking.user.countryOrigin}</p>
+                    <h4 className="font-medium text-text-accent">Guest Info</h4>
+                    <p className="text-sm text-body">📱 {booking.user.phone}</p>
+                    <p className="text-sm text-body">📧 {booking.user.email || 'Not provided'}</p>
+                    <p className="text-sm text-body">🌍 {booking.user.countryOrigin}</p>
                   </div>
                   <div>
-                    <h4 className="font-medium text-gray-700">Booking Details</h4>
-                    <p className="text-sm text-gray-600">📄 Source: {booking.booking.source}</p>
-                    <p className="text-sm text-gray-600">🆔 IDs: {booking.identities.length} verified</p>
-                    <p className="text-sm text-gray-600">📝 Created: {new Date(booking.booking.createdAt).toLocaleDateString()}</p>
+                    <h4 className="font-medium text-text-accent">Booking Details</h4>
+                    <p className="text-sm text-body">📄 Source: {booking.booking.source}</p>
+                    <p className="text-sm text-body">🆔 IDs: {booking.identities.length} verified</p>
+                    <p className="text-sm text-body">📝 Created: {new Date(booking.booking.createdAt).toLocaleDateString()}</p>
                   </div>
                   {booking.checkin && (
                     <div>
-                      <h4 className="font-medium text-gray-700">Check-in</h4>
-                      <p className="text-sm text-gray-600">⏰ {booking.checkin.arrivalTime}</p>
+                      <h4 className="font-medium text-text-accent">Check-in</h4>
+                      <p className="text-sm text-body">⏰ {booking.checkin.arrivalTime}</p>
                       {booking.checkin.specialRequests && (
-                        <p className="text-sm text-gray-600">💬 {booking.checkin.specialRequests}</p>
+                        <p className="text-sm text-body">💬 {booking.checkin.specialRequests}</p>
                       )}
                     </div>
                   )}
                 </div>
 
                 {booking.identities.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <h4 className="font-medium text-gray-700 mb-2">Verified Documents</h4>
+                  <div className="mt-4 pt-4 border-t border-soft" style={{ borderColor: 'var(--border-soft)' }}>
+                    <h4 className="font-medium text-text-accent mb-2">Verified Documents</h4>
                     <div className="flex flex-wrap gap-2">
                       {booking.identities.map((identity, i) => (
                         <span
                           key={i}
-                          className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-sm"
+                          className="px-2 py-1 surface-subtle text-body rounded text-sm"
                         >
                           {identity.type} ***{identity.last4Mask}
                         </span>

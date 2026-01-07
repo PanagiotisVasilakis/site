@@ -97,7 +97,7 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
     en: {
         appTitle: "Guest Guide",
         homeTitle: "Dolce Far Niente",
-        homeSubtitle: "Your personal guide to a relaxing stay.",
+        homeSubtitle: "Experience the sweet art of relaxation in a haven where you feel instantly at home.",
         backHome: "← Back home",
         skipLink: "Skip to content",
         details: "Details →",
@@ -176,7 +176,7 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
     el: {
         appTitle: "Οδηγός Επισκεπτών",
         homeTitle: "Dolce Far Niente",
-        homeSubtitle: "Ο προσωπικός σας οδηγός για μια χαλαρωτική διαμονή.",
+        homeSubtitle: "Ζήστε τη γλυκιά τέχνη της χαλάρωσης, σε ένα καταφύγιο που νιώθετε αμέσως σαν το σπίτι σας.",
         backHome: "← Πίσω στην αρχική",
         skipLink: "Μετάβαση στο περιεχόμενο",
         details: "Λεπτομέρειες →",

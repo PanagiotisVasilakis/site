@@ -9,7 +9,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { jwtVerify, SignJWT } from 'jose';
 import { logger } from '@/lib/logger-enterprise';
-import { TextEncoder } from 'util';
+// Note: TextEncoder is globally available in modern Node.js/browsers - don't import from 'util'
 
 /**
  * Session cookie configuration
@@ -112,7 +112,7 @@ export async function createSessionCookie(
   // Create a proper key buffer for signing
   const encoder = new TextEncoder();
   const secretBytes = encoder.encode(secretKey);
-  
+
   // Ensure we have enough key material (HS256 requires at least 256 bits = 32 bytes)
   let keyBuffer: Uint8Array;
   if (secretBytes.byteLength < 32) {
@@ -123,7 +123,7 @@ export async function createSessionCookie(
     // Truncate if too long (this is for testing only!)
     keyBuffer = secretBytes.slice(0, 32);
   }
-  
+
   const jwt = await new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt(iat)
@@ -162,14 +162,25 @@ export async function parseSessionCookie(
   }
 
   try {
-    const { payload } = await jwtVerify(cookieValue, new TextEncoder().encode(secretKey));
-    
+    // Use same key derivation as createSessionCookie
+    const encoder = new TextEncoder();
+    const secretBytes = encoder.encode(secretKey);
+    let keyBuffer: Uint8Array;
+    if (secretBytes.byteLength < 32) {
+      keyBuffer = new Uint8Array(32);
+      keyBuffer.set(secretBytes);
+    } else {
+      keyBuffer = secretBytes.slice(0, 32);
+    }
+
+    const { payload } = await jwtVerify(cookieValue, keyBuffer);
+
     // Check expiration
     const now = Math.floor(Date.now() / 1000);
     if (payload.exp && payload.exp < now) {
       return null; // Expired
     }
-    
+
     return payload as SessionPayload;
   } catch (error) {
     logger.warn('Failed to parse session cookie', { error });
@@ -191,11 +202,11 @@ export async function getSessionFromCookies(
   try {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get(cookieName)?.value;
-    
+
     if (!sessionCookie) {
       return null;
     }
-    
+
     return parseSessionCookie(sessionCookie, secret);
   } catch (error) {
     logger.warn('Failed to access session cookie', { error });

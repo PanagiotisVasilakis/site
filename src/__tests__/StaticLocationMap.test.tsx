@@ -75,7 +75,8 @@ describe('StaticLocationMap', () => {
   it('renders Greek content', () => {
     render(<StaticLocationMap locale="el" compact />);
     const title = screen.getByTestId('static-map-title');
-    expect(title).toHaveTextContent(/Εξερεύνηση της Πόλης μας/i);
+    // Updated to match new i18n dictionary value
+    expect(title).toHaveTextContent(/Τοποθεσία & Κοντινά/i);
     expect(screen.getByText(/Καλαμάτα/)).toBeInTheDocument();
     // Snapshot the Greek instance
     expect(title.parentElement?.parentElement?.parentElement?.parentElement).toMatchInlineSnapshot(`
@@ -102,7 +103,7 @@ describe('StaticLocationMap', () => {
                 class="text-lg sm:text-xl font-semibold text-brand-800"
                 data-testid="static-map-title"
               >
-                Εξερεύνηση της Πόλης μας
+                Τοποθεσία & Κοντινά
               </h3>
             </div>
             <div

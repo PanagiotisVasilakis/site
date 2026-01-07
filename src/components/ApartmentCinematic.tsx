@@ -264,7 +264,7 @@ export default function ApartmentCinematic({ locale, houseText, photos }: Props)
           --apartment-border: var(--border-soft);
         }
         .apartment-content-section {
-          background: #ffffff;
+          background: var(--sand-50);
           color: var(--apartment-ink);
         }
         [data-theme="dark"] .apartment-content-section {

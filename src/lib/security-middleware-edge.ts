@@ -206,10 +206,11 @@ class RateLimitMiddleware {
     const now = Date.now();
     const resetTime = now + this.config.windowMs;
 
-  const backend = typeof process !== 'undefined' && process.env ? process.env.RATE_LIMIT_BACKEND || '' : '';
+    const backend = typeof process !== 'undefined' && process.env ? process.env.RATE_LIMIT_BACKEND || '' : '';
     const isEdgeRuntime = typeof (globalThis as unknown as { EdgeRuntime?: string }).EdgeRuntime !== 'undefined';
+    const upstashConfigured = typeof process !== 'undefined' && process.env?.UPSTASH_REDIS_REST_URL;
 
-    if (backend === 'redis' || isEdgeRuntime) {
+    if ((backend === 'redis' || isEdgeRuntime) && upstashConfigured) {
       try {
         const upstash = await import('@/lib/upstash');
         const count = await upstash.incrWithExpire(key, this.config.windowMs);

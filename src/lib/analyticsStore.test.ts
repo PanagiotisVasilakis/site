@@ -1,6 +1,6 @@
 /// <reference types="vitest" />
 // Vitest globals are enabled; no named imports needed.
-import { describe, expect, it } from 'vitest';
+
 import { addHits, getHits, topPaths, hourBuckets, dayBuckets } from './analyticsStore';
 
 describe('analyticsStore basic', () => {

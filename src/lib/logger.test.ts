@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
 import { logger } from './logger';
 
 describe('logger', () => {
@@ -8,10 +8,10 @@ describe('logger', () => {
   let debugSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
-    debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { });
+    infoSpy = vi.spyOn(console, 'info').mockImplementation(() => { });
+    debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => { });
   });
 
   afterEach(() => {
@@ -22,11 +22,11 @@ describe('logger', () => {
     const err = new Error('boom');
     logger.error('test error', err);
     expect(errorSpy).toHaveBeenCalled();
-  const [, metaUnknown] = errorSpy.mock.calls[0];
-  const meta: any = metaUnknown as any;
-  expect(meta).toBeTruthy();
-  expect(meta.name).toBe('Error');
-  expect(meta.message).toBe('boom');
+    const [, metaUnknown] = errorSpy.mock.calls[0];
+    const meta: any = metaUnknown as any;
+    expect(meta).toBeTruthy();
+    expect(meta.name).toBe('Error');
+    expect(meta.message).toBe('boom');
     // In test env, stack should be included
     expect(typeof meta.stack === 'string' || meta.stack === undefined).toBe(true);
   });
@@ -36,7 +36,7 @@ describe('logger', () => {
     a.self = a;
     logger.warn('circular', a);
     expect(warnSpy).toHaveBeenCalled();
-  const [, meta] = warnSpy.mock.calls[0] as any;
+    const [, meta] = warnSpy.mock.calls[0] as any;
     // The circular reference should be replaced with a marker
     expect(JSON.stringify(meta)).toContain('[Circular]');
   });

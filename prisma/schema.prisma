@@ -192,15 +192,7 @@ model MfaChallenge {
   @@map("mfa_challenges")
 }
 
-model RateLimit {
-  key       String   @id
-  count     Int
-  resetTime DateTime @map("reset_time") @db.Timestamptz(6)
 
-  @@index([resetTime], map: "idx_rate_limits_reset_time")
-  @@index([count], map: "idx_rate_limits_count")
-  @@map("rate_limits")
-}
 
 model CacheEntry {
   key       String   @id
