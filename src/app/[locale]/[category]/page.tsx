@@ -58,6 +58,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
         momentsLayout={isMoments}
         emptyLabel={t.emptyState}
         ui={t.ui}
+        momentsFilters={t.momentsFilters}
       />
 
     </div>

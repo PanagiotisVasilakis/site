@@ -8,6 +8,7 @@ import dynamic from 'next/dynamic';
 import { useFavorites } from '@/lib/favorites';
 import { useToast } from '@/components/Toast';
 import { MomentsListCard } from '@/components/moments';
+import { MomentsFilterMenu, filterMomentsByCategory, type MomentsFilterKey } from '@/components/moments/MomentsFilterMenu';
 import { momentsLayoutConfig } from '@/config/momentsLayoutConfig';
 
 // Dynamic import for map component - only loads when needed
@@ -42,12 +43,14 @@ interface Props {
   phonesLayout?: boolean;
   momentsLayout?: boolean;
   ui?: { filters: string; map: string; list: string; resetAll: string; activeTags: string; none: string; };
+  momentsFilters?: { all: string; beaches: string; museums: string; restaurants: string; bars: string; brunchs: string; taygetos: string; sites: string; nearby: string; };
 }
 
-function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, ui, phonesLayout, momentsLayout }: Props) {
+function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, ui, phonesLayout, momentsLayout, momentsFilters }: Props) {
   const [active, setActive] = useState<string[]>([]);
   const [showMap, setShowMap] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [momentsFilter, setMomentsFilter] = useState<MomentsFilterKey>('all');
   const { isFavorite, toggle } = useFavorites();
   const { push } = useToast();
   // URL persistence
@@ -159,8 +162,13 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
       {/* Moments layout: using centralized MomentsListCard component */}
       {categorySlug === 'moments' && momentsLayout && !showMap ? (
         <div className={momentsLayoutConfig.grid.containerClass}>
+          <MomentsFilterMenu
+            active={momentsFilter}
+            onChange={setMomentsFilter}
+            ui={momentsFilters}
+          />
           <div className={momentsLayoutConfig.grid.gridClass}>
-            {items.map(i => (
+            {filterMomentsByCategory(items, momentsFilter).map(i => (
               <MomentsListCard
                 key={i.id}
                 id={i.id}
@@ -176,6 +184,9 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
               />
             ))}
           </div>
+          {filterMomentsByCategory(items, momentsFilter).length === 0 && (
+            <div className="text-center py-8 text-sm text-subtle">{emptyLabel}</div>
+          )}
         </div>
       ) : null}
       {showMap && (

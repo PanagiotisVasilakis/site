@@ -37,6 +37,15 @@ export const momentsLayoutConfig = {
         tagClass: 'text-xs rounded-full px-2 py-1 border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)]',
     },
 
+    /** Filter menu for moments categories (Sticky Bar) */
+    filterMenu: {
+        containerClass: 'filter-bar mb-6',
+        scrollClass: 'flex gap-2 overflow-x-auto scrollbar-hide w-full px-2',
+        buttonClass: 'flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap',
+        activeClass: 'bg-brand-600 text-white shadow-sm',
+        inactiveClass: 'text-[color:var(--text-accent)] hover:bg-[color:var(--layer-hover)]',
+    },
+
     /** Badge for recently updated items */
     updatedBadge: {
         class: 'text-xs rounded bg-amber-200 text-amber-900 px-2 py-0.5',

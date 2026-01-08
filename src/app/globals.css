@@ -1627,6 +1627,29 @@ html:not([data-theme="dark"]) .bg-app-vertical {
     0 0 60px rgba(18, 179, 164, 0.08) inset;
 }
 
+/* Filter bar for Moments page - matches booking bar aesthetic */
+.filter-bar {
+  display: flex;
+  background: white;
+  border-radius: 1000px;
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  position: relative;
+  max-width: min(100%, 850px);
+  margin: 0 auto;
+  padding: 0.35rem;
+  /* Padding for the scroll container inside */
+}
+
+[data-theme="dark"] .filter-bar {
+  background: linear-gradient(135deg, rgba(23, 35, 37, 0.85) 0%, rgba(17, 25, 26, 0.9) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 60px rgba(18, 179, 164, 0.08) inset;
+}
+
 .search-bar:focus-within {
   box-shadow: var(--shadow-glow);
 }

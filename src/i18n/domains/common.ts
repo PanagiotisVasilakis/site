@@ -76,6 +76,17 @@ export interface CommonDictionary {
         phones: string;
         moments: string;
     };
+    momentsFilters?: {
+        all: string;
+        beaches: string;
+        museums: string;
+        restaurants: string;
+        bars: string;
+        brunchs: string;
+        taygetos: string;
+        sites: string;
+        nearby: string;
+    };
     map?: {
         loading: string;
         apartmentMarkerTitle: string;
@@ -160,6 +171,17 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             phones: "Important Phones",
             moments: "Kalamata Moments",
         },
+        momentsFilters: {
+            all: "All",
+            beaches: "Beaches",
+            museums: "Museums",
+            restaurants: "Restaurants",
+            bars: "Bars",
+            brunchs: "Brunchs",
+            taygetos: "Taygetos",
+            sites: "Sites",
+            nearby: "Nearby",
+        },
         map: {
             loading: "Loading map...",
             apartmentMarkerTitle: "Your Apartment",
@@ -237,6 +259,17 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
         categories: {
             phones: "Χρήσιμα Τηλέφωνα",
             moments: "Η Καλαματα μας",
+        },
+        momentsFilters: {
+            all: "Όλα",
+            beaches: "Παραλίες",
+            museums: "Μουσεία",
+            restaurants: "Εστιατόρια",
+            bars: "Μπαρ",
+            brunchs: "Brunch",
+            taygetos: "Ταΰγετος",
+            sites: "Αξιοθέατα",
+            nearby: "Κοντά",
         },
         map: {
             loading: "Φόρτωση χάρτη...",
