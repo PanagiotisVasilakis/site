@@ -12,7 +12,7 @@ const DEFAULT_FLAGS: FeatureFlags = {
   checkinEnabled: true,
 };
 
-const FILE = path.join(process.cwd(), 'feature-flags.enc.json');
+const FILE = path.join(process.cwd(), 'data', 'secure', 'feature-flags.enc.json');
 
 function readFlags(): FeatureFlags {
   try {

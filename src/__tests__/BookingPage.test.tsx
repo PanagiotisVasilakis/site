@@ -63,7 +63,7 @@ describe('BookingPage (server component harness)', () => {
         class="space-y-3"
       >
         <h4
-          class="font-semibold"
+          class="font-serif italic font-bold"
         >
           Price breakdown
         </h4>

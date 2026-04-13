@@ -86,7 +86,7 @@ class GuestDataCLI {
   private loadData(): GuestDataFile {
     if (this.dataCache) return this.dataCache;
 
-    const filePath = path.join(process.cwd(), 'secure-data.enc.json');
+    const filePath = path.join(process.cwd(), 'data', 'secure', 'secure-data.enc.json');
     
     if (!fs.existsSync(filePath)) {
       console.log('📄 No guest data file found. No bookings have been created yet.');
@@ -351,7 +351,7 @@ class GuestDataCLI {
     console.log('  npm run query-guests search 2024-12-25');
     console.log('  npm run query-guests export booking-id-123');
     console.log('\n📁 Data Location:');
-    console.log('  ' + path.join(process.cwd(), 'secure-data.enc.json'));
+    console.log('  ' + path.join(process.cwd(), 'data', 'secure', 'secure-data.enc.json'));
     console.log('\n🔒 Security Note:');
     console.log('  Guest data is encrypted for security. Some operations may require decryption.');
   }

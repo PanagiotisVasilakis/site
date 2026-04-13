@@ -11,7 +11,7 @@ const preferencesSchema = z.object({
   checkOutTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Check-out time must be in HH:MM format'),
 });
 
-const PREFERENCES_FILE = path.join(process.cwd(), 'checkin-preferences.enc.json');
+const PREFERENCES_FILE = path.join(process.cwd(), 'data', 'secure', 'checkin-preferences.enc.json');
 
 interface CheckInPreferences {
   checkInTime: string;

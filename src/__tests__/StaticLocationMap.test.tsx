@@ -30,7 +30,7 @@ describe('StaticLocationMap', () => {
                 🏖️
               </div>
               <h3
-                class="text-lg sm:text-xl font-semibold text-brand-800"
+                class="text-lg sm:text-xl font-serif italic font-bold text-brand-800"
                 data-testid="static-map-title"
               >
                 Explore the Neighborhood
@@ -100,7 +100,7 @@ describe('StaticLocationMap', () => {
                 🏖️
               </div>
               <h3
-                class="text-lg sm:text-xl font-semibold text-brand-800"
+                class="text-lg sm:text-xl font-serif italic font-bold text-brand-800"
                 data-testid="static-map-title"
               >
                 Τοποθεσία & Κοντινά

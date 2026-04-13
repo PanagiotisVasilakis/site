@@ -10,7 +10,7 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
-  { ignores: ["**/node_modules/**", "**/.next/**", "out/**", "build/**", "next-env.d.ts", "**/jscpd-report/**"] },
+  { ignores: ["**/node_modules/**", "**/.next/**", "out/**", "build/**", "next-env.d.ts", "**/reports/**"] },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
     rules: { 'internal-fetch/no-internal-fetch': 'warn' }
@@ -29,7 +29,7 @@ const eslintConfig = [
     plugins: {
       'internal-fetch': {
         rules: {
-          'no-internal-fetch': (await import('./eslint-rules/internal-fetch.js')).default
+          'no-internal-fetch': (await import('./scripts/eslint-rules/internal-fetch.js')).default
         }
       }
     }
