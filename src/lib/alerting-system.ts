@@ -282,22 +282,27 @@ export class AlertingSystem {
         },
       },
     });
-    
+
     // Webhook notification channel (example)
-    this.addNotificationChannel('webhook', {
-      type: 'webhook',
-      config: {
-        webhook: {
-          url: process.env.ALERT_WEBHOOK_URL || 'http://localhost:3000/api/alerts/webhook',
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + (process.env.ALERT_WEBHOOK_TOKEN || 'test-token'),
+    const webhookToken = process.env.ALERT_WEBHOOK_TOKEN;
+    if (webhookToken) {
+      this.addNotificationChannel('webhook', {
+        type: 'webhook',
+        config: {
+          webhook: {
+            url: process.env.ALERT_WEBHOOK_URL || 'http://localhost:3000/api/alerts/webhook',
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${webhookToken}`,
+            },
+            timeout: 5000,
           },
-          timeout: 5000,
         },
-      },
-    });
+      });
+    } else {
+      logger.warn('ALERT_WEBHOOK_TOKEN not configured; webhook channel disabled');
+    }
   }
   
   private startEvaluation(): void {

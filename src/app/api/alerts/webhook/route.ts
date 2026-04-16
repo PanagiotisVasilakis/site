@@ -8,6 +8,7 @@ import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode } from 
 import { logger } from '@/lib/logger-enterprise';
 import { metrics } from '@/lib/metrics-collector';
 import { tracer, SpanStatus } from '@/lib/distributed-tracing';
+import crypto from 'node:crypto';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,7 +39,16 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   try {
     // Validate webhook authentication
     const authHeader = request.headers.get('authorization');
-    const expectedToken = process.env.ALERT_WEBHOOK_TOKEN || 'test-token';
+    const expectedToken = process.env.ALERT_WEBHOOK_TOKEN;
+
+    if (!expectedToken) {
+      throw new ApiError(
+        ApiErrorCode.SERVICE_UNAVAILABLE,
+        'Webhook token is not configured',
+        {},
+        correlationId
+      );
+    }
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       throw new ApiError(
@@ -50,7 +60,11 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     }
     
     const token = authHeader.substring(7); // Remove 'Bearer '
-    if (token !== expectedToken) {
+    const tokenBuffer = Buffer.from(token, 'utf8');
+    const expectedBuffer = Buffer.from(expectedToken, 'utf8');
+    const isValidToken = tokenBuffer.length === expectedBuffer.length
+      && crypto.timingSafeEqual(tokenBuffer, expectedBuffer);
+    if (!isValidToken) {
       throw new ApiError(
         ApiErrorCode.UNAUTHORIZED,
         'Invalid webhook token',

@@ -1,0 +1,17 @@
+[Unit]
+Description=QR City Guide Bootstrap (Build and Migrate)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=__APP_USER__
+Group=__APP_GROUP__
+WorkingDirectory=__REPO_ROOT__
+Environment=NODE_ENV=production
+EnvironmentFile=__ENV_FILE__
+ExecStart=/usr/bin/env bash __REPO_ROOT__/scripts/system-orchestrator.sh bootstrap --profile production --no-docker-fallback
+TimeoutStartSec=1800
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal

@@ -31,3 +31,44 @@ jobs:
           path: coverage/lcov.info
       - name: Build
         run: npm run build
+
+  orchestrator-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci_user
+          POSTGRES_PASSWORD: ci_pass
+          POSTGRES_DB: site_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci_user -d site_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://ci_user:ci_pass@localhost:5432/site_ci
+      ADMIN_JWT_SECRET: ci-admin-jwt-secret-should-be-32-chars-0001
+      ADMIN_DASH_SECRET: ci-admin-dash-secret-0001
+      SECURITY_ENC_KEY_HEX: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      SESSION_SECRET: ci-session-secret-should-be-32-chars-0001
+      SECURITY_PEPPER: ci-security-pepper
+      NEXT_PUBLIC_SITE_URL: https://example.test
+      ALLOWED_ORIGINS: https://example.test
+      VALID_API_KEYS: ci-read-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install deps
+        run: npm ci --no-audit --no-fund
+
+      - name: Orchestrator check mode
+        run: npm run ci:orchestrator-check

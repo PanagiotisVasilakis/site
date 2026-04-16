@@ -8,6 +8,7 @@ import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode } from 
 import { logger } from '@/lib/logger-enterprise';
 import { metrics } from '@/lib/metrics-collector';
 import { tracer, SpanStatus } from '@/lib/distributed-tracing';
+import { isAdminRequest } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,6 +53,60 @@ interface MetricRecord {
   timestamp: number;
   value: number;
   tags?: Record<string, string>;
+}
+
+function parseCsvEnv(envName: string): string[] {
+  return (process.env[envName] || '')
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+function extractApiKey(request: NextRequest): string | undefined {
+  const apiKey = request.headers.get('x-api-key')?.trim();
+  if (apiKey) return apiKey;
+
+  const authHeader = request.headers.get('authorization')?.trim();
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7).trim();
+    return token || undefined;
+  }
+
+  return undefined;
+}
+
+function hasReadApiKeyAccess(request: NextRequest): boolean {
+  const key = extractApiKey(request);
+  if (!key) return false;
+  const readKeys = parseCsvEnv('VALID_API_KEYS');
+  const writeKeys = parseCsvEnv('METRICS_WRITE_API_KEYS');
+  return readKeys.includes(key) || writeKeys.includes(key);
+}
+
+function hasWriteApiKeyAccess(request: NextRequest): boolean {
+  const key = extractApiKey(request);
+  if (!key) return false;
+  const writeKeys = parseCsvEnv('METRICS_WRITE_API_KEYS');
+  return writeKeys.includes(key);
+}
+
+function assertMetricsAccess(request: NextRequest, access: 'read' | 'write', correlationId?: string): void {
+  if (isAdminRequest(request)) return;
+
+  const hasAccess = access === 'write'
+    ? hasWriteApiKeyAccess(request)
+    : hasReadApiKeyAccess(request);
+
+  if (!hasAccess) {
+    throw new ApiError(
+      ApiErrorCode.FORBIDDEN,
+      access === 'write'
+        ? 'Admin or metrics-write API key required'
+        : 'Admin or API key required',
+      undefined,
+      correlationId
+    );
+  }
 }
 
 function isAggregation(v: string | null): v is Aggregation {
@@ -149,12 +204,50 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   const startTime = Date.now();
 
   try {
+    assertMetricsAccess(request, 'read', correlationId);
+
     const url = new URL(request.url);
+    const timeRangeRaw = url.searchParams.get('timeRange');
+    const parsedTimeRange = timeRangeRaw ? Number.parseInt(timeRangeRaw, 10) : 3600000;
+    if (!Number.isFinite(parsedTimeRange) || parsedTimeRange <= 0 || parsedTimeRange > 7 * 24 * 60 * 60 * 1000) {
+      throw new ApiError(
+        ApiErrorCode.VALIDATION_ERROR,
+        'timeRange must be a positive integer up to 604800000',
+        { timeRange: timeRangeRaw },
+        correlationId
+      );
+    }
+
+    let parsedTags: Record<string, string> | undefined;
+    const tagsRaw = url.searchParams.get('tags');
+    if (tagsRaw) {
+      try {
+        const decoded = JSON.parse(tagsRaw) as unknown;
+        if (!decoded || typeof decoded !== 'object' || Array.isArray(decoded)) {
+          throw new Error('tags must be an object');
+        }
+
+        parsedTags = Object.entries(decoded as Record<string, unknown>).reduce<Record<string, string>>((acc, [k, v]) => {
+          if (typeof v === 'string') {
+            acc[k] = v;
+          }
+          return acc;
+        }, {});
+      } catch {
+        throw new ApiError(
+          ApiErrorCode.VALIDATION_ERROR,
+          'tags must be a valid JSON object',
+          { tags: tagsRaw },
+          correlationId
+        );
+      }
+    }
+
     const query: MetricsQuery = {
       metric: url.searchParams.get('metric') || undefined,
-      timeRange: parseInt(url.searchParams.get('timeRange') || '3600000'), // Default: 1 hour
+      timeRange: parsedTimeRange,
       aggregation: isAggregation(url.searchParams.get('aggregation')) ? (url.searchParams.get('aggregation') as Aggregation) : 'avg',
-      tags: url.searchParams.get('tags') ? JSON.parse(url.searchParams.get('tags')!) : undefined,
+      tags: parsedTags,
     };
 
     // Ensure defaults for required fields
@@ -318,6 +411,8 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   const correlationId = logger.getContext()?.correlationId;
 
   try {
+    assertMetricsAccess(request, 'write', correlationId);
+
     const body = await request.json();
     
     const { metric, value, tags, type = 'gauge' } = body;

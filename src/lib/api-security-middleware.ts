@@ -228,8 +228,22 @@ export class XSSProtectionMiddleware {
   }
 
   private containsXSS(input: string, patterns: RegExp[]): boolean {
-    const decoded = decodeURIComponent(input);
-    return patterns.some(pattern => pattern.test(decoded));
+    let decoded = input;
+    try {
+      decoded = decodeURIComponent(input);
+    } catch {
+      // Malformed URI encodings are suspicious in request vectors.
+      return true;
+    }
+
+    return patterns.some(pattern => {
+      // Defensive reset for global regexes reused across multiple tests.
+      pattern.lastIndex = 0;
+      const decodedMatch = pattern.test(decoded);
+      pattern.lastIndex = 0;
+      const rawMatch = pattern.test(input);
+      return decodedMatch || rawMatch;
+    });
   }
 
   private logXSSAttempt(

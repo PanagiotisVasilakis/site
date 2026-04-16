@@ -49,6 +49,27 @@ function mapToken(token: {
   };
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function parseCompositeToken(token: string): { id?: string; secret: string } | null {
+  const normalized = token.trim();
+  if (!normalized) return null;
+
+  const separatorIndex = normalized.indexOf('.');
+  if (separatorIndex <= 0) {
+    // Legacy token format (secret only)
+    return { secret: normalized };
+  }
+
+  const id = normalized.slice(0, separatorIndex);
+  const secret = normalized.slice(separatorIndex + 1);
+  if (!UUID_REGEX.test(id) || !secret) {
+    return null;
+  }
+
+  return { id, secret };
+}
+
 async function create(
   userId: string,
   tokenHash: string,
@@ -81,6 +102,30 @@ async function create(
 
 async function verify(token: string): Promise<GuestRefreshTokenRec | undefined> {
   try {
+    const parsed = parseCompositeToken(token);
+    if (!parsed) return undefined;
+
+    const now = Date.now();
+
+    // O(1) path for modern token format: <token-id>.<secret>
+    if (parsed.id) {
+      const candidate = await prisma.refreshToken.findUnique({ where: { id: parsed.id } });
+      if (!candidate || candidate.revokedAt || candidate.expiresAt.getTime() <= now) {
+        return undefined;
+      }
+
+      if (!verifySensitive(parsed.secret, candidate.salt, candidate.tokenHash)) {
+        return undefined;
+      }
+
+      await prisma.refreshToken.update({
+        where: { id: candidate.id },
+        data: { lastUsedAt: new Date(now) },
+      });
+      return mapToken({ ...candidate, lastUsedAt: new Date(now) });
+    }
+
+    // Backward-compatible path for legacy tokens (secret-only format)
     const activeTokens = await prisma.refreshToken.findMany({
       where: {
         revokedAt: null,
@@ -91,9 +136,8 @@ async function verify(token: string): Promise<GuestRefreshTokenRec | undefined> 
       orderBy: { createdAt: 'desc' },
     });
 
-    const now = Date.now();
     for (const candidate of activeTokens) {
-      if (verifySensitive(token, candidate.salt, candidate.tokenHash)) {
+      if (verifySensitive(parsed.secret, candidate.salt, candidate.tokenHash)) {
         await prisma.refreshToken.update({
           where: { id: candidate.id },
           data: { lastUsedAt: new Date(now) },

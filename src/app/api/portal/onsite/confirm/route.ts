@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { withErrorHandler, validateRequestBody, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
+import { withErrorHandler, validateRequestBody, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import { guestStore } from '@/lib/guestDataStore';
 import { createRefreshCookie, createSessionCookie, signGuestSession } from '@/lib/guestSession';
@@ -82,29 +82,19 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   const jwt = signGuestSession({ user: { id: user.id }, booking: { id: booking.id } });
   const sess = createSessionCookie(jwt);
 
-  const res = createSuccessResponse({ redirect: '/check-in', bookingId: booking.id });
-  res.cookies.set(sess.name, sess.value, sess.options);
+  // Locale-aware redirect
+  const lang = request.cookies.get('lang')?.value;
+  const effLocale = lang && (locales as readonly string[]).includes(lang) ? lang : (defaultLocale as string);
+  // Build a redirect response and set cookies directly.
+  const redirectTo = `/${effLocale}/check-in?bookingId=${encodeURIComponent(booking.id)}`;
+  const redirect = NextResponse.redirect(redirectTo, 302);
+  redirect.cookies.set(sess.name, sess.value, sess.options);
 
   if (body.remember) {
     const issued = await guestStore.issueRefreshToken(user.id);
     const rtCookie = createRefreshCookie(issued.token);
-    res.cookies.set(rtCookie.name, rtCookie.value, rtCookie.options);
+    redirect.cookies.set(rtCookie.name, rtCookie.value, rtCookie.options);
   }
 
-  // Locale-aware redirect
-  const lang = request.cookies.get('lang')?.value;
-  const effLocale = lang && (locales as readonly string[]).includes(lang) ? lang : (defaultLocale as string);
-  // Build a redirect response and copy Set-Cookie headers from res
-  const redirectTo = `/${effLocale}/check-in?bookingId=${encodeURIComponent(booking.id)}`;
-  const redirect = NextResponse.redirect(redirectTo, 302);
-  // Carry over cookies
-  const cookiesHeader = res.headers.get('Set-Cookie');
-  if (cookiesHeader) {
-    // Multiple cookies may be joined by newlines; propagate each
-    const parts = cookiesHeader.split('\nSet-Cookie: ');
-    for (const p of parts) {
-      if (p) redirect.headers.append('Set-Cookie', p);
-    }
-  }
   return redirect;
 });

@@ -11,6 +11,27 @@ This guide documents how our continuous integration jobs provision PostgreSQL, c
 
 The remaining sections expand on each step with provider-specific commands and troubleshooting tips.
 
+## Orchestrator check mode in CI
+
+The repository CI pipeline includes an orchestrator check-mode sequence that validates startup prerequisites without launching a long-running server process:
+
+```bash
+npm run ci:orchestrator-check
+```
+
+This command executes:
+
+1. system-orchestrator check (env + DB contract)
+2. system-orchestrator migrate (Prisma readiness)
+3. system-orchestrator build (production build path)
+
+Additional behavior for reliability:
+
+- If local runtime is below required Node/npm versions, it bootstraps a portable Node runtime under `.runtime/tools`.
+- If `DATABASE_URL` is unreachable, it provisions a temporary local PostgreSQL container and tears it down automatically after the run.
+
+Use this command in pipeline jobs where you want deployment-grade validation in a non-daemon CI context.
+
 ## 1. Provisioning PostgreSQL for CI
 
 We support two provisioning models. Pick the option that matches your provider and cost envelope.

@@ -58,6 +58,7 @@ export default function CheckInInfo({
   const [copiedWifi, setCopiedWifi] = useState(false);
   const [checkInTime, setCheckInTime] = useState('15:00');
   const [checkOutTime, setCheckOutTime] = useState('11:00');
+  const [canEditTimes, setCanEditTimes] = useState(false);
   const [isEditingTimes, setIsEditingTimes] = useState(false);
   const [tempCheckInTime, setTempCheckInTime] = useState('15:00');
   const [tempCheckOutTime, setTempCheckOutTime] = useState('11:00');
@@ -76,10 +77,12 @@ export default function CheckInInfo({
             setCheckOutTime(data.data.checkOutTime || '11:00');
             setTempCheckInTime(data.data.checkInTime || '15:00');
             setTempCheckOutTime(data.data.checkOutTime || '11:00');
+            setCanEditTimes(Boolean(data.data.canEdit));
           }
         }
       } catch (error) {
         console.error('Failed to load check-in preferences:', error);
+        setCanEditTimes(false);
       }
     };
     loadPreferences();
@@ -93,6 +96,7 @@ export default function CheckInInfo({
   };
 
   const handleEditTimes = () => {
+    if (!canEditTimes) return;
     setTempCheckInTime(checkInTime);
     setTempCheckOutTime(checkOutTime);
     setIsEditingTimes(true);
@@ -158,7 +162,7 @@ export default function CheckInInfo({
               {t.checkinInfo?.checkInOutTitle || 'Check-in & Check-out'}
             </h3>
           </div>
-          {!isEditingTimes && (
+          {!isEditingTimes && canEditTimes && (
             <button
               onClick={handleEditTimes}
               className="text-sm px-3 py-1 rounded-lg bg-[color:var(--brand-primary)] text-white hover:opacity-80 transition"

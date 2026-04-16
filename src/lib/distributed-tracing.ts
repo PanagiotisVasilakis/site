@@ -5,6 +5,7 @@
 
 import { logger } from '@/lib/logger-enterprise';
 import { metrics } from '@/lib/metrics-collector';
+import crypto from 'node:crypto';
 
 // Trace interfaces
 interface TraceContext {
@@ -63,15 +64,13 @@ class DistributedTracer {
 
   // Generate trace/span IDs
   private generateTraceId(): string {
-    return Array.from({ length: 16 }, () => 
-      Math.floor(Math.random() * 16).toString(16)
-    ).join('');
+    // W3C trace-id: 16 bytes (32 hex chars)
+    return crypto.randomBytes(16).toString('hex');
   }
 
   private generateSpanId(): string {
-    return Array.from({ length: 8 }, () => 
-      Math.floor(Math.random() * 16).toString(16)
-    ).join('');
+    // W3C span-id: 8 bytes (16 hex chars)
+    return crypto.randomBytes(8).toString('hex');
   }
 
   // Extract trace context from headers

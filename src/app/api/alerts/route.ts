@@ -9,8 +9,20 @@ import { logger } from '@/lib/logger-enterprise';
 import { metrics } from '@/lib/metrics-collector';
 import { tracer, SpanStatus } from '@/lib/distributed-tracing';
 import { alertingSystem, AlertRule } from '@/lib/alerting-system';
+import { isAdminRequest } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
+
+function assertAdminAccess(request: NextRequest, correlationId?: string): void {
+  if (!isAdminRequest(request)) {
+    throw new ApiError(
+      ApiErrorCode.FORBIDDEN,
+      'Admin credentials required',
+      undefined,
+      correlationId
+    );
+  }
+}
 
 // GET /api/alerts - Get active alerts and system status
 export const GET = withErrorHandler(async (request: NextRequest) => {
@@ -23,9 +35,20 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   const correlationId = logger.getContext()?.correlationId;
 
   try {
+    assertAdminAccess(request, correlationId);
+
     const url = new URL(request.url);
     const type = url.searchParams.get('type') || 'active'; // active, history, rules
-    const hours = parseInt(url.searchParams.get('hours') || '24');
+    const hoursRaw = url.searchParams.get('hours');
+    const hours = hoursRaw ? Number.parseInt(hoursRaw, 10) : 24;
+    if (!Number.isFinite(hours) || hours <= 0 || hours > 24 * 30) {
+      throw new ApiError(
+        ApiErrorCode.VALIDATION_ERROR,
+        'hours must be an integer between 1 and 720',
+        { hours: hoursRaw },
+        correlationId
+      );
+    }
 
     tracer.addTags(span, {
       'alerts.type': type,
@@ -147,6 +170,8 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   const correlationId = logger.getContext()?.correlationId;
 
   try {
+    assertAdminAccess(request, correlationId);
+
     const body = await request.json();
     const { action, data } = body;
 
@@ -272,6 +297,8 @@ export const PUT = withErrorHandler(async (request: NextRequest) => {
   const correlationId = logger.getContext()?.correlationId;
 
   try {
+    assertAdminAccess(request, correlationId);
+
     const body = await request.json();
     const { ruleId, updates } = body;
 
@@ -353,6 +380,8 @@ export const DELETE = withErrorHandler(async (request: NextRequest) => {
   const correlationId = logger.getContext()?.correlationId;
 
   try {
+    assertAdminAccess(request, correlationId);
+
     const url = new URL(request.url);
     const ruleId = url.searchParams.get('ruleId');
 

@@ -60,7 +60,19 @@
     "db:studio": "bash ./scripts/db-check.sh studio",
     "db:migrate": "bash ./scripts/db-check.sh migrate",
     "db:generate": "bash ./scripts/db-check.sh generate",
-    "ensure-pepper": "node scripts/ensure-pepper.js"
+    "ensure-pepper": "node scripts/ensure-pepper.js",
+    "system:bootstrap": "bash ./scripts/system-orchestrator.sh bootstrap",
+    "system:up": "bash ./scripts/system-orchestrator.sh up",
+    "system:down": "bash ./scripts/system-orchestrator.sh down",
+    "system:restart": "bash ./scripts/system-orchestrator.sh restart",
+    "system:status": "bash ./scripts/system-orchestrator.sh status",
+    "system:logs": "bash ./scripts/system-orchestrator.sh logs",
+    "system:verify": "bash ./scripts/system-orchestrator.sh verify",
+    "system:build": "bash ./scripts/system-orchestrator.sh build",
+    "system:migrate": "bash ./scripts/system-orchestrator.sh migrate",
+    "system:check": "bash ./scripts/system-orchestrator.sh check",
+    "systemd:install": "sudo bash ./scripts/install-systemd-services.sh",
+    "ci:orchestrator-check": "bash ./scripts/ci-orchestrator-check.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

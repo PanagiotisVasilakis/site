@@ -1,0 +1,28 @@
+[Unit]
+Description=QR City Guide Web Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__APP_USER__
+Group=__APP_GROUP__
+WorkingDirectory=__REPO_ROOT__
+Environment=NODE_ENV=production
+EnvironmentFile=__ENV_FILE__
+ExecStartPre=/usr/bin/env bash __REPO_ROOT__/scripts/system-orchestrator.sh check --profile production --no-docker-fallback
+ExecStart=/usr/bin/env bash __REPO_ROOT__/scripts/system-orchestrator.sh up --profile production --skip-build --skip-migrate --skip-verify --foreground --no-docker-fallback
+ExecReload=/usr/bin/env bash __REPO_ROOT__/scripts/system-orchestrator.sh verify --profile production
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=300
+TimeoutStopSec=45
+KillMode=mixed
+NoNewPrivileges=true
+PrivateTmp=true
+LimitNOFILE=65535
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

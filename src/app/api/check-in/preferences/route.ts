@@ -1,10 +1,12 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { withErrorHandler, validateRequestBody, createSuccessResponse } from '@/lib/apiErrorHandler';
+import { withErrorHandler, validateRequestBody, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import fs from 'node:fs';
 import path from 'node:path';
 import { encryptJSON, decryptJSON } from '@/lib/crypto';
+import { hasVerifiedBookingSession, parseGuestSession } from '@/lib/guestSession';
+import { isAdminRequest } from '@/lib/rbac';
 
 const preferencesSchema = z.object({
   checkInTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Check-in time must be in HH:MM format'),
@@ -49,17 +51,28 @@ export const dynamic = 'force-dynamic';
 
 // GET: Retrieve current preferences
 export const GET = withErrorHandler(async (request: NextRequest) => {
+  const adminAccess = isAdminRequest(request);
+  const guestSession = parseGuestSession(request.cookies.get('guest_session')?.value);
+  const guestAccess = hasVerifiedBookingSession(guestSession);
+  if (!adminAccess && !guestAccess) {
+    throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Authentication required to view preferences');
+  }
+
   const prefs = readPreferences();
   const correlationId = request.headers.get('x-correlation-id') ?? undefined;
-  return createSuccessResponse(prefs, undefined, correlationId);
+  return createSuccessResponse({ ...prefs, canEdit: adminAccess }, undefined, correlationId);
 });
 
-// POST: Update preferences (no auth required - user-friendly)
+// POST: Update preferences (admin-only)
 export const POST = withErrorHandler(async (request: NextRequest) => {
   // Basic security checks only (content type, XSS/SQLi)
   const guard = createAPISecurityMiddleware();
   const early = guard(request);
   if (early) return early;
+
+  if (!isAdminRequest(request)) {
+    throw new ApiError(ApiErrorCode.FORBIDDEN, 'Admin credentials required to update preferences');
+  }
 
   const parseBody = validateRequestBody(preferencesSchema);
   const body = await parseBody(request);

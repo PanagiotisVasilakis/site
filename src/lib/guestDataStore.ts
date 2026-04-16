@@ -200,8 +200,8 @@ export const guestStore = {
   // Refresh tokens (development store only)
   async issueRefreshToken(user_id: string, ttlDays = 60, opts?: { family_id?: string; device_hint?: string; ip_hint?: string }): Promise<{ rec: GuestRefreshTokenRec; token: string }> {
     try {
-      const token = crypto.randomBytes(32).toString('base64url');
-      const { hash, salt } = hashSensitive(token);
+      const rawSecret = crypto.randomBytes(32).toString('base64url');
+      const { hash, salt } = hashSensitive(rawSecret);
       const family_id = opts?.family_id || `rtfam_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
       
       const rec = await refreshTokenRepository.create(
@@ -215,6 +215,9 @@ export const guestStore = {
           ipHint: opts?.ip_hint
         }
       );
+
+      // New token format enables O(1) verification: <token-id>.<secret>
+      const token = `${rec.id}.${rawSecret}`;
       
       return { rec, token };
     } catch (error) {

@@ -1,119 +1,147 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withErrorHandler, createSuccessResponse as success, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
+import { withErrorHandler, createSuccessResponse as success } from '@/lib/apiErrorHandler';
 import { guestStore } from '@/lib/guestDataStore';
-import { createSessionCookie, createRefreshCookie, signGuestSession, GuestSessionPayload } from '@/lib/guestSession';
+import {
+  createSessionCookie,
+  createRefreshCookie,
+  clearSessionCookie,
+  clearRefreshCookie,
+  signGuestSession,
+  GuestSessionPayload,
+} from '@/lib/guestSession';
 import { logger as elogger } from '@/lib/logger-enterprise';
 import { metrics } from '@/lib/metrics-collector';
 
-export const POST = withErrorHandler(async (req: NextRequest) => {
-  // Support GET-style redirect flow too by allowing query params in POST
-  const nextUrl = req.nextUrl
-  const nextRaw = nextUrl.searchParams.get('next');
-  const isSafePath = (p?: string | null) => !!p && p.startsWith('/') && !p.startsWith('//');
-  const nextParam = isSafePath(nextRaw) ? nextRaw! : undefined;
-  const refresh = req.cookies.get('guest_rt')?.value;
-  if (!refresh) throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Missing refresh token');
+const isSafePath = (p?: string | null): p is string =>
+  typeof p === 'string' && p.startsWith('/') && !p.startsWith('//');
 
-  const rec = await guestStore.verifyRefreshToken(refresh);
-  if (!rec) throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Invalid refresh token');
+function applyAuthCookies(response: NextResponse, sessionJwt: string, refreshToken?: string): void {
+  const sessionCookie = createSessionCookie(sessionJwt);
+  response.cookies.set(sessionCookie.name, sessionCookie.value, sessionCookie.options);
+
+  if (refreshToken) {
+    const refreshCookie = createRefreshCookie(refreshToken);
+    response.cookies.set(refreshCookie.name, refreshCookie.value, refreshCookie.options);
+  }
+}
+
+function clearAuthCookies(response: NextResponse): void {
+  const sessionCookie = clearSessionCookie();
+  const refreshCookie = clearRefreshCookie();
+  response.cookies.set(sessionCookie.name, sessionCookie.value, sessionCookie.options);
+  response.cookies.set(refreshCookie.name, refreshCookie.value, refreshCookie.options);
+}
+
+function unauthorizedResponse(request: NextRequest, failurePath?: string): NextResponse {
+  if (failurePath) {
+    const response = NextResponse.redirect(new URL(failurePath, request.url), 302);
+    clearAuthCookies(response);
+    return response;
+  }
+
+  const response = new NextResponse('Unauthorized', { status: 401 });
+  clearAuthCookies(response);
+  return response;
+}
+
+async function issueRefreshedSession(refreshToken: string): Promise<{ jwt: string; refreshToken: string } | null> {
+  const rec = await guestStore.verifyRefreshToken(refreshToken);
+  if (!rec) return null;
 
   // Rotate on use
-  const rotated = await guestStore.rotateRefreshToken(refresh);
-  const rt = rotated.token;
+  const rotated = await guestStore.rotateRefreshToken(refreshToken);
   if (rotated.old && rotated.rec) {
-    elogger.info('refresh_token.rotated', { correlationId: elogger.getContext()?.correlationId, user_id: rotated.old.user_id, old_id: rotated.old.id, new_id: rotated.rec.id, family_id: rotated.rec.family_id });
+    elogger.info('refresh_token.rotated', {
+      correlationId: elogger.getContext()?.correlationId,
+      user_id: rotated.old.user_id,
+      old_id: rotated.old.id,
+      new_id: rotated.rec.id,
+      family_id: rotated.rec.family_id,
+    });
     metrics.counter('refresh_token.rotated', 1);
   }
 
-  // Check if user has any current/future booking; in dev store, pick any linked booking via access table
-  const u = await guestStore.findUserById(rec.user_id);
-  const b = u ? await guestStore.findEligibleBookingForUser(u.id) : undefined;
+  // Require a successful rotation token and a valid booking subject for refreshed sessions.
+  if (!rotated.token) {
+    if (rotated.rec?.id) {
+      await guestStore.revokeRefreshToken(rotated.rec.id);
+    }
+    await guestStore.revokeRefreshToken(rec.id);
+    return null;
+  }
+
+  const user = await guestStore.findUserById(rec.user_id);
+  const booking = user ? await guestStore.findEligibleBookingForUser(user.id) : undefined;
+  if (!user || !booking) {
+    if (rotated.rec?.id) {
+      await guestStore.revokeRefreshToken(rotated.rec.id);
+    }
+    await guestStore.revokeRefreshToken(rec.id);
+    return null;
+  }
+
   const payload: GuestSessionPayload = {
-    user: u ? { id: u.id } : undefined,
-    booking: b ? { id: b.id } : undefined,
+    user: { id: user.id },
+    booking: { id: booking.id },
   };
-  const jwt = signGuestSession(payload);
-  const sessionCookie = createSessionCookie(jwt);
-  const refreshCookie = rt ? createRefreshCookie(rt) : undefined;
+  return {
+    jwt: signGuestSession(payload),
+    refreshToken: rotated.token,
+  };
+}
+
+export const POST = withErrorHandler(async (req: NextRequest) => {
+  // Support GET-style redirect flow too by allowing query params in POST.
+  const nextUrl = req.nextUrl;
+  const nextRaw = nextUrl.searchParams.get('next');
+  const nextParam = isSafePath(nextRaw) ? nextRaw : undefined;
+  const refresh = req.cookies.get('guest_rt')?.value;
+  if (!refresh) {
+    return unauthorizedResponse(req);
+  }
+
+  const refreshed = await issueRefreshedSession(refresh);
+  if (!refreshed) {
+    return unauthorizedResponse(req);
+  }
 
   const res = success({ refreshed: true });
-  res.headers.append('Set-Cookie', `${sessionCookie.name}=${sessionCookie.value}; Path=${sessionCookie.options.path}; HttpOnly; SameSite=Lax; Max-Age=${sessionCookie.options.maxAge};${sessionCookie.options.secure ? ' Secure;' : ''}`);
-  if (refreshCookie) {
-    res.headers.append('Set-Cookie', `${refreshCookie.name}=${refreshCookie.value}; Path=${refreshCookie.options.path}; HttpOnly; SameSite=Lax; Max-Age=${refreshCookie.options.maxAge};${refreshCookie.options.secure ? ' Secure;' : ''}`);
-  }
+  applyAuthCookies(res, refreshed.jwt, refreshed.refreshToken);
+
   // If next is provided, perform a redirect after setting cookies
   if (nextParam) {
-    const redirectResponse = new NextResponse(null, { status: 302 });
-    redirectResponse.headers.set('Location', nextParam);
-    res.headers.forEach((value, key) => {
-      if (key.toLowerCase() === 'set-cookie') {
-        redirectResponse.headers.append(key, value);
-      } else {
-        redirectResponse.headers.set(key, value);
-      }
-    });
+    const redirectResponse = NextResponse.redirect(new URL(nextParam, req.url), 302);
+    applyAuthCookies(redirectResponse, refreshed.jwt, refreshed.refreshToken);
     return redirectResponse;
   }
+
   return res;
 });
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
-  // Proxy GET to POST logic for convenience but handle redirects explicitly
+  // Proxy GET to POST logic for convenience but handle redirects explicitly.
   const refresh = req.cookies.get('guest_rt')?.value;
   const nextRaw = req.nextUrl.searchParams.get('next');
   const failureRaw = req.nextUrl.searchParams.get('failure');
-  const isSafePath = (p?: string | null) => !!p && p.startsWith('/') && !p.startsWith('//');
-  const nextParam = isSafePath(nextRaw) ? nextRaw! : undefined;
-  const failureParam = isSafePath(failureRaw) ? failureRaw! : undefined;
-  
+  const nextParam = isSafePath(nextRaw) ? nextRaw : undefined;
+  const failureParam = isSafePath(failureRaw) ? failureRaw : undefined;
+
   if (!refresh) {
-    if (failureParam) {
-      const failureResponse = new NextResponse(null, { status: 302 });
-      failureResponse.headers.set('Location', failureParam);
-      return failureResponse;
-    }
-    throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Missing refresh token');
+    return unauthorizedResponse(req, failureParam);
   }
-  const rec = await guestStore.verifyRefreshToken(refresh);
-  if (!rec) {
-    if (failureParam) {
-      const failureResponse = new NextResponse(null, { status: 302 });
-      failureResponse.headers.set('Location', failureParam);
-      return failureResponse;
-    }
-    throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Invalid refresh token');
+
+  const refreshed = await issueRefreshedSession(refresh);
+  if (!refreshed) {
+    return unauthorizedResponse(req, failureParam);
   }
-  const rotated = await guestStore.rotateRefreshToken(refresh);
-  const rt = rotated.token;
-  if (rotated.old && rotated.rec) {
-    elogger.info('refresh_token.rotated', { correlationId: elogger.getContext()?.correlationId, user_id: rotated.old.user_id, old_id: rotated.old.id, new_id: rotated.rec.id, family_id: rotated.rec.family_id });
-    metrics.counter('refresh_token.rotated', 1);
-  }
-  const u = await guestStore.findUserById(rec.user_id);
-  const b = u ? await guestStore.findEligibleBookingForUser(u.id) : undefined;
-  const payload: GuestSessionPayload = {
-    user: u ? { id: u.id } : undefined,
-    booking: b ? { id: b.id } : undefined,
-  };
-  const jwt = signGuestSession(payload);
-  const sessionCookie = createSessionCookie(jwt);
-  const refreshCookie = rt ? createRefreshCookie(rt) : undefined;
-  const headers = new Headers();
-  headers.append('Set-Cookie', `${sessionCookie.name}=${sessionCookie.value}; Path=${sessionCookie.options.path}; HttpOnly; SameSite=Lax; Max-Age=${sessionCookie.options.maxAge};${sessionCookie.options.secure ? ' Secure;' : ''}`);
-  if (refreshCookie) {
-    headers.append('Set-Cookie', `${refreshCookie.name}=${refreshCookie.value}; Path=${refreshCookie.options.path}; HttpOnly; SameSite=Lax; Max-Age=${refreshCookie.options.maxAge};${refreshCookie.options.secure ? ' Secure;' : ''}`);
-  }
+
   if (nextParam) {
-    const redirectResponse = new NextResponse(null, { status: 302 });
-    redirectResponse.headers.set('Location', nextParam);
-    headers.forEach((value, key) => {
-      if (key.toLowerCase() === 'set-cookie') {
-        redirectResponse.headers.append(key, value);
-      } else {
-        redirectResponse.headers.set(key, value);
-      }
-    });
+    const redirectResponse = NextResponse.redirect(new URL(nextParam, req.url), 302);
+    applyAuthCookies(redirectResponse, refreshed.jwt, refreshed.refreshToken);
     return redirectResponse;
   }
-  return new NextResponse(null, { status: 204, headers });
+
+  const response = new NextResponse(null, { status: 204 });
+  applyAuthCookies(response, refreshed.jwt, refreshed.refreshToken);
+  return response;
 });

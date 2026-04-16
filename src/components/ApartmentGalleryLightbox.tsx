@@ -96,7 +96,7 @@ export default function ApartmentGalleryLightbox({ photos, alts, enableHaptics =
   const paginate = useCallback((newDirection: number) => {
     setPage([page + newDirection, newDirection]);
     if (enableHaptics && typeof navigator !== 'undefined' && navigator.vibrate) {
-      try { navigator.vibrate(10); } catch (_e) { /* ignore */ }
+      try { navigator.vibrate(10); } catch { /* ignore */ }
     }
   }, [page, enableHaptics]);
 
@@ -106,7 +106,7 @@ export default function ApartmentGalleryLightbox({ photos, alts, enableHaptics =
     try {
       const globalIndex = activeSequenceRef.current[index] ?? 0;
       localStorage.setItem('apartmentGalleryLastIndex', String(globalIndex));
-    } catch (_e) { /* ignore */ }
+    } catch { /* ignore */ }
   }, [index]);
 
   const show = useCallback((globalIndex: number, sequence?: number[]) => {

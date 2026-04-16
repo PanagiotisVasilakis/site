@@ -17,12 +17,11 @@ const CompleteSchema = z.object({
 });
 
 // Dev-only persistence via store check-ins collection
-function saveCompletion(bookingId: string, data: z.infer<typeof CompleteSchema>) {
-  guestStore.upsertCheckinCompletion(bookingId, {
+async function saveCompletion(bookingId: string, data: z.infer<typeof CompleteSchema>): Promise<void> {
+  await guestStore.upsertCheckinCompletion(bookingId, {
     arrival_time: data.arrivalTime,
     special_requests: data.specialRequests,
   });
-  return true;
 }
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
@@ -41,10 +40,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Not authorized');
   }
 
-  const ok = saveCompletion(session.booking.id, body);
+  await saveCompletion(session.booking.id, body);
   metrics.counter('api_checkin_complete_count', 1, { endpoint: '/api/check-in/complete', method: 'POST' });
   metrics.trackApiCall('/api/check-in/complete', 'POST', 200, Date.now() - start);
-  tracer.finishSpan(span, ok ? SpanStatus.OK : SpanStatus.ERROR);
-  metrics.timer('api_checkin_complete_duration_ms', Date.now() - start, { endpoint: '/api/check-in/complete', method: 'POST', result: ok ? 'ok' : 'error' });
+  tracer.finishSpan(span, SpanStatus.OK);
+  metrics.timer('api_checkin_complete_duration_ms', Date.now() - start, { endpoint: '/api/check-in/complete', method: 'POST', result: 'ok' });
   return createSuccessResponse({ ok: true }) as NextResponse;
 });

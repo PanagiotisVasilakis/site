@@ -56,10 +56,51 @@ const MAX_REPORTS_PER_WINDOW = 20;
 // Deduplicate recent single-metric ids per session to avoid floods
 const recentMetrics = new Map<string, Map<string, number>>(); // sessionId -> (metricId -> expiryMs)
 const RECENT_ID_WINDOW_MS = 60 * 1000;
+const MAX_TRACKED_SESSIONS = 5000;
+const STORE_CLEANUP_INTERVAL_MS = 60 * 1000;
+let lastStoreCleanupAt = 0;
+
+function cleanupTrackingStores(now: number): void {
+  if (now - lastStoreCleanupAt < STORE_CLEANUP_INTERVAL_MS) {
+    return;
+  }
+  lastStoreCleanupAt = now;
+
+  for (const [sessionId, entry] of performanceReportLimits) {
+    if (entry.resetTime <= now) {
+      performanceReportLimits.delete(sessionId);
+    }
+  }
+
+  for (const [sessionId, metricMap] of recentMetrics) {
+    for (const [metricId, expiresAt] of metricMap) {
+      if (expiresAt <= now) {
+        metricMap.delete(metricId);
+      }
+    }
+    if (metricMap.size === 0) {
+      recentMetrics.delete(sessionId);
+    }
+  }
+
+  while (performanceReportLimits.size > MAX_TRACKED_SESSIONS) {
+    const oldestSessionId = performanceReportLimits.keys().next().value;
+    if (!oldestSessionId) break;
+    performanceReportLimits.delete(oldestSessionId);
+  }
+
+  while (recentMetrics.size > MAX_TRACKED_SESSIONS) {
+    const oldestSessionId = recentMetrics.keys().next().value;
+    if (!oldestSessionId) break;
+    recentMetrics.delete(oldestSessionId);
+  }
+}
 
 function dedupeSingleMetric(sessionId: string, metricId?: string): boolean {
   if (!metricId) return true;
   const now = Date.now();
+  cleanupTrackingStores(now);
+
   let sessionMap = recentMetrics.get(sessionId);
   if (!sessionMap) {
     sessionMap = new Map<string, number>();
@@ -75,12 +116,21 @@ function dedupeSingleMetric(sessionId: string, metricId?: string): boolean {
       if (ts <= now) sessionMap.delete(id);
     }
   }
+
   sessionMap.set(metricId, now + RECENT_ID_WINDOW_MS);
+
+  while (sessionMap.size > 1000) {
+    const oldestMetricId = sessionMap.keys().next().value;
+    if (!oldestMetricId) break;
+    sessionMap.delete(oldestMetricId);
+  }
+
   return true;
 }
 
 function checkRateLimit(sessionId: string): boolean {
   const now = Date.now();
+  cleanupTrackingStores(now);
   const limit = performanceReportLimits.get(sessionId);
 
   if (!limit || now > limit.resetTime) {

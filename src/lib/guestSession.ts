@@ -15,9 +15,9 @@ const COOKIE_NAME = 'guest_session';
 const REFRESH_COOKIE = 'guest_rt';
 
 function getGuestJwtSecret(): string {
-  const secret = process.env.GUEST_JWT_SECRET || process.env.ADMIN_JWT_SECRET;
+  const secret = process.env.GUEST_JWT_SECRET;
   if (process.env.NODE_ENV === 'production' && !secret) {
-    throw new Error('GUEST_JWT_SECRET (or ADMIN_JWT_SECRET) is required in production');
+    throw new Error('GUEST_JWT_SECRET is required in production');
   }
   return secret || 'dev-guest-secret-change-me';
 }
