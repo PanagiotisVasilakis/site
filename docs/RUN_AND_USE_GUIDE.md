@@ -1,104 +1,15 @@
 # Run and Use Guide
 
-This guide explains how to run the site locally and how to use the core flows (guest portal and admin analytics).
+This guide explains how to use the core flows (guest portal and admin analytics) once the system is running.
 
-## 1) Prerequisites
+## 1) Setup and start the system first
 
-- Node.js 20+
-- npm 10+
-- PostgreSQL (local or managed), or Docker for local DB
-- Linux/macOS shell (Windows users can run via WSL)
+- Canonical setup/run instructions (development, test, production): `scripts/README.md`
+- Deployment and maintenance runbook: `docs/PUBLIC_DEPLOYMENT_AND_MAINTENANCE.md`
 
-## 2) Install dependencies
+After following `scripts/README.md`, ensure the app is running and reachable at `http://localhost:3000`.
 
-From the repository root:
-
-```bash
-npm ci
-```
-
-## 3) Configure environment variables
-
-Create a local env file (if you do not already have one):
-
-```bash
-touch .env.local
-```
-
-Required values are validated in src/lib/env.ts. At minimum, set:
-
-- DATABASE_URL
-- ADMIN_JWT_SECRET
-- ADMIN_DASH_SECRET
-- SECURITY_ENC_KEY_HEX
-- SESSION_SECRET
-
-Security helper (recommended):
-
-```bash
-npm run ensure-pepper
-```
-
-This creates/updates .env.local with secure values for SECURITY_PEPPER and SECURITY_ENC_KEY_HEX when missing.
-
-## 4) Start a local database
-
-Option A: existing local PostgreSQL
-
-- Create a database and point DATABASE_URL to it.
-
-Option B: Docker test database (quick and reproducible)
-
-```bash
-docker-compose -f docker/docker-compose.test-db.yml up -d
-export TEST_DATABASE_URL="postgresql://testuser:testpass@localhost:5433/site_test"
-DATABASE_URL="$TEST_DATABASE_URL" npx prisma migrate deploy
-```
-
-If you use this option for app runtime too, set:
-
-```bash
-export DATABASE_URL="$TEST_DATABASE_URL"
-```
-
-## 5) Run the site (development)
-
-Preferred full-system command:
-
-```bash
-./scripts/system-orchestrator.sh up --profile development --skip-build
-```
-
-This command performs env checks, DB auto-detect/fallback, Prisma generation, migrations, app startup, and health verification.
-
-Alternative (app only):
-
-```bash
-npm run dev
-```
-
-Open http://localhost:3000.
-
-Locale routing is enforced by middleware, so root redirects to /en by default.
-
-## 6) Build and run in production mode (locally)
-
-Preferred orchestrated command:
-
-```bash
-./scripts/system-orchestrator.sh up --profile production
-```
-
-Alternative manual commands:
-
-```bash
-npm run build
-npm start
-```
-
-Open http://localhost:3000 and verify key pages.
-
-## 7) How to use the site
+## 2) How to use the site
 
 ### Guest flow
 
@@ -117,23 +28,17 @@ Access to /admin/analytics requires both:
 
 Set ADMIN_DASH_SECRET and ADMIN_JWT_SECRET before trying this flow.
 
-## 8) Useful commands
+## 3) Useful commands
 
-- Full bootstrap only: ./scripts/system-orchestrator.sh bootstrap --profile production
-- Start full system: ./scripts/system-orchestrator.sh up --profile production
-- Stop full system: ./scripts/system-orchestrator.sh down
-- Verify monitoring endpoints: ./scripts/system-orchestrator.sh verify
-- System status: ./scripts/system-orchestrator.sh status
-- System logs: ./scripts/system-orchestrator.sh logs --follow
-- Dev server: npm run dev
-- Build: npm run build
-- Start built app: npm start
+- Verify monitoring endpoints: ./scripts/system-orchestrator.sh verify --profile development
+- System status: ./scripts/system-orchestrator.sh status --profile development
+- System logs: ./scripts/system-orchestrator.sh logs --profile development --follow
 - Lint: npm run lint
 - Security scan: npm run security:scan
 - Unit/UI tests: npm test
 - API tests: npm run test:api
 
-## 9) Quick health checks
+## 4) Quick health checks
 
 After starting the app, check:
 
@@ -142,7 +47,7 @@ After starting the app, check:
 - /en/guest can submit valid guest verification
 - /en/check-in loads after successful verification
 
-## 10) Troubleshooting
+## 5) Troubleshooting
 
 - Missing env vars: validate values against src/lib/env.ts requirements.
 - Prisma connection errors: confirm DATABASE_URL and run migrations.
@@ -151,6 +56,7 @@ After starting the app, check:
 
 ## Related docs
 
+- scripts/README.md
 - docs/README_DB.md
 - docs/TEST_DATABASE_SETUP.md
 - docs/SECURITY_DATA_STORAGE.md

@@ -21,6 +21,7 @@ FORCE_INSTALL=0
 VERBOSE=0
 LOG_FOLLOW=0
 START_TIMEOUT=120
+DB_ONLY_MODE=0
 
 SUBCOMMAND=""
 COMPOSE_IMPL=""
@@ -50,6 +51,7 @@ Commands:
 Options:
   --profile <production|development|test>  Runtime profile (default: production)
   --strict                                 Add lint + typecheck + tests before build/start
+  --db-only                                Validate only DB-related environment and skip app build/start requirements
   --no-docker-fallback                     Fail instead of starting local DB when DATABASE_URL is unreachable
   --skip-build                             Skip build step where applicable
   --skip-migrate                           Skip migration step where applicable
@@ -64,6 +66,7 @@ Options:
 Examples:
   scripts/system-orchestrator.sh up --profile production
   scripts/system-orchestrator.sh up --profile development --skip-build
+  scripts/system-orchestrator.sh bootstrap --profile development --db-only --skip-build --skip-migrate
   scripts/system-orchestrator.sh migrate --profile production
   scripts/system-orchestrator.sh logs --follow
 USAGE
@@ -144,6 +147,10 @@ parse_args() {
         ;;
       --strict)
         STRICT_MODE=1
+        shift
+        ;;
+      --db-only)
+        DB_ONLY_MODE=1
         shift
         ;;
       --no-docker-fallback)
@@ -350,6 +357,20 @@ is_valid_url() {
 
 validate_environment_contract() {
   local failed=0
+
+  if (( DB_ONLY_MODE )); then
+    if [[ -n "${DATABASE_URL:-}" ]] && ! is_valid_url "$DATABASE_URL"; then
+      error "DATABASE_URL is not a valid URL"
+      failed=1
+    fi
+
+    if (( failed )); then
+      die "Environment validation failed" 14
+    fi
+
+    log "Environment contract validation passed (db-only mode)"
+    return
+  fi
 
   if [[ -z "${DATABASE_URL:-}" ]]; then
     error "DATABASE_URL is required"
@@ -849,12 +870,21 @@ run_preflight() {
   fi
 
   load_environment
-  maybe_ensure_pepper
+  if (( DB_ONLY_MODE == 0 )); then
+    maybe_ensure_pepper
+  fi
   validate_environment_contract
 }
 
 run_bootstrap_sequence() {
   run_preflight
+
+  if (( DB_ONLY_MODE )); then
+    prepare_database
+    log "DB-only bootstrap completed"
+    return
+  fi
+
   ensure_dependencies
   prepare_database
   run_prisma_generate

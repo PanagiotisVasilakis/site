@@ -48,7 +48,6 @@ source ~/.bashrc
 
 - `scripts/install-postgres-and-setup.sh` - Automated PostgreSQL setup
 - `scripts/setup-test-db.sh` - Docker-based setup (if Docker available)
-- `scripts/test-user-creation-mock.sh` - Mock test without database
 
 ## 📖 Reading Order
 
