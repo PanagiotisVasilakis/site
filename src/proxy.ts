@@ -16,7 +16,7 @@ const securityMiddleware = createSecurityMiddleware({
   enableNonce: true,
 });
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const startTime = Date.now();
   const { pathname } = req.nextUrl;
   
@@ -235,4 +235,3 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: ["/((?!_next|.*\..*).*)"],
 };
-

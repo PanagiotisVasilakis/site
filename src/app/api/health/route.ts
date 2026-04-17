@@ -5,6 +5,8 @@
  */
 
 import { NextRequest } from 'next/server';
+import { readFile } from 'node:fs/promises';
+import os from 'node:os';
 import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 import { logger } from '@/lib/logger-enterprise';
 import { metrics } from '@/lib/metrics-collector';
@@ -40,8 +42,63 @@ interface HealthCheckResponse {
 }
 
 // Health check thresholds
-const MEMORY_WARNING_THRESHOLD = 0.8; // 80%
-const MEMORY_CRITICAL_THRESHOLD = 0.9; // 90%
+const RSS_WARNING_THRESHOLD = 0.8; // 80%
+const RSS_CRITICAL_THRESHOLD = 0.9; // 90%
+const HEAP_HIGH_UTILIZATION_THRESHOLD = 0.95; // 95%
+const MEMORY_LIMIT_CACHE_MS = 60_000;
+const CGROUP_MEMORY_LIMIT_FILES = [
+  '/sys/fs/cgroup/memory.max', // cgroup v2
+  '/sys/fs/cgroup/memory/memory.limit_in_bytes', // cgroup v1
+];
+
+let cachedMemoryLimitBytes: number | null = null;
+let cachedMemoryLimitTimestamp = 0;
+
+function parseMemoryLimit(value: string): number | null {
+  const normalized = value.trim();
+  if (!normalized || normalized === 'max') {
+    return null;
+  }
+
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  // Some systems report effectively "unlimited" memory as a massive sentinel value.
+  if (parsed > 1e15) {
+    return null;
+  }
+
+  return parsed;
+}
+
+async function resolveMemoryLimitBytes(): Promise<number> {
+  const now = Date.now();
+  if (cachedMemoryLimitBytes !== null && now - cachedMemoryLimitTimestamp < MEMORY_LIMIT_CACHE_MS) {
+    return cachedMemoryLimitBytes;
+  }
+
+  const hostTotalMemory = os.totalmem();
+  let memoryLimitBytes = hostTotalMemory;
+
+  for (const limitFile of CGROUP_MEMORY_LIMIT_FILES) {
+    try {
+      const raw = await readFile(/*turbopackIgnore: true*/ limitFile, 'utf8');
+      const parsed = parseMemoryLimit(raw);
+      if (parsed !== null) {
+        memoryLimitBytes = Math.min(memoryLimitBytes, parsed);
+        break;
+      }
+    } catch {
+      // Ignore files that do not exist in this runtime.
+    }
+  }
+
+  cachedMemoryLimitBytes = memoryLimitBytes;
+  cachedMemoryLimitTimestamp = now;
+  return memoryLimitBytes;
+}
 
 async function performHealthChecks(): Promise<HealthCheckResponse> {
   const overallStartTime = Date.now();
@@ -50,17 +107,22 @@ async function performHealthChecks(): Promise<HealthCheckResponse> {
   // Memory check
   const memoryCheck = await runHealthCheck('memory', async () => {
     const memUsage = process.memoryUsage();
-    const usagePercentage = memUsage.heapUsed / memUsage.heapTotal;
+    const memoryLimitBytes = await resolveMemoryLimitBytes();
+    const heapUsagePercentage = memUsage.heapTotal > 0 ? memUsage.heapUsed / memUsage.heapTotal : 0;
+    const rssUsagePercentage = memoryLimitBytes > 0 ? memUsage.rss / memoryLimitBytes : 0;
     
     let status: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
-    let message = `Memory usage: ${Math.round(usagePercentage * 100)}%`;
+    let message = `Memory usage healthy (RSS ${Math.round(rssUsagePercentage * 100)}%, heap ${Math.round(heapUsagePercentage * 100)}%)`;
     
-    if (usagePercentage > MEMORY_CRITICAL_THRESHOLD) {
+    if (rssUsagePercentage > RSS_CRITICAL_THRESHOLD) {
       status = 'unhealthy';
-      message = `Critical memory usage: ${Math.round(usagePercentage * 100)}%`;
-    } else if (usagePercentage > MEMORY_WARNING_THRESHOLD) {
+      message = `Critical RSS memory usage: ${Math.round(rssUsagePercentage * 100)}%`;
+    } else if (rssUsagePercentage > RSS_WARNING_THRESHOLD) {
       status = 'degraded';
-      message = `High memory usage: ${Math.round(usagePercentage * 100)}%`;
+      message = `High RSS memory usage: ${Math.round(rssUsagePercentage * 100)}%`;
+    } else if (heapUsagePercentage > HEAP_HIGH_UTILIZATION_THRESHOLD) {
+      status = 'degraded';
+      message = `High heap utilization: ${Math.round(heapUsagePercentage * 100)}%`;
     }
 
     return {
@@ -71,7 +133,10 @@ async function performHealthChecks(): Promise<HealthCheckResponse> {
         heapTotal: memUsage.heapTotal,
         external: memUsage.external,
         rss: memUsage.rss,
-        percentage: Math.round(usagePercentage * 100),
+        memoryLimit: memoryLimitBytes,
+        percentage: Math.round(rssUsagePercentage * 100),
+        rssPercentage: Math.round(rssUsagePercentage * 100),
+        heapPercentage: Math.round(heapUsagePercentage * 100),
       },
     };
   });

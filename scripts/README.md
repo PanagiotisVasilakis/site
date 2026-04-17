@@ -11,6 +11,38 @@ This document explains how to set up this repository and run the site in develop
 - PostgreSQL (managed or local), or Docker for local fallback/test databases
 - Linux/macOS shell (Windows via WSL is fine)
 
+### 1.1) Upgrade to Node 20+ (Linux/WSL)
+
+If your terminal is still on Node 18, use one of these paths.
+
+Option A (recommended): install nvm and switch to Node 20
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+source ~/.nvm/nvm.sh
+nvm install 20
+nvm alias default 20
+nvm use 20
+npm install -g npm@10
+node -v && npm -v
+```
+
+Option B: system-wide Node 20 via NodeSource
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+sudo npm install -g npm@10
+node -v && npm -v
+```
+
+After upgrading, reinstall dependencies to align native modules and lockfile state:
+
+```bash
+rm -rf node_modules
+npm install
+```
+
 ## 2) One-time setup
 
 From the repository root:
