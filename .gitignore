@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/test-results/
+/playwright-report/
 
 # next.js
 /.next/
@@ -39,22 +41,24 @@ yarn-error.log*
 # vercel
 .vercel
 
+# generated reports and browser audit artifacts
+/reports/lighthouse-matrix/
+/reports/responsive-ux/
+/reports/**/screenshots-*/
+/lighthouse.*
+/.lighthouse*/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
 .vscode/settings.json
 public/precache.json
 public/version.json
-public/precache.json
 QWEN.md
-public/version.json
 GEMINI.md
-public/version.json
-public/version.json
 //wsl.localhost/
 
 .github/copilot-instructions.md
-public/version.json
 
 .venv
 .runtime/

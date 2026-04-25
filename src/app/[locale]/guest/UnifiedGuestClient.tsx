@@ -109,6 +109,10 @@ export default function UnifiedGuestClient() {
     exit: { opacity: 0, y: prefersReduced ? 0 : -8, transition: { duration: prefersReduced ? 0 : 0.12 } },
   }), [prefersReduced]);
 
+  const modeHint = mode === 'signin'
+    ? 'Access your booking and check-in details.'
+    : 'Create your guest account to continue.';
+
   // Seed analytics and URL mode parameter
   useEffect(() => {
     tracker.portalOpened('unified');
@@ -415,6 +419,15 @@ export default function UnifiedGuestClient() {
     <div className="mx-auto max-w-md p-4">
       <div className="main-glass-container card p-5">
         <>
+            <div className="mb-4 text-center">
+              <h1 className="text-2xl font-serif italic font-bold tracking-wide">
+                {mode === 'signin' ? (dict.portal?.signInTitle || 'Sign in') : (dict.portal?.signUpTitle || 'Sign up')}
+              </h1>
+              <p className="mt-1 text-sm" style={{ color: 'var(--fg-muted)' }}>
+                {modeHint}
+              </p>
+            </div>
+
             <motion.div
               role="tablist"
               aria-label="Authentication mode"
@@ -424,7 +437,7 @@ export default function UnifiedGuestClient() {
               transition={{ duration: prefersReduced ? 0 : 0.35, ease: 'easeOut' }}
             >
               {(['signin', 'signup'] as Mode[]).map((m) => (
-                <button key={m} role="tab" aria-selected={mode === m} aria-controls={`panel-${m}`} id={`tab-${m}`} className={`flex-1 h-9 rounded-full text-sm font-medium transition ${mode === m ? 'shadow' : ''}`} style={mode === m ? { background: 'var(--layer-surface)', color: 'var(--fg-default)' } : { color: 'var(--fg-muted)' }} onClick={() => setMode(m)}>
+                <button key={m} role="tab" aria-selected={mode === m} aria-controls={`panel-${m}`} id={`tab-${m}`} className={`flex-1 h-11 md:h-9 rounded-full text-sm font-medium transition ${mode === m ? 'shadow' : ''}`} style={mode === m ? { background: 'var(--layer-surface)', color: 'var(--fg-default)' } : { color: 'var(--fg-muted)' }} onClick={() => setMode(m)}>
                   {m === 'signin' ? (dict.portal?.signInTitle || 'Sign in') : (dict.portal?.signUpTitle || 'Sign up')}
                 </button>
               ))}
@@ -604,7 +617,7 @@ export default function UnifiedGuestClient() {
                               <button
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm opacity-60 hover:opacity-100 transition-opacity"
+                                className="absolute right-1 top-1/2 transform -translate-y-1/2 text-sm opacity-60 hover:opacity-100 transition-opacity min-h-11 min-w-11 flex items-center justify-center"
                                 style={{ color: 'var(--fg-muted)' }}
                                 aria-label={showPassword ? 'Hide password' : 'Show password'}
                               >

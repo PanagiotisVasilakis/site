@@ -68,7 +68,7 @@ export default async function BookingPage({
     basePrice: apartmentContent.pricing.basePrice,
     cleaningFee: apartmentContent.pricing.cleaningFee,
     serviceFee: apartmentContent.pricing.serviceFee,
-    image: '/house/att.FcEjVIjFuWRZjLgXbVE8uocMCMkIQ23IOfjVpyylEGM.jpeg'
+    image: '/house/living/living_1.jpeg'
   };
 
   // Calculate pricing
@@ -90,7 +90,7 @@ export default async function BookingPage({
           <div>
             <Link
               href={`/${eff}`}
-              className="inline-flex items-center gap-2 text-sm text-brand-700 hover:text-brand-800 font-medium mb-4 transition-colors"
+              className="inline-flex min-h-11 items-center gap-2 text-sm text-brand-700 hover:text-brand-800 font-medium mb-4 transition-colors"
             >
               ← Back to property
             </Link>
@@ -132,7 +132,7 @@ export default async function BookingPage({
                     </div>
                     <Link
                       href={`/${eff}`}
-                      className="text-sm text-red-600 hover:text-red-700 font-medium mt-2 inline-block"
+                      className="inline-flex min-h-11 items-center text-sm text-red-600 hover:text-red-700 font-medium mt-2"
                     >
                       ← Go back to select dates
                     </Link>
@@ -235,6 +235,7 @@ export default async function BookingPage({
                     height="260px"
                     zoom={15}
                     showNearbyAttractions={false}
+                    activation="intent"
                     className="rounded-lg overflow-hidden mb-4"
                     nearbyRestaurants={[]}
                     nearbyServices={[]}

@@ -23,6 +23,7 @@ interface ApartmentLocationMapProps {
   nearbyRestaurants?: CategoryItem[];
   nearbyServices?: CategoryItem[];
   nearbyAttractions?: CategoryItem[];
+  activation?: 'viewport' | 'intent';
 }
 
 // (villa content import removed – not needed here)
@@ -45,7 +46,8 @@ export default function ApartmentLocationMap({
   className = "",
   nearbyRestaurants = [],
   nearbyServices = [],
-  nearbyAttractions = []
+  nearbyAttractions = [],
+  activation = 'viewport'
 }: ApartmentLocationMapProps) {
 
   // Get nearby attractions from props
@@ -95,6 +97,7 @@ export default function ApartmentLocationMap({
         height={height}
         onMarkerClick={handleMarkerClick}
         locale={locale as 'en' | 'el'}
+        activation={activation}
       />
       <noscript>
         <div className="mt-4">

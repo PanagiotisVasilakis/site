@@ -355,6 +355,11 @@ export default function ApartmentCinematic({ locale, houseText, photos }: Props)
           cursor: pointer;
           outline: none;
         }
+        @media (max-width: 1280px) {
+          .apartment-photo-stack-wrapper {
+            overflow-x: clip;
+          }
+        }
         .apartment-photo-stack-wrapper:focus-visible {
           box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-500, #14b8a6) 45%, transparent);
           border-radius: 28px;

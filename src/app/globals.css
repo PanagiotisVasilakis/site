@@ -378,6 +378,28 @@ samp {
   }
 }
 
+/* Coarse pointers include tablet boundary viewports such as 768x1024. */
+@media (hover: none), (pointer: coarse) {
+  :where(button, a[href], input:not([type="hidden"]), select, textarea, [role="button"], [role="radio"], [tabindex="0"]) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  :where(button, a[href], [role="button"], [role="radio"], [tabindex="0"]) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  :where(.btn-primary, .btn-outline, .btn-secondary, .btn-tint, .btn-sm, .booking-button, .search-go, .search-trigger, .guest-input, .input) {
+    min-height: 44px !important;
+  }
+
+  :where(.btn-primary, .btn-outline, .btn-secondary, .btn-tint, .btn-sm) {
+    height: auto !important;
+  }
+}
+
 /* Tablet optimizations */
 @media (min-width: 641px) and (max-width: 1024px) {
   .page-container {
@@ -676,6 +698,17 @@ samp {
   padding: .35rem .7rem;
   font-size: .65rem;
   line-height: 1.1;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .btn-primary,
+  .btn-outline,
+  .btn-secondary,
+  .btn-tint,
+  .btn-sm {
+    min-height: 44px !important;
+    height: auto !important;
+  }
 }
 
 /* Generic panel + borders */
@@ -1752,6 +1785,17 @@ html:not([data-theme="dark"]) .bg-app-vertical {
   background: color-mix(in srgb, var(--brand-200) 40%, transparent);
 }
 
+@media (hover: none) and (pointer: coarse) {
+  .guest-input {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .search-seg {
+    min-height: 60px;
+  }
+}
+
 .search-action {
   display: flex;
   align-items: center;
@@ -1998,6 +2042,14 @@ html:not([data-theme="dark"]) .bg-app-vertical {
   cursor: pointer;
   box-shadow: var(--shadow-float-soft);
   transition: background var(--transition-fast), transform var(--transition-fast);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .wishlist-btn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0.55rem;
+  }
 }
 
 .wishlist-btn:hover {
@@ -2432,6 +2484,17 @@ html:not([data-theme="dark"]) .bg-app-vertical {
   color: var(--text-accent);
   border: 1px solid var(--border-soft);
   transition: background 120ms ease;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .leaflet-bar a,
+  .leaflet-control-zoom a {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    line-height: 44px !important;
+  }
 }
 
 .leaflet-bar a:hover,

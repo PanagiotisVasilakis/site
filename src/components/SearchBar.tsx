@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { DateRange, dateRangeFromParams, dateRangeToParams, getNights } from "@/lib/dateUtils";
 import { format } from "date-fns";
 import dynamic from "next/dynamic";
-import { trackEvent } from "@/lib/analyticsClient";
 import { getApartmentContent } from "@/data/apartmentData";
 
 interface BookingState {
@@ -217,14 +216,18 @@ export default function BookingBar({
       params.set("kids", state.kids.toString());
     }
 
-    trackEvent("booking_check_availability", {
-      property: propertyName,
-      hasDates: !!(state.dateRange?.from && state.dateRange?.to),
-      adults: state.adults,
-      kids: state.kids,
-      totalGuests: state.adults + state.kids,
-      nights: getNights(state.dateRange),
-    });
+    void import("@/lib/analyticsClient")
+      .then(({ trackEvent }) => {
+        trackEvent("booking_check_availability", {
+          property: propertyName,
+          hasDates: !!(state.dateRange?.from && state.dateRange?.to),
+          adults: state.adults,
+          kids: state.kids,
+          totalGuests: state.adults + state.kids,
+          nights: getNights(state.dateRange),
+        });
+      })
+      .catch(() => {});
 
     const bookingUrl = `/${locale}/book?${params.toString()}`;
     router.push(bookingUrl);

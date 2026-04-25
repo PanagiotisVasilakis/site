@@ -4,8 +4,8 @@ import { absUrl, siteUrl } from "@/lib/site";
 import { getDictionary } from "@/i18n/dictionaries";
 import { locales, type Locale } from "@/i18n/config";
 import HomeHero from "@/components/HomeHero";
-import HomeInteractiveBar from "@/components/HomeInteractiveBar";
-import ContactSection from "@/components/ContactSection";
+import DeferredHomeInteractiveBar from "@/components/DeferredHomeInteractiveBar";
+import DeferredContactSection from "@/components/DeferredContactSection";
 
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -34,7 +34,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         />
       </div>
       <div className="page-container home-typography mx-auto max-w-4xl">
-        <HomeInteractiveBar
+        <DeferredHomeInteractiveBar
           locale={eff}
           subline={eff === 'el' ? 'Πολυτελές διαμέρισμα στην Καλαμάτα' : 'Luxury apartment in Kalamata, Greece'}
           labels={{
@@ -84,7 +84,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           ))}
         </section>
       </div>
-      <ContactSection locale={eff} />
+      <DeferredContactSection locale={eff} />
     </>
   );
 }

@@ -3,11 +3,10 @@ import { locales, type Locale } from "@/i18n/config";
 // Removed Google font imports (Geist) to prevent build-time external fetch failures.
 import "../globals.css";
 import { getDictionary } from "@/i18n/dictionaries";
-import PwaManager from "@/components/PwaManager";
 import { ToastProvider } from "@/components/Toast";
-import Analytics from "@/components/Analytics";
 import JsonFetchHud from "@/components/JsonFetchHud";
 import TopControls from "@/components/TopControls";
+import DeferredRuntimeManagers from "@/components/DeferredRuntimeManagers";
 
 // Removed font variable placeholders.
 
@@ -39,8 +38,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   <div data-locale={eff}>
   <a href="#main-content" className="skip-link">{t.skipLink || 'Skip to content'}</a>
       <ToastProvider>
-      <PwaManager />
-      <Analytics />
+      <DeferredRuntimeManagers />
   <JsonFetchHud />
   <TopControls locale={eff} appTitle={t.appTitle} />
       {/* Update banner: light surface uses dark brand text; buttons tinted; dismiss available */}

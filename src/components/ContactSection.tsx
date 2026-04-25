@@ -111,7 +111,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
                       <h3 className="font-serif italic font-medium text-white mb-1 text-base">
                         {translations.address}
                       </h3>
-                      <a href="https://maps.app.goo.gl/9vqnjXJqQeakxdBx8" target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-white transition-colors text-xs block">
+                      <a href="https://maps.app.goo.gl/9vqnjXJqQeakxdBx8" target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-white transition-colors text-xs block min-h-11 leading-tight py-1">
                         {translations.streetCity}<br />
                         {translations.countryPostal}
                       </a>
@@ -124,7 +124,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
                       <h3 className="font-serif italic font-medium text-white mb-1 text-base">
                         {translations.phone}
                       </h3>
-                      <a href="tel:+306955810051" className="text-gray-300 hover:text-white transition-colors text-xs">
+                      <a href="tel:+306955810051" className="text-gray-300 hover:text-white transition-colors text-xs inline-flex items-center min-h-11">
                         +30 695 581 0051
                       </a>
                     </div>
@@ -136,7 +136,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
                       <h3 className="font-serif italic font-medium text-white mb-1 text-base">
                         {translations.email}
                       </h3>
-                      <a href="mailto:dolcefarnienteapartments@gmail.com" className="text-gray-300 hover:text-white transition-colors text-xs">
+                      <a href="mailto:dolcefarnienteapartments@gmail.com" className="text-gray-300 hover:text-white transition-colors text-xs inline-flex items-center min-h-11">
                         dolcefarnienteapartments@gmail.com
                       </a>
                     </div>
@@ -276,7 +276,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
                   <div className="text-3xl group-hover:scale-110 transition-transform duration-200 flex-shrink-0">📍</div>
                   <div className="text-left flex-1">
                     <h3 className="font-serif italic font-medium text-slate-700 mb-1 text-base">{translations.address}</h3>
-                    <a href="https://maps.app.goo.gl/9vqnjXJqQeakxdBx8" target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:text-slate-800 transition-colors text-xs block">
+                    <a href="https://maps.app.goo.gl/9vqnjXJqQeakxdBx8" target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:text-slate-800 transition-colors text-xs block min-h-11 leading-tight py-1">
                       {translations.streetCity}<br />
                       {translations.countryPostal}
                     </a>
@@ -287,7 +287,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
                   <div className="text-3xl group-hover:scale-110 transition-transform duration-200 flex-shrink-0">📞</div>
                   <div className="text-left flex-1">
                     <h3 className="font-serif italic font-medium text-slate-700 mb-1 text-base">{translations.phone}</h3>
-                    <a href="tel:+306955810051" className="text-slate-600 hover:text-slate-800 transition-colors text-xs">
+                    <a href="tel:+306955810051" className="text-slate-600 hover:text-slate-800 transition-colors text-xs inline-flex items-center min-h-11">
                       +30 695 581 0051
                     </a>
                   </div>
@@ -297,7 +297,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
                   <div className="text-3xl group-hover:scale-110 transition-transform duration-200 flex-shrink-0">✉️</div>
                   <div className="text-left flex-1">
                     <h3 className="font-serif italic font-medium text-slate-700 mb-1 text-base">{translations.email}</h3>
-                    <a href="mailto:dolcefarnienteapartments@gmail.com" className="text-slate-600 hover:text-slate-800 transition-colors text-xs">
+                    <a href="mailto:dolcefarnienteapartments@gmail.com" className="text-slate-600 hover:text-slate-800 transition-colors text-xs inline-flex items-center min-h-11">
                       dolcefarnienteapartments@gmail.com
                     </a>
                   </div>

@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { locales, type Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 import { getItemsByCategory } from '@/lib/data';
@@ -52,7 +53,13 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
   const session = await getGuestSessionFromCookies();
   if (!hasVerifiedBookingSession(session)) {
     const failMsg = encodeURIComponent('Please sign in to access check-in information');
-    const failure = encodeURIComponent(`/${eff}/guest?flash=${failMsg}`);
+    const failurePath = `/${eff}/guest?flash=${failMsg}`;
+    const cookieStore = await cookies();
+    if (!cookieStore.get('guest_rt')?.value) {
+      redirect(failurePath);
+    }
+
+    const failure = encodeURIComponent(failurePath);
     const next = encodeURIComponent(`/${eff}/check-in`);
     redirect(`/api/portal/refresh?next=${next}&failure=${failure}`);
   }

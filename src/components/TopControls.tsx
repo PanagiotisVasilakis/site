@@ -14,7 +14,7 @@ import { useGuestSession } from '@/hooks/useGuestSession';
 // --- Styles with CVA ---
 
 const navButton = cva(
-  "inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold tracking-wide leading-none transition whitespace-nowrap white-in-dark",
+  "inline-flex items-center justify-center gap-2 px-3 py-2 md:py-1 min-h-11 md:min-h-8 rounded-full text-[11px] font-semibold tracking-wide leading-none transition whitespace-nowrap white-in-dark",
   {
     variants: {
       intent: {
@@ -178,7 +178,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
               aria-expanded={open}
               onClick={() => setOpen(o => !o)}
               className={clsx(
-                "h-7 w-7 rounded-full flex items-center justify-center transition border text-sm shadow-sm flex-shrink-0",
+                "h-11 w-11 md:h-8 md:w-8 rounded-full flex items-center justify-center transition border text-sm shadow-sm flex-shrink-0",
                 "bg-white/30 dark:bg-white/40 hover:bg-white/60 dark:hover:bg-white/60 border-white/30 dark:border-white/40",
                 open && "ring-2 ring-brand-400"
               )}

@@ -20,6 +20,7 @@ interface InteractiveMapProps {
   className?: string;
   onMarkerClick?: (marker: MarkerData) => void;
   locale?: string; // for localized static fallback
+  activation?: 'viewport' | 'intent';
 }
 
 export default function InteractiveMap({
@@ -29,7 +30,8 @@ export default function InteractiveMap({
   height = "400px",
   className = "",
   onMarkerClick,
-  locale = 'en'
+  locale = 'en',
+  activation = 'viewport'
 }: InteractiveMapProps) {
   const eff: Locale = locale === 'el' ? 'el' : 'en';
   const dict = getDictionary(eff);
@@ -44,6 +46,7 @@ export default function InteractiveMap({
 
   useEffect(() => {
     if (!hasMounted) return;
+    if (activation === 'intent') return;
     const el = containerRef.current;
     if (!el) return;
 
@@ -66,7 +69,7 @@ export default function InteractiveMap({
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasMounted]);
+  }, [hasMounted, activation]);
 
   const leafletMarkers = useMemo<LeafletMarkerData[]>(() => {
     const deduped: MarkerData[] = [];
@@ -132,8 +135,19 @@ export default function InteractiveMap({
         <div className="absolute inset-0 flex flex-col items-center justify-center rounded-lg border border-brand-200 bg-gradient-to-br from-brand-50 to-brand-100 text-center text-sm text-brand-700">
           <div className="mb-2 text-3xl" aria-hidden>🗺️</div>
           <p className="max-w-xs leading-relaxed px-6">
-            {mapT?.deferredInteractiveLabel || 'Interactive map loads once it is in view to keep things speedy.'}
+            {activation === 'intent'
+              ? (mapT?.deferredInteractiveLabel || 'Interactive map is ready when you need it.')
+              : (mapT?.deferredInteractiveLabel || 'Interactive map loads once it is in view to keep things speedy.')}
           </p>
+          {activation === 'intent' && (
+            <button
+              type="button"
+              className="btn-tint mt-4 min-h-11"
+              onClick={() => setShouldRenderInteractive(true)}
+            >
+              Load map
+            </button>
+          )}
         </div>
       )}
       <noscript>
@@ -142,5 +156,3 @@ export default function InteractiveMap({
     </div>
   );
 }
-
-

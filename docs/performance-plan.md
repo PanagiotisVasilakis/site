@@ -29,4 +29,32 @@
 
 - Ensure the dev server is running (`npm run dev`) or point `LH_URL` at staging.
 - Run `npm run lighthouse:mobile` to generate a Slow 4G mobile report.
+- Run `npm run lighthouse:desktop` to generate a desktop performance report for the same route.
 - The script saves an HTML snapshot in the `scripts/` directory; archive it with the date for trend tracking.
+
+### Lighthouse Matrix Workflow
+
+- Run `npm run audit:lighthouse:matrix` to measure key routes under both mobile and desktop profiles.
+- Reports are saved under `reports/lighthouse-matrix/` as JSON and Markdown.
+- For CI gating, run `npm run ci:lighthouse:matrix` (fails when score threshold is breached or major/critical severity appears).
+- Override defaults when needed:
+  - `LH_BASE_URL` to target staging.
+  - `LH_MATRIX_PATHS` to use a custom route list.
+  - `LH_MATRIX_PROFILES` to choose mobile, desktop, or both.
+  - `CHROME_PATH` to force a specific Chrome/Chromium binary.
+
+### Responsive UX Workflow
+
+- Run `npm run check:browser-runtime` first on Linux to verify that Chrome/Chromium can launch.
+- Run `npm run audit:responsive:ux` to audit core routes across phone and desktop viewport presets.
+- Reports are saved under `reports/responsive-ux/` as both JSON and Markdown, plus screenshots per route x viewport cell.
+- For CI gating, run `npm run ci:responsive:ux` (fails when major or critical issues are detected).
+- Override defaults when needed:
+  - `RESPONSIVE_BASE_URL` to target staging.
+  - `RESPONSIVE_PATHS` to audit a custom route list.
+  - `RESPONSIVE_VIEWPORTS` to limit to specific presets.
+  - `RESPONSIVE_CHROME_PATH` to force a specific Chrome/Chromium binary when Puppeteer runtime libraries are unavailable.
+
+Linux runtime note:
+
+- If launch errors mention `libasound.so.2`, install `libasound2` (or `libasound2t64` on newer distros).

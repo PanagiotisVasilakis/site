@@ -16,7 +16,7 @@ export default function PwaManager() {
   try { document.documentElement.lang = document.documentElement.getAttribute('lang') || 'en'; } catch (err) { logger.warn('Set document lang failed', err instanceof Error ? err : { error: String(err) }); }
     // SW registration & update banner
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', async () => {
+      const registerServiceWorker = async () => {
         try {
           const reg = await navigator.serviceWorker.register('/sw.js');
           // Request current runtime version
@@ -39,7 +39,12 @@ export default function PwaManager() {
               });
             });
   } catch (err) { logger.error('Service worker registration failed', err instanceof Error ? err : { error: String(err) }); }
-      });
+      };
+      if (document.readyState === 'complete') {
+        void registerServiceWorker();
+      } else {
+        window.addEventListener('load', () => { void registerServiceWorker(); }, { once: true });
+      }
     }
     // iOS A2HS tip
   const hasTouch = 'maxTouchPoints' in navigator ? navigator.maxTouchPoints > 1 : false;
