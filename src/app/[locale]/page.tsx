@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getCategoriesWithCounts, pickCategoryLocale, type CategoryWithCount } from "@/lib/data";
 import { absUrl, siteUrl } from "@/lib/site";
 import { getDictionary } from "@/i18n/dictionaries";
@@ -6,12 +5,31 @@ import { locales, type Locale } from "@/i18n/config";
 import HomeHero from "@/components/HomeHero";
 import DeferredHomeInteractiveBar from "@/components/DeferredHomeInteractiveBar";
 import DeferredContactSection from "@/components/DeferredContactSection";
+import HomeFeatureGrid, { type HomeFeature } from "@/components/home/HomeFeatureGrid";
 
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : "en";
   const t = getDictionary(eff);
   const cats: CategoryWithCount[] = getCategoriesWithCounts();
+  const featureCards: HomeFeature[] = [
+    {
+      href: `/${eff}/apartment`,
+      label: t.house?.navLabel || 'Apartment Photos',
+      icon: '🏡',
+    },
+    {
+      href: `/${eff}/check-in`,
+      label: t.checkin?.navInfoLabel || 'Check-In Info',
+      icon: '✅',
+    },
+    ...cats.slice(0, 2).map((c) => ({
+      href: `/${eff}/${c.slug}`,
+      label: t.categories[c.slug as "phones" | "moments"] ?? (pickCategoryLocale(c, "title", eff) ?? c.title),
+      icon: c.icon ?? "📋",
+    })),
+  ];
+
   return (
     <>
       <script
@@ -33,7 +51,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           subtitle={t.homeSubtitle}
         />
       </div>
-      <div className="page-container home-typography mx-auto max-w-4xl">
+      <div className="page-container home-typography mx-auto max-w-5xl">
         <DeferredHomeInteractiveBar
           locale={eff}
           subline={eff === 'el' ? 'Πολυτελές διαμέρισμα στην Καλαμάτα' : 'Luxury apartment in Kalamata, Greece'}
@@ -50,39 +68,10 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
             departurePlaceholder: t.search?.departurePlaceholder
           }}
         />
-        {/* Apartment Features */}
-        <section className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 mb-10">
-          <Link
-            href={`/${eff}/apartment`}
-            className="card p-3 sm:p-6 flex flex-col items-center text-center transition-all group hover:shadow-lg"
-          >
-            <div className="text-2xl sm:text-4xl mb-2 sm:mb-3 group-hover:scale-110 transition-transform" aria-hidden>🏡</div>
-            <div className="text-xs sm:text-lg font-serif italic font-bold mb-1 sm:mb-2">{t.house?.navLabel || 'Apartment Photos'}</div>
-          </Link>
-
-          <Link
-            href={`/${eff}/check-in`}
-            className="card p-3 sm:p-6 flex flex-col items-center text-center transition-all group hover:shadow-lg"
-          >
-            <div className="text-2xl sm:text-4xl mb-2 sm:mb-3 group-hover:scale-110 transition-transform" aria-hidden>✅</div>
-            <div className="text-xs sm:text-lg font-serif italic font-bold mb-1 sm:mb-2">{t.checkin?.navInfoLabel || 'Check-In Info'}</div>
-          </Link>
-
-          {cats.slice(0, 2).map((c) => (
-            <Link
-              key={c.id}
-              href={`/${eff}/${c.slug}`}
-              className="card p-3 sm:p-6 flex flex-col items-center text-center transition-all group hover:shadow-lg"
-            >
-              <div className="text-2xl sm:text-4xl mb-2 sm:mb-3 group-hover:scale-110 transition-transform" aria-hidden>
-                {c.icon ?? "📋"}
-              </div>
-              <div className="text-xs sm:text-lg font-serif italic font-bold mb-1 sm:mb-2">
-                {t.categories[c.slug as "phones" | "moments"] ?? (pickCategoryLocale(c, "title", eff) ?? c.title)}
-              </div>
-            </Link>
-          ))}
-        </section>
+        <HomeFeatureGrid
+          label={eff === 'el' ? 'Βασικές επιλογές οδηγού επισκέπτη' : 'Guest guide shortcuts'}
+          features={featureCards}
+        />
       </div>
       <DeferredContactSection locale={eff} />
     </>

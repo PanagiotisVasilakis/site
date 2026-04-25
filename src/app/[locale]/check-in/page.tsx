@@ -68,7 +68,7 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
     <div className="page-container mx-auto max-w-3xl">
       <CheckinViewed locale={eff} />
       <div className="mb-6 text-center">
-        <h1 className="text-3xl font-serif italic font-bold mb-2 tracking-wider">
+        <h1 className="text-3xl font-serif italic font-bold mb-2">
           {getDictionary(eff).house?.guideTitle ?? 'House Guide'}
         </h1>
       </div>

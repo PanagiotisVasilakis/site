@@ -219,7 +219,7 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
         <>
           {featured.length > 0 && (
             <section>
-              <h2 className="text-sm font-serif italic font-bold tracking-wide mb-2 text-small-strong">Featured</h2>
+              <h2 className="text-sm font-serif italic font-bold mb-2 text-small-strong">Featured</h2>
               {renderGroup(featured)}
             </section>
           )}

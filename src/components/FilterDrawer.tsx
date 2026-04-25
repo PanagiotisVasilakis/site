@@ -64,7 +64,7 @@ export default function FilterDrawer({ open, onClose, children, title }: Props) 
       <div className={`absolute inset-0 bg-black/40 transition-opacity ${open ? 'opacity-100' : 'opacity-0'}`} onClick={onClose} />
   <aside ref={panelRef} className={`floating-banner absolute bottom-0 left-0 right-0 md:right-auto md:w-96 md:top-0 md:bottom-0 backdrop-blur border-t md:border-t-0 md:border-r border-soft rounded-t-xl md:rounded-none shadow-lg flex flex-col transform transition-transform ${open ? 'translate-y-0 md:translate-x-0' : 'translate-y-full md:-translate-x-full'}`} role="dialog" aria-modal="true" aria-label={title || 'Filters'}>
         <header className="p-4 border-b divider flex items-center justify-between">
-          <h2 className="text-sm font-semibold tracking-wide uppercase">{title || 'Filters'}</h2>
+          <h2 className="text-sm font-semibold uppercase">{title || 'Filters'}</h2>
           <button onClick={onClose} aria-label="Close filters" className="btn-tint btn-sm">✕</button>
         </header>
         <div className="p-4 overflow-y-auto text-sm flex-1">

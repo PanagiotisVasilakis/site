@@ -14,7 +14,7 @@ import { useGuestSession } from '@/hooks/useGuestSession';
 // --- Styles with CVA ---
 
 const navButton = cva(
-  "inline-flex items-center justify-center gap-2 px-3 py-2 md:py-1 min-h-11 md:min-h-8 rounded-full text-[11px] font-semibold tracking-wide leading-none transition whitespace-nowrap white-in-dark",
+  "inline-flex items-center justify-center gap-2 px-3 py-2 md:py-1 min-h-11 md:min-h-8 rounded-full text-[11px] font-semibold leading-none transition whitespace-nowrap white-in-dark",
   {
     variants: {
       intent: {
@@ -191,7 +191,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
         {/* Mobile Panel */}
         <div className={menuPanel({ open })} role="menu" aria-label="Main menu">
           <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-zinc-700/60">
-            <span className="text-xs font-bold tracking-wide uppercase">Menu</span>
+            <span className="text-xs font-bold uppercase">Menu</span>
             <div className="flex items-center gap-2">
               <div className="dark:border dark:border-zinc-700/60 rounded-full"><ThemeToggle /></div>
               <div className="dark:border dark:border-zinc-700/60 rounded-full"><LocaleSwitcher /></div>

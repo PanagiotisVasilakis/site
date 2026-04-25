@@ -1,17 +1,22 @@
 "use client";
 
-import { useTheme } from '@/hooks/useTheme';
+import type { ReactNode } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 
 interface ContactSectionProps {
   locale: string;
 }
 
+interface ContactItem {
+  label: string;
+  value: ReactNode;
+  href: string;
+  icon: string;
+}
+
 export default function ContactSection({ locale }: ContactSectionProps) {
-  const { isDark: isDarkMode } = useTheme();
   const { t } = useTranslation(locale);
 
-  // Use centralized dictionary translations
   const translations = {
     contactUs: t.contact?.title ?? 'Contact Us',
     followUs: t.contact?.followUs ?? 'Follow Us',
@@ -21,340 +26,88 @@ export default function ContactSection({ locale }: ContactSectionProps) {
     connectWithUs: t.contact?.connectWithUs ?? 'Connect with us',
     description: t.contact?.description ?? '',
     streetCity: t.contact?.streetCity ?? 'Archimidous 21 Kalamata',
-    countryPostal: t.contact?.countryPostal ?? 'Greece 24100'
+    countryPostal: t.contact?.countryPostal ?? 'Greece 24100',
   };
 
-  const socialLinks = [
-    { name: 'Instagram', icon: '📷', url: 'https://www.instagram.com/dolcefarniente_kalamata?igsh=MWlzNHlucjQ3NDBwMA==', color: 'hover:text-pink-500' },
+  const contactItems: ContactItem[] = [
+    {
+      label: translations.address,
+      value: (
+        <>
+          {translations.streetCity}
+          <br />
+          {translations.countryPostal}
+        </>
+      ),
+      href: 'https://maps.app.goo.gl/9vqnjXJqQeakxdBx8',
+      icon: 'MAP',
+    },
+    {
+      label: translations.phone,
+      value: '+30 695 581 0051',
+      href: 'tel:+306955810051',
+      icon: 'TEL',
+    },
+    {
+      label: translations.email,
+      value: 'dolcefarnienteapartments@gmail.com',
+      href: 'mailto:dolcefarnienteapartments@gmail.com',
+      icon: 'MAIL',
+    },
   ];
 
-
-  if (isDarkMode) {
-    return (
-      <section className="relative w-full px-4 py-6 overflow-hidden rounded-3xl transition-all duration-700 ease-in-out"
-        style={{
-          background: 'linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 25%, #1f1f1f 50%, #252525 75%, #1e1e1e 100%)',
-          boxShadow: '0 20px 40px -12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05) inset, 0 0 80px rgba(59, 130, 246, 0.05) inset'
-        }}>
-        {/* Decorative wave pattern overlay */}
-        <div className="absolute inset-0 opacity-3">
-          <svg className="w-full h-full" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
-            <defs>
-              <pattern id="wavePattern" x="0" y="0" width="150" height="150" patternUnits="userSpaceOnUse">
-                <path d="M0,75 Q37.5,37.5 75,75 T150,75 V150 H0 Z" fill="currentColor" opacity="0.2" />
-                <path d="M0,90 Q37.5,52.5 75,90 T150,90 V150 H0 Z" fill="currentColor" opacity="0.1" />
-                <circle cx="75" cy="75" r="2" fill="currentColor" opacity="0.15" />
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#wavePattern)" />
-          </svg>
-        </div>
-
-        {/* Floating geometric shapes */}
-        <div className="absolute top-16 left-8 w-24 h-24 opacity-6 animate-pulse" style={{ animationDuration: '4s' }}>
-          <svg viewBox="0 0 100 100" className="w-full h-full text-gray-400">
-            <polygon points="50,5 90,25 90,75 50,95 10,75 10,25" fill="currentColor" />
-          </svg>
-        </div>
-        <div className="absolute bottom-16 right-8 w-20 h-20 opacity-4 animate-pulse" style={{ animationDuration: '6s' }}>
-          <svg viewBox="0 0 100 100" className="w-full h-full text-gray-500">
-            <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="2" />
-            <circle cx="50" cy="50" r="30" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.5" />
-          </svg>
-        </div>
-
-        {/* Olive branch decorative element */}
-        <div className="absolute top-6 right-6 opacity-8 text-gray-600 animate-pulse" aria-hidden style={{ animationDuration: '8s' }}>
-          <svg width="100" height="70" viewBox="0 0 140 100" className="drop-shadow-lg">
-            <path d="M20,80 Q35,55 50,70 Q65,50 80,65 Q95,40 110,55 Q125,30 140,45"
-              stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.4" />
-            <circle cx="30" cy="60" r="4" fill="currentColor" opacity="0.5" />
-            <circle cx="55" cy="45" r="3" fill="currentColor" opacity="0.4" />
-            <circle cx="80" cy="35" r="3" fill="currentColor" opacity="0.3" />
-            <circle cx="105" cy="25" r="2" fill="currentColor" opacity="0.2" />
-            <circle cx="125" cy="20" r="2" fill="currentColor" opacity="0.1" />
-          </svg>
-        </div>
-
-        <div className="relative z-10 py-6 md:py-8">
-          {/* Headings Row - Only visible on medium screens and up */}
-          <div className="hidden md:grid md:grid-cols-2 gap-8 mb-6">
-            <div className="text-center group">
-              <h2 className="text-3xl md:text-4xl font-serif italic font-bold text-white mb-4 tracking-wider group-hover:scale-105 transition-transform duration-500">
-                {translations.contactUs}
-              </h2>
-              <div className="w-20 h-1 bg-gradient-to-r from-transparent via-gray-400 to-transparent mx-auto rounded-full"></div>
-            </div>
-            <div className="text-center group">
-              <h2 className="text-3xl md:text-4xl font-serif italic font-bold text-white mb-4 tracking-wider group-hover:scale-105 transition-transform duration-500">
-                {translations.followUs}
-              </h2>
-              <div className="w-20 h-1 bg-gradient-to-r from-transparent via-gray-400 to-transparent mx-auto rounded-full"></div>
-            </div>
-          </div>
-
-          {/* Content Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Contact Us Content */}
-            <div className="backdrop-blur-sm bg-gradient-to-br from-gray-700/30 to-gray-800/30 rounded-2xl p-6 border border-white/10 shadow-2xl transition-all duration-700">
-              <div className="text-center mb-6 block md:hidden">
-                <h2 className="text-2xl md:text-3xl font-serif italic font-bold text-white mb-2 tracking-wider">
-                  {translations.contactUs}
-                </h2>
-                <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-gray-400 to-transparent mx-auto rounded-full"></div>
-              </div>
-              <div className="space-y-4 text-center">
-                <div className="flex flex-col items-center space-y-3">
-                  <div className="group flex items-start space-x-4 w-full max-w-xs">
-                    <div className="text-3xl group-hover:scale-110 transition-transform duration-200 flex-shrink-0">📍</div>
-                    <div className="text-left flex-1">
-                      <h3 className="font-serif italic font-medium text-white mb-1 text-base">
-                        {translations.address}
-                      </h3>
-                      <a href="https://maps.app.goo.gl/9vqnjXJqQeakxdBx8" target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-white transition-colors text-xs block min-h-11 leading-tight py-1">
-                        {translations.streetCity}<br />
-                        {translations.countryPostal}
-                      </a>
-                    </div>
-                  </div>
-
-                  <div className="group flex items-start space-x-4 w-full max-w-xs">
-                    <div className="text-3xl group-hover:scale-110 transition-transform duration-200 flex-shrink-0">📞</div>
-                    <div className="text-left flex-1">
-                      <h3 className="font-serif italic font-medium text-white mb-1 text-base">
-                        {translations.phone}
-                      </h3>
-                      <a href="tel:+306955810051" className="text-gray-300 hover:text-white transition-colors text-xs inline-flex items-center min-h-11">
-                        +30 695 581 0051
-                      </a>
-                    </div>
-                  </div>
-
-                  <div className="group flex items-start space-x-4 w-full max-w-xs">
-                    <div className="text-3xl group-hover:scale-110 transition-transform duration-200 flex-shrink-0">✉️</div>
-                    <div className="text-left flex-1">
-                      <h3 className="font-serif italic font-medium text-white mb-1 text-base">
-                        {translations.email}
-                      </h3>
-                      <a href="mailto:dolcefarnienteapartments@gmail.com" className="text-gray-300 hover:text-white transition-colors text-xs inline-flex items-center min-h-11">
-                        dolcefarnienteapartments@gmail.com
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>            {/* Follow Us Content */}
-            <div className="backdrop-blur-sm bg-gradient-to-br from-gray-700/30 to-gray-800/30 rounded-2xl p-6 border border-white/10 shadow-2xl transition-all duration-700">
-              <div className="text-center mb-6 block md:hidden">
-                <h2 className="text-2xl md:text-3xl font-serif italic font-bold text-white mb-2 tracking-wider">
-                  {translations.followUs}
-                </h2>
-                <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-gray-400 to-transparent mx-auto rounded-full"></div>
-              </div>
-              <div className="space-y-4 text-center">
-                <p className="text-gray-300 leading-relaxed text-sm italic">
-                  {translations.description}
-                </p>
-
-                {/* Social Media Links */}
-                <div className="space-y-3">
-                  <h3 className="text-xl font-serif italic font-medium text-white tracking-wide">{translations.connectWithUs}</h3>
-                  <div className="flex flex-col items-center gap-2">
-                    {socialLinks.map((social) => (
-                      <a
-                        key={social.name}
-                        href={social.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group flex items-center justify-between w-full max-w-xs p-4 bg-gradient-to-r from-gray-700/40 to-gray-600/20 border border-gray-600/30 rounded-2xl hover:from-gray-600/50 hover:to-gray-500/30 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl backdrop-blur-sm"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="text-3xl group-hover:scale-125 transition-transform duration-300">
-                            {social.icon}
-                          </div>
-                          <div className="text-left">
-                            <div className="text-white font-semibold group-hover:text-white transition-colors text-base">
-                              {social.name}
-                            </div>
-                            <div className="text-gray-400 text-xs">
-                              @{social.name.toLowerCase()}/dolcefar niente
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-gray-400 group-hover:text-gray-300 transition-all duration-300 group-hover:translate-x-1">
-                          →
-                        </div>
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-    );
-  }
-
-  // Light mode version
   return (
-    <section className="relative w-full px-4 py-6 overflow-hidden rounded-3xl transition-all duration-700 ease-in-out"
-      style={{
-        background: 'linear-gradient(135deg, #faf9f6 0%, #f5f5f0 25%, #f2f2ed 50%, #faf9f6 75%, #fdfbf7 100%)',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05) inset, 0 0 100px rgba(200, 200, 190, 0.1) inset'
-      }}>
-      {/* Decorative wave pattern overlay */}
-      < div className="absolute inset-0 opacity-3" >
-        <svg className="w-full h-full" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
-          <defs>
-            <pattern id="wavePatternLight" x="0" y="0" width="150" height="150" patternUnits="userSpaceOnUse">
-              <path d="M0,75 Q37.5,37.5 75,75 T150,75 V150 H0 Z" fill="currentColor" opacity="0.2" />
-              <path d="M0,90 Q37.5,52.5 75,90 T150,90 V150 H0 Z" fill="currentColor" opacity="0.1" />
-              <circle cx="75" cy="75" r="2" fill="currentColor" opacity="0.15" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#wavePatternLight)" />
-        </svg>
-      </div >
-
-      {/* Floating geometric shapes */}
-      < div className="absolute top-16 left-8 w-24 h-24 opacity-6 animate-pulse text-slate-400" style={{ animationDuration: '4s' }}>
-        <svg viewBox="0 0 100 100" className="w-full h-full">
-          <polygon points="50,5 90,25 90,75 50,95 10,75 10,25" fill="currentColor" />
-        </svg>
-      </div >
-      <div className="absolute bottom-16 right-8 w-20 h-20 opacity-4 animate-pulse text-slate-400" style={{ animationDuration: '6s' }}>
-        <svg viewBox="0 0 100 100" className="w-full h-full">
-          <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="2" />
-          <circle cx="50" cy="50" r="30" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.5" />
-        </svg>
-      </div>
-
-      {/* Olive branch decorative element */}
-      <div className="absolute top-6 right-6 opacity-8 text-slate-500 animate-pulse" aria-hidden style={{ animationDuration: '8s' }}>
-        <svg width="100" height="70" viewBox="0 0 140 100" className="drop-shadow-lg">
-          <path d="M20,80 Q35,55 50,70 Q65,50 80,65 Q95,40 110,55 Q125,30 140,45"
-            stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.6" />
-          <circle cx="30" cy="60" r="4" fill="currentColor" opacity="0.7" />
-          <circle cx="55" cy="45" r="3" fill="currentColor" opacity="0.6" />
-          <circle cx="80" cy="35" r="3" fill="currentColor" opacity="0.5" />
-          <circle cx="105" cy="25" r="2" fill="currentColor" opacity="0.4" />
-          <circle cx="125" cy="20" r="2" fill="currentColor" opacity="0.3" />
-        </svg>
-      </div>
-
-      <div className="relative z-10 py-6 md:py-8">
-        {/* Headings Row - Only visible on medium screens and up */}
-        <div className="hidden md:grid md:grid-cols-2 gap-8 mb-6">
-          <div className="text-center group">
-            <h2 className="text-3xl md:text-4xl font-serif italic font-bold text-slate-800 mb-4 tracking-wider group-hover:scale-105 transition-transform duration-500">
-              {translations.contactUs}
-            </h2>
-            <div className="w-20 h-1 bg-gradient-to-r from-transparent via-slate-400 to-transparent mx-auto rounded-full"></div>
-          </div>
-          <div className="text-center group">
-            <h2 className="text-3xl md:text-4xl font-serif italic font-bold text-slate-800 mb-4 tracking-wider group-hover:scale-105 transition-transform duration-500">
-              {translations.followUs}
-            </h2>
-            <div className="w-20 h-1 bg-gradient-to-r from-transparent via-slate-400 to-transparent mx-auto rounded-full"></div>
-          </div>
+    <section className="contact-section" aria-labelledby="contact-section-title">
+      <div className="contact-section-inner">
+        <div className="contact-panel">
+          <h2 id="contact-section-title" className="contact-panel-title">
+            {translations.contactUs}
+          </h2>
+          <ul className="contact-list">
+            {contactItems.map((item) => (
+              <li key={item.href} className="contact-row">
+                <span className="contact-row-icon" aria-hidden>
+                  {item.icon}
+                </span>
+                <div className="min-w-0">
+                  <h3 className="contact-row-label">{item.label}</h3>
+                  <a
+                    href={item.href}
+                    target={item.href.startsWith('http') ? '_blank' : undefined}
+                    rel={item.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+                    className="contact-link"
+                  >
+                    {item.value}
+                  </a>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
 
-        {/* Content Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Contact Us Content */}
-          <div className="backdrop-blur-sm bg-white/80 rounded-2xl p-6 border border-white/50 shadow-lg shadow-stone-200/20">
-            <div className="text-center mb-6 block md:hidden">
-              <h2 className="text-2xl md:text-3xl font-serif italic font-bold text-slate-800 mb-2 tracking-wider">
-                {translations.contactUs}
-              </h2>
-              <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-slate-400 to-transparent mx-auto rounded-full"></div>
-            </div>
-            <div className="space-y-4 text-center">
-              <div className="flex flex-col items-center space-y-3">
-                <div className="group flex items-start space-x-4 w-full max-w-xs">
-                  <div className="text-3xl group-hover:scale-110 transition-transform duration-200 flex-shrink-0">📍</div>
-                  <div className="text-left flex-1">
-                    <h3 className="font-serif italic font-medium text-slate-700 mb-1 text-base">{translations.address}</h3>
-                    <a href="https://maps.app.goo.gl/9vqnjXJqQeakxdBx8" target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:text-slate-800 transition-colors text-xs block min-h-11 leading-tight py-1">
-                      {translations.streetCity}<br />
-                      {translations.countryPostal}
-                    </a>
-                  </div>
-                </div>
-
-                <div className="group flex items-start space-x-4 w-full max-w-xs">
-                  <div className="text-3xl group-hover:scale-110 transition-transform duration-200 flex-shrink-0">📞</div>
-                  <div className="text-left flex-1">
-                    <h3 className="font-serif italic font-medium text-slate-700 mb-1 text-base">{translations.phone}</h3>
-                    <a href="tel:+306955810051" className="text-slate-600 hover:text-slate-800 transition-colors text-xs inline-flex items-center min-h-11">
-                      +30 695 581 0051
-                    </a>
-                  </div>
-                </div>
-
-                <div className="group flex items-start space-x-4 w-full max-w-xs">
-                  <div className="text-3xl group-hover:scale-110 transition-transform duration-200 flex-shrink-0">✉️</div>
-                  <div className="text-left flex-1">
-                    <h3 className="font-serif italic font-medium text-slate-700 mb-1 text-base">{translations.email}</h3>
-                    <a href="mailto:dolcefarnienteapartments@gmail.com" className="text-slate-600 hover:text-slate-800 transition-colors text-xs inline-flex items-center min-h-11">
-                      dolcefarnienteapartments@gmail.com
-                    </a>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Follow Us Content */}
-          <div className="backdrop-blur-sm bg-white/80 rounded-2xl p-6 border border-white/50 shadow-lg shadow-stone-200/20">
-            <div className="text-center mb-6 block md:hidden">
-              <h2 className="text-2xl md:text-3xl font-serif italic font-bold text-slate-800 mb-2 tracking-wider">
-                {translations.followUs}
-              </h2>
-              <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-slate-400 to-transparent mx-auto rounded-full"></div>
-            </div>
-            <div className="space-y-4 text-center">
-              <p className="text-slate-700 leading-relaxed text-sm italic">
-                {translations.description}
-              </p>
-
-              {/* Social Media Links */}
-              <div className="space-y-3">
-                <h3 className="text-xl font-serif italic font-medium text-slate-800 tracking-wide">{translations.connectWithUs}</h3>
-                <div className="flex flex-col items-center gap-2">
-                  {socialLinks.map((social) => (
-                    <a
-                      key={social.name}
-                      href={social.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="group flex items-center justify-between w-full max-w-xs p-4 bg-gradient-to-r from-[#f5f5f0] to-[#faf9f6] border border-stone-200 border-b-2 border-b-stone-300/50 rounded-2xl shadow-md shadow-stone-200/50 hover:from-[#faf9f6] hover:to-[#f5f5f0] transition-all duration-500 transform hover:scale-105 hover:shadow-xl backdrop-blur-sm"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className="text-3xl group-hover:scale-125 transition-transform duration-300">
-                          {social.icon}
-                        </div>
-                        <div className="text-left">
-                          <div className="text-slate-700 font-semibold group-hover:text-slate-800 transition-colors text-base">
-                            {social.name}
-                          </div>
-                          <div className="text-slate-500 text-xs">
-                            @{social.name.toLowerCase()}/dolcefarniente_kalamata
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-slate-400 group-hover:text-slate-600 transition-all duration-300 group-hover:translate-x-1">
-                        →
-                      </div>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            </div>
+        <div className="contact-panel">
+          <h2 className="contact-panel-title">{translations.followUs}</h2>
+          {translations.description && (
+            <p className="contact-description">{translations.description}</p>
+          )}
+          <div className="contact-social">
+            <h3 className="contact-row-label">{translations.connectWithUs}</h3>
+            <a
+              href="https://www.instagram.com/dolcefarniente_kalamata?igsh=MWlzNHlucjQ3NDBwMA=="
+              target="_blank"
+              rel="noopener noreferrer"
+              className="contact-social-link"
+            >
+              <span aria-hidden className="contact-row-icon">IG</span>
+              <span className="min-w-0">
+                <span className="contact-social-name">Instagram</span>
+                <span className="contact-social-handle">@dolcefarniente_kalamata</span>
+              </span>
+              <span aria-hidden className="contact-social-arrow">→</span>
+            </a>
           </div>
         </div>
       </div>
-    </section >
+    </section>
   );
 }

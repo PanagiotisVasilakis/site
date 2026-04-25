@@ -7,8 +7,11 @@ interface HomeHeroProps {
 
 export default function HomeHero({ title, subtitle }: HomeHeroProps) {
   return (
-    <div className="relative overflow-hidden min-h-svh bg-transparent">
-      {/* Background Image - Full width, edge to edge */}
+    <section
+      className="relative isolate overflow-hidden bg-black"
+      aria-label={title}
+      style={{ minHeight: 'min(760px, 88svh)' }}
+    >
       <div className="absolute inset-0 z-0" aria-hidden>
         <Image
           src="/house/balcony/balcony_1_hero.webp"
@@ -21,19 +24,21 @@ export default function HomeHero({ title, subtitle }: HomeHeroProps) {
         />
       </div>
 
-      {/* Light overlay for sunny effect - adjusted for both themes */}
-      <div className="absolute inset-0 z-[1] bg-gradient-to-b from-black/10 via-transparent to-black/15 dark:bg-black/20 dark:from-black/60 dark:via-transparent dark:to-black/60" />
+      <div className="absolute inset-0 z-[1] bg-[linear-gradient(180deg,rgba(0,0,0,0.48)_0%,rgba(0,0,0,0.24)_48%,rgba(0,0,0,0.46)_100%)]" />
 
-      <div className="relative z-10 flex items-center justify-center min-h-svh bg-transparent px-6 sm:px-10 py-12">
-        <div className="relative text-center max-w-4xl mx-auto">
-          <h1 className="display-serif italian-title title-gradient title-ornament leading-tight tracking-tight whitespace-nowrap px-4 pb-3 mb-6" style={{ fontSize: 'clamp(3rem, 8vw, 6rem)' }}>
-            <span className="inline-block drop-shadow-2xl">{title}</span>
+      <div
+        className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-center px-5 py-24 text-center sm:px-8 lg:px-10"
+        style={{ minHeight: 'min(760px, 88svh)' }}
+      >
+        <div className="max-w-4xl">
+          <h1 className="font-serif text-4xl font-semibold italic leading-tight text-white drop-shadow-2xl sm:text-5xl md:text-6xl lg:text-7xl">
+            {title}
           </h1>
-          <p className="mt-4 text-lg sm:text-xl text-black leading-relaxed max-w-2xl mx-auto px-4 font-medium home-subtitle drop-shadow-md">
+          <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-white/90 drop-shadow sm:text-lg md:text-xl">
             {subtitle}
           </p>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

@@ -420,7 +420,7 @@ export default function UnifiedGuestClient() {
       <div className="main-glass-container card p-5">
         <>
             <div className="mb-4 text-center">
-              <h1 className="text-2xl font-serif italic font-bold tracking-wide">
+              <h1 className="text-2xl font-serif italic font-bold">
                 {mode === 'signin' ? (dict.portal?.signInTitle || 'Sign in') : (dict.portal?.signUpTitle || 'Sign up')}
               </h1>
               <p className="mt-1 text-sm" style={{ color: 'var(--fg-muted)' }}>
@@ -500,7 +500,7 @@ export default function UnifiedGuestClient() {
                                   aria-expanded={isDropdownOpen}
                                   aria-haspopup="listbox"
                                 >
-                                  <span className="font-medium tracking-wide">{phoneDial}</span>
+                                  <span className="font-medium">{phoneDial}</span>
                                 </button>
                                 
                                 {/* Custom Dropdown Arrow */}

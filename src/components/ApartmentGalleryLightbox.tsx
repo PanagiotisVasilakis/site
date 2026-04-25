@@ -209,7 +209,7 @@ export default function ApartmentGalleryLightbox({ photos, alts, enableHaptics =
         >
           {/* Controls Header */}
           <div className="flex items-center justify-between p-4 z-20 text-white bg-gradient-to-b from-black/60 to-transparent">
-            <span className="font-mono text-sm tracking-widest opacity-80">{counterDisplay}</span>
+            <span className="font-mono text-sm opacity-80">{counterDisplay}</span>
             <div className="flex gap-2">
               {/* Reset zoom if zoomed in, otherwise standard controls can stay */}
               {scale > 1 && (

@@ -142,7 +142,7 @@ export default function ApartmentCinematic({ locale, houseText, photos }: Props)
   return (
     <div className="relative apartment-cinematic-container">
       <section className="relative h-[90svh] md:h-[100svh] overflow-hidden" aria-label="Apartment hero">
-        <Image src={photos[0].src} alt={ht?.title || 'Hero'} fill priority fetchPriority="high" decoding="async" sizes="100vw" className="object-cover hero-ken-burns" />
+        <Image src={photos[0].src} alt={ht?.title || 'Hero'} fill priority loading="eager" fetchPriority="high" decoding="async" sizes="100vw" className="object-cover hero-ken-burns" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/35 to-black/15" aria-hidden="true" />
         <div className="absolute inset-x-0 top-0 flex h-full flex-col justify-center px-6 md:px-14 pt-20 md:pt-24 max-w-5xl">
           <h1 className="text-4xl md:text-6xl font-serif italic font-bold apartment-hero-title white-in-dark" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.3), 0 4px 8px rgba(0,0,0,0.2), 0 8px 16px rgba(0,0,0,0.1), 0 16px 32px rgba(0,0,0,0.05)' }}>{ht?.title || 'Seaside Modern Apartment'}</h1>
