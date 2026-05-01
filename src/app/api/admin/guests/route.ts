@@ -4,6 +4,7 @@ import { withErrorHandler } from '@/lib/apiErrorHandler';
 import { createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import { isAdminRequest } from '@/lib/rbac';
+import { checkInRequestRepository } from '@/lib/prisma-repositories/checkInRequestRepository';
 
 interface QueryParams {
   action?: string;
@@ -111,8 +112,27 @@ const handler = async (request: NextRequest) => {
         });
 
       case 'stats':
-  const statistics = await guestDataExport.getStatistics();
+        const statistics = await guestDataExport.getStatistics();
         return createSuccessResponse({ statistics });
+
+      case 'requests':
+        const requests = await checkInRequestRepository.getAll();
+        return createSuccessResponse({
+          requests: requests.map((request) => ({
+            id: request.id,
+            bookingId: request.booking_id,
+            userId: request.user_id,
+            guestName: request.guest_name,
+            guestEmail: request.guest_email,
+            guestPhone: request.guest_phone,
+            requestedTime: request.requested_time,
+            message: request.message,
+            status: request.status.toLowerCase(),
+            createdAt: new Date(request.created_at).toISOString(),
+            updatedAt: new Date(request.updated_at).toISOString(),
+          })),
+          total: requests.length,
+        });
 
       case 'export':
         if (!params.bookingId) {
@@ -139,7 +159,7 @@ const handler = async (request: NextRequest) => {
       default:
         throw new ApiError(
           ApiErrorCode.VALIDATION_ERROR,
-          'Invalid action. Supported actions: list, find, findById, phone, search, stats, export'
+          'Invalid action. Supported actions: list, find, findById, phone, search, stats, requests, export'
         );
     }
   } catch (error) {

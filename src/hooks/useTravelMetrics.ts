@@ -76,7 +76,7 @@ export function useTravelMetrics({
         cancelledRef.current = false;
 
         try {
-            const newData: TravelData = { ...data };
+            const newData: TravelData = {};
 
             // Chunk markers if needed
             const chunks: MarkerWithCoords[][] = [];
@@ -125,7 +125,7 @@ export function useTravelMetrics({
                 setLoading(false);
             }
         }
-    }, [origin, markers, modes, enabled, maxBatch, data, onProfilesFailed]);
+    }, [origin, markers, modes, enabled, maxBatch, onProfilesFailed]);
 
     // Debounced fetch on changes
     useEffect(() => {

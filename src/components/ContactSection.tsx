@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
+import { getApartmentMapLocation } from '@/data/mapLocations';
 
 interface ContactSectionProps {
   locale: string;
@@ -11,11 +12,63 @@ interface ContactItem {
   label: string;
   value: ReactNode;
   href: string;
-  icon: string;
+  icon: ContactIconName;
+}
+
+type ContactIconName = 'map' | 'phone' | 'mail' | 'instagram';
+
+function ContactIcon({ name }: { name: ContactIconName }) {
+  const common = {
+    width: 22,
+    height: 22,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 1.9,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    focusable: false,
+  };
+
+  if (name === 'map') {
+    return (
+      <svg {...common} aria-hidden>
+        <path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3z" />
+        <path d="M9 3v15" />
+        <path d="M15 6v15" />
+      </svg>
+    );
+  }
+
+  if (name === 'phone') {
+    return (
+      <svg {...common} aria-hidden>
+        <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.4 19.4 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z" />
+      </svg>
+    );
+  }
+
+  if (name === 'mail') {
+    return (
+      <svg {...common} aria-hidden>
+        <rect x="3" y="5" width="18" height="14" rx="3" />
+        <path d="M4 7l8 6 8-6" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg {...common} aria-hidden>
+      <rect x="4" y="4" width="16" height="16" rx="5" />
+      <circle cx="12" cy="12" r="3.5" />
+      <path d="M17.5 6.8h.01" />
+    </svg>
+  );
 }
 
 export default function ContactSection({ locale }: ContactSectionProps) {
   const { t } = useTranslation(locale);
+  const apartmentLocation = getApartmentMapLocation(locale === 'el' ? 'el' : 'en');
 
   const translations = {
     contactUs: t.contact?.title ?? 'Contact Us',
@@ -28,31 +81,35 @@ export default function ContactSection({ locale }: ContactSectionProps) {
     streetCity: t.contact?.streetCity ?? 'Archimidous 21 Kalamata',
     countryPostal: t.contact?.countryPostal ?? 'Greece 24100',
   };
+  const addressParts = (apartmentLocation.address ?? `${translations.streetCity}, ${translations.countryPostal}`)
+    .split(',')
+    .map(part => part.trim())
+    .filter(Boolean);
 
   const contactItems: ContactItem[] = [
     {
       label: translations.address,
       value: (
         <>
-          {translations.streetCity}
+          {addressParts[0] ?? translations.streetCity}
           <br />
-          {translations.countryPostal}
+          {addressParts.slice(1).join(', ') || translations.countryPostal}
         </>
       ),
-      href: 'https://maps.app.goo.gl/9vqnjXJqQeakxdBx8',
-      icon: 'MAP',
+      href: apartmentLocation.directionsUrl || 'https://maps.app.goo.gl/9vqnjXJqQeakxdBx8',
+      icon: 'map',
     },
     {
       label: translations.phone,
-      value: '+30 695 581 0051',
-      href: 'tel:+306955810051',
-      icon: 'TEL',
+      value: apartmentLocation.phone || '+30 695 581 0051',
+      href: `tel:${(apartmentLocation.phone || '+30 695 581 0051').replace(/[^+0-9]/g, '')}`,
+      icon: 'phone',
     },
     {
       label: translations.email,
       value: 'dolcefarnienteapartments@gmail.com',
       href: 'mailto:dolcefarnienteapartments@gmail.com',
-      icon: 'MAIL',
+      icon: 'mail',
     },
   ];
 
@@ -67,7 +124,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
             {contactItems.map((item) => (
               <li key={item.href} className="contact-row">
                 <span className="contact-row-icon" aria-hidden>
-                  {item.icon}
+                  <ContactIcon name={item.icon} />
                 </span>
                 <div className="min-w-0">
                   <h3 className="contact-row-label">{item.label}</h3>
@@ -98,7 +155,9 @@ export default function ContactSection({ locale }: ContactSectionProps) {
               rel="noopener noreferrer"
               className="contact-social-link"
             >
-              <span aria-hidden className="contact-row-icon">IG</span>
+              <span aria-hidden className="contact-row-icon">
+                <ContactIcon name="instagram" />
+              </span>
               <span className="min-w-0">
                 <span className="contact-social-name">Instagram</span>
                 <span className="contact-social-handle">@dolcefarniente_kalamata</span>

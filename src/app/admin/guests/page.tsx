@@ -31,6 +31,20 @@ interface BookingData {
   }
 }
 
+interface CheckInRequestData {
+  id: string
+  bookingId?: string
+  userId?: string
+  guestName?: string
+  guestEmail?: string
+  guestPhone?: string
+  requestedTime: string
+  message?: string
+  status: 'pending' | 'approved' | 'rejected'
+  createdAt: string
+  updatedAt: string
+}
+
 interface Statistics {
   totalBookings: number
   totalUsers: number
@@ -42,6 +56,7 @@ interface Statistics {
 
 export default function GuestDataViewer() {
   const [bookings, setBookings] = useState<BookingData[]>([])
+  const [arrivalRequests, setArrivalRequests] = useState<CheckInRequestData[]>([])
   const [stats, setStats] = useState<Statistics | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -96,6 +111,21 @@ export default function GuestDataViewer() {
       }
     } catch (error) {
       console.error('Failed to fetch statistics:', error)
+    }
+  }
+
+  const fetchArrivalRequests = async () => {
+    try {
+      const response = await internalFetch('/api/admin/guests?action=requests')
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`)
+      }
+      const data = await response.json()
+      if (data.success) {
+        setArrivalRequests(data.data.requests || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch arrival requests:', error)
     }
   }
 
@@ -164,7 +194,10 @@ export default function GuestDataViewer() {
   useEffect(() => {
     fetchAllBookings()
     fetchStatistics()
+    fetchArrivalRequests()
   }, [])
+
+  const pendingArrivalRequests = arrivalRequests.filter((request) => request.status === 'pending')
 
   return (
     <div className="min-h-screen p-6" style={{ background: 'var(--sand-50)' }}>
@@ -205,6 +238,64 @@ export default function GuestDataViewer() {
             <div className="surface-card p-4 rounded-lg shadow">
               <div className="text-2xl font-bold text-orange-600">{stats.totalCheckins}</div>
               <div className="text-sm text-subtle">Check-ins</div>
+            </div>
+          </motion.div>
+        )}
+
+        {arrivalRequests.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="surface-card rounded-lg shadow p-6 mb-6"
+          >
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-serif italic font-bold section-title">Arrival Time Requests</h2>
+                <p className="text-body text-sm">
+                  {pendingArrivalRequests.length} pending request{pendingArrivalRequests.length === 1 ? '' : 's'}
+                </p>
+              </div>
+              <button
+                onClick={fetchArrivalRequests}
+                className="px-4 py-2 rounded-full text-sm font-semibold surface-interactive"
+              >
+                Refresh
+              </button>
+            </div>
+            <div className="grid gap-3">
+              {arrivalRequests.slice(0, 6).map((request) => (
+                <div key={request.id} className="surface-panel rounded-lg p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-semibold text-text-accent">
+                          Requested arrival: {request.requestedTime}
+                        </h3>
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                          request.status === 'pending'
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'
+                            : request.status === 'approved'
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
+                              : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200'
+                        }`}>
+                          {request.status}
+                        </span>
+                      </div>
+                      <p className="text-sm text-body mt-1">
+                        {request.guestEmail || request.guestPhone || request.userId || 'Guest details unavailable'}
+                      </p>
+                      {request.message && (
+                        <p className="text-sm text-body mt-2">{request.message}</p>
+                      )}
+                    </div>
+                    <div className="text-xs text-subtle sm:text-right">
+                      <div>{new Date(request.createdAt).toLocaleString()}</div>
+                      {request.bookingId && <div>Booking: {request.bookingId}</div>}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </motion.div>
         )}

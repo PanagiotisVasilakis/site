@@ -26,9 +26,10 @@ function writeSet(s: Set<string>) {
 }
 
 export function useFavorites() {
-  const [fav, setFav] = useState<Set<string>>(() => readSet());
+  const [fav, setFav] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
+    setFav(readSet());
     const handler = () => setFav(readSet());
     window.addEventListener('storage', handler);
     return () => window.removeEventListener('storage', handler);

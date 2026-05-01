@@ -6,20 +6,20 @@
 export const momentsLayoutConfig = {
     /** Grid layout settings for the moments list page */
     grid: {
-        containerClass: 'max-w-5xl mx-auto px-4 mb-6',
-        gridClass: 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mx-auto',
+        containerClass: 'moments-shell',
+        gridClass: 'moments-grid',
     },
 
     /** Card styles for list items */
     card: {
         containerClass: 'relative h-full',
-        linkClass: 'card p-6 flex flex-col items-center text-center transition-all group hover:shadow-lg h-full min-h-[220px]',
+        linkClass: 'guide-option-card group min-h-[220px]',
         iconClass: 'text-4xl mb-3 group-hover:scale-110 transition-transform',
         defaultIcon: '🍽️',
-        nameClass: 'text-lg font-medium mb-2 line-clamp-2',
-        summaryClass: 'text-sm opacity-80 line-clamp-2 flex-grow',
-        ratingClass: 'mt-2 text-sm font-semibold flex items-center gap-1',
-        priceClass: 'mt-1 text-sm opacity-70',
+        nameClass: 'guide-option-title',
+        summaryClass: 'guide-option-summary',
+        ratingClass: 'guide-option-meta inline-flex items-center gap-1',
+        priceClass: 'guide-option-meta',
         wishlistBtnClass: 'wishlist-btn',
     },
 
@@ -39,11 +39,11 @@ export const momentsLayoutConfig = {
 
     /** Filter menu for moments categories (Sticky Bar) */
     filterMenu: {
-        containerClass: 'filter-bar mb-6',
-        scrollClass: 'flex gap-2 overflow-x-auto scrollbar-hide w-full px-2',
-        buttonClass: 'flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap',
-        activeClass: 'bg-brand-600 text-white shadow-sm',
-        inactiveClass: 'text-[color:var(--text-accent)] hover:bg-[color:var(--layer-hover)]',
+        containerClass: 'moments-chip-nav',
+        scrollClass: 'moments-chip-scroll',
+        buttonClass: 'moments-chip',
+        activeClass: 'is-active',
+        inactiveClass: '',
     },
 
     /** Badge for recently updated items */

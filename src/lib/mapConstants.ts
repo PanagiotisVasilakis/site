@@ -25,7 +25,7 @@ export const MAP_LOADING_STATES = {
 } as const;
 
 export const MAP_CSS_CLASSES = {
-  LOADING_CONTAINER: 'bg-gray-100 rounded-lg flex items-center justify-center',
-  LOADING_TEXT: 'text-gray-500 text-sm',
+  LOADING_CONTAINER: 'surface-subtle rounded-lg flex items-center justify-center',
+  LOADING_TEXT: 'text-subtle text-sm',
   MAP_CONTAINER: 'rounded-xl overflow-hidden shadow-lg'
 } as const;

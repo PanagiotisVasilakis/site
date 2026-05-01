@@ -1,19 +1,29 @@
 "use client";
-import React, { useEffect, useRef, useCallback } from 'react';
+
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import 'leaflet.markercluster';
-import { formatTravelChip } from '@/lib/travelFormat';
+import { formatTravelChip, type TravelMode } from '@/lib/travelFormat';
+import { getOSRMClient } from '@/lib/osrmClient';
+import { useTravelMetrics } from '@/hooks/useTravelMetrics';
 import { logger } from '@/lib/logger-client';
 
-type TravelMode = 'driving' | 'foot' | 'cycling';
+const DEFAULT_TRAVEL_MODES: TravelMode[] = ['driving', 'foot'];
+const DEFAULT_OSRM_BASE_URL = process.env.NEXT_PUBLIC_OSRM_BASE_URL || 'https://router.project-osrm.org';
 
 export interface LeafletMarkerData {
   id: string;
   name: string;
   description?: string;
+  address?: string;
+  phone?: string;
+  phones?: string[];
+  website?: string;
+  directionsUrl?: string;
+  href?: string;
   coordinates: [number, number]; // [lng, lat]
   type?: string;
   price?: string;
@@ -26,51 +36,28 @@ export interface LeafletMapProps {
   height?: string;
   className?: string;
   onMarkerClick?: (m: LeafletMarkerData) => void;
-  /** Force dark tiles true/false. If undefined (default) auto sync with data-theme attribute */
   darkTiles?: boolean;
-  /** Minimum markers required before enabling clustering */
   clusterMin?: number;
-  /** Persist last map center+zoom under this localStorage key (disable by setting to null) */
   persistKey?: string | null;
-  /** Show fit-to-bounds button */
   showFitButton?: boolean;
-  /** Animate markers on add */
   animateMarkers?: boolean;
-  /** Origin (lng,lat) used to compute travel distance/time */
   origin?: [number, number];
-  /** Show a dedicated marker for the origin (house) */
   showOriginMarker?: boolean;
-  /** Auto fit map to include origin + all markers on first load (skips if persisted position exists) */
   autoFitToOriginAndMarkers?: boolean;
-  /** Optional popup info for origin marker (shown if showOriginMarker) */
   originPopup?: { name?: string; address?: string; description?: string };
-  /** Refit bounds (origin + markers) whenever marker list changes */
   refitOnMarkerChange?: boolean;
-  /** Travel modes to compute (OSRM profiles). Supported: driving, foot */
   travelModes?: TravelMode[];
-  /** Allow user to toggle travel modes client-side */
   enableTravelModeToggle?: boolean;
-  /** Override OSRM base URL (must support /table); default public demo server */
   osrmBaseUrl?: string;
-  /** Debounce ms before firing OSRM distance fetch after input changes */
   travelFetchDebounceMs?: number;
-  /** Enable partial popup updates per-mode as soon as each mode resolves */
   partialUpdates?: boolean;
-  /** Maximum markers per OSRM table request (chunk if exceeded) */
   maxTableBatch?: number;
-  /** Minutes between background refreshes (0 to disable) */
   travelRefreshMinutes?: number;
-  /** Telemetry callback when profiles fail (after a run finishes) */
   onTravelProfilesFailed?: (failed: TravelMode[]) => void;
-  /** Enable drawing route polyline on marker click */
   enableRouting?: boolean;
-  /** Route profile if routing enabled; 'auto' uses first selected effective mode */
   routeProfile?: TravelMode | 'auto';
-  /** Polyline color */
   routeColor?: string;
-  /** Defer OSRM travel calculations until interaction */
   lazyTravelMetrics?: boolean;
-  /** Instruction text shown before travel metrics are requested */
   travelPrompt?: string;
 }
 
@@ -85,22 +72,76 @@ const CATEGORY_ICON: Record<string, string> = {
   cafe: 'M2 21h18v-2H2v2zm2-4h14v-3H4v3zm14-13v10h2V4h-2z',
   bar: 'M11 13.83l-3.83 3.83L6 16.51l3.83-3.83L6 8.83 7.17 7.66 11 11.5l3.83-3.84L16 8.83l-3.83 3.83L16 16.51l-1.17 1.17L11 13.83zM12 2a9 9 0 00-9 9c0 2.3.86 4.4 2.28 6L12 23.72 18.72 17A9 9 0 0012 2z',
   park: 'M12 2L9.5 5.5 11 6l-2 4-1-1-2 4h12l-2-4-1 1-2-4 1.5-.5L12 2z',
-  police: 'M13.5,13H12V8h1.5a2.5,2.5,0,0,1,2.5,2.5h0A2.5,2.5,0,0,1,13.5,13Z M21.94,10.29l-1.2-2.4A1,1,0,0,0,19.88,7H17V4a1,1,0,0,0-1-1H8A1,1,0,0,0,7,4V7H4.12a1,1,0,0,0-.86.49l-1.2,2.4A1,1,0,0,0,2,10.5V16a1,1,0,0,0,1,1H4v2a1,1,0,0,0,1,1H6a1,1,0,0,0,1-1V17H17v2a1,1,0,0,0,1,1h1a1,1,0,0,0,1-1V17h1a1,1,0,0,0,1-1V10.5A1,1,0,0,0,21.94,10.29ZM8,5H16V7H8ZM6,15a2,2,0,1,1,2-2A2,2,0,0,1,6,15Zm12,0a2,2,0,1,1,2-2A2,2,0,0,1,18,15Z',
+  police: 'M12 3l7 3v5.5c0 4.4-2.8 7.5-7 9.5-4.2-2-7-5.1-7-9.5V6l7-3z',
   'city-center': 'M15 11V5l-3-3-3 3v2H3v14h18V11h-6zm-8 8H5v-2h2v2zm0-4H5v-2h2v2zm0-4H5V9h2v2zm6 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V9h2v2zm0-4h-2V5h2v2zm6 8h-2v-2h2v2zm0-4h-2v-2h2v2z'
 };
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function svgIcon(path: string, color: string) {
-  return `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='20' height='20' fill='${color}'><path d='${path}'/></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="${color}" aria-hidden="true"><path d="${path}"/></svg>`;
 }
 
 function buildIcon(type = 'apartment') {
-  const path = CATEGORY_ICON[type] || CATEGORY_ICON['attraction'];
+  const path = CATEGORY_ICON[type] || CATEGORY_ICON.attraction;
   return L.divIcon({
     className: 'leaflet-custom-marker',
-    html: `<div class="lmk" data-type="${type}">${svgIcon(path, '#fff')}</div>`,
+    html: `<div class="lmk" data-type="${escapeHtml(type)}">${svgIcon(path, '#fff')}</div>`,
     iconSize: [42, 42],
-    iconAnchor: [21, 40]
+    iconAnchor: [21, 40],
   });
+}
+
+function phoneHref(phone: string) {
+  return `tel:${phone.replace(/[^+0-9]/g, '')}`;
+}
+
+function popupLink(href: string | undefined, label: string) {
+  if (!href) return '';
+  return `<a class="map-popup-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+}
+
+function sameCoordinates(a?: [number, number], b?: [number, number]) {
+  if (!a || !b) return false;
+  return Math.abs(a[0] - b[0]) < 0.00001 && Math.abs(a[1] - b[1]) < 0.00001;
+}
+
+function buildBasePopupHtml(marker: LeafletMarkerData) {
+  const phones = marker.phones?.length ? marker.phones : marker.phone ? [marker.phone] : [];
+  const phoneHtml = phones.map(phone => (
+    `<a class="map-popup-contact" href="${escapeHtml(phoneHref(phone))}">${escapeHtml(phone)}</a>`
+  )).join('');
+  const actionLinks = [
+    popupLink(marker.directionsUrl, 'Directions'),
+    popupLink(marker.website, 'Website'),
+    popupLink(marker.href, 'Details'),
+  ].filter(Boolean).join('');
+
+  return `
+    <article class="map-popup">
+      <h3>${escapeHtml(marker.name)}</h3>
+      ${marker.description ? `<p>${escapeHtml(marker.description)}</p>` : ''}
+      ${marker.address ? `<div class="map-popup-row"><strong>Address</strong><span>${escapeHtml(marker.address)}</span></div>` : ''}
+      ${phoneHtml ? `<div class="map-popup-row"><strong>Phone</strong><span class="map-popup-contacts">${phoneHtml}</span></div>` : ''}
+      ${marker.price ? `<div class="map-popup-price">${escapeHtml(marker.price)}</div>` : ''}
+      ${actionLinks ? `<div class="map-popup-actions">${actionLinks}</div>` : ''}
+    </article>
+  `;
+}
+
+type ClusterFactory = (opts?: Record<string, unknown>) => L.LayerGroup & { addLayer: (l: L.Layer) => void };
+interface ControlExtender {
+  extend: (o: { options?: Record<string, unknown>; onAdd: () => HTMLElement }) => new () => L.Control;
+}
+interface MapWithOrigin extends L.Map {
+  _originMarker?: L.Marker;
 }
 
 export default function LeafletMap({
@@ -120,11 +161,10 @@ export default function LeafletMap({
   autoFitToOriginAndMarkers = false,
   originPopup,
   refitOnMarkerChange = false,
-  travelModes = ['driving','foot'],
+  travelModes = DEFAULT_TRAVEL_MODES,
   enableTravelModeToggle = false,
   osrmBaseUrl,
   travelFetchDebounceMs = 350,
-  partialUpdates = true,
   maxTableBatch = 50,
   travelRefreshMinutes = 15,
   onTravelProfilesFailed,
@@ -132,127 +172,135 @@ export default function LeafletMap({
   routeProfile = 'auto',
   routeColor = '#2563eb',
   lazyTravelMetrics = false,
-  travelPrompt = 'Tap a marker to calculate travel time.'
+  travelPrompt = 'Tap a marker to calculate travel time.',
 }: LeafletMapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const clusterRef = useRef<(L.LayerGroup & { addLayer: (l: L.Layer) => void }) | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
-  const markerInstancesRef = useRef<Record<string, { marker: L.Marker; baseHtml: string }>>({});
+  const markerInstancesRef = useRef<Record<string, { marker: L.Marker; baseHtml: string; data: LeafletMarkerData }>>({});
   const routeLayerRef = useRef<L.Polyline | null>(null);
-  interface ModeData { distance: number; duration: number }
-  const travelCacheRef = useRef<Record<string, { driving?: ModeData; foot?: ModeData; cycling?: ModeData }>>({});
-  const [selectedModes, setSelectedModes] = React.useState<TravelMode[]>(travelModes);
-  const [shouldFetchTravel, setShouldFetchTravel] = React.useState(() => !lazyTravelMetrics);
-  // Keep selectedModes in sync if prop changes (when toggle disabled)
-  useEffect(()=>{
-    if(!enableTravelModeToggle){
-      // Avoid state churn: only update if arrays differ (order + length)
-      const same = selectedModes.length === travelModes.length && selectedModes.every((m,i)=>m===travelModes[i]);
-      if(!same){ setSelectedModes(travelModes); }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[travelModes, enableTravelModeToggle]);
-  useEffect(()=>{ if(enableTravelModeToggle && persistKey){ try { localStorage.setItem(persistKey+':modes', JSON.stringify(selectedModes)); } catch {} } },[selectedModes, enableTravelModeToggle, persistKey]);
-  const effectiveModes = enableTravelModeToggle ? selectedModes : travelModes;
-  useEffect(() => {
-    if (!lazyTravelMetrics) {
-      setShouldFetchTravel(true);
-    }
-  }, [lazyTravelMetrics]);
-  const osrmBase = (typeof osrmBaseUrl === 'string' && osrmBaseUrl) ? osrmBaseUrl.replace(/\/$/,'') : 'https://router.project-osrm.org';
-  // Global-ish in-module cache of OSRM responses by key (profile+coord list)
-  const osrmCacheRef = useRef<Record<string, { distances: number[][]; durations: number[][] }>>({});
-  const failedProfilesRef = useRef<Set<string>>(new Set());
+  const markersRef = useRef(markers);
+  const originRef = useRef(origin);
   const autoFitDoneRef = useRef(false);
+  const [selectedModes, setSelectedModes] = useState<TravelMode[]>(travelModes);
+  const [shouldFetchTravel, setShouldFetchTravel] = useState(() => !lazyTravelMetrics);
+  const [failedModes, setFailedModes] = useState<TravelMode[]>([]);
+  const [hasRoute, setHasRoute] = useState(false);
 
-  // Augment map instance to store origin marker reference without using 'any'
-  interface MapWithOrigin extends L.Map { _originMarker?: L.Marker }
-  // Dedicated origin (house) marker
-  useEffect(()=>{
-    const map = mapRef.current as MapWithOrigin | null;
-    if(!map) return;
-    if(map._originMarker){ map.removeLayer(map._originMarker); map._originMarker = undefined; }
-    if(showOriginMarker && origin){
-      map._originMarker = L.marker([origin[1], origin[0]], {
-        icon: L.divIcon({
-          className: 'leaflet-origin-marker',
-          html: `<div class="lmk" data-type="apartment" title="Apartment location">${svgIcon(CATEGORY_ICON['apartment'], '#fff')}</div>`,
-          iconSize: [42,42], iconAnchor:[21,40]
-        })
-      }).addTo(map);
-      if(originPopup){
-  const title = originPopup.name || 'Apartment';
-        const address = originPopup.address ? `<div style='margin-top:2px;font-size:12px;'>${originPopup.address}</div>` : '';
-        const desc = originPopup.description ? `<div style='margin-top:4px;font-size:12px;line-height:1.3;'>${originPopup.description}</div>` : '';
-        map._originMarker.bindPopup(`<div style='font-weight:600;margin-bottom:4px;'>${title}</div>${address}${desc}`);
-      }
+  useEffect(() => {
+    markersRef.current = markers;
+  }, [markers]);
+
+  useEffect(() => {
+    originRef.current = origin;
+  }, [origin]);
+
+  useEffect(() => {
+    if (!enableTravelModeToggle) {
+      const same = selectedModes.length === travelModes.length && selectedModes.every((mode, index) => mode === travelModes[index]);
+      if (!same) setSelectedModes(travelModes);
     }
-    // Attempt auto-fit (only once, only if not already persisted position)
-    if(autoFitToOriginAndMarkers && !autoFitDoneRef.current){
-      // Skip if persisted state would have positioned map (we detect via localStorage presence)
-      let hadPersist = false;
-      if(persistKey){
-        try { hadPersist = !!localStorage.getItem(persistKey); } catch {}
-      }
-      if(!hadPersist){
-        const pts: L.LatLngExpression[] = [];
-        if(origin) pts.push([origin[1], origin[0]]);
-        markers.forEach(m=>pts.push([m.coordinates[1], m.coordinates[0]]));
-        if(pts.length){
-          const bounds = L.latLngBounds(pts);
-          map.fitBounds(bounds.pad(0.15));
-          autoFitDoneRef.current = true;
-        }
-      }
+  }, [travelModes, enableTravelModeToggle, selectedModes]);
+
+  useEffect(() => {
+    if (enableTravelModeToggle && persistKey) {
+      try {
+        localStorage.setItem(`${persistKey}:modes`, JSON.stringify(selectedModes));
+      } catch { }
     }
-  },[origin, showOriginMarker, originPopup, autoFitToOriginAndMarkers, markers, persistKey]);
+  }, [selectedModes, enableTravelModeToggle, persistKey]);
 
+  useEffect(() => {
+    if (!lazyTravelMetrics) setShouldFetchTravel(true);
+  }, [lazyTravelMetrics]);
 
-  // Helper: decide if dark theme is active
+  const effectiveModes = useMemo(
+    () => enableTravelModeToggle ? selectedModes : travelModes,
+    [enableTravelModeToggle, selectedModes, travelModes]
+  );
+  const osrmBase = (osrmBaseUrl || DEFAULT_OSRM_BASE_URL).replace(/\/$/, '');
+  const travelTargets = useMemo(
+    () => origin ? markers.filter(marker => !sameCoordinates(marker.coordinates, origin)) : [],
+    [markers, origin]
+  );
+  const handleProfilesFailed = useCallback((failed: TravelMode[]) => {
+    setFailedModes(failed);
+    onTravelProfilesFailed?.(failed);
+  }, [onTravelProfilesFailed]);
+  const travel = useTravelMetrics({
+    origin,
+    markers: travelTargets,
+    modes: effectiveModes,
+    osrmBaseUrl: osrmBase,
+    debounceMs: travelFetchDebounceMs,
+    maxBatch: maxTableBatch,
+    refreshMinutes: travelRefreshMinutes,
+    enabled: Boolean(origin && shouldFetchTravel && effectiveModes.length > 0),
+    onProfilesFailed: handleProfilesFailed,
+  });
+
   const computeIsDark = useCallback(() => {
     if (typeof document === 'undefined') return false;
-    if (darkTiles !== undefined) return darkTiles; // forced
-    const attrDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    if (attrDark) return true;
-    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (darkTiles !== undefined) return darkTiles;
+    if (document.documentElement.getAttribute('data-theme') === 'dark') return true;
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
   }, [darkTiles]);
 
-  const applyTiles = (isDark: boolean) => {
+  const applyTiles = useCallback((isDark: boolean) => {
     if (!mapRef.current) return;
     const lightUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
     const darkUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-    if (tileLayerRef.current) {
-      mapRef.current.removeLayer(tileLayerRef.current);
-    }
+    if (tileLayerRef.current) mapRef.current.removeLayer(tileLayerRef.current);
     tileLayerRef.current = L.tileLayer(isDark ? darkUrl : lightUrl, {
-      attribution: isDark ? '&copy; OpenStreetMap & CartoDB' : '&copy; OpenStreetMap contributors'
+      attribution: isDark ? '&copy; OpenStreetMap & CartoDB' : '&copy; OpenStreetMap contributors',
     }).addTo(mapRef.current);
-  };
+  }, []);
 
   const fitOriginAndMarkers = useCallback(() => {
-    if(!mapRef.current) return;
+    if (!mapRef.current) return;
     const pts: L.LatLngExpression[] = [];
-    if(origin) pts.push([origin[1], origin[0]]);
-    markers.forEach(m=>pts.push([m.coordinates[1], m.coordinates[0]]));
-    if(!pts.length) return;
-    const bounds = L.latLngBounds(pts);
-    mapRef.current.fitBounds(bounds.pad(0.15));
-  }, [origin, markers]);
+    if (originRef.current) pts.push([originRef.current[1], originRef.current[0]]);
+    markersRef.current.forEach(marker => pts.push([marker.coordinates[1], marker.coordinates[0]]));
+    if (pts.length) mapRef.current.fitBounds(L.latLngBounds(pts).pad(0.15));
+  }, []);
 
-  // Refit whenever markers change (if enabled)
-  useEffect(()=>{
-    if(refitOnMarkerChange){
-      fitOriginAndMarkers();
+  const buildTravelInfoHtml = useCallback((marker: LeafletMarkerData) => {
+    if (!origin || sameCoordinates(marker.coordinates, origin)) return '';
+    if (lazyTravelMetrics && !shouldFetchTravel) {
+      return `<div class="map-popup-travel muted">${escapeHtml(travelPrompt)}</div>`;
     }
-  },[markers, refitOnMarkerChange, fitOriginAndMarkers]);
+
+    const markerTravel = travel.data[marker.id];
+    const chips = effectiveModes.map(mode => {
+      const metrics = markerTravel?.[mode];
+      if (metrics?.distance && metrics.duration) return formatTravelChip(mode, metrics.distance, metrics.duration);
+      if (failedModes.includes(mode)) {
+        const icon = mode === 'driving' ? '🚗' : mode === 'foot' ? '🚶' : '🚲';
+        return `<span class="inline-flex items-center gap-1 bg-red-500/10 text-red-700 dark:text-red-300 px-2 py-[2px] rounded-full">${icon}<span>n/a</span></span>`;
+      }
+      if (travel.loading) {
+        const icon = mode === 'driving' ? '🚗' : mode === 'foot' ? '🚶' : '🚲';
+        return `<span class="inline-flex items-center gap-1 bg-black/5 dark:bg-white/10 px-2 py-[2px] rounded-full">${icon}<span class="spinner"></span></span>`;
+      }
+      return '';
+    }).filter(Boolean);
+
+    if (chips.length) {
+      return `<div class="map-popup-travel" role="list" aria-live="polite">${chips.map(chip => `<span role="listitem">${chip}</span>`).join(' ')}<span class="map-popup-travel-note">Approximate - OSRM</span></div>`;
+    }
+
+    if (travel.error) {
+      return `<div class="map-popup-travel muted">Travel times unavailable. Use Directions for live navigation.</div>`;
+    }
+
+    return shouldFetchTravel ? `<div class="map-popup-travel muted">Travel times unavailable.</div>` : '';
+  }, [effectiveModes, failedModes, lazyTravelMetrics, origin, shouldFetchTravel, travel.data, travel.error, travel.loading, travelPrompt]);
 
   useEffect(() => {
-    if (!containerRef.current) return;
-    if (mapRef.current) return; // already
+    if (!containerRef.current || mapRef.current) return;
 
-    // Restore position if persisted
     let initialCenter: [number, number] = [center[1], center[0]];
     let initialZoom = zoom;
     if (persistKey) {
@@ -260,64 +308,47 @@ export default function LeafletMap({
         const raw = localStorage.getItem(persistKey);
         if (raw) {
           const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed.center) && parsed.center.length === 2 && typeof parsed.zoom === 'number') {
-              initialCenter = [parsed.center[0], parsed.center[1]];
-              initialZoom = parsed.zoom;
-            }
+          if (Array.isArray(parsed.center) && parsed.center.length === 2 && typeof parsed.zoom === 'number') {
+            initialCenter = [parsed.center[0], parsed.center[1]];
+            initialZoom = parsed.zoom;
+          }
         }
-      } catch {}
+      } catch { }
     }
 
-    mapRef.current = L.map(containerRef.current, {
+    const map = L.map(containerRef.current, {
       center: initialCenter,
       zoom: initialZoom,
       attributionControl: true,
-      zoomControl: true
+      zoomControl: true,
     });
-
+    mapRef.current = map;
     applyTiles(computeIsDark());
 
-    // Persist on moveend
     if (persistKey) {
-      mapRef.current.on('moveend', () => {
+      map.on('moveend', () => {
         try {
-          const c = mapRef.current!.getCenter();
-          const z = mapRef.current!.getZoom();
-          localStorage.setItem(persistKey, JSON.stringify({ center: [c.lat, c.lng], zoom: z }));
-        } catch {}
+          const c = map.getCenter();
+          localStorage.setItem(persistKey, JSON.stringify({ center: [c.lat, c.lng], zoom: map.getZoom() }));
+        } catch { }
       });
     }
 
-    // Observe theme changes if auto mode
+    let observer: MutationObserver | null = null;
+    let mqListener: (() => void) | null = null;
     if (darkTiles === undefined) {
-      const observer = new MutationObserver(() => {
-        applyTiles(computeIsDark());
-      });
+      observer = new MutationObserver(() => applyTiles(computeIsDark()));
       observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-      // Media query changes
       const mq = window.matchMedia('(prefers-color-scheme: dark)');
-      const mqListener = () => applyTiles(computeIsDark());
+      mqListener = () => applyTiles(computeIsDark());
       mq.addEventListener('change', mqListener);
-      // cleanup
-      mapRef.current.on('unload', () => {
-        observer.disconnect();
-        mq.removeEventListener('change', mqListener);
-      });
     }
 
-    // Geolocation button
-  interface ControlExtender { extend: (o: { options?: Record<string, unknown>; onAdd: () => HTMLElement }) => new () => L.Control; }
-  const LocateControl = (L.Control as unknown as ControlExtender).extend({
+    const LocateControl = (L.Control as unknown as ControlExtender).extend({
       options: { position: 'topleft' },
       onAdd: () => {
-        const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-        div.style.background = 'var(--layer-surface, #fff)';
-        div.style.display = 'flex';
-        div.style.alignItems = 'center';
-        div.style.justifyContent = 'center';
-        div.style.width = '34px';
-        div.style.height = '34px';
-        div.style.cursor = 'pointer';
+        const div = L.DomUtil.create('button', 'leaflet-bar leaflet-control map-control-button') as HTMLButtonElement;
+        div.type = 'button';
         div.title = 'Locate me';
         div.innerHTML = '📍';
         div.onclick = () => {
@@ -329,44 +360,69 @@ export default function LeafletMap({
           });
         };
         return div;
-      }
+      },
     });
-  mapRef.current.addControl(new (LocateControl as unknown as { new(): L.Control })());
+    map.addControl(new (LocateControl as unknown as { new(): L.Control })());
 
-    // Fit bounds button
     if (showFitButton) {
       const FitControl = (L.Control as unknown as ControlExtender).extend({
-        options: { position: 'topleft' },
-        onAdd: () => {
-          const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
-          div.style.background = 'var(--layer-surface, #fff)';
-          div.style.display = 'flex';
-          div.style.alignItems = 'center';
-          div.style.justifyContent = 'center';
-          div.style.width = '34px';
-          div.style.height = '34px';
-          div.style.cursor = 'pointer';
+      options: { position: 'topleft' },
+      onAdd: () => {
+          const div = L.DomUtil.create('button', 'leaflet-bar leaflet-control map-control-button') as HTMLButtonElement;
+          div.type = 'button';
           div.title = 'Fit to markers';
-          div.innerHTML = '🔍';
-          div.onclick = () => {
-            if (!mapRef.current) return;
-            const pts: L.LatLngExpression[] = [];
-            markers.forEach(m => pts.push([m.coordinates[1], m.coordinates[0]]));
-            if (pts.length === 0) return;
-            const bounds = L.latLngBounds(pts);
-            mapRef.current.fitBounds(bounds.pad(0.15));
-          };
+          div.innerHTML = '⌖';
+          div.onclick = fitOriginAndMarkers;
           return div;
-        }
+        },
       });
-      mapRef.current.addControl(new (FitControl as unknown as { new(): L.Control })());
+      map.addControl(new (FitControl as unknown as { new(): L.Control })());
     }
-  }, [center, zoom, darkTiles, persistKey, showFitButton, markers, computeIsDark]);
+
+    return () => {
+      observer?.disconnect();
+      if (mqListener) window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', mqListener);
+      map.remove();
+      mapRef.current = null;
+      tileLayerRef.current = null;
+      clusterRef.current = null;
+      markersLayerRef.current = null;
+      markerInstancesRef.current = {};
+    };
+  }, [applyTiles, center, computeIsDark, darkTiles, fitOriginAndMarkers, persistKey, showFitButton, zoom]);
+
+  useEffect(() => {
+    const map = mapRef.current as MapWithOrigin | null;
+    if (!map) return;
+    if (map._originMarker) {
+      map.removeLayer(map._originMarker);
+      map._originMarker = undefined;
+    }
+    if (!showOriginMarker || !origin) return;
+
+    const marker = L.marker([origin[1], origin[0]], {
+      icon: L.divIcon({
+        className: 'leaflet-origin-marker',
+        html: `<div class="lmk" data-type="apartment" title="Apartment location">${svgIcon(CATEGORY_ICON.apartment, '#fff')}</div>`,
+        iconSize: [42, 42],
+        iconAnchor: [21, 40],
+      }),
+    }).addTo(map);
+    const popupMarker: LeafletMarkerData = {
+      id: 'origin',
+      name: originPopup?.name || 'Apartment',
+      description: originPopup?.description,
+      address: originPopup?.address,
+      coordinates: origin,
+      type: 'apartment',
+    };
+    marker.bindPopup(buildBasePopupHtml(popupMarker));
+    map._originMarker = marker;
+  }, [origin, originPopup, showOriginMarker]);
 
   useEffect(() => {
     if (!mapRef.current) return;
 
-    // Remove old marker layers
     if (clusterRef.current) {
       mapRef.current.removeLayer(clusterRef.current);
       clusterRef.current = null;
@@ -375,298 +431,273 @@ export default function LeafletMap({
       mapRef.current.removeLayer(markersLayerRef.current);
       markersLayerRef.current = null;
     }
+    markerInstancesRef.current = {};
 
-    const useCluster = markers.length >= clusterMin;
-  type ClusterFactory = (opts?: Record<string, unknown>) => L.LayerGroup & { addLayer: (l: L.Layer) => void };
-  const leafletNs = L as typeof L & { markerClusterGroup?: ClusterFactory };
-  const mcFactory: ClusterFactory | undefined = leafletNs.markerClusterGroup;
-    if (useCluster && mcFactory) {
-      clusterRef.current = mcFactory({ showCoverageOnHover: false, maxClusterRadius: 50 });
-    } else {
-      markersLayerRef.current = L.layerGroup();
-    }
+    const leafletNs = L as typeof L & { markerClusterGroup?: ClusterFactory };
+    const useCluster = markers.length >= clusterMin && Boolean(leafletNs.markerClusterGroup);
+    const layer = useCluster
+      ? leafletNs.markerClusterGroup!({ showCoverageOnHover: false, maxClusterRadius: 50 })
+      : L.layerGroup();
 
-    const safeTravelPrompt = travelPrompt
-      ? travelPrompt.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      : '';
-
-  markers.forEach(m => {
-      const marker = L.marker([m.coordinates[1], m.coordinates[0]], { icon: buildIcon(m.type) });
-      let loadingPlaceholder = '';
-      if (origin) {
-        if (lazyTravelMetrics && !shouldFetchTravel && safeTravelPrompt) {
-          loadingPlaceholder = `<div class="mt-2 text-[11px] opacity-70 travel-prompt">${safeTravelPrompt}</div>`;
-        } else if (!lazyTravelMetrics || shouldFetchTravel) {
-          loadingPlaceholder = `<div class="mt-2 text-[11px] opacity-70 flex gap-2 travel-loading">${effectiveModes.map(mode => {
-            const icon = mode==='driving'?'🚗': mode==='foot'?'🚶':'🚲';
-            return `<span class=\"inline-flex items-center gap-1 bg-black/5 dark:bg-white/10 px-2 py-[2px] rounded-full\">${icon}<span class=spinner size=10></span></span>`;}).join(' ')}<span class="sr-only">Loading distances...</span></div>`;
-        }
-      }
-  const html = `<div style=\"font-weight:600;margin-bottom:4px;\">${m.name}</div>${m.description ? `<div style='font-size:12px;line-height:1.3;'>${m.description}</div>` : ''}${m.price ? `<div style='margin-top:4px;font-size:12px;font-weight:600;'>${m.price}</div>` : ''}${loadingPlaceholder}`;
-      marker.bindPopup(html);
+    markers.forEach(markerData => {
+      const marker = L.marker([markerData.coordinates[1], markerData.coordinates[0]], { icon: buildIcon(markerData.type) });
+      const baseHtml = buildBasePopupHtml(markerData);
+      marker.bindPopup(baseHtml);
       marker.on('click', () => {
-        onMarkerClick?.(m);
-        if (lazyTravelMetrics) {
-          setShouldFetchTravel(true);
-        }
+        onMarkerClick?.(markerData);
+        if (lazyTravelMetrics) setShouldFetchTravel(true);
         if (enableRouting && origin) {
           const profile = routeProfile === 'auto' ? (effectiveModes[0] || 'driving') : routeProfile;
-          const url = `${osrmBase}/route/v1/${profile}/${origin[0]},${origin[1]};${m.coordinates[0]},${m.coordinates[1]}?overview=full&geometries=geojson`;
-          // Use async/await properly with error handling
-          (async () => {
+          void (async () => {
             try {
-              const response = await fetch(url);
-              if (!response.ok) return;
-              const data = await response.json();
-              if (!data || !mapRef.current) return;
-              const coords: [number, number][] = data.routes?.[0]?.geometry?.coordinates || [];
-              if (!coords.length) return;
-              if (routeLayerRef.current) { 
-                routeLayerRef.current.remove(); 
-                routeLayerRef.current = null; 
+              const route = await getOSRMClient({ baseUrl: osrmBase }).getRoute(profile, origin, markerData.coordinates);
+              if (!route?.coordinates.length || !mapRef.current) return;
+              if (routeLayerRef.current) {
+                routeLayerRef.current.remove();
+                routeLayerRef.current = null;
               }
-              const latlngs = coords.map(c => [c[1], c[0]] as [number, number]);
+              const latlngs = route.coordinates.map(coord => [coord[1], coord[0]] as [number, number]);
               routeLayerRef.current = L.polyline(latlngs, { color: routeColor, weight: 4, opacity: 0.85 }).addTo(mapRef.current);
+              setHasRoute(true);
               mapRef.current.fitBounds(routeLayerRef.current.getBounds().pad(0.15));
+              if (persistKey) {
+                try {
+                  localStorage.setItem(`${persistKey}:route`, JSON.stringify({ profile, to: markerData.id, coords: route.coordinates }));
+                } catch { }
+              }
             } catch (err) {
               logger.warn('Route fetch failed', err instanceof Error ? err : { error: String(err) });
             }
           })();
         }
       });
-      // Animation
       if (animateMarkers) {
         marker.on('add', () => {
           const el = marker.getElement();
-          if (el) {
-            el.classList.add('marker-pop');
-            setTimeout(() => el.classList.remove('marker-pop'), 600);
-          }
+          if (!el) return;
+          el.classList.add('marker-pop');
+          setTimeout(() => el.classList.remove('marker-pop'), 600);
         });
       }
-      if (clusterRef.current) clusterRef.current.addLayer(marker); else markersLayerRef.current!.addLayer(marker);
-  markerInstancesRef.current[m.id] = { marker, baseHtml: html };
+      layer.addLayer(marker);
+      markerInstancesRef.current[markerData.id] = { marker, baseHtml, data: markerData };
     });
 
-    if (clusterRef.current) clusterRef.current.addTo(mapRef.current); else if (markersLayerRef.current) markersLayerRef.current.addTo(mapRef.current);
+    layer.addTo(mapRef.current);
+    if (useCluster) clusterRef.current = layer as L.LayerGroup & { addLayer: (l: L.Layer) => void };
+    else markersLayerRef.current = layer;
 
-    // Restore persisted route if exists and routing enabled
-    if(enableRouting && origin && persistKey){
+    if (enableRouting && origin && persistKey) {
       try {
-        const raw = localStorage.getItem(persistKey+':route');
-        if(raw){
-          const parsed = JSON.parse(raw) as { profile: string; to: string; coords: [number, number][] };
-          if(Array.isArray(parsed?.coords) && parsed.coords.length){
-            if(routeLayerRef.current){ routeLayerRef.current.remove(); routeLayerRef.current = null; }
-            const latlngs = parsed.coords.map(c => [c[1], c[0]] as [number, number]);
-            routeLayerRef.current = L.polyline(latlngs, { color: routeColor, weight:4, opacity:0.85 }).addTo(mapRef.current!);
+        const raw = localStorage.getItem(`${persistKey}:route`);
+        if (raw) {
+          const parsed = JSON.parse(raw) as { coords?: [number, number][] };
+          if (Array.isArray(parsed.coords) && parsed.coords.length) {
+            const latlngs = parsed.coords.map(coord => [coord[1], coord[0]] as [number, number]);
+            routeLayerRef.current = L.polyline(latlngs, { color: routeColor, weight: 4, opacity: 0.85 }).addTo(mapRef.current);
+            setHasRoute(true);
           }
         }
-      } catch {}
+      } catch { }
     }
-  }, [markers, onMarkerClick, clusterMin, animateMarkers, origin, effectiveModes, enableRouting, persistKey, routeColor, osrmBase, routeProfile, lazyTravelMetrics, shouldFetchTravel, travelPrompt]);
 
-  // Compute travel distances (matrix) using OSRM (public demo – not for heavy production) and update popups
-  useEffect(() => {
-    if (!origin || !mapRef.current || markers.length === 0) return;
-    if (!shouldFetchTravel) return;
-    if (effectiveModes.length === 0) return;
-
-  let cancelled = false;
-  const timeout = window.setTimeout(() => { void run(); }, travelFetchDebounceMs);
-  let intervalId: number | null = null;
-
-    const PROFILE_CANDIDATES: Record<string,string[]> = {
-      driving: ['driving','car'],
-      foot: ['foot','walking'],
-      cycling: ['cycling','bike','bicycle']
-    };
-
-    interface OSRMTableResponse { distances: number[][]; durations: number[][] }
-    const fetchWithRetry = async (url: string, attempts = 2, delay = 500): Promise<OSRMTableResponse | null> => {
-      for (let i=0;i<=attempts;i++) {
+    if (autoFitToOriginAndMarkers && !autoFitDoneRef.current) {
+      let hadPersist = false;
+      if (persistKey) {
         try {
-          const res = await fetch(url, { cache: 'no-store' });
-          if (res.ok) return await res.json() as OSRMTableResponse;
-        } catch {}
-        if (i < attempts) await new Promise(r => setTimeout(r, delay * Math.pow(2,i)));
+          hadPersist = Boolean(localStorage.getItem(persistKey));
+        } catch { }
       }
-      return null;
-    };
-
-    const updateAllPopups = () => {
-      if (cancelled) return;
-      Object.entries(markerInstancesRef.current).forEach(([id, inst]) => {
-        const info = travelCacheRef.current[id];
-        const chips: string[] = [];
-        effectiveModes.forEach((mode: TravelMode) => {
-          const entry = (info as Record<TravelMode, ModeData | undefined>)?.[mode];
-          if (entry) {
-            chips.push(formatTravelChip(mode, entry.distance, entry.duration));
-          } else if (failedProfilesRef.current.has(mode)) {
-            const icon = mode==='driving'?'🚗': mode==='foot'? '🚶':'🚲';
-            chips.push(`<span class=\"inline-flex items-center gap-1 bg-red-500/10 text-red-600 dark:text-red-400 px-2 py-[2px] rounded-full\">${icon}<span>n/a</span></span>`);
-          } else if (origin) {
-            const icon = mode==='driving'?'🚗': mode==='foot'? '🚶':'🚲';
-            chips.push(`<span class=\"inline-flex items-center gap-1 bg-black/5 dark:bg-white/10 px-2 py-[2px] rounded-full\">${icon}<span class=spinner size=10></span></span>`);
-          }
-        });
-        const popup = inst.marker.getPopup();
-        if (!popup) return;
-        if (chips.length) {
-          popup.setContent(inst.baseHtml + `<div class=\"mt-2 text-[11px] leading-tight travel-info\" role=\"list\" aria-live=\"polite\">${chips.map(c=>`<span role=\\"listitem\\">${c}</span>`).join(' ')}<span class=\"block opacity-50 mt-1\">Approximate – OSRM</span></div>`);
-        } else {
-          popup.setContent(inst.baseHtml + `<div class=\"mt-2 text-[11px] leading-tight text-amber-600 dark:text-amber-400\">Distances unavailable</div>`);
-        }
-      });
-      // Update origin popup summary if desired and origin marker has popup
-      if(showOriginMarker && originPopup){
-        const map = mapRef.current as (L.Map & { _originMarker?: L.Marker }) | null;
-        const om = map?._originMarker;
-        if(om){
-          const popup = om.getPopup();
-          if(popup){
-            // Build a small summary (average / nearest distance not applicable – show first driving + foot if available from any marker)
-            const sampleMarker = markers[0]?.id ? travelCacheRef.current[markers[0].id] : undefined;
-            const chips: string[] = [];
-            if(sampleMarker){
-              (['driving','foot','cycling'] as const).forEach(mode=>{
-                const entry = (sampleMarker as Record<string, { distance:number; duration:number } | undefined>)[mode];
-                if(entry){
-                  chips.push(formatTravelChip(mode, entry.distance, entry.duration));
-                }
-              });
-            }
-            if(chips.length){
-              const existingHtml = popup.getContent() as string;
-              if(!/travel-info-origin/.test(existingHtml)){
-                popup.setContent(existingHtml + `<div class=\"mt-2 text-[11px] leading-tight travel-info-origin\" aria-live=\"polite\">${chips.map(c=>`<span>${c}</span>`).join(' ')}<span class=\"block opacity-50 mt-1\">Approximate – OSRM</span></div>`);
-              }
-            }
-          }
-        }
+      if (!hadPersist) {
+        fitOriginAndMarkers();
+        autoFitDoneRef.current = true;
       }
-    };
-
-    const fetchChunk = async (mode: string, chunkMarkers: typeof markers) => {
-      const coordList = [origin, ...chunkMarkers.map(m => m.coordinates)];
-      const coordString = coordList.map(c => `${c[0]},${c[1]}`).join(';');
-      const cacheKey = `${mode}:${coordString}`;
-      if (osrmCacheRef.current[cacheKey]) return osrmCacheRef.current[cacheKey];
-      const profiles = PROFILE_CANDIDATES[mode] || [mode];
-      for (const profile of profiles) {
-        const url = `${osrmBase}/table/v1/${profile}/${coordString}?annotations=distance,duration`;
-        const data = await fetchWithRetry(url, 2, 600);
-        if (data) {
-          osrmCacheRef.current[cacheKey] = data;
-          return data;
-        }
-        if (cancelled) return null;
-      }
-      return null;
-    };
-
-  const run = async () => {
-  const modes = effectiveModes.filter((m): m is TravelMode => ['driving','foot','cycling'].includes(m));
-      const chunks: { start: number; end: number; list: typeof markers }[] = [];
-      if (markers.length > maxTableBatch) {
-        for (let i=0;i<markers.length;i+=maxTableBatch) {
-          chunks.push({ start: i, end: Math.min(i+maxTableBatch, markers.length), list: markers.slice(i, i+maxTableBatch) });
-        }
-      } else {
-        chunks.push({ start:0, end: markers.length, list: markers });
-      }
-
-      for (const mode of modes) {
-        for (const chunk of chunks) {
-          const data = await fetchChunk(mode, chunk.list);
-          if (!data) {
-            failedProfilesRef.current.add(mode);
-            continue;
-          }
-          const distances = data.distances?.[0] || [];
-          const durations = data.durations?.[0] || [];
-          chunk.list.forEach((m, idx) => {
-            if (!travelCacheRef.current[m.id]) travelCacheRef.current[m.id] = {};
-            (travelCacheRef.current[m.id] as Record<string, ModeData>)[mode] = { distance: distances[idx+1], duration: durations[idx+1] };
-          });
-          if (partialUpdates) updateAllPopups();
-          if (cancelled) return;
-        }
-      }
-      updateAllPopups();
-      if(onTravelProfilesFailed && failedProfilesRef.current.size){
-        onTravelProfilesFailed(Array.from(failedProfilesRef.current) as TravelMode[]);
-      }
-    };
-
-    updateAllPopups(); // initial state replacing any stale cache markers
-    if (travelRefreshMinutes > 0) {
-      intervalId = window.setInterval(()=>{ if(!cancelled){ void run(); } }, travelRefreshMinutes * 60 * 1000) as unknown as number;
     }
-    return () => { cancelled = true; window.clearTimeout(timeout); if(intervalId) window.clearInterval(intervalId); };
-  }, [origin, markers, effectiveModes, osrmBase, travelFetchDebounceMs, partialUpdates, maxTableBatch, travelRefreshMinutes, onTravelProfilesFailed, enableRouting, routeProfile, routeColor, showOriginMarker, originPopup, shouldFetchTravel]);
+  }, [animateMarkers, autoFitToOriginAndMarkers, clusterMin, effectiveModes, enableRouting, fitOriginAndMarkers, lazyTravelMetrics, markers, onMarkerClick, origin, osrmBase, persistKey, routeColor, routeProfile]);
 
-  // Deprecated legacy formatter kept for potential backward compatibility (unused)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  function formatMode(_icon: string, _distMeters?: number, _durSeconds?: number) { return ''; }
+  useEffect(() => {
+    Object.values(markerInstancesRef.current).forEach(({ marker, baseHtml, data }) => {
+      const popup = marker.getPopup();
+      popup?.setContent(baseHtml + buildTravelInfoHtml(data));
+    });
+  }, [buildTravelInfoHtml, travel.data, travel.loading, travel.error]);
+
+  useEffect(() => {
+    if (refitOnMarkerChange) fitOriginAndMarkers();
+  }, [fitOriginAndMarkers, markers, refitOnMarkerChange]);
 
   return (
     <div className={`${className} relative`} style={{ height }}>
       <div ref={containerRef} className="w-full h-full rounded-lg overflow-hidden leaflet-container-custom" />
-      {enableRouting && routeLayerRef.current && (
+      {enableRouting && hasRoute && (
         <button
           type="button"
           onClick={() => {
-            if(routeLayerRef.current){ routeLayerRef.current.remove(); routeLayerRef.current = null; }
-            if(persistKey){ try { localStorage.removeItem(persistKey+':route'); } catch {} }
+            if (routeLayerRef.current) {
+              routeLayerRef.current.remove();
+              routeLayerRef.current = null;
+            }
+            setHasRoute(false);
+            if (persistKey) {
+              try {
+                localStorage.removeItem(`${persistKey}:route`);
+              } catch { }
+            }
           }}
           className="absolute top-2 left-2 z-[5000] bg-white/80 dark:bg-zinc-800/80 backdrop-blur px-3 py-1 rounded-full text-xs font-medium shadow hover:bg-white dark:hover:bg-zinc-700 transition"
           aria-label="Clear route"
-        >✕ Route</button>
+        >
+          x Route
+        </button>
       )}
-  {enableTravelModeToggle && origin && (
+      {enableTravelModeToggle && origin && (
         <div className="absolute top-2 right-2 z-[5000] flex gap-1 bg-white/70 dark:bg-zinc-800/70 backdrop-blur px-2 py-1 rounded-full shadow-sm text-[11px] font-medium">
-          {(['driving','foot','cycling'] as const).map(mode => {
+          {(['driving', 'foot', 'cycling'] as const).map(mode => {
             const active = selectedModes.includes(mode);
             return (
               <button
                 key={mode}
                 type="button"
-                onClick={() => setSelectedModes(prev => prev.includes(mode) ? prev.filter(m=>m!==mode) : [...prev, mode])}
+                onClick={() => setSelectedModes(prev => prev.includes(mode) ? prev.filter(item => item !== mode) : [...prev, mode])}
                 className={`px-2 py-[2px] rounded-full flex items-center gap-1 transition ${active ? 'bg-black/80 text-white dark:bg-white/80 dark:text-black' : 'bg-black/10 dark:bg-white/10 text-black dark:text-white'}`}
                 aria-pressed={active}
               >
-        {mode === 'driving' ? '🚗' : mode === 'foot' ? '🚶' : '🚲'} {mode}
+                {mode === 'driving' ? '🚗' : mode === 'foot' ? '🚶' : '🚲'} {mode}
               </button>
             );
           })}
         </div>
       )}
       <style jsx global>{`
-        .leaflet-container-custom .lmk { 
-          background: var(--accent-500); 
-          width: 42px; height: 42px; border-radius: 50%; 
-          display:flex; align-items:center; justify-content:center; 
-          box-shadow:0 4px 10px rgba(0,0,0,0.25); 
-          font-size:18px; border:2px solid #fff; 
+        .leaflet-container-custom .lmk,
+        .leaflet-origin-marker .lmk {
+          background: var(--accent-500);
+          width: 42px;
+          height: 42px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+          border: 2px solid #fff;
         }
-  .leaflet-container-custom .lmk.marker-pop, .marker-pop.leaflet-marker-icon { animation: marker-pop 420ms ease; }
-  .marker-pop .lmk { animation: marker-pop 420ms ease; }
-  @keyframes marker-pop { 0% { transform: scale(0.4); opacity:0; } 60% { transform: scale(1.08); opacity:1;} 100% { transform: scale(1); } }
-        .leaflet-container-custom .lmk[data-type='restaurant'] { background:#ff6b6b; }
-        .leaflet-container-custom .lmk[data-type='service'] { background:var(--brand-600); }
-        .leaflet-container-custom .lmk[data-type='attraction'] { background:#4ecdc4; }
-  .leaflet-origin-marker .lmk { background:#f59e0b; }
-        [data-theme='dark'] .leaflet-container-custom .lmk { border-color:#111; }
+        .leaflet-container-custom .lmk[data-type='restaurant'] { background: #d85a3f; }
+        .leaflet-container-custom .lmk[data-type='service'],
+        .leaflet-container-custom .lmk[data-type='police'] { background: var(--brand-600); }
+        .leaflet-container-custom .lmk[data-type='attraction'],
+        .leaflet-container-custom .lmk[data-type='sightseeing'] { background: #0b998b; }
+        .leaflet-container-custom .lmk[data-type='park'] { background: #237f75; }
+        .leaflet-container-custom .lmk[data-type='apartment'],
+        .leaflet-origin-marker .lmk { background: #f59e0b; }
+        .leaflet-container-custom .lmk.marker-pop,
+        .marker-pop.leaflet-marker-icon,
+        .marker-pop .lmk { animation: marker-pop 420ms ease; }
+        @keyframes marker-pop { 0% { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
+        .map-control-button {
+          background: var(--layer-surface, #fff);
+          color: var(--text-accent);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 34px;
+          height: 34px;
+          cursor: pointer;
+          border: 1px solid var(--border-soft);
+        }
+        .map-popup {
+          min-width: 220px;
+          max-width: 270px;
+          padding: 12px;
+          color: var(--fg-default);
+        }
+        .map-popup h3 {
+          margin: 0 0 6px;
+          color: var(--fg-default);
+          font-size: 14px;
+          font-weight: 750;
+          line-height: 1.25;
+        }
+        .map-popup p {
+          margin: 0 0 8px;
+          color: var(--fg-muted);
+          font-size: 12px;
+          line-height: 1.4;
+        }
+        .map-popup-row {
+          display: grid;
+          gap: 2px;
+          margin-top: 7px;
+          font-size: 12px;
+          line-height: 1.35;
+        }
+        .map-popup-row strong {
+          color: var(--text-accent);
+          font-size: 10px;
+          text-transform: uppercase;
+        }
+        .map-popup-contacts {
+          display: grid;
+          gap: 2px;
+        }
+        .map-popup-contact,
+        .map-popup-link {
+          color: var(--brand-700);
+          text-decoration: none;
+        }
+        .map-popup-price {
+          margin-top: 8px;
+          font-size: 12px;
+          font-weight: 700;
+        }
+        .map-popup-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          margin-top: 10px;
+        }
+        .map-popup-link {
+          border: 1px solid var(--border-soft);
+          border-radius: 999px;
+          padding: 4px 8px;
+          background: var(--layer-surface-alt);
+          font-size: 11px;
+          font-weight: 700;
+        }
+        .map-popup-travel {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 5px;
+          margin: 10px 12px 12px;
+          color: var(--fg-muted);
+          font-size: 11px;
+          line-height: 1.2;
+        }
+        .map-popup-travel.muted {
+          display: block;
+        }
+        .map-popup-travel-note {
+          display: block;
+          width: 100%;
+          opacity: 0.58;
+          margin-top: 2px;
+        }
+        .map-popup-travel .spinner {
+          width: 10px;
+          height: 10px;
+          border: 2px solid currentColor;
+          border-top-color: transparent;
+          border-radius: 50%;
+          display: inline-block;
+          animation: spin 0.7s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .marker-cluster-small,
+        .marker-cluster-medium,
+        .marker-cluster-large { background: rgba(54,185,171,0.85); }
+        .marker-cluster div { background: #fff; color: #222; font-weight: 600; }
+        [data-theme='dark'] .leaflet-container-custom .lmk,
+        [data-theme='dark'] .leaflet-origin-marker .lmk { border-color: #111; }
         [data-theme='dark'] .leaflet-tile { filter: brightness(0.78) contrast(1.05) saturate(0.85); }
-        [data-theme='dark'] .leaflet-control-zoom a { background:#222; color:#eee; border-color:#333; }
-        /* Cluster styling */
-        .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large { background:rgba(54,185,171,0.85); }
-        .marker-cluster div { background:#fff; color:#222; font-weight:600; }
-  .travel-info span.inline-flex { font-weight:500; }
-  .travel-loading .spinner { width:10px; height:10px; border:2px solid currentColor; border-top-color:transparent; border-radius:50%; display:inline-block; animation: spin 0.7s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg);} }
       `}</style>
     </div>
   );

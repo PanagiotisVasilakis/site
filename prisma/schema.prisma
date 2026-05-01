@@ -119,6 +119,25 @@ model Checkin {
   @@map("checkins")
 }
 
+model CheckInRequest {
+  id            String               @id @db.Uuid
+  bookingId     String?              @map("booking_id") @db.Uuid
+  userId        String?              @map("user_id") @db.Uuid
+  guestName     String?              @map("guest_name")
+  guestEmail    String?              @map("guest_email")
+  guestPhone    String?              @map("guest_phone")
+  requestedTime String               @map("requested_time")
+  message       String?
+  status        CheckInRequestStatus @default(PENDING)
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([bookingId], map: "idx_check_in_requests_booking")
+  @@index([userId], map: "idx_check_in_requests_user")
+  @@index([status, createdAt], map: "idx_check_in_requests_status_created")
+  @@map("check_in_requests")
+}
+
 model RefreshToken {
   id            String         @id @db.Uuid
   userId        String         @map("user_id") @db.Uuid
@@ -192,8 +211,6 @@ model MfaChallenge {
   @@map("mfa_challenges")
 }
 
-
-
 model CacheEntry {
   key       String   @id
   value     String
@@ -246,6 +263,12 @@ enum BookingSource {
 enum AccessStatus {
   PENDING
   VERIFIED
+}
+
+enum CheckInRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum MfaFactorType {

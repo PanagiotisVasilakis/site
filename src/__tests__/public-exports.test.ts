@@ -1,22 +1,15 @@
-import React from 'react';
-import { validateOpenAPISpec } from '@/lib/openapi';
-import { DevStoreBookingLookup, type Booking, type LookupByPhoneParams, type LookupByRefParams, type BookingLookupProvider } from '@/lib/bookingLookup';
-import { createMarkerFromItem, type MarkerData as InteractiveMarkerData } from '@/components/InteractiveMap';
-import { clearSessionCookie, clearRefreshCookie, type BookingSource as SessionBookingSource, type BookingStatus } from '@/lib/guestSession';
-import { PerformanceBudgetValidator, performanceBudgetSchema, type PerformanceBudget } from '@/lib/performanceBudget';
-import { getSecurityConfig, validateSecurityConfig, type SecurityConfig } from '@/lib/security-config';
-import { SecurityReportGenerator, type SecurityMetrics } from '@/lib/security-monitoring';
-import { resetFeatureFlags } from '@/lib/featureFlags';
-import { ApiError, ValidationError, TimeoutError, RateLimitError, HttpStatus, success, error, validationError, rateLimitError, timeoutError, type ApiResponse, type ApiRouteHandler, type ErrorHandlerConfig } from '@/lib/apiErrorHandler';
-import { AlertingSystem, type Alert, type NotificationChannel } from '@/lib/alerting-system';
-import { formatDateRangeCompact, parseDate, isPastDate, type AvailabilityInfo } from '@/lib/dateUtils';
-import { locales, defaultLocale, type Dictionary as IndexDictionary } from '@/i18n';
+import { type Booking, type LookupByPhoneParams, type LookupByRefParams, type BookingLookupProvider } from '@/lib/bookingLookup';
+import { type MarkerData as InteractiveMarkerData } from '@/components/InteractiveMap';
+import { type BookingSource as SessionBookingSource, type BookingStatus } from '@/lib/guestSession';
+import { type PerformanceBudget } from '@/lib/performanceBudget';
+import { type SecurityConfig } from '@/lib/security-config';
+import { type SecurityMetrics } from '@/lib/security-monitoring';
+import { type ApiResponse, type ApiRouteHandler, type ErrorHandlerConfig } from '@/lib/apiErrorHandler';
+import { type Alert, type NotificationChannel } from '@/lib/alerting-system';
+import { type AvailabilityInfo } from '@/lib/dateUtils';
+import { type Dictionary as IndexDictionary } from '@/i18n';
 import { type Dictionary as I18nDictionary } from '@/i18n/dictionaries';
-import { GuestDataExport } from '@/lib/guestDataExport';
-import { resetFunnel } from '@/lib/analyticsClient';
-import { categorizeReason, track, tracker, type TrackerEventName, type EventProps } from '@/lib/tracker';
-import { internalFetch } from '@/lib/internalFetch';
-import { emitGuestSessionChanged } from '@/lib/sessionSignals';
+import { type TrackerEventName, type EventProps } from '@/lib/tracker';
 import { type Origin } from '@/lib/phone';
 import { type LogContext, type LogLevel, type LogEntry } from '@/lib/logger-enterprise';
 import { type Logger } from '@/lib/logger';
@@ -28,11 +21,8 @@ import { type LeafletMapProps } from '@/components/LeafletMap';
 import { type MarkerData as LazyMapMarkerData } from '@/components/InteractiveMap';
 import { type TravelMode } from '@/lib/travelFormat';
 import { type AnalyticsPersistenceData, type AnalyticsStorageAdapter } from '@/lib/storageAdapter';
-import { SpanStatus } from '@/lib/distributed-tracing';
 
-void React;
-
-// Ensure React default export is referenced for client component re-exports
+// Browser-only globals used by imported client utilities.
 vi.stubGlobal('BroadcastChannel', class {
   postMessage() { }
   close() { }
@@ -44,6 +34,36 @@ vi.stubGlobal('crypto', { randomUUID: () => 'abcd1234efgh5678ijkl9012mnop3456' }
 const hasDbUrl = !!(process.env.TEST_DATABASE_URL || process.env.DATABASE_URL);
 describe.skipIf(!hasDbUrl)('public API surface remains reachable', () => {
   it('validates utilities and classes are importable', async () => {
+    const { validateOpenAPISpec } = await import('@/lib/openapi');
+    const { DevStoreBookingLookup } = await import('@/lib/bookingLookup');
+    const { createMarkerFromItem } = await import('@/components/InteractiveMap');
+    const { clearSessionCookie, clearRefreshCookie } = await import('@/lib/guestSession');
+    const { PerformanceBudgetValidator, performanceBudgetSchema } = await import('@/lib/performanceBudget');
+    const { getSecurityConfig, validateSecurityConfig } = await import('@/lib/security-config');
+    const { SecurityReportGenerator } = await import('@/lib/security-monitoring');
+    const { resetFeatureFlags } = await import('@/lib/featureFlags');
+    const {
+      ApiError,
+      ValidationError,
+      TimeoutError,
+      RateLimitError,
+      HttpStatus,
+      success,
+      error,
+      validationError,
+      rateLimitError,
+      timeoutError,
+    } = await import('@/lib/apiErrorHandler');
+    const { AlertingSystem } = await import('@/lib/alerting-system');
+    const { formatDateRangeCompact, parseDate, isPastDate } = await import('@/lib/dateUtils');
+    const { locales, defaultLocale } = await import('@/i18n');
+    const { GuestDataExport } = await import('@/lib/guestDataExport');
+    const { resetFunnel } = await import('@/lib/analyticsClient');
+    const { categorizeReason, track, tracker } = await import('@/lib/tracker');
+    const { internalFetch } = await import('@/lib/internalFetch');
+    const { emitGuestSessionChanged } = await import('@/lib/sessionSignals');
+    const { SpanStatus } = await import('@/lib/distributed-tracing');
+
     expect(validateOpenAPISpec()).toBe(true);
 
     const lookup = new DevStoreBookingLookup();
@@ -59,7 +79,7 @@ describe.skipIf(!hasDbUrl)('public API surface remains reachable', () => {
       'attractions',
       'en'
     );
-    expect(marker.id).toBe('x');
+    expect(marker?.id).toBe('x');
 
     expect(clearSessionCookie().name).toBeDefined();
     expect(clearRefreshCookie().name).toBeDefined();

@@ -25,7 +25,7 @@ export default function ThemeToggle() {
       root.setAttribute('data-theme', 'dark');
       root.classList.add('dark');
     } else {
-      root.removeAttribute('data-theme');
+      root.setAttribute('data-theme', 'light');
       root.classList.remove('dark');
     }
     try { localStorage.setItem('theme', theme); } catch (err) { logger.warn('ThemeToggle write localStorage failed', err instanceof Error ? err : { error: String(err) }); }

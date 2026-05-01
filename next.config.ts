@@ -1,5 +1,22 @@
 import type { NextConfig } from "next";
 
+function externalOrigin(value: string | undefined) {
+  if (!value) return null;
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
+const osrmOrigin = externalOrigin(process.env.NEXT_PUBLIC_OSRM_BASE_URL) || 'https://router.project-osrm.org';
+const connectSources = Array.from(new Set([
+  "'self'",
+  osrmOrigin,
+  'https://router.project-osrm.org',
+  'https://maps.geoapify.com',
+])).join(' ');
+
 const securityHeaders = [
   {
     key: 'Content-Security-Policy',
@@ -9,7 +26,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https:",
       "font-src 'self' data:",
-      "connect-src 'self'",
+      `connect-src ${connectSources}`,
       "manifest-src 'self'",
       "worker-src 'self'",
       "frame-ancestors 'self'",
@@ -22,7 +39,7 @@ const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'X-DNS-Prefetch-Control', value: 'on' },
   { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
-  { key: 'Permissions-Policy', value: 'geolocation=(), microphone=(), camera=()' },
+  { key: 'Permissions-Policy', value: 'geolocation=(self), microphone=(), camera=()' },
 ];
 
 const nextConfig: NextConfig = {

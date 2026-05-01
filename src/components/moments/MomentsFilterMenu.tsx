@@ -1,7 +1,5 @@
 "use client";
 
-import { momentsLayoutConfig } from '@/config/momentsLayoutConfig';
-
 /** Filter categories for Moments page */
 export const MOMENTS_FILTER_KEYS = [
     'all', 'beaches', 'museums', 'restaurants', 'bars', 'brunchs', 'taygetos', 'sites', 'nearby'
@@ -38,34 +36,33 @@ interface MomentsFilterMenuProps {
     };
 }
 
-/**
- * Horizontal scrollable filter menu for Moments page.
- * Displays pill-shaped buttons for each category.
- */
-export function MomentsFilterMenu({ active, onChange, ui }: MomentsFilterMenuProps) {
-    const config = momentsLayoutConfig.filterMenu;
+const labelsFor = (ui: MomentsFilterMenuProps['ui']): Record<MomentsFilterKey, string> => ({
+    all: ui?.all || 'All',
+    beaches: ui?.beaches || 'Beaches',
+    museums: ui?.museums || 'Museums',
+    restaurants: ui?.restaurants || 'Restaurants',
+    bars: ui?.bars || 'Bars',
+    brunchs: ui?.brunchs || 'Brunchs',
+    taygetos: ui?.taygetos || 'Taygetos',
+    sites: ui?.sites || 'Sites',
+    nearby: ui?.nearby || 'Nearby',
+});
 
-    const labels: Record<MomentsFilterKey, string> = {
-        all: ui?.all || 'All',
-        beaches: ui?.beaches || 'Beaches',
-        museums: ui?.museums || 'Museums',
-        restaurants: ui?.restaurants || 'Restaurants',
-        bars: ui?.bars || 'Bars',
-        brunchs: ui?.brunchs || 'Brunchs',
-        taygetos: ui?.taygetos || 'Taygetos',
-        sites: ui?.sites || 'Sites',
-        nearby: ui?.nearby || 'Nearby',
-    };
+/**
+ * Horizontal scrollable category chips for Moments page.
+ */
+export function CategoryChips({ active, onChange, ui }: MomentsFilterMenuProps) {
+    const labels = labelsFor(ui);
 
     return (
-        <nav className={config.containerClass} aria-label="Filter moments by category">
-            <div className={config.scrollClass}>
+        <nav className="moments-chip-nav" aria-label="Filter moments by category">
+            <div className="moments-chip-scroll">
                 {MOMENTS_FILTER_KEYS.map(key => (
                     <button
                         key={key}
                         type="button"
                         onClick={() => onChange(key)}
-                        className={`${config.buttonClass} ${active === key ? config.activeClass : config.inactiveClass}`}
+                        className={`moments-chip ${active === key ? 'is-active' : ''}`}
                         aria-pressed={active === key}
                     >
                         {labels[key]}
@@ -74,6 +71,13 @@ export function MomentsFilterMenu({ active, onChange, ui }: MomentsFilterMenuPro
             </div>
         </nav>
     );
+}
+
+/**
+ * Backwards-compatible export for older call sites.
+ */
+export function MomentsFilterMenu(props: MomentsFilterMenuProps) {
+    return <CategoryChips {...props} />;
 }
 
 /**

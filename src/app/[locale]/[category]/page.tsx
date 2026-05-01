@@ -17,12 +17,14 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
 
   const isPhones = cat.slug === 'phones';
   const isMoments = cat.slug === 'moments';
+  const pageTitle = isMoments ? "Kalamata Moments" : (t.categories[cat.slug as "phones" | "moments"] ?? (pickCategoryLocale(cat, "title", eff) ?? cat.title));
+  const pageDescription = isMoments ? "Curated local recommendations for your stay" : (pickCategoryLocale(cat, "description", eff) ?? cat.description);
 
   return (
-    <div className={(isPhones || isMoments) ? "page-container mx-0 max-w-full safe-bottom px-4" : "page-container mx-auto max-w-3xl safe-bottom"}>
-      <header className={(isPhones || isMoments) ? "mb-4 text-center" : "mb-4"}>
-        <h1 className="text-2xl font-serif italic font-bold page-title">{t.categories[cat.slug as "phones" | "moments"] ?? (pickCategoryLocale(cat, "title", eff) ?? cat.title)}</h1>
-        {(pickCategoryLocale(cat, "description", eff) ?? cat.description) && <p className="text-sm opacity-80 text-body">{pickCategoryLocale(cat, "description", eff) ?? cat.description}</p>}
+    <div className={(isPhones || isMoments) ? `page-container mx-0 max-w-full safe-bottom px-4 ${isMoments ? "moments-page" : ""}` : "page-container mx-auto max-w-3xl safe-bottom"}>
+      <header className={isMoments ? "moments-hero" : ((isPhones || isMoments) ? "mb-4 text-center" : "mb-4")}>
+        <h1 className={isMoments ? "moments-hero-title" : "text-2xl font-serif italic font-bold page-title"}>{pageTitle}</h1>
+        {pageDescription && <p className={isMoments ? "moments-hero-subtitle" : "text-sm opacity-80 text-body"}>{pageDescription}</p>}
       </header>
 
       {items.length === 0 && (
@@ -47,10 +49,21 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
           tags: i.tags,
           featured: i.featured,
           categorySlug: cat.slug,
+          description: pickLocale(i, 'description', eff) ?? i.description,
           rating: i.rating,
           price: i.priceLevel ? '€'.repeat(i.priceLevel) : undefined,
           icon: cat.icon,
           image: i.image,
+          heroImage: i.heroImage,
+          heroImagePosition: i.heroImagePosition,
+          phone: i.phone,
+          phones: i.phones,
+          address: pickLocale(i, 'address', eff) ?? i.address,
+          location: i.location,
+          website: i.website,
+          directionsUrl: i.directionsUrl,
+          sourceUrls: i.sourceUrls,
+          priceLevel: i.priceLevel,
         }))}
         locale={eff}
         categorySlug={cat.slug}

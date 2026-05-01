@@ -115,18 +115,22 @@ const apartmentData = {
       'No smoking inside',
       'Quiet hours after 22:00', 
       'Maximum 4 guests',
+      'No parties or events are allowed',
       'Check-in: 15:00 - 22:00',
       'Check-out: 11:00',
       'Families with children welcome',
+      'Guests use the terrace at their own risk',
       'Free parking space included'
     ],
     el: [
       'Απαγορεύεται το κάπνισμα μέσα',
       'Ήσυχες ώρες μετά τις 22:00',
       'Μέγιστο 4 άτομα', 
+      'Δεν επιτρέπονται πάρτι ή εκδηλώσεις',
       'Άφιξη: 15:00 - 22:00',
       'Αναχώρηση: 11:00',
       'Οικογένειες με παιδιά καλοδεχούμενες',
+      'Οι επισκέπτες χρησιμοποιούν τη βεράντα με δική τους ευθύνη',
       'Δωρεάν θέση πάρκινγκ'
     ]
   }

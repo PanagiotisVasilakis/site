@@ -53,6 +53,7 @@ export interface CheckinInfoDictionary {
     rule3?: string;
     rule4?: string;
     rule5?: string;
+    rule6?: string;
     amenitiesTitle?: string;
     ac?: string;
     heating?: string;
@@ -144,9 +145,10 @@ export const checkinInfoTranslations: Record<Locale, CheckinInfoDictionary> = {
         houseRulesTitle: "House Rules",
         rule1: "Quiet hours: 23:00 - 08:00",
         rule2: "No smoking inside the property",
-        rule3: "Maximum capacity: 6 guests",
+        rule3: "Maximum capacity: 4 guests",
         rule4: "Please respect the neighborhood",
-        rule5: "Pets allowed with prior approval",
+        rule5: "No parties or events are allowed.",
+        rule6: "Guests use the terrace at their own risk.",
         amenitiesTitle: "Key Amenities",
         ac: "Air Conditioning",
         heating: "Heating",
@@ -189,9 +191,10 @@ export const checkinInfoTranslations: Record<Locale, CheckinInfoDictionary> = {
         houseRulesTitle: "Κανόνες Οικίας",
         rule1: "Ώρες ησυχίας: 23:00 - 08:00",
         rule2: "Απαγορεύεται το κάπνισμα μέσα στο ακίνητο",
-        rule3: "Μέγιστη χωρητικότητα: 6 άτομα",
+        rule3: "Μέγιστη χωρητικότητα: 4 άτομα",
         rule4: "Παρακαλούμε σεβαστείτε τη γειτονιά",
-        rule5: "Κατοικίδια επιτρέπονται με προηγούμενη έγκριση",
+        rule5: "Δεν επιτρέπονται πάρτι ή εκδηλώσεις.",
+        rule6: "Οι επισκέπτες χρησιμοποιούν τη βεράντα με δική τους ευθύνη.",
         amenitiesTitle: "Βασικές Ανέσεις",
         ac: "Κλιματισμός",
         heating: "Θέρμανση",

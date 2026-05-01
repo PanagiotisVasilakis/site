@@ -8,7 +8,7 @@ import DataWarmup from '@/components/DataWarmup';
 // Font variables removed (system fonts used)
 
 export const metadata: Metadata = {
-  manifest: "/manifest.webmanifest",
+  manifest: "/app.webmanifest",
   icons: {
     icon: [
       { url: "/favicon.ico" },
@@ -33,9 +33,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
   {/* next/font handles Google Fonts optimizations; manual preconnect tags removed to satisfy lint */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var t=localStorage.getItem('theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.setAttribute('data-theme',t);document.documentElement.classList.toggle('dark',t==='dark')}catch(e){document.documentElement.setAttribute('data-theme','light')}`,
+          }}
+        />
         <link rel="preconnect" href="https://maps.geoapify.com" />
       </head>
   <body className="antialiased">

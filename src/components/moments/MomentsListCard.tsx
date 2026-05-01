@@ -1,8 +1,8 @@
 "use client";
 
-import Image from 'next/image';
 import { useFavorites } from '@/lib/favorites';
 import { useToast } from '@/components/Toast';
+import GuideOptionCard from '@/components/GuideOptionCard';
 import { momentsLayoutConfig } from '@/config/momentsLayoutConfig';
 
 interface MomentsListCardProps {
@@ -40,6 +40,17 @@ export function MomentsListCard({
 
     const favoriteId = `${categorySlug}:${id}`;
     const isWished = isFavorite(favoriteId);
+    const meta = rating || price ? (
+        <>
+            {rating && (
+                <span className={config.ratingClass}>
+                    <span aria-hidden>⭐</span>
+                    {rating.toFixed(1)}
+                </span>
+            )}
+            {price && <span className={config.priceClass}>{price}</span>}
+        </>
+    ) : undefined;
 
     const handleFavoriteToggle = () => {
         const wasFavorite = isFavorite(favoriteId);
@@ -48,44 +59,24 @@ export function MomentsListCard({
     };
 
     return (
-        <div className={config.containerClass}>
-            <a
-                href={`/${locale}/${categorySlug}/${slug}`}
-                className={config.linkClass}
-            >
-                {image ? (
-                    <div className="w-16 h-16 mb-3 rounded-xl overflow-hidden group-hover:scale-110 transition-transform bg-white/80 dark:bg-gray-800/80 p-1 flex items-center justify-center">
-                        <Image
-                            src={image}
-                            alt={name}
-                            width={56}
-                            height={56}
-                            className="object-contain w-full h-full"
-                        />
-                    </div>
-                ) : (
-                    <div className={config.iconClass} aria-hidden>
-                        {icon || config.defaultIcon}
-                    </div>
-                )}
-                <div className={config.nameClass}>{name}</div>
-                {summary && <p className={config.summaryClass}>{summary}</p>}
-                {rating && (
-                    <div className={config.ratingClass}>
-                        <span aria-hidden>⭐</span>
-                        {rating.toFixed(1)}
-                    </div>
-                )}
-                {price && <div className={config.priceClass}>{price}</div>}
-            </a>
-            <button
-                type="button"
-                aria-label={isWished ? 'Remove favorite' : 'Add to favorites'}
-                className={config.wishlistBtnClass}
-                onClick={handleFavoriteToggle}
-            >
-                <span aria-hidden>{isWished ? '❤️' : '🤍'}</span>
-            </button>
-        </div>
+        <GuideOptionCard
+            href={`/${locale}/${categorySlug}/${slug}`}
+            title={name}
+            summary={summary}
+            image={image}
+            imageAlt={name}
+            icon={icon || config.defaultIcon}
+            meta={meta}
+            action={
+                <button
+                    type="button"
+                    aria-label={isWished ? 'Remove favorite' : 'Add to favorites'}
+                    className={config.wishlistBtnClass}
+                    onClick={handleFavoriteToggle}
+                >
+                    <span aria-hidden>{isWished ? '❤️' : '🤍'}</span>
+                </button>
+            }
+        />
     );
 }

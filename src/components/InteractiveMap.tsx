@@ -4,7 +4,8 @@ import dynamic from 'next/dynamic';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
 import StaticLocationMap from './StaticLocationMap';
-import { MarkerData, APARTMENT_LOCATION } from '@/lib/mapUtils';
+import { MarkerData, APARTMENT_LOCATION, markerFromMapLocation } from '@/lib/mapUtils';
+import { getApartmentMapLocation } from '@/data/mapLocations';
 import type { LeafletMarkerData } from '@/components/LeafletMap';
 
 const LeafletMap = dynamic(() => import('@/components/LeafletMap'), { ssr: false });
@@ -81,13 +82,11 @@ export default function InteractiveMap({
     });
 
     if (!deduped.some(marker => marker.id === 'apartment' || marker.type === 'apartment')) {
+      const apartment = markerFromMapLocation(getApartmentMapLocation(eff));
       deduped.unshift({
-        id: 'apartment',
-  name: mapT?.apartmentMarkerTitle || 'Apartment',
-  description: mapT?.apartmentMarkerDesc,
-        coordinates: APARTMENT_LOCATION,
-        type: 'apartment',
-        price: '€150/night'
+        ...apartment,
+        name: mapT?.apartmentMarkerTitle || apartment.name,
+        description: mapT?.apartmentMarkerDesc || apartment.description,
       });
     }
 
@@ -95,11 +94,17 @@ export default function InteractiveMap({
       id: marker.id,
       name: marker.name,
       description: marker.description,
+      address: marker.address,
+      phone: marker.phone,
+      phones: marker.phones,
+      website: marker.website,
+      directionsUrl: marker.directionsUrl,
       coordinates: marker.coordinates,
       type: marker.type,
-      price: marker.price
+      price: marker.price,
+      href: marker.href,
     }));
-  }, [markers, mapT]);
+  }, [markers, mapT, eff]);
 
   const handleMarkerClick = useMemo(() => {
     if (!onMarkerClick) return undefined;
@@ -108,9 +113,15 @@ export default function InteractiveMap({
         id: marker.id,
         name: marker.name,
         description: marker.description,
+        address: marker.address,
+        phone: marker.phone,
+        phones: marker.phones,
+        website: marker.website,
+        directionsUrl: marker.directionsUrl,
         coordinates: marker.coordinates,
         type: (marker.type as MarkerData['type']) ?? 'attraction',
-        price: marker.price
+        price: marker.price,
+        href: marker.href,
       };
       onMarkerClick(typed);
     };
@@ -132,7 +143,7 @@ export default function InteractiveMap({
           lazyTravelMetrics
         />
       ) : (
-        <div className="absolute inset-0 flex flex-col items-center justify-center rounded-lg border border-brand-200 bg-gradient-to-br from-brand-50 to-brand-100 text-center text-sm text-brand-700">
+        <div className="absolute inset-0 flex flex-col items-center justify-center rounded-lg border border-[color:var(--border-soft)] surface-subtle text-center text-sm text-[color:var(--text-accent)]">
           <div className="mb-2 text-3xl" aria-hidden>🗺️</div>
           <p className="max-w-xs leading-relaxed px-6">
             {activation === 'intent'
@@ -151,7 +162,7 @@ export default function InteractiveMap({
         </div>
       )}
       <noscript>
-  <StaticLocationMap height={height} className="mt-4" title={mapT?.apartmentMarkerTitle} locale={locale} showHeading={false} />
+        <StaticLocationMap height={height} className="mt-4" title={mapT?.apartmentMarkerTitle} locale={locale} showHeading={false} />
       </noscript>
     </div>
   );

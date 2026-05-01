@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { locales, type Locale } from '@/i18n/config';
-import { getDictionary } from '@/i18n/dictionaries';
 import { getItemsByCategory } from '@/lib/data';
 import type { Item } from '@/data/schemas';
 import { getGuestSessionFromCookies, hasVerifiedBookingSession } from '@/lib/guestSession';
@@ -22,7 +21,7 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
   if (!flags.checkinEnabled) return notFound();
   const { locale } = await params;
   const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : 'en';
-  // Welcome message is intentionally not rendered here; CheckInInfo handles its own welcome copy.
+  // CheckInInfo owns the guest-facing layout and welcome copy.
 
   const pickLocalized = (item: Item, baseKey: 'name' | 'summary'): string => {
     const localeKey = `${baseKey}_${eff}` as keyof Item;
@@ -44,6 +43,12 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
     rating: item.rating,
     priceLevel: item.priceLevel,
     location: item.location,
+    phone: item.phone,
+    phones: item.phones,
+    address: item.address,
+    website: item.website,
+    directionsUrl: item.directionsUrl,
+    sourceUrls: item.sourceUrls,
   });
 
   const nearbyRestaurants = getItemsByCategory('moments').slice(0, 5).map(mapItem);
@@ -65,13 +70,8 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
   }
 
   return (
-    <div className="page-container mx-auto max-w-3xl">
+    <div className="page-container checkin-page mx-auto max-w-[1200px]">
       <CheckinViewed locale={eff} />
-      <div className="mb-6 text-center">
-        <h1 className="text-3xl font-serif italic font-bold mb-2">
-          {getDictionary(eff).house?.guideTitle ?? 'House Guide'}
-        </h1>
-      </div>
       <CheckInInfo
         locale={eff}
         nearbyRestaurants={nearbyRestaurants}

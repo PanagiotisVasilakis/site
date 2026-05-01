@@ -1,13 +1,16 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+
+import React, { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { getApartmentContent } from '@/data/apartmentData';
+import { getApartmentMapLocation } from '@/data/mapLocations';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
 import internalFetch from '@/lib/internalFetchClient';
 import MapLoadingSkeleton from '@/components/MapLoadingSkeleton';
 import { MAP_DEFAULTS } from '@/lib/mapConstants';
-// Local type for highlights (kept in-file to avoid an extra util dependency)
-type LocationHighlight = { icon?: string; title: string; description: string };
+
+type LocationHighlight = { title: string; description: string };
 
 type NearbyCategoryItem = {
   id: string;
@@ -17,7 +20,54 @@ type NearbyCategoryItem = {
   rating?: number;
   priceLevel?: number;
   location?: { lat: number; lng: number };
+  phone?: string;
+  phones?: string[];
+  address?: string;
+  website?: string;
+  directionsUrl?: string;
+  sourceUrls?: string[];
 };
+
+type IconName =
+  | 'air'
+  | 'basket'
+  | 'bath'
+  | 'car'
+  | 'check'
+  | 'clock'
+  | 'copy'
+  | 'external'
+  | 'flame'
+  | 'home'
+  | 'info'
+  | 'key'
+  | 'map'
+  | 'mapPin'
+  | 'phone'
+  | 'shield'
+  | 'sun'
+  | 'utensils'
+  | 'washer'
+  | 'waves'
+  | 'wifi';
+
+type CopyTarget = 'wifi' | 'network' | 'password' | null;
+
+type ArrivalRequestStatus = 'pending' | 'approved' | 'rejected';
+
+type ArrivalRequest = {
+  id: string;
+  requestedTime: string;
+  message?: string;
+  status: ArrivalRequestStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+const WIFI_NETWORK = 'ApartmentGuest_5G';
+const WIFI_PASSWORD = 'Welcome2024!';
+const MAP_HEIGHT = 'clamp(240px, 35vw, 420px)';
+const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
 
 const DynamicApartmentLocationMap = dynamic(() => import('@/components/ApartmentLocationMap'), {
   ssr: false,
@@ -31,31 +81,383 @@ interface CheckInInfoProps {
   nearbyAttractions?: NearbyCategoryItem[];
 }
 
+function Icon({ name, className = 'h-5 w-5' }: { name: IconName; className?: string }) {
+  const common = {
+    className,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 1.8,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    'aria-hidden': true,
+  };
+
+  switch (name) {
+    case 'air':
+      return (
+        <svg {...common}>
+          <path d="M4 9h11a3 3 0 1 0-3-3" />
+          <path d="M4 14h14a3 3 0 1 1-3 3" />
+          <path d="M4 19h6" />
+        </svg>
+      );
+    case 'basket':
+      return (
+        <svg {...common}>
+          <path d="M6 10h12l-1.4 8.2a2 2 0 0 1-2 1.8H9.4a2 2 0 0 1-2-1.8L6 10Z" />
+          <path d="M9 10a3 3 0 0 1 6 0" />
+          <path d="M9 14h6" />
+        </svg>
+      );
+    case 'bath':
+      return (
+        <svg {...common}>
+          <path d="M5 11V6a3 3 0 0 1 6 0" />
+          <path d="M4 11h16v3a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5v-3Z" />
+          <path d="M8 21v-2" />
+          <path d="M16 21v-2" />
+        </svg>
+      );
+    case 'car':
+      return (
+        <svg {...common}>
+          <path d="M5 15h14l-1.6-4.7A2 2 0 0 0 15.5 9h-7a2 2 0 0 0-1.9 1.3L5 15Z" />
+          <path d="M4 15v3h3" />
+          <path d="M17 18h3v-3" />
+          <circle cx="8" cy="18" r="1.5" />
+          <circle cx="16" cy="18" r="1.5" />
+        </svg>
+      );
+    case 'check':
+      return (
+        <svg {...common}>
+          <path d="m5 12 4 4L19 6" />
+        </svg>
+      );
+    case 'clock':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="8.5" />
+          <path d="M12 7.5V12l3 2" />
+        </svg>
+      );
+    case 'copy':
+      return (
+        <svg {...common}>
+          <rect x="8" y="8" width="11" height="11" rx="2" />
+          <path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
+        </svg>
+      );
+    case 'external':
+      return (
+        <svg {...common}>
+          <path d="M14 5h5v5" />
+          <path d="m10 14 9-9" />
+          <path d="M19 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4" />
+        </svg>
+      );
+    case 'flame':
+      return (
+        <svg {...common}>
+          <path d="M12 21a7 7 0 0 0 7-7c0-3.3-2.1-5.4-4.4-7.5-.3 2-1.4 3.1-2.6 4.1C10.8 8.4 10.3 6.7 10 4c-2.5 2.1-5 5.1-5 9.8A7 7 0 0 0 12 21Z" />
+        </svg>
+      );
+    case 'home':
+      return (
+        <svg {...common}>
+          <path d="m4 11 8-7 8 7" />
+          <path d="M6.5 10.5V20h11v-9.5" />
+          <path d="M10 20v-5h4v5" />
+        </svg>
+      );
+    case 'info':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="8.5" />
+          <path d="M12 11.5V16" />
+          <path d="M12 8h.01" />
+        </svg>
+      );
+    case 'key':
+      return (
+        <svg {...common}>
+          <circle cx="7.5" cy="14.5" r="3.5" />
+          <path d="m10 12 8-8" />
+          <path d="m15 7 2 2" />
+          <path d="m13 9 2 2" />
+        </svg>
+      );
+    case 'map':
+      return (
+        <svg {...common}>
+          <path d="m8 18-5 2V6l5-2 8 2 5-2v14l-5 2-8-2Z" />
+          <path d="M8 4v14" />
+          <path d="M16 6v14" />
+        </svg>
+      );
+    case 'mapPin':
+      return (
+        <svg {...common}>
+          <path d="M12 21s6-5.1 6-11a6 6 0 0 0-12 0c0 5.9 6 11 6 11Z" />
+          <circle cx="12" cy="10" r="2" />
+        </svg>
+      );
+    case 'phone':
+      return (
+        <svg {...common}>
+          <path d="M8.2 5.2 9.6 8a2 2 0 0 1-.4 2.2l-.7.7a12 12 0 0 0 4.6 4.6l.7-.7a2 2 0 0 1 2.2-.4l2.8 1.4a1.5 1.5 0 0 1 .8 1.8l-.7 2.1a2 2 0 0 1-2.1 1.3C8.9 19.9 4.1 15.1 3 7.2a2 2 0 0 1 1.3-2.1l2.1-.7a1.5 1.5 0 0 1 1.8.8Z" />
+        </svg>
+      );
+    case 'shield':
+      return (
+        <svg {...common}>
+          <path d="M12 3 19 6v5c0 4.5-2.8 8.1-7 10-4.2-1.9-7-5.5-7-10V6l7-3Z" />
+          <path d="m9 12 2 2 4-5" />
+        </svg>
+      );
+    case 'sun':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2" />
+          <path d="M12 20v2" />
+          <path d="m4.9 4.9 1.4 1.4" />
+          <path d="m17.7 17.7 1.4 1.4" />
+          <path d="M2 12h2" />
+          <path d="M20 12h2" />
+          <path d="m4.9 19.1 1.4-1.4" />
+          <path d="m17.7 6.3 1.4-1.4" />
+        </svg>
+      );
+    case 'utensils':
+      return (
+        <svg {...common}>
+          <path d="M7 3v8" />
+          <path d="M4.5 3v4.5a2.5 2.5 0 0 0 5 0V3" />
+          <path d="M7 11v10" />
+          <path d="M17 3v18" />
+          <path d="M14 7a3 5 0 0 1 3-4" />
+        </svg>
+      );
+    case 'washer':
+      return (
+        <svg {...common}>
+          <rect x="5" y="3" width="14" height="18" rx="2" />
+          <circle cx="12" cy="14" r="4" />
+          <path d="M8 7h.01" />
+          <path d="M11 7h5" />
+        </svg>
+      );
+    case 'waves':
+      return (
+        <svg {...common}>
+          <path d="M3 8c2 0 2-1.5 4-1.5S9 8 11 8s2-1.5 4-1.5S17 8 21 8" />
+          <path d="M3 13c2 0 2-1.5 4-1.5S9 13 11 13s2-1.5 4-1.5S17 13 21 13" />
+          <path d="M3 18c2 0 2-1.5 4-1.5S9 18 11 18s2-1.5 4-1.5S17 18 21 18" />
+        </svg>
+      );
+    case 'wifi':
+      return (
+        <svg {...common}>
+          <path d="M5 13a10 10 0 0 1 14 0" />
+          <path d="M8.5 16.5a5 5 0 0 1 7 0" />
+          <path d="M12 20h.01" />
+        </svg>
+      );
+  }
+}
+
+function stripLeadingEmoji(value: string) {
+  return value.replace(/^[^\p{Letter}\p{Number}]+/u, '').trim();
+}
+
+function SectionTitle({
+  id,
+  eyebrow,
+  title,
+  icon,
+}: {
+  id?: string;
+  eyebrow?: string;
+  title: string;
+  icon: IconName;
+}) {
+  return (
+    <div className="mb-5 flex items-start gap-3">
+      <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#d9c7ad] bg-[#f4eadb] text-[#8C6A3E] dark:border-[#3a493f] dark:bg-[#203026] dark:text-[#D8C7A1]">
+        <Icon name={icon} className="h-5 w-5" />
+      </span>
+      <div>
+        {eyebrow && (
+          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-[#8C6A3E] dark:text-[#D8C7A1]">
+            {eyebrow}
+          </p>
+        )}
+        <h2 id={id} className="font-serif text-2xl font-semibold italic text-[#25342B] dark:text-[#F3EBDD]">
+          {title}
+        </h2>
+      </div>
+    </div>
+  );
+}
+
 export default function CheckInInfo({
   locale,
   nearbyRestaurants = [],
   nearbyServices = [],
   nearbyAttractions = [],
 }: CheckInInfoProps) {
-  const t = getDictionary((locale as Locale) ?? 'en');
-  // Combine checkinInfo and locationPanel so location-related strings are available
+  const effLocale: Locale = locale === 'el' ? 'el' : 'en';
+  const t = getDictionary(effLocale);
+  const apartment = getApartmentContent(effLocale);
+  const apartmentLocation = getApartmentMapLocation(effLocale);
   const checkinStrings = ({ ...(t.checkinInfo ?? {}), ...(t.locationPanel ?? {}) }) as Record<string, string | undefined>;
-  // Prefer the structured dictionary `locationPanel.highlights` when present
-  // (this ensures the Explore box and this panel stay in sync). If the
-  // dictionary doesn't include structured highlights, fall back to the
-  // existing helper which may pull from other sources (or return []).
+  const isGreek = effLocale === 'el';
+
   const panelHighlights = (t.locationPanel?.highlights ?? []) as Array<{
-    icon?: string;
     title: string;
     description: string;
   }>;
-  // Only use structured highlights from the dictionary. If none are
-  // present, render nothing for highlights.
-  const locationHighlights: LocationHighlight[] =
-    panelHighlights.length > 0
-      ? panelHighlights.map((h) => ({ icon: h.icon, title: h.title, description: h.description }))
-      : [];
-  const [copiedWifi, setCopiedWifi] = useState(false);
+  const locationHighlights: LocationHighlight[] = panelHighlights.map(({ title, description }) => ({
+    title,
+    description,
+  }));
+
+  const ui = {
+    guideLabel: t.house?.guideTitle ?? (isGreek ? 'Οδηγός διαμονής' : 'Guest stay guide'),
+    heroTitle: isGreek ? 'Νιώστε σαν στο σπίτι σας στην Καλαμάτα' : 'Make yourself at home in Kalamata',
+    quickActions: isGreek ? 'Γρήγορες ενέργειες' : 'Quick actions',
+    copyWifi: isGreek ? 'Αντιγραφή Wi-Fi' : 'Copy Wi-Fi',
+    openMaps: isGreek ? 'Άνοιγμα χάρτη' : 'Open Maps',
+    viewRules: isGreek ? 'Κανόνες σπιτιού' : 'House Rules',
+    guestEssentials: isGreek ? 'Βασικά για τη διαμονή' : 'Guest Essentials',
+    goodToKnow: t.checkinInfo?.additionalTitle || (isGreek ? 'Χρήσιμες πληροφορίες' : 'Good to Know'),
+    address: isGreek ? 'Διεύθυνση' : 'Address',
+    schedule: t.checkinInfo?.checkInOutTitle || (isGreek ? 'Αφιξη & αναχωρηση' : 'Check-in & Check-out'),
+    network: t.checkinInfo?.wifiNetwork || (isGreek ? 'Δίκτυο' : 'Network'),
+    password: t.checkinInfo?.wifiPassword || (isGreek ? 'Κωδικός' : 'Password'),
+    parking: t.checkinInfo?.parking || (isGreek ? 'Δωρεάν πάρκινγκ' : 'Free Parking'),
+    keys: stripLeadingEmoji(t.checkinInfo?.keysInfo || (isGreek ? 'Κλειδιά:' : 'Keys:')).replace(/:$/, ''),
+    emergency: t.checkinInfo?.emergencyTitle || (isGreek ? 'Επαφές ανάγκης' : 'Emergency Contacts'),
+    host: t.checkinInfo?.hostContact || (isGreek ? 'Ο οικοδεσπότης σας' : 'Your Host'),
+    save: isGreek ? 'Αποθήκευση' : 'Save',
+    saving: t.checkin?.saving || (isGreek ? 'Αποθήκευση...' : 'Saving...'),
+    cancel: isGreek ? 'Ακύρωση' : 'Cancel',
+    edit: isGreek ? 'Επεξεργασία' : 'Edit',
+    saved: isGreek ? 'Οι ώρες αποθηκεύτηκαν.' : 'Check-in times saved.',
+    copied: t.checkinInfo?.copied || (isGreek ? 'Αντιγράφηκε' : 'Copied'),
+    copy: t.checkinInfo?.copy || (isGreek ? 'Αντιγραφή' : 'Copy'),
+    neighborhood: checkinStrings.locationTitle || (isGreek ? 'Εξερευνήστε τη γειτονιά' : 'Explore the Neighborhood'),
+    nearby: t.locationPanel?.nearby || (isGreek ? 'Κοντά σας' : "What's Nearby?"),
+    standardCheckIn: isGreek ? 'Κανονική ώρα άφιξης' : 'Standard check-in',
+    requestDifferentArrival: isGreek ? 'Ζητήστε διαφορετική ώρα άφιξης' : 'Request different arrival time',
+    preferredArrivalTime: isGreek ? 'Προτιμώμενη ώρα άφιξης' : 'Preferred arrival time',
+    arrivalNote: isGreek ? 'Προσθέστε σημείωση' : 'Add a note',
+    arrivalNotePlaceholder: isGreek ? 'Π.χ. φτάνουμε νωρίτερα λόγω πτήσης.' : 'E.g. we may arrive earlier because of our flight.',
+    sendRequest: isGreek ? 'Αποστολή αιτήματος' : 'Send request',
+    requestSent: isGreek ? 'Το αίτημά σας στάλθηκε. Θα επιβεβαιώσουμε τη διαθεσιμότητα το συντομότερο δυνατό.' : "Your request has been sent. We'll confirm availability as soon as possible.",
+    requestError: isGreek ? 'Δεν ήταν δυνατή η αποστολή του αιτήματος. Παρακαλούμε δοκιμάστε ξανά.' : 'Unable to send the request. Please try again.',
+    requestRequired: isGreek ? 'Επιλέξτε προτιμώμενη ώρα άφιξης.' : 'Choose a preferred arrival time.',
+    latestRequest: isGreek ? 'Τελευταίο αίτημα' : 'Latest request',
+    statusPending: isGreek ? 'Σε εκκρεμότητα' : 'Pending',
+    statusApproved: isGreek ? 'Εγκρίθηκε' : 'Confirmed',
+    statusRejected: isGreek ? 'Δεν είναι διαθέσιμο' : 'Unavailable',
+  };
+
+  const ruleItems = [
+    t.checkinInfo?.rule1 || 'Quiet hours: 23:00 - 08:00',
+    t.checkinInfo?.rule2 || 'No smoking inside the property',
+    t.checkinInfo?.rule3 || 'Maximum capacity: 4 guests',
+    t.checkinInfo?.rule4 || 'Please respect the neighborhood',
+    t.checkinInfo?.rule5 || 'No parties or events are allowed.',
+    t.checkinInfo?.rule6 || 'Guests use the terrace at their own risk.',
+  ];
+
+  const amenityGroups: Array<{ title: string; icon: IconName; items: string[] }> = [
+    {
+      title: isGreek ? 'Βασικά' : 'Essentials',
+      icon: 'home',
+      items: isGreek
+        ? ['Δωρεάν ιδιωτικό πάρκινγκ', 'Δωρεάν Wi-Fi σε όλο το κατάλυμα', 'Οικογενειακά δωμάτια', 'Δωμάτια μη καπνιστών', 'Αποθήκευση αποσκευών']
+        : ['Free private parking', 'Free Wi-Fi throughout the property', 'Family rooms', 'Non-smoking rooms', 'Luggage storage'],
+    },
+    {
+      title: isGreek ? 'Άνεση' : 'Comfort',
+      icon: 'air',
+      items: isGreek
+        ? ['Κλιματισμός', 'Θέρμανση', 'Τζάκι', 'Καθιστικό με καναπέ', 'Ηχομόνωση', 'Τηλεόραση επίπεδης οθόνης']
+        : ['Air conditioning', 'Heating', 'Fireplace', 'Seating area with sofa', 'Soundproofing', 'Flat-screen TV'],
+    },
+    {
+      title: isGreek ? 'Κουζίνα' : 'Kitchen',
+      icon: 'utensils',
+      items: isGreek
+        ? ['Πλήρως εξοπλισμένη κουζίνα', 'Καφετιέρα/βραστήρας', 'Τραπεζαρία', 'Πλυντήριο ρούχων', 'Πλυντήριο πιάτων', 'Φούρνος μικροκυμάτων', 'Ψυγείο και φούρνος']
+        : ['Fully equipped kitchen', 'Coffee/tea maker', 'Dining table', 'Washing machine', 'Dishwasher', 'Microwave', 'Refrigerator and oven'],
+    },
+    {
+      title: isGreek ? 'Μπάνιο' : 'Bathroom',
+      icon: 'bath',
+      items: isGreek
+        ? ['Ιδιωτικό μπάνιο', 'Μπανιέρα', 'Πετσέτες και λευκά είδη', 'Σεσουάρ', 'Δωρεάν προϊόντα περιποίησης']
+        : ['Private bathroom', 'Bathtub', 'Towels and linens', 'Hair dryer', 'Free toiletries'],
+    },
+    {
+      title: isGreek ? 'Εξωτερικοί χώροι & θέα' : 'Outdoor & Views',
+      icon: 'sun',
+      items: isGreek
+        ? ['Μπαλκόνι', 'Βεράντα / ηλιόλουστη βεράντα', 'Εξωτερική τραπεζαρία', 'Θέα σε θάλασσα, βουνό και πόλη']
+        : ['Balcony', 'Terrace / sun terrace', 'Outdoor dining area', 'Sea, mountain, and city views'],
+    },
+    {
+      title: isGreek ? 'Ασφάλεια' : 'Safety',
+      icon: 'shield',
+      items: isGreek
+        ? ['Ανιχνευτές καπνού', 'Πυροσβεστήρες', 'Χρηματοκιβώτιο', 'Πρόσβαση με κλειδί', 'Σίδερο']
+        : ['Smoke detectors', 'Fire extinguishers', 'Safe', 'Key access', 'Iron'],
+    },
+  ];
+
+  const tipItems: Array<{ text: string; icon: IconName }> = [
+    { text: t.checkinInfo?.tip1 || 'The nearest beach is just 5 minutes walk away', icon: 'waves' },
+    { text: t.checkinInfo?.tip2 || 'Supermarket "AB Vassilopoulos" is 300m away, open 8:00-21:00', icon: 'basket' },
+    { text: t.checkinInfo?.tip3 || 'Check our restaurant recommendations in the main menu', icon: 'utensils' },
+    { text: t.checkinInfo?.tip4 || 'Need a taxi? Call +30 2721 023456 or use the Taxi app', icon: 'car' },
+  ];
+
+  const goodToKnowItems: Array<{ label: string; detail: string; icon: IconName }> = [
+    {
+      label: stripLeadingEmoji(t.checkinInfo?.trashInfo || 'Trash:').replace(/:$/, ''),
+      detail: t.checkinInfo?.trashDetail || 'Recycling bins are located near the main entrance',
+      icon: 'basket',
+    },
+    {
+      label: stripLeadingEmoji(t.checkinInfo?.waterInfo || 'Water:').replace(/:$/, ''),
+      detail: t.checkinInfo?.waterDetail || 'Tap water is safe to drink',
+      icon: 'waves',
+    },
+    {
+      label: stripLeadingEmoji(t.checkinInfo?.tvInfo || 'Entertainment:').replace(/:$/, ''),
+      detail: t.checkinInfo?.tvDetail || 'Smart TV with Netflix and YouTube available',
+      icon: 'info',
+    },
+  ];
+
+  const emergencyItems = [
+    {
+      label: ui.host,
+      value: apartmentLocation.phone || '+30 695 581 0051',
+      href: `tel:${(apartmentLocation.phone || '+30 695 581 0051').replace(/[^+0-9]/g, '')}`,
+    },
+    ...nearbyServices.slice(0, 2).map((item) => ({
+      label: item.name,
+      value: item.phone || item.phones?.[0] || item.summary || '',
+      href: item.phone || item.phones?.[0] ? `tel:${(item.phone || item.phones?.[0] || '').replace(/[^+0-9]/g, '')}` : undefined,
+    })),
+  ].filter((item) => item.value);
+
+  const [copiedTarget, setCopiedTarget] = useState<CopyTarget>(null);
   const [checkInTime, setCheckInTime] = useState('15:00');
   const [checkOutTime, setCheckOutTime] = useState('11:00');
   const [canEditTimes, setCanEditTimes] = useState(false);
@@ -64,8 +466,14 @@ export default function CheckInInfo({
   const [tempCheckOutTime, setTempCheckOutTime] = useState('11:00');
   const [savingTimes, setSavingTimes] = useState(false);
   const [timesSaved, setTimesSaved] = useState(false);
+  const [arrivalRequest, setArrivalRequest] = useState<ArrivalRequest | null>(null);
+  const [isRequestingArrival, setIsRequestingArrival] = useState(false);
+  const [requestedArrivalTime, setRequestedArrivalTime] = useState('15:00');
+  const [arrivalRequestMessage, setArrivalRequestMessage] = useState('');
+  const [arrivalRequestSubmitting, setArrivalRequestSubmitting] = useState(false);
+  const [arrivalRequestSuccess, setArrivalRequestSuccess] = useState('');
+  const [arrivalRequestError, setArrivalRequestError] = useState('');
 
-  // Load preferences on mount
   useEffect(() => {
     const loadPreferences = async () => {
       try {
@@ -88,10 +496,26 @@ export default function CheckInInfo({
     loadPreferences();
   }, []);
 
-  const copyToClipboard = (text: string) => {
+  useEffect(() => {
+    const loadArrivalRequest = async () => {
+      try {
+        const res = await internalFetch('/api/check-in/arrival-request');
+        if (res.ok) {
+          const data = await res.json();
+          setArrivalRequest(data.data?.request ?? null);
+        }
+      } catch (error) {
+        console.error('Failed to load arrival request:', error);
+      }
+    };
+    loadArrivalRequest();
+  }, []);
+
+  const copyToClipboard = (text: string, target: CopyTarget) => {
+    if (!navigator.clipboard) return;
     navigator.clipboard.writeText(text).then(() => {
-      setCopiedWifi(true);
-      setTimeout(() => setCopiedWifi(false), 2000);
+      setCopiedTarget(target);
+      setTimeout(() => setCopiedTarget(null), 2000);
     });
   };
 
@@ -141,289 +565,537 @@ export default function CheckInInfo({
     }
   };
 
+  const handleOpenArrivalRequest = () => {
+    setRequestedArrivalTime(arrivalRequest?.requestedTime || checkInTime);
+    setArrivalRequestMessage('');
+    setArrivalRequestError('');
+    setArrivalRequestSuccess('');
+    setIsRequestingArrival(true);
+  };
+
+  const handleSubmitArrivalRequest = async () => {
+    setArrivalRequestError('');
+    setArrivalRequestSuccess('');
+    if (!timeRegex.test(requestedArrivalTime)) {
+      setArrivalRequestError(ui.requestRequired);
+      return;
+    }
+
+    setArrivalRequestSubmitting(true);
+    try {
+      const res = await internalFetch('/api/check-in/arrival-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestedTime: requestedArrivalTime,
+          message: arrivalRequestMessage.trim() || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        setArrivalRequestError(data?.error?.message || ui.requestError);
+        return;
+      }
+
+      setArrivalRequest(data.data?.request ?? null);
+      setArrivalRequestSuccess(ui.requestSent);
+      setIsRequestingArrival(false);
+      setArrivalRequestMessage('');
+    } catch (error) {
+      console.error('Failed to submit arrival request:', error);
+      setArrivalRequestError(ui.requestError);
+    } finally {
+      setArrivalRequestSubmitting(false);
+    }
+  };
+
+  const requestStatusLabel = (status: ArrivalRequestStatus) => {
+    if (status === 'approved') return ui.statusApproved;
+    if (status === 'rejected') return ui.statusRejected;
+    return ui.statusPending;
+  };
+
+  const wifiText = `${ui.network}: ${WIFI_NETWORK}\n${ui.password}: ${WIFI_PASSWORD}`;
+  const panelClass =
+    'rounded-lg border border-[#dfd1bf] bg-[#fffaf2]/90 shadow-[0_18px_45px_-34px_rgba(37,52,43,0.68)] backdrop-blur dark:border-[#324338] dark:bg-[#17221D]/90 dark:shadow-[0_22px_54px_-34px_rgba(0,0,0,0.9)]';
+  const rowClass = 'flex items-start gap-3 border-t border-[#e6dac8] py-4 first:border-t-0 first:pt-0 last:pb-0 dark:border-[#2b3a30]';
+  const smallLabelClass = 'checkin-label text-[0.68rem] font-semibold uppercase tracking-[0.14em]';
+
   return (
-    <div className="space-y-6">
-      {/* Welcome Message */}
-      <section className="card p-6 bg-gradient-to-br from-[color:var(--brand-primary)] to-[color:var(--brand-secondary)]">
-        <h2 className="text-2xl font-serif italic font-bold mb-2" style={{ color: 'var(--text-accent)' }}>
-          {t.checkinInfo?.welcome || '🎉 Welcome to Our Apartment!'}
-        </h2>
-        <p className="white-in-dark" style={{ color: 'var(--text-accent)' }}>
-          {t.checkinInfo?.welcomeMessage || 'We\'re delighted to have you here. Below you\'ll find everything you need for a comfortable stay.'}
-        </p>
-      </section>
-
-      {/* Check-in/out Times */}
-      <section className="card p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl" aria-hidden>🕐</span>
-            <h3 className="text-xl font-serif italic font-bold" style={{ color: 'var(--text-accent)' }}>
-              {t.checkinInfo?.checkInOutTitle || 'Check-in & Check-out'}
-            </h3>
-          </div>
-          {!isEditingTimes && canEditTimes && (
-            <button
-              onClick={handleEditTimes}
-              className="text-sm px-3 py-1 rounded-lg bg-[color:var(--brand-primary)] text-white hover:opacity-80 transition"
-              title="Edit times (host only)"
+    <div className="checkin-portal text-[#25342B] dark:text-[#F3EBDD]">
+      <section
+        className={`${panelClass} relative overflow-hidden p-[clamp(1.25rem,3vw,2.5rem)]`}
+        aria-labelledby="checkin-welcome-title"
+      >
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(247,241,232,0.98)_0%,rgba(238,227,210,0.76)_48%,rgba(168,111,76,0.14)_100%)] dark:bg-[linear-gradient(135deg,rgba(16,25,22,0.98)_0%,rgba(23,34,29,0.9)_55%,rgba(168,111,76,0.18)_100%)]" />
+        <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] lg:items-end">
+          <div className="max-w-3xl">
+            <p className={smallLabelClass}>{ui.guideLabel}</p>
+            <h1
+              id="checkin-welcome-title"
+              className="mt-3 max-w-3xl font-serif text-[clamp(2.35rem,5vw,4.7rem)] font-semibold italic leading-[0.98] text-[#25342B] dark:text-[#F3EBDD]"
             >
-              ✏️ Edit
-            </button>
-          )}
-        </div>
-        
-        {timesSaved && (
-          <div className="mb-4 p-3 rounded-lg bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200 text-sm">
-            ✓ Check-in times saved successfully!
-          </div>
-        )}
+              {ui.heroTitle}
+            </h1>
+            <p className="mt-5 max-w-2xl text-base leading-7 text-[#526357] dark:text-[#C9D6C8] sm:text-lg">
+              {t.checkinInfo?.welcomeMessage || "We're delighted to have you here. Below you'll find everything you need for a comfortable stay."}
+            </p>
 
-        <div className="flex gap-4">
-          <div className="flex flex-col p-4 rounded-lg bg-[color:var(--layer-surface)] border border-[color:var(--border-soft)] flex-1">
-            <span className="text-sm text-[color:var(--fg-muted)] mb-1">{t.checkinInfo?.checkInTime || 'Check-in'}</span>
-            {isEditingTimes ? (
-              <input
-                type="time"
-                value={tempCheckInTime}
-                onChange={(e) => setTempCheckInTime(e.target.value)}
-                className="text-2xl font-bold px-2 py-1 rounded border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)]"
-                style={{ color: 'var(--text-accent)' }}
-              />
-            ) : (
-              <span className="text-2xl font-bold" style={{ color: 'var(--text-accent)' }}>{checkInTime}</span>
-            )}
-          </div>
-          <div className="flex flex-col p-4 rounded-lg bg-[color:var(--layer-surface)] border border-[color:var(--border-soft)] flex-1">
-            <span className="text-sm text-[color:var(--fg-muted)] mb-1">{t.checkinInfo?.checkOutTime || 'Check-out'}</span>
-            {isEditingTimes ? (
-              <input
-                type="time"
-                value={tempCheckOutTime}
-                onChange={(e) => setTempCheckOutTime(e.target.value)}
-                className="text-2xl font-bold px-2 py-1 rounded border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)]"
-                style={{ color: 'var(--text-accent)' }}
-              />
-            ) : (
-              <span className="text-2xl font-bold" style={{ color: 'var(--text-accent)' }}>{checkOutTime}</span>
-            )}
-          </div>
-        </div>
-
-        {isEditingTimes && (
-          <div className="flex gap-3 mt-4">
-            <button
-              onClick={handleSaveTimes}
-              disabled={savingTimes}
-              className="flex-1 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
-            >
-              {savingTimes ? 'Saving...' : '✓ Save Times'}
-            </button>
-            <button
-              onClick={handleCancelEdit}
-              disabled={savingTimes}
-              className="flex-1 px-4 py-2 rounded-lg bg-gray-500 text-white hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
-            >
-              ✗ Cancel
-            </button>
-          </div>
-        )}
-      </section>
-
-      {/* WiFi Information */}
-      <section className="card p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <span className="text-3xl" aria-hidden>📶</span>
-          <h3 className="text-xl font-serif italic font-bold" style={{ color: 'var(--text-accent)' }}>
-            {t.checkinInfo?.wifiTitle || 'Internet Access'}
-          </h3>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="p-4 rounded-lg bg-[color:var(--layer-surface)] border border-[color:var(--border-soft)]">
-            <div className="text-sm font-serif italic font-medium text-[color:var(--fg-muted)] mb-1">{t.checkinInfo?.wifiNetwork || 'Network Name'}</div>
-            <div className="flex items-center justify-between">
-              <span className="font-mono font-semibold text-lg grey-in-dark">ApartmentGuest_5G</span>
+            <div className="mt-7 flex flex-wrap gap-3" aria-label={ui.quickActions}>
               <button
-                onClick={() => copyToClipboard('ApartmentGuest_5G')}
-                className="text-xs px-3 py-1 rounded-full bg-[color:var(--brand-primary)] text-white hover:opacity-80 transition"
+                type="button"
+                onClick={() => copyToClipboard(wifiText, 'wifi')}
+                className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#25342B] px-4 py-2 text-sm font-semibold text-[#F7F1E8] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#35483B] dark:bg-[#D8C7A1] dark:text-[#101916] dark:hover:bg-[#E4D6BA]"
               >
-                {copiedWifi ? '✓ ' + (t.checkinInfo?.copied || 'Copied') : t.checkinInfo?.copy || 'Copy'}
+                <Icon name={copiedTarget === 'wifi' ? 'check' : 'copy'} className="h-4 w-4" />
+                {copiedTarget === 'wifi' ? ui.copied : ui.copyWifi}
               </button>
-            </div>
-          </div>
-          <div className="p-4 rounded-lg bg-[color:var(--layer-surface)] border border-[color:var(--border-soft)]">
-            <div className="text-sm font-serif italic font-medium text-[color:var(--fg-muted)] mb-1">{t.checkinInfo?.wifiPassword || 'Password'}</div>
-            <div className="flex items-center justify-between">
-              <span className="font-mono font-semibold text-lg grey-in-dark">Welcome2024!</span>
-              <button
-                onClick={() => copyToClipboard('Welcome2024!')}
-                className="text-xs px-3 py-1 rounded-full bg-[color:var(--brand-primary)] text-white hover:opacity-80 transition"
-              >
-                {t.checkinInfo?.copy || 'Copy'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* House Rules */}
-      <section className="card p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <span className="text-3xl" aria-hidden>📋</span>
-          <h3 className="text-xl font-serif italic font-bold" style={{ color: 'var(--text-accent)' }}>
-            {t.checkinInfo?.houseRulesTitle || 'House Rules'}
-          </h3>
-        </div>
-        <ul className="space-y-3">
-          <li className="flex items-start gap-3">
-            <span className="text-green-500 text-xl mt-0.5">✓</span>
-            <span>{t.checkinInfo?.rule1 || 'Quiet hours: 23:00 - 08:00'}</span>
-          </li>
-          <li className="flex items-start gap-3">
-            <span className="text-green-500 text-xl mt-0.5">✓</span>
-            <span>{t.checkinInfo?.rule2 || 'No smoking inside the property'}</span>
-          </li>
-          <li className="flex items-start gap-3">
-            <span className="text-green-500 text-xl mt-0.5">✓</span>
-            <span>{t.checkinInfo?.rule3 || 'Maximum capacity: 6 guests'}</span>
-          </li>
-          <li className="flex items-start gap-3">
-            <span className="text-green-500 text-xl mt-0.5">✓</span>
-            <span>{t.checkinInfo?.rule4 || 'Please respect the neighborhood'}</span>
-          </li>
-          <li className="flex items-start gap-3">
-            <span className="text-green-500 text-xl mt-0.5">✓</span>
-            <span>{t.checkinInfo?.rule5 || 'Pets allowed with prior approval'}</span>
-          </li>
-        </ul>
-      </section>
-
-      {/* Important Amenities */}
-      <section className="card p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <span className="text-3xl" aria-hidden>⭐</span>
-          <h3 className="text-xl font-serif italic font-bold" style={{ color: 'var(--text-accent)' }}>
-            {t.checkinInfo?.amenitiesTitle || 'Key Amenities'}
-          </h3>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 amenities-grid">
-          <div className="flex flex-col items-center p-3 rounded-lg bg-[color:var(--layer-surface)] border border-[color:var(--border-soft)] text-center">
-            <span className="text-2xl mb-2">❄️</span>
-            <span className="text-sm">{t.checkinInfo?.ac || 'Air Conditioning'}</span>
-          </div>
-          <div className="flex flex-col items-center p-3 rounded-lg bg-[color:var(--layer-surface)] border border-[color:var(--border-soft)] text-center">
-            <span className="text-2xl mb-2">🔥</span>
-            <span className="text-sm">{t.checkinInfo?.heating || 'Heating'}</span>
-          </div>
-          <div className="flex flex-col items-center p-3 rounded-lg bg-[color:var(--layer-surface)] border border-[color:var(--border-soft)] text-center">
-            <span className="text-2xl mb-2">🍳</span>
-            <span className="text-sm">{t.checkinInfo?.kitchen || 'Full Kitchen'}</span>
-          </div>
-          <div className="flex flex-col items-center p-3 rounded-lg bg-[color:var(--layer-surface)] border border-[color:var(--border-soft)] text-center">
-            <span className="text-2xl mb-2">🧺</span>
-            <span className="text-sm">{t.checkinInfo?.washer || 'Washer/Dryer'}</span>
-          </div>
-          <div className="flex flex-col items-center p-3 rounded-lg bg-[color:var(--layer-surface)] border border-[color:var(--border-soft)] text-center">
-            <span className="text-2xl mb-2">🅿️</span>
-            <span className="text-sm">{t.checkinInfo?.parking || 'Free Parking'}</span>
-          </div>
-          <div className="flex flex-col items-center p-3 rounded-lg bg-[color:var(--layer-surface)] border border-[color:var(--border-soft)] text-center">
-            <span className="text-2xl mb-2">🏊</span>
-            <span className="text-sm">{t.checkinInfo?.pool || 'Swimming Pool'}</span>
-          </div>
-        </div>
-      </section>
-
-      {/* Local Tips */}
-      <section className="card p-5 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20">
-        <div className="flex items-center gap-3 mb-4">
-          <span className="text-3xl" aria-hidden>💡</span>
-          <h3 className="text-xl font-serif italic font-bold" style={{ color: 'var(--text-accent)' }}>
-            {t.checkinInfo?.tipsTitle || 'Local Tips'}
-          </h3>
-        </div>
-        <ul className="space-y-2 text-sm">
-          <li className="flex items-start gap-2">
-            <span className="mt-1">🏖️</span>
-            <span>{t.checkinInfo?.tip1 || 'The nearest beach is just 5 minutes walk away'}</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="mt-1">🛒</span>
-            <span>{t.checkinInfo?.tip2 || 'Supermarket "AB Vassilopoulos" is 300m away, open 8:00-21:00'}</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="mt-1">🍽️</span>
-          <span>{t.checkinInfo?.tip3 || 'Check our Kalamata Moments recommendations in the main menu'}</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="mt-1">🚕</span>
-            <span>{t.checkinInfo?.tip4 || 'Need a taxi? Call +30 2721 023456 or use the Taxi app'}</span>
-          </li>
-        </ul>
-      </section>
-
-      <section className="card p-5 mt-6 space-y-5">
-        <div className="flex items-center gap-3">
-          <span className="text-3xl" aria-hidden>📍</span>
-          <h3 className="text-xl font-serif italic font-bold" style={{ color: 'var(--text-accent)' }}>
-            {checkinStrings.locationTitle || 'Explore the Neighborhood'}
-          </h3>
-        </div>
-  <p className="text-sm text-[color:var(--fg-muted)] max-w-2xl white-in-dark">
-   {checkinStrings.locationDescription || 'Discover your apartment’s prime location in Kalamata and explore Kalamata Moments, services, and sights within minutes.'}
-  </p>
-        <div className="rounded-xl overflow-hidden border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] shadow-sm">
-          <DynamicApartmentLocationMap
-            locale={locale}
-            height={MAP_DEFAULTS.HEIGHT.COMPACT}
-            zoom={12}
-            showNearbyAttractions
-            className="min-h-[260px]"
-            nearbyRestaurants={nearbyRestaurants}
-            nearbyServices={nearbyServices}
-            nearbyAttractions={nearbyAttractions}
-          />
-        </div>
-        {locationHighlights.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 location-grid">
-            {locationHighlights.map(({ icon, title, description }) => (
-              <div
-                key={`${title}-${description}`}
-                className="rounded-lg border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] p-4 text-center shadow-sm"
-              >
-                {icon && (
-                  <div className="text-2xl mb-2" aria-hidden>
-                    {icon}
-                  </div>
-                )}
-                <h4
-                  className="text-sm font-serif italic font-medium white-in-dark"
-                  style={{ color: 'var(--text-accent)' }}
+              {apartmentLocation.directionsUrl && (
+                <a
+                  href={apartmentLocation.directionsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="checkin-secondary-action inline-flex min-h-11 items-center gap-2 rounded-full border border-[#cdbb9e] bg-[#fffaf2]/70 px-4 py-2 text-sm font-semibold transition hover:-translate-y-0.5 hover:bg-[#ffffff] dark:border-[#3a493f] dark:bg-[#17221D]/70 dark:hover:bg-[#203026]"
                 >
-                  {title}
-                </h4>
-                <p className="text-xs text-[color:var(--fg-muted)] mt-1">{description}</p>
-              </div>
-            ))}
+                  <Icon name="external" className="h-4 w-4" />
+                  {ui.openMaps}
+                </a>
+              )}
+              <a
+                href="#house-rules"
+                className="checkin-secondary-action inline-flex min-h-11 items-center gap-2 rounded-full border border-[#cdbb9e] bg-[#fffaf2]/70 px-4 py-2 text-sm font-semibold transition hover:-translate-y-0.5 hover:bg-[#ffffff] dark:border-[#3a493f] dark:bg-[#17221D]/70 dark:hover:bg-[#203026]"
+              >
+                <Icon name="shield" className="h-4 w-4" />
+                {ui.viewRules}
+              </a>
+            </div>
           </div>
-        )}
+
+          <div className="rounded-lg border border-[#d9c7ad] bg-[#fffaf2]/72 p-4 dark:border-[#33443a] dark:bg-[#101916]/54">
+            <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+              <div>
+                <dt className={smallLabelClass}>{ui.address}</dt>
+                <dd className="mt-1 text-sm font-medium leading-6 text-[#25342B] dark:text-[#F3EBDD]">
+                  {apartmentLocation.address}
+                </dd>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <dt className={smallLabelClass}>{t.checkinInfo?.checkInTime || 'Check-in'}</dt>
+                  <dd className="mt-1 font-serif text-2xl font-semibold italic text-[#25342B] dark:text-[#F3EBDD]">
+                    {checkInTime}
+                  </dd>
+                </div>
+                <div>
+                  <dt className={smallLabelClass}>{t.checkinInfo?.checkOutTime || 'Check-out'}</dt>
+                  <dd className="mt-1 font-serif text-2xl font-semibold italic text-[#25342B] dark:text-[#F3EBDD]">
+                    {checkOutTime}
+                  </dd>
+                </div>
+              </div>
+              <div>
+                <dt className={smallLabelClass}>{t.checkinInfo?.wifiTitle || 'Internet Access'}</dt>
+                <dd className="mt-1 font-mono text-sm font-semibold text-[#25342B] dark:text-[#F3EBDD]">
+                  {WIFI_NETWORK}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </div>
       </section>
 
-      {/* Additional Info */}
-      <section className="card p-5">
-        <div className="flex items-center gap-3 mb-4">
-          <span className="text-3xl" aria-hidden>ℹ️</span>
-          <h3 className="text-xl font-serif italic font-bold" style={{ color: 'var(--text-accent)' }}>
-            {t.checkinInfo?.additionalTitle || 'Good to Know'}
-          </h3>
-        </div>
-          <div className="space-y-2 text-sm text-[color:var(--fg-muted)]">
-          <p className="white-in-dark">🔑 <strong className="font-serif italic font-medium" style={{ color: 'var(--text-accent)' }}>{t.checkinInfo?.keysInfo || 'Keys:'}</strong> {t.checkinInfo?.keysDetail || 'Please leave keys in the lockbox when checking out'}</p>
-          <p className="white-in-dark">🗑️ <strong className="font-serif italic font-medium" style={{ color: 'var(--text-accent)' }}>{t.checkinInfo?.trashInfo || 'Trash:'}</strong> {t.checkinInfo?.trashDetail || 'Recycling bins are located near the main entrance'}</p>
-          <p className="white-in-dark">💧 <strong className="font-serif italic font-medium" style={{ color: 'var(--text-accent)' }}>{t.checkinInfo?.waterInfo || 'Water:'}</strong> {t.checkinInfo?.waterDetail || 'Tap water is safe to drink'}</p>
-          <p className="white-in-dark">📺 <strong className="font-serif italic font-medium" style={{ color: 'var(--text-accent)' }}>{t.checkinInfo?.tvInfo || 'Entertainment:'}</strong> {t.checkinInfo?.tvDetail || 'Smart TV with Netflix and YouTube available'}</p>
-        </div>
-      </section>
+      <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(340px,420px)] lg:items-start">
+        <aside className="space-y-5 lg:order-2 lg:sticky lg:top-24">
+          <section className={`${panelClass} p-5`} aria-labelledby="guest-essentials-title">
+            <SectionTitle id="guest-essentials-title" title={ui.guestEssentials} icon="home" />
+            <div className="space-y-0">
+              <div className={rowClass}>
+                <Icon name="clock" className="mt-0.5 h-5 w-5 shrink-0 text-[#8C6A3E] dark:text-[#D8C7A1]" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-[#25342B] dark:text-[#F3EBDD]">
+                      {ui.schedule}
+                    </h3>
+                    {!isEditingTimes && canEditTimes && (
+                      <button
+                        type="button"
+                        onClick={handleEditTimes}
+                        className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-[#cfb994] px-3 py-1 text-xs font-semibold text-[#6f552f] transition hover:bg-[#f4eadb] dark:border-[#4a5a4d] dark:text-[#D8C7A1] dark:hover:bg-[#203026]"
+                        title="Edit times (host only)"
+                      >
+                        {ui.edit}
+                      </button>
+                    )}
+                  </div>
+
+                  {timesSaved && (
+                    <p className="mt-2 rounded-md bg-[#eef3e9] px-3 py-2 text-sm text-[#355232] dark:bg-[#233326] dark:text-[#CFE1C8]" role="status">
+                      {ui.saved}
+                    </p>
+                  )}
+
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <label className="block">
+                      <span className="text-xs font-medium text-[#667367] dark:text-[#B8C7B5]">
+                        {ui.standardCheckIn}
+                      </span>
+                      {isEditingTimes ? (
+                        <input
+                          type="time"
+                          value={tempCheckInTime}
+                          onChange={(e) => setTempCheckInTime(e.target.value)}
+                          className="mt-1 w-full rounded-md border border-[#d9c7ad] bg-[#fffaf2] px-2 py-2 text-base font-semibold text-[#25342B] dark:border-[#3a493f] dark:bg-[#101916] dark:text-[#F3EBDD]"
+                        />
+                      ) : (
+                        <span className="mt-1 block font-serif text-2xl font-semibold italic text-[#25342B] dark:text-[#F3EBDD]">
+                          {checkInTime}
+                        </span>
+                      )}
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-medium text-[#667367] dark:text-[#B8C7B5]">
+                        {t.checkinInfo?.checkOutTime || 'Check-out'}
+                      </span>
+                      {isEditingTimes ? (
+                        <input
+                          type="time"
+                          value={tempCheckOutTime}
+                          onChange={(e) => setTempCheckOutTime(e.target.value)}
+                          className="mt-1 w-full rounded-md border border-[#d9c7ad] bg-[#fffaf2] px-2 py-2 text-base font-semibold text-[#25342B] dark:border-[#3a493f] dark:bg-[#101916] dark:text-[#F3EBDD]"
+                        />
+                      ) : (
+                        <span className="mt-1 block font-serif text-2xl font-semibold italic text-[#25342B] dark:text-[#F3EBDD]">
+                          {checkOutTime}
+                        </span>
+                      )}
+                    </label>
+                  </div>
+
+                  {isEditingTimes && (
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSaveTimes}
+                        disabled={savingTimes}
+                        className="inline-flex min-h-10 items-center justify-center rounded-full bg-[#25342B] px-3 py-2 text-sm font-semibold text-[#F7F1E8] transition hover:bg-[#35483B] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-[#D8C7A1] dark:text-[#101916] dark:hover:bg-[#E4D6BA]"
+                      >
+                        {savingTimes ? ui.saving : ui.save}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelEdit}
+                        disabled={savingTimes}
+                        className="inline-flex min-h-10 items-center justify-center rounded-full border border-[#cfb994] px-3 py-2 text-sm font-semibold text-[#6f552f] transition hover:bg-[#f4eadb] disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#4a5a4d] dark:text-[#D8C7A1] dark:hover:bg-[#203026]"
+                      >
+                        {ui.cancel}
+                      </button>
+                    </div>
+                  )}
+
+                  {!isEditingTimes && (
+                    <div className="mt-4 space-y-3">
+                      {arrivalRequest && (
+                        <div className="rounded-lg border border-[#e2d4c1] bg-[#fffaf2]/62 p-3 dark:border-[#2d3b31] dark:bg-[#101916]/42">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8C6A3E] dark:text-[#D8C7A1]">
+                              {ui.latestRequest}
+                            </p>
+                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                              arrivalRequest.status === 'approved'
+                                ? 'bg-[#e6f0dd] text-[#36552e] dark:bg-[#233326] dark:text-[#CFE1C8]'
+                                : arrivalRequest.status === 'rejected'
+                                  ? 'bg-[#f8e6de] text-[#8a4229] dark:bg-[#3a241c] dark:text-[#F0B8A0]'
+                                  : 'bg-[#f4eadb] text-[#7b5d32] dark:bg-[#2e2d22] dark:text-[#D8C7A1]'
+                            }`}>
+                              {requestStatusLabel(arrivalRequest.status)}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-[#617061] dark:text-[#C4D0C2]">
+                            {ui.preferredArrivalTime}: <strong className="font-semibold text-[#25342B] dark:text-[#F3EBDD]">{arrivalRequest.requestedTime}</strong>
+                          </p>
+                        </div>
+                      )}
+
+                      {!isRequestingArrival && (
+                        <button
+                          type="button"
+                          onClick={handleOpenArrivalRequest}
+                          className="inline-flex min-h-10 w-full items-center justify-center rounded-full border border-[#cfb994] px-3 py-2 text-sm font-semibold text-[#6f552f] transition hover:bg-[#f4eadb] dark:border-[#4a5a4d] dark:text-[#D8C7A1] dark:hover:bg-[#203026]"
+                        >
+                          {ui.requestDifferentArrival}
+                        </button>
+                      )}
+
+                      {isRequestingArrival && (
+                        <div className="rounded-lg border border-[#e2d4c1] bg-[#fffaf2]/72 p-3 dark:border-[#2d3b31] dark:bg-[#101916]/46">
+                          <label className="block">
+                            <span className="text-xs font-semibold text-[#667367] dark:text-[#B8C7B5]">
+                              {ui.preferredArrivalTime}
+                            </span>
+                            <input
+                              type="time"
+                              value={requestedArrivalTime}
+                              onChange={(event) => setRequestedArrivalTime(event.target.value)}
+                              className="mt-1 w-full rounded-md border border-[#d9c7ad] bg-[#fffaf2] px-3 py-2 text-base font-semibold text-[#25342B] dark:border-[#3a493f] dark:bg-[#101916] dark:text-[#F3EBDD]"
+                              aria-invalid={Boolean(arrivalRequestError)}
+                            />
+                          </label>
+                          <label className="mt-3 block">
+                            <span className="text-xs font-semibold text-[#667367] dark:text-[#B8C7B5]">
+                              {ui.arrivalNote}
+                            </span>
+                            <textarea
+                              value={arrivalRequestMessage}
+                              onChange={(event) => setArrivalRequestMessage(event.target.value)}
+                              maxLength={500}
+                              rows={3}
+                              placeholder={ui.arrivalNotePlaceholder}
+                              className="mt-1 w-full resize-none rounded-md border border-[#d9c7ad] bg-[#fffaf2] px-3 py-2 text-sm leading-6 text-[#25342B] placeholder:text-[#8d988e] dark:border-[#3a493f] dark:bg-[#101916] dark:text-[#F3EBDD] dark:placeholder:text-[#7f927d]"
+                            />
+                          </label>
+                          {arrivalRequestError && (
+                            <p className="mt-2 text-sm text-[#8a4229] dark:text-[#F0B8A0]" role="alert">
+                              {arrivalRequestError}
+                            </p>
+                          )}
+                          <div className="mt-3 grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={handleSubmitArrivalRequest}
+                              disabled={arrivalRequestSubmitting}
+                              className="inline-flex min-h-10 items-center justify-center rounded-full bg-[#25342B] px-3 py-2 text-sm font-semibold text-[#F7F1E8] transition hover:bg-[#35483B] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-[#D8C7A1] dark:text-[#101916] dark:hover:bg-[#E4D6BA]"
+                            >
+                              {arrivalRequestSubmitting ? ui.saving : ui.sendRequest}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsRequestingArrival(false);
+                                setArrivalRequestError('');
+                              }}
+                              disabled={arrivalRequestSubmitting}
+                              className="inline-flex min-h-10 items-center justify-center rounded-full border border-[#cfb994] px-3 py-2 text-sm font-semibold text-[#6f552f] transition hover:bg-[#f4eadb] disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#4a5a4d] dark:text-[#D8C7A1] dark:hover:bg-[#203026]"
+                            >
+                              {ui.cancel}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {arrivalRequestSuccess && (
+                        <p className="rounded-lg bg-[#eef3e9] px-3 py-2 text-sm leading-6 text-[#355232] dark:bg-[#233326] dark:text-[#CFE1C8]" role="status">
+                          {arrivalRequestSuccess}
+                        </p>
+                      )}
+                      {arrivalRequestError && !isRequestingArrival && (
+                        <p className="rounded-lg bg-[#f8e6de] px-3 py-2 text-sm leading-6 text-[#8a4229] dark:bg-[#3a241c] dark:text-[#F0B8A0]" role="alert">
+                          {arrivalRequestError}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className={rowClass}>
+                <Icon name="wifi" className="mt-0.5 h-5 w-5 shrink-0 text-[#8C6A3E] dark:text-[#D8C7A1]" />
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-semibold text-[#25342B] dark:text-[#F3EBDD]">
+                    {t.checkinInfo?.wifiTitle || 'Internet Access'}
+                  </h3>
+                  <dl className="mt-3 divide-y divide-[#e6dac8] rounded-lg border border-[#e2d4c1] bg-[#fffaf2]/62 dark:divide-[#2b3a30] dark:border-[#2d3b31] dark:bg-[#101916]/42">
+                    {[
+                      {
+                        label: ui.network,
+                        value: WIFI_NETWORK,
+                        target: 'network' as const,
+                        aria: isGreek ? 'Αντιγραφή ονόματος δικτύου Wi-Fi' : 'Copy Wi-Fi network name',
+                      },
+                      {
+                        label: ui.password,
+                        value: WIFI_PASSWORD,
+                        target: 'password' as const,
+                        aria: isGreek ? 'Αντιγραφή κωδικού Wi-Fi' : 'Copy Wi-Fi password',
+                      },
+                    ].map((item) => (
+                      <div key={item.target} className="grid gap-2 p-3 sm:grid-cols-[5.75rem_minmax(0,1fr)] sm:items-center">
+                        <dt className="text-xs font-medium text-[#667367] dark:text-[#B8C7B5]">{item.label}</dt>
+                        <dd className="flex min-w-0 flex-wrap items-center gap-2">
+                          <span className="min-w-0 flex-1 whitespace-nowrap font-mono text-[0.8125rem] font-semibold text-[#25342B] dark:text-[#F3EBDD]">
+                            {item.value}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(item.value, item.target)}
+                            className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-full border border-[#cfb994] px-3 py-1 text-xs font-semibold text-[#6f552f] transition hover:bg-[#f4eadb] dark:border-[#4a5a4d] dark:text-[#D8C7A1] dark:hover:bg-[#203026]"
+                            aria-label={item.aria}
+                          >
+                            <Icon name={copiedTarget === item.target ? 'check' : 'copy'} className="h-3.5 w-3.5" />
+                            {copiedTarget === item.target ? ui.copied : ui.copy}
+                          </button>
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              </div>
+
+              <div className={rowClass}>
+                <Icon name="key" className="mt-0.5 h-5 w-5 shrink-0 text-[#8C6A3E] dark:text-[#D8C7A1]" />
+                <div>
+                  <h3 className="text-sm font-semibold text-[#25342B] dark:text-[#F3EBDD]">{ui.keys}</h3>
+                  <p className="mt-1 text-sm leading-6 text-[#617061] dark:text-[#C4D0C2]">
+                    {t.checkinInfo?.keysDetail || 'Please leave keys in the lockbox when checking out'}
+                  </p>
+                </div>
+              </div>
+
+              <div className={rowClass}>
+                <Icon name="car" className="mt-0.5 h-5 w-5 shrink-0 text-[#8C6A3E] dark:text-[#D8C7A1]" />
+                <div>
+                  <h3 className="text-sm font-semibold text-[#25342B] dark:text-[#F3EBDD]">{ui.parking}</h3>
+                  <p className="mt-1 text-sm leading-6 text-[#617061] dark:text-[#C4D0C2]">
+                    {apartment.highlights.find((item) => item.toLowerCase().includes('parking')) || ui.parking}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className={`${panelClass} p-5`} aria-labelledby="emergency-title">
+            <SectionTitle id="emergency-title" title={ui.emergency} icon="phone" />
+            <div className="divide-y divide-[#e6dac8] dark:divide-[#2b3a30]">
+              {emergencyItems.map((item) => (
+                <div key={`${item.label}-${item.value}`} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-sm font-semibold text-[#25342B] dark:text-[#F3EBDD]">{item.label}</h3>
+                    <p className="mt-0.5 truncate text-sm text-[#617061] dark:text-[#C4D0C2]">{item.value}</p>
+                  </div>
+                  {item.href && (
+                    <a
+                      href={item.href}
+                      className="checkin-icon-action inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#cfb994] transition hover:bg-[#f4eadb] dark:border-[#4a5a4d] dark:hover:bg-[#203026]"
+                      aria-label={`${ui.emergency}: ${item.label}`}
+                    >
+                      <Icon name="phone" className="h-4 w-4" />
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className={`${panelClass} p-5`} aria-labelledby="good-to-know-title">
+            <SectionTitle id="good-to-know-title" title={ui.goodToKnow} icon="info" />
+            <div className="space-y-4">
+              {goodToKnowItems.map((item) => (
+                <div key={item.label} className="flex gap-3">
+                  <Icon name={item.icon} className="mt-0.5 h-5 w-5 shrink-0 text-[#8C6A3E] dark:text-[#D8C7A1]" />
+                  <p className="text-sm leading-6 text-[#617061] dark:text-[#C4D0C2]">
+                    <strong className="font-semibold text-[#25342B] dark:text-[#F3EBDD]">{item.label}:</strong>{' '}
+                    {item.detail}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        </aside>
+
+        <main className="space-y-6 lg:order-1">
+          <section id="house-rules" className={`${panelClass} scroll-mt-24 p-5 sm:p-6`} aria-labelledby="house-rules-title">
+            <SectionTitle id="house-rules-title" title={t.checkinInfo?.houseRulesTitle || 'House Rules'} icon="shield" />
+            <ul className="grid gap-3 sm:grid-cols-2">
+              {ruleItems.map((rule) => (
+                <li key={rule} className="flex items-start gap-3 rounded-lg bg-[#F7F1E8]/72 p-3 text-sm leading-6 text-[#536252] dark:bg-[#101916]/46 dark:text-[#C4D0C2]">
+                  <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#efe3cf] text-[#8C6A3E] dark:bg-[#26372d] dark:text-[#D8C7A1]">
+                    <Icon name="check" className="h-3.5 w-3.5" />
+                  </span>
+                  <span>{rule}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className={`${panelClass} p-5 sm:p-6`} aria-labelledby="amenities-title">
+            <SectionTitle id="amenities-title" title={t.checkinInfo?.amenitiesTitle || 'Key Amenities'} icon="sun" />
+            <div className="grid gap-4 md:grid-cols-2">
+              {amenityGroups.map((group) => (
+                <div
+                  key={group.title}
+                  className="rounded-lg border border-[#e2d4c1] bg-[#fffaf2]/66 p-4 transition hover:-translate-y-0.5 hover:border-[#cbb68f] hover:shadow-[0_16px_28px_-24px_rgba(37,52,43,0.65)] dark:border-[#2d3b31] dark:bg-[#101916]/42 dark:hover:border-[#566851]"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f0e3ce] text-[#8C6A3E] dark:bg-[#26372d] dark:text-[#D8C7A1]">
+                      <Icon name={group.icon} className="h-[1.125rem] w-[1.125rem]" />
+                    </span>
+                    <h3 className="text-sm font-semibold text-[#25342B] dark:text-[#F3EBDD]">{group.title}</h3>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {group.items.map((item) => (
+                      <span
+                        key={item}
+                        className="rounded-full border border-[#e0d0b8] bg-[#F7F1E8]/72 px-3 py-1.5 text-xs font-medium text-[#536252] dark:border-[#344439] dark:bg-[#101916]/52 dark:text-[#C4D0C2]"
+                      >
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className={`${panelClass} p-5 sm:p-6`} aria-labelledby="tips-title">
+            <SectionTitle id="tips-title" title={t.checkinInfo?.tipsTitle || 'Local Tips'} icon="mapPin" />
+            <div className="divide-y divide-[#e6dac8] dark:divide-[#2b3a30]">
+              {tipItems.map((tip) => (
+                <div key={tip.text} className="flex gap-3 py-4 first:pt-0 last:pb-0">
+                  <Icon name={tip.icon} className="mt-0.5 h-5 w-5 shrink-0 text-[#A86F4C] dark:text-[#D8C7A1]" />
+                  <p className="text-sm leading-6 text-[#536252] dark:text-[#C4D0C2]">{tip.text}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className={`${panelClass} p-5 sm:p-6`} aria-labelledby="neighborhood-title">
+            <SectionTitle id="neighborhood-title" eyebrow={ui.nearby} title={ui.neighborhood} icon="map" />
+            <p className="max-w-2xl text-sm leading-6 text-[#617061] dark:text-[#C4D0C2]">
+              {checkinStrings.locationDescription || "Discover your apartment's prime location in Kalamata and explore Kalamata Moments, services, and sights within minutes."}
+            </p>
+            <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(260px,0.65fr)]">
+              <div className="overflow-hidden rounded-lg border border-[#d8c8ad] bg-[#fffaf2] shadow-sm dark:border-[#2d3b31] dark:bg-[#101916]">
+                <DynamicApartmentLocationMap
+                  locale={locale}
+                  height={MAP_HEIGHT}
+                  zoom={12}
+                  showNearbyAttractions
+                  className="min-h-[240px]"
+                  nearbyRestaurants={nearbyRestaurants}
+                  nearbyServices={nearbyServices}
+                  nearbyAttractions={nearbyAttractions}
+                />
+              </div>
+              {locationHighlights.length > 0 && (
+                <div className="grid content-start gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                  {locationHighlights.map(({ title, description }) => (
+                    <div
+                      key={`${title}-${description}`}
+                      className="flex gap-3 rounded-lg border border-[#e2d4c1] bg-[#fffaf2]/66 p-3 dark:border-[#2d3b31] dark:bg-[#101916]/42"
+                    >
+                      <Icon name="mapPin" className="mt-0.5 h-5 w-5 shrink-0 text-[#A86F4C] dark:text-[#D8C7A1]" />
+                      <div>
+                        <h3 className="text-sm font-semibold text-[#25342B] dark:text-[#F3EBDD]">{title}</h3>
+                        <p className="mt-1 text-xs leading-5 text-[#617061] dark:text-[#C4D0C2]">{description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        </main>
+      </div>
     </div>
   );
 }

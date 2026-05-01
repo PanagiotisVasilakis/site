@@ -98,7 +98,7 @@ export default function StatusCluster({ className = '', labels, pollMs = 15000 }
         const ctrl = new AbortController();
         const timeoutId = setTimeout(() => ctrl.abort(), 4000);
         
-        await fetch('/manifest.webmanifest?probe=' + Date.now(), {
+        await fetch('/app.webmanifest?probe=' + Date.now(), {
           method: 'HEAD',
           cache: 'no-store',
           signal: ctrl.signal

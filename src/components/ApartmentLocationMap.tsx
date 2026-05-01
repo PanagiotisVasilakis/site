@@ -1,7 +1,8 @@
 "use client";
 import React, { useMemo } from 'react';
 import InteractiveMap from './InteractiveMap';
-import { createMarkerFromItem, type MarkerData, APARTMENT_LOCATION } from '@/lib/mapUtils';
+import { createMarkerFromItem, markerFromMapLocation, type MarkerData } from '@/lib/mapUtils';
+import { getApartmentMapLocation } from '@/data/mapLocations';
 import StaticLocationMap from './StaticLocationMap';
 
 interface CategoryItem {
@@ -10,8 +11,15 @@ interface CategoryItem {
   summary?: string;
   slug?: string;
   rating?: number;
+  price?: string;
   priceLevel?: number;
   location?: { lat: number; lng: number };
+  phone?: string;
+  phones?: string[];
+  address?: string;
+  website?: string;
+  directionsUrl?: string;
+  sourceUrls?: string[];
 }
 
 interface ApartmentLocationMapProps {
@@ -26,18 +34,6 @@ interface ApartmentLocationMapProps {
   activation?: 'viewport' | 'intent';
 }
 
-// (villa content import removed – not needed here)
-
-// Apartment details - now using real Kalamata location
-const APARTMENT_DATA = {
-  id: 'apartment',
-  name: '2-Bedroom Apartment with Views',
-  description: 'Spacious apartment with mountain & sea views',
-  coordinates: APARTMENT_LOCATION, // Use imported constant
-  type: 'apartment' as const,
-  price: '€65/night'
-};
-
 export default function ApartmentLocationMap({
   locale,
   height = "300px",
@@ -49,53 +45,46 @@ export default function ApartmentLocationMap({
   nearbyAttractions = [],
   activation = 'viewport'
 }: ApartmentLocationMapProps) {
+  const apartmentMarker = useMemo(
+    () => markerFromMapLocation(getApartmentMapLocation(locale === 'el' ? 'el' : 'en')),
+    [locale]
+  );
 
   // Get nearby attractions from props
   const nearbyMarkers: MarkerData[] = useMemo(() => {
-    const markers: MarkerData[] = [{
-      id: APARTMENT_DATA.id,
-      name: APARTMENT_DATA.name,
-      description: APARTMENT_DATA.description,
-      coordinates: APARTMENT_DATA.coordinates,
-      type: 'apartment',
-      price: APARTMENT_DATA.price
-    }];
+    const markers: MarkerData[] = [apartmentMarker];
 
     if (!showNearbyAttractions) return markers;
 
     // Add restaurants from props
     nearbyRestaurants.slice(0, 5).forEach(item => {
-      markers.push(createMarkerFromItem(item, 'moments', locale));
+      const marker = createMarkerFromItem(item, 'moments', locale);
+      if (marker) markers.push(marker);
     });
 
     // Add services from props
     nearbyServices.slice(0, 3).forEach(item => {
-      markers.push(createMarkerFromItem(item, 'phones', locale));
+      const marker = createMarkerFromItem(item, 'phones', locale);
+      if (marker) markers.push(marker);
     });
 
     // Add attractions from props  
     nearbyAttractions.slice(0, 4).forEach(item => {
-      markers.push(createMarkerFromItem(item, 'sightseeing', locale));
+      const marker = createMarkerFromItem(item, 'sightseeing', locale);
+      if (marker) markers.push(marker);
     });
 
     return markers;
-  }, [locale, showNearbyAttractions, nearbyRestaurants, nearbyServices, nearbyAttractions]);
-
-  const handleMarkerClick = (marker: MarkerData) => {
-    if (marker.href) {
-      window.open(marker.href, '_blank');
-    }
-  };
+  }, [apartmentMarker, locale, showNearbyAttractions, nearbyRestaurants, nearbyServices, nearbyAttractions]);
 
   // Single responsibility: delegate fallback to InteractiveMap; add dedicated static panel for no-JS via <noscript>
   return (
     <div className={className}>
       <InteractiveMap
         markers={nearbyMarkers}
-        center={APARTMENT_DATA.coordinates}
+        center={apartmentMarker.coordinates}
         zoom={zoom}
         height={height}
-        onMarkerClick={handleMarkerClick}
         locale={locale as 'en' | 'el'}
         activation={activation}
       />
