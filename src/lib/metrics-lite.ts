@@ -24,5 +24,3 @@ const metricsLite: MetricsLite = {
 };
 
 export const metrics = metricsLite;
-export type { MetricsLite };
-

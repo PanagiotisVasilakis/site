@@ -8,7 +8,7 @@ import {
   type MapMarkerType,
 } from '@/data/mapLocations';
 
-export { APARTMENT_LOCATION, createMapLocationFromItem, type MapLocation, type MapMarkerType };
+export { APARTMENT_LOCATION };
 
 export interface MarkerData {
   id: string;

@@ -1,7 +1,7 @@
 "use client";
 
 /** Filter categories for Moments page */
-export const MOMENTS_FILTER_KEYS = [
+const MOMENTS_FILTER_KEYS = [
     'all', 'beaches', 'museums', 'restaurants', 'bars', 'brunchs', 'taygetos', 'sites', 'nearby'
 ] as const;
 
@@ -71,13 +71,6 @@ export function CategoryChips({ active, onChange, ui }: MomentsFilterMenuProps) 
             </div>
         </nav>
     );
-}
-
-/**
- * Backwards-compatible export for older call sites.
- */
-export function MomentsFilterMenu(props: MomentsFilterMenuProps) {
-    return <CategoryChips {...props} />;
 }
 
 /**

@@ -10,12 +10,9 @@ const CORE_ASSETS = [
   '/offline',
   '/en/offline','/el/offline',
   '/favicon.ico',
-  '/manifest.webmanifest',
+  '/app.webmanifest',
   // Key icons / imagery likely referenced above the fold (add more as needed)
-  '/globe.svg','/window.svg','/file.svg'
-  // Curated hero / brand images (add if present; harmless if 404 skipped)
-  // Add any critical above-the-fold images you want guaranteed offline
-  ,'/next.svg','/vercel.svg','/qr/site.png'
+  '/qr/site.png'
 ];
 // Internal fetch helper to centralize internal route calls (for lint compliance)
 function fetchInternal(input, init) { return fetch(input, init); }
@@ -61,7 +58,7 @@ async function manageCacheStorage(cache) {
 const DB_NAME = 'analytics-queue-db';
 const STORE = 'queue';
 function openQueueDb() {
-  return new Promise<IDBDatabase>((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, 1);
     req.onupgradeneeded = () => {
       const db = req.result;

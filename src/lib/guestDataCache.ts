@@ -26,7 +26,7 @@ type SnapshotResolver = () => Promise<GuestDatasetSnapshot>;
 
 export type GuestDataCacheConfig = Partial<Record<GuestDatasetKey, SnapshotResolver>>;
 
-export class GuestDataCache {
+class GuestDataCache {
   private entries = new Map<GuestDatasetKey, GuestDataCacheEntry<unknown>>();
   private pendingLoads = new Map<GuestDatasetKey, Promise<GuestDataCacheEntry<unknown>>>();
   private hits = 0;

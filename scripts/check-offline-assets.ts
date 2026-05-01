@@ -4,7 +4,7 @@ import { URL } from 'node:url';
 const PROVIDED = process.env.OFFLINE_CHECK_HOST;
 const DEFAULT_HOSTS = ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://169.254.83.107:3000'];
 const CANDIDATE_HOSTS = PROVIDED ? [PROVIDED, ...DEFAULT_HOSTS] : DEFAULT_HOSTS;
-const PATHS = ['/sw.js', '/precache.json', '/critical-precache.json', '/version.json', '/manifest.webmanifest'];
+const PATHS = ['/sw.js', '/precache.json', '/critical-precache.json', '/version.json', '/app.webmanifest'];
 
 async function tryHost(host: string, path: string): Promise<number> {
   return new Promise((resolve) => {

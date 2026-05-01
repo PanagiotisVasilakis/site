@@ -45,9 +45,24 @@ yarn-error.log*
 # generated reports and browser audit artifacts
 /reports/lighthouse-matrix/
 /reports/responsive-ux/
+/reports/jscpd-report/
 /reports/**/screenshots-*/
 /lighthouse.*
 /.lighthouse*/
+
+# generated local runtime data
+/analytics-data.json
+/analytics-data.json.tmp
+/analytics-ratelimit.json
+/analytics-ratelimit.json.tmp
+/analytics-backups/
+/data/*.db
+/data/*.db-*
+/data/*.sqlite
+/data/.*.sqlite
+
+# legacy raw SQL migration output; canonical migrations live in prisma/migrations/
+/migrations/
 
 # typescript
 *.tsbuildinfo

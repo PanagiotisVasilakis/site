@@ -51,5 +51,3 @@ export const momentsLayoutConfig = {
         class: 'text-xs rounded bg-amber-200 text-amber-900 px-2 py-0.5',
     },
 } as const;
-
-export type MomentsLayoutConfig = typeof momentsLayoutConfig;

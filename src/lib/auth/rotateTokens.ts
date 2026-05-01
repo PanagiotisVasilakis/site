@@ -205,32 +205,3 @@ export async function rotateRefreshToken(
     throw error;
   }
 }
-
-/**
- * Detect potential replay attacks
- * 
- * Checks if a token has been used after it was supposedly rotated.
- * 
- * @param tokenRecord - Token record to check
- * @param storage - Storage adapter for token persistence
- * @returns True if potential replay attack detected
- */
-export async function detectReplayAttack(
-  tokenRecord: RefreshTokenRecord,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _storage: TokenStorageAdapter
-): Promise<boolean> {
-  // If token is revoked and we have a rotated-from ID, check if newer tokens exist
-  if (tokenRecord.revokedAt && tokenRecord.rotatedFromId) {
-    // In a real implementation, you'd check the token family for signs of misuse
-    // For now, we'll just log this scenario
-    // console.warn('Potential replay attack detected', {
-    //   tokenId: tokenRecord.id,
-    //   familyId: tokenRecord.familyId,
-    //   rotatedFromId: tokenRecord.rotatedFromId
-    // });
-    return true;
-  }
-
-  return false;
-}
