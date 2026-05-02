@@ -19,7 +19,7 @@ export default function AdminLoginPage() {
         console.warn('Failed to persist admin secret', err);
       }
       setStatus('success');
-      window.location.href = `/admin/analytics?token=${encodeURIComponent(token)}`;
+      window.location.href = `/admin?token=${encodeURIComponent(token)}`;
     } catch {
       setStatus('error');
     }

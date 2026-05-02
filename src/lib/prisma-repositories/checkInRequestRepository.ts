@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger-enterprise';
-import type { CheckInRequest, CheckInRequestStatus } from '@prisma/client';
+import { CheckInRequestStatus } from '@prisma/client';
+import type { CheckInRequest } from '@prisma/client';
 import crypto from 'node:crypto';
 
 export type CheckInRequestRecord = {
@@ -25,6 +26,18 @@ type CreateCheckInRequestInput = {
   guestPhone?: string;
   requestedTime: string;
   message?: string;
+};
+
+type ListCheckInRequestParams = {
+  status?: CheckInRequestStatus;
+  limit?: number;
+};
+
+export type CheckInRequestStatusCounts = {
+  pending: number;
+  approved: number;
+  rejected: number;
+  total: number;
 };
 
 function mapRequest(request: CheckInRequest): CheckInRequestRecord {
@@ -70,6 +83,19 @@ async function create(input: CreateCheckInRequestInput): Promise<CheckInRequestR
   }
 }
 
+async function findById(id: string): Promise<CheckInRequestRecord | undefined> {
+  try {
+    const request = await prisma.checkInRequest.findUnique({
+      where: { id },
+    });
+
+    return request ? mapRequest(request) : undefined;
+  } catch (error) {
+    logger.error('checkInRequestRepository(prisma): findById failed', error);
+    throw error;
+  }
+}
+
 async function findLatestForGuest(params: { bookingId?: string; userId?: string }): Promise<CheckInRequestRecord | undefined> {
   try {
     if (!params.bookingId && !params.userId) return undefined;
@@ -91,21 +117,69 @@ async function findLatestForGuest(params: { bookingId?: string; userId?: string 
   }
 }
 
-async function getAll(): Promise<CheckInRequestRecord[]> {
+async function list(params: ListCheckInRequestParams = {}): Promise<CheckInRequestRecord[]> {
   try {
+    const limit = Math.min(Math.max(params.limit ?? 100, 1), 500);
     const requests = await prisma.checkInRequest.findMany({
+      where: params.status ? { status: params.status } : undefined,
       orderBy: { createdAt: 'desc' },
-      take: 100,
+      take: limit,
     });
     return requests.map(mapRequest);
   } catch (error) {
-    logger.error('checkInRequestRepository(prisma): getAll failed', error);
+    logger.error('checkInRequestRepository(prisma): list failed', error);
     throw error;
   }
 }
 
+async function updateStatus(id: string, status: CheckInRequestStatus): Promise<CheckInRequestRecord> {
+  try {
+    const request = await prisma.checkInRequest.update({
+      where: { id },
+      data: { status },
+    });
+
+    logger.info('Check-in request status updated', {
+      requestId: id,
+      status,
+    });
+    return mapRequest(request);
+  } catch (error) {
+    logger.error('checkInRequestRepository(prisma): updateStatus failed', error);
+    throw error;
+  }
+}
+
+async function getStatusCounts(): Promise<CheckInRequestStatusCounts> {
+  try {
+    const [pending, approved, rejected] = await prisma.$transaction([
+      prisma.checkInRequest.count({ where: { status: CheckInRequestStatus.PENDING } }),
+      prisma.checkInRequest.count({ where: { status: CheckInRequestStatus.APPROVED } }),
+      prisma.checkInRequest.count({ where: { status: CheckInRequestStatus.REJECTED } }),
+    ]);
+
+    return {
+      pending,
+      approved,
+      rejected,
+      total: pending + approved + rejected,
+    };
+  } catch (error) {
+    logger.error('checkInRequestRepository(prisma): getStatusCounts failed', error);
+    throw error;
+  }
+}
+
+async function getAll(): Promise<CheckInRequestRecord[]> {
+  return list();
+}
+
 export const checkInRequestRepository = {
   create,
+  findById,
   findLatestForGuest,
+  list,
+  updateStatus,
+  getStatusCounts,
   getAll,
 };

@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import internalFetch, { ADMIN_SECRET_STORAGE_KEY } from '@/lib/internalFetchClient'
@@ -256,12 +257,20 @@ export default function GuestDataViewer() {
                   {pendingArrivalRequests.length} pending request{pendingArrivalRequests.length === 1 ? '' : 's'}
                 </p>
               </div>
-              <button
-                onClick={fetchArrivalRequests}
-                className="px-4 py-2 rounded-full text-sm font-semibold surface-interactive"
-              >
-                Refresh
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href="/admin/requests"
+                  className="px-4 py-2 rounded-full text-sm font-semibold surface-interactive"
+                >
+                  Open inbox
+                </Link>
+                <button
+                  onClick={fetchArrivalRequests}
+                  className="px-4 py-2 rounded-full text-sm font-semibold surface-interactive"
+                >
+                  Refresh
+                </button>
+              </div>
             </div>
             <div className="grid gap-3">
               {arrivalRequests.slice(0, 6).map((request) => (

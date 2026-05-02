@@ -1,26 +1,14 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
-import internalFetch, { ADMIN_SECRET_STORAGE_KEY } from '@/lib/internalFetchClient';
+import internalFetch from '@/lib/internalFetchClient';
+import { clearStoredAdminSecret, persistAdminSecretFromUrl } from '@/lib/adminClientSession';
 
 // Polls remaining time and refreshes JWT 5 minutes before 2h expiry, provides logout button.
 export default function AdminSessionManager() {
   const [status, setStatus] = useState<'ok'|'refreshing'|'error'>('ok');
   const timerRef = useRef<number | undefined>(undefined);
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const token = params.get('token')?.trim();
-      if (token) {
-  window.sessionStorage?.setItem(ADMIN_SECRET_STORAGE_KEY, token);
-        params.delete('token');
-        const url = new URL(window.location.href);
-        url.search = params.toString();
-        window.history.replaceState({}, document.title, url.toString());
-      }
-    } catch (err) {
-      console.warn('AdminSessionManager failed to persist admin token', err);
-    }
+    persistAdminSecretFromUrl();
   }, []);
   useEffect(() => {
     function schedule() {
@@ -31,7 +19,7 @@ export default function AdminSessionManager() {
     async function doRefresh() {
       setStatus('refreshing');
       try {
-  const res = await internalFetch('/api/admin/refresh', { method: 'POST' });
+        const res = await internalFetch('/api/admin/refresh', { method: 'POST' });
         if (!res.ok) throw new Error('refresh failed');
         setStatus('ok');
       } catch {
@@ -44,17 +32,13 @@ export default function AdminSessionManager() {
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, []);
   async function logout() {
-  await internalFetch('/api/admin/logout', { method: 'POST' });
-    try {
-  window.sessionStorage?.removeItem(ADMIN_SECRET_STORAGE_KEY);
-    } catch {
-      // ignore
-    }
+    await internalFetch('/api/admin/logout', { method: 'POST' });
+    clearStoredAdminSecret();
     window.location.reload();
   }
   return (
     <>
-  <div className="fixed top-2 right-2 z-50 flex gap-2 items-center text-xs px-2 py-1 rounded shadow" style={{background:'var(--brand-700)', color:'var(--fg-inverse)'}}>
+      <div className="fixed top-2 right-2 z-50 flex gap-2 items-center text-xs px-2 py-1 rounded shadow" style={{background:'var(--brand-700)', color:'var(--fg-inverse)'}}>
         <span>Session: {status}</span>
         <button onClick={logout} className="bg-white/20 hover:bg-white/30 px-1 rounded">Logout</button>
       </div>

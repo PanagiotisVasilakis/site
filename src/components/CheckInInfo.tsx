@@ -363,6 +363,9 @@ export default function CheckInInfo({
     statusPending: isGreek ? 'Σε εκκρεμότητα' : 'Pending',
     statusApproved: isGreek ? 'Εγκρίθηκε' : 'Confirmed',
     statusRejected: isGreek ? 'Δεν είναι διαθέσιμο' : 'Unavailable',
+    statusPendingCopy: isGreek ? 'Το αίτημά σας έχει ληφθεί και αναμένει επιβεβαίωση.' : 'Your request has been received and is awaiting confirmation.',
+    statusApprovedCopy: isGreek ? 'Η ώρα άφιξης που ζητήσατε έχει επιβεβαιωθεί.' : 'Your requested arrival time has been confirmed.',
+    statusRejectedCopy: isGreek ? 'Η ώρα άφιξης που ζητήσατε δεν μπόρεσε να επιβεβαιωθεί. Ισχύει η κανονική ώρα άφιξης.' : 'Your requested arrival time could not be confirmed. The standard check-in time still applies.',
   };
 
   const ruleItems = [
@@ -594,7 +597,7 @@ export default function CheckInInfo({
       const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        setArrivalRequestError(data?.error?.message || ui.requestError);
+        setArrivalRequestError(res.status < 500 && data?.error?.message ? data.error.message : ui.requestError);
         return;
       }
 
@@ -614,6 +617,12 @@ export default function CheckInInfo({
     if (status === 'approved') return ui.statusApproved;
     if (status === 'rejected') return ui.statusRejected;
     return ui.statusPending;
+  };
+
+  const requestStatusDescription = (status: ArrivalRequestStatus) => {
+    if (status === 'approved') return ui.statusApprovedCopy;
+    if (status === 'rejected') return ui.statusRejectedCopy;
+    return ui.statusPendingCopy;
   };
 
   const wifiText = `${ui.network}: ${WIFI_NETWORK}\n${ui.password}: ${WIFI_PASSWORD}`;
@@ -813,6 +822,9 @@ export default function CheckInInfo({
                           </div>
                           <p className="mt-2 text-sm leading-6 text-[#617061] dark:text-[#C4D0C2]">
                             {ui.preferredArrivalTime}: <strong className="font-semibold text-[#25342B] dark:text-[#F3EBDD]">{arrivalRequest.requestedTime}</strong>
+                          </p>
+                          <p className="mt-2 text-sm leading-6 text-[#617061] dark:text-[#C4D0C2]">
+                            {requestStatusDescription(arrivalRequest.status)}
                           </p>
                         </div>
                       )}
