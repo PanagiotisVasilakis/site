@@ -1,20 +1,43 @@
 import React from 'react';
-import { render } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 // Mock next/navigation router hooks deterministically
 const replaceMock = vi.fn();
 const pushMock = vi.fn();
+const internalFetchMock = vi.hoisted(() => vi.fn());
 vi.mock('next/navigation', () => ({
   useParams: () => ({ locale: 'en' }),
   useRouter: () => ({ replace: replaceMock, push: pushMock }),
   useSearchParams: () => new URLSearchParams('mode=signin'),
 }));
 
+vi.mock('@/lib/internalFetchClient', () => ({
+  default: internalFetchMock,
+}));
+
 // Mock framer-motion to avoid animations affecting test timing
 vi.mock('framer-motion', () => ({
   AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  motion: { div: (props: any) => <div {...props} /> },
+  motion: {
+    div: (props: any) => {
+      const cleaned = { ...props };
+      delete cleaned.layout;
+      delete cleaned.animate;
+      delete cleaned.transition;
+      delete cleaned.variants;
+      delete cleaned.initial;
+      delete cleaned.exit;
+      return <div {...cleaned} />;
+    },
+    button: (props: any) => {
+      const cleaned = { ...props };
+      delete cleaned.initial;
+      delete cleaned.animate;
+      delete cleaned.transition;
+      return <button {...cleaned} />;
+    },
+  },
   useReducedMotion: () => true,
 }));
 
@@ -37,6 +60,12 @@ vi.mock('@/lib/tracker', () => ({
 import UnifiedGuestClient from '../app/[locale]/guest/UnifiedGuestClient';
 
 describe('UnifiedGuestClient', () => {
+  beforeEach(() => {
+    replaceMock.mockClear();
+    pushMock.mockClear();
+    internalFetchMock.mockReset();
+  });
+
   it('syncs tab mode with URL and updates when toggled', async () => {
     const user = userEvent.setup();
     render(<UnifiedGuestClient />);
@@ -61,5 +90,43 @@ describe('UnifiedGuestClient', () => {
     expect(signUpPanel.getAttribute('role')).toBe('tabpanel');
     expect(signUpPanel.getAttribute('aria-labelledby')).toBe('tab-signup');
     expect(replaceMock).toHaveBeenLastCalledWith('/en/guest?mode=signup', { scroll: false });
+  });
+
+  it('uses last-name signup wording and submits lastName without unused email data', async () => {
+    const user = userEvent.setup();
+    internalFetchMock.mockResolvedValue(new Response(JSON.stringify({
+      data: { redirect: '/en/check-in' },
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
+
+    render(<UnifiedGuestClient />);
+
+    await user.click(document.getElementById('tab-signup') as HTMLButtonElement);
+    await user.click(screen.getByRole('radio', { name: /world/i }));
+
+    expect(screen.getByText(/Last name/)).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText('123 456 7890'), '6900000002');
+    await user.type(screen.getByPlaceholderText('At least 8 characters'), 'new-password');
+    await user.type(screen.getByPlaceholderText('A12345678'), 'AB12345');
+    await user.type(screen.getByPlaceholderText('Doe'), 'Guest');
+    await user.click(screen.getByRole('button', { name: /continue/i }));
+
+    await waitFor(() => expect(internalFetchMock).toHaveBeenCalledWith('/api/portal/verify', expect.any(Object)));
+
+    const [, init] = internalFetchMock.mock.calls[0];
+    const body = JSON.parse(init.body as string);
+    expect(body).toMatchObject({
+      mode: 'signup',
+      origin: 'ABROAD',
+      phone: '+16900000002',
+      password: 'new-password',
+      passport: 'AB12345',
+      lastName: 'Guest',
+    });
+    expect(body).not.toHaveProperty('email');
+    expect(pushMock).toHaveBeenCalledWith('/en/check-in');
   });
 });

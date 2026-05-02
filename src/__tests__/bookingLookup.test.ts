@@ -1,6 +1,4 @@
 // Vitest globals are enabled; no named imports needed.
-import { bookingLookup } from '@/lib/bookingLookup';
-import { guestStore } from '@/lib/guestDataStore';
 
 function today(offsetDays = 0): string {
   const d = new Date();
@@ -16,6 +14,8 @@ describe.skipIf(!hasDbUrl)('Booking lookup service', () => {
   });
 
   it.skip('finds booking by reference + last name (case/spacing resilient)', async () => {
+    const { bookingLookup } = await import('@/lib/bookingLookup');
+    const { guestStore } = await import('@/lib/guestDataStore');
     const user = await guestStore.createUser({ phone_e164: '+306981234567', country_origin: 'GR' });
     const start = today(5); const end = today(10);
     const uniqueRef = 'ABC' + Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -29,6 +29,8 @@ describe.skipIf(!hasDbUrl)('Booking lookup service', () => {
   });
 
   it.skip('finds booking by phone + upcoming window', async () => {
+    const { bookingLookup } = await import('@/lib/bookingLookup');
+    const { guestStore } = await import('@/lib/guestDataStore');
     const uniquePhone = '+1' + Math.floor(Math.random() * 1e10).toString().padStart(10, '0');
     const user = await guestStore.createUser({ phone_e164: uniquePhone, country_origin: 'ABROAD' });
     const upcomingStart = today(1); const upcomingEnd = today(3);
@@ -41,6 +43,7 @@ describe.skipIf(!hasDbUrl)('Booking lookup service', () => {
   });
 
   it('returns null when nothing matches', async () => {
+    const { bookingLookup } = await import('@/lib/bookingLookup');
     const none1 = await bookingLookup.lookupByReference({ bookingRef: 'NOPE', lastName: 'Smith' });
     expect(none1).toBeNull();
     const none2 = await bookingLookup.lookupByPhone({ phone: '+999123' });

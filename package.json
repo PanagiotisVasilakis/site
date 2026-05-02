@@ -60,6 +60,7 @@
     "docker:security-test": "docker run --rm -v \"$PWD\":/app -w /app aquasec/trivy fs .",
     "validate:security": "tsx scripts/validate-security.ts",
     "query-guests": "tsx scripts/query-guests.ts",
+    "repair:booking-last-name-tokens": "tsx scripts/repair-booking-last-name-tokens.ts",
     "db:start": "bash ./scripts/system-orchestrator.sh bootstrap --profile development --db-only --skip-build --skip-migrate",
     "db:check": "bash ./scripts/system-orchestrator.sh bootstrap --profile development --db-only --skip-build --skip-migrate",
     "db:logs": "docker logs --follow site-dev-db",

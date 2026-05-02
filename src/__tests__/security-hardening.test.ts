@@ -16,6 +16,12 @@ function makeReq(url: string, init?: RequestInit & { cookies?: Record<string, st
 }
 
 describe('Security hardening regressions', () => {
+  afterEach(() => {
+    vi.doUnmock('@/lib/featureFlags');
+    vi.doUnmock('@/lib/guestDataStore');
+    vi.doUnmock('@/lib/prisma-repositories/checkInRequestRepository');
+  });
+
   it('requires auth to read check-in preferences', async () => {
     const { GET } = await import('@/app/api/check-in/preferences/route');
     const res = await GET(makeReq('/api/check-in/preferences') as any, { params: {} } as any);
@@ -44,6 +50,40 @@ describe('Security hardening regressions', () => {
     const { GET } = await import('@/app/api/metrics/route');
     const res = await GET(makeReq('/api/metrics') as any, { params: {} } as any);
     expect(res.status).toBe(403);
+  });
+
+  it('returns 404 from check-in APIs when check-in is disabled', async () => {
+    vi.resetModules();
+    vi.doMock('@/lib/featureFlags', () => ({
+      getFeatureFlags: () => ({ portalEnabled: true, checkinEnabled: false }),
+    }));
+    vi.doMock('@/lib/guestDataStore', () => ({
+      guestStore: {},
+    }));
+    vi.doMock('@/lib/prisma-repositories/checkInRequestRepository', () => ({
+      checkInRequestRepository: {},
+    }));
+
+    const preferences = await import('@/app/api/check-in/preferences/route');
+    const arrivalRequest = await import('@/app/api/check-in/arrival-request/route');
+    const complete = await import('@/app/api/check-in/complete/route');
+    const completeGet = await import('@/app/api/check-in/complete/get/route');
+
+    const preferenceRead = await preferences.GET(makeReq('/api/check-in/preferences') as any, { params: {} } as any);
+    expect(preferenceRead.status).toBe(404);
+
+    const arrivalRead = await arrivalRequest.GET(makeReq('/api/check-in/arrival-request') as any, { params: {} } as any);
+    expect(arrivalRead.status).toBe(404);
+
+    const completeWrite = await complete.POST(makeReq('/api/check-in/complete', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ arrivalTime: '15:00', acceptTerms: true }),
+    }) as any, { params: {} } as any);
+    expect(completeWrite.status).toBe(404);
+
+    const completionRead = await completeGet.GET(makeReq('/api/check-in/complete/get') as any, { params: {} } as any);
+    expect(completionRead.status).toBe(404);
   });
 
   it('fails closed when webhook token is not configured', async () => {

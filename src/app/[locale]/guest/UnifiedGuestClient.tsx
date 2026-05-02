@@ -30,10 +30,9 @@ export default function UnifiedGuestClient() {
   const [passport, setPassport] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState('');
   const [remember, setRemember] = useState(true);
   const [bookingRef, setBookingRef] = useState('');
-  const [fullName, setFullName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState<{ summary: string; details?: string[] } | null>(null);
   
@@ -76,7 +75,7 @@ export default function UnifiedGuestClient() {
       return phone.length > 0 && password.length >= 8;
     }
     // Sign-up: all fields required
-    if (!origin || !phone || !fullName || !password || password.length < 8) return false;
+    if (!origin || !phone || !lastName || !password || password.length < 8) return false;
     if (origin === 'GR' && !validateAfm(afm)) return false;
     if (origin === 'ABROAD' && !validatePassport(passport)) return false;
     return true;
@@ -147,12 +146,12 @@ export default function UnifiedGuestClient() {
 
     // Frontend validation with specific field guidance
     // Skip full name validation for sign-in mode
-    if (mode === 'signup' && (!fullName || fullName.trim().length === 0)) {
+    if (mode === 'signup' && (!lastName || lastName.trim().length === 0)) {
       setSubmitError({
-        summary: '❌ Problem with: Name - Surname',
+        summary: '❌ Problem with: Last name',
         details: [
           'This field is empty',
-          'Please enter your full name as it appears on your booking'
+          'Please enter your surname as it appears on your booking'
         ]
       });
       return;
@@ -265,7 +264,7 @@ export default function UnifiedGuestClient() {
         base.origin = origin === 'GR' ? 'GR' : 'ABROAD';
         if (origin === 'GR') base.afm = afm;
         if (origin === 'ABROAD') base.passport = passport;
-        base.lastName = fullName;
+        base.lastName = lastName;
         if (bookingRef) base.bookingRef = bookingRef;
       }
 
@@ -320,9 +319,9 @@ export default function UnifiedGuestClient() {
             }
             
             if (mapped.fields.lastName) {
-              summary = '❌ Problem with: Name - Surname';
+              summary = '❌ Problem with: Last name';
               fieldErrors.push('Error: ' + mapped.fields.lastName);
-              fieldErrors.push('Please enter your name as shown on your booking');
+              fieldErrors.push('Please enter your surname as shown on your booking');
             }
             
             if (mapped.fields.bookingRef) {
@@ -359,7 +358,7 @@ export default function UnifiedGuestClient() {
                 details = [
                   'Please check that all these fields are correct:',
                   '',
-                  '📝 Name - Surname: Must match your booking',
+                  '📝 Last name: Must match your booking',
                   '📱 Phone Number: Include +30 or just the 10 digits',
                   origin === 'GR' 
                     ? '🆔 AFM: All 9 digits of your tax number' 
@@ -376,7 +375,7 @@ export default function UnifiedGuestClient() {
                 details = [
                   'Please check that all these fields are correct:',
                   '',
-                  '📝 Name - Surname: Must match your booking',
+                  '📝 Last name: Must match your booking',
                   '📱 Phone Number: Include +30 or just the 10 digits',
                   origin === 'GR' 
                     ? '🆔 AFM: All 9 digits of your tax number' 
@@ -683,7 +682,7 @@ export default function UnifiedGuestClient() {
                           {mode === 'signup' && (
                             <div>
                               <label className="block text-sm mb-1" style={{ color: 'var(--fg-default)' }}>
-                                {locale === 'el' ? 'Όνομα - Επώνυμο' : 'Name - Surname'} *
+                                {locale === 'el' ? 'Επώνυμο' : 'Last name'} *
                               </label>
                               <input 
                                 className="w-full input" 
@@ -691,9 +690,9 @@ export default function UnifiedGuestClient() {
                                   color: 'var(--fg-default) !important',
                                   '--placeholder-color': 'var(--fg-muted)',
                                 } as React.CSSProperties}
-                                value={fullName} 
-                                onChange={e=>setFullName(e.target.value)} 
-                                placeholder={locale === 'el' ? 'Ιωάννης Παπαδόπουλος' : 'John Doe'}
+                                value={lastName} 
+                                onChange={e=>setLastName(e.target.value)} 
+                                placeholder={locale === 'el' ? 'Παπαδόπουλος' : 'Doe'}
                                 required 
                               />
                             </div>
@@ -724,7 +723,7 @@ export default function UnifiedGuestClient() {
                                     {locale === 'el' ? 'Πρόσθετες Πληροφορίες (Προαιρετικό)' : 'Additional Information (Optional)'}
                                   </span>
                                   <span className="text-xs opacity-50">
-                                    {isOptionalExpanded ? '' : (locale === 'el' ? '• Email, Αριθμός κράτησης' : '• Email, Booking reference')}
+                                    {isOptionalExpanded ? '' : (locale === 'el' ? '• Αριθμός κράτησης' : '• Booking reference')}
                                   </span>
                                 </div>
                                 
@@ -762,25 +761,6 @@ export default function UnifiedGuestClient() {
                                           initial={{ opacity: 0, x: -10 }}
                                           animate={{ opacity: 1, x: 0 }}
                                           transition={{ delay: 0.1, duration: 0.2 }}
-                                        >
-                                          <label className="block text-sm mb-1" style={{ color: 'var(--fg-default)' }}>Email (optional)</label>
-                                          <input 
-                                            className="w-full input" 
-                                            style={{ 
-                                              color: 'var(--fg-default) !important',
-                                              '--placeholder-color': 'var(--fg-muted)',
-                                            } as React.CSSProperties}
-                                            type="email" 
-                                            value={email} 
-                                            onChange={e=>setEmail(e.target.value)} 
-                                            placeholder="guest@example.com"
-                                          />
-                                        </motion.div>
-                                        
-                                        <motion.div
-                                          initial={{ opacity: 0, x: -10 }}
-                                          animate={{ opacity: 1, x: 0 }}
-                                          transition={{ delay: 0.2, duration: 0.2 }}
                                         >
                                           <label className="block text-sm mb-1" style={{ color: 'var(--fg-default)' }}>{dict.portal?.bookingRefLabel || 'Booking reference (optional)'}</label>
                                           <input 

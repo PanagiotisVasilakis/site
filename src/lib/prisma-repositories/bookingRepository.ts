@@ -77,19 +77,18 @@ async function create(params: Omit<BookingRecord, 'id' | 'created_at'>): Promise
 
 async function findByReferenceAndLastName(
   reference: string,
-  lastNameToken: string,
-  lastNameTokenNoWs: string,
+  lastNameTokenCandidates: string[],
 ): Promise<BookingRecord | undefined> {
   try {
+    if (lastNameTokenCandidates.length === 0) {
+      return undefined;
+    }
+
     const clauses = [] as { lastNameToken?: string; lastNameTokenNoWs?: string }[];
 
-    if (lastNameToken) {
-      clauses.push({ lastNameToken });
-      clauses.push({ lastNameTokenNoWs: lastNameToken });
-    }
-    if (lastNameTokenNoWs) {
-      clauses.push({ lastNameToken: lastNameTokenNoWs });
-      clauses.push({ lastNameTokenNoWs });
+    for (const token of lastNameTokenCandidates) {
+      clauses.push({ lastNameToken: token });
+      clauses.push({ lastNameTokenNoWs: token });
     }
 
     const booking = await prisma.booking.findFirst({

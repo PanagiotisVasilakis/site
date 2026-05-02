@@ -172,6 +172,108 @@ describe('guest auth and arrival request flows remain separate from admin', () =
     }));
   });
 
+  it('rejects sign-up without a password before touching account data', async () => {
+    const { POST } = await import('@/app/api/portal/verify/route');
+    const res = await POST(jsonPost('/api/portal/verify', {
+      mode: 'signup',
+      origin: 'ABROAD',
+      phone: '+306900000002',
+      passport: 'AB12345',
+      bookingRef: 'BOOK-2',
+      lastName: 'Guest',
+      remember: false,
+    }) as any, { params: Promise.resolve({}) } as any);
+
+    expect(res.status).toBe(422);
+    expect(guestStore.findUserByPhone).not.toHaveBeenCalled();
+    expect(guestStore.linkUserToBookingWithAccess).not.toHaveBeenCalled();
+  });
+
+  it('rejects existing sign-up accounts that do not have a password hash', async () => {
+    guestStore.findUserByPhone.mockResolvedValue({
+      id: USER_ID,
+      phone_e164: '+306900000002',
+      country_origin: 'ABROAD',
+    });
+
+    const { POST } = await import('@/app/api/portal/verify/route');
+    const res = await POST(jsonPost('/api/portal/verify', {
+      mode: 'signup',
+      origin: 'ABROAD',
+      phone: '+306900000002',
+      password: 'new-password',
+      passport: 'AB12345',
+      bookingRef: 'BOOK-2',
+      lastName: 'Guest',
+      remember: false,
+    }) as any, { params: Promise.resolve({}) } as any);
+
+    expect(res.status).toBe(401);
+    expect(guestStore.linkUserToBookingWithAccess).not.toHaveBeenCalled();
+  });
+
+  it('rejects existing sign-up accounts when the password is wrong', async () => {
+    guestStore.findUserByPhone.mockResolvedValue({
+      id: USER_ID,
+      phone_e164: '+306900000002',
+      password_hash: 'stored-password-hash',
+      country_origin: 'ABROAD',
+    });
+    bcryptCompare.mockResolvedValue(false);
+
+    const { POST } = await import('@/app/api/portal/verify/route');
+    const res = await POST(jsonPost('/api/portal/verify', {
+      mode: 'signup',
+      origin: 'ABROAD',
+      phone: '+306900000002',
+      password: 'wrong-password',
+      passport: 'AB12345',
+      bookingRef: 'BOOK-2',
+      lastName: 'Guest',
+      remember: false,
+    }) as any, { params: Promise.resolve({}) } as any);
+
+    expect(res.status).toBe(401);
+    expect(bcryptCompare).toHaveBeenCalledWith('wrong-password', 'stored-password-hash');
+    expect(guestStore.linkUserToBookingWithAccess).not.toHaveBeenCalled();
+  });
+
+  it('allows existing sign-up accounts only after password verification', async () => {
+    guestStore.findUserByPhone.mockResolvedValue({
+      id: USER_ID,
+      phone_e164: '+306900000002',
+      password_hash: 'stored-password-hash',
+      country_origin: 'ABROAD',
+    });
+    guestStore.linkUserToBookingWithAccess.mockResolvedValue({
+      booking: {
+        id: BOOKING_ID,
+        source: 'EXTERNAL',
+        reference: 'BOOK-2',
+      },
+    });
+    bcryptCompare.mockResolvedValue(true);
+
+    const { POST } = await import('@/app/api/portal/verify/route');
+    const res = await POST(jsonPost('/api/portal/verify', {
+      mode: 'signup',
+      origin: 'ABROAD',
+      phone: '+306900000002',
+      password: 'correct-password',
+      passport: 'AB12345',
+      bookingRef: 'BOOK-2',
+      lastName: 'Guest',
+      remember: false,
+    }) as any, { params: Promise.resolve({}) } as any);
+
+    expect(res.status).toBe(200);
+    expect(bcryptCompare).toHaveBeenCalledWith('correct-password', 'stored-password-hash');
+    expect(guestStore.linkUserToBookingWithAccess).toHaveBeenCalledWith(expect.objectContaining({
+      userId: USER_ID,
+      lastName: 'Guest',
+    }));
+  });
+
   it('keeps guest arrival request creation on guest_session auth only', async () => {
     const token = signGuestSession({
       user: { id: USER_ID },

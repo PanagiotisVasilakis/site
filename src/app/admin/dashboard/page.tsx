@@ -6,6 +6,8 @@
 import React from 'react';
 import ObservabilityDashboard from '@/components/ObservabilityDashboard';
 import { Metadata } from 'next';
+import AdminSessionManager from '@/components/AdminSessionManager';
+import { requireAdminPageSession } from '@/lib/adminPageAuth';
 
 export const metadata: Metadata = {
   title: 'Admin Dashboard | Monitoring & Observability',
@@ -13,9 +15,14 @@ export const metadata: Metadata = {
   robots: 'noindex, nofollow', // Don't index admin pages
 };
 
-export default function AdminDashboardPage() {
+export const dynamic = 'force-dynamic';
+
+export default async function AdminDashboardPage() {
+  await requireAdminPageSession();
+
   return (
     <div className="min-h-screen">
+      <AdminSessionManager />
       <ObservabilityDashboard 
         refreshInterval={30000} // 30 seconds
         autoRefresh={true}

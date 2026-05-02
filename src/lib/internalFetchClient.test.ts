@@ -9,6 +9,7 @@ describe('internalFetch', () => {
   let debugSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    window.sessionStorage.clear();
     errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => { });
     warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => { });
     debugSpy = vi.spyOn(logger, 'debug').mockImplementation(() => { });
@@ -47,5 +48,27 @@ describe('internalFetch', () => {
     global.fetch = vi.fn().mockRejectedValue(netErr as any);
     await expect(internalFetch('/api/test')).rejects.toBe(netErr);
     expect(errorSpy).toHaveBeenCalled();
+  });
+
+  it('attaches stored admin secret to known admin-protected API paths', async () => {
+    window.sessionStorage.setItem('admin_secret', 'stored-admin-secret');
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: 'OK', url: '/api/metrics', headers: new Map() } as any);
+
+    await internalFetch('/api/metrics?timeRange=1000');
+
+    const [, init] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const headers = new Headers(init?.headers as HeadersInit);
+    expect(headers.get('x-admin-secret')).toBe('stored-admin-secret');
+  });
+
+  it('does not attach admin secret to alert webhook submissions', async () => {
+    window.sessionStorage.setItem('admin_secret', 'stored-admin-secret');
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: 'OK', url: '/api/alerts/webhook', headers: new Map() } as any);
+
+    await internalFetch('/api/alerts/webhook');
+
+    const [, init] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const headers = new Headers(init?.headers as HeadersInit);
+    expect(headers.get('x-admin-secret')).toBeNull();
   });
 });

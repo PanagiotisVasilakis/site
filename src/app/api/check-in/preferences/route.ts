@@ -7,6 +7,7 @@ import path from 'node:path';
 import { encryptJSON, decryptJSON } from '@/lib/crypto';
 import { hasVerifiedBookingSession, parseGuestSession } from '@/lib/guestSession';
 import { isAdminRequest } from '@/lib/rbac';
+import { getFeatureFlags } from '@/lib/featureFlags';
 
 const preferencesSchema = z.object({
   checkInTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Check-in time must be in HH:MM format'),
@@ -51,6 +52,11 @@ export const dynamic = 'force-dynamic';
 
 // GET: Retrieve current preferences
 export const GET = withErrorHandler(async (request: NextRequest) => {
+  const flags = getFeatureFlags();
+  if (!flags.checkinEnabled) {
+    throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
+  }
+
   const adminAccess = isAdminRequest(request);
   const guestSession = parseGuestSession(request.cookies.get('guest_session')?.value);
   const guestAccess = hasVerifiedBookingSession(guestSession);
@@ -65,6 +71,11 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
 
 // POST: Update preferences (admin-only)
 export const POST = withErrorHandler(async (request: NextRequest) => {
+  const flags = getFeatureFlags();
+  if (!flags.checkinEnabled) {
+    throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
+  }
+
   // Basic security checks only (content type, XSS/SQLi)
   const guard = createAPISecurityMiddleware();
   const early = guard(request);

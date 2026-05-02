@@ -52,7 +52,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
             type: 'text',
             requiredWhen: { origin: 'GR' },
             pattern: '^\\d{9}$',
-            help: 'Greek Tax ID (9 digits) – checksum validated on server',
+            help: 'Greek Tax ID (9 digits).',
           },
           {
             name: 'passport',
@@ -60,6 +60,12 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
             requiredWhen: { origin: 'ABROAD' },
             pattern: '^[A-Za-z0-9]{5,20}$',
             help: 'Passport number (letters/numbers only, 5–20 chars).',
+          },
+          {
+            name: 'password',
+            type: 'password',
+            required: true,
+            help: 'Required for sign up and future sign in.',
           },
           {
             name: 'bookingRef',
@@ -70,8 +76,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
           {
             name: 'lastName',
             type: 'text',
-            required: false,
-            help: 'Optional last name for booking lookup.',
+            required: true,
+            help: 'Surname as it appears on the booking.',
           },
           {
             name: 'remember',

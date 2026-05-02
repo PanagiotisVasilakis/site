@@ -1,5 +1,4 @@
 import { NextRequest } from 'next/server';
-import crypto from 'node:crypto';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode, ValidationError } from '@/lib/apiErrorHandler';
@@ -28,9 +27,9 @@ const baseSignUpSchema = z.object({
   mode: z.literal('signup'),
   origin: originEnum,
   phone: phoneE164,
-  password: passwordSchema.optional(),
+  password: passwordSchema,
   bookingRef: z.string().trim().min(3).max(64).optional(),
-  lastName: z.string().trim().min(1).max(100).optional(),
+  lastName: z.string().trim().min(1).max(100),
   remember: z.boolean().optional(),
 });
 
@@ -135,23 +134,17 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   if (!user) {
     const saltRounds = 10;
-    const passwordToStore = body.password ?? crypto.randomBytes(12).toString('base64url');
-    const password_hash = await bcrypt.hash(passwordToStore, saltRounds);
+    const password_hash = await bcrypt.hash(body.password, saltRounds);
     user = await guestStore.createUser({
       phone_e164: body.phone,
       country_origin: body.origin,
       password_hash,
     });
   } else if (!user.password_hash) {
-    const saltRounds = 10;
-    const passwordToStore = body.password ?? crypto.randomBytes(12).toString('base64url');
-    const password_hash = await bcrypt.hash(passwordToStore, saltRounds);
-    const updatedUser = await guestStore.updateUserPassword(user.id, password_hash);
-    if (!updatedUser) {
-      throw new ApiError(ApiErrorCode.INTERNAL_ERROR, 'Unable to update user password');
-    }
-    user = updatedUser;
-  } else if (body.password) {
+    throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Existing account requires password verification', {
+      fields: { password: 'This phone number is already linked to an account without password sign-in. Please contact support.' }
+    });
+  } else {
     const matches = await bcrypt.compare(body.password, user.password_hash);
     if (!matches) {
       throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Incorrect password for existing account', {

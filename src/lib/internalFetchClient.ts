@@ -6,6 +6,27 @@ const CORRELATION_STORAGE_KEY = 'correlation_id';
 
 export const ADMIN_SECRET_STORAGE_KEY = 'admin_secret';
 
+const ADMIN_SECRET_EXACT_PATHS = new Set([
+  '/api/alerts',
+  '/api/check-in/preferences',
+  '/api/metrics',
+  '/api/security/dashboard',
+]);
+
+function getRequestPath(input: string): string {
+  try {
+    const base = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+    return new URL(input, base).pathname;
+  } catch {
+    return input.split('?')[0] || input;
+  }
+}
+
+function shouldAttachAdminSecret(input: string): boolean {
+  const path = getRequestPath(input);
+  return path.startsWith('/api/admin/') || ADMIN_SECRET_EXACT_PATHS.has(path);
+}
+
 /**
  * Get correlation ID from server-side logger context if available
  * Falls back to undefined in browser context
@@ -81,7 +102,7 @@ function buildHeaders(init?: RequestInit, adminSecret?: string): HeadersInit | u
 }
 
 async function internalFetch(input: string, init?: RequestInit) {
-  const isAdminAPI = typeof input === 'string' && input.startsWith('/api/admin/');
+  const isAdminAPI = typeof input === 'string' && shouldAttachAdminSecret(input);
   const adminSecret = isAdminAPI ? getAdminSecret() : null;
   const finalInit: RequestInit = { ...init };
 

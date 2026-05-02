@@ -4,7 +4,8 @@ import { userRepository, type UserRecord } from '@/lib/prisma-repositories/userR
 import { identityRepository, type IdentityRecord } from '@/lib/prisma-repositories/identityRepository';
 import { bookingRepository, type BookingRecord } from '@/lib/prisma-repositories/bookingRepository';
 import { refreshTokenRepository, type GuestRefreshTokenRec as PrismaGuestRefreshTokenRec } from '@/lib/prisma-repositories/refreshTokenRepository';
-import { hashSensitive, maskLast4, hmacDeterministic } from '@/lib/crypto';
+import { hashSensitive, maskLast4 } from '@/lib/crypto';
+import { buildBookingLastNameTokenSearchValues, createBookingLastNameTokens } from '@/lib/bookingLastNameTokens';
 import { logger } from '@/lib/logger-enterprise';
 import { prisma } from '@/lib/prisma';
 import { guestDataCache } from '@/lib/guestDataCache';
@@ -83,15 +84,12 @@ export const guestStore = {
     try {
       // Check if booking already exists
       if (params.reference) {
-        const lnLower = params.last_name?.toLowerCase() || '';
-        const lnNowhitespace = lnLower.replace(/\s+/g, '');
-        const tokenLower = lnLower ? hmacDeterministic(lnLower) : '';
-        const tokenNoWs = lnNowhitespace ? hmacDeterministic(lnNowhitespace) : '';
-        
+        const tokenCandidates = params.last_name
+          ? buildBookingLastNameTokenSearchValues(params.last_name)
+          : [];
         const existing = await bookingRepository.findByReferenceAndLastName(
           params.reference,
-          tokenLower,
-          tokenNoWs
+          tokenCandidates
         );
         if (existing) return existing;
       }
@@ -105,8 +103,7 @@ export const guestStore = {
         last_name_salt = r.salt;
       }
       
-      const lnLower = params.last_name?.toLowerCase();
-      const lnNowhitespace = lnLower?.replace(/\s+/g, '');
+      const lookupTokens = params.last_name ? createBookingLastNameTokens(params.last_name) : undefined;
       
       const booking = await bookingRepository.create({
         source: params.source,
@@ -116,8 +113,8 @@ export const guestStore = {
         user_id: params.user_id,
         last_name_hash,
         last_name_salt,
-        last_name_token: lnLower ? hmacDeterministic(lnLower) : undefined,
-        last_name_token_nows: lnNowhitespace ? hmacDeterministic(lnNowhitespace) : undefined
+        last_name_token: lookupTokens?.lastNameToken,
+        last_name_token_nows: lookupTokens?.lastNameTokenNoWs
       });
       guestDataCache.invalidate(['bookings']);
       return booking;
@@ -129,16 +126,12 @@ export const guestStore = {
   
   async findBookingByReferenceAndLastName(reference: string, lastName: string): Promise<Booking | undefined> {
     try {
-      const ln = lastName.toLowerCase();
-      const lnNows = ln.replace(/\s+/g, '');
-      const tokenLower = hmacDeterministic(ln);
-      const tokenNoWs = hmacDeterministic(lnNows);
+      const tokenCandidates = buildBookingLastNameTokenSearchValues(lastName);
       
       // Accept matches where either stored token equals either input token variant
       return await bookingRepository.findByReferenceAndLastName(
         reference,
-        tokenLower,
-        tokenNoWs
+        tokenCandidates
       );
     } catch (error) {
       logger.error('guestStore: failed to find booking by reference and last name', error);
@@ -401,14 +394,14 @@ export const guestStore = {
         
         if (params.bookingRef && params.lastName) {
           // Search by reference - use same logic as repositories
-          const lastNameLower = params.lastName.toLowerCase();
+          const tokenCandidates = buildBookingLastNameTokenSearchValues(params.lastName);
           bookingDb = await tx.booking.findFirst({
             where: {
               reference: params.bookingRef,
-              OR: [
-                { lastNameToken: lastNameLower },
-                { lastNameTokenNoWs: lastNameLower.replace(/\s+/g, '') },
-              ],
+              OR: tokenCandidates.flatMap((token) => [
+                { lastNameToken: token },
+                { lastNameTokenNoWs: token },
+              ]),
             },
           });
         }
@@ -416,7 +409,7 @@ export const guestStore = {
         if (!bookingDb) {
           // PostgreSQL UUID column requires pure UUID format (no prefix)
           const id = crypto.randomUUID();
-          const lastNameLower = params.lastName?.toLowerCase();
+          const lookupTokens = params.lastName ? createBookingLastNameTokens(params.lastName) : undefined;
           const lastNameHashed = params.lastName ? hashSensitive(params.lastName) : null;
           bookingDb = await tx.booking.create({
             data: {
@@ -425,8 +418,8 @@ export const guestStore = {
               reference: params.bookingRef ?? null,
               lastNameHash: lastNameHashed?.hash ?? null,
               lastNameSalt: lastNameHashed?.salt ?? null,
-              lastNameToken: lastNameLower ?? null,
-              lastNameTokenNoWs: lastNameLower?.replace(/\s+/g, '') ?? null,
+              lastNameToken: lookupTokens?.lastNameToken ?? null,
+              lastNameTokenNoWs: lookupTokens?.lastNameTokenNoWs ?? null,
               startDate: new Date(params.startDate),
               endDate: new Date(params.endDate),
               userId: params.userId,
@@ -541,14 +534,14 @@ export const guestStore = {
         }
 
         if (!bookingDb && params.booking.reference && params.booking.lastName) {
-          const lastNameLower = params.booking.lastName.toLowerCase();
+          const tokenCandidates = buildBookingLastNameTokenSearchValues(params.booking.lastName);
           bookingDb = await tx.booking.findFirst({
             where: {
               reference: params.booking.reference,
-              OR: [
-                { lastNameToken: lastNameLower },
-                { lastNameTokenNoWs: lastNameLower.replace(/\s+/g, '') },
-              ],
+              OR: tokenCandidates.flatMap((token) => [
+                { lastNameToken: token },
+                { lastNameTokenNoWs: token },
+              ]),
             },
           });
         }
@@ -556,7 +549,7 @@ export const guestStore = {
         if (!bookingDb) {
           // PostgreSQL UUID column requires pure UUID format (no prefix)
           const id = crypto.randomUUID();
-          const lastNameLower = params.booking.lastName?.toLowerCase();
+          const lookupTokens = params.booking.lastName ? createBookingLastNameTokens(params.booking.lastName) : undefined;
           const lastNameHashed = params.booking.lastName ? hashSensitive(params.booking.lastName) : null;
           bookingDb = await tx.booking.create({
             data: {
@@ -565,8 +558,8 @@ export const guestStore = {
               reference: params.booking.reference ?? null,
               lastNameHash: lastNameHashed?.hash ?? null,
               lastNameSalt: lastNameHashed?.salt ?? null,
-              lastNameToken: lastNameLower ?? null,
-              lastNameTokenNoWs: lastNameLower?.replace(/\s+/g, '') ?? null,
+              lastNameToken: lookupTokens?.lastNameToken ?? null,
+              lastNameTokenNoWs: lookupTokens?.lastNameTokenNoWs ?? null,
               startDate: new Date(params.booking.startDate),
               endDate: new Date(params.booking.endDate),
               userId: userDb.id,

@@ -6,6 +6,7 @@ import { parseGuestSession, hasVerifiedBookingSession, type GuestSessionPayload 
 import { guestStore } from '@/lib/guestDataStore';
 import { checkInRequestRepository, type CheckInRequestRecord } from '@/lib/prisma-repositories/checkInRequestRepository';
 import { logger } from '@/lib/logger-enterprise';
+import { getFeatureFlags } from '@/lib/featureFlags';
 
 const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -88,6 +89,11 @@ async function notifyHost(payload: {
 }
 
 export const GET = withErrorHandler(async (request: NextRequest) => {
+  const flags = getFeatureFlags();
+  if (!flags.checkinEnabled) {
+    throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
+  }
+
   const session = getVerifiedSession(request);
   const latest = await checkInRequestRepository.findLatestForGuest({
     bookingId: safeUuid(session.booking?.id),
@@ -99,6 +105,11 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
 });
 
 export const POST = withErrorHandler(async (request: NextRequest) => {
+  const flags = getFeatureFlags();
+  if (!flags.checkinEnabled) {
+    throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
+  }
+
   const guard = createAPISecurityMiddleware();
   const early = guard(request);
   if (early) return early;
