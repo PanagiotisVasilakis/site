@@ -1,0 +1,577 @@
+.custom-day-picker {
+  --rdp-accent-color: var(--brand-600);
+  --rdp-background-color: var(--brand-100);
+}
+
+.custom-day-picker .rdp-months {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: nowrap;
+  /* keep months on one row */
+  justify-content: center;
+}
+
+.custom-day-picker .rdp-month {
+  flex: 0 0 auto;
+  min-width: 16.5rem;
+  /* ensure 7 columns fit in default sizing */
+  padding: 0;
+  /* remove side padding so caption aligns with grid */
+  margin: 0;
+  /* rely on .rdp-months gap for spacing */
+  display: grid;
+  /* center caption and table on the same axis */
+  justify-content: center;
+}
+
+.custom-day-picker .rdp-day {
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  font-size: 0.85rem;
+  min-width: 2.25rem;
+  height: 2.25rem;
+  font-weight: 500;
+  margin: 0 !important;
+  /* eliminate any inter-cell gaps from margins */
+}
+
+.custom-day-picker .rdp-day:hover:not([disabled]) {
+  background-color: var(--brand-50);
+  color: var(--brand-800);
+}
+
+.custom-day-picker .rdp-day_selected {
+  background-color: var(--brand-600) !important;
+  color: white !important;
+  font-weight: 600;
+}
+
+.custom-day-picker .rdp-day_range_middle {
+  background-color: var(--brand-100) !important;
+  color: var(--brand-900) !important;
+}
+
+.custom-day-picker .rdp-day_today:not(.rdp-day_selected) {
+  background-color: var(--layer-surface-alt);
+  font-weight: 600;
+  border: 1px solid var(--brand-300);
+}
+
+.custom-day-picker .rdp-day[disabled] {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.custom-day-picker .rdp-caption_label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-accent);
+  text-align: center;
+  display: inline-block;
+  /* shrink to content */
+  width: auto;
+  margin: 0 auto;
+  pointer-events: none;
+  /* ensure nav/buttons remain clickable */
+}
+
+/* Ensure caption container supports absolute-centered label */
+.custom-day-picker .rdp-caption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  min-height: 1.75rem;
+  /* reserve height for label and buttons */
+  padding: 0;
+  /* eliminate side padding that offsets center */
+  margin: 0 0 0.25rem;
+  /* slightly tighter gap below caption */
+  justify-self: center;
+  /* center relative to dates grid */
+}
+
+/* Center the dates table as well so its center aligns with caption */
+.custom-day-picker .rdp-table {
+  justify-self: center;
+  border-collapse: collapse !important;
+  /* remove space between rows/cols */
+  border-spacing: 0 !important;
+}
+
+/* Tighten default variant cell padding (rows/columns gaps) */
+.custom-day-picker .rdp-head_cell,
+.custom-day-picker .rdp-cell {
+  padding: 0 !important;
+  /* minimal gaps between rows/columns */
+}
+
+.custom-day-picker .rdp-nav_button {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 6px;
+  transition: background-color 0.15s ease;
+}
+
+.custom-day-picker .rdp-nav_button:hover {
+  background-color: var(--brand-100);
+}
+
+/* Streamlined variant for desktop popover */
+.custom-day-picker.streamlined {
+  --rdp-day-size: 2rem;
+}
+
+.custom-day-picker.streamlined .rdp-months {
+  gap: 1rem;
+  position: relative;
+  display: flex;
+  flex-wrap: nowrap;
+  /* force side-by-side */
+  justify-content: center;
+}
+
+.custom-day-picker.streamlined .rdp-month {
+  flex: 0 0 auto;
+  min-width: calc(var(--rdp-day-size) * 7 + 2.75rem);
+  /* 7 days + header/gutters */
+  padding: 0;
+  /* remove side padding so caption aligns with grid */
+  margin: 0;
+  /* rely on .rdp-months gap for spacing */
+  display: grid;
+  /* center caption and table on the same axis */
+  justify-content: center;
+}
+
+.custom-day-picker.streamlined .rdp-day {
+  min-width: var(--rdp-day-size);
+  height: var(--rdp-day-size);
+  font-size: 0.8rem;
+}
+
+.custom-day-picker.streamlined .rdp-caption_label {
+  font-size: 0.875rem;
+  text-align: center;
+  display: inline-block;
+  /* shrink to content */
+  width: auto;
+  margin: 0 auto;
+  pointer-events: none;
+  /* ensure nav/buttons remain clickable */
+}
+
+.custom-day-picker.streamlined .rdp-table {
+  margin: 0;
+  justify-self: center;
+}
+
+/* Streamlined caption styling to match regular variant */
+.custom-day-picker.streamlined .rdp-caption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  min-height: 1.75rem;
+  /* reserve height for label and buttons */
+  padding: 0;
+  /* eliminate side padding that offsets center */
+  margin: 0 0 0.25rem;
+  /* slightly tighter gap below caption */
+  justify-self: center;
+  /* center relative to dates grid */
+}
+
+/* Hide default navigation on streamlined desktop layout (custom React buttons are used) */
+.custom-day-picker.streamlined .rdp-nav {
+  display: none;
+}
+
+/* Remove outer day padding on streamlined */
+.custom-day-picker.streamlined .rdp-head_cell,
+.custom-day-picker.streamlined .rdp-cell {
+  padding: 0 !important;
+  /* minimal gap between rows/columns */
+}
+
+/* Remove default table spacing to tighten grid further */
+.custom-day-picker.streamlined .rdp-table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+/* Compact variant for small screens */
+.custom-day-picker.compact {
+  --rdp-day-size: 1.75rem;
+}
+
+.custom-day-picker.compact .rdp-day {
+  min-width: 1.75rem;
+  height: 1.75rem;
+  font-size: 0.75rem;
+}
+
+.custom-day-picker.compact .rdp-caption_label {
+  font-size: 0.8rem;
+}
+
+.custom-day-picker.compact .rdp-nav_button {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+/* Dark theme overrides */
+[data-theme="dark"] .custom-day-picker {
+  --rdp-accent-color: var(--brand-400);
+  --rdp-background-color: var(--brand-900);
+}
+
+[data-theme="dark"] .custom-day-picker .rdp-day_selected {
+  background-color: var(--brand-400) !important;
+  color: var(--brand-900) !important;
+}
+
+[data-theme="dark"] .custom-day-picker .rdp-day_range_middle {
+  background-color: var(--brand-800) !important;
+  color: var(--brand-200) !important;
+}
+
+[data-theme="dark"] .custom-day-picker .rdp-day:hover:not([disabled]) {
+  background-color: var(--brand-900);
+  color: var(--brand-200);
+}
+
+/* Dark mode styles for date picker popover */
+[data-theme="dark"] .date-picker-popover {
+  background: var(--layer-surface);
+  border-color: var(--border-soft);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .date-picker-popover .date-picker-arrow {
+  background: var(--layer-surface);
+  border-color: var(--border-soft);
+}
+
+/* Dark mode text colors for date picker */
+[data-theme="dark"] .date-picker-popover button[class*="text-gray"] {
+  color: var(--fg-muted);
+}
+
+[data-theme="dark"] .date-picker-popover button[class*="hover:text-gray"]:hover {
+  color: var(--fg-default);
+}
+
+[data-theme="dark"] .date-picker-popover .text-gray-600 {
+  color: var(--fg-muted);
+}
+
+[data-theme="dark"] .date-picker-popover .text-brand-800 {
+  color: var(--brand-200);
+}
+
+/* Dark mode colors for day picker buttons */
+[data-theme="dark"] .custom-day-picker .rdp-day {
+  color: var(--fg-default);
+}
+
+[data-theme="dark"] .custom-day-picker .rdp-day_today:not(.rdp-day_selected) {
+  background-color: var(--layer-surface-alt);
+  color: var(--fg-default);
+}
+
+/* Dark mode styles for navigation buttons */
+[data-theme="dark"] .date-picker-popover button[class*="text-gray"] {
+  color: var(--fg-muted);
+}
+
+[data-theme="dark"] .date-picker-popover button[class*="hover:text-gray"]:hover {
+  color: var(--fg-default);
+}
+
+[data-theme="dark"] .date-picker-popover button[class*="hover:bg-gray-50"]:hover {
+  background-color: var(--layer-surface-alt);
+}
+
+[data-theme="dark"] .date-picker-popover button[class*="border-gray-200"] {
+  border-color: var(--border-soft);
+}
+
+/* Responsive calendar styles for all screen sizes */
+@media (max-width: 640px) {
+
+  /* Mobile: single month, standard nav buttons */
+  .custom-day-picker:not(.streamlined) .rdp-months {
+    flex-direction: column;
+  }
+
+  .custom-day-picker:not(.streamlined) .rdp-month {
+    min-width: auto;
+    width: 100%;
+  }
+
+  .custom-day-picker .rdp-day {
+    min-width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .custom-day-picker .rdp-months {
+    gap: 1rem;
+  }
+}
+
+/* End of React Day Picker customizations */
+
+/* Leaflet overrides to match theme */
+.leaflet-container {
+  font-family: var(--font-sans);
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-soft);
+}
+
+.leaflet-popup-content {
+  margin: 0;
+  padding: 0;
+}
+
+.leaflet-bar a,
+.leaflet-control-zoom a {
+  background: var(--layer-surface, #fff);
+  color: var(--text-accent);
+  border: 1px solid var(--border-soft);
+  transition: background 120ms ease;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .leaflet-bar a,
+  .leaflet-control-zoom a {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    line-height: 44px !important;
+  }
+}
+
+.leaflet-bar a:hover,
+.leaflet-control-zoom a:hover {
+  background: var(--layer-surface-alt, #f6f6f6);
+}
+
+[data-theme="dark"] .leaflet-popup-content-wrapper {
+  background: var(--layer-surface);
+  border-color: var(--border-soft);
+}
+
+[data-theme="dark"] .leaflet-bar a,
+[data-theme="dark"] .leaflet-control-zoom a {
+  background: var(--layer-surface);
+  color: var(--fg-default);
+  border-color: var(--border-soft);
+}
+
+[data-theme="dark"] .leaflet-bar a:hover,
+[data-theme="dark"] .leaflet-control-zoom a:hover {
+  background: var(--layer-surface-alt);
+}
+
+.leaflet-container-custom .lmk,
+.leaflet-origin-marker .lmk {
+  display: flex;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--accent-500);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+}
+
+.leaflet-container-custom .lmk[data-type='restaurant'] {
+  background: #d85a3f;
+}
+
+.leaflet-container-custom .lmk[data-type='service'],
+.leaflet-container-custom .lmk[data-type='police'] {
+  background: var(--brand-600);
+}
+
+.leaflet-container-custom .lmk[data-type='attraction'],
+.leaflet-container-custom .lmk[data-type='sightseeing'] {
+  background: #0b998b;
+}
+
+.leaflet-container-custom .lmk[data-type='park'] {
+  background: #237f75;
+}
+
+.leaflet-container-custom .lmk[data-type='apartment'],
+.leaflet-origin-marker .lmk {
+  background: #f59e0b;
+}
+
+.leaflet-container-custom .lmk.marker-pop,
+.marker-pop.leaflet-marker-icon,
+.marker-pop .lmk {
+  animation: marker-pop 420ms ease;
+}
+
+@keyframes marker-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+
+  60% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+.map-control-button {
+  display: flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-soft);
+  background: var(--layer-surface, #fff);
+  color: var(--text-accent);
+  cursor: pointer;
+}
+
+.map-popup {
+  min-width: 220px;
+  max-width: 270px;
+  padding: 12px;
+  color: var(--fg-default);
+}
+
+.map-popup h3 {
+  margin: 0 0 6px;
+  color: var(--fg-default);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.map-popup p {
+  margin: 0 0 8px;
+  color: var(--fg-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.map-popup-row {
+  display: grid;
+  gap: 2px;
+  margin-top: 7px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.map-popup-row strong {
+  color: var(--text-accent);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.map-popup-contacts {
+  display: grid;
+  gap: 2px;
+}
+
+.map-popup-contact,
+.map-popup-link {
+  color: var(--brand-800);
+  text-decoration: none;
+}
+
+.map-popup-price {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.map-popup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.map-popup-link {
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: var(--layer-surface-alt);
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.map-popup-travel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 10px 12px 12px;
+  color: var(--fg-muted);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.map-popup-travel.muted {
+  display: block;
+}
+
+.map-popup-travel-note {
+  display: block;
+  width: 100%;
+  margin-top: 2px;
+  opacity: 0.58;
+}
+
+.map-popup-travel .spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.marker-cluster-small,
+.marker-cluster-medium,
+.marker-cluster-large {
+  background: rgba(54, 185, 171, 0.85);
+}
+
+.marker-cluster div {
+  background: #fff;
+  color: #222;
+  font-weight: 600;
+}
+
+[data-theme='dark'] .leaflet-container-custom .lmk,
+[data-theme='dark'] .leaflet-origin-marker .lmk {
+  border-color: #111;
+}
+
+[data-theme='dark'] .leaflet-tile {
+  filter: brightness(0.78) contrast(1.05) saturate(0.85);
+}

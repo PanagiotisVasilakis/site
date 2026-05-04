@@ -45,6 +45,7 @@ export const ItemSchema = z.object({
   priceLevel: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]).optional(),
   rating: z.number().min(0).max(5).optional(),
   tags: z.array(z.string()).optional(),
+  icon: z.string().optional(),
   image: z.string().optional(),
   heroImage: z.string().optional(),
   heroImagePosition: z.string().optional(),

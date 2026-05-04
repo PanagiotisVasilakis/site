@@ -1,0 +1,525 @@
+.search-bar {
+  --seg-gap: 1px;
+  display: flex;
+  align-items: stretch;
+  background: white;
+  border-radius: 1000px;
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  position: relative;
+}
+
+/* Booking bar for single property */
+.booking-bar {
+  --seg-gap: 1px;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0;
+  background: white;
+  border-radius: 16px;
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  position: relative;
+  max-width: min(100%, 950px);
+  margin: 0 auto;
+  container-type: inline-size;
+}
+
+[data-theme="dark"] .search-bar {
+  background: linear-gradient(135deg, rgba(23, 35, 37, 0.85) 0%, rgba(17, 25, 26, 0.9) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 60px rgba(18, 179, 164, 0.08) inset;
+}
+
+[data-theme="dark"] .booking-bar {
+  background: linear-gradient(135deg, rgba(23, 35, 37, 0.85) 0%, rgba(17, 25, 26, 0.9) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 60px rgba(18, 179, 164, 0.08) inset;
+}
+
+/* Filter bar for Moments page - matches booking bar aesthetic */
+.filter-bar {
+  display: flex;
+  background: white;
+  border-radius: 1000px;
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  position: relative;
+  max-width: min(100%, 850px);
+  margin: 0 auto;
+  padding: 0.35rem;
+  /* Padding for the scroll container inside */
+}
+
+[data-theme="dark"] .filter-bar {
+  background: linear-gradient(135deg, rgba(23, 35, 37, 0.85) 0%, rgba(17, 25, 26, 0.9) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 60px rgba(18, 179, 164, 0.08) inset;
+}
+
+.search-bar:focus-within {
+  box-shadow: var(--shadow-glow);
+}
+
+.booking-bar:focus-within {
+  box-shadow: var(--shadow-glow);
+}
+
+.search-seg {
+  position: relative;
+  padding: 0.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1 1 9rem;
+  min-width: 0;
+}
+
+.search-seg:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 12%;
+  right: 0;
+  height: 76%;
+  width: 1px;
+  background: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.12), transparent);
+}
+
+[data-theme="dark"] .search-seg:not(:last-child)::after {
+  background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.15), transparent);
+}
+
+.search-trigger {
+  border-radius: 8px;
+  padding: 0.25rem 0.5rem;
+  transition: background-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.search-trigger:hover {
+  background-color: color-mix(in srgb, var(--brand-100) 95%, transparent);
+}
+
+.search-trigger.is-active {
+  background-color: color-mix(in srgb, var(--brand-100) 98%, transparent);
+}
+
+[data-theme="dark"] .search-trigger:hover {
+  background-color: color-mix(in srgb, var(--brand-900) 92%, transparent);
+}
+
+[data-theme="dark"] .search-trigger.is-active {
+  background-color: color-mix(in srgb, var(--brand-900) 96%, transparent);
+}
+
+.search-label {
+  font-size: 0.65rem;
+  letter-spacing: 0;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-accent-subtle);
+  opacity: 1;
+}
+
+.search-value {
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-accent);
+}
+
+[data-theme="dark"] .search-label {
+  color: var(--brand-400);
+}
+
+[data-theme="dark"] .search-value {
+  color: var(--brand-300);
+}
+
+.guest-input {
+  appearance: textfield;
+}
+
+.guest-input::-webkit-outer-spin-button,
+.guest-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.guest-input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.guest-input {
+  color: var(--text-accent);
+}
+
+.guest-input::selection {
+  background: color-mix(in srgb, var(--brand-200) 40%, transparent);
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .guest-input {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .search-seg {
+    min-height: 60px;
+  }
+}
+
+.search-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 6px 12px 6px 6px;
+  flex-shrink: 0;
+  min-width: 9rem;
+}
+
+.search-go {
+  background: var(--brand-900);
+  color: var(--fg-inverse);
+  border: none;
+  font-size: 0.85rem;
+  padding: 0.75rem 1.05rem;
+  border-radius: 1000px;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-weight: 700;
+  letter-spacing: 0;
+  box-shadow: 0 4px 14px -4px rgba(0, 0, 0, 0.30);
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+
+/* Ensure text has maximum contrast: remove decorative shadow */
+.search-go-text {
+  color: var(--fg-inverse);
+}
+
+.search-go:hover {
+  background: #012b29;
+}
+
+.search-go:active {
+  transform: translateY(1px);
+}
+
+[data-theme="dark"] .search-go {
+  background: var(--brand-500);
+  color: #042c28;
+}
+
+[data-theme="dark"] .search-go:hover {
+  background: var(--brand-400);
+}
+
+[data-theme="dark"] .search-go-text {
+  color: #042c28;
+}
+
+/* Booking button for single property */
+.booking-button {
+  background: var(--brand-700);
+  color: var(--fg-inverse);
+  border: none;
+  font-size: 0.875rem;
+  padding: 0.75rem 1.75rem;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  min-width: 140px;
+  box-shadow: 0 4px 14px -4px rgba(0, 0, 0, 0.25);
+  transition: all var(--transition-fast);
+  margin: 4px;
+}
+
+.booking-button:hover:not(:disabled) {
+  background: var(--brand-800);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px -4px rgba(0, 0, 0, 0.35);
+}
+
+.booking-button:active {
+  transform: translateY(0);
+}
+
+.booking-button:disabled {
+  background: var(--fg-muted);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.booking-button.ready {
+  background: var(--accent-500);
+  box-shadow: 0 6px 20px -4px rgba(200, 108, 81, 0.4);
+}
+
+.booking-button.ready:hover {
+  background: var(--accent-400);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -4px rgba(200, 108, 81, 0.5);
+}
+
+[data-theme="dark"] .booking-button {
+  background: var(--brand-400);
+  color: #042c28;
+}
+
+[data-theme="dark"] .booking-button:hover:not(:disabled) {
+  background: var(--brand-300);
+}
+
+[data-theme="dark"] .booking-button.ready {
+  background: var(--accent-400);
+  color: white;
+}
+
+[data-theme="dark"] .booking-button.ready:hover {
+  background: var(--accent-300);
+}
+
+/* Horizontal scroll chips */
+.h-scroll {
+  display: flex;
+  gap: .75rem;
+  overflow-x: auto;
+  padding-bottom: .5rem;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.h-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.chip-cat {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .55rem .95rem;
+  border-radius: 999px;
+  background: var(--layer-surface);
+  font-size: .75rem;
+  font-weight: 500;
+  border: 1px solid var(--border-soft);
+  color: var(--text-accent);
+  cursor: pointer;
+  transition: background var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), font-weight var(--transition-fast);
+}
+
+.chip-cat:hover {
+  background: #f2fffd;
+}
+
+.chip-cat[data-active="true"] {
+  background: var(--brand-tint);
+  color: var(--text-accent);
+  box-shadow: 0 4px 10px -4px rgba(0, 0, 0, 0.12);
+  border-color: var(--brand-400);
+  font-weight: 600;
+}
+
+[data-theme="dark"] .chip-cat {
+  background: rgba(17, 25, 26, 0.65);
+  color: var(--brand-300);
+  border-color: var(--border-soft);
+}
+
+[data-theme="dark"] .chip-cat:hover {
+  background: rgba(17, 25, 26, 0.85);
+}
+
+[data-theme="dark"] .chip-cat[data-active="true"] {
+  background: var(--brand-400);
+  color: #042c28;
+}
+
+.listing-card {
+  position: relative;
+  background: var(--layer-surface);
+  border-radius: 10px;
+  border: 1px solid var(--border-soft);
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(16, 24, 24, 0.05), 0 1px 0 rgba(255, 255, 255, 0.7) inset;
+  display: flex;
+  flex-direction: column;
+  transition: transform 140ms var(--transition-fast), box-shadow 140ms var(--transition-fast);
+}
+
+[data-theme="dark"] .listing-card {
+  background: linear-gradient(135deg, rgba(30, 45, 50, 0.95), rgba(20, 30, 35, 0.9));
+  border-color: rgba(18, 179, 164, 0.15);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6), 0 4px 16px rgba(18, 179, 164, 0.1);
+}
+
+.listing-card img {
+  object-fit: cover;
+  width: 100%;
+  aspect-ratio: 4/3;
+  background: #edf6f5;
+}
+
+.listing-info {
+  padding: .35rem .45rem .5rem;
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+  font-size: .74rem;
+}
+
+/* Subtle beveled/depth edge using inset highlight and outer shadow */
+.listing-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), inset 0 -6px 20px rgba(0, 0, 0, 0.02);
+}
+
+[data-theme="dark"] .listing-card::after {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 -8px 24px rgba(0, 0, 0, 0.4), 0 0 20px rgba(18, 179, 164, 0.05);
+}
+
+.listing-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(2, 6, 23, 0.08), 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+}
+
+[data-theme="dark"] .listing-card:hover {
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+}
+
+.wishlist-btn {
+  position: absolute;
+  top: .45rem;
+  right: .45rem;
+  background: var(--brand-tint);
+  color: var(--text-strong);
+  border: 1px solid var(--border-soft);
+  padding: .45rem .5rem;
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-float-soft);
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .wishlist-btn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0.55rem;
+  }
+}
+
+.wishlist-btn:hover {
+  background: #d3eeec;
+}
+
+.wishlist-btn:active {
+  transform: translateY(1px);
+}
+
+[data-theme="dark"] .wishlist-btn {
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+}
+
+/* New tinted button variant */
+.btn-tint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.55rem 1rem;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  min-height: 40px;
+  background: #0d3f3b;
+  color: #ffffff;
+  border: 1px solid #0a3330;
+  transition: background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.btn-tint:hover {
+  background: #0b3532;
+}
+
+.btn-tint:active {
+  transform: translateY(1px);
+}
+
+[data-theme="dark"] .btn-tint {
+  background: #ffffff;
+  color: #042c28;
+  border-color: #ffffff;
+}
+
+[data-theme="dark"] .btn-tint:hover {
+  background: #f1f5f5;
+}
+
+/* High-contrast small text helper */
+.text-small-strong {
+  font-size: 0.68rem;
+  line-height: 1.1;
+  color: var(--text-accent);
+  font-weight: 600;
+  opacity: 1 !important;
+}
+
+/* Floating banner utility */
+.floating-banner {
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--fg-default);
+  backdrop-filter: blur(8px) saturate(160%);
+  -webkit-backdrop-filter: blur(8px) saturate(160%);
+  box-shadow: var(--shadow-float-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+}
+
+[data-theme="dark"] .floating-banner {
+  background: rgba(17, 25, 26, 0.8);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Hit target utility */
+.hit-target {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* NOTE: top-controls-compact override removed to keep desktop sizing consistently applied
+   across viewports (user requested same blueprint size on small screens). */
+
+/* React Day Picker Custom Styles */

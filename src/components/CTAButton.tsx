@@ -1,6 +1,6 @@
 import React from 'react';
 
-type Common = { variant?: 'primary' | 'secondary' | 'outline' | 'tint'; asChild?: boolean; className?: string };
+type Common = { variant?: 'primary' | 'secondary' | 'outline' | 'tint' | 'danger' | 'ghost'; asChild?: boolean; className?: string };
 type ButtonProps = Common & React.ButtonHTMLAttributes<HTMLButtonElement>;
 
 export function CTAButton({ variant='primary', className='', asChild=false, ...rest }: ButtonProps) {
@@ -9,7 +9,9 @@ export function CTAButton({ variant='primary', className='', asChild=false, ...r
     primary: 'btn-primary',
     secondary: 'btn-accent',
     outline: 'btn-outline',
-    tint: 'btn-tint'
+    tint: 'btn-tint',
+    danger: 'btn-danger',
+    ghost: 'btn-ghost',
   };
   if (asChild) {
     // Expect caller to pass an <a> as children; clone to inject className

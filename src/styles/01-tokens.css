@@ -1,0 +1,179 @@
+/* Design tokens and theme variables. */
+
+:root {
+  /* Base (soft neutral rather than stark white) */
+  --background: #faf8f5;
+  --foreground: #243133;
+  /* deep desaturated teal-gray for softer contrast */
+
+  /* Layered neutrals for structural separation */
+  --layer-bg-subtle: #f7f9f9;
+  --layer-surface: #ffffff;
+  --layer-surface-alt: #f0f4f4;
+
+  /* Semantic foreground tokens */
+  --fg-default: #000000;
+  --fg-muted: #1f2937;
+  --fg-inverse: #ffffff;
+
+  /* Calmed brand palette (slightly desaturated & lightened for comfort) */
+  --brand-50: #e9f8f5;
+  --brand-100: #d6f1ec;
+  --brand-200: #b8e5dd;
+  --brand-300: #91d6cb;
+  --brand-400: #63c7ba;
+  --brand-500: #36b9ab;
+  /* primary (softer than previous #2ec4b6) */
+  --brand-600: #2aa89a;
+  --brand-700: #237f75;
+  --brand-800: #065f5b;
+  /* for high-contrast text accents */
+  --brand-900: #03403d;
+  /* deepest brand shade for max contrast */
+
+  /* Semantic border tokens (light) */
+  --border-soft: rgba(0, 0, 0, 0.08);
+  --border-soft-strong: rgba(0, 0, 0, 0.12);
+  --border-accent: var(--brand-300);
+
+  /* Semantic text accent tokens (light) */
+  --text-accent: #111827;
+  --text-accent-subtle: var(--brand-700);
+  --text-strong: var(--brand-900);
+
+  /* Badge tokens (light) */
+  --badge-info-bg: var(--brand-100);
+  --badge-info-fg: var(--text-accent);
+  --badge-warn-bg: #fff4e5;
+  --badge-warn-fg: #b5531d;
+  --badge-ok-bg: #e6f7f0;
+  --badge-ok-fg: #0f6f55;
+  --danger-600: #dc2626;
+
+  /* Semantic action colors (map to perceptual equals in dark mode) */
+  --action-bg: var(--brand-800);
+  --action-bg-hover: var(--brand-900);
+  --action-fg: var(--fg-inverse);
+
+  /* Accent (muted coral / terracotta) */
+  --accent-50: #fbeee9;
+  --accent-100: #f6dccf;
+  --accent-200: #edbfa8;
+  --accent-300: #e3a487;
+  --accent-400: #d7876a;
+  --accent-500: #c86c51;
+  /* softer, less saturated */
+
+  /* Cozy neutrals (warm sand + gentle sea foam) */
+  --sand-50: #f4eee6;
+  --sand-100: #ece4d8;
+  --sea-50: #eef6f4;
+  --sea-100: #deece9;
+
+  /* Spacing scale (4px base) */
+  --space-1: 0.25rem;
+  /* 4px */
+  --space-2: 0.5rem;
+  /* 8px */
+  --space-3: 0.75rem;
+  /* 12px */
+  --space-4: 1rem;
+  /* 16px */
+  --space-5: 1.25rem;
+  /* 20px */
+  --space-6: 1.5rem;
+  /* 24px */
+  --space-8: 2rem;
+  /* 32px */
+  --space-10: 2.5rem;
+  /* 40px */
+  --space-12: 3rem;
+  /* 48px */
+
+  /* Radius scale */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* Shadow tokens */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.07), 0 1px 2px -1px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 3px 6px -1px rgba(0, 0, 0, 0.08), 0 6px 18px -4px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 8px 24px -6px rgba(0, 0, 0, 0.15);
+  --shadow-glow: 0 0 0 1px rgba(54, 185, 171, 0.08), 0 4px 18px -4px rgba(54, 185, 171, 0.35);
+  --shadow-float-soft: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --brand-tint: #e0f4f3;
+
+  /* Typography scale */
+  --font-size-xs: 0.75rem;
+  /* 12 */
+  --font-size-sm: 0.875rem;
+  /* 14 */
+  --font-size-base: 1rem;
+  /* 16 */
+  --font-size-lg: 1.125rem;
+  /* 18 */
+  --font-size-xl: 1.25rem;
+  /* 20 */
+  --font-size-2xl: 1.5rem;
+  /* 24 */
+  --font-size-3xl: 1.875rem;
+  /* 30 */
+  --font-size-4xl: 2.25rem;
+  /* 36 */
+  --line-height-tight: 1.15;
+  --line-height-snug: 1.25;
+  --line-height-normal: 1.5;
+
+  /* Transitions */
+  --transition-fast: 120ms cubic-bezier(.4, 0, .2, 1);
+  --transition-normal: 200ms cubic-bezier(.4, 0, .2, 1);
+
+  /* Form placeholder color (accessible contrast on white surfaces) */
+  --placeholder-color: #64737a;
+  --placeholder-color-soft: rgba(100, 115, 122, 0.6);
+
+  /* Font stacks fall back to system fonts now that self-hosted files were removed */
+  --font-title-stack: Georgia, "Times New Roman", serif;
+  --font-sans-stack: "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono-stack: "JetBrains Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--font-mono-stack);
+}
+
+/* Tailwind v4 inline theme variables (without @theme to avoid build errors) */
+:root {
+  --color-background: var(--background);
+  --color-foreground: var(--fg-default);
+  --font-serif: var(--font-title-stack);
+  --font-sans: var(--font-sans-stack);
+  --font-mono: var(--font-mono-stack);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+    --layer-bg-subtle: #121718;
+    --layer-surface: #182224;
+    --layer-surface-alt: #1e2c2e;
+    color-scheme: dark;
+  }
+}
+
+[data-theme="light"] {
+  --background: #faf8f5;
+  --foreground: #243133;
+  --layer-bg-subtle: #f7f9f9;
+  --layer-surface: #ffffff;
+  --layer-surface-alt: #f0f4f4;
+  color-scheme: light;
+}

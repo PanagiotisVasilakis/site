@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import internalFetch, { ADMIN_SECRET_STORAGE_KEY } from '@/lib/internalFetchClient'
+import { Badge } from '@/components/ui'
 
 interface BookingData {
   booking: {
@@ -201,7 +202,7 @@ export default function GuestDataViewer() {
   const pendingArrivalRequests = arrivalRequests.filter((request) => request.status === 'pending')
 
   return (
-    <div className="min-h-screen p-6" style={{ background: 'var(--sand-50)' }}>
+    <div className="admin-page-shell min-h-screen p-6">
       <div className="max-w-7xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -281,15 +282,9 @@ export default function GuestDataViewer() {
                         <h3 className="font-semibold text-text-accent">
                           Requested arrival: {request.requestedTime}
                         </h3>
-                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                          request.status === 'pending'
-                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'
-                            : request.status === 'approved'
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200'
-                        }`}>
+                        <Badge variant={request.status}>
                           {request.status}
-                        </span>
+                        </Badge>
                       </div>
                       <p className="text-sm text-body mt-1">
                         {request.guestEmail || request.guestPhone || request.userId || 'Guest details unavailable'}
@@ -321,8 +316,7 @@ export default function GuestDataViewer() {
             <select
               value={searchType}
               onChange={(e) => setSearchType(e.target.value as 'reference' | 'phone' | 'date')}
-              className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent surface-interactive"
-              style={{ borderColor: 'var(--border-soft)' }}
+              className="px-4 py-2 border border-soft rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent surface-interactive"
             >
               <option value="reference">Reference + Last Name</option>
               <option value="phone">Phone Number</option>
@@ -337,8 +331,7 @@ export default function GuestDataViewer() {
                   searchType === 'phone' ? '+306912345678' :
                     '2024-12-25'
               }
-              className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent surface-interactive"
-              style={{ borderColor: 'var(--border-soft)' }}
+              className="flex-1 px-4 py-2 border border-soft rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent surface-interactive"
             />
             <button
               onClick={handleSearch}
@@ -407,12 +400,9 @@ export default function GuestDataViewer() {
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <span className={`px-3 py-1 rounded-full text-sm ${booking.checkin
-                      ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
-                      : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300'
-                      }`}>
+                    <Badge variant={booking.checkin ? 'approved' : 'pending'}>
                       {booking.checkin ? 'Checked In' : 'Pending'}
-                    </span>
+                    </Badge>
                     <button
                       onClick={() => exportBooking(booking.booking.id)}
                       className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300"
@@ -447,7 +437,7 @@ export default function GuestDataViewer() {
                 </div>
 
                 {booking.identities.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-soft" style={{ borderColor: 'var(--border-soft)' }}>
+                  <div className="mt-4 pt-4 border-t border-soft">
                     <h4 className="font-medium text-text-accent mb-2">Verified Documents</h4>
                     <div className="flex flex-wrap gap-2">
                       {booking.identities.map((identity, i) => (

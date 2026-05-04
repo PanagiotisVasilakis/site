@@ -15,7 +15,7 @@ const axeSource: string = (axePkg as unknown as { source?: string }).source || f
 
 const BASE = process.env.AXE_BASE || 'http://localhost:3000';
 // Expanded default PATHS for broader coverage; can override via AXE_PATHS env.
-const PATHS = (process.env.AXE_PATHS || '/en,/en/villa,/en/favorites,/en/offline,/en/phones,/en/phones/police-emergency').split(',');
+const PATHS = (process.env.AXE_PATHS || '/en,/en/apartment,/en/favorites,/en/offline,/en/phones,/en/phones/emergency-112').split(',');
 // Allow static fallback using prerendered HTML in .next if network fetch fails (useful in locked CI sandboxes)
 const STATIC_DIR = process.env.AXE_STATIC_DIR || '.next/server/app';
 

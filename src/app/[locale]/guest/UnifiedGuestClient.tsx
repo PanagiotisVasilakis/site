@@ -416,13 +416,13 @@ export default function UnifiedGuestClient() {
 
   return (
     <div className="mx-auto max-w-md p-4">
-      <div className="main-glass-container card p-5">
+      <div className="main-glass-container surface-card p-5">
         <>
             <div className="mb-4 text-center">
               <h1 className="text-2xl font-serif italic font-bold">
                 {mode === 'signin' ? (dict.portal?.signInTitle || 'Sign in') : (dict.portal?.signUpTitle || 'Sign up')}
               </h1>
-              <p className="mt-1 text-sm" style={{ color: 'var(--fg-muted)' }}>
+              <p className="mt-1 text-sm text-subtle">
                 {modeHint}
               </p>
             </div>
@@ -462,15 +462,15 @@ export default function UnifiedGuestClient() {
                       {mode === 'signup' && (
                         <motion.div layout>
                           <div>
-                            <label className="block text-lg md:text-xl font-semibold mb-4" style={{ color: 'var(--fg-default)' }}>{dict.portal?.originQuestion || 'Where are you coming from?'}</label>
+                            <label className="block text-lg md:text-xl font-semibold mb-4 text-body">{dict.portal?.originQuestion || 'Where are you coming from?'}</label>
                             <div role="radiogroup" aria-label="Origin selection" className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5">
-                              <button type="button" role="radio" aria-checked={origin === 'GR'} tabIndex={0} onClick={() => selectOrigin('GR')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectOrigin('GR'); } }} className="card p-5 md:p-6 h-32 md:h-36 w-full flex flex-col items-center justify-center transition focus:outline-none" style={origin === 'GR' ? { border: '1px solid var(--brand-400)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--brand-400) 20%, transparent)' } : {}}>
+                              <button type="button" role="radio" aria-checked={origin === 'GR'} tabIndex={0} onClick={() => selectOrigin('GR')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectOrigin('GR'); } }} className={`guest-origin-option surface-card p-5 md:p-6 h-32 md:h-36 w-full flex flex-col items-center justify-center transition focus:outline-none ${origin === 'GR' ? 'is-selected' : ''}`}>
                                 <div className="text-4xl md:text-5xl mb-2" aria-hidden>🇬🇷</div>
-                                <div className="text-base md:text-lg font-semibold" style={{ color: origin === 'GR' ? 'var(--fg-default)' : 'var(--fg-muted)' }}>{dict.portal?.originGR || 'Greece'}</div>
+                                <div className="guest-origin-option-label text-base md:text-lg font-semibold">{dict.portal?.originGR || 'Greece'}</div>
                               </button>
-                              <button type="button" role="radio" aria-checked={origin === 'ABROAD'} tabIndex={0} onClick={() => selectOrigin('ABROAD')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectOrigin('ABROAD'); } }} className="card p-5 md:p-6 h-32 md:h-36 w-full flex flex-col items-center justify-center transition focus:outline-none" style={origin === 'ABROAD' ? { border: '1px solid var(--brand-400)', boxShadow: '0 0 0 3px color-mix(in srgb, var(--brand-400) 20%, transparent)' } : {}}>
+                              <button type="button" role="radio" aria-checked={origin === 'ABROAD'} tabIndex={0} onClick={() => selectOrigin('ABROAD')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectOrigin('ABROAD'); } }} className={`guest-origin-option surface-card p-5 md:p-6 h-32 md:h-36 w-full flex flex-col items-center justify-center transition focus:outline-none ${origin === 'ABROAD' ? 'is-selected' : ''}`}>
                                 <div className="text-4xl md:text-5xl mb-2" aria-hidden>🌍</div>
-                                <div className="text-base md:text-lg font-semibold" style={{ color: origin === 'ABROAD' ? 'var(--fg-default)' : 'var(--fg-muted)' }}>{dict.portal?.originAbroad || 'World'}</div>
+                                <div className="guest-origin-option-label text-base md:text-lg font-semibold">{dict.portal?.originAbroad || 'World'}</div>
                               </button>
                             </div>
                           </div>
@@ -481,8 +481,8 @@ export default function UnifiedGuestClient() {
                       {(mode === 'signin' || origin) ? (
                         <div className="text-[color:var(--fg-default)]">
                           <div>
-                            <label className="block text-sm mb-1" style={{ color: 'var(--fg-default)' }}>{dict.portal?.phoneLabel || 'Phone Number'} *</label>
-                            <div className="relative flex items-center border rounded-lg" style={{ borderColor: 'var(--border-soft)' }}>
+                            <label className="block text-sm mb-1 text-body">{dict.portal?.phoneLabel || 'Phone Number'} *</label>
+                            <div className="relative flex items-center border border-soft rounded-lg">
                               <div className="relative" ref={dropdownRef}>
                                 {/* Custom Dropdown Button */}
                                 <button
@@ -575,7 +575,7 @@ export default function UnifiedGuestClient() {
                                   )}
                                 </AnimatePresence>
                               </div>
-                              <div className="w-px bg-gray-200" style={{ backgroundColor: 'var(--border-soft)' }}></div>
+                              <div className="bg-border-soft w-px"></div>
                               <input 
                                 ref={phoneInputRef} 
                                 className="flex-1 border-none outline-none py-3 pl-3 pr-3 rounded-r-lg input" 
@@ -624,7 +624,7 @@ export default function UnifiedGuestClient() {
                               </button>
                             </div>
                             {password && password.length < 8 && (
-                              <p className="text-xs mt-1" style={{ color: 'var(--danger-600)' }}>
+                              <p className="text-danger text-xs mt-1">
                                 {locale === 'el' ? 'Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες' : 'Password must be at least 8 characters'}
                               </p>
                             )}
@@ -649,7 +649,7 @@ export default function UnifiedGuestClient() {
                                 required 
                               />
                               {afm && !validateAfm(afm) && (
-                                <p className="text-xs mt-1" style={{ color: 'var(--danger-600)' }}>
+                                <p className="text-danger text-xs mt-1">
                                   AFM must be exactly 9 digits
                                 </p>
                               )}
@@ -672,7 +672,7 @@ export default function UnifiedGuestClient() {
                                 required 
                               />
                               {passport && !validatePassport(passport) && (
-                                <p className="text-xs mt-1" style={{ color: 'var(--danger-600)' }}>
+                                <p className="text-danger text-xs mt-1">
                                   Passport number must be 5-20 alphanumeric characters
                                 </p>
                               )}

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import internalFetch from '@/lib/internalFetchClient';
 import { persistAdminSecretFromUrl } from '@/lib/adminClientSession';
+import { Badge, EmptyPanel, MetricCard, Surface } from '@/components/ui';
 
 type RequestStatus = 'pending' | 'approved' | 'rejected';
 type RequestFilter = RequestStatus | 'all';
@@ -67,16 +68,6 @@ function initialsFor(value: string): string {
 
   if (parts.length === 0) return 'G';
   return parts.slice(0, 2).map((part) => part[0]?.toUpperCase()).join('');
-}
-
-function statusClass(status: RequestStatus): string {
-  if (status === 'approved') {
-    return 'bg-[#e6f0dd] text-[#36552e] dark:bg-[#233326] dark:text-[#CFE1C8]';
-  }
-  if (status === 'rejected') {
-    return 'bg-[#f8e6de] text-[#8a4229] dark:bg-[#3a241c] dark:text-[#F0B8A0]';
-  }
-  return 'bg-[#f4eadb] text-[#7b5d32] dark:bg-[#2e2d22] dark:text-[#D8C7A1]';
 }
 
 export default function AdminRequestsClient() {
@@ -166,7 +157,7 @@ export default function AdminRequestsClient() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="surface-card rounded-xl p-6 shadow-lg">
+      <Surface padding="lg" radius="lg" shadow="lg" border="none">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-accent-subtle">
@@ -181,21 +172,16 @@ export default function AdminRequestsClient() {
           </div>
           <Link
             href="/admin"
-            className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#cfb994] px-5 py-2 text-sm font-semibold text-[#6f552f] transition hover:bg-[#f4eadb] dark:border-[#4a5a4d] dark:text-[#D8C7A1] dark:hover:bg-[#203026]"
+            className="admin-action-outline min-h-11 px-5"
           >
             Back to operations
           </Link>
         </div>
-      </div>
+      </Surface>
 
       <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Request summary">
         {summaryCards.map(([label, value]) => (
-          <div key={label} className="surface-card rounded-lg border border-soft p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-subtle">{label}</p>
-            <p className="mt-2 text-3xl font-semibold text-text-accent">
-              {loading ? '...' : value}
-            </p>
-          </div>
+          <MetricCard key={label} label={label} value={loading ? '...' : value} />
         ))}
       </section>
 
@@ -210,11 +196,7 @@ export default function AdminRequestsClient() {
                   type="button"
                   onClick={() => changeFilter(item.value)}
                   aria-pressed={active}
-                  className={`inline-flex min-h-10 items-center rounded-full px-4 py-2 text-sm font-semibold transition ${
-                    active
-                      ? 'bg-[#25342B] text-[#F7F1E8] dark:bg-[#D8C7A1] dark:text-[#101916]'
-                      : 'border border-[#cfb994] text-[#6f552f] hover:bg-[#f4eadb] dark:border-[#4a5a4d] dark:text-[#D8C7A1] dark:hover:bg-[#203026]'
-                  }`}
+                  className={active ? 'admin-action-primary min-h-10' : 'admin-action-outline'}
                 >
                   {item.label}
                 </button>
@@ -225,7 +207,7 @@ export default function AdminRequestsClient() {
             type="button"
             onClick={() => loadRequests(filter)}
             disabled={loading}
-            className="inline-flex min-h-10 items-center justify-center rounded-full border border-soft px-4 py-2 text-sm font-semibold text-body transition hover:bg-[color:var(--layer-surface-alt)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="admin-action-outline"
           >
             {loading ? 'Refreshing...' : 'Refresh'}
           </button>
@@ -233,11 +215,7 @@ export default function AdminRequestsClient() {
 
         {feedback && (
           <div
-            className={`mt-4 rounded-lg px-4 py-3 text-sm ${
-              feedback.type === 'success'
-                ? 'bg-[#eef3e9] text-[#355232] dark:bg-[#233326] dark:text-[#CFE1C8]'
-                : 'border border-[#dfb8a8] bg-[#fff4ef] text-[#82432d] dark:border-[#613426] dark:bg-[#321d17] dark:text-[#F0B8A0]'
-            }`}
+            className={`mt-4 rounded-lg px-4 py-3 text-sm ${feedback.type === 'success' ? 'feedback-success' : 'feedback-error'}`}
             role={feedback.type === 'error' ? 'alert' : 'status'}
           >
             {feedback.message}
@@ -247,14 +225,9 @@ export default function AdminRequestsClient() {
 
       <section className="mt-6 space-y-4" aria-label="Arrival-time requests">
         {loading ? (
-          <div className="surface-card rounded-lg border border-soft p-8 text-center shadow-sm">
-            <p className="text-sm text-body">Loading requests...</p>
-          </div>
+          <EmptyPanel>Loading requests...</EmptyPanel>
         ) : requests.length === 0 ? (
-          <div className="surface-card rounded-lg border border-soft p-8 text-center shadow-sm">
-            <h2 className="font-serif text-2xl font-semibold italic section-title">No requests</h2>
-            <p className="mt-2 text-sm text-body">There are no arrival-time requests for this filter.</p>
-          </div>
+          <EmptyPanel title="No requests">There are no arrival-time requests for this filter.</EmptyPanel>
         ) : (
           requests.map((request) => {
             const guest = displayGuest(request);
@@ -265,7 +238,7 @@ export default function AdminRequestsClient() {
               <article key={request.id} className="surface-card rounded-lg border border-soft p-5 shadow-sm">
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                   <div className="flex min-w-0 gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#f0e3ce] text-sm font-semibold text-[#6f552f] dark:bg-[#26372d] dark:text-[#D8C7A1]">
+                    <div className="admin-avatar">
                       {initialsFor(guest)}
                     </div>
                     <div className="min-w-0">
@@ -273,9 +246,9 @@ export default function AdminRequestsClient() {
                         <h2 className="break-words font-serif text-2xl font-semibold italic section-title">
                           {guest}
                         </h2>
-                        <span className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${statusClass(request.status)}`}>
+                        <Badge variant={request.status}>
                           {request.status}
-                        </span>
+                        </Badge>
                       </div>
                       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
                         <div>
@@ -309,7 +282,7 @@ export default function AdminRequestsClient() {
                         <p className="mt-3 text-sm text-body">{request.guestPhone}</p>
                       )}
                       {request.message && (
-                        <div className="mt-4 rounded-lg border border-[#e2d4c1] bg-[#fffaf2]/72 p-3 text-sm leading-6 text-body dark:border-[#2d3b31] dark:bg-[#101916]/46">
+                        <div className="admin-note-panel mt-4 text-body">
                           {request.message}
                         </div>
                       )}
@@ -322,7 +295,7 @@ export default function AdminRequestsClient() {
                         type="button"
                         onClick={() => updateRequestStatus(request.id, 'approved')}
                         disabled={isActing}
-                        className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#25342B] px-4 py-2 text-sm font-semibold text-[#F7F1E8] transition hover:bg-[#35483B] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-[#D8C7A1] dark:text-[#101916] dark:hover:bg-[#E4D6BA]"
+                        className="admin-action-primary"
                       >
                         {isActing ? 'Updating...' : 'Approve'}
                       </button>
@@ -330,7 +303,7 @@ export default function AdminRequestsClient() {
                         type="button"
                         onClick={() => updateRequestStatus(request.id, 'rejected')}
                         disabled={isActing}
-                        className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#c99f8c] px-4 py-2 text-sm font-semibold text-[#82432d] transition hover:bg-[#fff1ea] disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#613426] dark:text-[#F0B8A0] dark:hover:bg-[#321d17]"
+                        className="admin-action-danger"
                       >
                         {isActing ? 'Updating...' : 'Reject'}
                       </button>

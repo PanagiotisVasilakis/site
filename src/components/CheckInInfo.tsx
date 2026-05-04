@@ -285,16 +285,16 @@ function SectionTitle({
 }) {
   return (
     <div className="mb-5 flex items-start gap-3">
-      <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#d9c7ad] bg-[#f4eadb] text-[#8C6A3E] dark:border-[#3a493f] dark:bg-[#203026] dark:text-[#D8C7A1]">
+      <span className="checkin-icon-bubble mt-0.5 h-10 w-10 shrink-0">
         <Icon name={icon} className="h-5 w-5" />
       </span>
       <div>
         {eyebrow && (
-          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-[#8C6A3E] dark:text-[#D8C7A1]">
+          <p className="checkin-label text-[0.68rem] font-semibold uppercase tracking-[0.18em]">
             {eyebrow}
           </p>
         )}
-        <h2 id={id} className="font-serif text-2xl font-semibold italic text-[#25342B] dark:text-[#F3EBDD]">
+        <h2 id={id} className="checkin-title font-serif text-2xl font-semibold italic">
           {title}
         </h2>
       </div>
@@ -626,28 +626,33 @@ export default function CheckInInfo({
   };
 
   const wifiText = `${ui.network}: ${WIFI_NETWORK}\n${ui.password}: ${WIFI_PASSWORD}`;
-  const panelClass =
-    'rounded-lg border border-[#dfd1bf] bg-[#fffaf2]/90 shadow-[0_18px_45px_-34px_rgba(37,52,43,0.68)] backdrop-blur dark:border-[#324338] dark:bg-[#17221D]/90 dark:shadow-[0_22px_54px_-34px_rgba(0,0,0,0.9)]';
-  const rowClass = 'flex items-start gap-3 border-t border-[#e6dac8] py-4 first:border-t-0 first:pt-0 last:pb-0 dark:border-[#2b3a30]';
+  const panelClass = 'checkin-panel';
+  const rowClass = 'checkin-row';
   const smallLabelClass = 'checkin-label text-[0.68rem] font-semibold uppercase tracking-[0.14em]';
+  const titleClass = 'checkin-title';
+  const valueClass = 'checkin-value';
+  const bodyTextClass = 'checkin-copy';
+  const mutedTextClass = 'checkin-muted-text';
+  const iconClass = 'checkin-icon-token mt-0.5 h-5 w-5 shrink-0';
+  const accentIconClass = 'checkin-accent-token mt-0.5 h-5 w-5 shrink-0';
 
   return (
-    <div className="checkin-portal text-[#25342B] dark:text-[#F3EBDD]">
+    <div className="checkin-portal">
       <section
         className={`${panelClass} relative overflow-hidden p-[clamp(1.25rem,3vw,2.5rem)]`}
         aria-labelledby="checkin-welcome-title"
       >
-        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(247,241,232,0.98)_0%,rgba(238,227,210,0.76)_48%,rgba(168,111,76,0.14)_100%)] dark:bg-[linear-gradient(135deg,rgba(16,25,22,0.98)_0%,rgba(23,34,29,0.9)_55%,rgba(168,111,76,0.18)_100%)]" />
+        <div className="checkin-hero-bg absolute inset-0" />
         <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] lg:items-end">
           <div className="max-w-3xl">
             <p className={smallLabelClass}>{ui.guideLabel}</p>
             <h1
               id="checkin-welcome-title"
-              className="mt-3 max-w-3xl font-serif text-[clamp(2.35rem,5vw,4.7rem)] font-semibold italic leading-[0.98] text-[#25342B] dark:text-[#F3EBDD]"
+              className={`${titleClass} mt-3 max-w-3xl font-serif text-[clamp(2.35rem,5vw,4.7rem)] font-semibold italic leading-[0.98]`}
             >
               {ui.heroTitle}
             </h1>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-[#526357] dark:text-[#C9D6C8] sm:text-lg">
+            <p className={`${bodyTextClass} mt-5 max-w-2xl text-base leading-7 sm:text-lg`}>
               {t.checkinInfo?.welcomeMessage || "We're delighted to have you here. Below you'll find everything you need for a comfortable stay."}
             </p>
 
@@ -655,7 +660,7 @@ export default function CheckInInfo({
               <button
                 type="button"
                 onClick={() => copyToClipboard(wifiText, 'wifi')}
-                className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#25342B] px-4 py-2 text-sm font-semibold text-[#F7F1E8] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#35483B] dark:bg-[#D8C7A1] dark:text-[#101916] dark:hover:bg-[#E4D6BA]"
+                className="checkin-primary-action min-h-11 px-4 shadow-sm hover:-translate-y-0.5"
               >
                 <Icon name={copiedTarget === 'wifi' ? 'check' : 'copy'} className="h-4 w-4" />
                 {copiedTarget === 'wifi' ? ui.copied : ui.copyWifi}
@@ -665,7 +670,7 @@ export default function CheckInInfo({
                   href={apartmentLocation.directionsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="checkin-secondary-action inline-flex min-h-11 items-center gap-2 rounded-full border border-[#cdbb9e] bg-[#fffaf2]/70 px-4 py-2 text-sm font-semibold transition hover:-translate-y-0.5 hover:bg-[#ffffff] dark:border-[#3a493f] dark:bg-[#17221D]/70 dark:hover:bg-[#203026]"
+                  className="checkin-secondary-action checkin-outline-action min-h-11 px-4 hover:-translate-y-0.5"
                 >
                   <Icon name="external" className="h-4 w-4" />
                   {ui.openMaps}
@@ -673,7 +678,7 @@ export default function CheckInInfo({
               )}
               <a
                 href="#house-rules"
-                className="checkin-secondary-action inline-flex min-h-11 items-center gap-2 rounded-full border border-[#cdbb9e] bg-[#fffaf2]/70 px-4 py-2 text-sm font-semibold transition hover:-translate-y-0.5 hover:bg-[#ffffff] dark:border-[#3a493f] dark:bg-[#17221D]/70 dark:hover:bg-[#203026]"
+                className="checkin-secondary-action checkin-outline-action min-h-11 px-4 hover:-translate-y-0.5"
               >
                 <Icon name="shield" className="h-4 w-4" />
                 {ui.viewRules}
@@ -681,31 +686,31 @@ export default function CheckInInfo({
             </div>
           </div>
 
-          <div className="rounded-lg border border-[#d9c7ad] bg-[#fffaf2]/72 p-4 dark:border-[#33443a] dark:bg-[#101916]/54">
+          <div className="checkin-card checkin-card--strong p-4">
             <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
               <div>
                 <dt className={smallLabelClass}>{ui.address}</dt>
-                <dd className="mt-1 text-sm font-medium leading-6 text-[#25342B] dark:text-[#F3EBDD]">
+                <dd className={`${valueClass} mt-1 text-sm font-medium leading-6`}>
                   {apartmentLocation.address}
                 </dd>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <dt className={smallLabelClass}>{t.checkinInfo?.checkInTime || 'Check-in'}</dt>
-                  <dd className="mt-1 font-serif text-2xl font-semibold italic text-[#25342B] dark:text-[#F3EBDD]">
+                  <dd className={`${valueClass} mt-1 font-serif text-2xl font-semibold italic`}>
                     {checkInTime}
                   </dd>
                 </div>
                 <div>
                   <dt className={smallLabelClass}>{t.checkinInfo?.checkOutTime || 'Check-out'}</dt>
-                  <dd className="mt-1 font-serif text-2xl font-semibold italic text-[#25342B] dark:text-[#F3EBDD]">
+                  <dd className={`${valueClass} mt-1 font-serif text-2xl font-semibold italic`}>
                     {checkOutTime}
                   </dd>
                 </div>
               </div>
               <div>
                 <dt className={smallLabelClass}>{t.checkinInfo?.wifiTitle || 'Internet Access'}</dt>
-                <dd className="mt-1 font-mono text-sm font-semibold text-[#25342B] dark:text-[#F3EBDD]">
+                <dd className={`${valueClass} mt-1 font-mono text-sm font-semibold`}>
                   {WIFI_NETWORK}
                 </dd>
               </div>
@@ -720,17 +725,17 @@ export default function CheckInInfo({
             <SectionTitle id="guest-essentials-title" title={ui.guestEssentials} icon="home" />
             <div className="space-y-0">
               <div className={rowClass}>
-                <Icon name="clock" className="mt-0.5 h-5 w-5 shrink-0 text-[#8C6A3E] dark:text-[#D8C7A1]" />
+                <Icon name="clock" className={iconClass} />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-[#25342B] dark:text-[#F3EBDD]">
+                    <h3 className={`${titleClass} text-sm font-semibold`}>
                       {ui.schedule}
                     </h3>
                     {!isEditingTimes && canEditTimes && (
                       <button
                         type="button"
                         onClick={handleEditTimes}
-                        className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-[#cfb994] px-3 py-1 text-xs font-semibold text-[#6f552f] transition hover:bg-[#f4eadb] dark:border-[#4a5a4d] dark:text-[#D8C7A1] dark:hover:bg-[#203026]"
+                        className="checkin-outline-action min-h-9 px-3 py-1 text-xs"
                         title="Edit times (host only)"
                       >
                         {ui.edit}
@@ -739,14 +744,14 @@ export default function CheckInInfo({
                   </div>
 
                   {timesSaved && (
-                    <p className="mt-2 rounded-md bg-[#eef3e9] px-3 py-2 text-sm text-[#355232] dark:bg-[#233326] dark:text-[#CFE1C8]" role="status">
+                    <p className="mt-2 rounded-md checkin-status-success px-3 py-2 text-sm" role="status">
                       {ui.saved}
                     </p>
                   )}
 
                   <div className="mt-3 grid grid-cols-2 gap-3">
                     <label className="block">
-                      <span className="text-xs font-medium text-[#667367] dark:text-[#B8C7B5]">
+                      <span className={`${mutedTextClass} text-xs font-medium`}>
                         {ui.standardCheckIn}
                       </span>
                       {isEditingTimes ? (
@@ -754,16 +759,16 @@ export default function CheckInInfo({
                           type="time"
                           value={tempCheckInTime}
                           onChange={(e) => setTempCheckInTime(e.target.value)}
-                          className="mt-1 w-full rounded-md border border-[#d9c7ad] bg-[#fffaf2] px-2 py-2 text-base font-semibold text-[#25342B] dark:border-[#3a493f] dark:bg-[#101916] dark:text-[#F3EBDD]"
+                          className="checkin-field mt-1 px-2 py-2 text-base"
                         />
                       ) : (
-                        <span className="mt-1 block font-serif text-2xl font-semibold italic text-[#25342B] dark:text-[#F3EBDD]">
+                        <span className={`${valueClass} mt-1 block font-serif text-2xl font-semibold italic`}>
                           {checkInTime}
                         </span>
                       )}
                     </label>
                     <label className="block">
-                      <span className="text-xs font-medium text-[#667367] dark:text-[#B8C7B5]">
+                      <span className={`${mutedTextClass} text-xs font-medium`}>
                         {t.checkinInfo?.checkOutTime || 'Check-out'}
                       </span>
                       {isEditingTimes ? (
@@ -771,10 +776,10 @@ export default function CheckInInfo({
                           type="time"
                           value={tempCheckOutTime}
                           onChange={(e) => setTempCheckOutTime(e.target.value)}
-                          className="mt-1 w-full rounded-md border border-[#d9c7ad] bg-[#fffaf2] px-2 py-2 text-base font-semibold text-[#25342B] dark:border-[#3a493f] dark:bg-[#101916] dark:text-[#F3EBDD]"
+                          className="checkin-field mt-1 px-2 py-2 text-base"
                         />
                       ) : (
-                        <span className="mt-1 block font-serif text-2xl font-semibold italic text-[#25342B] dark:text-[#F3EBDD]">
+                        <span className={`${valueClass} mt-1 block font-serif text-2xl font-semibold italic`}>
                           {checkOutTime}
                         </span>
                       )}
@@ -787,7 +792,7 @@ export default function CheckInInfo({
                         type="button"
                         onClick={handleSaveTimes}
                         disabled={savingTimes}
-                        className="inline-flex min-h-10 items-center justify-center rounded-full bg-[#25342B] px-3 py-2 text-sm font-semibold text-[#F7F1E8] transition hover:bg-[#35483B] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-[#D8C7A1] dark:text-[#101916] dark:hover:bg-[#E4D6BA]"
+                        className="checkin-primary-action"
                       >
                         {savingTimes ? ui.saving : ui.save}
                       </button>
@@ -795,7 +800,7 @@ export default function CheckInInfo({
                         type="button"
                         onClick={handleCancelEdit}
                         disabled={savingTimes}
-                        className="inline-flex min-h-10 items-center justify-center rounded-full border border-[#cfb994] px-3 py-2 text-sm font-semibold text-[#6f552f] transition hover:bg-[#f4eadb] disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#4a5a4d] dark:text-[#D8C7A1] dark:hover:bg-[#203026]"
+                        className="checkin-outline-action"
                       >
                         {ui.cancel}
                       </button>
@@ -805,25 +810,19 @@ export default function CheckInInfo({
                   {!isEditingTimes && (
                     <div className="mt-4 space-y-3">
                       {arrivalRequest && (
-                        <div className="rounded-lg border border-[#e2d4c1] bg-[#fffaf2]/62 p-3 dark:border-[#2d3b31] dark:bg-[#101916]/42">
+                        <div className="checkin-card p-3">
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8C6A3E] dark:text-[#D8C7A1]">
+                            <p className="checkin-label text-xs font-semibold uppercase tracking-[0.14em]">
                               {ui.latestRequest}
                             </p>
-                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                              arrivalRequest.status === 'approved'
-                                ? 'bg-[#e6f0dd] text-[#36552e] dark:bg-[#233326] dark:text-[#CFE1C8]'
-                                : arrivalRequest.status === 'rejected'
-                                  ? 'bg-[#f8e6de] text-[#8a4229] dark:bg-[#3a241c] dark:text-[#F0B8A0]'
-                                  : 'bg-[#f4eadb] text-[#7b5d32] dark:bg-[#2e2d22] dark:text-[#D8C7A1]'
-                            }`}>
+                            <span className={`checkin-status-pill checkin-status-${arrivalRequest.status}`}>
                               {requestStatusLabel(arrivalRequest.status)}
                             </span>
                           </div>
-                          <p className="mt-2 text-sm leading-6 text-[#617061] dark:text-[#C4D0C2]">
-                            {ui.preferredArrivalTime}: <strong className="font-semibold text-[#25342B] dark:text-[#F3EBDD]">{arrivalRequest.requestedTime}</strong>
+                          <p className={`${bodyTextClass} mt-2 text-sm leading-6`}>
+                            {ui.preferredArrivalTime}: <strong className={`${valueClass} font-semibold`}>{arrivalRequest.requestedTime}</strong>
                           </p>
-                          <p className="mt-2 text-sm leading-6 text-[#617061] dark:text-[#C4D0C2]">
+                          <p className={`${bodyTextClass} mt-2 text-sm leading-6`}>
                             {requestStatusDescription(arrivalRequest.status)}
                           </p>
                         </div>
@@ -833,28 +832,28 @@ export default function CheckInInfo({
                         <button
                           type="button"
                           onClick={handleOpenArrivalRequest}
-                          className="inline-flex min-h-10 w-full items-center justify-center rounded-full border border-[#cfb994] px-3 py-2 text-sm font-semibold text-[#6f552f] transition hover:bg-[#f4eadb] dark:border-[#4a5a4d] dark:text-[#D8C7A1] dark:hover:bg-[#203026]"
+                          className="checkin-outline-action w-full"
                         >
                           {ui.requestDifferentArrival}
                         </button>
                       )}
 
                       {isRequestingArrival && (
-                        <div className="rounded-lg border border-[#e2d4c1] bg-[#fffaf2]/72 p-3 dark:border-[#2d3b31] dark:bg-[#101916]/46">
+                        <div className="checkin-card checkin-card--strong p-3">
                           <label className="block">
-                            <span className="text-xs font-semibold text-[#667367] dark:text-[#B8C7B5]">
+                            <span className={`${mutedTextClass} text-xs font-semibold`}>
                               {ui.preferredArrivalTime}
                             </span>
                             <input
                               type="time"
                               value={requestedArrivalTime}
                               onChange={(event) => setRequestedArrivalTime(event.target.value)}
-                              className="mt-1 w-full rounded-md border border-[#d9c7ad] bg-[#fffaf2] px-3 py-2 text-base font-semibold text-[#25342B] dark:border-[#3a493f] dark:bg-[#101916] dark:text-[#F3EBDD]"
+                              className="checkin-field mt-1 px-3 py-2 text-base"
                               aria-invalid={Boolean(arrivalRequestError)}
                             />
                           </label>
                           <label className="mt-3 block">
-                            <span className="text-xs font-semibold text-[#667367] dark:text-[#B8C7B5]">
+                            <span className={`${mutedTextClass} text-xs font-semibold`}>
                               {ui.arrivalNote}
                             </span>
                             <textarea
@@ -863,11 +862,11 @@ export default function CheckInInfo({
                               maxLength={500}
                               rows={3}
                               placeholder={ui.arrivalNotePlaceholder}
-                              className="mt-1 w-full resize-none rounded-md border border-[#d9c7ad] bg-[#fffaf2] px-3 py-2 text-sm leading-6 text-[#25342B] placeholder:text-[#8d988e] dark:border-[#3a493f] dark:bg-[#101916] dark:text-[#F3EBDD] dark:placeholder:text-[#7f927d]"
+                              className="checkin-field checkin-textarea mt-1 px-3 py-2"
                             />
                           </label>
                           {arrivalRequestError && (
-                            <p className="mt-2 text-sm text-[#8a4229] dark:text-[#F0B8A0]" role="alert">
+                            <p className="mt-2 text-sm checkin-status-error" role="alert">
                               {arrivalRequestError}
                             </p>
                           )}
@@ -876,7 +875,7 @@ export default function CheckInInfo({
                               type="button"
                               onClick={handleSubmitArrivalRequest}
                               disabled={arrivalRequestSubmitting}
-                              className="inline-flex min-h-10 items-center justify-center rounded-full bg-[#25342B] px-3 py-2 text-sm font-semibold text-[#F7F1E8] transition hover:bg-[#35483B] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-[#D8C7A1] dark:text-[#101916] dark:hover:bg-[#E4D6BA]"
+                              className="checkin-primary-action"
                             >
                               {arrivalRequestSubmitting ? ui.saving : ui.sendRequest}
                             </button>
@@ -887,7 +886,7 @@ export default function CheckInInfo({
                                 setArrivalRequestError('');
                               }}
                               disabled={arrivalRequestSubmitting}
-                              className="inline-flex min-h-10 items-center justify-center rounded-full border border-[#cfb994] px-3 py-2 text-sm font-semibold text-[#6f552f] transition hover:bg-[#f4eadb] disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#4a5a4d] dark:text-[#D8C7A1] dark:hover:bg-[#203026]"
+                              className="checkin-outline-action"
                             >
                               {ui.cancel}
                             </button>
@@ -896,12 +895,12 @@ export default function CheckInInfo({
                       )}
 
                       {arrivalRequestSuccess && (
-                        <p className="rounded-lg bg-[#eef3e9] px-3 py-2 text-sm leading-6 text-[#355232] dark:bg-[#233326] dark:text-[#CFE1C8]" role="status">
+                        <p className="rounded-lg checkin-status-success px-3 py-2 text-sm leading-6" role="status">
                           {arrivalRequestSuccess}
                         </p>
                       )}
                       {arrivalRequestError && !isRequestingArrival && (
-                        <p className="rounded-lg bg-[#f8e6de] px-3 py-2 text-sm leading-6 text-[#8a4229] dark:bg-[#3a241c] dark:text-[#F0B8A0]" role="alert">
+                        <p className="rounded-lg checkin-status-error px-3 py-2 text-sm leading-6" role="alert">
                           {arrivalRequestError}
                         </p>
                       )}
@@ -911,12 +910,12 @@ export default function CheckInInfo({
               </div>
 
               <div className={rowClass}>
-                <Icon name="wifi" className="mt-0.5 h-5 w-5 shrink-0 text-[#8C6A3E] dark:text-[#D8C7A1]" />
+                <Icon name="wifi" className={iconClass} />
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-sm font-semibold text-[#25342B] dark:text-[#F3EBDD]">
+                  <h3 className={`${titleClass} text-sm font-semibold`}>
                     {t.checkinInfo?.wifiTitle || 'Internet Access'}
                   </h3>
-                  <dl className="mt-3 divide-y divide-[#e6dac8] rounded-lg border border-[#e2d4c1] bg-[#fffaf2]/62 dark:divide-[#2b3a30] dark:border-[#2d3b31] dark:bg-[#101916]/42">
+                  <dl className="checkin-card checkin-divided mt-3">
                     {[
                       {
                         label: ui.network,
@@ -932,15 +931,15 @@ export default function CheckInInfo({
                       },
                     ].map((item) => (
                       <div key={item.target} className="grid gap-2 p-3 sm:grid-cols-[5.75rem_minmax(0,1fr)] sm:items-center">
-                        <dt className="text-xs font-medium text-[#667367] dark:text-[#B8C7B5]">{item.label}</dt>
+                        <dt className={`${mutedTextClass} text-xs font-medium`}>{item.label}</dt>
                         <dd className="flex min-w-0 flex-wrap items-center gap-2">
-                          <span className="min-w-0 flex-1 whitespace-nowrap font-mono text-[0.8125rem] font-semibold text-[#25342B] dark:text-[#F3EBDD]">
+                          <span className={`${valueClass} min-w-0 flex-1 whitespace-nowrap font-mono text-[0.8125rem] font-semibold`}>
                             {item.value}
                           </span>
                           <button
                             type="button"
                             onClick={() => copyToClipboard(item.value, item.target)}
-                            className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-full border border-[#cfb994] px-3 py-1 text-xs font-semibold text-[#6f552f] transition hover:bg-[#f4eadb] dark:border-[#4a5a4d] dark:text-[#D8C7A1] dark:hover:bg-[#203026]"
+                            className="checkin-copy-action"
                             aria-label={item.aria}
                           >
                             <Icon name={copiedTarget === item.target ? 'check' : 'copy'} className="h-3.5 w-3.5" />
@@ -954,20 +953,20 @@ export default function CheckInInfo({
               </div>
 
               <div className={rowClass}>
-                <Icon name="key" className="mt-0.5 h-5 w-5 shrink-0 text-[#8C6A3E] dark:text-[#D8C7A1]" />
+                <Icon name="key" className={iconClass} />
                 <div>
-                  <h3 className="text-sm font-semibold text-[#25342B] dark:text-[#F3EBDD]">{ui.keys}</h3>
-                  <p className="mt-1 text-sm leading-6 text-[#617061] dark:text-[#C4D0C2]">
+                  <h3 className={`${titleClass} text-sm font-semibold`}>{ui.keys}</h3>
+                  <p className={`${bodyTextClass} mt-1 text-sm leading-6`}>
                     {t.checkinInfo?.keysDetail || 'Please leave keys in the lockbox when checking out'}
                   </p>
                 </div>
               </div>
 
               <div className={rowClass}>
-                <Icon name="car" className="mt-0.5 h-5 w-5 shrink-0 text-[#8C6A3E] dark:text-[#D8C7A1]" />
+                <Icon name="car" className={iconClass} />
                 <div>
-                  <h3 className="text-sm font-semibold text-[#25342B] dark:text-[#F3EBDD]">{ui.parking}</h3>
-                  <p className="mt-1 text-sm leading-6 text-[#617061] dark:text-[#C4D0C2]">
+                  <h3 className={`${titleClass} text-sm font-semibold`}>{ui.parking}</h3>
+                  <p className={`${bodyTextClass} mt-1 text-sm leading-6`}>
                     {apartment.highlights.find((item) => item.toLowerCase().includes('parking')) || ui.parking}
                   </p>
                 </div>
@@ -977,17 +976,17 @@ export default function CheckInInfo({
 
           <section className={`${panelClass} p-5`} aria-labelledby="emergency-title">
             <SectionTitle id="emergency-title" title={ui.emergency} icon="phone" />
-            <div className="divide-y divide-[#e6dac8] dark:divide-[#2b3a30]">
+            <div className="checkin-divided">
               {emergencyItems.map((item) => (
                 <div key={`${item.label}-${item.value}`} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
                   <div className="min-w-0">
-                    <h3 className="truncate text-sm font-semibold text-[#25342B] dark:text-[#F3EBDD]">{item.label}</h3>
-                    <p className="mt-0.5 truncate text-sm text-[#617061] dark:text-[#C4D0C2]">{item.value}</p>
+                    <h3 className={`${titleClass} truncate text-sm font-semibold`}>{item.label}</h3>
+                    <p className={`${bodyTextClass} mt-0.5 truncate text-sm`}>{item.value}</p>
                   </div>
                   {item.href && (
                     <a
                       href={item.href}
-                      className="checkin-icon-action inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#cfb994] transition hover:bg-[#f4eadb] dark:border-[#4a5a4d] dark:hover:bg-[#203026]"
+                      className="checkin-icon-action checkin-copy-action h-10 w-10 justify-center px-0"
                       aria-label={`${ui.emergency}: ${item.label}`}
                     >
                       <Icon name="phone" className="h-4 w-4" />
@@ -1003,9 +1002,9 @@ export default function CheckInInfo({
             <div className="space-y-4">
               {goodToKnowItems.map((item) => (
                 <div key={item.label} className="flex gap-3">
-                  <Icon name={item.icon} className="mt-0.5 h-5 w-5 shrink-0 text-[#8C6A3E] dark:text-[#D8C7A1]" />
-                  <p className="text-sm leading-6 text-[#617061] dark:text-[#C4D0C2]">
-                    <strong className="font-semibold text-[#25342B] dark:text-[#F3EBDD]">{item.label}:</strong>{' '}
+                  <Icon name={item.icon} className={iconClass} />
+                  <p className={`${bodyTextClass} text-sm leading-6`}>
+                    <strong className={`${titleClass} font-semibold`}>{item.label}:</strong>{' '}
                     {item.detail}
                   </p>
                 </div>
@@ -1019,8 +1018,8 @@ export default function CheckInInfo({
             <SectionTitle id="house-rules-title" title={t.checkinInfo?.houseRulesTitle || 'House Rules'} icon="shield" />
             <ul className="grid gap-3 sm:grid-cols-2">
               {ruleItems.map((rule) => (
-                <li key={rule} className="flex items-start gap-3 rounded-lg bg-[#F7F1E8]/72 p-3 text-sm leading-6 text-[#536252] dark:bg-[#101916]/46 dark:text-[#C4D0C2]">
-                  <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#efe3cf] text-[#8C6A3E] dark:bg-[#26372d] dark:text-[#D8C7A1]">
+                <li key={rule} className="checkin-rule-item">
+                  <span className="checkin-rule-icon mt-0.5 h-6 w-6">
                     <Icon name="check" className="h-3.5 w-3.5" />
                   </span>
                   <span>{rule}</span>
@@ -1035,20 +1034,17 @@ export default function CheckInInfo({
               {amenityGroups.map((group) => (
                 <div
                   key={group.title}
-                  className="rounded-lg border border-[#e2d4c1] bg-[#fffaf2]/66 p-4 transition hover:-translate-y-0.5 hover:border-[#cbb68f] hover:shadow-[0_16px_28px_-24px_rgba(37,52,43,0.65)] dark:border-[#2d3b31] dark:bg-[#101916]/42 dark:hover:border-[#566851]"
+                  className="checkin-card checkin-card--interactive p-4"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f0e3ce] text-[#8C6A3E] dark:bg-[#26372d] dark:text-[#D8C7A1]">
+                    <span className="checkin-amenity-icon h-9 w-9">
                       <Icon name={group.icon} className="h-[1.125rem] w-[1.125rem]" />
                     </span>
-                    <h3 className="text-sm font-semibold text-[#25342B] dark:text-[#F3EBDD]">{group.title}</h3>
+                    <h3 className={`${titleClass} text-sm font-semibold`}>{group.title}</h3>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {group.items.map((item) => (
-                      <span
-                        key={item}
-                        className="rounded-full border border-[#e0d0b8] bg-[#F7F1E8]/72 px-3 py-1.5 text-xs font-medium text-[#536252] dark:border-[#344439] dark:bg-[#101916]/52 dark:text-[#C4D0C2]"
-                      >
+                      <span key={item} className="checkin-chip">
                         {item}
                       </span>
                     ))}
@@ -1060,11 +1056,11 @@ export default function CheckInInfo({
 
           <section className={`${panelClass} p-5 sm:p-6`} aria-labelledby="tips-title">
             <SectionTitle id="tips-title" title={t.checkinInfo?.tipsTitle || 'Local Tips'} icon="mapPin" />
-            <div className="divide-y divide-[#e6dac8] dark:divide-[#2b3a30]">
+            <div className="checkin-divided">
               {tipItems.map((tip) => (
                 <div key={tip.text} className="flex gap-3 py-4 first:pt-0 last:pb-0">
-                  <Icon name={tip.icon} className="mt-0.5 h-5 w-5 shrink-0 text-[#A86F4C] dark:text-[#D8C7A1]" />
-                  <p className="text-sm leading-6 text-[#536252] dark:text-[#C4D0C2]">{tip.text}</p>
+                  <Icon name={tip.icon} className={accentIconClass} />
+                  <p className={`${bodyTextClass} text-sm leading-6`}>{tip.text}</p>
                 </div>
               ))}
             </div>
@@ -1072,11 +1068,11 @@ export default function CheckInInfo({
 
           <section className={`${panelClass} p-5 sm:p-6`} aria-labelledby="neighborhood-title">
             <SectionTitle id="neighborhood-title" eyebrow={ui.nearby} title={ui.neighborhood} icon="map" />
-            <p className="max-w-2xl text-sm leading-6 text-[#617061] dark:text-[#C4D0C2]">
+            <p className={`${bodyTextClass} max-w-2xl text-sm leading-6`}>
               {checkinStrings.locationDescription || "Discover your apartment's prime location in Kalamata and explore Kalamata Moments, services, and sights within minutes."}
             </p>
             <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(260px,0.65fr)]">
-              <div className="overflow-hidden rounded-lg border border-[#d8c8ad] bg-[#fffaf2] shadow-sm dark:border-[#2d3b31] dark:bg-[#101916]">
+              <div className="checkin-map-shell">
                 <DynamicApartmentLocationMap
                   locale={locale}
                   height={MAP_HEIGHT}
@@ -1093,12 +1089,12 @@ export default function CheckInInfo({
                   {locationHighlights.map(({ title, description }) => (
                     <div
                       key={`${title}-${description}`}
-                      className="flex gap-3 rounded-lg border border-[#e2d4c1] bg-[#fffaf2]/66 p-3 dark:border-[#2d3b31] dark:bg-[#101916]/42"
+                      className="checkin-card flex gap-3 p-3"
                     >
-                      <Icon name="mapPin" className="mt-0.5 h-5 w-5 shrink-0 text-[#A86F4C] dark:text-[#D8C7A1]" />
+                      <Icon name="mapPin" className={accentIconClass} />
                       <div>
-                        <h3 className="text-sm font-semibold text-[#25342B] dark:text-[#F3EBDD]">{title}</h3>
-                        <p className="mt-1 text-xs leading-5 text-[#617061] dark:text-[#C4D0C2]">{description}</p>
+                        <h3 className={`${titleClass} text-sm font-semibold`}>{title}</h3>
+                        <p className={`${bodyTextClass} mt-1 text-xs leading-5`}>{description}</p>
                       </div>
                     </div>
                   ))}

@@ -15,7 +15,7 @@ export default async function AdminPage() {
   await requireAdminPageSession();
 
   return (
-    <main className="min-h-screen" style={{ background: 'var(--sand-50)' }}>
+    <main className="admin-page-shell min-h-screen">
       <AdminSessionManager />
       <AdminHomeClient />
     </main>

@@ -76,7 +76,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
   return (
     <html>
       <body>
-        <div className="min-h-screen flex items-center justify-center p-6" style={{ background: 'var(--sand-50)' }}>
+        <div className="page-bg min-h-screen flex items-center justify-center p-6">
           <div className="max-w-md w-full text-center space-y-6 surface-card rounded-lg shadow-lg p-8">
             {/* Error Icon */}
             <div className="text-red-500 mb-4">
@@ -114,16 +114,14 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
 
               <button
                 onClick={handleReload}
-                className="w-full px-6 py-3 border border-gray-300 text-body surface-interactive rounded-lg transition-colors"
-                style={{ borderColor: 'var(--border-soft)' }}
+                className="w-full px-6 py-3 border border-soft text-body surface-interactive rounded-lg transition-colors"
               >
                 Reload Page
               </button>
 
               <button
                 onClick={handleGoHome}
-                className="w-full px-6 py-3 border border-gray-300 text-body surface-interactive rounded-lg transition-colors"
-                style={{ borderColor: 'var(--border-soft)' }}
+                className="w-full px-6 py-3 border border-soft text-body surface-interactive rounded-lg transition-colors"
               >
                 Go to Homepage
               </button>

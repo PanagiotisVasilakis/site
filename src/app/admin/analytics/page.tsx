@@ -31,7 +31,7 @@ export default async function AnalyticsAdminPage() {
   const p90 = percentile(hourCounts, 0.9);
   const p99 = percentile(hourCounts, 0.99);
   return (
-    <div className="mx-auto max-w-4xl p-6 space-y-8 min-h-screen" style={{ background: 'var(--sand-50)' }}>
+    <div className="admin-page-shell mx-auto max-w-4xl p-6 space-y-8 min-h-screen">
       <AdminSessionManager />
       <h1 className="text-2xl font-semibold page-title">Analytics Overview</h1>
       <section className="grid gap-4 md:grid-cols-2">

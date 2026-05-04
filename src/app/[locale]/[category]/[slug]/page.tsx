@@ -30,6 +30,7 @@ export default async function ItemPage({ params }: { params: Promise<{ locale: s
   const descriptionTitle = pickLocale(item, "descriptionTitle", eff) ?? item.descriptionTitle;
 
   const recently = isRecentlyUpdated(item);
+  const heroImage = item.heroImage ?? item.image;
 
   // Use centralized layout for moments category
   if (cat.slug === 'moments') {
@@ -90,7 +91,7 @@ export default async function ItemPage({ params }: { params: Promise<{ locale: s
             url: absUrl(`/${eff}/${cat.slug}/${slug}`),
             telephone: item.phone,
             aggregateRating: item.rating ? { '@type': 'AggregateRating', ratingValue: item.rating } : undefined,
-            image: item.image,
+            image: heroImage,
           })
         }}
       />
@@ -98,13 +99,13 @@ export default async function ItemPage({ params }: { params: Promise<{ locale: s
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-serif italic font-bold flex items-center gap-2">{name}{recently && <span className="text-xs rounded bg-amber-200 text-amber-900 px-2 py-0.5">{t.labels?.updated ?? 'Updated'}</span>}</h1>
-            {summary && <p className="text-sm opacity-80">{summary}</p>}
+            {summary && <p className="text-body text-sm">{summary}</p>}
           </div>
         </div>
       </header>
-      {item.image && (
+      {heroImage && (
         <Suspense fallback={<Skeleton className="w-full h-60" />}>
-          <ResponsiveImage src={item.image} alt={name} width={800} height={500} className="w-full" priority />
+          <ResponsiveImage src={heroImage} alt={name} width={800} height={500} className="w-full" priority />
         </Suspense>
       )}
 

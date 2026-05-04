@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import internalFetch from '@/lib/internalFetchClient';
 import { getStoredAdminSecret, persistAdminSecretFromUrl } from '@/lib/adminClientSession';
+import { Badge, Button, MetricCard, Surface } from '@/components/ui';
 
 type Summary = {
   pending: number;
@@ -99,7 +100,7 @@ export default function AdminHomeClient() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="surface-card rounded-xl p-6 shadow-lg">
+      <Surface padding="lg" radius="lg" shadow="lg" border="none">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-accent-subtle">
@@ -112,17 +113,14 @@ export default function AdminHomeClient() {
               Manage guest arrival requests, bookings, and operational monitoring from one place.
             </p>
           </div>
-          <Link
-            href="/admin/requests"
-            className="inline-flex min-h-11 items-center justify-center rounded-full bg-[color:var(--brand-700)] px-5 py-2 text-sm font-semibold text-[color:var(--fg-inverse)] shadow-sm transition hover:bg-[color:var(--brand-800)]"
-          >
-            Review requests
-          </Link>
+          <Button asChild variant="primary" className="min-h-11 px-5">
+            <Link href="/admin/requests">Review requests</Link>
+          </Button>
         </div>
-      </div>
+      </Surface>
 
       {error && (
-        <div className="mt-5 rounded-lg border border-[#dfb8a8] bg-[#fff4ef] px-4 py-3 text-sm text-[#82432d] dark:border-[#613426] dark:bg-[#321d17] dark:text-[#F0B8A0]" role="alert">
+        <div className="mt-5 rounded-lg px-4 py-3 text-sm feedback-error" role="alert">
           {error}
         </div>
       )}
@@ -134,12 +132,7 @@ export default function AdminHomeClient() {
           ['Rejected', summary.rejected],
           ['Total', summary.total],
         ].map(([label, value]) => (
-          <div key={label} className="surface-card rounded-lg border border-soft p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-subtle">{label}</p>
-            <p className="mt-2 text-3xl font-semibold text-text-accent">
-              {state === 'loading' ? '...' : value}
-            </p>
-          </div>
+          <MetricCard key={label} label={label} value={state === 'loading' ? '...' : value} />
         ))}
       </section>
 
@@ -150,9 +143,9 @@ export default function AdminHomeClient() {
               <div>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <h2 className="font-serif text-2xl font-semibold italic section-title">{card.title}</h2>
-                  <span className="rounded-full bg-[#f0e3ce] px-3 py-1 text-xs font-semibold text-[#6f552f] dark:bg-[#26372d] dark:text-[#D8C7A1]">
+                  <Badge variant="warning">
                     {card.value}
-                  </span>
+                  </Badge>
                 </div>
                 <p className="mt-3 text-sm leading-6 text-body">{card.body}</p>
               </div>
@@ -160,19 +153,19 @@ export default function AdminHomeClient() {
                 {card.href ? (
                   <Link
                     href={card.href}
-                    className="inline-flex min-h-10 items-center justify-center rounded-full border border-[#cfb994] px-4 py-2 text-sm font-semibold text-[#6f552f] transition hover:bg-[#f4eadb] dark:border-[#4a5a4d] dark:text-[#D8C7A1] dark:hover:bg-[#203026]"
+                    className="admin-action-outline"
                   >
                     {card.action}
                   </Link>
                 ) : (
-                  <span className="inline-flex min-h-10 items-center rounded-full border border-soft px-4 py-2 text-sm font-semibold text-subtle">
+                  <span className="admin-action-muted">
                     {card.action}
                   </span>
                 )}
                 {card.secondaryHref && (
                   <Link
                     href={card.secondaryHref}
-                    className="inline-flex min-h-10 items-center justify-center rounded-full border border-soft px-4 py-2 text-sm font-semibold text-body transition hover:bg-[color:var(--layer-surface-alt)]"
+                    className="admin-action-outline"
                   >
                     Open monitoring
                   </Link>

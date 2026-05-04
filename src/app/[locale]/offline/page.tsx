@@ -18,17 +18,17 @@ export default async function OfflineLocalePage({ params }: { params: Promise<{ 
             <span className="text-3xl" aria-hidden>📡</span>
             <h1 className="text-xl md:text-2xl font-serif italic font-bold">{t.appTitle}</h1>
           </div>
-          <p className="text-sm leading-relaxed mb-3 opacity-90">
+          <p className="text-body text-sm leading-relaxed mb-3">
             {greek
               ? "Δεν υπάρχει σύνδεση στο διαδίκτυο. Το περιεχόμενο που έχετε ήδη ανοίξει παραμένει διαθέσιμο."
               : "You’re offline. Content you opened before is still available."}
           </p>
-          <p className="text-xs leading-relaxed mb-6 opacity-75">
+          <p className="text-body text-xs leading-relaxed mb-6">
             {greek
               ? "Μόλις επανέλθει η σύνδεση, η σελίδα θα προσπαθήσει να ανανεωθεί αυτόματα."
               : "Once the connection is back, the page will try to refresh automatically."}
           </p>
-          <div className="text-[11px] mb-2 opacity-60">
+          <div className="text-body text-[11px] mb-2">
             {greek ? "Συμβουλή: ανοίξτε σημαντικές σελίδες όταν είστε online για πρόσβαση αργότερα." : "Tip: open important pages while online so they’re ready later."}
           </div>
           <OfflineActions homeHref={homeHref} homeLabel={t.cta.home} retryLabel={greek ? "Επαναφόρτωση" : "Retry"} />

@@ -1,0 +1,164 @@
+/* Global top gap under fixed main bar */
+:root {
+  --top-gap: 5vh;
+  /* Adjust this to increase/decrease the uniform spacing */
+}
+
+.top-gap {
+  /* Add safe-area inset for iOS notch devices */
+  margin-top: calc(var(--top-gap, 5vh) + env(safe-area-inset-top));
+}
+
+/* Utility to cancel the top gap on specific pages (e.g., villa) */
+.cancel-top-gap {
+  margin-top: calc(var(--top-gap, 5vh) * -1);
+}
+
+/* Responsive page container utility for consistent spacing */
+.page-container {
+  margin-left: auto;
+  margin-right: auto;
+  /* Fluid horizontal/vertical padding that adapts to viewport */
+  padding-left: clamp(1rem, 4vw, 2.5rem);
+  padding-right: clamp(1rem, 4vw, 2.5rem);
+  padding-top: clamp(1rem, 3vw, 2rem);
+  padding-bottom: clamp(1rem, 3vw, 2rem);
+  width: 100%;
+  /* Let pages control max-width (e.g., max-w-3xl/6xl) */
+}
+
+/* Keep global layout rules predictable. Component grids own their breakpoints. */
+h1,
+h2,
+h3 {
+  line-height: var(--line-height-tight);
+}
+
+p {
+  line-height: var(--line-height-normal);
+}
+
+/* Ensure touch targets are at least 44x44px on mobile */
+@media (max-width: 640px) {
+  :where(button, a, [role="button"], [tabindex="0"]):not(.top-controls-compact *):not(.mobile-menu-panel *):not(.mobile-2col-grid *) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Better spacing on mobile */
+  .page-container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  /* Make cards more compact on mobile */
+  .card {
+    padding: 0.75rem;
+    border-radius: 8px;
+  }
+
+  /* Use this only on intentional compact two-column mobile layouts. */
+  .mobile-2col-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem !important;
+  }
+}
+
+/* Coarse pointers include tablet boundary viewports such as 768x1024. */
+@media (hover: none), (pointer: coarse) {
+  :where(button, a[href], input:not([type="hidden"]), select, textarea, [role="button"], [role="radio"], [tabindex="0"]) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  :where(button, a[href], [role="button"], [role="radio"], [tabindex="0"]) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  :where(.btn-primary, .btn-outline, .btn-secondary, .btn-tint, .btn-sm, .booking-button, .search-go, .search-trigger, .guest-input, .input) {
+    min-height: 44px !important;
+  }
+
+  :where(.btn-primary, .btn-outline, .btn-secondary, .btn-tint, .btn-sm) {
+    height: auto !important;
+  }
+}
+
+/* Tablet spacing */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .page-container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+
+  .card {
+    padding: 1.25rem;
+  }
+}
+
+/* Desktop spacing */
+@media (min-width: 1025px) {
+  .page-container {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+
+  .card {
+    padding: 1.5rem;
+  }
+}
+
+/* Top menu bar dark mode: match menu item color */
+[data-theme="dark"] .fixed.top-0.left-0.right-0 .flex.items-center {
+  color: inherit;
+}
+
+/* Mobile Quick Access menu dark mode */
+.mobile-menu-panel {
+  background: #ffffff;
+  border-color: rgb(226, 232, 240);
+  color: rgb(30, 41, 59);
+}
+
+[data-theme="dark"] .mobile-menu-panel {
+  background: #050b11;
+  border-color: rgba(148, 163, 184, 0.35);
+  color: #ffffff;
+}
+
+[data-theme="dark"] .mobile-menu-panel .locale-switcher,
+[data-theme="dark"] .mobile-menu-panel button {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+[data-theme="dark"] .mobile-menu-panel .locale-switcher:hover,
+[data-theme="dark"] .mobile-menu-panel button:hover {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.mobile-menu-item {
+  background: rgb(241, 245, 249);
+  border-color: rgb(226, 232, 240);
+  color: rgb(30, 41, 59);
+}
+
+[data-theme="dark"] .mobile-menu-item {
+  background: #1f2937;
+  border-color: #475569;
+  color: #f8fafc;
+}
+
+.mobile-menu-item:hover {
+  background: rgb(226, 232, 240);
+}
+
+[data-theme="dark"] .mobile-menu-item:hover {
+  background: rgb(51, 65, 85);
+}
+
+/* Homepage typography: make headings/text match the main menu color */

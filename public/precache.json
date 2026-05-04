@@ -7,9 +7,11 @@
   "/el/moments/viktoria-karelia-greek-costumes-collection",
   "/el/moments/war-museum-kalamata-branch",
   "/el/phones",
-  "/el/phones/ambulance",
-  "/el/phones/police",
-  "/el/phones/taxi",
+  "/el/phones/emergency-112",
+  "/el/phones/general-hospital-of-kalamata",
+  "/el/phones/kalamata-fire-department",
+  "/el/phones/kalamata-police-station",
+  "/el/phones/radio-taxi-kalamatas",
   "/en",
   "/en/moments",
   "/en/moments/archaeological-museum-of-messinia",
@@ -18,7 +20,9 @@
   "/en/moments/viktoria-karelia-greek-costumes-collection",
   "/en/moments/war-museum-kalamata-branch",
   "/en/phones",
-  "/en/phones/ambulance",
-  "/en/phones/police",
-  "/en/phones/taxi"
+  "/en/phones/emergency-112",
+  "/en/phones/general-hospital-of-kalamata",
+  "/en/phones/kalamata-fire-department",
+  "/en/phones/kalamata-police-station",
+  "/en/phones/radio-taxi-kalamatas"
 ]

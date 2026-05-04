@@ -4,6 +4,7 @@ import { ItemSchema, type Item } from "../data/schemas";
 import { categories } from "../data/categories";
 import type { Locale } from "@/i18n/config";
 import { logger } from '@/lib/logger-enterprise';
+export { mapsHref, telHref } from '@/lib/contactLinks';
 
 const dataRoot = path.join(process.cwd(), "src", "data", "items");
 
@@ -86,18 +87,6 @@ export function toSlug(name: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
-}
-
-export function telHref(phone?: string): string | undefined {
-  if (!phone) return undefined;
-  const digits = phone.replace(/[^+0-9]/g, "");
-  return `tel:${digits}`;
-}
-
-export function mapsHref(address?: string, lat?: number, lng?: number): string | undefined {
-  if (!address && (lat == null || lng == null)) return undefined;
-  if (lat != null && lng != null) return `https://maps.google.com/?q=${lat},${lng}`;
-  return `https://maps.google.com/?q=${encodeURIComponent(address!)}`;
 }
 
 export function pickLocale<T extends Record<string, unknown>>(obj: T, baseKey: string, locale: Locale): string | undefined {

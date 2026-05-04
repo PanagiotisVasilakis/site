@@ -5,12 +5,9 @@ import ListingCard from '@/components/ListingCard';
 import FilterDrawer from '@/components/FilterDrawer';
 import { ListingCardSkeleton } from '@/components/ListingCardSkeleton';
 import dynamic from 'next/dynamic';
-import { useFavorites } from '@/lib/favorites';
-import { useToast } from '@/components/Toast';
 import { EmptyState, MomentCard, MomentsToolbar } from '@/components/moments';
 import { filterMomentsByCategory, type MomentsFilterKey } from '@/components/moments/MomentsFilterMenu';
 import { momentsLayoutConfig } from '@/config/momentsLayoutConfig';
-import GuideOptionCard from '@/components/GuideOptionCard';
 
 // Dynamic import for map component - only loads when needed
 const ApartmentLocationMap = dynamic(() => import('@/components/ApartmentLocationMap'), {
@@ -44,6 +41,7 @@ interface Item {
   directionsUrl?: string;
   sourceUrls?: string[];
   priceLevel?: number;
+  hideAddressOnFront?: boolean;
   categorySlug: string;
 }
 
@@ -55,72 +53,23 @@ interface Props {
   phonesLayout?: boolean;
   momentsLayout?: boolean;
   ui?: { filters: string; map: string; list: string; resetAll: string; activeTags: string; none: string; };
+  cardLabels?: {
+    viewDetails: string;
+    back: string;
+    call: string;
+    directions: string;
+    website: string;
+  };
   momentsFilters?: { all: string; beaches: string; museums: string; restaurants: string; bars: string; brunchs: string; taygetos: string; sites: string; nearby: string; };
 }
 
-function PhoneOptionIcon({ id }: { id: string }) {
-  const common = {
-    width: 26,
-    height: 26,
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: 1.9,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-    focusable: false,
-  };
 
-  if (id === 'police') {
-    return (
-      <svg {...common} aria-hidden>
-        <path d="M12 3l7 3v5.5c0 4.4-2.8 7.5-7 9.5-4.2-2-7-5.1-7-9.5V6l7-3z" />
-        <path d="M9.2 12.1l1.9 1.9 3.9-4.2" />
-      </svg>
-    );
-  }
-
-  if (id === 'ambulance') {
-    return (
-      <svg {...common} aria-hidden>
-        <path d="M3 8h10v8H3z" />
-        <path d="M13 10h3.2l2.8 3v3h-6z" />
-        <path d="M6.5 18.5a1.6 1.6 0 1 0 0-3.2 1.6 1.6 0 0 0 0 3.2z" />
-        <path d="M16.8 18.5a1.6 1.6 0 1 0 0-3.2 1.6 1.6 0 0 0 0 3.2z" />
-        <path d="M8 6v5" />
-        <path d="M5.5 8.5h5" />
-      </svg>
-    );
-  }
-
-  if (id === 'taxi') {
-    return (
-      <svg {...common} aria-hidden>
-        <path d="M6 16h12" />
-        <path d="M5 12l1.6-4.2A2 2 0 0 1 8.5 6.5h7a2 2 0 0 1 1.9 1.3L19 12" />
-        <path d="M4 12h16v5H4z" />
-        <path d="M7 17.5v1" />
-        <path d="M17 17.5v1" />
-        <path d="M9.5 4.5h5" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg {...common} aria-hidden>
-      <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.4 19.4 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z" />
-    </svg>
-  );
-}
-
-function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, ui, phonesLayout, momentsLayout, momentsFilters }: Props) {
+function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, ui, cardLabels, phonesLayout, momentsLayout, momentsFilters }: Props) {
   const [active, setActive] = useState<string[]>([]);
   const [showMap, setShowMap] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [momentsFilter, setMomentsFilter] = useState<MomentsFilterKey>('all');
   const [momentsSearch, setMomentsSearch] = useState('');
-  const { isFavorite, toggle } = useFavorites();
-  const { push } = useToast();
   // URL persistence
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -129,6 +78,9 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
     if (tags) setActive(tags.split(',').filter(Boolean));
     if (map === '1') setShowMap(true);
   }, []);
+  useEffect(() => {
+    if (phonesLayout) setShowMap(false);
+  }, [phonesLayout]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (active.length > 0) params.set('tags', active.join(',')); else params.delete('tags');
@@ -177,6 +129,49 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
     return () => obs.disconnect();
   }, [rest.length]);
 
+  const renderMomentCard = (i: Item, index: number) => (
+    <MomentCard
+      key={i.id}
+      id={i.id}
+      slug={i.slug}
+      name={i.name}
+      summary={i.summary}
+      description={i.description}
+      rating={i.rating}
+      price={i.price}
+      icon={i.icon}
+      image={i.image}
+      heroImage={i.heroImage}
+      heroImagePosition={i.heroImagePosition}
+      priority={index === 0}
+      tags={i.tags}
+      address={i.address}
+      location={i.location}
+      directionsUrl={i.directionsUrl}
+      phone={i.phone}
+      phones={i.phones}
+      website={i.website}
+      hideAddressOnFront={i.hideAddressOnFront}
+      categorySlug={categorySlug}
+      locale={locale}
+      labels={cardLabels}
+    />
+  );
+
+  const renderMomentsToolbar = () => (
+    <MomentsToolbar
+      search={momentsSearch}
+      onSearchChange={setMomentsSearch}
+      activeFilter={momentsFilter}
+      onFilterChange={setMomentsFilter}
+      showMap={showMap}
+      onMapToggle={() => setShowMap(m => !m)}
+      mapLabel={ui?.map || 'Map'}
+      listLabel={ui?.list || 'List'}
+      filters={momentsFilters}
+    />
+  );
+
   const renderGroup = useCallback((group: Item[], progressive = false) => {
     if (group.length === 0) return null;
     const slice = progressive ? group.slice(0, visibleCount) : group;
@@ -205,7 +200,7 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
   }, [visibleCount, locale, categorySlug]);
   return (
     <div>
-      {!momentsLayout && (
+      {!(phonesLayout || momentsLayout) && (
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="flex-1" />
         <div className="flex items-center gap-2">
@@ -223,71 +218,20 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
         </div>
       )}
 
-      {/* Phones layout: responsive grid that wraps to next row when needed */}
-      {categorySlug === 'phones' && phonesLayout && !showMap ? (
-        <div className="max-w-5xl mx-auto px-4 mb-6">
-          <div className="guide-option-grid mx-auto">
-            {items.map(i => {
-              const fid = `${categorySlug}:${i.id}`;
-              const wish = isFavorite(fid);
-              const toggleLocal = () => { const before = isFavorite(fid); toggle(fid); if (!before) push('Added to favorites'); else push('Removed from favorites'); };
-              return (
-                <GuideOptionCard
-                  key={i.id}
-                  href={`/${locale}/${categorySlug}/${i.slug}`}
-                  title={i.name}
-                  summary={i.summary}
-                  icon={<PhoneOptionIcon id={i.id} />}
-                  minHeightClass="min-h-[200px]"
-                  action={
-                    <button type="button" aria-label={wish ? 'Remove favorite' : 'Add to favorites'} className="wishlist-btn" onClick={toggleLocal}>
-                      <span aria-hidden>{wish ? '❤️' : '🤍'}</span>
-                    </button>
-                  }
-                />
-              );
-            })}
+      {/* Phones layout: moments-style grid */}
+      {categorySlug === 'phones' && phonesLayout ? (
+        <div className={momentsLayoutConfig.grid.containerClass}>
+          <div className={momentsLayoutConfig.grid.gridClass}>
+            {items.map(renderMomentCard)}
           </div>
         </div>
       ) : null}
       {/* Moments layout */}
       {categorySlug === 'moments' && momentsLayout && !showMap ? (
         <div className={momentsLayoutConfig.grid.containerClass}>
-          <MomentsToolbar
-            search={momentsSearch}
-            onSearchChange={setMomentsSearch}
-            activeFilter={momentsFilter}
-            onFilterChange={setMomentsFilter}
-            showMap={showMap}
-            onMapToggle={() => setShowMap(m => !m)}
-            mapLabel={ui?.map || 'Map'}
-            listLabel={ui?.list || 'List'}
-            filters={momentsFilters}
-          />
+          {renderMomentsToolbar()}
           <div className={momentsLayoutConfig.grid.gridClass}>
-            {momentsFiltered.map((i, index) => (
-              <MomentCard
-                key={i.id}
-                id={i.id}
-                slug={i.slug}
-                name={i.name}
-                summary={i.summary}
-                description={i.description}
-                rating={i.rating}
-                price={i.price}
-                icon={i.icon}
-                image={i.image}
-                heroImage={i.heroImage}
-                heroImagePosition={i.heroImagePosition}
-                priority={index === 0}
-                tags={i.tags}
-                address={i.address}
-                location={i.location}
-                directionsUrl={i.directionsUrl}
-                categorySlug={categorySlug}
-                locale={locale}
-              />
-            ))}
+            {momentsFiltered.map(renderMomentCard)}
           </div>
           {momentsFiltered.length === 0 && (
             <EmptyState
@@ -299,17 +243,7 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
       ) : null}
       {categorySlug === 'moments' && momentsLayout && showMap ? (
         <div className={momentsLayoutConfig.grid.containerClass}>
-          <MomentsToolbar
-            search={momentsSearch}
-            onSearchChange={setMomentsSearch}
-            activeFilter={momentsFilter}
-            onFilterChange={setMomentsFilter}
-            showMap={showMap}
-            onMapToggle={() => setShowMap(m => !m)}
-            mapLabel={ui?.map || 'Map'}
-            listLabel={ui?.list || 'List'}
-            filters={momentsFilters}
-          />
+          {renderMomentsToolbar()}
           <div className="moments-map-panel">
             <ApartmentLocationMap
               locale={locale}
@@ -384,7 +318,7 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
               </div>
               <div>
                 <h3 className="text-sm font-serif italic font-bold mb-1 text-small-strong">Stub Controls</h3>
-                <p className="text-xs text-small-strong" style={{ fontWeight: 400 }}>Add price range, rating slider, open now, etc.</p>
+                <p className="text-xs text-small-strong font-normal">Add price range, rating slider, open now, etc.</p>
               </div>
               <div>
                 <button onClick={() => { setActive([]); }} className="text-xs underline">{ui?.resetAll || 'Reset All'}</button>

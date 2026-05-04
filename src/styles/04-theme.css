@@ -1,0 +1,110 @@
+/* Explicit dark theme via data-theme="dark" overrides media query */
+[data-theme="dark"] {
+  --background: #0a0f10;
+  --foreground: #e6f7f5;
+  --sand-50: #11191a;
+  --sand-100: #1b2729;
+  --sea-50: #0d1f1e;
+  --sea-100: #12312f;
+  --layer-bg-subtle: #101a1b;
+  --layer-surface: #172325;
+  --layer-surface-alt: #1d3032;
+  --brand-50: #103b38;
+  --brand-100: #0d524c;
+  --brand-200: #0a6a61;
+  --brand-300: #088276;
+  --brand-400: #0b998b;
+  --brand-500: #12b3a4;
+  --brand-600: #19c7b6;
+  --brand-700: #30d5c4;
+  --brand-900: #5fe9dd;
+  --accent-50: #4a2015;
+  --accent-100: #672c1d;
+  --accent-200: #8a3a27;
+  --accent-300: #b24933;
+  --accent-400: #d85a3f;
+  --accent-500: #ff6d4d;
+
+  /* Dark semantic token overrides */
+  --border-soft: rgba(255, 255, 255, 0.08);
+  --border-soft-strong: rgba(255, 255, 255, 0.15);
+  --border-accent: var(--brand-400);
+  /* Increase brand contrast for readability in dark mode */
+  --text-accent: var(--brand-400);
+  --text-accent-subtle: var(--brand-300);
+  --text-strong: var(--brand-500);
+
+  /* Dark mode text colors - two visible tones */
+  --fg-default: #e2e8f0;
+  /* Primary text - light but not too bright */
+  --fg-muted: #64748b;
+  /* Secondary text - darker for more distinction */
+
+  /* Badge tokens (dark) */
+  --badge-info-bg: rgba(17, 25, 26, 0.55);
+  --badge-info-fg: var(--brand-300);
+  --badge-warn-bg: #3a2812;
+  --badge-warn-fg: #ffb877;
+  --badge-ok-bg: #12352c;
+  --badge-ok-fg: #49d1a8;
+  --danger-600: #F0B8A0;
+
+  /* Dark semantic action mapping (slightly lighter brand step to equalize contrast) */
+  --action-bg: var(--brand-300);
+  --action-bg-hover: var(--brand-400);
+  --action-fg: #042c28;
+}
+
+/* Force apartment-style dark background on all pages and containers in dark mode */
+[data-theme="dark"] body {
+  background: linear-gradient(180deg, #0a0f10 0%, #0d1416 35%, #101a1b 100%);
+  background-attachment: fixed;
+  position: relative;
+}
+
+/* Subtle grid pattern overlay */
+[data-theme="dark"] body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image:
+    linear-gradient(rgba(18, 179, 164, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(18, 179, 164, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.4;
+}
+
+/* Ensure page containers inherit the dark background with subtle depth */
+[data-theme="dark"] .page-container {
+  background: transparent;
+  position: relative;
+  z-index: 1;
+}
+
+/* Elegant radial glow overlay for depth */
+[data-theme="dark"] .page-container::before {
+  content: "";
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(100%, 1200px);
+  height: 800px;
+  background: radial-gradient(ellipse at top center, rgba(18, 179, 164, 0.08) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Make sure min-h-screen elements use the correct background */
+[data-theme="dark"] .min-h-screen {
+  background: transparent;
+  position: relative;
+  z-index: 1;
+}
+
+/* Button primitives (moved outside dark theme block) */

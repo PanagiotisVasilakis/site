@@ -16,6 +16,9 @@ export async function GET() {
     <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui.css" />
     <link rel="icon" type="image/png" href="/favicon.ico" />
     <style>
+        :root {
+            --title-font: Georgia, "Times New Roman", serif;
+        }
         html {
             box-sizing: border-box;
             overflow: -moz-scrollbars-vertical;
@@ -28,6 +31,12 @@ export async function GET() {
             margin: 0;
             background: #fafafa;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        h1, h2, h3,
+        .swagger-ui .info .title,
+        .swagger-ui .opblock-tag,
+        .swagger-ui .opblock-summary-path {
+            font-family: var(--title-font);
         }
         .swagger-ui .topbar {
             background-color: #1976d2;
