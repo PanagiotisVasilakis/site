@@ -66,7 +66,7 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
 
     const failure = encodeURIComponent(failurePath);
     const next = encodeURIComponent(`/${eff}/check-in`);
-    redirect(`/api/portal/refresh?next=${next}&failure=${failure}`);
+    redirect(`/${eff}/portal/refresh?next=${next}&failure=${failure}`);
   }
 
   return (
