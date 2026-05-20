@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger-enterprise';
-import { CheckInRequestStatus } from '@prisma/client';
-import type { CheckInRequest } from '@prisma/client';
+import { CheckInRequestStatus } from '@/generated/prisma/client';
+import type { CheckInRequest } from '@/generated/prisma/client';
 import crypto from 'node:crypto';
 
 export type CheckInRequestRecord = {

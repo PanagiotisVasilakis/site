@@ -46,6 +46,7 @@ yarn-error.log*
 /reports/**/screenshots-*/
 /lighthouse.*
 /.lighthouse*/
+/src/generated/prisma/
 
 # generated local runtime data
 /analytics-data.json

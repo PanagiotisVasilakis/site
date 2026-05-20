@@ -20,9 +20,11 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 COPY .npmrc* ./
+COPY prisma ./prisma
+COPY prisma.config.ts ./
 
 # Install dependencies with security flags
-RUN npm ci --only=production --audit=false --fund=false && \
+RUN npm ci --audit=false --fund=false && \
     npm cache clean --force
 
 # Copy source code with proper ownership
@@ -32,7 +34,7 @@ COPY --chown=nextjs:nodejs . .
 RUN npm run build && \
     # Remove dev dependencies and source after build
     rm -rf node_modules src && \
-    npm ci --only=production --audit=false --fund=false
+    npm ci --omit=dev --ignore-scripts --audit=false --fund=false
 
 # Stage 2: Production runtime
 FROM node:20-alpine AS runner

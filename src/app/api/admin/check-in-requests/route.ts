@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { CheckInRequestStatus } from '@prisma/client';
+import { CheckInRequestStatus } from '@/generated/prisma/client';
 import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import { isAdminRequest } from '@/lib/rbac';

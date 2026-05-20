@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger-enterprise';
 import crypto from 'node:crypto';
-import type { User as PrismaUser, CountryOrigin } from '@prisma/client';
+import type { User as PrismaUser, CountryOrigin } from '@/generated/prisma/client';
 
 export type UserRecord = {
   id: string;
