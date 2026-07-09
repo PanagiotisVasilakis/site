@@ -4,6 +4,7 @@ import type { Prisma } from '@/generated/prisma/client';
 import { logger } from '@/lib/logger-enterprise';
 import { tracer, SpanStatus } from '@/lib/distributed-tracing';
 import { metrics } from '@/lib/metrics-collector';
+import { buildPrismaPgAdapterArgs } from '@/lib/prismaPgConfig';
 
 type ExtendedGlobal = typeof globalThis & {
   __prisma__?: PrismaClient;
@@ -18,20 +19,6 @@ type PrismaClientWithEvents = PrismaClient & {
 const globalThisWithPrisma = globalThis as ExtendedGlobal;
 let prismaInitLogged = false;
 
-type PrismaPgConfig = ConstructorParameters<typeof PrismaPg>[0];
-type PrismaPgOptions = NonNullable<ConstructorParameters<typeof PrismaPg>[1]>;
-
-const DEFAULT_CONNECTION_TIMEOUT_MS = 5_000;
-const DEFAULT_IDLE_TIMEOUT_MS = 300_000;
-const PRISMA_URL_PARAMS = [
-  'connection_limit',
-  'pool_timeout',
-  'connect_timeout',
-  'max_idle_connection_lifetime',
-  'max_connection_lifetime',
-  'schema',
-] as const;
-
 function assertDatabaseUrl(): string {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -41,73 +28,8 @@ function assertDatabaseUrl(): string {
   return databaseUrl;
 }
 
-function parsePositiveInteger(value: string | null): number | undefined {
-  if (!value) {
-    return undefined;
-  }
-
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-}
-
-function secondsToMilliseconds(seconds: number): number {
-  return seconds * 1_000;
-}
-
-function buildPgAdapterArgs(connectionString: string): {
-  config: PrismaPgConfig;
-  options?: PrismaPgOptions;
-} {
-  const config: PrismaPgConfig = {
-    connectionString,
-    connectionTimeoutMillis: DEFAULT_CONNECTION_TIMEOUT_MS,
-    idleTimeoutMillis: DEFAULT_IDLE_TIMEOUT_MS,
-  };
-
-  try {
-    const url = new URL(connectionString);
-    const connectionLimit = parsePositiveInteger(url.searchParams.get('connection_limit'));
-    const connectTimeout = parsePositiveInteger(url.searchParams.get('connect_timeout'));
-    const poolTimeout = parsePositiveInteger(url.searchParams.get('pool_timeout'));
-    const maxIdleLifetime = parsePositiveInteger(url.searchParams.get('max_idle_connection_lifetime'));
-    const maxConnectionLifetime = parsePositiveInteger(url.searchParams.get('max_connection_lifetime'));
-    const schema = url.searchParams.get('schema') || undefined;
-
-    if (connectionLimit) {
-      config.max = connectionLimit;
-    }
-
-    const timeoutSeconds = connectTimeout ?? poolTimeout;
-    if (timeoutSeconds) {
-      config.connectionTimeoutMillis = secondsToMilliseconds(timeoutSeconds);
-    }
-
-    if (maxIdleLifetime) {
-      config.idleTimeoutMillis = secondsToMilliseconds(maxIdleLifetime);
-    }
-
-    if (maxConnectionLifetime) {
-      config.maxLifetimeSeconds = maxConnectionLifetime;
-    }
-
-    for (const param of PRISMA_URL_PARAMS) {
-      url.searchParams.delete(param);
-    }
-
-    config.connectionString = url.toString();
-
-    return {
-      config,
-      options: schema ? { schema } : undefined,
-    };
-  } catch {
-    logger.warn('Unable to parse DATABASE_URL for Prisma pg adapter tuning; using raw connection string');
-    return { config };
-  }
-}
-
 function createPrismaPgAdapter(connectionString: string): PrismaPg {
-  const { config, options } = buildPgAdapterArgs(connectionString);
+  const { config, options } = buildPrismaPgAdapterArgs(connectionString);
   return options ? new PrismaPg(config, options) : new PrismaPg(config);
 }
 

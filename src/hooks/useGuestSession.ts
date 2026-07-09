@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import internalFetch from '@/lib/internalFetchClient';
-import { onGuestSessionChange } from '@/lib/sessionSignals';
+import { emitGuestSessionChanged, onGuestSessionChange } from '@/lib/sessionSignals';
+import { logger } from '@/lib/logger-client';
 
 interface UseGuestSessionOptions {
     initialIsSignedIn?: boolean;
@@ -33,19 +34,20 @@ export function useGuestSession({ initialIsSignedIn = false, enabled = true }: U
             const ok = res.ok; // 200 when session verified
             setIsSignedIn(ok);
         } catch {
-            // Network error or aborted -> treat as signed out or keep previous? 
-            // Safe default is signed out if we can't verify
-            setIsSignedIn(false);
+            // Preserve the last verified state during transient network failures.
         }
     }, [enabled]);
 
     const signOut = useCallback(async () => {
         try {
-            await internalFetch('/api/portal/logout', { method: 'POST' });
+            const response = await internalFetch('/api/portal/logout', { method: 'POST' });
+            if (!response.ok) {
+                throw new Error(`Logout failed with status ${response.status}`);
+            }
             setIsSignedIn(false);
-            // Optional: Consumer can handle redirect
+            emitGuestSessionChanged('signout');
         } catch (error) {
-            console.error('Logout failed:', error);
+            logger.error('Guest logout failed', error instanceof Error ? error : { error: String(error) });
         }
     }, []);
 
@@ -63,21 +65,25 @@ export function useGuestSession({ initialIsSignedIn = false, enabled = true }: U
         }
 
         // Instant cross-tab reaction
-        const unsubscribe = onGuestSessionChange(() => {
-            checkSession();
+        const unsubscribe = onGuestSessionChange((event) => {
+            if (event.reason === 'signout') {
+                setIsSignedIn(false);
+                return;
+            }
+            void checkSession();
         });
 
         document.addEventListener('visibilitychange', onVisibility);
         window.addEventListener('focus', onFocus);
 
         // Periodic poll
-        checkerRef.current = window.setInterval(checkSession, 30_000);
+        checkerRef.current = window.setInterval(checkSession, 5 * 60_000);
 
         return () => {
             document.removeEventListener('visibilitychange', onVisibility);
             window.removeEventListener('focus', onFocus);
             unsubscribe?.();
-            if (checkerRef.current) window.clearInterval(checkerRef.current);
+            if (checkerRef.current !== null) window.clearInterval(checkerRef.current);
             inFlight.current?.abort();
         };
     }, [enabled, checkSession]);

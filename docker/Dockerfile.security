@@ -1,6 +1,6 @@
 # Multi-stage Docker build for enhanced security
 # Stage 1: Build dependencies and application
-FROM node:20-alpine AS builder
+FROM node:22.19-alpine AS builder
 
 # Add security labels
 LABEL maintainer="security@villa-app.com"
@@ -8,7 +8,8 @@ LABEL version="1.0"
 LABEL description="Villa booking application - secure build"
 
 # Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+RUN apk add --no-cache dumb-init && \
+    npm install --global npm@11.18.0
 
 # Create non-root user for build
 RUN addgroup -g 1001 -S nodejs
@@ -19,7 +20,6 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-COPY .npmrc* ./
 COPY prisma ./prisma
 COPY prisma.config.ts ./
 
@@ -30,20 +30,15 @@ RUN npm ci --audit=false --fund=false && \
 # Copy source code with proper ownership
 COPY --chown=nextjs:nodejs . .
 
-# Build application
-RUN npm run build && \
-    # Remove dev dependencies and source after build
-    rm -rf node_modules src && \
-    npm ci --omit=dev --ignore-scripts --audit=false --fund=false
+# Build application. Next.js standalone output contains the required runtime modules.
+RUN npm run build
 
 # Stage 2: Production runtime
-FROM node:20-alpine AS runner
+FROM node:22.19-alpine AS runner
 
 # Install security updates
 RUN apk upgrade --no-cache && \
     apk add --no-cache dumb-init curl && \
-    # Remove unnecessary packages
-    apk del --no-cache && \
     rm -rf /var/cache/apk/*
 
 # Create non-root user

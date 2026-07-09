@@ -11,6 +11,7 @@ import {
 } from '@/data/mapLocations';
 import type { Locale } from '@/i18n/config';
 import type { LeafletMarkerData } from '@/components/LeafletMap';
+import { dedupeById } from '@/lib/collections';
 
 export { APARTMENT_LOCATION };
 
@@ -52,7 +53,7 @@ export function markerFromMapLocation(location: MapLocation): MarkerData {
   };
 }
 
-export function markersFromMapLocations(locations: readonly MapLocation[]): MarkerData[] {
+function markersFromMapLocations(locations: readonly MapLocation[]): MarkerData[] {
   return locations.map(markerFromMapLocation);
 }
 
@@ -74,12 +75,7 @@ export function getKalamataMarkers(
 }
 
 export function dedupeMarkers(markers: readonly MarkerData[]): MarkerData[] {
-  const seen = new Set<string>();
-  return markers.filter((marker) => {
-    if (seen.has(marker.id)) return false;
-    seen.add(marker.id);
-    return true;
-  });
+  return dedupeById(markers);
 }
 
 export function toLeafletMarker(marker: MarkerData): LeafletMarkerData {

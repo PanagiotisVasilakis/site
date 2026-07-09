@@ -13,22 +13,29 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
+      - name: Install required npm
+        run: npm install --global npm@11.18.0
+      - name: Reject unresolved merge conflicts
+        run: npm run check:conflicts
       - name: Install deps
         run: npm ci --no-audit --no-fund
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
-        run: npm run lint || true
-      - name: Test
-        run: npm test -- --reporter=default
+        run: npm run lint
+      - name: Test with coverage
+        run: npm run test:coverage -- --reporter=default
+      - name: API contract smoke tests
+        run: npm run test:api
       - name: Coverage Artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-lcov
           path: coverage/lcov.info
+          if-no-files-found: error
       - name: Build
         run: npm run build
 
@@ -52,6 +59,10 @@ jobs:
     env:
       NODE_ENV: production
       DATABASE_URL: postgresql://ci_user:ci_pass@localhost:5432/site_ci
+      TEST_DATABASE_URL: postgresql://ci_user:ci_pass@localhost:5432/site_ci
+      GUEST_JWT_SECRET: ci-guest-jwt-secret-should-be-32-chars-0001
+      GUEST_WIFI_NETWORK: ci-guest-network
+      GUEST_WIFI_PASSWORD: ci-guest-password
       ADMIN_JWT_SECRET: ci-admin-jwt-secret-should-be-32-chars-0001
       ADMIN_DASH_SECRET: ci-admin-dash-secret-0001
       SECURITY_ENC_KEY_HEX: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
@@ -59,13 +70,16 @@ jobs:
       SECURITY_PEPPER: ci-security-pepper
       NEXT_PUBLIC_SITE_URL: https://example.test
       ALLOWED_ORIGINS: https://example.test
-      VALID_API_KEYS: ci-read-key
+      VALID_API_KEYS: 0123456789abcdef0123456789abcdef
+      INTERNAL_API_KEYS: fedcba9876543210fedcba9876543210
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
+      - name: Install required npm
+        run: npm install --global npm@11.18.0
 
       - name: Install deps
         run: npm ci --no-audit --no-fund

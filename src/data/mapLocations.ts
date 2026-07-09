@@ -1,4 +1,5 @@
 import type { Locale } from '@/i18n/config';
+import { dedupeById } from '@/lib/collections';
 import { getApartmentContent } from '@/data/apartmentData';
 
 export const APARTMENT_LOCATION: [number, number] = [22.094364, 37.040635];
@@ -90,7 +91,7 @@ interface KalamataLandmarkDefinition {
  * Curated, stable points that should appear wherever the local map is shown.
  * Coordinates use the application-wide `[lng, lat]` format.
  */
-export const KALAMATA_LANDMARKS: readonly KalamataLandmarkDefinition[] = [
+const KALAMATA_LANDMARKS: readonly KalamataLandmarkDefinition[] = [
   {
     id: 'landmark-almyros-beach',
     name: { en: 'Almyros Beach', el: 'Παραλία Αλμυρού' },
@@ -192,7 +193,7 @@ function localizedText(text: LocalizedMapText, locale: Locale): string {
   return text[locale] || text.en;
 }
 
-export function getDirectionsUrl(coordinates: MapCoordinates): string {
+function getDirectionsUrl(coordinates: MapCoordinates): string {
   const [lng, lat] = coordinates;
   return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
 }
@@ -294,13 +295,8 @@ export function createMapLocationFromItem(
   };
 }
 
-export function dedupeMapLocations(locations: MapLocation[]): MapLocation[] {
-  const seen = new Set<string>();
-  return locations.filter((location) => {
-    if (seen.has(location.id)) return false;
-    seen.add(location.id);
-    return true;
-  });
+function dedupeMapLocations(locations: MapLocation[]): MapLocation[] {
+  return dedupeById(locations);
 }
 
 export function getKalamataMapLocations(

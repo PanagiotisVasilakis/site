@@ -3,6 +3,7 @@ import { addHits, getHits, vitalsRecent } from '@/lib/analyticsStore';
 import fs from 'node:fs';
 import path from 'node:path';
 import { logger } from '@/lib/logger-enterprise';
+import { getClientIp } from '@/lib/net/getClientIp';
 
 // Rate limiting configuration
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
@@ -12,95 +13,9 @@ const RATE_LIMIT_PERSIST_INTERVAL_MS = 30_000; // 30 seconds
 // Bot detection patterns
 const BOT_PATTERNS = /(bot|crawl|spider|slurp|headless|instrumented)/i;
 
-// IP validation constants
-const MAX_IP_LENGTH = 45; // Maximum length for IPv6 addresses
-
 // Very lightweight in-memory rate limit / bot filter (non-production grade)
 const recentByIp: Record<string, number[]> = {};
 let lastPersist = 0;
-
-/**
- * Extract client IP from request headers, handling various proxy configurations
- * and IPv6 addresses properly
- */
-function extractClientIP(req: NextRequest): string {
-  // Try various headers in order of preference
-  const headers = [
-    'x-forwarded-for',
-    'x-real-ip', 
-    'cf-connecting-ip', // Cloudflare
-    'x-client-ip',
-    'x-forwarded',
-    'forwarded-for',
-    'forwarded'
-  ];
-  
-  for (const header of headers) {
-    const value = req.headers.get(header);
-    if (value) {
-      // Handle comma-separated IPs (take the first one)
-      const ip = value.split(',')[0]?.trim();
-      if (ip && isValidIP(ip)) {
-        return normalizeIP(ip);
-      }
-    }
-  }
-  
-  return 'unknown';
-}
-
-/**
- * Basic IP validation for both IPv4 and IPv6
- */
-function isValidIP(ip: string): boolean {
-  if (!ip || ip.length > MAX_IP_LENGTH) return false; // Max IPv6 length
-  
-  // IPv4 pattern
-  const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/;
-  // IPv6 pattern (simplified)
-  const ipv6Pattern = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
-  
-  if (ipv4Pattern.test(ip)) {
-    // Validate IPv4 octets
-    const octets = ip.split('.');
-    return octets.every(octet => {
-      const num = parseInt(octet, 10);
-      return num >= 0 && num <= 255;
-    });
-  }
-  
-  if (ipv6Pattern.test(ip) || ip.includes('::')) {
-    return true; // Accept IPv6 (more complex validation could be added)
-  }
-  
-  return false;
-}
-
-/**
- * Normalize IP for consistent rate limiting
- */
-function normalizeIP(ip: string): string {
-  if (ip.includes(':')) {
-    // IPv6 - normalize compressed notation and case
-    try {
-      // Basic IPv6 normalization - expand :: and lowercase
-      const normalized = ip.toLowerCase();
-      
-      // Handle IPv6 mapped IPv4 addresses
-      if (normalized.includes('::ffff:')) {
-        const ipv4Part = normalized.split('::ffff:')[1];
-        if (ipv4Part && /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ipv4Part)) {
-          return ipv4Part; // Use IPv4 part for consistency
-        }
-      }
-      
-      return normalized;
-    } catch {
-      return ip.toLowerCase();
-    }
-  }
-  return ip; // IPv4
-}
 
 // Use path.join for safe file operations
 const RATE_LIMIT_FILE = path.join(process.cwd(), 'analytics-ratelimit.json');
@@ -169,7 +84,7 @@ function loadRateLimit() {
 loadRateLimit();
 
 export async function POST(req: NextRequest) {
-  const ip = extractClientIP(req);
+  const ip = getClientIp(req, { trustProxy: true });
   
   try {
     const ua = req.headers.get('user-agent') || '';

@@ -10,6 +10,12 @@ import { cva } from 'class-variance-authority';
 import clsx from 'clsx';
 import { useScroll } from '@/hooks/useScroll';
 import { useGuestSession } from '@/hooks/useGuestSession';
+import {
+  ChevronIcon,
+  MenuGlyph,
+  MenuIcon,
+} from '@/components/navigation/MenuIcons';
+import { buildMenuLinks } from '@/components/navigation/menuLinks';
 
 const navButton = cva(
   "inline-flex items-center justify-center gap-2 px-3 py-2 md:py-1 min-h-11 md:min-h-8 rounded-full text-[11px] font-semibold leading-none transition whitespace-nowrap white-in-dark",
@@ -32,76 +38,6 @@ interface TopControlsProps {
   showCheckIn?: boolean;
 }
 
-type MenuIconName =
-  | 'gallery'
-  | 'calendar'
-  | 'booking'
-  | 'about'
-  | 'favorite'
-  | 'moments'
-  | 'phone'
-  | 'checkin'
-  | 'user';
-
-interface MenuLink {
-  href: string;
-  label: string;
-  icon: MenuIconName;
-  event: string;
-  group: 'stay' | 'explore';
-  featured?: boolean;
-}
-
-function MenuIcon({ name }: { name: MenuIconName }) {
-  const commonProps = {
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: 1.8,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-    'aria-hidden': true,
-  };
-
-  switch (name) {
-    case 'gallery':
-      return <svg {...commonProps}><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9" r="1.5" /><path d="m5 17 4.5-4.5 3.2 3.2 2.3-2.3 4 3.6" /></svg>;
-    case 'calendar':
-      return <svg {...commonProps}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /><path d="m8.5 15 2 2 5-5" /></svg>;
-    case 'booking':
-      return <svg {...commonProps}><path d="M7 3h10a2 2 0 0 1 2 2v16l-7-3-7 3V5a2 2 0 0 1 2-2Z" /><path d="M9 8h6M9 12h6" /></svg>;
-    case 'about':
-      return <svg {...commonProps}><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.5h.01" /></svg>;
-    case 'favorite':
-      return <svg {...commonProps}><path d="m12 3 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.92 1.06-6.2L3 9.53l6.22-.9L12 3Z" /></svg>;
-    case 'moments':
-      return <svg {...commonProps}><path d="M7 3v7a3 3 0 0 1-3 3V3M7 3v18M17 3v18M17 3c2.2 2.1 3 4.3 3 6.5S18.7 13 17 13" /><circle cx="12" cy="10" r="2.5" /></svg>;
-    case 'phone':
-      return <svg {...commonProps}><path d="M7.2 3.5 10 7.8 7.9 10a16.2 16.2 0 0 0 6.1 6.1l2.2-2.1 4.3 2.8-.8 3a2 2 0 0 1-2 1.5C9.4 20.5 3.5 14.6 2.7 6.3a2 2 0 0 1 1.5-2l3-.8Z" /></svg>;
-    case 'checkin':
-      return <svg {...commonProps}><path d="M4 12.5 9 17l11-11" /></svg>;
-    case 'user':
-      return <svg {...commonProps}><circle cx="12" cy="8" r="4" /><path d="M4.5 21a7.5 7.5 0 0 1 15 0" /></svg>;
-  }
-}
-
-function ChevronIcon() {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-      <path d="m7.5 4.5 5 5.5-5 5.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function MenuGlyph({ open }: { open: boolean }) {
-  return (
-    <span className="menu-trigger-glyph" aria-hidden>
-      <span className={clsx("menu-trigger-line", open && "is-open")} />
-      <span className={clsx("menu-trigger-line", open && "is-open")} />
-    </span>
-  );
-}
-
 export default function TopControls({ locale, appTitle, showCheckIn = false }: TopControlsProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -115,11 +51,9 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
   const { scrolled, hidden } = useScroll();
   const { isSignedIn, signOut } = useGuestSession({
     initialIsSignedIn: !!showCheckIn,
-    // Only check session on check-in related pages to save resources/bandwidth
-    enabled: pathname?.includes('/check-in')
   });
 
-  const shouldShowCheckIn = isSignedIn && pathname?.includes('/check-in');
+  const shouldShowCheckIn = isSignedIn;
 
   const trackAnalyticsEvent = (eventName: string, props?: Record<string, unknown>) => {
     import('@/lib/analyticsClient')
@@ -183,33 +117,10 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
     setOpen(false);
   }, [pathname]);
 
-  const mobileMenuLinks = useMemo(() => {
-    const links: MenuLink[] = [
-      { href: `/${locale}/house`, label: dictionary.house?.navLabel ?? dictionary.house?.title ?? 'House Guide', icon: 'gallery', event: 'mobile_nav_house', group: 'stay' },
-      { href: `/${locale}/book`, label: dictionary.cta?.reserve ?? 'Book stay', icon: 'calendar', event: 'mobile_nav_book', group: 'stay', featured: true },
-      { href: `/${locale}/booking-details`, label: dictionary.bookingDetails ?? 'Booking Details', icon: 'booking', event: 'mobile_nav_booking_details', group: 'stay' },
-      { href: `/${locale}/about`, label: dictionary.aboutUs ?? 'About Us', icon: 'about', event: 'mobile_nav_about', group: 'stay' },
-      { href: `/${locale}/favorites`, label: dictionary.labels?.favorites ?? 'Favorites', icon: 'favorite', event: 'mobile_nav_favorites', group: 'explore' },
-      { href: `/${locale}?category=moments`, label: dictionary.categories?.moments ?? 'Kalamata Moments', icon: 'moments', event: 'mobile_nav_moments', group: 'explore' },
-      { href: `/${locale}?category=phones`, label: dictionary.categories?.phones ?? 'Important Phones', icon: 'phone', event: 'mobile_nav_phones', group: 'explore' },
-    ];
-
-    if (shouldShowCheckIn) {
-<<<<<<< HEAD
-      links.splice(3, 0, {
-        href: `/${locale}/check-in`,
-        label: 'Check‑in',
-        icon: 'checkin',
-        event: 'mobile_nav_checkin',
-        group: 'stay',
-        featured: false,
-      });
-=======
-      links.push({ href: `/${locale}/check-in`, label: dictionary.checkin?.navLabel ?? 'Check‑in', icon: '✓', event: 'mobile_nav_checkin' });
->>>>>>> 430442a31b6b7b701ebd6c42f2511f661d11f85f
-    }
-    return links.filter(l => Boolean(l.label));
-  }, [locale, dictionary, shouldShowCheckIn]);
+  const mobileMenuLinks = useMemo(
+    () => buildMenuLinks(locale, dictionary, shouldShowCheckIn),
+    [locale, dictionary, shouldShowCheckIn],
+  );
 
   const stayLinks = mobileMenuLinks.filter(link => link.group === 'stay');
   const exploreLinks = mobileMenuLinks.filter(link => link.group === 'explore');
@@ -259,12 +170,13 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
   };
 
   return (
-    <div
+    <header
       className={clsx(
         "fixed top-0 left-0 right-0 z-40 flex justify-center pointer-events-none transition-transform duration-300",
         hidden ? "-translate-y-full" : "translate-y-0"
       )}
-      aria-hidden={hidden}
+      aria-hidden={hidden || undefined}
+      inert={hidden}
     >
       <div ref={containerRef} className="top-controls-compact w-full px-4 pt-2 pointer-events-auto">
         <div className={clsx(
@@ -280,7 +192,6 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
           >
             <span className="text-sm leading-none flex-shrink-0" aria-hidden>🏠</span>
             <span className="truncate max-w-[200px] text-[11px]" title={appTitle}>{appTitle}</span>
-            <small className="hidden sm:inline text-[10px] font-normal opacity-60 flex-shrink-0 text-[color:var(--text-accent-subtle)]"></small>
           </Link>
 
           <div className="flex items-center gap-1">
@@ -317,13 +228,9 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
             </div>
 
             <button
-<<<<<<< HEAD
               ref={triggerRef}
               type="button"
               aria-label={open ? (menuLabels?.closeMenu || 'Close menu') : (menuLabels?.menu || 'Open menu')}
-=======
-              aria-label={dictionary.ui?.menu ?? 'Menu'}
->>>>>>> 430442a31b6b7b701ebd6c42f2511f661d11f85f
               aria-expanded={open}
               aria-controls={panelId}
               aria-haspopup="dialog"
@@ -339,7 +246,6 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
           </div>
         </div>
 
-<<<<<<< HEAD
         <button
           type="button"
           tabIndex={open ? 0 : -1}
@@ -402,34 +308,6 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
                   {stayLinks.map(renderMenuLink)}
                 </div>
               </div>
-=======
-        {/* Mobile Panel */}
-        <div className={menuPanel({ open })} role="menu" aria-label={dictionary.ui?.mainMenu ?? 'Main menu'}>
-          <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-zinc-700/60">
-            <span className="text-xs font-bold uppercase">{dictionary.ui?.menu ?? 'Menu'}</span>
-            <div className="flex items-center gap-2">
-              <div className="dark:border dark:border-zinc-700/60 rounded-full"><ThemeToggle /></div>
-              <div className="dark:border dark:border-zinc-700/60 rounded-full"><LocaleSwitcher /></div>
-            </div>
-          </div>
-
-          <nav className="flex flex-col gap-2" aria-label={dictionary.ui?.primaryPages ?? 'Primary pages'}>
-            {mobileMenuLinks.map(link => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={navButton({ intent: 'mobileItem' })}
-                onClick={() => {
-                  if (link.event) trackAnalyticsEvent(link.event, { destination: link.href });
-                  setOpen(false);
-                }}
-              >
-                <span aria-hidden className="text-base leading-none w-6 text-center">{link.icon}</span>
-                <span className="flex-1 text-left">{link.label}</span>
-              </Link>
-            ))}
-          </nav>
->>>>>>> 430442a31b6b7b701ebd6c42f2511f661d11f85f
 
               <div className="guest-menu-group">
                 <p className="guest-menu-eyebrow">{menuLabels?.explore || 'Explore Kalamata'}</p>
@@ -474,6 +352,6 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
           </footer>
         </section>
       </div>
-    </div>
+    </header>
   );
 }

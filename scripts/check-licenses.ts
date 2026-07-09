@@ -25,6 +25,7 @@ const ALLOWED_LICENSES = [
 // Some packages ship LICENSE files but omit package.json license fields.
 const PACKAGE_LICENSE_FALLBACKS: Record<string, string[]> = {
   atomically: ['MIT'],
+  'seq-queue': ['MIT'],
   'stubborn-fs': ['MIT'],
 };
 

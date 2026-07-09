@@ -19,6 +19,17 @@ export type GuestRefreshTokenRec = {
   ip_hint?: string;
 };
 
+export type RefreshTokenRotationResult =
+  | { status: 'rotated'; old: GuestRefreshTokenRec; rec: GuestRefreshTokenRec }
+  | { status: 'invalid' }
+  | { status: 'replayed'; familyId: string };
+
+type RefreshTokenReplacement = {
+  tokenHash: string;
+  salt: string;
+  expiresAt: number;
+};
+
 function mapToken(token: {
   id: string;
   userId: string;
@@ -177,14 +188,83 @@ async function revoke(id: string): Promise<boolean> {
   }
 }
 
-async function updateRotatedFromId(id: string, rotatedFromId: string): Promise<void> {
+async function rotate(
+  token: string,
+  replacement: RefreshTokenReplacement,
+): Promise<RefreshTokenRotationResult> {
+  const parsed = parseCompositeToken(token);
+  if (!parsed?.id) {
+    return { status: 'invalid' };
+  }
+
+  const now = new Date();
+
   try {
-    await prisma.refreshToken.update({
-      where: { id },
-      data: { rotatedFromId },
+    return await prisma.$transaction(async (tx) => {
+      const candidate = await tx.refreshToken.findUnique({ where: { id: parsed.id } });
+      if (!candidate || !verifySensitive(parsed.secret, candidate.salt, candidate.tokenHash)) {
+        return { status: 'invalid' } as const;
+      }
+
+      if (candidate.revokedAt) {
+        await tx.refreshToken.updateMany({
+          where: { familyId: candidate.familyId, revokedAt: null },
+          data: { revokedAt: now },
+        });
+        logger.warn('Refresh token replay detected; family revoked', {
+          tokenId: candidate.id,
+          familyId: candidate.familyId,
+        });
+        return { status: 'replayed', familyId: candidate.familyId } as const;
+      }
+
+      if (candidate.expiresAt.getTime() <= now.getTime()) {
+        return { status: 'invalid' } as const;
+      }
+
+      const revoked = await tx.refreshToken.updateMany({
+        where: {
+          id: candidate.id,
+          revokedAt: null,
+          expiresAt: { gt: now },
+        },
+        data: { revokedAt: now, lastUsedAt: now },
+      });
+
+      if (revoked.count !== 1) {
+        await tx.refreshToken.updateMany({
+          where: { familyId: candidate.familyId, revokedAt: null },
+          data: { revokedAt: now },
+        });
+        logger.warn('Concurrent refresh token replay detected; family revoked', {
+          tokenId: candidate.id,
+          familyId: candidate.familyId,
+        });
+        return { status: 'replayed', familyId: candidate.familyId } as const;
+      }
+
+      const created = await tx.refreshToken.create({
+        data: {
+          id: crypto.randomUUID(),
+          userId: candidate.userId,
+          tokenHash: replacement.tokenHash,
+          salt: replacement.salt,
+          familyId: candidate.familyId,
+          expiresAt: new Date(replacement.expiresAt),
+          rotatedFromId: candidate.id,
+          deviceHint: candidate.deviceHint,
+          ipHint: candidate.ipHint,
+        },
+      });
+
+      return {
+        status: 'rotated',
+        old: mapToken({ ...candidate, revokedAt: now, lastUsedAt: now }),
+        rec: mapToken(created),
+      } as const;
     });
   } catch (error) {
-    logger.error('refreshTokenRepository(prisma): updateRotatedFromId failed', error);
+    logger.error('refreshTokenRepository(prisma): rotate failed', error);
     throw error;
   }
 }
@@ -215,6 +295,6 @@ export const refreshTokenRepository = {
   create,
   verify,
   revoke,
-  updateRotatedFromId,
+  rotate,
   purgeExpired,
 };

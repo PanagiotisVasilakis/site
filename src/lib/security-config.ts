@@ -121,7 +121,7 @@ const developmentConfig: SecurityConfig = {
       baseUri: ["'self'"],
       formAction: ["'self'"],
     },
-    useNonce: true,
+    useNonce: false,
     reportUri: '/api/security/csp-report',
   },
   headers: {
@@ -206,7 +206,7 @@ const productionConfig: SecurityConfig = {
       baseUri: ["'self'"],
       formAction: ["'self'"],
     },
-    useNonce: true,
+    useNonce: false,
     reportUri: '/api/security/csp-report',
   },
   headers: {
@@ -312,15 +312,16 @@ export function getSecurityConfig(): SecurityConfig {
 }
 
 // CSP directive builders
-export function buildCSPDirective(directives: SecurityConfig['csp']['directives'], useNonce?: boolean): string {
-  const nonce = useNonce ? `'nonce-${generateNonce()}'` : '';
-  
+export function buildCSPDirective(
+  directives: SecurityConfig['csp']['directives'],
+  nonce?: string,
+): string {
   const cspParts: string[] = [];
   
   Object.entries(directives).forEach(([directive, sources]) => {
     const kebabDirective = directive.replace(/([A-Z])/g, '-$1').toLowerCase();
-    const sourcesWithNonce = directive === 'scriptSrc' && nonce 
-      ? [...sources, nonce]
+    const sourcesWithNonce = directive === 'scriptSrc' && nonce
+      ? [...sources.filter((source) => source !== "'unsafe-inline'"), `'nonce-${nonce}'`]
       : sources;
     
     cspParts.push(`${kebabDirective} ${sourcesWithNonce.join(' ')}`);

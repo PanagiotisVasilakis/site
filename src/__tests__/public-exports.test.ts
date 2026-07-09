@@ -12,7 +12,6 @@ import { type Dictionary as I18nDictionary } from '@/i18n/dictionaries';
 import { type TrackerEventName, type EventProps } from '@/lib/tracker';
 import { type Origin } from '@/lib/phone';
 import { type LogContext, type LogLevel, type LogEntry } from '@/lib/logger-enterprise';
-import { type Logger } from '@/lib/logger';
 import { type IdentityType, type BookingSource, type AccessStatus, type BookingAccess, type GuestRefreshTokenRec } from '@/lib/guestDataStore';
 import { type VillaPhoto } from '@/types/villa';
 import { type AppConfig } from '@/lib/config';
@@ -60,7 +59,6 @@ describe.skipIf(!hasDbUrl)('public API surface remains reachable', () => {
     const { GuestDataExport } = await import('@/lib/guestDataExport');
     const { resetFunnel } = await import('@/lib/analyticsClient');
     const { categorizeReason, track, tracker } = await import('@/lib/tracker');
-    const { internalFetch } = await import('@/lib/internalFetch');
     const { emitGuestSessionChanged } = await import('@/lib/sessionSignals');
     const { SpanStatus } = await import('@/lib/distributed-tracing');
 
@@ -121,9 +119,6 @@ describe.skipIf(!hasDbUrl)('public API surface remains reachable', () => {
     tracker.portalOpened('test');
     expect(() => track({ name: 'checkin_viewed', props: {} })).not.toThrow();
 
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({}) })));
-    await internalFetch('/api/test');
-
     emitGuestSessionChanged('test');
 
     expect([SpanStatus.TIMEOUT, SpanStatus.CANCELLED]).toHaveLength(2);
@@ -133,7 +128,6 @@ describe.skipIf(!hasDbUrl)('public API surface remains reachable', () => {
     expectTypeOf<LogContext>().toBeObject();
     expectTypeOf<LogLevel>().toEqualTypeOf<'debug' | 'info' | 'warn' | 'error' | 'trace' | 'fatal'>();
     expectTypeOf<LogEntry>().toMatchTypeOf<{ level: LogLevel }>();
-    expectTypeOf<Logger>().toBeObject();
     expectTypeOf<Booking>().toMatchTypeOf<Record<string, any>>();
     expectTypeOf<LookupByRefParams>().toMatchTypeOf<{ bookingRef: string }>();
     expectTypeOf<LookupByPhoneParams>().toMatchTypeOf<{ phone: string }>();

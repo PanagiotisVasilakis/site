@@ -65,7 +65,6 @@ export interface BookingDictionary {
     completeTitle?: string;
     yourDetails?: string;
     datesLabel?: string;
-    guestsLabel?: string;
     durationLabel?: string;
     notSelected?: string;
     selectDatesPrompt?: string;
@@ -96,7 +95,6 @@ export const bookingTranslations: Record<Locale, BookingDictionary> = {
         completeTitle: "Complete your booking",
         yourDetails: "Your booking details",
         datesLabel: "Dates",
-        guestsLabel: "Guests",
         durationLabel: "Duration",
         notSelected: "Not selected",
         selectDatesPrompt: "Please complete your booking details above to continue.",
@@ -187,7 +185,6 @@ export const bookingTranslations: Record<Locale, BookingDictionary> = {
         completeTitle: "Ολοκληρώστε την κράτηση",
         yourDetails: "Στοιχεία κράτησης",
         datesLabel: "Ημερομηνίες",
-        guestsLabel: "Επισκέπτες",
         durationLabel: "Διάρκεια",
         notSelected: "Δεν έχει επιλεγεί",
         selectDatesPrompt: "Συμπληρώστε τα στοιχεία κράτησης παραπάνω για να συνεχίσετε.",

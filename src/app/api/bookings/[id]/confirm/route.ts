@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guestStore } from '@/lib/guestDataStore';
-import { createRefreshCookie, createSessionCookie, signGuestSession } from '@/lib/guestSession';
+import {
+  createRefreshCookie,
+  createSessionCookie,
+  parseGuestSession,
+  signGuestSession,
+} from '@/lib/guestSession';
 import { logger } from '@/lib/logger-enterprise';
 import { locales, defaultLocale } from '@/i18n/config';
+
+export const dynamic = 'force-dynamic';
 
 type ConfirmBody = {
   lastName?: string;
   remember?: boolean;
-  userId?: string;
 };
 
 function resolveLocale(request: NextRequest): string {
@@ -35,7 +41,6 @@ async function parseBody(request: NextRequest): Promise<ConfirmBody> {
       const get = (key: string) => form.get(key);
       return {
         lastName: typeof get('lastName') === 'string' ? String(get('lastName')) : undefined,
-        userId: typeof get('userId') === 'string' ? String(get('userId')) : undefined,
         remember: (() => {
           const raw = get('remember');
           if (typeof raw === 'string') {
@@ -76,24 +81,32 @@ export async function POST(request: NextRequest, context: NextAppRouteContext) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
     }
 
-    if (body.lastName && booking.reference) {
-      const matching = await guestStore.findBookingByReferenceAndLastName(booking.reference, body.lastName);
-      if (!matching || matching.id !== booking.id) {
+    const existingSession = parseGuestSession(request.cookies.get('guest_session')?.value);
+    const sessionOwnsBooking = Boolean(
+      existingSession?.booking?.id === booking.id
+      && existingSession.user?.id
+      && existingSession.user.id === booking.user_id
+    );
+
+    if (!sessionOwnsBooking) {
+      const lastName = body.lastName?.trim();
+      if (!lastName || !booking.reference) {
+        return NextResponse.json({ error: 'Booking verification is required' }, { status: 401 });
+      }
+
+      const matching = await guestStore.findBookingByReferenceAndLastName(booking.reference, lastName);
+      if (!matching || matching.id !== booking.id || matching.user_id !== booking.user_id) {
         return NextResponse.json({ error: 'Booking details do not match' }, { status: 403 });
       }
     }
 
-    const userId = body.userId ?? booking.user_id;
+    const userId = booking.user_id;
 
     if (!userId) {
       return NextResponse.json({ error: 'Booking is not linked to a user' }, { status: 409 });
     }
 
-    try {
-      await guestStore.setAccess(userId, booking.id, 'VERIFIED');
-    } catch (error) {
-      logger.warn('Failed to set booking access during confirmation', { error, bookingId, userId });
-    }
+    await guestStore.setAccess(userId, booking.id, 'VERIFIED');
 
     const token = signGuestSession({ user: { id: userId }, booking: { id: booking.id } });
     const sessionCookie = createSessionCookie(token);

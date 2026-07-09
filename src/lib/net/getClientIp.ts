@@ -5,7 +5,7 @@
  * Handles multiple header formats and provides options for trusted proxy scenarios.
  */
 
-import { NextRequest } from 'next/server';
+import type { NextRequest } from 'next/server';
 
 /**
  * Options for IP extraction
@@ -50,32 +50,47 @@ export function getClientIp(request: NextRequest, options?: GetClientIpOptions):
   }
   
   // Check for pre-extracted client IP from middleware
-  const clientIP = request.headers.get(clientIpHeader);
-  if (clientIP) {
-    return clientIP.trim();
-  }
-  
-  // Cloudflare connecting IP
-  const cfConnectingIP = request.headers.get('cf-connecting-ip');
-  if (cfConnectingIP) {
-    return cfConnectingIP.trim();
-  }
-  
-  // X-Real-IP (Nginx, etc.)
-  const realIP = request.headers.get('x-real-ip');
-  if (realIP) {
-    return realIP.trim();
-  }
-  
-  // X-Forwarded-For (comma-separated list, first IP is client)
-  const forwardedFor = request.headers.get('x-forwarded-for');
-  if (forwardedFor) {
-    // Take first IP in the list (client IP)
-    return forwardedFor.split(',')[0].trim();
+  const headerNames = [
+    clientIpHeader,
+    'cf-connecting-ip',
+    'x-real-ip',
+    'x-forwarded-for',
+  ];
+
+  for (const headerName of headerNames) {
+    const rawValue = request.headers.get(headerName);
+    const candidate = rawValue?.split(',')[0]?.trim();
+    if (candidate && isValidIpAddress(candidate)) {
+      return normalizeIpAddress(candidate);
+    }
   }
   
   // Fallback: Return unknown if no IP can be determined
   return 'unknown';
+}
+
+function isValidIpAddress(ip: string): boolean {
+  if (!ip || ip.length > 45) return false;
+
+  const ipv4Pattern = /^(?:\d{1,3}\.){3}\d{1,3}$/;
+  if (ipv4Pattern.test(ip)) {
+    return ip.split('.').every((octet) => {
+      const value = Number.parseInt(octet, 10);
+      return value >= 0 && value <= 255;
+    });
+  }
+
+  const ipv6Pattern = /^(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}$/i;
+  return ipv6Pattern.test(ip) || (
+    ip.includes('::')
+    && /^[0-9a-f:.]+$/i.test(ip)
+  );
+}
+
+function normalizeIpAddress(ip: string): string {
+  const normalized = ip.toLowerCase();
+  const mappedIpv4 = normalized.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/)?.[1];
+  return mappedIpv4 && isValidIpAddress(mappedIpv4) ? mappedIpv4 : normalized;
 }
 
 /**

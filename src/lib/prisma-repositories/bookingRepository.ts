@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger-enterprise';
 import crypto from 'node:crypto';
+import { mapBookingFromDb } from '@/lib/mappers/domainMappers';
 
 export type BookingRecord = {
   id: string;
@@ -15,34 +16,6 @@ export type BookingRecord = {
   user_id?: string;
   created_at: number;
 };
-
-function mapBooking(booking: {
-  id: string;
-  source: 'ONSITE' | 'EXTERNAL';
-  reference: string | null;
-  lastNameHash: string | null;
-  lastNameSalt: string | null;
-  lastNameToken: string | null;
-  lastNameTokenNoWs: string | null;
-  startDate: Date;
-  endDate: Date;
-  userId: string | null;
-  createdAt: Date;
-}): BookingRecord {
-  return {
-    id: booking.id,
-    source: booking.source,
-    reference: booking.reference ?? undefined,
-    last_name_hash: booking.lastNameHash ?? undefined,
-    last_name_salt: booking.lastNameSalt ?? undefined,
-    last_name_token: booking.lastNameToken ?? undefined,
-    last_name_token_nows: booking.lastNameTokenNoWs ?? undefined,
-    start_date: booking.startDate.toISOString(),
-    end_date: booking.endDate.toISOString(),
-    user_id: booking.userId ?? undefined,
-    created_at: booking.createdAt.getTime(),
-  };
-}
 
 function generateId(): string {
   // PostgreSQL UUID column requires pure UUID format (no prefix)
@@ -68,7 +41,7 @@ async function create(params: Omit<BookingRecord, 'id' | 'created_at'>): Promise
     });
 
     logger.info('Booking created (prisma)', { bookingId: id });
-    return mapBooking(booking);
+    return mapBookingFromDb(booking);
   } catch (error) {
     logger.error('bookingRepository(prisma): create failed', error);
     throw error;
@@ -98,7 +71,7 @@ async function findByReferenceAndLastName(
       },
     });
 
-    return booking ? mapBooking(booking) : undefined;
+    return booking ? mapBookingFromDb(booking) : undefined;
   } catch (error) {
     logger.error('bookingRepository(prisma): findByReferenceAndLastName failed', error);
     throw error;
@@ -108,7 +81,7 @@ async function findByReferenceAndLastName(
 async function findById(id: string): Promise<BookingRecord | undefined> {
   try {
     const booking = await prisma.booking.findUnique({ where: { id } });
-    return booking ? mapBooking(booking) : undefined;
+    return booking ? mapBookingFromDb(booking) : undefined;
   } catch (error) {
     logger.error('bookingRepository(prisma): findById failed', error);
     throw error;
@@ -129,7 +102,7 @@ async function findEligibleForUser(userId: string, nowDateISO: string): Promise<
       },
     });
 
-    return booking ? mapBooking(booking) : undefined;
+    return booking ? mapBookingFromDb(booking) : undefined;
   } catch (error) {
     logger.error('bookingRepository(prisma): findEligibleForUser failed', error);
     throw error;
@@ -139,7 +112,7 @@ async function findEligibleForUser(userId: string, nowDateISO: string): Promise<
 async function getAll(): Promise<BookingRecord[]> {
   try {
     const bookings = await prisma.booking.findMany({ orderBy: { createdAt: 'desc' } });
-    return bookings.map(mapBooking);
+    return bookings.map(mapBookingFromDb);
   } catch (error) {
     logger.error('bookingRepository(prisma): getAll failed', error);
     throw error;

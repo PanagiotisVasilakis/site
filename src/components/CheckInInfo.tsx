@@ -13,6 +13,7 @@ import type { Locale } from '@/i18n/config';
 import internalFetch from '@/lib/internalFetchClient';
 import MapLoadingSkeleton from '@/components/MapLoadingSkeleton';
 import { MAP_DEFAULTS } from '@/lib/mapConstants';
+import WifiAccessCard from '@/components/checkin/WifiAccessCard';
 
 type LocationHighlight = { title: string; description: string };
 
@@ -54,8 +55,6 @@ type ArrivalRequest = {
   updatedAt: string;
 };
 
-const WIFI_NETWORK = 'ApartmentGuest_5G';
-const WIFI_PASSWORD = 'Welcome2024!';
 const MAP_HEIGHT = 'clamp(240px, 35vw, 420px)';
 const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
 
@@ -332,6 +331,7 @@ export default function CheckInInfo({
     schedule: t.checkinInfo?.checkInOutTitle || (isGreek ? 'Αφιξη & αναχωρηση' : 'Check-in & Check-out'),
     network: t.checkinInfo?.wifiNetwork || (isGreek ? 'Δίκτυο' : 'Network'),
     password: t.checkinInfo?.wifiPassword || (isGreek ? 'Κωδικός' : 'Password'),
+    unavailable: isGreek ? 'Μη διαθέσιμο' : 'Unavailable',
     parking: t.checkinInfo?.parking || (isGreek ? 'Δωρεάν πάρκινγκ' : 'Free Parking'),
     keys: stripLeadingEmoji(t.checkinInfo?.keysInfo || (isGreek ? 'Κλειδιά:' : 'Keys:')).replace(/:$/, ''),
     emergency: t.checkinInfo?.emergencyTitle || (isGreek ? 'Επαφές ανάγκης' : 'Emergency Contacts'),
@@ -456,6 +456,8 @@ export default function CheckInInfo({
   ].filter((item) => item.value);
 
   const [copiedTarget, setCopiedTarget] = useState<CopyTarget>(null);
+  const [wifiNetwork, setWifiNetwork] = useState('');
+  const [wifiPassword, setWifiPassword] = useState('');
   const [checkInTime, setCheckInTime] = useState('15:00');
   const [checkOutTime, setCheckOutTime] = useState('11:00');
   const [canEditTimes, setCanEditTimes] = useState(false);
@@ -484,6 +486,8 @@ export default function CheckInInfo({
             setTempCheckInTime(data.data.checkInTime || '15:00');
             setTempCheckOutTime(data.data.checkOutTime || '11:00');
             setCanEditTimes(Boolean(data.data.canEdit));
+            setWifiNetwork(data.data.wifi?.network || '');
+            setWifiPassword(data.data.wifi?.password || '');
           }
         }
       } catch (error) {
@@ -621,7 +625,7 @@ export default function CheckInInfo({
     return ui.statusPendingCopy;
   };
 
-  const wifiText = `${ui.network}: ${WIFI_NETWORK}\n${ui.password}: ${WIFI_PASSWORD}`;
+  const wifiText = `${ui.network}: ${wifiNetwork}\n${ui.password}: ${wifiPassword}`;
   const panelClass = 'checkin-panel';
   const rowClass = 'checkin-row';
   const smallLabelClass = 'checkin-label text-[0.68rem] font-semibold uppercase tracking-[0.14em]';
@@ -656,6 +660,7 @@ export default function CheckInInfo({
               <button
                 type="button"
                 onClick={() => copyToClipboard(wifiText, 'wifi')}
+                disabled={!wifiNetwork || !wifiPassword}
                 className="checkin-primary-action min-h-11 px-4 shadow-sm hover:-translate-y-0.5"
               >
                 <Icon name={copiedTarget === 'wifi' ? 'check' : 'copy'} className="h-4 w-4" />
@@ -707,7 +712,7 @@ export default function CheckInInfo({
               <div>
                 <dt className={smallLabelClass}>{t.checkinInfo?.wifiTitle || 'Internet Access'}</dt>
                 <dd className={`${valueClass} mt-1 font-mono text-sm font-semibold`}>
-                  {WIFI_NETWORK}
+                  {wifiNetwork || ui.unavailable}
                 </dd>
               </div>
             </dl>
@@ -907,45 +912,20 @@ export default function CheckInInfo({
 
               <div className={rowClass}>
                 <Icon name="wifi" className={iconClass} />
-                <div className="min-w-0 flex-1">
-                  <h3 className={`${titleClass} text-sm font-semibold`}>
-                    {t.checkinInfo?.wifiTitle || 'Internet Access'}
-                  </h3>
-                  <dl className="checkin-card checkin-divided mt-3">
-                    {[
-                      {
-                        label: ui.network,
-                        value: WIFI_NETWORK,
-                        target: 'network' as const,
-                        aria: isGreek ? 'Αντιγραφή ονόματος δικτύου Wi-Fi' : 'Copy Wi-Fi network name',
-                      },
-                      {
-                        label: ui.password,
-                        value: WIFI_PASSWORD,
-                        target: 'password' as const,
-                        aria: isGreek ? 'Αντιγραφή κωδικού Wi-Fi' : 'Copy Wi-Fi password',
-                      },
-                    ].map((item) => (
-                      <div key={item.target} className="grid gap-2 p-3 sm:grid-cols-[5.75rem_minmax(0,1fr)] sm:items-center">
-                        <dt className={`${mutedTextClass} text-xs font-medium`}>{item.label}</dt>
-                        <dd className="flex min-w-0 flex-wrap items-center gap-2">
-                          <span className={`${valueClass} min-w-0 flex-1 whitespace-nowrap font-mono text-[0.8125rem] font-semibold`}>
-                            {item.value}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(item.value, item.target)}
-                            className="checkin-copy-action"
-                            aria-label={item.aria}
-                          >
-                            <Icon name={copiedTarget === item.target ? 'check' : 'copy'} className="h-3.5 w-3.5" />
-                            {copiedTarget === item.target ? ui.copied : ui.copy}
-                          </button>
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                </div>
+                <WifiAccessCard
+                  title={t.checkinInfo?.wifiTitle || 'Internet Access'}
+                  networkLabel={ui.network}
+                  passwordLabel={ui.password}
+                  network={wifiNetwork}
+                  password={wifiPassword}
+                  unavailableLabel={ui.unavailable}
+                  copyLabel={ui.copy}
+                  copiedLabel={ui.copied}
+                  copiedTarget={copiedTarget === 'network' || copiedTarget === 'password' ? copiedTarget : null}
+                  onCopy={copyToClipboard}
+                  networkCopyLabel={isGreek ? 'Αντιγραφή ονόματος δικτύου Wi-Fi' : 'Copy Wi-Fi network name'}
+                  passwordCopyLabel={isGreek ? 'Αντιγραφή κωδικού Wi-Fi' : 'Copy Wi-Fi password'}
+                />
               </div>
 
               <div className={rowClass}>

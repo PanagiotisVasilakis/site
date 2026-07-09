@@ -9,6 +9,7 @@ import { buildBookingLastNameTokenSearchValues, createBookingLastNameTokens } fr
 import { logger } from '@/lib/logger-enterprise';
 import { prisma } from '@/lib/prisma';
 import { guestDataCache } from '@/lib/guestDataCache';
+import { mapAccessFromDb, mapBookingFromDb, mapUserFromDb } from '@/lib/mappers/domainMappers';
 import crypto from 'node:crypto';
 
 export type IdentityType = 'AFM' | 'PASSPORT';
@@ -190,7 +191,7 @@ export const guestStore = {
     }
   },
 
-  // Refresh tokens (development store only)
+  // Refresh tokens
   async issueRefreshToken(user_id: string, ttlDays = 60, opts?: { family_id?: string; device_hint?: string; ip_hint?: string }): Promise<{ rec: GuestRefreshTokenRec; token: string }> {
     try {
       const rawSecret = crypto.randomBytes(32).toString('base64url');
@@ -245,30 +246,34 @@ export const guestStore = {
     }
   },
   
-  async rotateRefreshToken(oldToken: string, ttlDays = 60): Promise<{ old?: GuestRefreshTokenRec; rec?: GuestRefreshTokenRec; token?: string }> {
+  async rotateRefreshToken(oldToken: string, ttlDays = 60): Promise<{
+    status: 'rotated' | 'invalid' | 'replayed';
+    old?: GuestRefreshTokenRec;
+    rec?: GuestRefreshTokenRec;
+    token?: string;
+  }> {
     try {
-      const old = await this.verifyRefreshToken(oldToken);
-      if (!old) return {};
-      
-      // Revoke the old token
-      await refreshTokenRepository.revoke(old.id);
-      
-      // Issue a new token
-      const { rec, token } = await this.issueRefreshToken(old.user_id, ttlDays, { 
-        family_id: old.family_id, 
-        device_hint: old.device_hint, 
-        ip_hint: old.ip_hint 
+      const rawSecret = crypto.randomBytes(32).toString('base64url');
+      const { hash, salt } = hashSensitive(rawSecret);
+      const result = await refreshTokenRepository.rotate(oldToken, {
+        tokenHash: hash,
+        salt,
+        expiresAt: Date.now() + ttlDays * 24 * 60 * 60 * 1000,
       });
-      
-      rec.rotated_from_id = old.id;
-      
-      // Update the new token record
-      await refreshTokenRepository.updateRotatedFromId(rec.id, old.id);
-      
-      return { old, rec, token };
+
+      if (result.status !== 'rotated') {
+        return { status: result.status };
+      }
+
+      return {
+        status: 'rotated',
+        old: result.old,
+        rec: result.rec,
+        token: `${result.rec.id}.${rawSecret}`,
+      };
     } catch (error) {
       logger.error('guestStore: failed to rotate refresh token', error);
-      return {};
+      return { status: 'invalid' };
     }
   },
   
@@ -445,28 +450,8 @@ export const guestStore = {
           },
         });
 
-        // Map to snake_case types
-        const booking: Booking = {
-          id: bookingDb.id,
-          source: bookingDb.source,
-          reference: bookingDb.reference ?? undefined,
-          last_name_hash: bookingDb.lastNameHash ?? undefined,
-          last_name_salt: bookingDb.lastNameSalt ?? undefined,
-          last_name_token: bookingDb.lastNameToken ?? undefined,
-          last_name_token_nows: bookingDb.lastNameTokenNoWs ?? undefined,
-          start_date: bookingDb.startDate.toISOString(),
-          end_date: bookingDb.endDate.toISOString(),
-          user_id: bookingDb.userId ?? undefined,
-          created_at: bookingDb.createdAt.getTime(),
-        };
-
-        const access: BookingAccess = {
-          user_id: accessDb.userId,
-          booking_id: accessDb.bookingId,
-          status: accessDb.status,
-          created_at: accessDb.createdAt.getTime(),
-          updated_at: accessDb.updatedAt.getTime(),
-        };
+        const booking: Booking = mapBookingFromDb(bookingDb);
+        const access: BookingAccess = mapAccessFromDb(accessDb);
 
         return { booking, access };
       });
@@ -585,38 +570,9 @@ export const guestStore = {
           },
         });
 
-        // Map to snake_case types
-        const user: User = {
-          id: userDb.id,
-          email: userDb.email ?? undefined,
-          phone_e164: userDb.phoneE164,
-          password_hash: userDb.passwordHash ?? undefined,
-          country_origin: userDb.countryOrigin,
-          created_at: userDb.createdAt.getTime(),
-          updated_at: userDb.updatedAt.getTime(),
-        };
-
-        const booking: Booking = {
-          id: bookingDb.id,
-          source: bookingDb.source,
-          reference: bookingDb.reference ?? undefined,
-          last_name_hash: bookingDb.lastNameHash ?? undefined,
-          last_name_salt: bookingDb.lastNameSalt ?? undefined,
-          last_name_token: bookingDb.lastNameToken ?? undefined,
-          last_name_token_nows: bookingDb.lastNameTokenNoWs ?? undefined,
-          start_date: bookingDb.startDate.toISOString(),
-          end_date: bookingDb.endDate.toISOString(),
-          user_id: bookingDb.userId ?? undefined,
-          created_at: bookingDb.createdAt.getTime(),
-        };
-
-        const access: BookingAccess = {
-          user_id: accessDb.userId,
-          booking_id: accessDb.bookingId,
-          status: accessDb.status,
-          created_at: accessDb.createdAt.getTime(),
-          updated_at: accessDb.updatedAt.getTime(),
-        };
+        const user: User = mapUserFromDb(userDb);
+        const booking: Booking = mapBookingFromDb(bookingDb);
+        const access: BookingAccess = mapAccessFromDb(accessDb);
 
         return { user, booking, access };
       });

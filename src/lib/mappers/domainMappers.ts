@@ -13,7 +13,7 @@
  */
 export function mapBookingFromDb(bookingDb: {
   id: string;
-  source: string;
+  source: 'ONSITE' | 'EXTERNAL';
   reference: string | null;
   lastNameHash: string | null;
   lastNameSalt: string | null;
@@ -25,7 +25,7 @@ export function mapBookingFromDb(bookingDb: {
   createdAt: Date;
 }): {
   id: string;
-  source: string;
+  source: 'ONSITE' | 'EXTERNAL';
   reference?: string;
   last_name_hash?: string;
   last_name_salt?: string;
@@ -60,13 +60,13 @@ export function mapBookingFromDb(bookingDb: {
 export function mapAccessFromDb(accessDb: {
   userId: string;
   bookingId: string;
-  status: string;
+  status: 'PENDING' | 'VERIFIED';
   createdAt: Date;
   updatedAt: Date;
 }): {
   user_id: string;
   booking_id: string;
-  status: string;
+  status: 'PENDING' | 'VERIFIED';
   created_at: number;
   updated_at: number;
 } {
@@ -90,7 +90,7 @@ export function mapUserFromDb(userDb: {
   email: string | null;
   phoneE164: string;
   passwordHash: string | null;
-  countryOrigin: string;
+  countryOrigin: 'GR' | 'ABROAD';
   createdAt: Date;
   updatedAt: Date;
 }): {
@@ -98,7 +98,7 @@ export function mapUserFromDb(userDb: {
   email?: string;
   phone_e164: string;
   password_hash?: string;
-  country_origin: string;
+  country_origin: 'GR' | 'ABROAD';
   created_at: number;
   updated_at: number;
 } {

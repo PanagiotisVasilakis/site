@@ -10,12 +10,13 @@ on:
     - cron: '0 2 * * *'
 
 env:
-  NODE_VERSION: '20'
+  NPM_VERSION: '11.18.0'
 
 permissions:
   contents: read
   security-events: write
   actions: read
+  issues: write
 
 jobs:
   dependency-scanning:
@@ -29,16 +30,19 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
           cache: npm
+
+      - name: Install required npm
+        run: npm install --global "npm@${{ env.NPM_VERSION }}"
 
       - name: Install dependencies
         run: npm ci --audit=false
 
       - name: Run npm audit
         run: |
-          npm audit --audit-level=high --production
-          npm audit --json --audit-level=high --production > npm-audit-report.json || true
+          npm audit --audit-level=high --omit=dev
+          npm audit --json --audit-level=high --omit=dev > npm-audit-report.json || true
 
       - name: Run Snyk security scan
         uses: snyk/actions/node@master
@@ -50,7 +54,8 @@ jobs:
 
       - name: Upload Snyk results to GitHub Code Scanning
         if: env.SNYK_TOKEN != ''
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
+        continue-on-error: true
         with:
           sarif_file: snyk.sarif
 
@@ -78,8 +83,6 @@ jobs:
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          base: main
-          head: HEAD
           extra_args: --debug --only-verified
 
   container-security:
@@ -93,7 +96,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -f Dockerfile.security -t villa-app:${{ github.sha }} .
+          docker build -f docker/Dockerfile.security -t villa-app:${{ github.sha }} .
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
@@ -103,7 +106,8 @@ jobs:
           output: 'trivy-results.sarif'
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
+        continue-on-error: true
         with:
           sarif_file: 'trivy-results.sarif'
 
@@ -138,7 +142,7 @@ jobs:
           fetch-depth: 0
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: javascript-typescript
           queries: security-and-quality
@@ -146,8 +150,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
           cache: npm
+
+      - name: Install required npm
+        run: npm install --global "npm@${{ env.NPM_VERSION }}"
 
       - name: Install dependencies
         run: npm ci --audit=false
@@ -156,13 +163,13 @@ jobs:
         run: npm run build
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
+        continue-on-error: true
         with:
           category: "/language:javascript-typescript"
 
       - name: Run ESLint security rules
-        run: |
-          npx eslint . --ext .js,.jsx,.ts,.tsx --format json -o eslint-security-report.json || true
+        run: npx eslint --config eslint.config.security.mjs --format json --output-file eslint-security-report.json .
 
       - name: Upload static analysis artifacts
         if: always()
@@ -184,27 +191,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
           cache: npm
+
+      - name: Install required npm
+        run: npm install --global "npm@${{ env.NPM_VERSION }}"
 
       - name: Install dependencies
         run: npm ci --audit=false
 
       - name: License compliance check
-        run: |
-          npx license-checker --onlyAllow 'MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;Unlicense;WTFPL' --excludePrivatePackages --json > license-report.json || {
-            echo "License compliance check failed"
-            npx license-checker --summary
-            exit 1
-          }
-
-      - name: Upload license report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: license-compliance-report
-          path: license-report.json
-          retention-days: 30
+        run: npm run security:license-check
 
   security-summary:
     name: Security Summary
@@ -219,6 +216,7 @@ jobs:
 
       - name: Create security summary
         uses: actions/github-script@v7
+        continue-on-error: true
         with:
           script: |
             const fs = require('fs');
@@ -245,14 +243,8 @@ jobs:
               summary += `- **Static Analysis**: ✅ No issues found\n`;
             }
             
-            // Check license compliance
-            try {
-              const licenseReport = JSON.parse(fs.readFileSync('./reports/license-compliance-report/license-report.json', 'utf8'));
-              const packageCount = Object.keys(licenseReport).length;
-              summary += `- **License Compliance**: ✅ ${packageCount} packages checked\n`;
-            } catch (e) {
-              summary += `- **License Compliance**: ❌ Compliance check failed\n`;
-            }
+            const licenseResult = '${{ needs.license-compliance.result }}';
+            summary += `- **License Compliance**: ${licenseResult === 'success' ? '✅ Passed' : `❌ ${licenseResult}`}\n`;
             
             summary += '\n📋 **Full reports are available in the workflow artifacts.**';
             

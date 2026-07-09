@@ -27,24 +27,47 @@ function readFlags(): FeatureFlags {
 
 function writeFlags(flags: FeatureFlags): void {
   const enc = encryptJSON(flags);
-  fs.writeFileSync(FILE, enc, 'utf-8');
+  const temporaryFile = `${FILE}.${process.pid}.tmp`;
+  try {
+    fs.writeFileSync(temporaryFile, enc, { encoding: 'utf-8', mode: 0o600 });
+    fs.renameSync(temporaryFile, FILE);
+  } catch (error) {
+    try { fs.unlinkSync(temporaryFile); } catch {}
+    throw error;
+  }
 }
 
 let cache: FeatureFlags | null = null;
+let cacheMtimeMs = -1;
+
+function flagsMtimeMs(): number {
+  try {
+    return fs.statSync(FILE).mtimeMs;
+  } catch {
+    return 0;
+  }
+}
 
 export function getFeatureFlags(): FeatureFlags {
-  if (!cache) cache = readFlags();
-  return cache;
+  const currentMtimeMs = flagsMtimeMs();
+  if (!cache || currentMtimeMs !== cacheMtimeMs) {
+    cache = readFlags();
+    cacheMtimeMs = currentMtimeMs;
+  }
+  return { ...cache };
 }
 
 export function setFeatureFlags(partial: Partial<FeatureFlags>): FeatureFlags {
   const merged = { ...getFeatureFlags(), ...partial } as FeatureFlags;
-  cache = merged;
   writeFlags(merged);
-  return merged;
+  cache = merged;
+  cacheMtimeMs = flagsMtimeMs();
+  return { ...merged };
 }
 
 export function resetFeatureFlags(): void {
-  cache = { ...DEFAULT_FLAGS };
-  writeFlags(cache);
+  const defaults = { ...DEFAULT_FLAGS };
+  writeFlags(defaults);
+  cache = defaults;
+  cacheMtimeMs = flagsMtimeMs();
 }

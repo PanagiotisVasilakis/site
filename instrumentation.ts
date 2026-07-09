@@ -13,10 +13,9 @@ export async function register() {
       // Validate environment variables at startup
       validateEnv();
       console.log('✅ Environment validation passed');
-    } catch {
-      // Error details already logged by validateEnv()
+    } catch (error) {
       console.error('❌ Environment validation failed - server will not start properly');
-      // Don't throw - let Next.js handle it gracefully
+      throw error;
     }
   }
 }

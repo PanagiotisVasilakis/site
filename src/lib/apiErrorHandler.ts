@@ -8,6 +8,7 @@ import { logger } from './logger-enterprise';
 import { z } from 'zod';
 import type { ApiErrorCode } from './apiErrorTypes';
 import { ApiErrorCode as ErrorCodes } from './apiErrorTypes';
+import { getClientIp } from './net/getClientIp';
 
 // Re-export for backward compatibility
 export { ErrorCodes as ApiErrorCode };
@@ -223,7 +224,7 @@ export function withErrorHandler(
       requestId: correlationId,
       route: new URL(url).pathname,
       userAgent: request.headers.get('user-agent') || undefined,
-      ip: getClientIP(request),
+      ip: getClientIp(request, { trustProxy: true }),
     });
 
     try {
@@ -435,14 +436,6 @@ export function validateRequestBody<T>(schema: z.ZodSchema<T>) {
  */
 function generateCorrelationId(): string {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
-
-function getClientIP(request: NextRequest): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  const realIP = request.headers.get('x-real-ip');
-  const cfIP = request.headers.get('cf-connecting-ip');
-  
-  return forwarded?.split(',')[0]?.trim() || realIP || cfIP || 'unknown';
 }
 
 function sanitizeHeaders(headers: Headers): Record<string, string> {

@@ -1,22 +1,13 @@
 {
   "$schema": "https://unpkg.com/knip@latest/schema.json",
   "ignore": [
-    "public/guest-viewer.js",
     "public/sw.js"
   ],
   "ignoreDependencies": [
-    "eslint-config-next",
-    "tailwindcss"
+    "@prisma/client",
+    "pg"
   ],
   "ignoreBinaries": [
-    "trivy",
-    "wait-on",
-    "Apache-2.0",
-    "BSD-2-Clause",
-    "BSD-3-Clause",
-    "ISC",
-    "Unlicense",
-    "WTFPL",
-    "license-checker"
+    "trivy"
   ]
 }

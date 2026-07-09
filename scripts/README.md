@@ -197,15 +197,13 @@ Make shortcuts:
 
 ## 8) Quick troubleshooting
 
-- Runtime fails immediately with version error: use Node 20+ and npm 10+.
+- Runtime fails immediately with version error: use Node 22.19+ and npm 11.18+.
 - Env validation fails: check `DATABASE_URL`, `ADMIN_JWT_SECRET`, `ADMIN_DASH_SECRET`, `SECURITY_ENC_KEY_HEX`, `SESSION_SECRET`.
 - Database unreachable: start Docker and rerun orchestrator, or set a reachable managed `DATABASE_URL`.
 - Tests fail on DB connection: verify `TEST_DATABASE_URL`, run migrations again, and confirm test DB container health.
 
 ## 9) Related docs
 
-- `docs/RUN_AND_USE_GUIDE.md`
-- `docs/PUBLIC_DEPLOYMENT_AND_MAINTENANCE.md`
-- `docs/TEST_DATABASE_QUICK_START.md`
-- `docs/TEST_DATABASE_SETUP.md`
-- `docs/README_DB.md`
+- `docs/ci/db-tests.md`
+- `docs/testing/db-lookup.md`
+- `SECURITY.md`

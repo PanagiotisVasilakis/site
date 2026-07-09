@@ -14,6 +14,7 @@ import {
   type SecurityEvent,
 } from '@/lib/security-config';
 import { metrics } from '@/lib/metrics-lite';
+import { getClientIp } from '@/lib/net/getClientIp';
 
 let securityHeadersCache: Record<string, string> | null = null;
 let cacheTimestamp = 0;
@@ -50,7 +51,19 @@ class SecurityHeadersMiddleware {
     this.applyCspHeaders(response, nonce);
     this.logSecurityContext(request);
 
-    return response;
+    const requestHeaders = new Headers(request.headers);
+    const csp = response.headers.get('Content-Security-Policy')
+      || response.headers.get('Content-Security-Policy-Report-Only');
+    if (csp) {
+      requestHeaders.set('Content-Security-Policy', csp);
+    }
+    if (nonce) {
+      requestHeaders.set('x-nonce', nonce);
+    }
+
+    const forwarded = NextResponse.next({ request: { headers: requestHeaders } });
+    response.headers.forEach((value, key) => forwarded.headers.set(key, value));
+    return forwarded;
   }
 
   private shouldSkipPath(pathname: string): boolean {
@@ -114,11 +127,10 @@ class SecurityHeadersMiddleware {
   private applyCspHeaders(response: NextResponse, nonce?: string): void {
     if (!this.config.csp.enabled) return;
 
-    let csp = buildCSPDirective(this.config.csp.directives, this.config.csp.useNonce);
-
-    if (nonce && this.config.csp.useNonce) {
-      csp = csp.replace("script-src 'self' 'unsafe-inline'", `script-src 'self' 'nonce-${nonce}'`);
-    }
+    let csp = buildCSPDirective(
+      this.config.csp.directives,
+      this.config.csp.useNonce ? nonce : undefined,
+    );
 
     if (this.config.csp.reportUri) {
       csp += `; report-uri ${this.config.csp.reportUri}`;
@@ -160,7 +172,7 @@ class SecurityHeadersMiddleware {
       type: 'suspicious_activity',
       severity: 'medium',
       timestamp: new Date().toISOString(),
-      ip: this.getClientIP(request),
+      ip: getClientIp(request, { trustProxy: true }),
       userAgent,
       url,
       details: {
@@ -174,25 +186,6 @@ class SecurityHeadersMiddleware {
 
     logSecurityEvent(event);
   }
-
-  private getClientIP(request: NextRequest): string {
-    const forwardedFor = request.headers.get('x-forwarded-for');
-    if (forwardedFor) {
-      return forwardedFor.split(',')[0]?.trim() || 'unknown';
-    }
-
-    const realIP = request.headers.get('x-real-ip');
-    if (realIP) {
-      return realIP;
-    }
-
-    const cfIP = request.headers.get('cf-connecting-ip');
-    if (cfIP) {
-      return cfIP;
-    }
-
-    return 'unknown';
-  }
 }
 
 class RateLimitMiddleware {
@@ -201,6 +194,7 @@ class RateLimitMiddleware {
 
   public async handle(request: NextRequest): Promise<NextResponse | null> {
     if (!this.config.enabled) return null;
+    if (!request.nextUrl.pathname.startsWith('/api/')) return null;
 
     const key = this.generateKey(request);
     const now = Date.now();
@@ -275,23 +269,7 @@ class RateLimitMiddleware {
   }
 
   private generateKey(request: NextRequest): string {
-    const ip = this.getClientIP(request);
-    const path = request.nextUrl.pathname;
-    return `${ip}:${path}`;
-  }
-
-  private getClientIP(request: NextRequest): string {
-    const forwardedFor = request.headers.get('x-forwarded-for');
-    if (forwardedFor) {
-      return forwardedFor.split(',')[0]?.trim() || 'unknown';
-    }
-
-    const realIP = request.headers.get('x-real-ip');
-    if (realIP) {
-      return realIP;
-    }
-
-    return 'unknown';
+    return getClientIp(request, { trustProxy: true });
   }
 }
 
@@ -313,7 +291,7 @@ class CORSMiddleware {
         type: 'cors_violation',
         severity: 'medium',
         timestamp: new Date().toISOString(),
-        ip: this.getClientIP(request),
+        ip: getClientIp(request, { trustProxy: true }),
         userAgent: request.headers.get('user-agent') || undefined,
         url: request.nextUrl.toString(),
         details: {
@@ -349,11 +327,6 @@ class CORSMiddleware {
 
   private isOriginAllowed(origin: string): boolean {
     return this.config.origins.includes(origin) || this.config.origins.includes('*');
-  }
-
-  private getClientIP(request: NextRequest): string {
-    const forwardedFor = request.headers.get('x-forwarded-for');
-    return forwardedFor ? forwardedFor.split(',')[0]?.trim() || 'unknown' : 'unknown';
   }
 }
 

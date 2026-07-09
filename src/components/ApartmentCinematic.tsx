@@ -155,7 +155,6 @@ export default function ApartmentCinematic({ locale, houseText, photos }: Props)
         <div className="mx-auto max-w-6xl px-6 md:px-14 py-14 lg:py-20 space-y-16" aria-label={photosRegionLabel} data-apartment-gallery-root>
           {roomSections.map(({ label, dictKey, description, stack, stackIndices }) => {
             const anchorId = `sec-${label.replace(/\s+/g, '-')}`;
-            const firstIndex = stackIndices[0] ?? 0;
             const openLabel = isGreek ? `Άνοιγμα γκαλερί ${label}` : `Open ${label.toLowerCase()} gallery`;
             return (
               <article key={label} className="grid gap-8 lg:gap-16 xl:gap-24 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] items-start scroll-mt-24" aria-labelledby={anchorId}>
@@ -167,24 +166,14 @@ export default function ApartmentCinematic({ locale, houseText, photos }: Props)
                 </div>
                 <div
                   className="apartment-photo-stack-wrapper"
-                  role="button"
-                  tabIndex={0}
-                  aria-label={openLabel}
-                  onClick={() => openGalleryAt(firstIndex, stackIndices)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ' || event.key === 'Space' || event.key === 'Spacebar') {
-                      event.preventDefault();
-                      openGalleryAt(firstIndex, stackIndices);
-                    }
-                  }}
-                  data-open-photo={firstIndex}
                   data-room={dictKey}
                 >
-                  <div className="apartment-photo-stack" role="presentation" data-count={stack.length}>
+                  <div className="apartment-photo-stack" data-count={stack.length}>
                     {stack.map(({ photo, index: photoIndex }, idx) => (
                       <figure
                         key={`${photo.src}-${idx}`}
-                        role="presentation"
+                        role="button"
+                        aria-label={`${openLabel} ${idx + 1}`}
                         className="apartment-photo-stack-card"
                         data-layer={idx}
                         data-primary={idx === 0}

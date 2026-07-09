@@ -36,7 +36,7 @@ describe('RateLimitMiddleware', () => {
     // override config for deterministic test
     (mw as any).config = { enabled: true, windowMs: 60000, maxRequests: 5, standardHeaders: true, legacyHeaders: true };
 
-    const res = await mw.handle(makeReq('/test'));
+    const res = await mw.handle(makeReq('/api/test'));
     expect(res).toBeNull();
     expect(incr).toHaveBeenCalled();
   });
@@ -55,7 +55,7 @@ describe('RateLimitMiddleware', () => {
     const mw = new RateLimitMiddleware();
     (mw as any).config = { enabled: true, windowMs: 60000, maxRequests: 5, standardHeaders: true, legacyHeaders: true };
 
-    const res = await mw.handle(makeReq('/blocked'));
+    const res = await mw.handle(makeReq('/api/blocked'));
     expect(res).not.toBeNull();
     expect((res as any).status).toBe(429);
     expect((res as any).headers.get('X-RateLimit-Limit')).toBe('5');
@@ -76,12 +76,20 @@ describe('RateLimitMiddleware', () => {
     (mw as any).config = { enabled: true, windowMs: 1000, maxRequests: 2, standardHeaders: true, legacyHeaders: false };
 
     // First two allowed
-    expect(await mw.handle(makeReq('/mem'))).toBeNull();
-    expect(await mw.handle(makeReq('/mem'))).toBeNull();
+    expect(await mw.handle(makeReq('/api/mem'))).toBeNull();
+    expect(await mw.handle(makeReq('/api/mem'))).toBeNull();
 
     // Third blocked
-    const third = await mw.handle(makeReq('/mem'));
+    const third = await mw.handle(makeReq('/api/mem'));
     expect(third).not.toBeNull();
     expect((third as any).status).toBe(429);
+  });
+
+  it('does not rate-limit page navigations', async () => {
+    const mod = await import('../security-middleware');
+    const mw = new mod.RateLimitMiddleware();
+    (mw as any).config = { enabled: true, windowMs: 1000, maxRequests: 0, standardHeaders: true, legacyHeaders: false };
+
+    expect(await mw.handle(makeReq('/en/apartment'))).toBeNull();
   });
 });

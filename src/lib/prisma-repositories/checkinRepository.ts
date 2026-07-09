@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger-enterprise';
+import { mapCheckinFromDb } from '@/lib/mappers/domainMappers';
 
 export type CheckinRecord = {
   booking_id: string;
@@ -7,20 +8,6 @@ export type CheckinRecord = {
   special_requests?: string;
   accepted_at: number;
 };
-
-function mapCheckin(checkin: {
-  bookingId: string;
-  arrivalTime: string;
-  specialRequests: string | null;
-  acceptedAt: Date;
-}): CheckinRecord {
-  return {
-    booking_id: checkin.bookingId,
-    arrival_time: checkin.arrivalTime,
-    special_requests: checkin.specialRequests ?? undefined,
-    accepted_at: checkin.acceptedAt.getTime(),
-  };
-}
 
 async function upsert(bookingId: string, arrivalTime: string, specialRequests?: string): Promise<CheckinRecord> {
   try {
@@ -40,7 +27,7 @@ async function upsert(bookingId: string, arrivalTime: string, specialRequests?: 
     });
 
     logger.info('Checkin record upserted (prisma)', { bookingId });
-    return mapCheckin(checkin);
+    return mapCheckinFromDb(checkin);
   } catch (error) {
     logger.error('checkinRepository(prisma): upsert failed', error);
     throw error;
@@ -50,7 +37,7 @@ async function upsert(bookingId: string, arrivalTime: string, specialRequests?: 
 async function getByBookingId(bookingId: string): Promise<CheckinRecord | undefined> {
   try {
     const checkin = await prisma.checkin.findUnique({ where: { bookingId } });
-    return checkin ? mapCheckin(checkin) : undefined;
+    return checkin ? mapCheckinFromDb(checkin) : undefined;
   } catch (error) {
     logger.error('checkinRepository(prisma): getByBookingId failed', error);
     throw error;
@@ -60,7 +47,7 @@ async function getByBookingId(bookingId: string): Promise<CheckinRecord | undefi
 async function getAll(): Promise<CheckinRecord[]> {
   try {
     const checkins = await prisma.checkin.findMany({ orderBy: { acceptedAt: 'desc' } });
-    return checkins.map(mapCheckin);
+    return checkins.map(mapCheckinFromDb);
   } catch (error) {
     logger.error('checkinRepository(prisma): getAll failed', error);
     throw error;

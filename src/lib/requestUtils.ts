@@ -4,6 +4,7 @@
  */
 
 import type { NextRequest } from 'next/server';
+import { getClientIp } from '@/lib/net/getClientIp';
 
 /**
  * Extracts the client IP address from a Next.js request.
@@ -16,21 +17,5 @@ import type { NextRequest } from 'next/server';
  * @returns The client IP address or 'unknown' if not determinable
  */
 export function getClientIP(request: NextRequest): string {
-    const forwardedFor = request.headers.get('x-forwarded-for');
-    const realIP = request.headers.get('x-real-ip');
-    const cfConnectingIP = request.headers.get('cf-connecting-ip');
-
-    if (forwardedFor) {
-        return forwardedFor.split(',')[0].trim();
-    }
-
-    if (realIP) {
-        return realIP;
-    }
-
-    if (cfConnectingIP) {
-        return cfConnectingIP;
-    }
-
-    return 'unknown';
+    return getClientIp(request, { trustProxy: true });
 }

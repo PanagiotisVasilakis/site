@@ -45,38 +45,32 @@ function unauthorizedResponse(request: NextRequest, failurePath?: string): NextR
 }
 
 async function issueRefreshedSession(refreshToken: string): Promise<{ jwt: string; refreshToken: string } | null> {
-  const rec = await guestStore.verifyRefreshToken(refreshToken);
-  if (!rec) return null;
-
-  // Rotate on use
   const rotated = await guestStore.rotateRefreshToken(refreshToken);
-  if (rotated.old && rotated.rec) {
-    elogger.info('refresh_token.rotated', {
+  if (rotated.status === 'replayed') {
+    elogger.warn('refresh_token.replay_detected', {
       correlationId: elogger.getContext()?.correlationId,
-      user_id: rotated.old.user_id,
-      old_id: rotated.old.id,
-      new_id: rotated.rec.id,
-      family_id: rotated.rec.family_id,
     });
-    metrics.counter('refresh_token.rotated', 1);
-  }
-
-  // Require a successful rotation token and a valid booking subject for refreshed sessions.
-  if (!rotated.token) {
-    if (rotated.rec?.id) {
-      await guestStore.revokeRefreshToken(rotated.rec.id);
-    }
-    await guestStore.revokeRefreshToken(rec.id);
+    metrics.counter('refresh_token.replay_detected', 1);
     return null;
   }
 
-  const user = await guestStore.findUserById(rec.user_id);
+  if (rotated.status !== 'rotated' || !rotated.old || !rotated.rec || !rotated.token) {
+    return null;
+  }
+
+  elogger.info('refresh_token.rotated', {
+    correlationId: elogger.getContext()?.correlationId,
+    user_id: rotated.old.user_id,
+    old_id: rotated.old.id,
+    new_id: rotated.rec.id,
+    family_id: rotated.rec.family_id,
+  });
+  metrics.counter('refresh_token.rotated', 1);
+
+  const user = await guestStore.findUserById(rotated.old.user_id);
   const booking = user ? await guestStore.findEligibleBookingForUser(user.id) : undefined;
   if (!user || !booking) {
-    if (rotated.rec?.id) {
-      await guestStore.revokeRefreshToken(rotated.rec.id);
-    }
-    await guestStore.revokeRefreshToken(rec.id);
+    await guestStore.revokeRefreshToken(rotated.rec.id);
     return null;
   }
 

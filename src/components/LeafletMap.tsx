@@ -10,6 +10,7 @@ import { formatTravelChip, type TravelMode } from '@/lib/travelFormat';
 import { getOSRMClient } from '@/lib/osrmClient';
 import { useTravelMetrics } from '@/hooks/useTravelMetrics';
 import { logger } from '@/lib/logger-client';
+import { buildBasePopupHtml, escapeMapHtml as escapeHtml } from '@/components/maps/leafletPopup';
 
 const DEFAULT_TRAVEL_MODES: TravelMode[] = ['driving', 'foot'];
 const DEFAULT_OSRM_BASE_URL = process.env.NEXT_PUBLIC_OSRM_BASE_URL || 'https://router.project-osrm.org';
@@ -122,15 +123,6 @@ const CATEGORY_ICON: Record<string, string> = {
   church: 'M11 2h2v4h4v2h-4v14h-2V8H7V6h4z',
 };
 
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
 function svgIcon(path: string, color: string) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="${color}" aria-hidden="true"><path d="${path}"/></svg>`;
 }
@@ -145,41 +137,9 @@ function buildIcon(type = 'apartment') {
   });
 }
 
-function phoneHref(phone: string) {
-  return `tel:${phone.replace(/[^+0-9]/g, '')}`;
-}
-
-function popupLink(href: string | undefined, label: string) {
-  if (!href) return '';
-  return `<a class="map-popup-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`;
-}
-
 function sameCoordinates(a?: [number, number], b?: [number, number]) {
   if (!a || !b) return false;
   return Math.abs(a[0] - b[0]) < 0.00001 && Math.abs(a[1] - b[1]) < 0.00001;
-}
-
-function buildBasePopupHtml(marker: LeafletMarkerData, labels: LeafletMapLabels) {
-  const phones = marker.phones?.length ? marker.phones : marker.phone ? [marker.phone] : [];
-  const phoneHtml = phones.map(phone => (
-    `<a class="map-popup-contact" href="${escapeHtml(phoneHref(phone))}">${escapeHtml(phone)}</a>`
-  )).join('');
-  const actionLinks = [
-    popupLink(marker.directionsUrl, labels.directions),
-    popupLink(marker.website, labels.website),
-    popupLink(marker.href, labels.details),
-  ].filter(Boolean).join('');
-
-  return `
-    <article class="map-popup">
-      <h3>${escapeHtml(marker.name)}</h3>
-      ${marker.description ? `<p>${escapeHtml(marker.description)}</p>` : ''}
-      ${marker.address ? `<div class="map-popup-row"><strong>${escapeHtml(labels.address)}</strong><span>${escapeHtml(marker.address)}</span></div>` : ''}
-      ${phoneHtml ? `<div class="map-popup-row"><strong>${escapeHtml(labels.phone)}</strong><span class="map-popup-contacts">${phoneHtml}</span></div>` : ''}
-      ${marker.price ? `<div class="map-popup-price">${escapeHtml(marker.price)}</div>` : ''}
-      ${actionLinks ? `<div class="map-popup-actions">${actionLinks}</div>` : ''}
-    </article>
-  `;
 }
 
 type ClusterFactory = (opts?: Record<string, unknown>) => L.LayerGroup & { addLayer: (l: L.Layer) => void };

@@ -35,6 +35,7 @@ yarn-error.log*
 
 # env files
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -67,6 +68,7 @@ yarn-error.log*
 next-env.d.ts
 .vscode/settings.json
 public/precache.json
+public/critical-precache.json
 public/version.json
 QWEN.md
 GEMINI.md

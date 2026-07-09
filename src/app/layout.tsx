@@ -15,7 +15,6 @@ import "../styles/11-contact.css";
 import "../styles/12-apartment-checkin.css";
 import "../styles/13-compatibility-admin.css";
 import WebVitalsReporter from '@/components/WebVitalsReporter';
-import StatusCluster from '@/components/StatusCluster';
 import DataWarmup from '@/components/DataWarmup';
 
 // Font variables removed (system fonts used)
@@ -60,9 +59,6 @@ export default function RootLayout({
         <div className="min-h-svh">{children}</div>
         <DataWarmup />
         <WebVitalsReporter />
-        <div className="fixed bottom-2 left-2 z-50 sm:hidden">
-          <StatusCluster labels={{ online:'Online', offline:'Offline', reconnecting:'Reconnected', slow:'Slow', syncPending:'Sync pending', syncIdle:'Synced' }} />
-        </div>
       </body>
     </html>
   );
