@@ -54,7 +54,6 @@ export interface CommonDictionary {
         signIn?: string;
         signOut?: string;
         menu?: string;
-<<<<<<< HEAD
         closeMenu?: string;
         guestGuide?: string;
         preferences?: string;
@@ -64,12 +63,10 @@ export interface CommonDictionary {
         yourStay?: string;
         explore?: string;
         account?: string;
-=======
         mainMenu?: string;
         primaryPages?: string;
         closeFilters?: string;
         done?: string;
->>>>>>> 430442a31b6b7b701ebd6c42f2511f661d11f85f
     };
     cta: {
         call: string;
@@ -235,7 +232,6 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             back: "Back",
             signIn: "Sign in",
             signOut: "Sign out",
-<<<<<<< HEAD
             menu: "Open menu",
             closeMenu: "Close menu",
             guestGuide: "Your stay, at a glance",
@@ -245,14 +241,11 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             primaryNavigation: "Primary navigation",
             yourStay: "Your stay",
             explore: "Explore Kalamata",
-            account: "Guest account"
-=======
-            menu: "Menu",
+            account: "Guest account",
             mainMenu: "Main menu",
             primaryPages: "Primary pages",
             closeFilters: "Close filters",
             done: "Done"
->>>>>>> 430442a31b6b7b701ebd6c42f2511f661d11f85f
         },
         updates: {
             updateAvailable: "An update is available",
@@ -448,7 +441,6 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             back: "Πίσω",
             signIn: "Σύνδεση",
             signOut: "Αποσύνδεση",
-<<<<<<< HEAD
             menu: "Άνοιγμα μενού",
             closeMenu: "Κλείσιμο μενού",
             guestGuide: "Η διαμονή σας, με μια ματιά",
@@ -458,14 +450,11 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             primaryNavigation: "Κύρια πλοήγηση",
             yourStay: "Η διαμονή σας",
             explore: "Ανακαλύψτε την Καλαμάτα",
-            account: "Λογαριασμός επισκέπτη"
-=======
-            menu: "Μενού",
+            account: "Λογαριασμός επισκέπτη",
             mainMenu: "Κύριο μενού",
             primaryPages: "Κύριες σελίδες",
             closeFilters: "Κλείσιμο φίλτρων",
             done: "Τέλος"
->>>>>>> 430442a31b6b7b701ebd6c42f2511f661d11f85f
         },
         updates: {
             updateAvailable: "Μια ενημέρωση είναι διαθέσιμη",

@@ -61,14 +61,10 @@ export default function ThemeToggle({
     return () => mq.removeEventListener('change', listener);
   }, [mounted]);
   const icon = mounted ? (theme === 'dark' ? '🌞' : '🌙') : '🌙';
-<<<<<<< HEAD
-  const label = mounted ? (theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode') : 'Toggle color scheme';
   const visibleText = mounted && theme === 'dark' ? darkText : lightText;
-=======
   const label = mounted
     ? (theme === 'dark' ? (a11y?.switchToLight ?? 'Switch to light mode') : (a11y?.switchToDark ?? 'Switch to dark mode'))
     : (a11y?.toggleColorScheme ?? 'Toggle color scheme');
->>>>>>> 430442a31b6b7b701ebd6c42f2511f661d11f85f
   return (
     <button
       type="button"

@@ -25,6 +25,7 @@
     "typecheck": "tsc --noEmit",
     "start": "next start",
     "lint": "eslint",
+    "check:conflicts": "node scripts/check-conflict-markers.mjs",
     "lint:security": "eslint --ext .js,.jsx,.ts,.tsx --config eslint.config.security.mjs .",
     "qr": "tsx scripts/generate-qr.ts",
     "check:offline-assets": "tsx scripts/check-offline-assets.ts",
