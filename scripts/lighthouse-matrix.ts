@@ -400,7 +400,7 @@ async function run() {
             config,
           );
 
-          const lhr = result.lhr as any;
+          const lhr = result.lhr;
           const score = Math.round((lhr.categories?.performance?.score ?? 0) * 100);
 
           const lcpMs = num(lhr.audits?.['largest-contentful-paint']?.numericValue);

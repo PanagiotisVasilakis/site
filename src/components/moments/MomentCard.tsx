@@ -249,21 +249,14 @@ export function MomentCard({
                 {isPhoneCard ? (
                     <PhoneServiceIcon id={id} />
                 ) : image ? (
-                    isSvgImage ? (
-                        <img
-                            src={image}
-                            alt=""
-                            className="moment-card-avatar-image"
-                        />
-                    ) : (
-                        <Image
-                            src={image}
-                            alt=""
-                            width={72}
-                            height={72}
-                            className="moment-card-avatar-image"
-                        />
-                    )
+                    <Image
+                        src={image}
+                        alt=""
+                        width={72}
+                        height={72}
+                        unoptimized={isSvgImage}
+                        className="moment-card-avatar-image"
+                    />
                 ) : (
                     <span>{icon || momentsLayoutConfig.card.defaultIcon}</span>
                 )}
