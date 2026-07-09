@@ -3,13 +3,14 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { DateRange, dateRangeFromParams, dateRangeToParams, getNights } from "@/lib/dateUtils";
 import { format } from "date-fns";
+import { el as elLocale } from "date-fns/locale";
 import dynamic from "next/dynamic";
 import { getApartmentContent } from "@/data/apartmentData";
+import { getDictionary } from "@/i18n/dictionaries";
+import type { Locale } from "@/i18n/config";
 
 interface BookingState {
   dateRange: DateRange;
-  adults: number;
-  kids: number;
 }
 
 type DateField = "arrival" | "departure";
@@ -69,6 +70,8 @@ export default function BookingBar({
   showPropertyHeader = true,
 }: Props) {
   const apartmentContent = getApartmentContent(locale as "en" | "el");
+  const t = getDictionary(locale as Locale);
+  const dateFnsLocale = locale === 'el' ? elLocale : undefined;
   const router = useRouter();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -78,8 +81,6 @@ export default function BookingBar({
   const [isHydrated, setIsHydrated] = useState(false);
   const [state, setState] = useState<BookingState>(() => ({
     dateRange: { from: undefined, to: undefined },
-    adults: initial?.adults || 1,
-    kids: initial?.kids || 0,
   }));
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [shouldLoadDatePicker, setShouldLoadDatePicker] = useState(false);
@@ -102,13 +103,9 @@ export default function BookingBar({
     const dateParams = dateRangeToParams(state.dateRange);
     params.delete("checkin");
     params.delete("checkout");
+    params.delete("adults");
+    params.delete("kids");
     dateParams.forEach((value, key) => params.set(key, value));
-
-    if (state.adults > 1) params.set("adults", state.adults.toString());
-    else params.delete("adults");
-
-    if (state.kids > 0) params.set("kids", state.kids.toString());
-    else params.delete("kids");
 
     const newUrl = params.toString()
       ? `${window.location.pathname}?${params}`
@@ -208,22 +205,11 @@ export default function BookingBar({
       params.set("checkout", format(state.dateRange.to, "yyyy-MM-dd"));
     }
 
-    if (state.adults > 1) {
-      params.set("adults", state.adults.toString());
-    }
-
-    if (state.kids > 0) {
-      params.set("kids", state.kids.toString());
-    }
-
     void import("@/lib/analyticsClient")
       .then(({ trackEvent }) => {
         trackEvent("booking_check_availability", {
           property: propertyName,
           hasDates: !!(state.dateRange?.from && state.dateRange?.to),
-          adults: state.adults,
-          kids: state.kids,
-          totalGuests: state.adults + state.kids,
           nights: getNights(state.dateRange),
         });
       })
@@ -233,18 +219,17 @@ export default function BookingBar({
     router.push(bookingUrl);
   }, [onBooking, state, locale, propertyName, router]);
 
-  const arrivalLabel = labels?.arrivalLabel || "Arrival";
-  const departureLabel = labels?.departureLabel || "Departure";
-  const arrivalPlaceholder = labels?.arrivalPlaceholder || labels?.addDates || "Add dates";
-  const departurePlaceholder = labels?.departurePlaceholder || labels?.addDates || "Add dates";
+  const arrivalLabel = labels?.arrivalLabel || t.search?.arrivalLabel || "Arrival";
+  const departureLabel = labels?.departureLabel || t.search?.departureLabel || "Departure";
+  const arrivalPlaceholder = labels?.arrivalPlaceholder || labels?.addDates || t.search?.arrivalPlaceholder || t.search?.addDates || "Add dates";
+  const departurePlaceholder = labels?.departurePlaceholder || labels?.addDates || t.search?.departurePlaceholder || t.search?.addDates || "Add dates";
+  const checkAvailabilityLabel = labels?.checkAvailability || t.search?.checkAvailability || "Check availability";
 
-  const arrivalDisplay = state.dateRange?.from ? format(state.dateRange.from, "MMM d, yyyy") : arrivalPlaceholder;
-  const departureDisplay = state.dateRange?.to ? format(state.dateRange.to, "MMM d, yyyy") : departurePlaceholder;
+  const arrivalDisplay = state.dateRange?.from ? format(state.dateRange.from, "MMM d, yyyy", { locale: dateFnsLocale }) : arrivalPlaceholder;
+  const departureDisplay = state.dateRange?.to ? format(state.dateRange.to, "MMM d, yyyy", { locale: dateFnsLocale }) : departurePlaceholder;
 
   const nights = getNights(state.dateRange);
   const hasValidDates = state.dateRange?.from && state.dateRange?.to;
-  const basePrice = apartmentContent.pricing.basePrice;
-  const totalPrice = hasValidDates ? nights * basePrice : 0;
 
   return (
     <div className="relative" ref={containerRef}>
@@ -253,11 +238,11 @@ export default function BookingBar({
           <h2 className="text-lg font-serif italic font-bold text-brand-800">{propertyName || apartmentContent.shortName}</h2>
         )}
         <p className="text-sm font-serif italic font-bold text-muted mt-3">
-          {subline ?? `${apartmentContent.location.city}, ${apartmentContent.location.country} • €${basePrice}/night`}
+          {subline ?? `${apartmentContent.location.city}, ${apartmentContent.location.country}`}
         </p>
       </div>
 
-      <div className="booking-bar" role="search" aria-label="Check availability">
+      <div className="booking-bar" role="search" aria-label={checkAvailabilityLabel}>
         <div className="search-seg text-left flex-1">
           <button
             ref={arrivalButtonRef}
@@ -288,65 +273,19 @@ export default function BookingBar({
           </button>
         </div>
 
-        <div className="search-seg text-left min-w-[100px]">
-          <span className="search-label">{labels?.adultsLabel || "Adults"}</span>
-          <span className="search-value flex items-center gap-1">
-            <input
-              aria-label={labels?.adultsLabel || "Adults"}
-              type="number"
-              min={1}
-              max={apartmentContent.specs.maxGuests - state.kids}
-              value={state.adults}
-              onChange={(e) =>
-                updateState(
-                  "adults",
-                  Math.max(1, Math.min(apartmentContent.specs.maxGuests - state.kids, Number(e.target.value) || 1))
-                )
-              }
-              className="guest-input bg-transparent w-10 focus:outline-none"
-            />
-            <span className="opacity-70">
-              {state.adults === 1 ? "adult" : "adults"}
-            </span>
-          </span>
-        </div>
-
-        <div className="search-seg text-left min-w-[100px]">
-          <span className="search-label">{labels?.kidsLabel || "Kids"}</span>
-          <span className="search-value flex items-center gap-1">
-            <input
-              aria-label={labels?.kidsLabel || "Kids"}
-              type="number"
-              min={0}
-              max={apartmentContent.specs.maxGuests - state.adults}
-              value={state.kids}
-              onChange={(e) =>
-                updateState(
-                  "kids",
-                  Math.max(0, Math.min(apartmentContent.specs.maxGuests - state.adults, Number(e.target.value) || 0))
-                )
-              }
-              className="guest-input bg-transparent w-10 focus:outline-none"
-            />
-            <span className="opacity-70">
-              {state.kids === 1 ? "kid" : "kids"}
-            </span>
-          </span>
-        </div>
-
         <div className="search-action">
           <button
             type="button"
             onClick={checkAvailability}
             className={`booking-button ${isHydrated && hasValidDates ? "ready" : ""}`}
-            aria-label={labels?.checkAvailability || "Check availability"}
+            aria-label={checkAvailabilityLabel}
             disabled={!isHydrated || !hasValidDates}
           >
             <div className="flex flex-col items-center gap-1">
-              <span className="text-sm font-medium">{labels?.checkAvailability || "Check availability"}</span>
+              <span className="text-sm font-medium">{checkAvailabilityLabel}</span>
               {isHydrated && hasValidDates && (
                 <span className="text-xs opacity-90">
-                  €{totalPrice} • {nights} {nights === 1 ? "night" : "nights"}
+                  {nights} {nights === 1 ? (t.booking?.night ?? "night") : (t.booking?.nights ?? "nights")}
                 </span>
               )}
             </div>
@@ -360,9 +299,10 @@ export default function BookingBar({
           value={state.dateRange}
           onChange={handleDateChange}
           onClose={handleDatePickerClose}
-          showPricing={true}
+          showPricing={false}
           activeField={activeDateField}
           anchor={pickerAnchor ?? undefined}
+          locale={locale}
         />
       )}
     </div>

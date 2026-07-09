@@ -6,12 +6,16 @@ interface AmenitiesListProps {
   amenities: string[];
   maxInitialItems?: number;
   className?: string;
+  showMoreLabel?: string;
+  showLessLabel?: string;
 }
 
 export default function AmenitiesList({ 
   amenities, 
   maxInitialItems = 6,
-  className = '' 
+  className = '',
+  showMoreLabel = 'Show all {count} amenities',
+  showLessLabel = 'Show less amenities'
 }: AmenitiesListProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   
@@ -37,12 +41,12 @@ export default function AmenitiesList({
         >
           {isExpanded ? (
             <>
-              Show less amenities
+              {showLessLabel}
               <SimpleChevronUp className="w-4 h-4" />
             </>
           ) : (
             <>
-              Show all {amenities.length} amenities
+              {showMoreLabel.replace('{count}', String(amenities.length))}
               <SimpleChevronDown className="w-4 h-4" />
             </>
           )}

@@ -23,7 +23,7 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
   const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : 'en';
   // CheckInInfo owns the guest-facing layout and welcome copy.
 
-  const pickLocalized = (item: Item, baseKey: 'name' | 'summary'): string => {
+  const pickLocalized = (item: Item, baseKey: 'name' | 'summary' | 'address'): string => {
     const localeKey = `${baseKey}_${eff}` as keyof Item;
     const englishKey = `${baseKey}_en` as keyof Item;
     const greekKey = `${baseKey}_el` as keyof Item;
@@ -42,18 +42,18 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
     slug: item.slug,
     rating: item.rating,
     priceLevel: item.priceLevel,
+      tags: item.tags,
     location: item.location,
     phone: item.phone,
     phones: item.phones,
-    address: item.address,
+      address: pickLocalized(item, 'address') || undefined,
     website: item.website,
     directionsUrl: item.directionsUrl,
     sourceUrls: item.sourceUrls,
   });
 
-  const nearbyRestaurants = getItemsByCategory('moments').slice(0, 5).map(mapItem);
-  const nearbyServices = getItemsByCategory('phones').slice(0, 3).map(mapItem);
-  const nearbyAttractions = getItemsByCategory('sightseeing').slice(0, 4).map(mapItem);
+  const nearbyRestaurants = getItemsByCategory('moments').map(mapItem);
+  const nearbyServices = getItemsByCategory('phones').map(mapItem);
 
   const session = await getGuestSessionFromCookies();
   if (!hasVerifiedBookingSession(session)) {
@@ -76,7 +76,6 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
         locale={eff}
         nearbyRestaurants={nearbyRestaurants}
         nearbyServices={nearbyServices}
-        nearbyAttractions={nearbyAttractions}
       />
     </div>
   );

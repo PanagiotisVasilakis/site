@@ -18,7 +18,8 @@ import type {
   CheckinDictionary,
   CheckinInfoDictionary,
   PortalDictionary,
-  ContactDictionary
+  ContactDictionary,
+  AboutDictionary
 } from './domains';
 
 // Import domain translations
@@ -27,6 +28,7 @@ import { houseTranslations, locationPanelTranslations } from './domains/house';
 import { bookingTranslations } from './domains/booking';
 import { checkinTranslations, checkinInfoTranslations } from './domains/checkin';
 import { portalTranslations, contactTranslations } from './domains/portal';
+import { aboutTranslations } from './domains/about';
 
 // ============================================================================
 // Combined Dictionary Type
@@ -44,6 +46,7 @@ export type Dictionary = CommonDictionary & {
   checkinInfo?: CheckinInfoDictionary;
   portal?: PortalDictionary;
   contact?: ContactDictionary;
+  about?: AboutDictionary;
 };
 
 // ============================================================================
@@ -65,6 +68,7 @@ function mergeDictionary(locale: Locale): Dictionary {
     checkinInfo: checkinInfoTranslations[locale],
     portal: portalTranslations[locale],
     contact: contactTranslations[locale],
+    about: aboutTranslations[locale],
   };
 }
 
@@ -98,4 +102,5 @@ export type {
   CheckinInfoDictionary,
   PortalDictionary,
   ContactDictionary,
+  AboutDictionary,
 };

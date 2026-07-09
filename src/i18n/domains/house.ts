@@ -35,6 +35,7 @@ export interface HouseDictionary {
         prev?: string;
         next?: string;
         close?: string;
+        resetZoom?: string;
     };
     // Index signature for extensibility (used by ApartmentCinematic)
     [k: string]: unknown;
@@ -84,7 +85,7 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
             "2 bedrooms",
             "1 bathroom",
             "2nd floor",
-            "75 m²",
+            "90 m²",
             "Mountain & sea views",
             "Free parking"
         ],
@@ -137,7 +138,8 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
             counter: "Currently viewing image {current} of {total}.",
             prev: "Previous image",
             next: "Next image",
-            close: "Close viewer"
+            close: "Close viewer",
+            resetZoom: "Reset Zoom"
         },
     },
     el: {
@@ -156,7 +158,7 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
             "2 υπνοδωμάτια",
             "1 μπάνιο",
             "2ος όροφος",
-            "75 τ.μ.",
+            "90 τ.μ.",
             "Θέα βουνό & θάλασσα",
             "Δωρεάν πάρκινγκ"
         ],
@@ -209,7 +211,8 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
             counter: "Προβάλλεται η εικόνα {current} από {total}.",
             prev: "Προηγούμενη εικόνα",
             next: "Επόμενη εικόνα",
-            close: "Κλείσιμο προβολής"
+            close: "Κλείσιμο προβολής",
+            resetZoom: "Επαναφορά ζουμ"
         },
     },
 };

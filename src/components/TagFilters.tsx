@@ -5,9 +5,10 @@ interface Props {
   items: Array<{ tags?: string[] }>;
   active?: string[];
   onChange?: (tags: string[]) => void;
+  resetLabel?: string;
 }
 
-function TagFiltersComponent({ items, active: controlledActive, onChange }: Props) {
+function TagFiltersComponent({ items, active: controlledActive, onChange, resetLabel = 'Reset filters' }: Props) {
   const all = useMemo(() => {
     const s = new Set<string>();
     items.forEach(i => i.tags?.forEach(t => s.add(t)));
@@ -37,8 +38,8 @@ function TagFiltersComponent({ items, active: controlledActive, onChange }: Prop
           key="__reset"
           onClick={clearAll}
           className="tag-filter reset-chip"
-          aria-label="Reset filters"
-        >Reset filters</button>
+          aria-label={resetLabel}
+        >{resetLabel}</button>
       )}
       {all.map(tag => {
         const on = active.includes(tag);

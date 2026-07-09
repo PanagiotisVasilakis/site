@@ -195,6 +195,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
     ];
 
     if (shouldShowCheckIn) {
+<<<<<<< HEAD
       links.splice(3, 0, {
         href: `/${locale}/check-in`,
         label: 'Check‑in',
@@ -203,6 +204,9 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
         group: 'stay',
         featured: false,
       });
+=======
+      links.push({ href: `/${locale}/check-in`, label: dictionary.checkin?.navLabel ?? 'Check‑in', icon: '✓', event: 'mobile_nav_checkin' });
+>>>>>>> 430442a31b6b7b701ebd6c42f2511f661d11f85f
     }
     return links.filter(l => Boolean(l.label));
   }, [locale, dictionary, shouldShowCheckIn]);
@@ -272,7 +276,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
           <Link
             href={`/${locale}`}
             className={clsx(navButton({ intent: 'primary' }), "group min-w-0 max-w-fit focus:outline-none focus-visible:ring-2 ring-brand-400/60")}
-            aria-label="Home"
+            aria-label={dictionary.cta?.home ?? 'Home'}
           >
             <span className="text-sm leading-none flex-shrink-0" aria-hidden>🏠</span>
             <span className="truncate max-w-[200px] text-[11px]" title={appTitle}>{appTitle}</span>
@@ -307,15 +311,19 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
                   className={navButton({ intent: 'secondary' })}
                   onClick={() => trackAnalyticsEvent('checkin_nav_clicked')}
                 >
-                  Check‑in
+                  {dictionary.checkin?.navLabel ?? 'Check‑in'}
                 </Link>
               )}
             </div>
 
             <button
+<<<<<<< HEAD
               ref={triggerRef}
               type="button"
               aria-label={open ? (menuLabels?.closeMenu || 'Close menu') : (menuLabels?.menu || 'Open menu')}
+=======
+              aria-label={dictionary.ui?.menu ?? 'Menu'}
+>>>>>>> 430442a31b6b7b701ebd6c42f2511f661d11f85f
               aria-expanded={open}
               aria-controls={panelId}
               aria-haspopup="dialog"
@@ -331,6 +339,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
           </div>
         </div>
 
+<<<<<<< HEAD
         <button
           type="button"
           tabIndex={open ? 0 : -1}
@@ -393,6 +402,34 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
                   {stayLinks.map(renderMenuLink)}
                 </div>
               </div>
+=======
+        {/* Mobile Panel */}
+        <div className={menuPanel({ open })} role="menu" aria-label={dictionary.ui?.mainMenu ?? 'Main menu'}>
+          <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-zinc-700/60">
+            <span className="text-xs font-bold uppercase">{dictionary.ui?.menu ?? 'Menu'}</span>
+            <div className="flex items-center gap-2">
+              <div className="dark:border dark:border-zinc-700/60 rounded-full"><ThemeToggle /></div>
+              <div className="dark:border dark:border-zinc-700/60 rounded-full"><LocaleSwitcher /></div>
+            </div>
+          </div>
+
+          <nav className="flex flex-col gap-2" aria-label={dictionary.ui?.primaryPages ?? 'Primary pages'}>
+            {mobileMenuLinks.map(link => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={navButton({ intent: 'mobileItem' })}
+                onClick={() => {
+                  if (link.event) trackAnalyticsEvent(link.event, { destination: link.href });
+                  setOpen(false);
+                }}
+              >
+                <span aria-hidden className="text-base leading-none w-6 text-center">{link.icon}</span>
+                <span className="flex-1 text-left">{link.label}</span>
+              </Link>
+            ))}
+          </nav>
+>>>>>>> 430442a31b6b7b701ebd6c42f2511f661d11f85f
 
               <div className="guest-menu-group">
                 <p className="guest-menu-eyebrow">{menuLabels?.explore || 'Explore Kalamata'}</p>

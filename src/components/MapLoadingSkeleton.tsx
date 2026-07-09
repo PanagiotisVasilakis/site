@@ -1,5 +1,10 @@
+"use client";
+
 import React from 'react';
-import { MAP_LOADING_STATES, MAP_CSS_CLASSES, MAP_DEFAULTS } from '@/lib/mapConstants';
+import { useParams } from 'next/navigation';
+import { MAP_CSS_CLASSES, MAP_DEFAULTS } from '@/lib/mapConstants';
+import { getDictionary } from '@/i18n/dictionaries';
+import type { Locale } from '@/i18n/config';
 
 interface MapLoadingSkeletonProps {
   height?: string;
@@ -9,16 +14,20 @@ interface MapLoadingSkeletonProps {
 
 export default function MapLoadingSkeleton({ 
   height = MAP_DEFAULTS.HEIGHT.DEFAULT,
-  message = MAP_LOADING_STATES.DEFAULT,
+  message,
   className = ''
 }: MapLoadingSkeletonProps) {
+  const params = useParams<{ locale?: string }>();
+  const locale: Locale = params?.locale === 'el' ? 'el' : 'en';
+  const localizedMessage = message ?? getDictionary(locale).map?.loading ?? 'Loading map...';
+
   return (
     <div 
       className={`${MAP_CSS_CLASSES.LOADING_CONTAINER} ${className}`}
       style={{ height }}
     >
       <div className={MAP_CSS_CLASSES.LOADING_TEXT}>
-        {message}
+        {localizedMessage}
       </div>
     </div>
   );

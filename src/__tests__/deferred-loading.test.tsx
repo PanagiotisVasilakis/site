@@ -41,7 +41,10 @@ vi.mock('@/components/DateRangePicker', () => ({
   ),
 }));
 
-const LeafletMapMock = vi.fn(() => <div data-testid="leaflet-map">interactive map</div>);
+const LeafletMapMock = vi.fn((props: Record<string, unknown>) => {
+  void props;
+  return <div data-testid="leaflet-map">interactive map</div>;
+});
 vi.mock('@/components/LeafletMap', () => ({
   default: LeafletMapMock,
 }));
@@ -135,5 +138,27 @@ describe('Deferred loading guardrails', () => {
     });
 
     expect(await screen.findByTestId('leaflet-map')).toBeInTheDocument();
+  });
+
+  it('passes Greek labels to the Leaflet map controls and popups', async () => {
+    const InteractiveMap = (await import('@/components/InteractiveMap')).default;
+    const user = userEvent.setup();
+
+    render(<InteractiveMap locale="el" markers={[]} activation="intent" />);
+    await user.click(screen.getByRole('button', { name: /φόρτωση χάρτη/i }));
+
+    await waitFor(() => expect(LeafletMapMock).toHaveBeenCalled());
+
+    const [props] = LeafletMapMock.mock.calls[LeafletMapMock.mock.calls.length - 1]!;
+    const mapProps = props as {
+      labels?: { directions?: string; locateMe?: string; clearRoute?: string };
+      travelPrompt?: string;
+    };
+    expect(mapProps.labels).toMatchObject({
+      directions: 'Οδηγίες',
+      locateMe: 'Εντοπισμός θέσης',
+      clearRoute: 'Εκκαθάριση διαδρομής',
+    });
+    expect(mapProps.travelPrompt).toBe('Πατήστε έναν δείκτη για να υπολογίσουμε τον χρόνο διαδρομής.');
   });
 });

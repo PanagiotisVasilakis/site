@@ -1,6 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
+import { usePathname } from 'next/navigation';
 import { logger } from '@/lib/logger-client';
+import { getDictionary } from '@/i18n/dictionaries';
+import type { Locale } from '@/i18n/config';
 
 interface ThemeToggleProps {
   className?: string;
@@ -19,6 +22,9 @@ export default function ThemeToggle({
 }: ThemeToggleProps = {}) {
   const [theme, setTheme] = useState<"light" | "dark">('light');
   const [mounted, setMounted] = useState(false);
+  const pathname = usePathname();
+  const locale: Locale = pathname?.startsWith('/el') ? 'el' : 'en';
+  const a11y = getDictionary(locale).a11y;
   // On mount, resolve real theme (stored > system preference)
   useEffect(() => {
     setMounted(true);
@@ -55,8 +61,14 @@ export default function ThemeToggle({
     return () => mq.removeEventListener('change', listener);
   }, [mounted]);
   const icon = mounted ? (theme === 'dark' ? '🌞' : '🌙') : '🌙';
+<<<<<<< HEAD
   const label = mounted ? (theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode') : 'Toggle color scheme';
   const visibleText = mounted && theme === 'dark' ? darkText : lightText;
+=======
+  const label = mounted
+    ? (theme === 'dark' ? (a11y?.switchToLight ?? 'Switch to light mode') : (a11y?.switchToDark ?? 'Switch to dark mode'))
+    : (a11y?.toggleColorScheme ?? 'Toggle color scheme');
+>>>>>>> 430442a31b6b7b701ebd6c42f2511f661d11f85f
   return (
     <button
       type="button"

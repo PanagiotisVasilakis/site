@@ -1,5 +1,8 @@
 "use client";
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
+import { getDictionary } from '@/i18n/dictionaries';
+import type { Locale } from '@/i18n/config';
 
 type Toast = { id: number; message: string; expires: number };
 
@@ -11,6 +14,9 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const pathname = usePathname();
+  const locale: Locale = pathname?.startsWith('/el') ? 'el' : 'en';
+  const dismissLabel = getDictionary(locale).updates?.dismiss ?? 'Dismiss';
   const push = useCallback((message: string, opts?: { duration?: number }) => {
     setToasts(ts => [...ts, { id: Date.now() + Math.random(), message, expires: Date.now() + (opts?.duration ?? 3000) }]);
   }, []);
@@ -29,7 +35,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {toasts.map(t => (
       <div key={t.id} className="toast-item floating-banner text-[11px] px-3 py-2 rounded-full shadow-float-soft flex items-center gap-2">
             <span>{t.message}</span>
-            <button aria-label="Dismiss" className="btn-tint btn-sm" onClick={() => setToasts(ts => ts.filter(x => x.id !== t.id))}>×</button>
+            <button aria-label={dismissLabel} className="btn-tint btn-sm" onClick={() => setToasts(ts => ts.filter(x => x.id !== t.id))}>×</button>
           </div>
         ))}
       </div>
