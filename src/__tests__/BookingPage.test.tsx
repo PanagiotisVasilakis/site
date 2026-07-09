@@ -52,80 +52,13 @@ describe('BookingPage (server component harness)', () => {
     expect(h1s.some(h => /Κράτηση|Ολοκληρώστε/i.test(h.textContent || ''))).toBe(true);
   });
 
-  it('shows pricing breakdown when valid dates provided', async () => {
+  it('does not render any prices when valid dates provided', async () => {
     const ui = await BookingPage({ params: makeParams('en'), searchParams: makeSearchParams({ guests: '2', checkin: '2030-09-10', checkout: '2030-09-15' }) });
     render(ui);
-    expect(screen.getByText(/Price Breakdown/i)).toBeInTheDocument();
-    expect(screen.getByText(/Total/i)).toBeInTheDocument();
-    const pricingSection = screen.getByText(/Price Breakdown/i).closest('div');
-    expect(pricingSection).toMatchInlineSnapshot(`
-      <div
-        class="space-y-3"
-      >
-        <h4
-          class="font-serif italic font-bold"
-        >
-          Price breakdown
-        </h4>
-        <div
-          class="space-y-2 text-sm"
-        >
-          <div
-            class="flex justify-between opacity-80"
-          >
-            <span>
-              €
-              65
-               × 
-              5
-               
-              guests
-            </span>
-            <span>
-              €
-              325
-            </span>
-          </div>
-          <div
-            class="flex justify-between opacity-80"
-          >
-            <span>
-              Cleaning fee
-            </span>
-            <span>
-              €
-              25
-            </span>
-          </div>
-          <div
-            class="flex justify-between opacity-80"
-          >
-            <span>
-              Service fee
-            </span>
-            <span>
-              €
-              15
-            </span>
-          </div>
-        </div>
-        <div
-          class="border-t border-[color:var(--border-soft)] pt-3"
-        >
-          <div
-            class="flex justify-between font-semibold text-lg"
-          >
-            <span>
-              Total
-            </span>
-            <span>
-              €
-              365
-            </span>
-          </div>
-        </div>
-      </div>
-    `);
+    expect(screen.queryByText(/Price Breakdown/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Cleaning fee/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Service fee/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/€/)).not.toBeInTheDocument();
   });
 
   it('shows validation errors after field interaction and enables submit once fields valid', async () => {
@@ -160,7 +93,6 @@ describe('BookingPage (server component harness)', () => {
       <BookingForm
         dateRange={dateRange}
         guests={2}
-        total={200}
         locale="en"
         submissionDelayMs={10}
       />

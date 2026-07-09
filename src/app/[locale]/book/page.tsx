@@ -65,16 +65,9 @@ export default async function BookingPage({
     bathrooms: apartmentContent.specs.bathrooms,
     floor: apartmentContent.specs.floor,
     size: apartmentContent.specs.size,
-    basePrice: apartmentContent.pricing.basePrice,
-    cleaningFee: apartmentContent.pricing.cleaningFee,
-    serviceFee: apartmentContent.pricing.serviceFee,
     image: '/house/living/living_1.jpeg'
   };
 
-  // Calculate pricing
-  const subtotal = hasValidDates ? nights * property.basePrice : 0;
-  const total = subtotal + property.cleaningFee + property.serviceFee;
-  const currency = '€';
   const ordinal = (n: number) => {
     const s = ["th", "st", "nd", "rd"]; const v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]);
   };
@@ -157,7 +150,6 @@ export default async function BookingPage({
                   <BookingForm
                     dateRange={dateRange}
                     guests={guests}
-                    total={total}
                     locale={eff}
                   />
                 </Suspense>
@@ -192,39 +184,6 @@ export default async function BookingPage({
                   </div>
                 </div>
               </div>
-
-              {/* Pricing Breakdown */}
-              {hasValidDates ? (
-                <div className="space-y-3">
-                  <h4 className="font-serif italic font-bold">{t.booking?.priceBreakdown}</h4>
-
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between opacity-80">
-                      <span>{currency}{property.basePrice} × {nights} {nights === 1 ? t.search?.guestSingular : t.search?.guestPlural}</span>
-                      <span>{currency}{subtotal}</span>
-                    </div>
-                    <div className="flex justify-between opacity-80">
-                      <span>{t.booking?.cleaningFee}</span>
-                      <span>{currency}{property.cleaningFee}</span>
-                    </div>
-                    <div className="flex justify-between opacity-80">
-                      <span>{t.booking?.serviceFee}</span>
-                      <span>{currency}{property.serviceFee}</span>
-                    </div>
-                  </div>
-
-                  <div className="border-t border-[color:var(--border-soft)] pt-3">
-                    <div className="flex justify-between font-semibold text-lg">
-                      <span>{t.booking?.total}</span>
-                      <span>{currency}{total}</span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-4 opacity-70">
-                  <p>{t.booking?.completeDetailsHint}</p>
-                </div>
-              )}
 
               {/* Location */}
               <div className="mt-6 pt-6 border-t border-[color:var(--border-soft)]">

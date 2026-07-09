@@ -84,7 +84,7 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
             "2 bedrooms",
             "1 bathroom",
             "2nd floor",
-            "75 m²",
+            "90 m²",
             "Mountain & sea views",
             "Free parking"
         ],
@@ -156,7 +156,7 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
             "2 υπνοδωμάτια",
             "1 μπάνιο",
             "2ος όροφος",
-            "75 τ.μ.",
+            "90 τ.μ.",
             "Θέα βουνό & θάλασσα",
             "Δωρεάν πάρκινγκ"
         ],

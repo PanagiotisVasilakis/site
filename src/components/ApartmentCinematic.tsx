@@ -35,8 +35,8 @@ export default function ApartmentCinematic({ locale, houseText, photos }: Props)
   const specsList = Array.isArray(ht?.specs) && ht.specs.length > 0
     ? ht.specs
     : (isGreek
-      ? ['2 υπνοδωμάτια', '1 μπάνιο', '2ος όροφος', '75 τ.μ.', 'Θέα βουνό & θάλασσα', 'Δωρεάν πάρκινγκ']
-      : ['2 bedrooms', '1 bathroom', '2nd floor', '75 m²', 'Mountain & sea views', 'Free parking']);
+      ? ['2 υπνοδωμάτια', '1 μπάνιο', '2ος όροφος', '90 τ.μ.', 'Θέα βουνό & θάλασσα', 'Δωρεάν πάρκινγκ']
+      : ['2 bedrooms', '1 bathroom', '2nd floor', '90 m²', 'Mountain & sea views', 'Free parking']);
   const ctaPrimaryText = typeof ht?.ctaPrimary === 'string' ? ht.ctaPrimary : (isGreek ? 'Κράτηση' : 'Book');
   const ctaSecondaryText = typeof ht?.ctaSecondary === 'string' ? ht.ctaSecondary : (isGreek ? 'Επικοινωνία' : 'Contact Us');
   const footerNote = typeof ht?.footerNote === 'string' ? ht.footerNote : (isGreek ? '© Διαμέρισμα Καλαμάτας' : '© Kalamata Apartment');

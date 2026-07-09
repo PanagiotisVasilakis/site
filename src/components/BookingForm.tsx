@@ -12,7 +12,6 @@ import { logger } from '@/lib/logger-client';
 interface BookingFormProps {
   dateRange: DateRange;
   guests: number;
-  total: number;
   locale: string;
   /**
    * Optional override for the artificial submission delay (ms). Defaults to 2000 for UX realism.
@@ -33,7 +32,7 @@ const bookingSchema = z.object({
 
 type BookingFormData = z.infer<typeof bookingSchema>;
 
-export default function BookingForm({ dateRange, guests, total, locale, submissionDelayMs = 2000 }: BookingFormProps) {
+export default function BookingForm({ dateRange, guests, locale, submissionDelayMs = 2000 }: BookingFormProps) {
   const [submitted, setSubmitted] = useState(false);
 
   const {
@@ -60,7 +59,6 @@ export default function BookingForm({ dateRange, guests, total, locale, submissi
       trackEvent('booking_submitted', {
         nights: getNights(dateRange),
         guests,
-        total,
         arrivalTime: data.arrivalTime || 'not_specified'
       });
 
@@ -95,7 +93,6 @@ export default function BookingForm({ dateRange, guests, total, locale, submissi
             <div><strong>Property:</strong> Seaside Modern Villa</div>
             <div><strong>Dates:</strong> {formatDateRange(dateRange)}</div>
             <div><strong>Guests:</strong> {guests}</div>
-            <div><strong>Total:</strong> €{total}</div>
           </div>
         </div>
         <div className="flex gap-3 justify-center">
@@ -275,7 +272,7 @@ export default function BookingForm({ dateRange, guests, total, locale, submissi
             Processing booking...
           </span>
         ) : (
-          `Confirm booking • €${total}`
+          `Confirm booking`
         )}
       </button>
     </form>
