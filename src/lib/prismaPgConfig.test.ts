@@ -14,6 +14,10 @@ describe('buildPrismaPgAdapterArgs', () => {
       idleTimeoutMillis: 12_000,
       maxLifetimeSeconds: 60,
     });
+    expect(typeof result.config).toBe('object');
+    if (typeof result.config === 'string' || !('connectionString' in result.config)) {
+      throw new Error('Expected a pg PoolConfig');
+    }
     expect(result.config.connectionString).toContain('sslmode=require');
     expect(result.config.connectionString).not.toContain('connection_limit');
     expect(result.options).toEqual({ schema: 'guest' });

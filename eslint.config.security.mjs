@@ -4,7 +4,7 @@ import security from 'eslint-plugin-security';
 
 const config = [
   {
-    ignores: ['**/node_modules/**', '**/.next/**', 'out/**', 'build/**', 'next-env.d.ts', '**/reports/**'],
+    ignores: ['**/node_modules/**', '**/.next/**', '**/coverage/**', 'out/**', 'build/**', 'next-env.d.ts', '**/reports/**'],
   },
   ...nextCoreWebVitals,
   ...nextTypescript,

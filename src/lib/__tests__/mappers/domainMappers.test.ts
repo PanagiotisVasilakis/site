@@ -16,7 +16,7 @@ describe('domainMappers', () => {
       const now = new Date();
       const bookingDb = {
         id: 'booking-123',
-        source: 'external',
+        source: 'EXTERNAL' as const,
         reference: 'REF123',
         lastNameHash: 'hashed_lastname',
         lastNameSalt: 'salt123',
@@ -32,7 +32,7 @@ describe('domainMappers', () => {
 
       expect(result).toEqual({
         id: 'booking-123',
-        source: 'external',
+        source: 'EXTERNAL',
         reference: 'REF123',
         last_name_hash: 'hashed_lastname',
         last_name_salt: 'salt123',
@@ -49,7 +49,7 @@ describe('domainMappers', () => {
       const now = new Date();
       const bookingDb = {
         id: 'booking-123',
-        source: 'external',
+        source: 'EXTERNAL' as const,
         reference: null,
         lastNameHash: null,
         lastNameSalt: null,
@@ -65,7 +65,7 @@ describe('domainMappers', () => {
 
       expect(result).toEqual({
         id: 'booking-123',
-        source: 'external',
+        source: 'EXTERNAL',
         start_date: '2023-06-01T00:00:00.000Z',
         end_date: '2023-06-07T00:00:00.000Z',
         created_at: now.getTime()
@@ -82,7 +82,7 @@ describe('domainMappers', () => {
       const accessDb = {
         userId: 'user-123',
         bookingId: 'booking-123',
-        status: 'active',
+        status: 'VERIFIED' as const,
         createdAt,
         updatedAt
       };
@@ -92,7 +92,7 @@ describe('domainMappers', () => {
       expect(result).toEqual({
         user_id: 'user-123',
         booking_id: 'booking-123',
-        status: 'active',
+        status: 'VERIFIED',
         created_at: createdAt.getTime(),
         updated_at: updatedAt.getTime()
       });
@@ -110,7 +110,7 @@ describe('domainMappers', () => {
         email: 'test@example.com',
         phoneE164: '+1234567890',
         passwordHash: 'hashed_password',
-        countryOrigin: 'US',
+        countryOrigin: 'ABROAD' as const,
         createdAt,
         updatedAt
       };
@@ -122,7 +122,7 @@ describe('domainMappers', () => {
         email: 'test@example.com',
         phone_e164: '+1234567890',
         password_hash: 'hashed_password',
-        country_origin: 'US',
+        country_origin: 'ABROAD',
         created_at: createdAt.getTime(),
         updated_at: updatedAt.getTime()
       });
@@ -138,7 +138,7 @@ describe('domainMappers', () => {
         email: null,
         phoneE164: '+1234567890',
         passwordHash: null,
-        countryOrigin: 'US',
+        countryOrigin: 'ABROAD' as const,
         createdAt,
         updatedAt
       };
@@ -148,7 +148,7 @@ describe('domainMappers', () => {
       expect(result).toEqual({
         id: 'user-123',
         phone_e164: '+1234567890',
-        country_origin: 'US',
+        country_origin: 'ABROAD',
         created_at: createdAt.getTime(),
         updated_at: updatedAt.getTime()
       });

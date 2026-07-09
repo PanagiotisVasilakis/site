@@ -53,7 +53,7 @@ export function markerFromMapLocation(location: MapLocation): MarkerData {
   };
 }
 
-export function markersFromMapLocations(locations: readonly MapLocation[]): MarkerData[] {
+function markersFromMapLocations(locations: readonly MapLocation[]): MarkerData[] {
   return locations.map(markerFromMapLocation);
 }
 

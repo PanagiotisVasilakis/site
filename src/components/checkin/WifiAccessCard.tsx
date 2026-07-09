@@ -1,4 +1,4 @@
-export type WifiCopyTarget = 'network' | 'password';
+type WifiCopyTarget = 'network' | 'password';
 
 interface WifiAccessCardProps {
   title: string;

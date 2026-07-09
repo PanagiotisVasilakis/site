@@ -74,7 +74,7 @@ async function updatePassword(userId: string, password_hash: string): Promise<Us
 async function getAll(): Promise<UserRecord[]> {
   try {
     const users = await prisma.user.findMany({ orderBy: { createdAt: 'desc' } });
-    return users.map(mapUser);
+    return users.map(mapUserFromDb);
   } catch (error) {
     logger.error('userRepository(prisma): getAll failed', error);
     throw error;

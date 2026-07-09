@@ -69,7 +69,7 @@ export function getClientIp(request: NextRequest, options?: GetClientIpOptions):
   return 'unknown';
 }
 
-export function isValidIpAddress(ip: string): boolean {
+function isValidIpAddress(ip: string): boolean {
   if (!ip || ip.length > 45) return false;
 
   const ipv4Pattern = /^(?:\d{1,3}\.){3}\d{1,3}$/;
@@ -87,7 +87,7 @@ export function isValidIpAddress(ip: string): boolean {
   );
 }
 
-export function normalizeIpAddress(ip: string): string {
+function normalizeIpAddress(ip: string): string {
   const normalized = ip.toLowerCase();
   const mappedIpv4 = normalized.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/)?.[1];
   return mappedIpv4 && isValidIpAddress(mappedIpv4) ? mappedIpv4 : normalized;
