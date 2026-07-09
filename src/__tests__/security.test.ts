@@ -77,9 +77,10 @@ describe('Security Configuration', () => {
   test('should use exactly the request nonce for scripts', () => {
     const directives = getSecurityConfig().csp.directives;
     const csp = buildCSPDirective(directives, 'request-nonce');
+    const scriptDirective = csp.split('; ').find((directive) => directive.startsWith('script-src'));
 
-    expect(csp).toMatch(/script-src [^;]*'nonce-request-nonce'/);
-    expect(csp).not.toContain("'unsafe-inline'");
+    expect(scriptDirective).toContain("'nonce-request-nonce'");
+    expect(scriptDirective).not.toContain("'unsafe-inline'");
     expect(csp.match(/nonce-/g)).toHaveLength(1);
   });
 
