@@ -61,7 +61,9 @@ export TEST_DATABASE_URL="postgresql://testuser:testpass@postgres-test:5432/site
 
 ### Option B: Managed Postgres (Neon, RDS, Cloud SQL, …)
 
-If Docker is unavailable or you prefer managed infrastructure, create a dedicated test branch/instance using the process in [`docs/NEON_MANAGED_DB.md`](../NEON_MANAGED_DB.md). Recommended minimums:
+If Docker is unavailable or you prefer managed infrastructure, create an isolated
+test database at your provider and store its connection URL in the CI secret
+manager. Recommended minimums:
 
 - Provision a **non-production** database/user pair scoped to CI only.
 - Enforce automated cleanup of transient data (nightly truncation or reset scripts).

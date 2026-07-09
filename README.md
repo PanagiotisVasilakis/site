@@ -10,19 +10,19 @@ For complete setup and run instructions (development, test, production), use:
 
 ## Use Flows
 
-For guest and admin usage flows after the system is running, use:
-
-- [docs/RUN_AND_USE_GUIDE.md](docs/RUN_AND_USE_GUIDE.md)
+The guest portal uses the localized `/{locale}/guest` entry point. Operational
+setup and the available guest/admin commands are documented in
+[scripts/README.md](scripts/README.md).
 
 ## Deployment and Operations
 
-- [docs/PUBLIC_DEPLOYMENT_AND_MAINTENANCE.md](docs/PUBLIC_DEPLOYMENT_AND_MAINTENANCE.md)
-- [docs/README_DB.md](docs/README_DB.md)
-- [docs/TEST_DATABASE_SETUP.md](docs/TEST_DATABASE_SETUP.md)
+- [Database CI](docs/ci/db-tests.md)
+- [Database lookup testing](docs/testing/db-lookup.md)
+- [Security and secret handling](SECURITY.md)
 
 ## Coverage Badge Endpoint
 
-The route `/api/coverage` returns Shields.io style JSON computed from `coverage/lcov.info`. Run `npm test` before build/deploy to refresh coverage values.
+The route `/api/coverage` returns Shields.io style JSON computed from `coverage/lcov.info`. Run `npm run test:coverage` before build/deploy to refresh coverage values.
 
 ## Architecture Summary
 

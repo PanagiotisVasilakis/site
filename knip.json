@@ -1,7 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@latest/schema.json",
   "ignore": [
-    "public/guest-viewer.js",
     "public/sw.js"
   ],
   "ignoreDependencies": [
