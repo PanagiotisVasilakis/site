@@ -230,10 +230,10 @@ button[role="tab"] {
 }
 
 /* Links should be visible in dark mode, but don't override buttons */
-[data-theme="dark"] a:not(.btn-primary):not(.btn-accent):not(.btn-outline):not(.btn-tint):not(.btn-secondary):not(.villa-btn-primary):not(.apartment-btn-primary):not(.home-feature-card):not(.guide-option-card):not(.contact-link):not(.contact-social-link) {
+[data-theme="dark"] a:not(.btn-primary):not(.btn-accent):not(.btn-outline):not(.btn-tint):not(.btn-secondary):not(.villa-btn-primary):not(.apartment-btn-primary):not(.home-feature-card):not(.guide-option-card):not(.contact-link):not(.contact-social-link):not(.guest-menu-link):not(.guest-menu-brand):not(.guest-menu-account):not(.guest-menu-utility) {
   color: var(--brand-400);
 }
 
-[data-theme="dark"] a:not(.btn-primary):not(.btn-accent):not(.btn-outline):not(.btn-tint):not(.btn-secondary):not(.villa-btn-primary):not(.apartment-btn-primary):not(.home-feature-card):not(.guide-option-card):not(.contact-link):not(.contact-social-link):hover {
+[data-theme="dark"] a:not(.btn-primary):not(.btn-accent):not(.btn-outline):not(.btn-tint):not(.btn-secondary):not(.villa-btn-primary):not(.apartment-btn-primary):not(.home-feature-card):not(.guide-option-card):not(.contact-link):not(.contact-social-link):not(.guest-menu-link):not(.guest-menu-brand):not(.guest-menu-account):not(.guest-menu-utility):hover {
   color: var(--brand-300);
 }

@@ -52,6 +52,16 @@ export interface CommonDictionary {
         back?: string;
         signIn?: string;
         signOut?: string;
+        menu?: string;
+        closeMenu?: string;
+        guestGuide?: string;
+        preferences?: string;
+        lightMode?: string;
+        darkMode?: string;
+        primaryNavigation?: string;
+        yourStay?: string;
+        explore?: string;
+        account?: string;
     };
     cta: {
         call: string;
@@ -139,7 +149,17 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             none: "None",
             back: "Back",
             signIn: "Sign in",
-            signOut: "Sign out"
+            signOut: "Sign out",
+            menu: "Open menu",
+            closeMenu: "Close menu",
+            guestGuide: "Your stay, at a glance",
+            preferences: "Preferences",
+            lightMode: "Light",
+            darkMode: "Dark",
+            primaryNavigation: "Primary navigation",
+            yourStay: "Your stay",
+            explore: "Explore Kalamata",
+            account: "Guest account"
         },
         updates: {
             updateAvailable: "An update is available",
@@ -228,7 +248,17 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             none: "Κανένα",
             back: "Πίσω",
             signIn: "Σύνδεση",
-            signOut: "Αποσύνδεση"
+            signOut: "Αποσύνδεση",
+            menu: "Άνοιγμα μενού",
+            closeMenu: "Κλείσιμο μενού",
+            guestGuide: "Η διαμονή σας, με μια ματιά",
+            preferences: "Προτιμήσεις",
+            lightMode: "Φωτεινό",
+            darkMode: "Σκούρο",
+            primaryNavigation: "Κύρια πλοήγηση",
+            yourStay: "Η διαμονή σας",
+            explore: "Ανακαλύψτε την Καλαμάτα",
+            account: "Λογαριασμός επισκέπτη"
         },
         updates: {
             updateAvailable: "Μια ενημέρωση είναι διαθέσιμη",

@@ -2,7 +2,21 @@
 import { useEffect, useState } from "react";
 import { logger } from '@/lib/logger-client';
 
-export default function ThemeToggle() {
+interface ThemeToggleProps {
+  className?: string;
+  showText?: boolean;
+  lightText?: string;
+  darkText?: string;
+}
+
+const DEFAULT_CLASS = "w-12 h-11 md:h-9 inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold bg-black/10 hover:bg-black/20 text-slate-800 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/70 white-in-dark transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60 dark:focus-visible:ring-brand-400/50";
+
+export default function ThemeToggle({
+  className,
+  showText = false,
+  lightText = 'Light',
+  darkText = 'Dark',
+}: ThemeToggleProps = {}) {
   const [theme, setTheme] = useState<"light" | "dark">('light');
   const [mounted, setMounted] = useState(false);
   // On mount, resolve real theme (stored > system preference)
@@ -42,15 +56,17 @@ export default function ThemeToggle() {
   }, [mounted]);
   const icon = mounted ? (theme === 'dark' ? '🌞' : '🌙') : '🌙';
   const label = mounted ? (theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode') : 'Toggle color scheme';
+  const visibleText = mounted && theme === 'dark' ? darkText : lightText;
   return (
     <button
       type="button"
       aria-label={label}
       suppressHydrationWarning
       onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-      className="w-12 h-11 md:h-9 inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold bg-black/10 hover:bg-black/20 text-slate-800 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/70 white-in-dark transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60 dark:focus-visible:ring-brand-400/50"
+      className={className || DEFAULT_CLASS}
     >
       <span aria-hidden suppressHydrationWarning className="select-none text-sm">{icon}</span>
+      {showText && <span suppressHydrationWarning>{visibleText}</span>}
     </button>
   );
 }

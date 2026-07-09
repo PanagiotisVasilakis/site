@@ -11,35 +11,17 @@ import clsx from 'clsx';
 import { useScroll } from '@/hooks/useScroll';
 import { useGuestSession } from '@/hooks/useGuestSession';
 
-// --- Styles with CVA ---
-
 const navButton = cva(
   "inline-flex items-center justify-center gap-2 px-3 py-2 md:py-1 min-h-11 md:min-h-8 rounded-full text-[11px] font-semibold leading-none transition whitespace-nowrap white-in-dark",
   {
     variants: {
       intent: {
         primary: "shadow-md bg-black/10 hover:bg-black/20 text-slate-800 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/70",
-        secondary: "border border-white/30 dark:border-white/40 bg-white/30 hover:bg-white/60 dark:bg-white/40 dark:hover:bg-white/60 text-slate-800 shadow-sm font-medium",
-        mobileItem: "w-full px-3 py-2.5 justify-start bg-slate-100 hover:bg-white text-slate-900 shadow-sm border border-slate-300 dark:bg-white/10 dark:backdrop-blur-md dark:hover:bg-white/20 dark:text-white dark:border-white/10"
-      },
-      active: {
-        true: "ring-2 ring-brand-400"
+        secondary: "border border-white/30 dark:border-white/40 bg-white/30 hover:bg-white/60 dark:bg-white/40 dark:hover:bg-white/60 text-slate-800 shadow-sm font-medium"
       }
     },
     defaultVariants: {
       intent: "primary"
-    }
-  }
-);
-
-const menuPanel = cva(
-  "fixed top-12 right-3 z-40 w-60 rounded-2xl mobile-menu-panel shadow-lg p-4 flex flex-col gap-4 transition-transform origin-top-right bg-white text-slate-900 dark:bg-black dark:text-white",
-  {
-    variants: {
-      open: {
-        true: "scale-100 opacity-100",
-        false: "scale-95 opacity-0 pointer-events-none"
-      }
     }
   }
 );
@@ -50,12 +32,86 @@ interface TopControlsProps {
   showCheckIn?: boolean;
 }
 
+type MenuIconName =
+  | 'gallery'
+  | 'calendar'
+  | 'booking'
+  | 'about'
+  | 'favorite'
+  | 'moments'
+  | 'phone'
+  | 'checkin'
+  | 'user';
+
+interface MenuLink {
+  href: string;
+  label: string;
+  icon: MenuIconName;
+  event: string;
+  group: 'stay' | 'explore';
+  featured?: boolean;
+}
+
+function MenuIcon({ name }: { name: MenuIconName }) {
+  const commonProps = {
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 1.8,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    'aria-hidden': true,
+  };
+
+  switch (name) {
+    case 'gallery':
+      return <svg {...commonProps}><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9" r="1.5" /><path d="m5 17 4.5-4.5 3.2 3.2 2.3-2.3 4 3.6" /></svg>;
+    case 'calendar':
+      return <svg {...commonProps}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /><path d="m8.5 15 2 2 5-5" /></svg>;
+    case 'booking':
+      return <svg {...commonProps}><path d="M7 3h10a2 2 0 0 1 2 2v16l-7-3-7 3V5a2 2 0 0 1 2-2Z" /><path d="M9 8h6M9 12h6" /></svg>;
+    case 'about':
+      return <svg {...commonProps}><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.5h.01" /></svg>;
+    case 'favorite':
+      return <svg {...commonProps}><path d="m12 3 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.92 1.06-6.2L3 9.53l6.22-.9L12 3Z" /></svg>;
+    case 'moments':
+      return <svg {...commonProps}><path d="M7 3v7a3 3 0 0 1-3 3V3M7 3v18M17 3v18M17 3c2.2 2.1 3 4.3 3 6.5S18.7 13 17 13" /><circle cx="12" cy="10" r="2.5" /></svg>;
+    case 'phone':
+      return <svg {...commonProps}><path d="M7.2 3.5 10 7.8 7.9 10a16.2 16.2 0 0 0 6.1 6.1l2.2-2.1 4.3 2.8-.8 3a2 2 0 0 1-2 1.5C9.4 20.5 3.5 14.6 2.7 6.3a2 2 0 0 1 1.5-2l3-.8Z" /></svg>;
+    case 'checkin':
+      return <svg {...commonProps}><path d="M4 12.5 9 17l11-11" /></svg>;
+    case 'user':
+      return <svg {...commonProps}><circle cx="12" cy="8" r="4" /><path d="M4.5 21a7.5 7.5 0 0 1 15 0" /></svg>;
+  }
+}
+
+function ChevronIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <path d="m7.5 4.5 5 5.5-5 5.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function MenuGlyph({ open }: { open: boolean }) {
+  return (
+    <span className="menu-trigger-glyph" aria-hidden>
+      <span className={clsx("menu-trigger-line", open && "is-open")} />
+      <span className={clsx("menu-trigger-line", open && "is-open")} />
+    </span>
+  );
+}
+
 export default function TopControls({ locale, appTitle, showCheckIn = false }: TopControlsProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const dictionary = useMemo(() => getDictionary(locale as Locale), [locale]);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  const panelId = 'guest-navigation-panel';
+  const menuLabels = dictionary.ui;
 
-  // Custom Hooks
   const { scrolled, hidden } = useScroll();
   const { isSignedIn, signOut } = useGuestSession({
     initialIsSignedIn: !!showCheckIn,
@@ -65,7 +121,6 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
 
   const shouldShowCheckIn = isSignedIn && pathname?.includes('/check-in');
 
-  // Analytics helper (lazy load)
   const trackAnalyticsEvent = (eventName: string, props?: Record<string, unknown>) => {
     import('@/lib/analyticsClient')
       .then(m => m.trackEvent(eventName, props))
@@ -77,7 +132,22 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
     window.location.href = `/${locale}`;
   };
 
-  // Close menu on outside click
+  const closeMenu = (restoreFocus = false) => {
+    setOpen(false);
+    if (restoreFocus) {
+      window.setTimeout(() => triggerRef.current?.focus(), 0);
+    }
+  };
+
+  const toggleMenu = () => {
+    if (open) {
+      closeMenu(true);
+      return;
+    }
+    setOpen(true);
+    window.setTimeout(() => closeButtonRef.current?.focus(), 50);
+  };
+
   const containerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -89,29 +159,100 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
     return () => document.removeEventListener('mousedown', handleClick);
   }, [open]);
 
-  // Handle Escape key
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && open) {
+        setOpen(false);
+        window.setTimeout(() => triggerRef.current?.focus(), 0);
+      }
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
 
   const mobileMenuLinks = useMemo(() => {
-    const links = [
-      { href: `/${locale}/house`, label: dictionary.house?.navLabel ?? dictionary.house?.title ?? 'House Guide', icon: '📘', event: 'mobile_nav_house' },
-      { href: `/${locale}/book`, label: dictionary.cta?.reserve ?? 'Book stay', icon: '🗓️', event: 'mobile_nav_book' },
-      { href: `/${locale}/booking-details`, label: dictionary.bookingDetails ?? 'Booking Details', icon: '📋', event: 'mobile_nav_booking_details' },
-      { href: `/${locale}/about`, label: dictionary.aboutUs ?? 'About Us', icon: 'ℹ️', event: 'mobile_nav_about' },
-      { href: `/${locale}/favorites`, label: dictionary.labels?.favorites ?? 'Favorites', icon: '⭐', event: 'mobile_nav_favorites' },
-      { href: `/${locale}?category=moments`, label: dictionary.categories?.moments ?? 'Kalamata Moments', icon: '🍽️', event: 'mobile_nav_moments' },
-      { href: `/${locale}?category=phones`, label: dictionary.categories?.phones ?? 'Important Phones', icon: '📞', event: 'mobile_nav_phones' },
+    const links: MenuLink[] = [
+      { href: `/${locale}/house`, label: dictionary.house?.navLabel ?? dictionary.house?.title ?? 'House Guide', icon: 'gallery', event: 'mobile_nav_house', group: 'stay' },
+      { href: `/${locale}/book`, label: dictionary.cta?.reserve ?? 'Book stay', icon: 'calendar', event: 'mobile_nav_book', group: 'stay', featured: true },
+      { href: `/${locale}/booking-details`, label: dictionary.bookingDetails ?? 'Booking Details', icon: 'booking', event: 'mobile_nav_booking_details', group: 'stay' },
+      { href: `/${locale}/about`, label: dictionary.aboutUs ?? 'About Us', icon: 'about', event: 'mobile_nav_about', group: 'stay' },
+      { href: `/${locale}/favorites`, label: dictionary.labels?.favorites ?? 'Favorites', icon: 'favorite', event: 'mobile_nav_favorites', group: 'explore' },
+      { href: `/${locale}?category=moments`, label: dictionary.categories?.moments ?? 'Kalamata Moments', icon: 'moments', event: 'mobile_nav_moments', group: 'explore' },
+      { href: `/${locale}?category=phones`, label: dictionary.categories?.phones ?? 'Important Phones', icon: 'phone', event: 'mobile_nav_phones', group: 'explore' },
     ];
 
     if (shouldShowCheckIn) {
-      links.push({ href: `/${locale}/check-in`, label: 'Check‑in', icon: '✓', event: 'mobile_nav_checkin' });
+      links.splice(3, 0, {
+        href: `/${locale}/check-in`,
+        label: 'Check‑in',
+        icon: 'checkin',
+        event: 'mobile_nav_checkin',
+        group: 'stay',
+        featured: false,
+      });
     }
     return links.filter(l => Boolean(l.label));
   }, [locale, dictionary, shouldShowCheckIn]);
+
+  const stayLinks = mobileMenuLinks.filter(link => link.group === 'stay');
+  const exploreLinks = mobileMenuLinks.filter(link => link.group === 'explore');
+  const isCurrentPage = (href: string) => {
+    const hrefPath = href.split('?')[0];
+    return hrefPath !== `/${locale}` && pathname === hrefPath;
+  };
+
+  const handlePanelKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key !== 'Tab' || !panelRef.current) return;
+    const focusable = Array.from(
+      panelRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+    );
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (!first || !last) return;
+
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
+  const renderMenuLink = (link: (typeof mobileMenuLinks)[number]) => {
+    const active = isCurrentPage(link.href);
+    return (
+      <Link
+        key={link.href}
+        href={link.href}
+        className={clsx("guest-menu-link", link.featured && "is-featured", active && "is-active")}
+        aria-current={active ? 'page' : undefined}
+        onClick={() => {
+          if (link.event) trackAnalyticsEvent(link.event, { destination: link.href });
+          setOpen(false);
+        }}
+      >
+        <span className="guest-menu-link-icon"><MenuIcon name={link.icon} /></span>
+        <span className="guest-menu-link-label">{link.label}</span>
+        <span className="guest-menu-link-arrow"><ChevronIcon /></span>
+      </Link>
+    );
+  };
 
   return (
     <div
@@ -123,7 +264,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
     >
       <div ref={containerRef} className="top-controls-compact w-full px-4 pt-2 pointer-events-auto">
         <div className={clsx(
-          "flex items-center justify-between gap-1 rounded-full px-1.5 py-0.5 h-auto overflow-hidden backdrop-blur transition-colors",
+          "top-controls-bar flex items-center justify-between gap-1 rounded-full px-1.5 py-0.5 h-auto overflow-hidden backdrop-blur transition-colors",
           "bg-white/12 dark:bg-white/25 border",
           scrolled ? "shadow-md border-[color:var(--border-soft,#e5e7eb)]" : "shadow-sm border-transparent"
         )}>
@@ -139,7 +280,6 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
           </Link>
 
           <div className="flex items-center gap-1">
-            {/* Desktop Controls */}
             <div className="hidden md:flex items-center gap-0.5 lg:gap-1">
               {isSignedIn ? (
                 <button
@@ -172,70 +312,130 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
               )}
             </div>
 
-            {/* Menu Trigger */}
             <button
-              aria-label="Menu"
+              ref={triggerRef}
+              type="button"
+              aria-label={open ? (menuLabels?.closeMenu || 'Close menu') : (menuLabels?.menu || 'Open menu')}
               aria-expanded={open}
-              onClick={() => setOpen(o => !o)}
+              aria-controls={panelId}
+              aria-haspopup="dialog"
+              onClick={toggleMenu}
               className={clsx(
-                "h-11 w-11 md:h-8 md:w-8 rounded-full flex items-center justify-center transition border text-sm shadow-sm flex-shrink-0",
+                "menu-trigger h-11 w-11 md:h-8 md:w-8 rounded-full flex items-center justify-center transition border text-sm shadow-sm flex-shrink-0",
                 "bg-white/30 dark:bg-white/40 hover:bg-white/60 dark:hover:bg-white/60 border-white/30 dark:border-white/40",
                 open && "ring-2 ring-brand-400"
               )}
             >
-              <span aria-hidden>{open ? '×' : '☰'}</span>
+              <MenuGlyph open={open} />
             </button>
           </div>
         </div>
 
-        {/* Mobile Panel */}
-        <div className={menuPanel({ open })} role="menu" aria-label="Main menu">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-zinc-700/60">
-            <span className="text-xs font-bold uppercase">Menu</span>
-            <div className="flex items-center gap-2">
-              <div className="dark:border dark:border-zinc-700/60 rounded-full"><ThemeToggle /></div>
-              <div className="dark:border dark:border-zinc-700/60 rounded-full"><LocaleSwitcher /></div>
-            </div>
+        <button
+          type="button"
+          tabIndex={open ? 0 : -1}
+          aria-label={menuLabels?.closeMenu || 'Close menu'}
+          className={clsx("guest-menu-backdrop", open && "is-open")}
+          onClick={() => closeMenu(true)}
+        />
+
+        <section
+          ref={panelRef}
+          id={panelId}
+          className={clsx("mobile-menu-panel guest-menu-panel", open && "is-open")}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={`${panelId}-title`}
+          aria-hidden={!open}
+          inert={!open}
+          onKeyDown={handlePanelKeyDown}
+        >
+          <header className="guest-menu-header">
+            <Link href={`/${locale}`} className="guest-menu-brand" onClick={() => setOpen(false)}>
+              <span className="guest-menu-monogram" aria-hidden>DF</span>
+              <span>
+                <strong id={`${panelId}-title`}>{appTitle}</strong>
+                <small>{menuLabels?.guestGuide || 'Your stay, at a glance'}</small>
+              </span>
+            </Link>
+            <button
+              ref={closeButtonRef}
+              type="button"
+              className="guest-menu-close"
+              onClick={() => closeMenu(true)}
+              aria-label={menuLabels?.closeMenu || 'Close menu'}
+            >
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                <path d="m5 5 10 10M15 5 5 15" strokeLinecap="round" />
+              </svg>
+            </button>
+          </header>
+
+          <div className="guest-menu-utilities" aria-label={menuLabels?.preferences || 'Preferences'}>
+            <ThemeToggle
+              className="guest-menu-utility"
+              showText
+              lightText={menuLabels?.lightMode || 'Light'}
+              darkText={menuLabels?.darkMode || 'Dark'}
+            />
+            <LocaleSwitcher
+              fullText
+              showGlobeIcon
+              className="guest-menu-utility"
+            />
           </div>
 
-          <nav className="flex flex-col gap-2" aria-label="Primary pages">
-            {mobileMenuLinks.map(link => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={navButton({ intent: 'mobileItem' })}
-                onClick={() => {
-                  if (link.event) trackAnalyticsEvent(link.event, { destination: link.href });
-                  setOpen(false);
-                }}
-              >
-                <span aria-hidden className="text-base leading-none w-6 text-center">{link.icon}</span>
-                <span className="flex-1 text-left">{link.label}</span>
-              </Link>
-            ))}
-          </nav>
+          <div className="guest-menu-scroll">
+            <nav className="guest-menu-nav" aria-label={menuLabels?.primaryNavigation || 'Primary navigation'}>
+              <div className="guest-menu-group">
+                <p className="guest-menu-eyebrow">{menuLabels?.yourStay || 'Your stay'}</p>
+                <div className="guest-menu-links">
+                  {stayLinks.map(renderMenuLink)}
+                </div>
+              </div>
 
-          <div className="md:hidden flex flex-col gap-2 pt-3 border-t border-slate-200 dark:border-zinc-700/60">
+              <div className="guest-menu-group">
+                <p className="guest-menu-eyebrow">{menuLabels?.explore || 'Explore Kalamata'}</p>
+                <div className="guest-menu-links">
+                  {exploreLinks.map(renderMenuLink)}
+                </div>
+              </div>
+            </nav>
+          </div>
+
+          <footer className="guest-menu-footer">
             {isSignedIn ? (
               <button
-                onClick={() => { handleSignOut(); setOpen(false); }}
-                className={navButton({ intent: 'mobileItem' })}
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  void handleSignOut();
+                }}
+                className="guest-menu-account"
               >
-                <span aria-hidden className="text-base leading-none">👤</span>
-                <span className="flex-1 text-left">{dictionary.ui?.signOut || "Sign out"}</span>
+                <span className="guest-menu-account-icon"><MenuIcon name="user" /></span>
+                <span>
+                  <small>{menuLabels?.account || 'Guest account'}</small>
+                  <strong>{menuLabels?.signOut || "Sign out"}</strong>
+                </span>
+                <span className="guest-menu-link-arrow"><ChevronIcon /></span>
               </button>
             ) : (
               <Link
                 href={`/${locale}/guest?mode=signin`}
-                className={navButton({ intent: 'mobileItem' })}
+                className="guest-menu-account"
                 onClick={() => setOpen(false)}
               >
-                <span aria-hidden className="text-base leading-none">👤</span>
-                <span className="flex-1 text-left">{dictionary.ui?.signIn || "Sign in"}</span>
+                <span className="guest-menu-account-icon"><MenuIcon name="user" /></span>
+                <span>
+                  <small>{menuLabels?.account || 'Guest account'}</small>
+                  <strong>{menuLabels?.signIn || "Sign in"}</strong>
+                </span>
+                <span className="guest-menu-link-arrow"><ChevronIcon /></span>
               </Link>
             )}
-          </div>
-        </div>
+          </footer>
+        </section>
       </div>
     </div>
   );
