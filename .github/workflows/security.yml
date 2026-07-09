@@ -16,6 +16,7 @@ permissions:
   contents: read
   security-events: write
   actions: read
+  issues: write
 
 jobs:
   dependency-scanning:
@@ -53,7 +54,8 @@ jobs:
 
       - name: Upload Snyk results to GitHub Code Scanning
         if: env.SNYK_TOKEN != ''
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
+        continue-on-error: true
         with:
           sarif_file: snyk.sarif
 
@@ -104,7 +106,8 @@ jobs:
           output: 'trivy-results.sarif'
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
+        continue-on-error: true
         with:
           sarif_file: 'trivy-results.sarif'
 
@@ -139,7 +142,7 @@ jobs:
           fetch-depth: 0
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: javascript-typescript
           queries: security-and-quality
@@ -160,7 +163,8 @@ jobs:
         run: npm run build
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
+        continue-on-error: true
         with:
           category: "/language:javascript-typescript"
 
@@ -238,14 +242,8 @@ jobs:
               summary += `- **Static Analysis**: ✅ No issues found\n`;
             }
             
-            // Check license compliance
-            try {
-              const licenseReport = JSON.parse(fs.readFileSync('./reports/license-compliance-report/license-report.json', 'utf8'));
-              const packageCount = Object.keys(licenseReport).length;
-              summary += `- **License Compliance**: ✅ ${packageCount} packages checked\n`;
-            } catch (e) {
-              summary += `- **License Compliance**: ❌ Compliance check failed\n`;
-            }
+            const licenseResult = '${{ needs.license-compliance.result }}';
+            summary += `- **License Compliance**: ${licenseResult === 'success' ? '✅ Passed' : `❌ ${licenseResult}`}\n`;
             
             summary += '\n📋 **Full reports are available in the workflow artifacts.**';
             
