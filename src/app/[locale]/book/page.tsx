@@ -25,7 +25,6 @@ const ApartmentLocationMap = dynamic(() => import('@/components/ApartmentLocatio
 interface BookingParams {
   checkin?: string;
   checkout?: string;
-  guests?: string;
 }
 
 export default async function BookingPage({
@@ -40,9 +39,6 @@ export default async function BookingPage({
 
   const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : "en";
   const t = getDictionary(eff);
-
-  // Parse booking parameters
-  const guests = parseInt(booking.guests || '2', 10);
 
   // Parse date range from URL
   const urlParams = new URLSearchParams();
@@ -60,7 +56,6 @@ export default async function BookingPage({
   const property = {
     name: apartmentContent.name,
     location: `${apartmentContent.location.city}, ${apartmentContent.location.country}`,
-    maxGuests: apartmentContent.specs.maxGuests,
     bedrooms: apartmentContent.specs.bedrooms,
     bathrooms: apartmentContent.specs.bathrooms,
     floor: apartmentContent.specs.floor,
@@ -73,7 +68,7 @@ export default async function BookingPage({
   };
 
   // Check if booking is valid
-  const canBook = dateValidation.valid && guests <= property.maxGuests && guests >= 1;
+  const canBook = dateValidation.valid;
 
   return (
     <div className="min-h-screen">
@@ -104,10 +99,6 @@ export default async function BookingPage({
                     <span className="font-medium">{t.booking?.datesLabel}</span>
                     <span className="opacity-80">{hasValidDates ? formatDateRange(dateRange) : t.booking?.notSelected}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="font-medium">{t.booking?.guestsLabel}</span>
-                    <span className="opacity-80">{guests} {guests === 1 ? 'guest' : 'guests'}</span>
-                  </div>
                   {hasValidDates && (
                     <div className="flex justify-between">
                       <span className="font-medium">{t.booking?.durationLabel}</span>
@@ -131,17 +122,6 @@ export default async function BookingPage({
                     </Link>
                   </div>
                 )}
-
-                {guests > property.maxGuests && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-yellow-600" aria-hidden>⚠️</span>
-                      <span className="text-sm text-yellow-800">
-                        This property accommodates up to {property.maxGuests} guests. Please adjust your guest count.
-                      </span>
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Booking Form */}
@@ -149,7 +129,6 @@ export default async function BookingPage({
                 <Suspense fallback={<BookingFormSkeleton />}>
                   <BookingForm
                     dateRange={dateRange}
-                    guests={guests}
                     locale={eff}
                   />
                 </Suspense>
@@ -180,7 +159,7 @@ export default async function BookingPage({
                   <h3 className="font-serif italic font-bold truncate">{property.name}</h3>
                   <p className="text-sm opacity-80 truncate">{property.location}</p>
                   <div className="text-xs opacity-70 mt-1">
-                    {property.bedrooms} bed • {property.bathrooms} bath • {ordinal(property.floor)} floor • {property.size} • {property.maxGuests} guests max
+                    {property.bedrooms} bed • {property.bathrooms} bath • {ordinal(property.floor)} floor • {property.size}
                   </div>
                 </div>
               </div>

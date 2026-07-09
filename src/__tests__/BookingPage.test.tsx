@@ -92,7 +92,6 @@ describe('BookingPage (server component harness)', () => {
     render(
       <BookingForm
         dateRange={dateRange}
-        guests={2}
         locale="en"
         submissionDelayMs={10}
       />
