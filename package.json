@@ -3,6 +3,10 @@
   "version": "0.1.1",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.19.0",
+    "npm": ">=11.18.0"
+  },
   "scripts": {
     "migrate": "bash ./scripts/system-orchestrator.sh migrate --profile production",
     "postinstall": "prisma generate",
@@ -119,7 +123,7 @@
     "@types/jsonwebtoken": "^9.0.6",
     "@types/leaflet": "^1.9.20",
     "@types/leaflet.markercluster": "^1.5.4",
-    "@types/node": "^20.19.17",
+    "@types/node": "^22.19.0",
     "@types/pg": "^8.16.0",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^19.1.13",
@@ -131,8 +135,8 @@
     "eslint": "^9.36.0",
     "eslint-config-next": "^16.2.4",
     "eslint-plugin-security": "^3.0.1",
-    "lighthouse": "^12.1.0",
-    "postcss": "^8.5.6",
+    "lighthouse": "^13.4.0",
+    "postcss": "^8.5.10",
     "prisma": "^7.0.0",
     "puppeteer": "^24.9.0",
     "spdx-expression-parse": "^4.0.0",
@@ -145,5 +149,22 @@
   },
   "optionalDependencies": {
     "sharp": "^0.33.5"
+  },
+  "overrides": {
+    "@prisma/dev": "0.24.14",
+    "@sentry/node": "^10.64.0",
+    "postcss": "$postcss"
+  },
+  "allowScripts": {
+    "@prisma/engines@7.8.0": true,
+    "@tailwindcss/oxide@4.1.13": true,
+    "bcrypt@6.0.0": true,
+    "esbuild@0.25.9": true,
+    "fsevents@2.3.3": true,
+    "sharp@0.34.5": true,
+    "sharp@0.33.5": true,
+    "prisma@7.8.0": true,
+    "puppeteer@24.25.0": true,
+    "unrs-resolver@1.11.1": true
   }
 }
