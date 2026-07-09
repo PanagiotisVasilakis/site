@@ -6,33 +6,33 @@ This document explains how to set up this repository and run the site in develop
 
 ## 1) Prerequisites
 
-- Node.js 20+ (from `.nvmrc`)
-- npm 10+
+- Node.js 22.19+ (from `.nvmrc`)
+- npm 11.18+
 - PostgreSQL (managed or local), or Docker for local fallback/test databases
 - Linux/macOS shell (Windows via WSL is fine)
 
-### 1.1) Upgrade to Node 20+ (Linux/WSL)
+### 1.1) Upgrade to Node 22.19+ (Linux/WSL)
 
-If your terminal is still on Node 18, use one of these paths.
+If your terminal is still below Node 22.19, use one of these paths.
 
-Option A (recommended): install nvm and switch to Node 20
+Option A (recommended): install nvm and switch to Node 22.19+
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
 source ~/.nvm/nvm.sh
-nvm install 20
-nvm alias default 20
-nvm use 20
-npm install -g npm@10
+nvm install 22.19
+nvm alias default 22.19
+nvm use 22.19
+npm install -g npm@11.18.0
 node -v && npm -v
 ```
 
-Option B: system-wide Node 20 via NodeSource
+Option B: system-wide Node 22 via NodeSource
 
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt-get install -y nodejs
-sudo npm install -g npm@10
+sudo npm install -g npm@11.18.0
 node -v && npm -v
 ```
 

@@ -52,7 +52,7 @@ const apartmentData = {
     bathrooms: 1,
     floor: 2,
     maxGuests: 4,
-    size: '75 m²' // estimated
+    size: '90 m²'
   },
 
   amenities: {

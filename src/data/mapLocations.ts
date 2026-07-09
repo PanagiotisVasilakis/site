@@ -15,7 +15,10 @@ export type MapMarkerType =
   | 'bar'
   | 'park'
   | 'police'
-  | 'city-center';
+  | 'city-center'
+  | 'church';
+
+export type MapCoordinates = [lng: number, lat: number];
 
 export interface MapLocation {
   id: string;
@@ -26,7 +29,7 @@ export interface MapLocation {
   phones?: string[];
   website?: string;
   directionsUrl?: string;
-  coordinates: [number, number];
+  coordinates: MapCoordinates;
   category: string;
   markerType: MapMarkerType;
   href?: string;
@@ -62,6 +65,152 @@ export interface CategoryMapItem {
   slug?: string;
 }
 
+export interface MapContentItem {
+  item: CategoryMapItem;
+  categorySlug: string;
+}
+
+interface LocalizedMapText {
+  en: string;
+  el: string;
+}
+
+interface KalamataLandmarkDefinition {
+  id: string;
+  name: LocalizedMapText;
+  description: LocalizedMapText;
+  address: LocalizedMapText;
+  coordinates: MapCoordinates;
+  category: 'landmarks';
+  markerType: MapMarkerType;
+  sourceUrls: string[];
+}
+
+/**
+ * Curated, stable points that should appear wherever the local map is shown.
+ * Coordinates use the application-wide `[lng, lat]` format.
+ */
+export const KALAMATA_LANDMARKS: readonly KalamataLandmarkDefinition[] = [
+  {
+    id: 'landmark-almyros-beach',
+    name: { en: 'Almyros Beach', el: 'Παραλία Αλμυρού' },
+    description: {
+      en: 'A popular pebble beach east of Kalamata, near Verga.',
+      el: 'Δημοφιλής βοτσαλωτή παραλία ανατολικά της Καλαμάτας, κοντά στη Βέργα.',
+    },
+    address: { en: 'Almyros, Verga, Kalamata', el: 'Αλμυρός, Βέργα, Καλαμάτα' },
+    coordinates: [22.155378, 36.99795],
+    category: 'landmarks',
+    markerType: 'beach',
+    sourceUrls: [
+      'https://visit-kalamata.gr/en/almyrosen/',
+      'https://sandee.com/map/almiros-beach/@36.99795,22.155378',
+    ],
+  },
+  {
+    id: 'landmark-kordia-beach',
+    name: { en: 'West Kalamata – Kordia Beach', el: 'Δυτική Παραλία Καλαμάτας – Κορδίας' },
+    description: {
+      en: 'An organised beach west of the port, with views across the Messinian Gulf.',
+      el: 'Οργανωμένη παραλία δυτικά του λιμανιού, με θέα στον Μεσσηνιακό Κόλπο.',
+    },
+    address: { en: 'Kordia Beach, Kalamata', el: 'Παραλία Κορδίας, Καλαμάτα' },
+    coordinates: [22.0894, 37.027],
+    category: 'landmarks',
+    markerType: 'beach',
+    sourceUrls: [
+      'https://www.blueflag.gr/el/beach/dytiki-kalamata-paralia-kordia',
+      'https://visitpeloponnese.com/en/toyristiko-periehomeno/beaches-kalamata',
+    ],
+  },
+  {
+    id: 'landmark-vasileos-georgiou-square',
+    name: { en: 'Vasileos Georgiou Square', el: 'Πλατεία Βασιλέως Γεωργίου' },
+    description: {
+      en: 'Kalamata’s central square and a focal point for daily city life.',
+      el: 'Η κεντρική πλατεία της Καλαμάτας και σημείο συνάντησης της πόλης.',
+    },
+    address: { en: 'Vasileos Georgiou Square, Kalamata', el: 'Πλατεία Βασιλέως Γεωργίου, Καλαμάτα' },
+    coordinates: [22.1110293, 37.0381278],
+    category: 'landmarks',
+    markerType: 'city-center',
+    sourceUrls: [
+      'https://kalamata.gr/el/component/gmapfp/308:plateia-georgiou?view=gmapfp',
+      'https://www.openstreetmap.org/way/298356181',
+    ],
+  },
+  {
+    id: 'landmark-march-23-square',
+    name: { en: '23rd of March Square', el: 'Πλατεία 23ης Μαρτίου' },
+    description: {
+      en: 'The historic square at the heart of Kalamata’s old town.',
+      el: 'Η ιστορική πλατεία στην καρδιά της παλιάς πόλης της Καλαμάτας.',
+    },
+    address: { en: '23rd of March Square, Kalamata', el: 'Πλατεία 23ης Μαρτίου, Καλαμάτα' },
+    coordinates: [22.1131936, 37.0429578],
+    category: 'landmarks',
+    markerType: 'sightseeing',
+    sourceUrls: [
+      'https://greece.terrabook.com/el/messinia/page/plateia-23-martiou/',
+      'https://www.openstreetmap.org/way/552176073',
+    ],
+  },
+  {
+    id: 'landmark-agia-triada-church',
+    name: { en: 'Holy Trinity Church', el: 'Ιερός Ναός Αγίας Τριάδας' },
+    description: {
+      en: 'The parish church of Agia Triada on Athinon Avenue.',
+      el: 'Ο ενοριακός ναός της Αγίας Τριάδας στη λεωφόρο Αθηνών.',
+    },
+    address: { en: '150 Athinon Avenue, Kalamata', el: 'Αθηνών 150, Καλαμάτα' },
+    coordinates: [22.0958081, 37.0416033],
+    category: 'landmarks',
+    markerType: 'church',
+    sourceUrls: [
+      'https://kalamata.gr/el/component/gmapfp/420:2014-01-13-09-09-51?view=gmapfp',
+    ],
+  },
+  {
+    id: 'landmark-sklavenitis-athinon',
+    name: { en: 'Sklavenitis Supermarket', el: 'ΣΚΛΑΒΕΝΙΤΗΣ' },
+    description: {
+      en: 'Sklavenitis supermarket on Athinon Avenue.',
+      el: 'Σούπερ μάρκετ ΣΚΛΑΒΕΝΙΤΗΣ στη λεωφόρο Αθηνών.',
+    },
+    address: { en: 'Athinon Avenue, Kalamata', el: 'Λεωφόρος Αθηνών, Καλαμάτα' },
+    coordinates: [22.0911789, 37.0433823],
+    category: 'landmarks',
+    markerType: 'shop',
+    sourceUrls: [
+      'https://www.sklavenitis.gr/about/katastimata/',
+      'https://www.openstreetmap.org/node/6636741387',
+    ],
+  },
+];
+
+function localizedText(text: LocalizedMapText, locale: Locale): string {
+  return text[locale] || text.en;
+}
+
+export function getDirectionsUrl(coordinates: MapCoordinates): string {
+  const [lng, lat] = coordinates;
+  return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+}
+
+export function getKalamataLandmarks(locale: Locale = 'en'): MapLocation[] {
+  return KALAMATA_LANDMARKS.map((landmark) => ({
+    id: landmark.id,
+    name: localizedText(landmark.name, locale),
+    description: localizedText(landmark.description, locale),
+    address: localizedText(landmark.address, locale),
+    directionsUrl: getDirectionsUrl(landmark.coordinates),
+    coordinates: landmark.coordinates,
+    category: landmark.category,
+    markerType: landmark.markerType,
+    sourceUrls: [...landmark.sourceUrls],
+  }));
+}
+
 function pickLocalized(item: CategoryMapItem, key: 'name' | 'summary' | 'description' | 'address', locale: Locale): string | undefined {
   const localized = item[`${key}_${locale}` as keyof CategoryMapItem];
   const english = item[`${key}_en` as keyof CategoryMapItem];
@@ -86,6 +235,7 @@ function markerTypeForItem(item: CategoryMapItem, categorySlug: string): MapMark
   if (tags.has('restaurant') || tags.has('food')) return 'restaurant';
   if (tags.has('park') || tags.has('outdoor') || tags.has('railway')) return 'park';
   if (tags.has('site') || tags.has('sightseeing') || tags.has('archaeology')) return 'sightseeing';
+  if (tags.has('church') || tags.has('religion')) return 'church';
   if (tags.has('museum') || tags.has('culture') || tags.has('history')) return 'attraction';
 
   return categorySlug === 'sightseeing' ? 'sightseeing' : 'attraction';
@@ -93,17 +243,20 @@ function markerTypeForItem(item: CategoryMapItem, categorySlug: string): MapMark
 
 export function getApartmentMapLocation(locale: Locale = 'en'): MapLocation {
   const apartment = getApartmentContent(locale);
+  const address = locale === 'el'
+    ? 'Αρχιμήδους 21, Καλαμάτα 24100, Ελλάδα'
+    : 'Archimidous 21, Kalamata 24100, Greece';
+
   return {
     id: 'apartment',
     name: apartment.shortName,
     description: apartment.description,
-    address: 'Archimidous 21, Kalamata 24100, Greece',
+    address,
     phone: '+30 695 581 0051',
-    directionsUrl: 'https://maps.app.goo.gl/9vqnjXJqQeakxdBx8',
+    directionsUrl: 'https://maps.app.goo.gl/wW1Lnh14k3psKGAm9',
     coordinates: APARTMENT_LOCATION,
     category: 'apartment',
     markerType: 'apartment',
-    price: `€${apartment.pricing.basePrice}/night`,
   };
 }
 
@@ -130,7 +283,7 @@ export function createMapLocationFromItem(
     phone: item.phone ?? phones?.[0],
     phones,
     website: item.website,
-    directionsUrl: item.directionsUrl,
+    directionsUrl: item.directionsUrl ?? getDirectionsUrl([item.location.lng, item.location.lat]),
     coordinates: [item.location.lng, item.location.lat],
     category: categorySlug,
     markerType: markerTypeForItem(item, categorySlug),
@@ -139,4 +292,32 @@ export function createMapLocationFromItem(
     href: `/${eff}/${categorySlug}/${item.slug || item.id}`,
     sourceUrls: item.sourceUrls,
   };
+}
+
+export function dedupeMapLocations(locations: MapLocation[]): MapLocation[] {
+  const seen = new Set<string>();
+  return locations.filter((location) => {
+    if (seen.has(location.id)) return false;
+    seen.add(location.id);
+    return true;
+  });
+}
+
+export function getKalamataMapLocations(
+  locale: Locale,
+  contentItems: readonly MapContentItem[] = [],
+  options: { includeApartment?: boolean; includeLandmarks?: boolean } = {}
+): MapLocation[] {
+  const { includeApartment = true, includeLandmarks = true } = options;
+  const locations: MapLocation[] = [];
+
+  if (includeApartment) locations.push(getApartmentMapLocation(locale));
+  if (includeLandmarks) locations.push(...getKalamataLandmarks(locale));
+
+  contentItems.forEach(({ item, categorySlug }) => {
+    const location = createMapLocationFromItem(item, categorySlug, locale);
+    if (location) locations.push(location);
+  });
+
+  return dedupeMapLocations(locations);
 }

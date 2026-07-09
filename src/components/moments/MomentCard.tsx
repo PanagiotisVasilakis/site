@@ -7,6 +7,8 @@ import { useFavorites } from '@/lib/favorites';
 import { useToast } from '@/components/Toast';
 import { momentsLayoutConfig } from '@/config/momentsLayoutConfig';
 import { mapsHref, telHref } from '@/lib/contactLinks';
+import { getDictionary } from '@/i18n/dictionaries';
+import type { Locale } from '@/i18n/config';
 
 interface MomentCardProps {
     id: string;
@@ -84,9 +86,8 @@ function categoryTone(tags?: string[]) {
     return 'is-culture';
 }
 
-function primaryTag(tags?: string[]) {
-    const tag = tags?.find(candidate => tagLabels[candidate]);
-    return tag ? tagLabels[tag] : undefined;
+function primaryTagKey(tags?: string[]) {
+    return tags?.find(candidate => tagLabels[candidate]);
 }
 
 function PhoneServiceIcon({ id }: { id: string }) {
@@ -192,6 +193,7 @@ export function MomentCard({
     const [isFlipped, setIsFlipped] = useState(false);
     const { isFavorite, toggle } = useFavorites();
     const { push } = useToast();
+    const t = getDictionary(locale as Locale);
     const favoriteId = `${categorySlug}:${id}`;
     const isWished = isFavorite(favoriteId);
     const detailsId = useId();
@@ -199,7 +201,8 @@ export function MomentCard({
     const directionsHref = directionsUrl || mapsHref(address, location?.lat, location?.lng);
     const phoneNumbers = Array.from(new Set([phone, ...(phones ?? [])].filter(Boolean) as string[]));
     const primaryPhoneHref = telHref(phoneNumbers[0]);
-    const tag = primaryTag(tags);
+    const tagKey = primaryTagKey(tags);
+    const tag = tagKey ? (t.momentTags?.[tagKey] ?? tagLabels[tagKey]) : undefined;
     const copy = summary || description;
     const detailCopy = description || summary;
     const isSvgImage = Boolean(image && image.endsWith('.svg'));
@@ -213,7 +216,7 @@ export function MomentCard({
     };
     const metadata = [
         tag,
-        rating ? `${rating.toFixed(1)} rating` : undefined,
+        rating ? (t.labels?.rating ?? '{value} rating').replace('{value}', rating.toFixed(1)) : undefined,
         price,
         hideAddressOnFront ? undefined : address,
     ].filter((item): item is string => Boolean(item));
@@ -221,7 +224,7 @@ export function MomentCard({
     const handleFavoriteToggle = () => {
         const wasFavorite = isFavorite(favoriteId);
         toggle(favoriteId);
-        push(wasFavorite ? 'Removed from favorites' : 'Added to favorites');
+        push(wasFavorite ? (t.labels?.removedFavorite ?? 'Removed from favorites') : (t.labels?.addedFavorite ?? 'Added to favorites'));
     };
 
     const frontContent = (
@@ -270,7 +273,7 @@ export function MomentCard({
                 <span className="moment-card-title">{name}</span>
                 {copy && <span className="moment-card-summary">{copy}</span>}
                 {metadata.length > 0 && (
-                    <span className="moment-card-meta" aria-label="Place details">
+                    <span className="moment-card-meta" aria-label={t.a11y?.placeDetails ?? 'Place details'}>
                         {metadata.map(item => (
                             <span key={item}>{item}</span>
                         ))}
@@ -284,7 +287,7 @@ export function MomentCard({
         <article className={`moment-card${isPhoneCard ? ' moment-card-flip' : ''}${isFlipped ? ' is-flipped' : ''}`}>
             <button
                 type="button"
-                aria-label={isWished ? 'Remove from favorites' : 'Save to favorites'}
+                aria-label={isWished ? (t.labels?.removeFavorite ?? 'Remove from favorites') : (t.labels?.addFavorite ?? 'Save to favorites')}
                 className={`moment-favorite-button ${isWished ? 'is-active' : ''}`}
                 onClick={handleFavoriteToggle}
             >
@@ -375,7 +378,7 @@ export function MomentCard({
                 </div>
             ) : (
                 <>
-                    <Link href={href} className="moment-card-main" aria-label={`View details for ${name}`}>
+                    <Link href={href} className="moment-card-main" aria-label={(t.a11y?.viewDetailsFor ?? 'View details for {name}').replace('{name}', name)}>
                         {frontContent}
                     </Link>
 
@@ -389,9 +392,9 @@ export function MomentCard({
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="moment-card-action"
-                                aria-label={`Open map for ${name}`}
+                                aria-label={(t.a11y?.openMapFor ?? 'Open map for {name}').replace('{name}', name)}
                             >
-                                Open map
+                                {t.map?.openMap ?? 'Open map'}
                             </a>
                         )}
                     </div>

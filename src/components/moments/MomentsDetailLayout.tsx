@@ -22,6 +22,7 @@ interface MomentsItem {
 interface MomentsDetailLayoutProps {
     item: MomentsItem;
     categorySlug: string;
+    locale?: string;
     isRecentlyUpdated?: boolean;
     /** Pre-computed URLs - computed on server side */
     urls: {
@@ -51,6 +52,7 @@ interface MomentsDetailLayoutProps {
 export function MomentsDetailLayout({
     item,
     categorySlug,
+    locale = 'en',
     isRecentlyUpdated,
     urls,
     translations,
@@ -131,8 +133,8 @@ export function MomentsDetailLayout({
                         <a href={urls.reservationUrl} target="_blank">{t.cta.reserve}</a>
                     </CTAButton>
                 )}
-                <ShareButton title={item.name} text={item.summary} className="btn-primary" />
-                <FavoriteButton id={`${categorySlug}:${item.id}`} label={item.name} />
+                <ShareButton title={item.name} text={item.summary} className="btn-primary" locale={locale} />
+                <FavoriteButton id={`${categorySlug}:${item.id}`} label={item.name} locale={locale} />
             </div>
 
             {/* Description */}

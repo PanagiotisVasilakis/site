@@ -27,6 +27,10 @@
     "icon": "🚓",
     "address": "Iroon Polytechniou 3-5, Kalamata 241 00",
     "address_el": "Ηρ. Πολυτεχνείου 3-5, Καλαμάτα 241 00",
+    "location": {
+      "lat": 37.0340541,
+      "lng": 22.0979818
+    },
     "website": "https://www.astynomia.gr/",
     "directionsUrl": "https://maps.app.goo.gl/DFsTwLdL2AxLgZMb7",
     "image": "/phones/police-icon.svg",
@@ -37,6 +41,7 @@
       "https://maps.app.goo.gl/DFsTwLdL2AxLgZMb7",
       "https://www.astynomia.gr/",
       "https://passport.gov.gr/en/grafeia-kai-orario/grafeia-diavatirion-ellada/peloponnisos/nomos-messinias/kalamata.html",
+      "https://www.govmap.gr/item/astynomiki-dieythynsi-messinias",
       "https://unsplash.com/photos/TbZAMYvA2cg",
       "https://github.com/lucide-icons/lucide/blob/main/icons/shield.svg"
     ],
@@ -47,30 +52,42 @@
     "categoryId": "phones",
     "name": "Kalamata Fire Department",
     "name_el": "Πυροσβεστική Υπηρεσία Καλαμάτας",
-    "phone": "+30 27210 62020",
+    "phone": "+30 27210 92100",
     "summary": "Fire and rescue services",
     "summary_el": "Υπηρεσίες πυρόσβεσης και διάσωσης",
     "icon": "🚒",
-    "address": "Solonos 7, Kalamata 241 00",
-    "address_el": "Σόλωνος 7, Καλαμάτα 241 00",
+    "address": "Solonos 7, Kalamata 241 31",
+    "address_el": "Σόλωνος 7, Καλαμάτα 241 31",
+    "location": {
+      "lat": 37.0347815,
+      "lng": 22.1087865
+    },
     "website": "https://www.fireservice.gr/",
-    "directionsUrl": "https://maps.app.goo.gl/5eKq94tmUNVo6sS89",
+    "directionsUrl": "https://www.google.com/maps/dir/?api=1&destination=37.0347815%2C22.1087865",
     "image": "/phones/fire-icon.svg",
     "heroImage": "/phones/fire-department-hero.png",
     "heroImagePosition": "center center",
-    "tags": ["emergency", "safety"]
+    "tags": ["emergency", "safety"],
+    "sourceUrls": [
+      "https://kalamata.gr/el/component/gmapfp/798:pyrosvestiki-ypiresia-kalamatas?view=gmapfp",
+      "https://www.fireservice.gr/documents/20184/4080089/3+%CE%A3%CE%A4%CE%9F%CE%99%CE%A7%CE%95%CE%99%CE%91+%CE%94%CE%99%CE%A0%CE%A5%CE%9D-%CE%94%CE%99%CE%A0%CE%A5.pdf/5f809aba-476b-4541-a720-8872ac438cb2"
+    ]
   },
   {
     "id": "kalamata-hospital",
     "categoryId": "phones",
     "name": "General Hospital of Kalamata",
     "name_el": "Γενικό Νοσοκομείο Καλαμάτας",
-    "phone": "+30 27210 46000",
+    "phone": "+30 27213 63000",
     "summary": "24/7 public hospital and emergency care",
     "summary_el": "Δημόσιο νοσοκομείο 24/7 και επείγουσα φροντίδα",
     "icon": "🏥",
     "address": "Antikalamos, Kalamata 241 00",
     "address_el": "Αντικαλαμός, Καλαμάτα 241 00",
+    "location": {
+      "lat": 37.0680919,
+      "lng": 22.0606781
+    },
     "website": "https://www.nosokomeiokalamatas.gr/",
     "directionsUrl": "https://maps.app.goo.gl/NL4bWgGUe4GqUAww6",
     "image": "/phones/hospital-icon.svg",
@@ -80,6 +97,7 @@
     "sourceUrls": [
       "https://maps.app.goo.gl/NL4bWgGUe4GqUAww6",
       "https://www.nosokomeiokalamatas.gr/epikoinonia/",
+      "https://www.govmap.gr/item/geniko-nosokomeio-kalamatas",
       "https://unsplash.com/photos/8PB_TFEy2XQ",
       "https://github.com/lucide-icons/lucide/blob/main/icons/hospital.svg"
     ],

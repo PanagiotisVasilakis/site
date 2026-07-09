@@ -61,7 +61,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
             guestsLabel: t.search?.guestsLabel || 'Guests',
             guestSingular: t.search?.guestSingular || 'guest',
             guestPlural: t.search?.guestPlural || 'guests',
-            checkAvailability: 'Check availability',
+            checkAvailability: t.search?.checkAvailability || 'Check availability',
             arrivalLabel: t.search?.arrivalLabel,
             arrivalPlaceholder: t.search?.arrivalPlaceholder,
             departureLabel: t.search?.departureLabel,

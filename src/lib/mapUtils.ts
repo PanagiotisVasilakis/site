@@ -3,10 +3,14 @@
 import {
   APARTMENT_LOCATION,
   createMapLocationFromItem,
+  getKalamataMapLocations,
   type CategoryMapItem,
+  type MapContentItem,
   type MapLocation,
   type MapMarkerType,
 } from '@/data/mapLocations';
+import type { Locale } from '@/i18n/config';
+import type { LeafletMarkerData } from '@/components/LeafletMap';
 
 export { APARTMENT_LOCATION };
 
@@ -48,6 +52,10 @@ export function markerFromMapLocation(location: MapLocation): MarkerData {
   };
 }
 
+export function markersFromMapLocations(locations: readonly MapLocation[]): MarkerData[] {
+  return locations.map(markerFromMapLocation);
+}
+
 export function createMarkerFromItem(
   item: CategoryMapItem,
   categorySlug: string,
@@ -55,4 +63,38 @@ export function createMarkerFromItem(
 ): MarkerData | null {
   const location = createMapLocationFromItem(item, categorySlug, locale);
   return location ? markerFromMapLocation(location) : null;
+}
+
+export function getKalamataMarkers(
+  locale: Locale,
+  contentItems: readonly MapContentItem[] = [],
+  options?: { includeApartment?: boolean; includeLandmarks?: boolean }
+): MarkerData[] {
+  return markersFromMapLocations(getKalamataMapLocations(locale, contentItems, options));
+}
+
+export function dedupeMarkers(markers: readonly MarkerData[]): MarkerData[] {
+  const seen = new Set<string>();
+  return markers.filter((marker) => {
+    if (seen.has(marker.id)) return false;
+    seen.add(marker.id);
+    return true;
+  });
+}
+
+export function toLeafletMarker(marker: MarkerData): LeafletMarkerData {
+  return {
+    id: marker.id,
+    name: marker.name,
+    description: marker.description,
+    address: marker.address,
+    phone: marker.phone,
+    phones: marker.phones,
+    website: marker.website,
+    directionsUrl: marker.directionsUrl,
+    coordinates: marker.coordinates,
+    type: marker.type,
+    price: marker.price,
+    href: marker.href,
+  };
 }

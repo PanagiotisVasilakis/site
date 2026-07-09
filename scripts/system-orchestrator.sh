@@ -208,30 +208,76 @@ parse_major_version() {
   printf '%s' "$version" | sed 's/^v//' | cut -d'.' -f1
 }
 
+normalize_semver_min() {
+  local version="${1#v}"
+  local major minor patch
+  IFS='.' read -r major minor patch _ <<< "$version"
+  minor="${minor:-0}"
+  patch="${patch:-0}"
+  patch="${patch%%[^0-9]*}"
+  printf '%s.%s.%s' "$major" "$minor" "${patch:-0}"
+}
+
+version_at_least() {
+  local current="$1"
+  local required="$2"
+
+  node --input-type=module - "$current" "$required" <<'NODE'
+function parseVersion(raw) {
+  const match = String(raw).trim().replace(/^v/, '').match(/^(\d+)(?:\.(\d+))?(?:\.(\d+))?/);
+  if (!match) {
+    process.exit(2);
+  }
+  return [Number(match[1]), Number(match[2] ?? 0), Number(match[3] ?? 0)];
+}
+
+const current = parseVersion(process.argv[2]);
+const required = parseVersion(process.argv[3]);
+
+for (let i = 0; i < 3; i += 1) {
+  if (current[i] > required[i]) process.exit(0);
+  if (current[i] < required[i]) process.exit(1);
+}
+process.exit(0);
+NODE
+}
+
+package_engine_min() {
+  local engine_name="$1"
+
+  node --input-type=module - "$REPO_ROOT/package.json" "$engine_name" <<'NODE'
+import fs from 'node:fs';
+
+const packagePath = process.argv[2];
+const engineName = process.argv[3];
+const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+const engine = pkg.engines?.[engineName] ?? '';
+const match = String(engine).match(/>=\s*([0-9]+(?:\.[0-9]+){0,2})/);
+process.stdout.write(match?.[1] ?? '');
+NODE
+}
+
 check_node_and_npm_versions() {
   require_cmd node
   require_cmd npm
 
-  local current_node current_node_major
+  local current_node
   local required_node=""
-  local required_node_major=""
-  local current_npm current_npm_major
+  local current_npm required_npm=""
 
   current_node="$(node -v)"
-  current_node_major="$(parse_major_version "$current_node")"
 
   if [[ -f "$REPO_ROOT/.nvmrc" ]]; then
-    required_node="$(tr -d '[:space:]' < "$REPO_ROOT/.nvmrc")"
-    required_node_major="$(parse_major_version "$required_node")"
-    if [[ "$current_node_major" -lt "$required_node_major" ]]; then
-      die "Node $required_node_major+ required by .nvmrc, found $current_node" 12
+    required_node="$(normalize_semver_min "$(tr -d '[:space:]' < "$REPO_ROOT/.nvmrc")")"
+    if ! version_at_least "$current_node" "$required_node"; then
+      die "Node $required_node+ required by .nvmrc, found $current_node" 12
     fi
   fi
 
   current_npm="$(npm -v)"
-  current_npm_major="$(parse_major_version "$current_npm")"
-  if [[ "$current_npm_major" -lt 10 ]]; then
-    die "npm 10+ is required, found $current_npm" 12
+  required_npm="$(package_engine_min npm)"
+  if [[ -n "$required_npm" ]] && ! version_at_least "$current_npm" "$required_npm"; then
+    die "npm $required_npm+ is required, found $current_npm" 12
   fi
 
   log "Runtime check passed (node: $current_node, npm: $current_npm)"
@@ -519,11 +565,12 @@ prepare_database() {
     return
   fi
 
-  warn "DATABASE_URL is not reachable"
   if (( DOCKER_FALLBACK == 0 )); then
+    warn "DATABASE_URL is not reachable"
     die "Database unreachable and docker fallback disabled" 17
   fi
 
+  log "DATABASE_URL is not reachable; using local Docker fallback"
   start_fallback_database
 
   if ! database_reachable "$DATABASE_URL"; then
@@ -557,7 +604,7 @@ run_migration_once() {
     touch "$MIGRATION_LOCK_FILE"
     flock -x "$MIGRATION_LOCK_FILE" bash -lc "cd '$REPO_ROOT' && npm run prisma:migrate:deploy"
   else
-    warn "flock not found; running migrations without file lock"
+    log "flock not found; running migrations without file lock"
     (
       cd "$REPO_ROOT"
       npm run prisma:migrate:deploy
@@ -734,7 +781,7 @@ wait_for_health() {
   local code=""
 
   while (( elapsed < START_TIMEOUT )); do
-    code="$(curl -sS -o /dev/null -w '%{http_code}' "$url" || true)"
+    code="$(curl -s -o /dev/null -w '%{http_code}' "$url" || true)"
     if [[ "$code" == "200" ]]; then
       log "Health endpoint is ready ($url)"
       return 0
@@ -766,7 +813,7 @@ verify_metrics_endpoint() {
     local key
     key="$(first_csv_value "$VALID_API_KEYS")"
     if [[ -n "$key" ]]; then
-      code="$(curl -sS -o /dev/null -w '%{http_code}' -H "x-api-key: $key" "$url" || true)"
+      code="$(curl -s -o /dev/null -w '%{http_code}' -H "x-api-key: $key" "$url" || true)"
       if [[ "$code" == "200" ]]; then
         log "Metrics endpoint verification passed with API key"
         return 0
@@ -776,7 +823,7 @@ verify_metrics_endpoint() {
     fi
   fi
 
-  code="$(curl -sS -o /dev/null -w '%{http_code}' "$url" || true)"
+  code="$(curl -s -o /dev/null -w '%{http_code}' "$url" || true)"
   case "$code" in
     200|401|403)
       log "Metrics endpoint is reachable (HTTP $code)"
@@ -804,13 +851,13 @@ stop_app() {
   local pid
   pid="$(cat "$APP_PID_FILE" 2>/dev/null || true)"
   if [[ -z "$pid" ]]; then
-    warn "App PID file was empty"
+    log "App PID file was empty; removing stale PID file"
     rm -f "$APP_PID_FILE"
     return
   fi
 
   if ! kill -0 "$pid" >/dev/null 2>&1; then
-    warn "App PID $pid not running; removing stale PID file"
+    log "App PID $pid not running; removing stale PID file"
     rm -f "$APP_PID_FILE"
     return
   fi
@@ -961,7 +1008,7 @@ cmd_status() {
   if app_is_running; then
     if command -v curl >/dev/null 2>&1; then
       local code
-      code="$(curl -sS -o /dev/null -w '%{http_code}' "$(health_url)" || true)"
+      code="$(curl -s -o /dev/null -w '%{http_code}' "$(health_url)" || true)"
       printf 'Health endpoint: HTTP %s\n' "${code:-unreachable}"
     else
       printf 'Health endpoint: curl not installed\n'
@@ -982,6 +1029,7 @@ cmd_logs() {
 }
 
 cmd_verify() {
+  run_preflight
   verify_runtime
 }
 

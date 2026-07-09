@@ -17,14 +17,16 @@ interface ListingCardProps {
   favoriteId?: string;
   favLabelAdd?: string;
   favLabelRemove?: string;
+  addedToast?: string;
+  removedToast?: string;
 }
 
-function ListingCardComponent({ id, title, subtitle, image, rating, price, href = '#', icon, footer, favoriteId, favLabelAdd = 'Add to favorites', favLabelRemove = 'Remove from favorites' }: ListingCardProps) {
+function ListingCardComponent({ id, title, subtitle, image, rating, price, href = '#', icon, footer, favoriteId, favLabelAdd = 'Add to favorites', favLabelRemove = 'Remove from favorites', addedToast = 'Added to favorites', removedToast = 'Removed from favorites' }: ListingCardProps) {
   const fid = favoriteId || id;
   const { isFavorite, toggle } = useFavorites();
   const { push } = useToast();
   const wish = isFavorite(fid);
-  const toggleLocal = useCallback(() => { const before = isFavorite(fid); toggle(fid); if (!before) push('Added to favorites'); else push('Removed from favorites'); }, [fid, isFavorite, toggle, push]);
+  const toggleLocal = useCallback(() => { const before = isFavorite(fid); toggle(fid); if (!before) push(addedToast); else push(removedToast); }, [fid, isFavorite, toggle, push, addedToast, removedToast]);
   const aria = useMemo(() => ({
     labelledby: `title-${id}`,
     describedby: `desc-${id}`

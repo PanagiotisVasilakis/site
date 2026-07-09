@@ -68,12 +68,13 @@ function ContactIcon({ name }: { name: ContactIconName }) {
 
 export default function ContactSection({ locale }: ContactSectionProps) {
   const { t } = useTranslation(locale);
+  const isGreek = locale === 'el';
   const apartmentLocation = getApartmentMapLocation(locale === 'el' ? 'el' : 'en');
 
   const translations = {
     contactUs: t.contact?.title ?? 'Contact Us',
     followUs: t.contact?.followUs ?? 'Follow Us',
-    address: t.contact?.address ?? 'Address',
+    address: t.contact?.address ?? (isGreek ? 'Διεύθυνση' : 'Address'),
     phone: t.contact?.phone ?? 'Phone',
     email: t.contact?.email ?? 'Email',
     connectWithUs: t.contact?.connectWithUs ?? 'Connect with us',
@@ -96,7 +97,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
           {addressParts.slice(1).join(', ') || translations.countryPostal}
         </>
       ),
-      href: apartmentLocation.directionsUrl || 'https://maps.app.goo.gl/9vqnjXJqQeakxdBx8',
+      href: apartmentLocation.directionsUrl || 'https://maps.app.goo.gl/wW1Lnh14k3psKGAm9',
       icon: 'map',
     },
     {

@@ -8,3 +8,4 @@ export * from './house';
 export * from './booking';
 export * from './checkin';
 export * from './portal';
+export * from './about';
