@@ -4,7 +4,7 @@ This project uses a server-side secret named `SECURITY_PEPPER` for additional cr
 
 Local development
 
-- Use `.env.local` to store `SECURITY_PEPPER` and `SECURITY_ENC_KEY_HEX` locally. This repository ignores `.env*` files by default — do not commit `.env.local`.
+- Use `.env.local` to store local development secrets such as `SECURITY_PEPPER`, `SECURITY_ENC_KEY_HEX`, and guest auth/Wi-Fi placeholders. This repository ignores `.env*` files by default — do not commit `.env.local`.
 
 - To generate secure values locally run:
 
@@ -12,7 +12,7 @@ Local development
   npm run ensure-pepper
   ```
 
-  The command will create `.env.local` (if missing) and append securely generated hex values for `SECURITY_PEPPER` and `SECURITY_ENC_KEY_HEX` as needed. The script is idempotent and will not overwrite existing values.
+  The command will create `.env.local` (if missing) and append missing local-only values as needed. The script is idempotent and will not overwrite existing values.
 
 CI / Production
 

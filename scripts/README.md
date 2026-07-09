@@ -52,7 +52,7 @@ npm ci
 npm run ensure-pepper
 ```
 
-`npm run ensure-pepper` creates missing local `SECURITY_PEPPER` and `SECURITY_ENC_KEY_HEX` values in `.env.local`.
+`npm run ensure-pepper` creates missing local development secrets and guest Wi-Fi placeholders in `.env.local`.
 
 ## 3) Environment files and required variables
 
@@ -67,8 +67,12 @@ For full app bootstrap/start (`up`, `bootstrap`, `build`, `migrate`), set at lea
 - `DATABASE_URL` (valid PostgreSQL URL)
 - `ADMIN_JWT_SECRET` (minimum 32 chars)
 - `ADMIN_DASH_SECRET` (minimum 20 chars)
+- `GUEST_JWT_SECRET` (minimum 32 chars)
 - `SECURITY_ENC_KEY_HEX` (64 hex chars)
+- `SECURITY_PEPPER` (minimum 16 chars)
 - `SESSION_SECRET` (minimum 32 chars)
+- `GUEST_WIFI_NETWORK` (non-empty)
+- `GUEST_WIFI_PASSWORD` (minimum 8 chars)
 
 Recommended for realistic runtime checks:
 
@@ -198,7 +202,7 @@ Make shortcuts:
 ## 8) Quick troubleshooting
 
 - Runtime fails immediately with version error: use Node 22.19+ and npm 11.18+.
-- Env validation fails: check `DATABASE_URL`, `ADMIN_JWT_SECRET`, `ADMIN_DASH_SECRET`, `SECURITY_ENC_KEY_HEX`, `SESSION_SECRET`.
+- Env validation fails: check `DATABASE_URL`, `ADMIN_JWT_SECRET`, `ADMIN_DASH_SECRET`, `GUEST_JWT_SECRET`, `SECURITY_ENC_KEY_HEX`, `SECURITY_PEPPER`, `SESSION_SECRET`, `GUEST_WIFI_NETWORK`, `GUEST_WIFI_PASSWORD`.
 - Database unreachable: start Docker and rerun orchestrator, or set a reachable managed `DATABASE_URL`.
 - Tests fail on DB connection: verify `TEST_DATABASE_URL`, run migrations again, and confirm test DB container health.
 
