@@ -57,9 +57,9 @@ export default async function LocaleLayout({ children, params }: { children: Rea
           </div>
       </div>
       {/* iOS Add to Home Screen tip */}
-  <div id="ios-a2hs-tip" role="region" aria-label="iOS add to home screen tip" className="hidden fixed bottom-2 left-1/2 -translate-x-1/2 z-50 safe-bottom bg-white/90 backdrop-blur border-soft rounded-full px-3 py-2 text-xs items-center gap-2 shadow" style={{ color: 'var(--text-accent)' }}>
-        <span>Add to Home Screen: Share → Add to Home Screen</span>
-        <button id="ios-tip-close" aria-label="Close" className="btn-outline btn-sm">×</button>
+  <div id="ios-a2hs-tip" role="region" aria-label={t.a2hs?.region || 'iOS add to home screen tip'} className="hidden fixed bottom-2 left-1/2 -translate-x-1/2 z-50 safe-bottom bg-white/90 backdrop-blur border-soft rounded-full px-3 py-2 text-xs items-center gap-2 shadow" style={{ color: 'var(--text-accent)' }}>
+        <span>{t.a2hs?.message || 'Add to Home Screen: Share → Add to Home Screen'}</span>
+        <button id="ios-tip-close" aria-label={t.a2hs?.close || 'Close'} className="btn-outline btn-sm">×</button>
       </div>
   <main id="main-content" className="safe-bottom top-gap" role="main">{children}</main>
   </ToastProvider>

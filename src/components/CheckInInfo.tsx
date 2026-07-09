@@ -558,11 +558,12 @@ export default function CheckInInfo({
         setTimeout(() => setTimesSaved(false), 3000);
       } else {
         const error = await res.json();
-        alert(`Failed to save: ${error.error?.message || 'Unknown error'}`);
+        const unknownError = isGreek ? 'Άγνωστο σφάλμα' : 'Unknown error';
+        alert(`${isGreek ? 'Αποτυχία αποθήκευσης' : 'Failed to save'}: ${error.error?.message || unknownError}`);
       }
     } catch (error) {
       console.error('Failed to save preferences:', error);
-      alert('Failed to save preferences. Please try again.');
+      alert(isGreek ? 'Αποτυχία αποθήκευσης προτιμήσεων. Παρακαλώ δοκιμάστε ξανά.' : 'Failed to save preferences. Please try again.');
     } finally {
       setSavingTimes(false);
     }
@@ -736,7 +737,7 @@ export default function CheckInInfo({
                         type="button"
                         onClick={handleEditTimes}
                         className="checkin-outline-action min-h-9 px-3 py-1 text-xs"
-                        title="Edit times (host only)"
+                        title={isGreek ? 'Επεξεργασία ωρών (μόνο οικοδεσπότης)' : 'Edit times (host only)'}
                       >
                         {ui.edit}
                       </button>

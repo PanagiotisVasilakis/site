@@ -17,6 +17,8 @@ export default function UnifiedGuestClient() {
   const params = useParams() as { locale: string };
   const locale = (params?.locale as Locale) || 'en';
   const dict = getDictionary(locale);
+  const pe = dict.portal?.errors;
+  const problemWith = (field: string) => (pe?.problemWith ?? '❌ Problem with: {field}').replace('{field}', field);
   const router = useRouter();
   const search = useSearchParams();
   const prefersReduced = useReducedMotion();
@@ -109,8 +111,8 @@ export default function UnifiedGuestClient() {
   }), [prefersReduced]);
 
   const modeHint = mode === 'signin'
-    ? 'Access your booking and check-in details.'
-    : 'Create your guest account to continue.';
+    ? (dict.portal?.modeHintSignin ?? 'Access your booking and check-in details.')
+    : (dict.portal?.modeHintSignup ?? 'Create your guest account to continue.');
 
   // Seed analytics and URL mode parameter
   useEffect(() => {
@@ -148,10 +150,10 @@ export default function UnifiedGuestClient() {
     // Skip full name validation for sign-in mode
     if (mode === 'signup' && (!lastName || lastName.trim().length === 0)) {
       setSubmitError({
-        summary: '❌ Problem with: Last name',
+        summary: problemWith(pe?.fieldLastName ?? 'Last name'),
         details: [
-          'This field is empty',
-          'Please enter your surname as it appears on your booking'
+          pe?.empty ?? 'This field is empty',
+          pe?.lastNameEmptyHint ?? 'Please enter your surname as it appears on your booking'
         ]
       });
       return;
@@ -159,11 +161,11 @@ export default function UnifiedGuestClient() {
 
     if (!phone || phone.trim().length === 0) {
       setSubmitError({
-        summary: '❌ Problem with: Phone Number',
+        summary: problemWith(pe?.fieldPhone ?? 'Phone Number'),
         details: [
-          'This field is empty',
-          'Please enter your phone number with country code',
-          'Example: +30 695 581 0051 or 6955810051'
+          pe?.empty ?? 'This field is empty',
+          pe?.phoneEmpty1 ?? 'Please enter your phone number with country code',
+          pe?.phoneEmpty2 ?? 'Example: +30 695 581 0051 or 6955810051'
         ]
       });
       return;
@@ -171,11 +173,11 @@ export default function UnifiedGuestClient() {
 
     if (phone.trim().length < 8) {
       setSubmitError({
-        summary: '❌ Problem with: Phone Number',
+        summary: problemWith(pe?.fieldPhone ?? 'Phone Number'),
         details: [
-          `You entered: ${phone} (only ${phone.trim().length} digits)`,
-          'Phone numbers must be at least 8 digits',
-          'Please enter your complete phone number'
+          (pe?.phoneShort ?? 'You entered: {value} (only {count} digits)').replace('{value}', phone).replace('{count}', String(phone.trim().length)),
+          pe?.phoneShort1 ?? 'Phone numbers must be at least 8 digits',
+          pe?.phoneShort2 ?? 'Please enter your complete phone number'
         ]
       });
       return;
@@ -185,23 +187,23 @@ export default function UnifiedGuestClient() {
     if (mode === 'signup' && origin === 'GR') {
       if (!afm || afm.trim().length === 0) {
         setSubmitError({
-          summary: '❌ Problem with: AFM (9 digits)',
+          summary: problemWith(pe?.fieldAfm ?? 'AFM (9 digits)'),
           details: [
-            'This field is empty',
-            'Please enter your 9-digit AFM (Αριθμός Φορολογικού Μητρώου)',
-            'Your Greek tax identification number'
+            pe?.empty ?? 'This field is empty',
+            pe?.afmEmpty1 ?? 'Please enter your 9-digit AFM (Αριθμός Φορολογικού Μητρώου)',
+            pe?.afmEmpty2 ?? 'Your Greek tax identification number'
           ]
         });
         return;
       }
       if (!validateAfm(afm)) {
         setSubmitError({
-          summary: '❌ Problem with: AFM (9 digits)',
+          summary: problemWith(pe?.fieldAfm ?? 'AFM (9 digits)'),
           details: [
-            `You entered: ${afm} (${afm.length} ${afm.length === 1 ? 'digit' : 'digits'})`,
-            'AFM must be exactly 9 digits (0-9)',
-            'Example: 123456789',
-            'Please enter all 9 digits of your Greek tax number'
+            (pe?.afmEntered ?? 'You entered: {value} ({count} digits)').replace('{value}', afm).replace('{count}', String(afm.length)),
+            pe?.afmMust9 ?? 'AFM must be exactly 9 digits (0-9)',
+            pe?.afmExample ?? 'Example: 123456789',
+            pe?.afmAll9 ?? 'Please enter all 9 digits of your Greek tax number'
           ]
         });
         return;
@@ -211,23 +213,23 @@ export default function UnifiedGuestClient() {
     if (mode === 'signup' && origin === 'ABROAD') {
       if (!passport || passport.trim().length === 0) {
         setSubmitError({
-          summary: '❌ Problem with: Passport Number',
+          summary: problemWith(pe?.fieldPassport ?? 'Passport Number'),
           details: [
-            'This field is empty',
-            'Please enter your passport number',
-            'Found on the information page of your passport'
+            pe?.empty ?? 'This field is empty',
+            pe?.passportEmpty1 ?? 'Please enter your passport number',
+            pe?.passportEmpty2 ?? 'Found on the information page of your passport'
           ]
         });
         return;
       }
       if (!validatePassport(passport)) {
         setSubmitError({
-          summary: '❌ Problem with: Passport Number',
+          summary: problemWith(pe?.fieldPassport ?? 'Passport Number'),
           details: [
-            `You entered: ${passport} (${passport.length} characters)`,
-            'Passport must be 5-20 letters and numbers only',
-            'Example: AB1234567',
-            'Please check your passport and enter the number correctly'
+            (pe?.passportEntered ?? 'You entered: {value} ({count} characters)').replace('{value}', passport).replace('{count}', String(passport.length)),
+            pe?.passportMust ?? 'Passport must be 5-20 letters and numbers only',
+            pe?.passportExample ?? 'Example: AB1234567',
+            pe?.passportCheck ?? 'Please check your passport and enter the number correctly'
           ]
         });
         return;
@@ -236,11 +238,11 @@ export default function UnifiedGuestClient() {
 
     if (mode === 'signup' && bookingRef && bookingRef.trim().length > 0 && bookingRef.trim().length < 3) {
       setSubmitError({
-        summary: '❌ Problem with: Booking Reference',
+        summary: problemWith(pe?.fieldBookingRef ?? 'Booking Reference'),
         details: [
-          `You entered: ${bookingRef.trim()} (only ${bookingRef.trim().length} characters)`,
-          'Booking reference must be at least 3 characters',
-          'Or leave it empty if you don\'t have one'
+          (pe?.bookingRefEntered ?? 'You entered: {value} (only {count} characters)').replace('{value}', bookingRef.trim()).replace('{count}', String(bookingRef.trim().length)),
+          pe?.bookingRefMin ?? 'Booking reference must be at least 3 characters',
+          pe?.bookingRefEmptyHint ?? "Or leave it empty if you don't have one"
         ]
       });
       return;
@@ -275,59 +277,60 @@ export default function UnifiedGuestClient() {
       });
 
       if (!res.ok) {
-        let summary = 'Something went wrong';
+        let summary = pe?.somethingWentWrong ?? 'Something went wrong';
         let details: string[] | undefined = undefined;
+        const errPrefix = pe?.errorPrefix ?? 'Error: ';
         try {
           const errJson = await res.json();
-          const mapped = mapApiErrorToUI(errJson);
+          const mapped = mapApiErrorToUI(errJson, locale === 'el' ? 'el' : 'en');
           
           // Make error messages more specific based on field errors
           if (mapped.fields) {
             const fieldErrors: string[] = [];
             
             if (mapped.fields.afm) {
-              summary = '❌ Problem with: AFM (9 digits)';
-              fieldErrors.push('Error: ' + mapped.fields.afm);
-              fieldErrors.push('AFM must be exactly 9 digits (0-9)');
-              fieldErrors.push('Please check your Greek tax identification number');
+              summary = problemWith(pe?.fieldAfm ?? 'AFM (9 digits)');
+              fieldErrors.push(errPrefix + mapped.fields.afm);
+              fieldErrors.push(pe?.afmMust9 ?? 'AFM must be exactly 9 digits (0-9)');
+              fieldErrors.push(pe?.afmCheck ?? 'Please check your Greek tax identification number');
             }
             
             if (mapped.fields.passport) {
-              summary = '❌ Problem with: Passport Number';
-              fieldErrors.push('Error: ' + mapped.fields.passport);
-              fieldErrors.push('Passport must be 5-20 letters and numbers');
-              fieldErrors.push('Please check your passport and enter correctly');
+              summary = problemWith(pe?.fieldPassport ?? 'Passport Number');
+              fieldErrors.push(errPrefix + mapped.fields.passport);
+              fieldErrors.push(pe?.passportMust2 ?? 'Passport must be 5-20 letters and numbers');
+              fieldErrors.push(pe?.passportCheck2 ?? 'Please check your passport and enter correctly');
             }
             
             if (mapped.fields.phone) {
-              summary = '❌ Problem with: Phone Number';
-              fieldErrors.push('Error: ' + mapped.fields.phone);
-              fieldErrors.push('Phone number format is incorrect');
-              fieldErrors.push('Include country code: +30 695 581 0051');
+              summary = problemWith(pe?.fieldPhone ?? 'Phone Number');
+              fieldErrors.push(errPrefix + mapped.fields.phone);
+              fieldErrors.push(pe?.phoneFormatIncorrect ?? 'Phone number format is incorrect');
+              fieldErrors.push(pe?.phoneIncludeCode ?? 'Include country code: +30 695 581 0051');
             }
             
             if (mapped.fields.password) {
-              summary = '❌ Problem with: Password';
-              fieldErrors.push('Error: ' + mapped.fields.password);
+              summary = problemWith(pe?.fieldPassword ?? 'Password');
+              fieldErrors.push(errPrefix + mapped.fields.password);
               if (mode === 'signin') {
-                fieldErrors.push('The password you entered is incorrect');
-                fieldErrors.push('Please try again or reset your password');
+                fieldErrors.push(pe?.passwordIncorrect ?? 'The password you entered is incorrect');
+                fieldErrors.push(pe?.passwordTryReset ?? 'Please try again or reset your password');
               } else {
-                fieldErrors.push('Password must be at least 8 characters long');
-                fieldErrors.push('Please enter a stronger password');
+                fieldErrors.push(pe?.passwordMin8 ?? 'Password must be at least 8 characters long');
+                fieldErrors.push(pe?.passwordStronger ?? 'Please enter a stronger password');
               }
             }
             
             if (mapped.fields.lastName) {
-              summary = '❌ Problem with: Last name';
-              fieldErrors.push('Error: ' + mapped.fields.lastName);
-              fieldErrors.push('Please enter your surname as shown on your booking');
+              summary = problemWith(pe?.fieldLastName ?? 'Last name');
+              fieldErrors.push(errPrefix + mapped.fields.lastName);
+              fieldErrors.push(pe?.lastNameEmptyHint ?? 'Please enter your surname as shown on your booking');
             }
             
             if (mapped.fields.bookingRef) {
-              summary = '❌ Problem with: Booking Reference';
-              fieldErrors.push('Error: ' + mapped.fields.bookingRef);
-              fieldErrors.push('Check your booking confirmation email');
+              summary = problemWith(pe?.fieldBookingRef ?? 'Booking Reference');
+              fieldErrors.push(errPrefix + mapped.fields.bookingRef);
+              fieldErrors.push(pe?.bookingRefCheck ?? 'Check your booking confirmation email');
             }
             
             if (fieldErrors.length > 0) {
@@ -343,55 +346,55 @@ export default function UnifiedGuestClient() {
                 mapped.summary.toLowerCase().includes('incorrect')) {
               // Sign-in authentication failure
               if (mode === 'signin') {
-                summary = '❌ Sign-in failed';
+                summary = pe?.signinFailed ?? '❌ Sign-in failed';
                 details = [
-                  'The phone number or password you entered is incorrect',
+                  pe?.signinIncorrect ?? 'The phone number or password you entered is incorrect',
                   '',
-                  '📱 Phone Number: Check that you entered the correct number',
-                  '🔒 Password: Make sure you\'re using the right password',
+                  pe?.phoneCheckCorrect ?? '📱 Phone Number: Check that you entered the correct number',
+                  pe?.passwordUseRight ?? "🔒 Password: Make sure you're using the right password",
                   '',
-                  'Tip: If you just signed up, use the same password you created',
-                  'If you forgot your password, please contact support'
+                  pe?.tipSamePassword ?? 'Tip: If you just signed up, use the same password you created',
+                  pe?.forgotPassword ?? 'If you forgot your password, please contact support'
                 ];
               } else {
-                summary = '❌ Could not verify your information';
+                summary = pe?.couldNotVerify ?? '❌ Could not verify your information';
                 details = [
-                  'Please check that all these fields are correct:',
+                  pe?.checkAllFields ?? 'Please check that all these fields are correct:',
                   '',
-                  '📝 Last name: Must match your booking',
-                  '📱 Phone Number: Include +30 or just the 10 digits',
+                  pe?.verifyLastName ?? '📝 Last name: Must match your booking',
+                  pe?.verifyPhone ?? '📱 Phone Number: Include +30 or just the 10 digits',
                   origin === 'GR' 
-                    ? '🆔 AFM: All 9 digits of your tax number' 
-                    : '🛂 Passport: Your passport number',
+                    ? (pe?.verifyAfm ?? '🆔 AFM: All 9 digits of your tax number')
+                    : (pe?.verifyPassport ?? '🛂 Passport: Your passport number'),
                   '',
-                  'If everything looks correct, contact support'
+                  pe?.ifCorrectContact ?? 'If everything looks correct, contact support'
                 ];
               }
             } else if (mapped.summary.toLowerCase().includes('not found') || 
                 mapped.summary.toLowerCase().includes('no matching')) {
-              summary = '❌ Could not verify your information';
+              summary = pe?.couldNotVerify ?? '❌ Could not verify your information';
               if (mode === 'signup') {
                 // For sign-up, suggest contacting support if data doesn't match
                 details = [
-                  'Please check that all these fields are correct:',
+                  pe?.checkAllFields ?? 'Please check that all these fields are correct:',
                   '',
-                  '📝 Last name: Must match your booking',
-                  '📱 Phone Number: Include +30 or just the 10 digits',
+                  pe?.verifyLastName ?? '📝 Last name: Must match your booking',
+                  pe?.verifyPhone ?? '📱 Phone Number: Include +30 or just the 10 digits',
                   origin === 'GR' 
-                    ? '🆔 AFM: All 9 digits of your tax number' 
-                    : '🛂 Passport: Your passport number',
+                    ? (pe?.verifyAfm ?? '🆔 AFM: All 9 digits of your tax number')
+                    : (pe?.verifyPassport ?? '🛂 Passport: Your passport number'),
                   '',
-                  'If everything looks correct, contact support'
+                  pe?.ifCorrectContact ?? 'If everything looks correct, contact support'
                 ];
               } else {
                 // For sign-in, just ask them to double-check their info
                 details = [
-                  'Please double-check that all fields are correct:',
+                  pe?.doubleCheckFields ?? 'Please double-check that all fields are correct:',
                   '',
-                  '📱 Phone Number: Include +30 or just the 10 digits',
-                  '🔒 Password: Must be at least 8 characters',
+                  pe?.verifyPhone ?? '📱 Phone Number: Include +30 or just the 10 digits',
+                  pe?.verifyPassword8 ?? '🔒 Password: Must be at least 8 characters',
                   '',
-                  'If you haven\'t signed up yet, please use Sign Up instead'
+                  pe?.useSignupInstead ?? "If you haven't signed up yet, please use Sign Up instead"
                 ];
               }
             } else {
@@ -408,7 +411,7 @@ export default function UnifiedGuestClient() {
         router.push(redirect);
       }
     } catch {
-      setSubmitError({ summary: 'Network error', details: ['Please check your connection and try again.'] });
+      setSubmitError({ summary: pe?.networkError ?? 'Network error', details: [pe?.networkErrorDetail ?? 'Please check your connection and try again.'] });
     } finally {
       setLoading(false);
     }
@@ -429,7 +432,7 @@ export default function UnifiedGuestClient() {
 
             <motion.div
               role="tablist"
-              aria-label="Authentication mode"
+              aria-label={dict.portal?.a11y?.authMode ?? 'Authentication mode'}
               className="flex rounded-full p-1 layer-surface border border-[color:var(--border-soft)] shadow-sm"
               layout
               animate={{ marginBottom: origin ? 'clamp(8px, 3.8vh, 32px)' : 'clamp(18px, 9.2vh, 96px)' }}
@@ -453,7 +456,7 @@ export default function UnifiedGuestClient() {
                   <div ref={panelRef} role="tabpanel" id={`panel-${mode}`} aria-labelledby={`tab-${mode}`} tabIndex={-1}>
                     {submitError ? (
                       <div className="mb-3">
-                        <ErrorSummary summary={submitError.summary} details={submitError.details} onRetry={() => { setSubmitError(null); }} supportHref={`/${locale}/contact`} />
+                        <ErrorSummary summary={submitError.summary} details={submitError.details} onRetry={() => { setSubmitError(null); }} supportHref={`/${locale}/contact`} locale={locale} />
                       </div>
                     ) : null}
 
@@ -463,7 +466,7 @@ export default function UnifiedGuestClient() {
                         <motion.div layout>
                           <div>
                             <label className="block text-lg md:text-xl font-semibold mb-4 text-body">{dict.portal?.originQuestion || 'Where are you coming from?'}</label>
-                            <div role="radiogroup" aria-label="Origin selection" className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5">
+                            <div role="radiogroup" aria-label={dict.portal?.a11y?.originSelection ?? 'Origin selection'} className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5">
                               <button type="button" role="radio" aria-checked={origin === 'GR'} tabIndex={0} onClick={() => selectOrigin('GR')} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectOrigin('GR'); } }} className={`guest-origin-option surface-card p-5 md:p-6 h-32 md:h-36 w-full flex flex-col items-center justify-center transition focus:outline-none ${origin === 'GR' ? 'is-selected' : ''}`}>
                                 <div className="text-4xl md:text-5xl mb-2" aria-hidden>🇬🇷</div>
                                 <div className="guest-origin-option-label text-base md:text-lg font-semibold">{dict.portal?.originGR || 'Greece'}</div>
@@ -487,7 +490,7 @@ export default function UnifiedGuestClient() {
                                 {/* Custom Dropdown Button */}
                                 <button
                                   type="button"
-                                  aria-label="Select country code"
+                                  aria-label={dict.portal?.a11y?.selectCountryCode ?? 'Select country code'}
                                   className="flex items-center py-3 pl-3 pr-6 rounded-l-lg transition-all duration-300 ease-in-out cursor-pointer text-sm relative border-none outline-none"
                                   style={{ 
                                     color: 'var(--fg-default)',
@@ -535,7 +538,7 @@ export default function UnifiedGuestClient() {
                                         zIndex: 9999,
                                       }}
                                       role="listbox"
-                                      aria-label="Country codes"
+                                      aria-label={dict.portal?.a11y?.countryCodes ?? 'Country codes'}
                                     >
                                       {phoneOptions.map((opt, index) => (
                                         <motion.button
@@ -618,7 +621,7 @@ export default function UnifiedGuestClient() {
                                 onClick={() => setShowPassword(!showPassword)}
                                 className="absolute right-1 top-1/2 transform -translate-y-1/2 text-sm opacity-60 hover:opacity-100 transition-opacity min-h-11 min-w-11 flex items-center justify-center"
                                 style={{ color: 'var(--fg-muted)' }}
-                                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                aria-label={showPassword ? (dict.portal?.a11y?.hidePassword ?? 'Hide password') : (dict.portal?.a11y?.showPassword ?? 'Show password')}
                               >
                                 {showPassword ? '👁️' : '👁️‍🗨️'}
                               </button>
@@ -645,12 +648,12 @@ export default function UnifiedGuestClient() {
                                 inputMode="numeric" 
                                 pattern="\\d{9}" 
                                 maxLength={9}
-                                title="AFM must be exactly 9 digits"
+                                title={dict.portal?.validation?.afmInvalid ?? 'AFM must be exactly 9 digits'}
                                 required 
                               />
                               {afm && !validateAfm(afm) && (
                                 <p className="text-danger text-xs mt-1">
-                                  AFM must be exactly 9 digits
+                                  {dict.portal?.validation?.afmInvalid ?? 'AFM must be exactly 9 digits'}
                                 </p>
                               )}
                             </div>
@@ -668,12 +671,12 @@ export default function UnifiedGuestClient() {
                                 onChange={handlePassportChange}
                                 placeholder="A12345678"
                                 maxLength={20}
-                                title="Passport number must be 5-20 alphanumeric characters"
+                                title={dict.portal?.validation?.passportInvalid ?? 'Passport number must be 5-20 alphanumeric characters'}
                                 required 
                               />
                               {passport && !validatePassport(passport) && (
                                 <p className="text-danger text-xs mt-1">
-                                  Passport number must be 5-20 alphanumeric characters
+                                  {dict.portal?.validation?.passportInvalid ?? 'Passport number must be 5-20 alphanumeric characters'}
                                 </p>
                               )}
                             </div>
@@ -787,7 +790,7 @@ export default function UnifiedGuestClient() {
                           </div>
 
                           <button className="btn-primary w-full mt-6" type="submit" disabled={loading || (mode === 'signup' && (!origin || !isFormValid())) || (mode === 'signin' && (!phone || password.length < 8))} aria-busy={loading}>
-                            {loading ? 'Working…' : (dict.portal?.continueBtn || 'Continue')}
+                            {loading ? (dict.portal?.working ?? 'Working…') : (dict.portal?.continueBtn || 'Continue')}
                           </button>
                         </div>
                       ) : null}

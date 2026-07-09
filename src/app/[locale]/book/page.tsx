@@ -48,157 +48,175 @@ export default async function BookingPage({
 
   // Validate booking parameters
   const hasValidDates = dateRange.from && dateRange.to;
-  const dateValidation = hasValidDates ? validateDateRange(dateRange) : { valid: false, error: 'Please select dates' };
+  const dateValidation = hasValidDates ? validateDateRange(dateRange) : { valid: false, error: t.booking?.selectDatesError };
   const nights = hasValidDates ? getNights(dateRange) : 0;
+  const nightsLabel = nights === 1 ? t.booking?.night : t.booking?.nights;
 
   // Get real apartment data
   const apartmentContent = getApartmentContent(eff);
   const property = {
     name: apartmentContent.name,
     location: `${apartmentContent.location.city}, ${apartmentContent.location.country}`,
-    bedrooms: apartmentContent.specs.bedrooms,
-    bathrooms: apartmentContent.specs.bathrooms,
-    floor: apartmentContent.specs.floor,
-    size: apartmentContent.specs.size,
     image: '/house/living/living_1.jpeg'
-  };
-
-  const ordinal = (n: number) => {
-    const s = ["th", "st", "nd", "rd"]; const v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]);
   };
 
   // Check if booking is valid
   const canBook = dateValidation.valid;
 
+  // Reuse the already-translated specs (bedrooms, bathroom, floor, size)
+  const specChips = (t.house?.specs ?? []).slice(0, 4);
+
   return (
     <div className="min-h-screen">
       <div className="page-container mx-auto max-w-6xl">
         {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <Link
-              href={`/${eff}`}
-              className="inline-flex min-h-11 items-center gap-2 text-sm text-brand-700 hover:text-brand-800 font-medium mb-4 transition-colors"
-            >
-              ← Back to property
-            </Link>
-            <h1 className="text-3xl font-serif italic font-bold">{t.booking?.completeTitle}</h1>
+        <div className="mb-8">
+          <Link
+            href={`/${eff}`}
+            className="inline-flex min-h-11 items-center gap-2 text-sm text-brand-700 hover:text-brand-800 font-medium transition-colors"
+          >
+            {t.booking?.backToProperty}
+          </Link>
+          <div className="mt-1 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-serif italic font-bold">{t.booking?.completeTitle}</h1>
+              <p className="mt-2 text-sm opacity-70">{property.name} — {property.location}</p>
+            </div>
+            {hasValidDates && (
+              <div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] px-4 py-2 text-sm shadow-sm">
+                <span className="font-medium">{formatDateRange(dateRange)}</span>
+                <span className="opacity-40" aria-hidden>•</span>
+                <span className="opacity-80">{nights} {nightsLabel}</span>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8">
-          {/* Booking Form */}
-          <div className="lg:col-span-3 order-2 lg:order-1">
-            <div className="rounded-2xl shadow-sm border border-[color:var(--border-soft)] p-6 space-y-6 transition-colors bg-[color:var(--layer-surface)]">
-              <div>
-                <h2 className="text-xl font-serif italic font-bold mb-4">{t.booking?.yourDetails}</h2>
-
-                {/* Booking Summary */}
-                <div className="rounded-lg p-4 space-y-3 transition-colors bg-[color:var(--layer-bg-subtle)]">
-                  <div className="flex justify-between">
-                    <span className="font-medium">{t.booking?.datesLabel}</span>
-                    <span className="opacity-80">{hasValidDates ? formatDateRange(dateRange) : t.booking?.notSelected}</span>
-                  </div>
-                  {hasValidDates && (
-                    <div className="flex justify-between">
-                      <span className="font-medium">{t.booking?.durationLabel}</span>
-                      <span className="opacity-80">{nights} {nights === 1 ? 'night' : 'nights'}</span>
-                    </div>
-                  )}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8 items-stretch">
+          {/* Left column: trip summary + guest form */}
+          <div className="lg:col-span-3 order-2 lg:order-1 flex flex-col gap-6">
+            {/* Trip summary tiles */}
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              <div className="rounded-2xl border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] p-4 shadow-sm transition-colors">
+                <div className="text-[11px] font-semibold uppercase tracking-wider opacity-60">{t.booking?.datesLabel}</div>
+                <div className="mt-1.5 text-sm font-medium leading-snug">
+                  {hasValidDates ? formatDateRange(dateRange) : t.booking?.notSelected}
                 </div>
+              </div>
+              <div className="rounded-2xl border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] p-4 shadow-sm transition-colors">
+                <div className="text-[11px] font-semibold uppercase tracking-wider opacity-60">{t.booking?.durationLabel}</div>
+                <div className="mt-1.5 text-sm font-medium leading-snug">
+                  {hasValidDates ? `${nights} ${nightsLabel}` : t.booking?.notSelected}
+                </div>
+              </div>
+            </div>
 
-                {/* Validation Errors */}
-                {!dateValidation.valid && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-red-600" aria-hidden>⚠️</span>
-                      <span className="text-sm text-red-800">{dateValidation.error}</span>
-                    </div>
-                    <Link
-                      href={`/${eff}`}
-                      className="inline-flex min-h-11 items-center text-sm text-red-600 hover:text-red-700 font-medium mt-2"
-                    >
-                      ← Go back to select dates
-                    </Link>
+            {/* Validation Errors */}
+            {!dateValidation.valid && (
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-red-600" aria-hidden>⚠️</span>
+                  <span className="text-sm text-red-800">{dateValidation.error}</span>
+                </div>
+                <Link
+                  href={`/${eff}`}
+                  className="inline-flex min-h-11 items-center text-sm text-red-600 hover:text-red-700 font-medium mt-1"
+                >
+                  {t.booking?.goBackToDates}
+                </Link>
+              </div>
+            )}
+
+            {/* Guest details card */}
+            <div className="flex-1 rounded-2xl shadow-sm border border-[color:var(--border-soft)] transition-colors bg-[color:var(--layer-surface)] overflow-hidden">
+              <div className="px-6 py-5 border-b border-[color:var(--border-soft)] bg-[color:var(--layer-bg-subtle)]">
+                <h2 className="text-xl font-serif italic font-bold">{t.booking?.yourDetails}</h2>
+              </div>
+              <div className="p-6">
+                {canBook ? (
+                  <Suspense fallback={<BookingFormSkeleton />}>
+                    <BookingForm
+                      dateRange={dateRange}
+                      locale={eff}
+                      labels={t.booking!.form!}
+                      propertyName={property.name}
+                    />
+                  </Suspense>
+                ) : (
+                  <div className="text-center py-10 opacity-70">
+                    <p>{t.booking?.selectDatesPrompt}</p>
                   </div>
                 )}
               </div>
-
-              {/* Booking Form */}
-              {canBook ? (
-                <Suspense fallback={<BookingFormSkeleton />}>
-                  <BookingForm
-                    dateRange={dateRange}
-                    locale={eff}
-                  />
-                </Suspense>
-              ) : (
-                <div className="text-center py-8 opacity-70">
-                  <p>{t.booking?.selectDatesPrompt}</p>
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Booking Summary */}
-          <div className="lg:col-span-2 order-1 lg:order-2">
-            <div className="rounded-2xl shadow-sm border border-[color:var(--border-soft)] p-4 md:p-6 lg:sticky lg:top-6 transition-colors bg-[color:var(--layer-surface)]">
-              {/* Property Card */}
-              <div className="flex gap-4 mb-6">
-                <div className="relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
-                  <Image
-                    src={property.image}
-                    alt={property.name}
-                    fill
-                    sizes="80px"
-                    className="object-cover"
-                    priority={false}
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-serif italic font-bold truncate">{property.name}</h3>
-                  <p className="text-sm opacity-80 truncate">{property.location}</p>
-                  <div className="text-xs opacity-70 mt-1">
-                    {property.bedrooms} bed • {property.bathrooms} bath • {ordinal(property.floor)} floor • {property.size}
-                  </div>
-                </div>
-              </div>
-
-              {/* Location */}
-              <div className="mt-6 pt-6 border-t border-[color:var(--border-soft)]">
-                <h4 className="font-serif italic font-bold mb-3">{t.locationPanel?.title}</h4>
-                <ClientBoundary>
-                  <ApartmentLocationMap
-                    locale={eff}
-                    height="260px"
-                    zoom={15}
-                    showNearbyAttractions={false}
-                    activation="intent"
-                    className="rounded-lg overflow-hidden mb-4"
-                    nearbyRestaurants={[]}
-                    nearbyServices={[]}
-                    nearbyAttractions={[]}
-                  />
-                </ClientBoundary>
-                <div className="mt-4">
-                  <StaticLocationMap
-                    locale={eff}
-                    compact={false}
-                    variant="panel"
-                    showHeading={false}
-                  />
-                </div>
-              </div>
-
-              {/* Property Highlights with Expandable Amenities */}
-              <div className="mt-6 pt-6 border-t border-[color:var(--border-soft)]">
-                <h4 className="font-serif italic font-bold mb-3">{t.booking?.whatsIncluded}</h4>
-                <AmenitiesList
-                  amenities={apartmentContent.amenities}
-                  maxInitialItems={6}
+          {/* Right column: property + amenities */}
+          <div className="lg:col-span-2 order-1 lg:order-2 flex flex-col gap-6">
+            {/* Property card */}
+            <div className="rounded-2xl shadow-sm border border-[color:var(--border-soft)] transition-colors bg-[color:var(--layer-surface)] overflow-hidden">
+              <div className="relative h-44 w-full">
+                <Image
+                  src={property.image}
+                  alt={property.name}
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 420px"
+                  className="object-cover"
+                  priority
                 />
               </div>
+              <div className="p-5">
+                <h3 className="font-serif italic font-bold text-lg">{property.name}</h3>
+                <p className="text-sm opacity-80 mt-0.5">{property.location}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {specChips.map((chip) => (
+                    <span
+                      key={chip}
+                      className="rounded-full border border-[color:var(--border-soft)] bg-[color:var(--layer-bg-subtle)] px-3 py-1 text-xs font-medium opacity-90"
+                    >
+                      {chip}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
+
+            {/* Amenities card */}
+            <div className="flex-1 rounded-2xl shadow-sm border border-[color:var(--border-soft)] transition-colors bg-[color:var(--layer-surface)] p-5">
+              <h4 className="font-serif italic font-bold mb-3">{t.booking?.whatsIncluded}</h4>
+              <AmenitiesList
+                amenities={apartmentContent.amenities}
+                maxInitialItems={6}
+                showMoreLabel={t.booking?.showAllAmenities}
+                showLessLabel={t.booking?.showLessAmenities}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Full-width: Explore the Neighborhood */}
+        <div className="mt-6 lg:mt-8 rounded-2xl shadow-sm border border-[color:var(--border-soft)] transition-colors bg-[color:var(--layer-surface)] p-5 md:p-6">
+          <h4 className="font-serif italic font-bold mb-3">{t.locationPanel?.title}</h4>
+          <ClientBoundary>
+            <ApartmentLocationMap
+              locale={eff}
+              height="360px"
+              zoom={15}
+              showNearbyAttractions={false}
+              activation="intent"
+              className="rounded-xl overflow-hidden"
+              nearbyRestaurants={[]}
+              nearbyServices={[]}
+              nearbyAttractions={[]}
+            />
+          </ClientBoundary>
+          <div className="mt-4">
+            <StaticLocationMap
+              locale={eff}
+              compact={false}
+              variant="panel"
+              showHeading={false}
+            />
           </div>
         </div>
       </div>

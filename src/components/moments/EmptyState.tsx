@@ -3,11 +3,13 @@
 interface EmptyStateProps {
     message?: string;
     onClear?: () => void;
+    clearLabel?: string;
 }
 
 export function EmptyState({
     message = 'No places found. Try another category or clear your search.',
     onClear,
+    clearLabel = 'Clear search',
 }: EmptyStateProps) {
     return (
         <div className="moments-empty-state" role="status" aria-live="polite">
@@ -20,7 +22,7 @@ export function EmptyState({
             <p>{message}</p>
             {onClear && (
                 <button type="button" className="moments-empty-action" onClick={onClear}>
-                    Clear search
+                    {clearLabel}
                 </button>
             )}
         </div>

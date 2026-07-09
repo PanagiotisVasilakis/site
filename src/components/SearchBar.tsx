@@ -3,8 +3,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { DateRange, dateRangeFromParams, dateRangeToParams, getNights } from "@/lib/dateUtils";
 import { format } from "date-fns";
+import { el as elLocale } from "date-fns/locale";
 import dynamic from "next/dynamic";
 import { getApartmentContent } from "@/data/apartmentData";
+import { getDictionary } from "@/i18n/dictionaries";
+import type { Locale } from "@/i18n/config";
 
 interface BookingState {
   dateRange: DateRange;
@@ -67,6 +70,8 @@ export default function BookingBar({
   showPropertyHeader = true,
 }: Props) {
   const apartmentContent = getApartmentContent(locale as "en" | "el");
+  const t = getDictionary(locale as Locale);
+  const dateFnsLocale = locale === 'el' ? elLocale : undefined;
   const router = useRouter();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -214,13 +219,14 @@ export default function BookingBar({
     router.push(bookingUrl);
   }, [onBooking, state, locale, propertyName, router]);
 
-  const arrivalLabel = labels?.arrivalLabel || "Arrival";
-  const departureLabel = labels?.departureLabel || "Departure";
-  const arrivalPlaceholder = labels?.arrivalPlaceholder || labels?.addDates || "Add dates";
-  const departurePlaceholder = labels?.departurePlaceholder || labels?.addDates || "Add dates";
+  const arrivalLabel = labels?.arrivalLabel || t.search?.arrivalLabel || "Arrival";
+  const departureLabel = labels?.departureLabel || t.search?.departureLabel || "Departure";
+  const arrivalPlaceholder = labels?.arrivalPlaceholder || labels?.addDates || t.search?.arrivalPlaceholder || t.search?.addDates || "Add dates";
+  const departurePlaceholder = labels?.departurePlaceholder || labels?.addDates || t.search?.departurePlaceholder || t.search?.addDates || "Add dates";
+  const checkAvailabilityLabel = labels?.checkAvailability || t.search?.checkAvailability || "Check availability";
 
-  const arrivalDisplay = state.dateRange?.from ? format(state.dateRange.from, "MMM d, yyyy") : arrivalPlaceholder;
-  const departureDisplay = state.dateRange?.to ? format(state.dateRange.to, "MMM d, yyyy") : departurePlaceholder;
+  const arrivalDisplay = state.dateRange?.from ? format(state.dateRange.from, "MMM d, yyyy", { locale: dateFnsLocale }) : arrivalPlaceholder;
+  const departureDisplay = state.dateRange?.to ? format(state.dateRange.to, "MMM d, yyyy", { locale: dateFnsLocale }) : departurePlaceholder;
 
   const nights = getNights(state.dateRange);
   const hasValidDates = state.dateRange?.from && state.dateRange?.to;
@@ -236,7 +242,7 @@ export default function BookingBar({
         </p>
       </div>
 
-      <div className="booking-bar" role="search" aria-label="Check availability">
+      <div className="booking-bar" role="search" aria-label={checkAvailabilityLabel}>
         <div className="search-seg text-left flex-1">
           <button
             ref={arrivalButtonRef}
@@ -272,14 +278,14 @@ export default function BookingBar({
             type="button"
             onClick={checkAvailability}
             className={`booking-button ${isHydrated && hasValidDates ? "ready" : ""}`}
-            aria-label={labels?.checkAvailability || "Check availability"}
+            aria-label={checkAvailabilityLabel}
             disabled={!isHydrated || !hasValidDates}
           >
             <div className="flex flex-col items-center gap-1">
-              <span className="text-sm font-medium">{labels?.checkAvailability || "Check availability"}</span>
+              <span className="text-sm font-medium">{checkAvailabilityLabel}</span>
               {isHydrated && hasValidDates && (
                 <span className="text-xs opacity-90">
-                  {nights} {nights === 1 ? "night" : "nights"}
+                  {nights} {nights === 1 ? (t.booking?.night ?? "night") : (t.booking?.nights ?? "nights")}
                 </span>
               )}
             </div>
@@ -296,6 +302,7 @@ export default function BookingBar({
           showPricing={false}
           activeField={activeDateField}
           anchor={pickerAnchor ?? undefined}
+          locale={locale}
         />
       )}
     </div>

@@ -18,8 +18,8 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
   const isPhones = cat.slug === 'phones';
   const isMoments = cat.slug === 'moments';
   const useMomentsShell = isPhones || isMoments;
-  const pageTitle = isMoments ? "Kalamata Moments" : (t.categories[cat.slug as "phones" | "moments"] ?? (pickCategoryLocale(cat, "title", eff) ?? cat.title));
-  const pageDescription = isMoments ? "Curated local recommendations for your stay" : (pickCategoryLocale(cat, "description", eff) ?? cat.description);
+  const pageTitle = isMoments ? t.categories.moments : (t.categories[cat.slug as "phones" | "moments"] ?? (pickCategoryLocale(cat, "title", eff) ?? cat.title));
+  const pageDescription = isMoments ? (t.moments?.subtitle ?? "Curated local recommendations for your stay") : (pickCategoryLocale(cat, "description", eff) ?? cat.description);
 
   return (
     <div className={useMomentsShell ? "page-container mx-0 max-w-full safe-bottom px-4 moments-page" : "page-container mx-auto max-w-3xl safe-bottom"}>
@@ -34,7 +34,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
             <span aria-hidden>🗒️</span>
             <span>{t.emptyState}</span>
           </div>
-          <div className="text-xs text-subtle">Content updating – please check again later.</div>
+          <div className="text-xs text-subtle">{t.labels?.contentUpdating ?? 'Content updating – please check again later.'}</div>
           <div>
             <Link href={`/${locale}`} className="underline text-brand-700 hover:text-brand-800 transition-colors">{t.cta.home}</Link>
           </div>

@@ -23,6 +23,7 @@ const filterToTags: Record<MomentsFilterKey, string[] | null> = {
 interface MomentsFilterMenuProps {
     active: MomentsFilterKey;
     onChange: (filter: MomentsFilterKey) => void;
+    filterByCategoryLabel?: string;
     ui?: {
         all?: string;
         beaches?: string;
@@ -51,11 +52,11 @@ const labelsFor = (ui: MomentsFilterMenuProps['ui']): Record<MomentsFilterKey, s
 /**
  * Horizontal scrollable category chips for Moments page.
  */
-export function CategoryChips({ active, onChange, ui }: MomentsFilterMenuProps) {
+export function CategoryChips({ active, onChange, ui, filterByCategoryLabel = 'Filter moments by category' }: MomentsFilterMenuProps) {
     const labels = labelsFor(ui);
 
     return (
-        <nav className="moments-chip-nav" aria-label="Filter moments by category">
+        <nav className="moments-chip-nav" aria-label={filterByCategoryLabel}>
             <div className="moments-chip-scroll">
                 {MOMENTS_FILTER_KEYS.map(key => (
                     <button

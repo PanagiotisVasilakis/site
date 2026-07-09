@@ -9,6 +9,8 @@ import {
   getNights
 } from '@/lib/dateUtils';
 import { logger } from '@/lib/logger-client';
+import { getDictionary } from '@/i18n/dictionaries';
+import type { Locale } from '@/i18n/config';
 
 // Import styles
 import 'react-day-picker/dist/style.css';
@@ -24,6 +26,7 @@ interface DateRangePickerProps {
   isOpen?: boolean;
   showPricing?: boolean;
   activeField?: 'arrival' | 'departure' | null;
+  locale?: string;
   anchor?: {
     left: number;
     width: number;
@@ -38,8 +41,11 @@ export default function DateRangePicker({
   isOpen = false,
   showPricing = true,
   activeField = null,
+  locale = 'en',
   anchor
 }: DateRangePickerProps) {
+  const t = getDictionary(locale as Locale);
+  const dp = t.datePicker;
   const [selectedRange, setSelectedRange] = useState<DateRange>(value || { from: undefined, to: undefined });
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [isMobile, setIsMobile] = useState(false);
@@ -211,14 +217,14 @@ export default function DateRangePicker({
   const DatePickerContent = () => (
     <div className={isCompact ? "space-y-1" : "space-y-1.5"}>
       {/* Calendar with inline controls */}
-      <div className="relative" role="application" aria-label="Date picker calendar">
+      <div className="relative" role="application" aria-label={dp?.calendar ?? 'Date picker calendar'}>
         {/* Clear button positioned top-right, only show when dates selected */}
         {(selectedRange?.from || selectedRange?.to) && (
           <button
             onClick={handleClear}
             className={`absolute top-0 right-0 z-10 p-1.5 text-subtle hover:text-body hover:bg-[var(--layer-surface-alt)] rounded-full transition-colors ${isCompact ? 'p-1' : 'p-1.5'}`}
-            aria-label="Clear selected dates"
-            title="Clear dates"
+            aria-label={dp?.clearSelected ?? 'Clear selected dates'}
+            title={dp?.clearDates ?? 'Clear dates'}
           >
             <svg width={isCompact ? "14" : "16"} height={isCompact ? "14" : "16"} viewBox="0 0 16 16" fill="currentColor">
               <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L8 6.586l2.293-2.293a1 1 0 111.414 1.414L9.414 8l2.293 2.293a1 1 0 01-1.414 1.414L8 9.414l-2.293 2.293a1 1 0 01-1.414-1.414L6.586 8 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -230,7 +236,7 @@ export default function DateRangePicker({
         <button
           onClick={handlePreviousMonth}
           className={`absolute left-4 top-0 z-20 w-7 h-7 flex items-center justify-center text-subtle hover:text-body hover:bg-[var(--layer-surface-alt)] rounded-md transition-colors border border-soft ${isCompact ? 'w-6 h-6 left-2' : 'w-7 h-7 left-4'}`}
-          aria-label="Previous month"
+          aria-label={dp?.prevMonth ?? 'Previous month'}
           style={{ top: '0rem' }}
         >
           <svg width={isCompact ? "12" : "14"} height={isCompact ? "12" : "14"} viewBox="0 0 16 16" fill="currentColor">
@@ -240,7 +246,7 @@ export default function DateRangePicker({
         <button
           onClick={handleNextMonth}
           className={`absolute right-4 top-0 z-20 w-7 h-7 flex items-center justify-center text-subtle hover:text-body hover:bg-[var(--layer-surface-alt)] rounded-md transition-colors border border-soft ${isCompact ? 'w-6 h-6 right-2' : 'w-7 h-7 right-4'}`}
-          aria-label="Next month"
+          aria-label={dp?.nextMonth ?? 'Next month'}
           style={{ top: '0rem' }}
         >
           <svg width={isCompact ? "12" : "14"} height={isCompact ? "12" : "14"} viewBox="0 0 16 16" fill="currentColor">
@@ -256,7 +262,7 @@ export default function DateRangePicker({
           numberOfMonths={1}
           showOutsideDays={false}
           className={`custom-day-picker ${!isMobile ? 'streamlined' : ''} ${isCompact ? 'compact' : ''}`}
-          aria-label="Select check-in and check-out dates"
+          aria-label={dp?.selectDates ?? 'Select check-in and check-out dates'}
           month={currentMonth}
           onMonthChange={setCurrentMonth}
           hideNavigation={true}
@@ -266,9 +272,9 @@ export default function DateRangePicker({
       {/* Compact pricing summary - only when both dates selected */}
       {
         pricingInfo && selectedRange?.from && selectedRange?.to && (
-          <div className={`surface-subtle border border-soft rounded-md px-3 py-1.5 ${isCompact ? 'px-2 py-1' : 'px-3 py-1.5'}`} role="region" aria-label="Booking summary">
+          <div className={`surface-subtle border border-soft rounded-md px-3 py-1.5 ${isCompact ? 'px-2 py-1' : 'px-3 py-1.5'}`} role="region" aria-label={dp?.bookingSummary ?? 'Booking summary'}>
             <div className={`flex justify-between items-center ${isCompact ? 'text-xs' : 'text-xs'}`}>
-              <span className="text-body">{pricingInfo.nights} night{pricingInfo.nights !== 1 ? 's' : ''}</span>
+              <span className="text-body">{pricingInfo.nights} {pricingInfo.nights !== 1 ? (t.booking?.nights ?? 'nights') : (t.booking?.night ?? 'night')}</span>
               <span className="font-semibold text-brand-700 dark:text-brand-400">€{pricingInfo.total}</span>
             </div>
           </div>
@@ -281,9 +287,9 @@ export default function DateRangePicker({
           <button
             onClick={handleApply}
             className={`w-full px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-md hover:bg-brand-700 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:ring-offset-1 transition-colors ${isCompact ? 'px-3 py-1.5 text-sm' : 'px-4 py-2 text-sm'}`}
-            aria-label="Apply selected date range"
+            aria-label={dp?.applyRange ?? 'Apply selected date range'}
           >
-            Apply dates
+            {dp?.applyDates ?? 'Apply dates'}
           </button>
         )
       }
@@ -297,7 +303,7 @@ export default function DateRangePicker({
       className={`absolute top-full left-0 mt-2 surface-card rounded-xl shadow-xl border border-soft p-3 z-50 date-picker-popover ${isCompact ? 'compact-datepicker' : ''}`}
       role="dialog"
       aria-modal="true"
-      aria-label="Date range picker"
+      aria-label={dp?.rangePicker ?? 'Date range picker'}
       style={{
         width: isCompact ? 'min(90vw, 320px)' : 'min(92vw, 360px)',
         maxHeight: isCompact ? 'min(70vh, 380px)' : 'min(80vh, 450px)',

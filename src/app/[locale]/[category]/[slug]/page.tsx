@@ -54,6 +54,7 @@ export default async function ItemPage({ params }: { params: Promise<{ locale: s
           description,
         }}
         categorySlug={cat.slug}
+        locale={eff}
         isRecentlyUpdated={recently}
         urls={{
           tel: momentsTel,
@@ -130,8 +131,8 @@ export default async function ItemPage({ params }: { params: Promise<{ locale: s
             <a href={reservationUrl} target="_blank">{t.cta.reserve}</a>
           </CTAButton>
         )}
-        <ShareButton title={name} text={summary} className="btn-primary" />
-        <FavoriteButton id={`${cat.id}:${item.id}`} label={name} />
+        <ShareButton title={name} text={summary} className="btn-primary" locale={eff} />
+        <FavoriteButton id={`${cat.id}:${item.id}`} label={name} locale={eff} />
       </div>
 
       <DescriptionBox title={descriptionTitle} description={description} />

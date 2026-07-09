@@ -35,6 +35,7 @@ export interface HouseDictionary {
         prev?: string;
         next?: string;
         close?: string;
+        resetZoom?: string;
     };
     // Index signature for extensibility (used by ApartmentCinematic)
     [k: string]: unknown;
@@ -137,7 +138,8 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
             counter: "Currently viewing image {current} of {total}.",
             prev: "Previous image",
             next: "Next image",
-            close: "Close viewer"
+            close: "Close viewer",
+            resetZoom: "Reset Zoom"
         },
     },
     el: {
@@ -209,7 +211,8 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
             counter: "Προβάλλεται η εικόνα {current} από {total}.",
             prev: "Προηγούμενη εικόνα",
             next: "Επόμενη εικόνα",
-            close: "Κλείσιμο προβολής"
+            close: "Κλείσιμο προβολής",
+            resetZoom: "Επαναφορά ζουμ"
         },
     },
 };

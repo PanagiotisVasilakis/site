@@ -3,6 +3,9 @@ import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import BookingPage from '@/app/[locale]/book/page';
 import BookingForm from '@/components/BookingForm';
+import { getDictionary } from '@/i18n/dictionaries';
+
+const bookingFormLabels = getDictionary('en').booking!.form!;
 
 // Types for better type safety
 type MockComponent<T = Record<string, unknown>> = React.FC<T>;
@@ -93,6 +96,8 @@ describe('BookingPage (server component harness)', () => {
       <BookingForm
         dateRange={dateRange}
         locale="en"
+        labels={bookingFormLabels}
+        propertyName="Test Apartment"
         submissionDelayMs={10}
       />
     );

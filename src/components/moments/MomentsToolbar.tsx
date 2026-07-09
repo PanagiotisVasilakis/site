@@ -11,6 +11,10 @@ interface MomentsToolbarProps {
     onMapToggle: () => void;
     mapLabel?: string;
     listLabel?: string;
+    searchAndFilterLabel?: string;
+    searchMomentsLabel?: string;
+    searchPlaceholder?: string;
+    filterByCategoryLabel?: string;
     filters?: {
         all?: string;
         beaches?: string;
@@ -33,22 +37,26 @@ export function MomentsToolbar({
     onMapToggle,
     mapLabel = 'Map',
     listLabel = 'List',
+    searchAndFilterLabel = 'Search and filter moments',
+    searchMomentsLabel = 'Search moments',
+    searchPlaceholder = 'Search places, beaches, museums...',
+    filterByCategoryLabel = 'Filter moments by category',
     filters,
 }: MomentsToolbarProps) {
     return (
-        <div className="moments-toolbar" role="region" aria-label="Search and filter moments">
+        <div className="moments-toolbar" role="region" aria-label={searchAndFilterLabel}>
             <label className="moments-search">
-                <span className="sr-only">Search moments</span>
+                <span className="sr-only">{searchMomentsLabel}</span>
                 <input
                     type="search"
                     value={search}
                     onChange={(event) => onSearchChange(event.target.value)}
-                    placeholder="Search places, beaches, museums..."
+                    placeholder={searchPlaceholder}
                     className="moments-search-input"
                 />
             </label>
 
-            <CategoryChips active={activeFilter} onChange={onFilterChange} ui={filters} />
+            <CategoryChips active={activeFilter} onChange={onFilterChange} ui={filters} filterByCategoryLabel={filterByCategoryLabel} />
 
             <button
                 type="button"

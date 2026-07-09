@@ -8,6 +8,8 @@ import dynamic from 'next/dynamic';
 import { EmptyState, MomentCard, MomentsToolbar } from '@/components/moments';
 import { filterMomentsByCategory, type MomentsFilterKey } from '@/components/moments/MomentsFilterMenu';
 import { momentsLayoutConfig } from '@/config/momentsLayoutConfig';
+import { getDictionary } from '@/i18n/dictionaries';
+import type { Locale } from '@/i18n/config';
 
 // Dynamic import for map component - only loads when needed
 const ApartmentLocationMap = dynamic(() => import('@/components/ApartmentLocationMap'), {
@@ -65,6 +67,8 @@ interface Props {
 
 
 function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, ui, cardLabels, phonesLayout, momentsLayout, momentsFilters }: Props) {
+  const t = useMemo(() => getDictionary(locale as Locale), [locale]);
+  const categoryLabel = t.categories?.[categorySlug as "phones" | "moments"] ?? categorySlug;
   const [active, setActive] = useState<string[]>([]);
   const [showMap, setShowMap] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -168,6 +172,10 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
       onMapToggle={() => setShowMap(m => !m)}
       mapLabel={ui?.map || 'Map'}
       listLabel={ui?.list || 'List'}
+      searchAndFilterLabel={t.moments?.searchAndFilter}
+      searchMomentsLabel={t.moments?.searchMoments}
+      searchPlaceholder={t.moments?.searchPlaceholder}
+      filterByCategoryLabel={t.moments?.filterByCategory}
       filters={momentsFilters}
     />
   );
@@ -188,16 +196,18 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
             icon={i.icon}
             href={`/${locale}/${categorySlug}/${i.slug}`}
             favoriteId={`${categorySlug}:${i.id}`}
-            favLabelAdd="Add to favorites"
-            favLabelRemove="Remove favorite"
+            favLabelAdd={t.labels?.addFavorite ?? 'Add to favorites'}
+            favLabelRemove={t.labels?.removeFavorite ?? 'Remove favorite'}
+            addedToast={t.labels?.addedFavorite ?? 'Added to favorites'}
+            removedToast={t.labels?.removedFavorite ?? 'Removed from favorites'}
           />
         ))}
         {progressive && slice.length < group.length && (
-          <div ref={loadMoreRef} className="col-span-full flex justify-center py-4 text-xs opacity-60 loading-sentinel">Loading more…</div>
+          <div ref={loadMoreRef} className="col-span-full flex justify-center py-4 text-xs opacity-60 loading-sentinel">{t.labels?.loadingMore ?? 'Loading more…'}</div>
         )}
       </div>
     );
-  }, [visibleCount, locale, categorySlug]);
+  }, [visibleCount, locale, categorySlug, t]);
   return (
     <div>
       {!(phonesLayout || momentsLayout) && (
@@ -214,7 +224,7 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
 
       {!(phonesLayout || momentsLayout) && (
         <div className="mb-3">
-          <TagFilters items={items.map(i => ({ tags: i.tags }))} active={active} onChange={setActive} />
+          <TagFilters items={items.map(i => ({ tags: i.tags }))} active={active} onChange={setActive} resetLabel={t.ui?.resetAll} />
         </div>
       )}
 
@@ -235,7 +245,8 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
           </div>
           {momentsFiltered.length === 0 && (
             <EmptyState
-              message="No places found. Try another category or clear your search."
+              message={t.moments?.noPlaces}
+              clearLabel={t.moments?.clearSearch}
               onClear={momentsSearch ? () => setMomentsSearch('') : undefined}
             />
           )}
@@ -254,12 +265,13 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
               nearbyRestaurants={momentsFiltered}
             />
             <p className="moments-map-caption">
-              Apartment location and nearby {categorySlug}. Zoom and click markers for details.
+              {(t.moments?.mapCaption ?? 'Apartment location and nearby {category}. Zoom and click markers for details.').replace('{category}', categoryLabel)}
             </p>
           </div>
           {momentsFiltered.length === 0 && (
             <EmptyState
-              message="No places found. Try another category or clear your search."
+              message={t.moments?.noPlaces}
+              clearLabel={t.moments?.clearSearch}
               onClear={momentsSearch ? () => setMomentsSearch('') : undefined}
             />
           )}
@@ -279,7 +291,7 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
           />
           <div className="mt-3 text-center">
             <p className="text-sm text-subtle">
-              🏡 Apartment location and nearby {categorySlug} • Zoom and click markers for details
+              {(t.moments?.mapCaptionShort ?? '🏡 Apartment location and nearby {category} • Zoom and click markers for details').replace('{category}', categoryLabel)}
             </p>
           </div>
         </div>
@@ -295,7 +307,7 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
         <>
           {featured.length > 0 && (
             <section>
-              <h2 className="text-sm font-serif italic font-bold mb-2 text-small-strong">Featured</h2>
+              <h2 className="text-sm font-serif italic font-bold mb-2 text-small-strong">{t.labels?.featured ?? 'Featured'}</h2>
               {renderGroup(featured)}
             </section>
           )}
@@ -303,22 +315,18 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
           {filtered.length === 0 && (
             <div className="text-xs text-subtle px-2">{emptyLabel}</div>
           )}
-          <FilterDrawer open={filtersOpen} onClose={() => setFiltersOpen(false)} title={ui?.filters || 'Filters'}>
+          <FilterDrawer open={filtersOpen} onClose={() => setFiltersOpen(false)} title={ui?.filters || 'Filters'} closeLabel={t.ui?.closeFilters} doneLabel={t.ui?.done}>
             <div className="space-y-4">
               <div>
                 <h3 className="text-sm font-serif italic font-bold mb-1 text-small-strong">{ui?.activeTags || 'Active Tags'}</h3>
                 {active.length === 0 && <div className="text-xs opacity-50">{ui?.none || 'None'}</div>}
                 {active.length > 0 && (
                   <ul className="flex flex-wrap gap-1">
-                    {active.map(t => (
-                      <li key={t} className="tag-filter is-on flex items-center gap-1">{t}<button aria-label={`Remove ${t}`} onClick={() => setActive(prev => prev.filter(x => x !== t))}>✕</button></li>
+                    {active.map(tag => (
+                      <li key={tag} className="tag-filter is-on flex items-center gap-1">{tag}<button aria-label={(t.moments?.removeTag ?? 'Remove {tag}').replace('{tag}', tag)} onClick={() => setActive(prev => prev.filter(x => x !== tag))}>✕</button></li>
                     ))}
                   </ul>
                 )}
-              </div>
-              <div>
-                <h3 className="text-sm font-serif italic font-bold mb-1 text-small-strong">Stub Controls</h3>
-                <p className="text-xs text-small-strong font-normal">Add price range, rating slider, open now, etc.</p>
               </div>
               <div>
                 <button onClick={() => { setActive([]); }} className="text-xs underline">{ui?.resetAll || 'Reset All'}</button>

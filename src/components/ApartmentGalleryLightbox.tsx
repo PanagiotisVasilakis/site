@@ -13,6 +13,7 @@ type LightboxLabels = {
   prev?: string;
   next?: string;
   close?: string;
+  resetZoom?: string;
 };
 const DEFAULT_LIGHTBOX_LABELS: Required<LightboxLabels> = {
   instructions: 'Photo viewer controls: Use arrow keys to navigate between images, Home/End keys to jump to first/last image, Escape to close viewer.',
@@ -20,6 +21,7 @@ const DEFAULT_LIGHTBOX_LABELS: Required<LightboxLabels> = {
   prev: 'Previous image',
   next: 'Next image',
   close: 'Close viewer',
+  resetZoom: 'Reset Zoom',
 };
 
 interface Props {
@@ -88,7 +90,8 @@ export default function ApartmentGalleryLightbox({ photos, alts, enableHaptics =
     prev: labels?.prev ?? DEFAULT_LIGHTBOX_LABELS.prev,
     next: labels?.next ?? DEFAULT_LIGHTBOX_LABELS.next,
     close: labels?.close ?? DEFAULT_LIGHTBOX_LABELS.close,
-  }), [labels]);
+    resetZoom: labels?.resetZoom ?? (locale === 'el' ? 'Επαναφορά ζουμ' : DEFAULT_LIGHTBOX_LABELS.resetZoom),
+  }), [labels, locale]);
 
   const counterDisplay = `${numberFormatter.format(index + 1)}/${numberFormatter.format(total)}`;
 
@@ -214,7 +217,7 @@ export default function ApartmentGalleryLightbox({ photos, alts, enableHaptics =
               {/* Reset zoom if zoomed in, otherwise standard controls can stay */}
               {scale > 1 && (
                 <button onClick={resetZoom} className="px-3 py-1 bg-white/10 rounded-full text-xs hover:bg-white/20 transition">
-                  Reset Zoom
+                  {resolvedLabels.resetZoom}
                 </button>
               )}
               <button onClick={close} className="p-2 hover:bg-white/20 rounded-full transition" aria-label={resolvedLabels.close}>

@@ -9,9 +9,46 @@ interface GlobalErrorProps {
   reset: () => void;
 }
 
+const copy = {
+  en: {
+    title: 'Oops! Something went wrong',
+    body: 'We encountered an unexpected error. Our team has been notified and is working on a fix.',
+    errorId: 'Error ID:',
+    tryAgain: 'Try Again',
+    reload: 'Reload Page',
+    goHome: 'Go to Homepage',
+    detailsSummary: 'Error Details (Development)',
+    name: 'Name:',
+    message: 'Message:',
+    digest: 'Digest:',
+    stack: 'Stack Trace:',
+    needHelp: 'Need help? Contact our',
+    supportTeam: 'support team',
+    includeId: 'and include error ID:',
+  },
+  el: {
+    title: 'Ουπς! Κάτι πήγε στραβά',
+    body: 'Παρουσιάστηκε ένα απροσδόκητο σφάλμα. Η ομάδα μας ειδοποιήθηκε και εργάζεται για τη διόρθωσή του.',
+    errorId: 'Κωδικός σφάλματος:',
+    tryAgain: 'Δοκιμάστε ξανά',
+    reload: 'Επαναφόρτωση σελίδας',
+    goHome: 'Μετάβαση στην αρχική',
+    detailsSummary: 'Λεπτομέρειες σφάλματος (Ανάπτυξη)',
+    name: 'Όνομα:',
+    message: 'Μήνυμα:',
+    digest: 'Digest:',
+    stack: 'Ίχνος στοίβας:',
+    needHelp: 'Χρειάζεστε βοήθεια; Επικοινωνήστε με την',
+    supportTeam: 'ομάδα υποστήριξης',
+    includeId: 'και συμπεριλάβετε τον κωδικό σφάλματος:',
+  },
+} as const;
+
 export default function GlobalError({ error, reset }: GlobalErrorProps) {
   const { reportError: boundaryReportError } = useErrorHandler();
   const { reportError, addBreadcrumb } = useErrorReporting();
+  const isGreek = typeof window !== 'undefined' && window.location.pathname.startsWith('/el');
+  const t = isGreek ? copy.el : copy.en;
 
   useEffect(() => {
     // Report error with full context
@@ -92,13 +129,13 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
 
             {/* Error Message */}
             <div className="space-y-2">
-              <h1 className="text-2xl font-serif italic font-bold page-title">Oops! Something went wrong</h1>
+              <h1 className="text-2xl font-serif italic font-bold page-title">{t.title}</h1>
               <p className="text-body">
-                We encountered an unexpected error. Our team has been notified and is working on a fix.
+                {t.body}
               </p>
               {error.digest && (
                 <p className="text-xs text-subtle font-mono surface-subtle p-2 rounded">
-                  Error ID: {error.digest}
+                  {t.errorId} {error.digest}
                 </p>
               )}
             </div>
@@ -109,43 +146,43 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
                 onClick={handleReset}
                 className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
               >
-                Try Again
+                {t.tryAgain}
               </button>
 
               <button
                 onClick={handleReload}
                 className="w-full px-6 py-3 border border-soft text-body surface-interactive rounded-lg transition-colors"
               >
-                Reload Page
+                {t.reload}
               </button>
 
               <button
                 onClick={handleGoHome}
                 className="w-full px-6 py-3 border border-soft text-body surface-interactive rounded-lg transition-colors"
               >
-                Go to Homepage
+                {t.goHome}
               </button>
             </div>
 
             {/* Development Error Details */}
             {process.env.NODE_ENV === 'development' && (
               <details className="text-left text-xs text-subtle surface-subtle p-3 rounded">
-                <summary className="cursor-pointer font-medium mb-2">Error Details (Development)</summary>
+                <summary className="cursor-pointer font-medium mb-2">{t.detailsSummary}</summary>
                 <div className="space-y-2">
                   <div>
-                    <strong>Name:</strong> {error.name}
+                    <strong>{t.name}</strong> {error.name}
                   </div>
                   <div>
-                    <strong>Message:</strong> {error.message}
+                    <strong>{t.message}</strong> {error.message}
                   </div>
                   {error.digest && (
                     <div>
-                      <strong>Digest:</strong> {error.digest}
+                      <strong>{t.digest}</strong> {error.digest}
                     </div>
                   )}
                   {error.stack && (
                     <div>
-                      <strong>Stack Trace:</strong>
+                      <strong>{t.stack}</strong>
                       <pre className="mt-1 whitespace-pre-wrap text-xs bg-white p-2 rounded border overflow-auto max-h-40">
                         {error.stack}
                       </pre>
@@ -158,12 +195,12 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
             {/* Contact Support */}
             <div className="pt-4 border-t border-gray-200">
               <p className="text-sm text-subtle">
-                Need help? Contact our{' '}
+                {t.needHelp}{' '}
                 <a href="mailto:support@villa-app.com" className="text-blue-600 hover:underline">
-                  support team
+                  {t.supportTeam}
                 </a>
                 {error.digest && (
-                  <span> and include error ID: <code className="font-mono">{error.digest}</code></span>
+                  <span> {t.includeId} <code className="font-mono">{error.digest}</code></span>
                 )}
               </p>
             </div>
