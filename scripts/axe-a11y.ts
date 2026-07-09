@@ -12,7 +12,7 @@ import axePkg from 'axe-core';
 const axeSource: string = (axePkg as unknown as { source?: string }).source || fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 
 const BASE = process.env.AXE_BASE || 'http://localhost:3000';
-const PATHS = (process.env.AXE_PATHS || '/en,/en/apartment,/en/favorites,/en/offline,/en/phones,/en/phones/police-emergency').split(',');
+const PATHS = (process.env.AXE_PATHS || '/en,/en/apartment,/en/favorites,/en/offline,/en/phones,/en/phones/emergency-112').split(',');
 const STATIC_DIR = process.env.AXE_STATIC_DIR || '.next/server/app';
 
 interface ViolationSummary { id: string; impact: string | null; help: string; nodes: number; url: string; }

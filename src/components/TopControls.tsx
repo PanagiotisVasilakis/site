@@ -170,7 +170,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
   };
 
   return (
-    <div
+    <header
       className={clsx(
         "fixed top-0 left-0 right-0 z-40 flex justify-center pointer-events-none transition-transform duration-300",
         hidden ? "-translate-y-full" : "translate-y-0"
@@ -352,6 +352,6 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
           </footer>
         </section>
       </div>
-    </div>
+    </header>
   );
 }
