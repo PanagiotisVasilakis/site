@@ -14,6 +14,7 @@ import {
   type SecurityEvent,
 } from '@/lib/security-config';
 import { metrics } from '@/lib/metrics-lite';
+import { getClientIp } from '@/lib/net/getClientIp';
 
 let securityHeadersCache: Record<string, string> | null = null;
 let cacheTimestamp = 0;
@@ -171,7 +172,7 @@ class SecurityHeadersMiddleware {
       type: 'suspicious_activity',
       severity: 'medium',
       timestamp: new Date().toISOString(),
-      ip: this.getClientIP(request),
+      ip: getClientIp(request, { trustProxy: true }),
       userAgent,
       url,
       details: {
@@ -184,25 +185,6 @@ class SecurityHeadersMiddleware {
     };
 
     logSecurityEvent(event);
-  }
-
-  private getClientIP(request: NextRequest): string {
-    const forwardedFor = request.headers.get('x-forwarded-for');
-    if (forwardedFor) {
-      return forwardedFor.split(',')[0]?.trim() || 'unknown';
-    }
-
-    const realIP = request.headers.get('x-real-ip');
-    if (realIP) {
-      return realIP;
-    }
-
-    const cfIP = request.headers.get('cf-connecting-ip');
-    if (cfIP) {
-      return cfIP;
-    }
-
-    return 'unknown';
   }
 }
 
@@ -286,23 +268,7 @@ class RateLimitMiddleware {
   }
 
   private generateKey(request: NextRequest): string {
-    const ip = this.getClientIP(request);
-    const path = request.nextUrl.pathname;
-    return `${ip}:${path}`;
-  }
-
-  private getClientIP(request: NextRequest): string {
-    const forwardedFor = request.headers.get('x-forwarded-for');
-    if (forwardedFor) {
-      return forwardedFor.split(',')[0]?.trim() || 'unknown';
-    }
-
-    const realIP = request.headers.get('x-real-ip');
-    if (realIP) {
-      return realIP;
-    }
-
-    return 'unknown';
+    return getClientIp(request, { trustProxy: true });
   }
 }
 
@@ -324,7 +290,7 @@ class CORSMiddleware {
         type: 'cors_violation',
         severity: 'medium',
         timestamp: new Date().toISOString(),
-        ip: this.getClientIP(request),
+        ip: getClientIp(request, { trustProxy: true }),
         userAgent: request.headers.get('user-agent') || undefined,
         url: request.nextUrl.toString(),
         details: {
@@ -360,11 +326,6 @@ class CORSMiddleware {
 
   private isOriginAllowed(origin: string): boolean {
     return this.config.origins.includes(origin) || this.config.origins.includes('*');
-  }
-
-  private getClientIP(request: NextRequest): string {
-    const forwardedFor = request.headers.get('x-forwarded-for');
-    return forwardedFor ? forwardedFor.split(',')[0]?.trim() || 'unknown' : 'unknown';
   }
 }
 

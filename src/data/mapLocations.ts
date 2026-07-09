@@ -1,4 +1,5 @@
 import type { Locale } from '@/i18n/config';
+import { dedupeById } from '@/lib/collections';
 import { getApartmentContent } from '@/data/apartmentData';
 
 export const APARTMENT_LOCATION: [number, number] = [22.094364, 37.040635];
@@ -295,12 +296,7 @@ export function createMapLocationFromItem(
 }
 
 export function dedupeMapLocations(locations: MapLocation[]): MapLocation[] {
-  const seen = new Set<string>();
-  return locations.filter((location) => {
-    if (seen.has(location.id)) return false;
-    seen.add(location.id);
-    return true;
-  });
+  return dedupeById(locations);
 }
 
 export function getKalamataMapLocations(

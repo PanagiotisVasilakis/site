@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger-enterprise';
+import { mapAccessFromDb } from '@/lib/mappers/domainMappers';
 
 export type AccessRecord = {
   user_id: string;
@@ -8,22 +9,6 @@ export type AccessRecord = {
   created_at: number;
   updated_at: number;
 };
-
-function mapAccess(access: {
-  userId: string;
-  bookingId: string;
-  status: 'PENDING' | 'VERIFIED';
-  createdAt: Date;
-  updatedAt: Date;
-}): AccessRecord {
-  return {
-    user_id: access.userId,
-    booking_id: access.bookingId,
-    status: access.status,
-    created_at: access.createdAt.getTime(),
-    updated_at: access.updatedAt.getTime(),
-  };
-}
 
 async function set(userId: string, bookingId: string, status: 'PENDING' | 'VERIFIED'): Promise<AccessRecord> {
   try {
@@ -43,7 +28,7 @@ async function set(userId: string, bookingId: string, status: 'PENDING' | 'VERIF
     });
 
     logger.info('Access record upserted (prisma)', { userId, bookingId, status });
-    return mapAccess(access);
+    return mapAccessFromDb(access);
   } catch (error) {
     logger.error('accessRepository(prisma): set failed', error);
     throw error;
@@ -56,7 +41,7 @@ async function listByUser(userId: string): Promise<AccessRecord[]> {
       where: { userId },
       orderBy: { updatedAt: 'desc' },
     });
-    return records.map(mapAccess);
+    return records.map(mapAccessFromDb);
   } catch (error) {
     logger.error('accessRepository(prisma): listByUser failed', error);
     throw error;
@@ -66,7 +51,7 @@ async function listByUser(userId: string): Promise<AccessRecord[]> {
 async function getAll(): Promise<AccessRecord[]> {
   try {
     const records = await prisma.access.findMany({ orderBy: { updatedAt: 'desc' } });
-    return records.map(mapAccess);
+    return records.map(mapAccessFromDb);
   } catch (error) {
     logger.error('accessRepository(prisma): getAll failed', error);
     throw error;

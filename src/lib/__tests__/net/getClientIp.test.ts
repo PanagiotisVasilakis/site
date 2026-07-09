@@ -85,4 +85,22 @@ describe('getClientIp', () => {
     const result = getClientIp(mockRequest, { trustProxy: true });
     expect(result).toBe('203.0.113.195');
   });
+
+  it('should ignore malformed proxy values', () => {
+    vi.mocked(mockRequest.headers.get).mockImplementation((name: string) => {
+      if (name === 'x-client-ip') return 'attacker-controlled-value';
+      if (name === 'x-real-ip') return '198.51.100.42';
+      return null;
+    });
+
+    expect(getClientIp(mockRequest, { trustProxy: true })).toBe('198.51.100.42');
+  });
+
+  it('should normalize IPv4-mapped IPv6 addresses', () => {
+    vi.mocked(mockRequest.headers.get).mockImplementation((name: string) => (
+      name === 'cf-connecting-ip' ? '::ffff:203.0.113.10' : null
+    ));
+
+    expect(getClientIp(mockRequest, { trustProxy: true })).toBe('203.0.113.10');
+  });
 });

@@ -10,23 +10,12 @@ import {
   securityReportGenerator 
 } from '@/lib/security-monitoring';
 import { verifyAdmin } from '@/lib/auth/admin';
-
-function getClientIP(request: NextRequest): string {
-  const forwardedFor = request.headers.get('x-forwarded-for');
-  const realIP = request.headers.get('x-real-ip');
-  
-  if (forwardedFor) {
-    return forwardedFor.split(',')[0].trim();
-  }
-  
-  return realIP || 'unknown';
-}
+import { getClientIp } from '@/lib/net/getClientIp';
 
 function requireAuth(request: NextRequest): boolean {
   // Check admin secret
   const secret = process.env.ADMIN_DASH_SECRET;
-  const provided = request.headers.get('x-admin-secret') || 
-                   new URL(request.url).searchParams.get('token');
+  const provided = request.headers.get('x-admin-secret');
   
   // Parse JWT token from cookie
   const cookieHeader = request.headers.get('cookie') || '';
@@ -135,7 +124,7 @@ export async function POST(request: NextRequest) {
           type: 'suspicious_activity' as const,
           severity: 'medium' as const,
           timestamp: new Date().toISOString(),
-          ip: getClientIP(request),
+          ip: getClientIp(request, { trustProxy: true }),
           userAgent: request.headers.get('user-agent') || undefined,
           url: request.url,
           details: {

@@ -9,6 +9,7 @@ import { buildBookingLastNameTokenSearchValues, createBookingLastNameTokens } fr
 import { logger } from '@/lib/logger-enterprise';
 import { prisma } from '@/lib/prisma';
 import { guestDataCache } from '@/lib/guestDataCache';
+import { mapAccessFromDb, mapBookingFromDb, mapUserFromDb } from '@/lib/mappers/domainMappers';
 import crypto from 'node:crypto';
 
 export type IdentityType = 'AFM' | 'PASSPORT';
@@ -449,28 +450,8 @@ export const guestStore = {
           },
         });
 
-        // Map to snake_case types
-        const booking: Booking = {
-          id: bookingDb.id,
-          source: bookingDb.source,
-          reference: bookingDb.reference ?? undefined,
-          last_name_hash: bookingDb.lastNameHash ?? undefined,
-          last_name_salt: bookingDb.lastNameSalt ?? undefined,
-          last_name_token: bookingDb.lastNameToken ?? undefined,
-          last_name_token_nows: bookingDb.lastNameTokenNoWs ?? undefined,
-          start_date: bookingDb.startDate.toISOString(),
-          end_date: bookingDb.endDate.toISOString(),
-          user_id: bookingDb.userId ?? undefined,
-          created_at: bookingDb.createdAt.getTime(),
-        };
-
-        const access: BookingAccess = {
-          user_id: accessDb.userId,
-          booking_id: accessDb.bookingId,
-          status: accessDb.status,
-          created_at: accessDb.createdAt.getTime(),
-          updated_at: accessDb.updatedAt.getTime(),
-        };
+        const booking: Booking = mapBookingFromDb(bookingDb);
+        const access: BookingAccess = mapAccessFromDb(accessDb);
 
         return { booking, access };
       });
@@ -589,38 +570,9 @@ export const guestStore = {
           },
         });
 
-        // Map to snake_case types
-        const user: User = {
-          id: userDb.id,
-          email: userDb.email ?? undefined,
-          phone_e164: userDb.phoneE164,
-          password_hash: userDb.passwordHash ?? undefined,
-          country_origin: userDb.countryOrigin,
-          created_at: userDb.createdAt.getTime(),
-          updated_at: userDb.updatedAt.getTime(),
-        };
-
-        const booking: Booking = {
-          id: bookingDb.id,
-          source: bookingDb.source,
-          reference: bookingDb.reference ?? undefined,
-          last_name_hash: bookingDb.lastNameHash ?? undefined,
-          last_name_salt: bookingDb.lastNameSalt ?? undefined,
-          last_name_token: bookingDb.lastNameToken ?? undefined,
-          last_name_token_nows: bookingDb.lastNameTokenNoWs ?? undefined,
-          start_date: bookingDb.startDate.toISOString(),
-          end_date: bookingDb.endDate.toISOString(),
-          user_id: bookingDb.userId ?? undefined,
-          created_at: bookingDb.createdAt.getTime(),
-        };
-
-        const access: BookingAccess = {
-          user_id: accessDb.userId,
-          booking_id: accessDb.bookingId,
-          status: accessDb.status,
-          created_at: accessDb.createdAt.getTime(),
-          updated_at: accessDb.updatedAt.getTime(),
-        };
+        const user: User = mapUserFromDb(userDb);
+        const booking: Booking = mapBookingFromDb(bookingDb);
+        const access: BookingAccess = mapAccessFromDb(accessDb);
 
         return { user, booking, access };
       });
