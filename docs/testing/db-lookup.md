@@ -4,14 +4,14 @@ This guide documents the quick smoke test that verifies whether the Docker-based
 
 ## Issue 1 lookup smoke test workflow
 
-The commands below mirror the repository's `scripts/setup-test-db.sh` helper so you can replicate the CI lookup locally. They target the `postgres-test` service defined in [`docker-compose.test-db.yml`](../../docker-compose.test-db.yml) and rely on the same `TEST_DATABASE_URL` string that Vitest expects.
+The commands below replicate the CI lookup locally. They target the `postgres-test` service defined in [`docker/docker-compose.test-db.yml`](../../docker/docker-compose.test-db.yml) and rely on the same `TEST_DATABASE_URL` string that Vitest expects.
 
 ### 1. Ensure the Docker service is running
 
 Bring up the Postgres service that ships with the repository:
 
 ```bash
-docker-compose -f docker-compose.test-db.yml up -d postgres-test
+docker compose -f docker/docker-compose.test-db.yml up -d postgres-test
 ```
 
 The compose file exposes the container as `site-test-db` on host port `5433` with credentials `testuser` / `testpass` and database `site_test`.

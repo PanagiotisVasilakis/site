@@ -38,10 +38,10 @@ We support two provisioning models. Pick the option that matches your provider a
 
 ### Option A: Ephemeral container (recommended for per-run isolation)
 
-Use the repository's `docker-compose.test-db.yml` to start a disposable PostgreSQL 16 service. CI systems with Docker support (GitHub Actions, Buildkite with Docker plugin, etc.) can launch it directly:
+Use the repository's `docker/docker-compose.test-db.yml` to start a disposable PostgreSQL 16 service. CI systems with Docker support (GitHub Actions, Buildkite with Docker plugin, etc.) can launch it directly:
 
 ```bash
-docker-compose -f docker-compose.test-db.yml up -d postgres-test
+docker compose -f docker/docker-compose.test-db.yml up -d postgres-test
 ```
 
 Key details from the compose file:
@@ -166,9 +166,9 @@ Secure handling of database credentials is mandatory. Follow these practices per
          - uses: actions/checkout@v4
          - uses: actions/setup-node@v4
            with:
-             node-version: '20'
+             node-version-file: '.nvmrc'
          - run: npm ci
-         - run: docker-compose -f docker-compose.test-db.yml up -d postgres-test
+         - run: docker compose -f docker/docker-compose.test-db.yml up -d postgres-test
          - run: DATABASE_URL="$TEST_DATABASE_URL" npx prisma migrate deploy
          - run: npm run ci:test:db
    ```
@@ -191,7 +191,7 @@ Secure handling of database credentials is mandatory. Follow these practices per
    steps:
      - label: ":postgres: CI database tests"
        command:
-         - docker-compose -f docker-compose.test-db.yml up -d postgres-test
+         - docker compose -f docker/docker-compose.test-db.yml up -d postgres-test
          - DATABASE_URL="$TEST_DATABASE_URL" npx prisma migrate deploy
          - npm run ci:test:db
    ```

@@ -10,7 +10,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  NODE_VERSION: '20'
+  NPM_VERSION: '11.18.0'
 
 permissions:
   contents: read
@@ -32,17 +32,20 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
           cache: npm
+
+      - name: Install required npm
+        run: npm install --global "npm@${{ env.NPM_VERSION }}"
 
       - name: Install dependencies
         run: npm ci --audit=false
 
       - name: Run security audit
-        id: audit
+        id: security-gate
         run: |
-          npm audit --audit-level=critical --production
-          echo "audit_passed=$?" >> $GITHUB_OUTPUT
+          npm audit --audit-level=critical --omit=dev
+          echo "passed=true" >> "$GITHUB_OUTPUT"
 
       - name: Validate environment configuration
         run: |
@@ -55,17 +58,6 @@ jobs:
           # Validate build passes
           npm run build
 
-      - name: Security gate
-        id: security-gate
-        run: |
-          if [ "${{ steps.audit.outputs.audit_passed }}" = "0" ]; then
-            echo "passed=true" >> $GITHUB_OUTPUT
-          else
-            echo "passed=false" >> $GITHUB_OUTPUT
-            echo "::error::Security audit failed"
-            exit 1
-          fi
-
   build-and-sign:
     name: Build and Sign Artifacts
     runs-on: ubuntu-latest
@@ -75,12 +67,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3
@@ -117,7 +103,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile.security
+          file: ./docker/Dockerfile.security
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

@@ -4,8 +4,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+REQUIRED_NODE_VERSION=""
 REQUIRED_NODE_MAJOR=""
-REQUIRED_NPM_MAJOR=10
+REQUIRED_NPM_VERSION="11.18.0"
 
 STARTED_LOCAL_PG=0
 LOCAL_PG_CONTAINER="${CI_PG_CONTAINER:-site-ci-orchestrator-db}"
@@ -34,29 +35,33 @@ parse_major() {
 
 resolve_required_node_major() {
   if [[ -f "$REPO_ROOT/.nvmrc" ]]; then
-    REQUIRED_NODE_MAJOR="$(parse_major "$(tr -d '[:space:]' < "$REPO_ROOT/.nvmrc")")"
+    REQUIRED_NODE_VERSION="$(tr -d '[:space:]' < "$REPO_ROOT/.nvmrc")"
   else
-    REQUIRED_NODE_MAJOR="20"
+    REQUIRED_NODE_VERSION="22.19.0"
   fi
+  REQUIRED_NODE_MAJOR="$(parse_major "$REQUIRED_NODE_VERSION")"
+}
+
+version_at_least() {
+  local actual="${1#v}" required="${2#v}"
+  [[ "$(printf '%s\n%s\n' "$required" "$actual" | sort -V | head -n1)" == "$required" ]]
 }
 
 runtime_is_compatible() {
   command -v node >/dev/null 2>&1 || return 1
   command -v npm >/dev/null 2>&1 || return 1
 
-  local node_version npm_version node_major npm_major
+  local node_version npm_version
   node_version="$(node -v 2>/dev/null || true)"
   npm_version="$(npm -v 2>/dev/null || true)"
   [[ -n "$node_version" && -n "$npm_version" ]] || return 1
 
-  node_major="$(parse_major "$node_version")"
-  npm_major="$(parse_major "$npm_version")"
-
-  if [[ "$node_major" -ge "$REQUIRED_NODE_MAJOR" && "$npm_major" -ge "$REQUIRED_NPM_MAJOR" ]]; then
+  if version_at_least "$node_version" "$REQUIRED_NODE_VERSION" \
+    && version_at_least "$npm_version" "$REQUIRED_NPM_VERSION"; then
     return 0
   fi
 
-  log "Detected runtime node=$node_version npm=$npm_version; required node>=${REQUIRED_NODE_MAJOR}, npm>=${REQUIRED_NPM_MAJOR}"
+  log "Detected runtime node=$node_version npm=$npm_version; required node>=${REQUIRED_NODE_VERSION}, npm>=${REQUIRED_NPM_VERSION}"
   return 1
 }
 
@@ -94,6 +99,11 @@ bootstrap_portable_node_runtime() {
 
   export PATH="$extract_dir/bin:$PATH"
   hash -r
+
+  if ! version_at_least "$(npm -v 2>/dev/null || printf '0')" "$REQUIRED_NPM_VERSION"; then
+    log "Installing npm ${REQUIRED_NPM_VERSION} into portable runtime"
+    npm install --global "npm@${REQUIRED_NPM_VERSION}"
+  fi
 
   local node_version npm_version
   node_version="$(node -v 2>/dev/null || true)"
@@ -222,6 +232,7 @@ run_check_sequence() {
     cd "$REPO_ROOT"
     bash ./scripts/system-orchestrator.sh check --profile production --no-docker-fallback
     bash ./scripts/system-orchestrator.sh migrate --profile production --no-docker-fallback
+    npm run ci:test:db
     bash ./scripts/system-orchestrator.sh build --profile production --no-docker-fallback
   )
 }

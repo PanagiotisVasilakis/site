@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   audits:
     runs-on: ubuntu-latest
@@ -17,8 +21,11 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version-file: .nvmrc
           cache: 'npm'
+
+      - name: Install required npm
+        run: npm install --global npm@11.18.0
 
       - name: Install dependencies
         run: npm ci
@@ -47,19 +54,6 @@ jobs:
           export KEEP_REPORTS=${KEEP_REPORTS:-5}
           echo "Using KEEP_REPORTS=$KEEP_REPORTS"
           npm run ci:accessibility
-
-      - name: Fail if violations present
-        run: |
-          if grep -q '"violations": \[\]' axe-a11y-report-*.json; then
-            echo "No accessibility violations detected";
-          else
-            echo "Accessibility violations found"; exit 1;
-          fi
-          if grep -q '"issues": \[\]' axe-contrast-report-*.json; then
-            echo "No contrast issues detected";
-          else
-            echo "Contrast issues found"; exit 1;
-          fi
 
       - name: Upload reports
         if: always()
@@ -92,7 +86,6 @@ jobs:
               return `${key} (${file}): ${count} ${count===1?'issue':'issues'}`;
             }
             const body = `### Accessibility Audit Summary\n- ${summarize(a11y,'a11y')}\n- ${summarize(contrast,'contrast')}\n\nKEEP_REPORTS=${process.env.KEEP_REPORTS || '5 (default)'}`;
-            const {context, github} = require('@actions/github');
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,

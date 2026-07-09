@@ -10,7 +10,7 @@ on:
     - cron: '0 2 * * *'
 
 env:
-  NODE_VERSION: '20'
+  NPM_VERSION: '11.18.0'
 
 permissions:
   contents: read
@@ -29,16 +29,19 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
           cache: npm
+
+      - name: Install required npm
+        run: npm install --global "npm@${{ env.NPM_VERSION }}"
 
       - name: Install dependencies
         run: npm ci --audit=false
 
       - name: Run npm audit
         run: |
-          npm audit --audit-level=high --production
-          npm audit --json --audit-level=high --production > npm-audit-report.json || true
+          npm audit --audit-level=high --omit=dev
+          npm audit --json --audit-level=high --omit=dev > npm-audit-report.json || true
 
       - name: Run Snyk security scan
         uses: snyk/actions/node@master
@@ -78,8 +81,6 @@ jobs:
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          base: main
-          head: HEAD
           extra_args: --debug --only-verified
 
   container-security:
@@ -93,7 +94,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -f Dockerfile.security -t villa-app:${{ github.sha }} .
+          docker build -f docker/Dockerfile.security -t villa-app:${{ github.sha }} .
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
@@ -146,8 +147,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
           cache: npm
+
+      - name: Install required npm
+        run: npm install --global "npm@${{ env.NPM_VERSION }}"
 
       - name: Install dependencies
         run: npm ci --audit=false
@@ -161,8 +165,7 @@ jobs:
           category: "/language:javascript-typescript"
 
       - name: Run ESLint security rules
-        run: |
-          npx eslint . --ext .js,.jsx,.ts,.tsx --format json -o eslint-security-report.json || true
+        run: npx eslint --config eslint.config.security.mjs --format json --output-file eslint-security-report.json .
 
       - name: Upload static analysis artifacts
         if: always()
@@ -184,8 +187,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version-file: .nvmrc
           cache: npm
+
+      - name: Install required npm
+        run: npm install --global "npm@${{ env.NPM_VERSION }}"
 
       - name: Install dependencies
         run: npm ci --audit=false
