@@ -3,11 +3,7 @@
 import { useEffect, useState, type ComponentType } from 'react';
 
 interface BookingLabels {
-  dates: string;
   addDates: string;
-  guestsLabel: string;
-  guestSingular: string;
-  guestPlural: string;
   checkAvailability: string;
   arrivalLabel?: string;
   arrivalPlaceholder?: string;

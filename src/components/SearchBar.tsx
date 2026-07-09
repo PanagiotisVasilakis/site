@@ -23,17 +23,10 @@ interface PickerAnchor {
 
 interface Props {
   onBooking?: (state: BookingState) => void;
-  initial?: Partial<Omit<BookingState, "dateRange"> & { dates?: string }>;
   locale?: string;
   propertyName?: string;
   labels?: {
-    dates: string;
     addDates: string;
-    guestsLabel: string;
-    adultsLabel?: string;
-    kidsLabel?: string;
-    guestSingular: string;
-    guestPlural: string;
     checkAvailability: string;
     arrivalLabel?: string;
     arrivalPlaceholder?: string;
@@ -62,7 +55,6 @@ const LazyDateRangePicker = dynamic(() => import("@/components/DateRangePicker")
 
 export default function BookingBar({
   onBooking,
-  initial,
   locale = "en",
   propertyName,
   labels,

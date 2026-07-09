@@ -31,11 +31,7 @@ export interface CommonDictionary {
     search?: {
         where: string;
         addLocation: string;
-        dates: string;
         addDates: string;
-        guestsLabel: string;
-        guestSingular: string;
-        guestPlural: string;
         search: string;
         arrivalLabel?: string;
         arrivalPlaceholder?: string;
@@ -210,11 +206,7 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
         search: {
             where: "Where",
             addLocation: "Choose a location",
-            dates: "Dates",
             addDates: "Select your dates",
-            guestsLabel: "Guests",
-            guestSingular: "guest",
-            guestPlural: "guests",
             search: "Search",
             arrivalLabel: "Arrival",
             departureLabel: "Departure",
@@ -419,11 +411,7 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
         search: {
             where: "Προορισμός",
             addLocation: "Επιλέξτε τοποθεσία",
-            dates: "Ημερομηνίες",
             addDates: "Επιλέξτε ημερομηνίες",
-            guestsLabel: "Επισκέπτες",
-            guestSingular: "επισκέπτης",
-            guestPlural: "επισκέπτες",
             search: "Αναζήτηση",
             arrivalLabel: "Άφιξη",
             departureLabel: "Αναχώρηση",

@@ -140,16 +140,10 @@ export class SecurityHeadersMiddleware {
   private applyCSPHeaders(response: NextResponse, nonce?: string): void {
     if (!this.config.csp.enabled) return;
 
-    const cspDirective = buildCSPDirective(this.config.csp.directives, this.config.csp.useNonce);
-
-    // Add nonce to CSP if provided
-    let finalCSP = cspDirective;
-    if (nonce && this.config.csp.useNonce) {
-      finalCSP = finalCSP.replace(
-        "script-src 'self' 'unsafe-inline'",
-        `script-src 'self' 'nonce-${nonce}'`
-      );
-    }
+    let finalCSP = buildCSPDirective(
+      this.config.csp.directives,
+      this.config.csp.useNonce ? nonce : undefined,
+    );
 
     // Add report URI if configured
     if (this.config.csp.reportUri) {

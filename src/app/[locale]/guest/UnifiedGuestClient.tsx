@@ -5,6 +5,7 @@ import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
 import internalFetch from '@/lib/internalFetchClient';
 import { tracker } from '@/lib/tracker';
+import { emitGuestSessionChanged } from '@/lib/sessionSignals';
 import ErrorSummary from '@/components/ErrorSummary';
 import { mapApiErrorToUI } from '@/lib/userFacingErrors';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
@@ -114,11 +115,9 @@ export default function UnifiedGuestClient() {
     ? (dict.portal?.modeHintSignin ?? 'Access your booking and check-in details.')
     : (dict.portal?.modeHintSignup ?? 'Create your guest account to continue.');
 
-  // Seed analytics and URL mode parameter
+  // Seed analytics once; the mode effect below owns URL synchronization.
   useEffect(() => {
     tracker.portalOpened('unified');
-    router.replace(`/${locale}/guest?mode=${initialMode}`, { scroll: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Update URL and analytics when mode changes
@@ -408,6 +407,7 @@ export default function UnifiedGuestClient() {
   try { tracker.formSubmitted(mode === 'signup' ? 'sign-up' : 'sign-in'); } catch {}
         const data = await res.json().catch(() => ({} as Record<string, unknown>));
         const redirect = data?.data?.redirect || `/${locale}/check-in`;
+        emitGuestSessionChanged('signin');
         router.push(redirect);
       }
     } catch {

@@ -56,11 +56,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           locale={eff}
           subline={eff === 'el' ? 'Πολυτελές διαμέρισμα στην Καλαμάτα' : 'Luxury apartment in Kalamata, Greece'}
           labels={{
-            dates: t.search?.dates || 'Dates',
             addDates: t.search?.addDates || 'Add dates',
-            guestsLabel: t.search?.guestsLabel || 'Guests',
-            guestSingular: t.search?.guestSingular || 'guest',
-            guestPlural: t.search?.guestPlural || 'guests',
             checkAvailability: t.search?.checkAvailability || 'Check availability',
             arrivalLabel: t.search?.arrivalLabel,
             arrivalPlaceholder: t.search?.arrivalPlaceholder,

@@ -74,6 +74,15 @@ describe('Security Configuration', () => {
     expect(csp).toContain("style-src 'self' https://fonts.googleapis.com");
   });
 
+  test('should use exactly the request nonce for scripts', () => {
+    const directives = getSecurityConfig().csp.directives;
+    const csp = buildCSPDirective(directives, 'request-nonce');
+
+    expect(csp).toContain("script-src 'self' 'unsafe-eval' 'nonce-request-nonce'");
+    expect(csp).not.toContain("'unsafe-inline'");
+    expect(csp.match(/nonce-/g)).toHaveLength(1);
+  });
+
   test('should generate valid nonce', () => {
     const nonce = generateNonce();
     expect(nonce).toBeDefined();
@@ -351,6 +360,33 @@ describe('API Key Authentication', () => {
 
     const response = middleware.validateRequest(request);
     expect(response?.status).toBe(401);
+  });
+
+  test('should enforce internal scope with a dedicated key', () => {
+    const readKey = '0123456789abcdef0123456789abcdef';
+    const internalKey = 'fedcba9876543210fedcba9876543210';
+    vi.stubEnv('VALID_API_KEYS', readKey);
+    vi.stubEnv('INTERNAL_API_KEYS', internalKey);
+    const localMiddleware = new APIKeyAuthMiddleware();
+
+    const readRequest = new NextRequest('https://example.com/api/internal/cache-metrics', {
+      headers: { 'x-api-key': readKey },
+    });
+    expect(localMiddleware.validateRequest(readRequest, ['internal'])?.status).toBe(403);
+
+    const internalRequest = new NextRequest('https://example.com/api/internal/cache-metrics', {
+      headers: { 'x-api-key': internalKey },
+    });
+    expect(localMiddleware.validateRequest(internalRequest, ['internal'])).toBeNull();
+  });
+
+  test('should not accept API keys from query parameters', () => {
+    const validKey = '0123456789abcdef0123456789abcdef';
+    vi.stubEnv('VALID_API_KEYS', validKey);
+    const localMiddleware = new APIKeyAuthMiddleware();
+    const request = new NextRequest(`https://example.com/api/protected?api_key=${validKey}`);
+
+    expect(localMiddleware.validateRequest(request)?.status).toBe(401);
   });
 });
 

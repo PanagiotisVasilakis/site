@@ -273,11 +273,7 @@ export class XSSProtectionMiddleware {
 
 // API Key authentication middleware
 export class APIKeyAuthMiddleware {
-  private config = getSecurityConfig();
-
   public validateRequest(request: NextRequest, requiredScopes?: string[]): NextResponse | null {
-    if (!this.config.apiSecurity.apiKeyAuth.enabled) return null;
-
     const apiKey = this.extractAPIKey(request);
 
     if (!apiKey) {
@@ -332,12 +328,6 @@ export class APIKeyAuthMiddleware {
       return apiKeyHeader;
     }
 
-    // Try query parameter (less secure, but sometimes necessary)
-    const apiKeyParam = request.nextUrl.searchParams.get('api_key');
-    if (apiKeyParam) {
-      return apiKeyParam;
-    }
-
     return null;
   }
 
@@ -347,17 +337,22 @@ export class APIKeyAuthMiddleware {
   }
 
   private isValidAPIKey(apiKey: string): boolean {
-    // This would typically check against a database
-    // For demo purposes, we'll check against environment variables
-    const validKeys = (process.env.VALID_API_KEYS || '').split(',').filter(Boolean);
-    return validKeys.includes(apiKey);
+    return this.getConfiguredKeys('VALID_API_KEYS').includes(apiKey)
+      || this.getConfiguredKeys('INTERNAL_API_KEYS').includes(apiKey);
   }
 
   private getAPIKeyScopes(apiKey: string): string[] {
-    void apiKey; // not used in demo implementation
-    // This would typically fetch from a database
-    // For demo purposes, return default scopes
+    if (this.getConfiguredKeys('INTERNAL_API_KEYS').includes(apiKey)) {
+      return ['internal'];
+    }
     return ['read', 'write'];
+  }
+
+  private getConfiguredKeys(name: 'VALID_API_KEYS' | 'INTERNAL_API_KEYS'): string[] {
+    return (process.env[name] || '')
+      .split(',')
+      .map((key) => key.trim())
+      .filter(Boolean);
   }
 
   private logAuthFailure(

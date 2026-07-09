@@ -4,11 +4,7 @@ import BookingBar from "@/components/SearchBar";
 import { getApartmentContent } from '@/data/apartmentData';
 
 interface BookingLabels {
-  dates: string;
   addDates: string;
-  guestsLabel: string;
-  guestSingular: string;
-  guestPlural: string;
   checkAvailability: string;
   arrivalLabel?: string;
   arrivalPlaceholder?: string;

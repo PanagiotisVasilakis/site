@@ -68,7 +68,8 @@ jobs:
       SECURITY_PEPPER: ci-security-pepper
       NEXT_PUBLIC_SITE_URL: https://example.test
       ALLOWED_ORIGINS: https://example.test
-      VALID_API_KEYS: ci-read-key
+      VALID_API_KEYS: 0123456789abcdef0123456789abcdef
+      INTERNAL_API_KEYS: fedcba9876543210fedcba9876543210
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

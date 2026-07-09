@@ -7,6 +7,8 @@ import { ToastProvider } from "@/components/Toast";
 import JsonFetchHud from "@/components/JsonFetchHud";
 import TopControls from "@/components/TopControls";
 import DeferredRuntimeManagers from "@/components/DeferredRuntimeManagers";
+import DocumentLocale from "@/components/DocumentLocale";
+import StatusCluster from "@/components/StatusCluster";
 
 // Removed font variable placeholders.
 
@@ -35,7 +37,8 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   const t = getDictionary(eff);
   // Avoid reading cookies server-side so the route can stay fully static; client components fetch session state.
   return (
-  <div data-locale={eff}>
+  <div data-locale={eff} lang={eff}>
+  <DocumentLocale locale={eff} />
   <a href="#main-content" className="skip-link">{t.skipLink || 'Skip to content'}</a>
       <ToastProvider>
       <DeferredRuntimeManagers />
@@ -62,6 +65,16 @@ export default async function LocaleLayout({ children, params }: { children: Rea
         <button id="ios-tip-close" aria-label={t.a2hs?.close || 'Close'} className="btn-outline btn-sm">×</button>
       </div>
   <main id="main-content" className="safe-bottom top-gap" role="main">{children}</main>
+      <div className="fixed bottom-2 left-2 z-50 sm:hidden">
+        <StatusCluster labels={{
+          online: t.labels?.networkOnline || 'Online',
+          offline: t.labels?.networkOffline || 'Offline',
+          reconnecting: t.labels?.networkReconnected || 'Reconnected',
+          slow: t.labels?.networkSlow || 'Slow',
+          syncPending: t.labels?.syncPending || 'Sync pending',
+          syncIdle: t.labels?.syncIdle || 'Synced',
+        }} />
+      </div>
   </ToastProvider>
     </div>
   );

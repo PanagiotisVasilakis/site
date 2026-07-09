@@ -16,11 +16,14 @@ const envSchema = z.object({
   // Security secrets (must be strong in production)
   ADMIN_JWT_SECRET: z.string().min(32, 'ADMIN_JWT_SECRET must be at least 32 characters'),
   ADMIN_DASH_SECRET: z.string().min(20, 'ADMIN_DASH_SECRET must be at least 20 characters'),
+  GUEST_JWT_SECRET: z.string().min(32, 'GUEST_JWT_SECRET must be at least 32 characters'),
   SECURITY_ENC_KEY_HEX: z.string().length(64, 'SECURITY_ENC_KEY_HEX must be exactly 64 hex characters'),
+  SECURITY_PEPPER: z.string().min(16, 'SECURITY_PEPPER must be at least 16 characters'),
   SESSION_SECRET: z.string().min(32, 'SESSION_SECRET must be at least 32 characters'),
 
   // API keys (optional but validated format if present)
   VALID_API_KEYS: z.string().optional(),
+  INTERNAL_API_KEYS: z.string().optional(),
   
   // CORS and origins
   ALLOWED_ORIGINS: z.string().optional(),

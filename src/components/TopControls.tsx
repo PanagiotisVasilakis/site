@@ -115,11 +115,9 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
   const { scrolled, hidden } = useScroll();
   const { isSignedIn, signOut } = useGuestSession({
     initialIsSignedIn: !!showCheckIn,
-    // Only check session on check-in related pages to save resources/bandwidth
-    enabled: pathname?.includes('/check-in')
   });
 
-  const shouldShowCheckIn = isSignedIn && pathname?.includes('/check-in');
+  const shouldShowCheckIn = isSignedIn;
 
   const trackAnalyticsEvent = (eventName: string, props?: Record<string, unknown>) => {
     import('@/lib/analyticsClient')
@@ -185,7 +183,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
 
   const mobileMenuLinks = useMemo(() => {
     const links: MenuLink[] = [
-      { href: `/${locale}/house`, label: dictionary.house?.navLabel ?? dictionary.house?.title ?? 'House Guide', icon: 'gallery', event: 'mobile_nav_house', group: 'stay' },
+      { href: `/${locale}/apartment`, label: dictionary.house?.navLabel ?? dictionary.house?.title ?? 'House Guide', icon: 'gallery', event: 'mobile_nav_house', group: 'stay' },
       { href: `/${locale}/book`, label: dictionary.cta?.reserve ?? 'Book stay', icon: 'calendar', event: 'mobile_nav_book', group: 'stay', featured: true },
       { href: `/${locale}/booking-details`, label: dictionary.bookingDetails ?? 'Booking Details', icon: 'booking', event: 'mobile_nav_booking_details', group: 'stay' },
       { href: `/${locale}/about`, label: dictionary.aboutUs ?? 'About Us', icon: 'about', event: 'mobile_nav_about', group: 'stay' },
@@ -260,7 +258,8 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
         "fixed top-0 left-0 right-0 z-40 flex justify-center pointer-events-none transition-transform duration-300",
         hidden ? "-translate-y-full" : "translate-y-0"
       )}
-      aria-hidden={hidden}
+      aria-hidden={hidden || undefined}
+      inert={hidden}
     >
       <div ref={containerRef} className="top-controls-compact w-full px-4 pt-2 pointer-events-auto">
         <div className={clsx(
@@ -276,7 +275,6 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
           >
             <span className="text-sm leading-none flex-shrink-0" aria-hidden>🏠</span>
             <span className="truncate max-w-[200px] text-[11px]" title={appTitle}>{appTitle}</span>
-            <small className="hidden sm:inline text-[10px] font-normal opacity-60 flex-shrink-0 text-[color:var(--text-accent-subtle)]"></small>
           </Link>
 
           <div className="flex items-center gap-1">

@@ -26,23 +26,15 @@ function maybeHash(p: string) {
 }
 
 function loadHits() {
-  if (loaded) return;
-  if (loading) {
-    // Wait for concurrent load to complete
-    let attempts = 0;
-    while (loading && attempts < 50) { // Max 500ms wait
-      attempts++;
-      // Use sync sleep to avoid async complications in this context
-      const start = Date.now();
-      while (Date.now() - start < 10) { /* busy wait 10ms */ }
-    }
-    return;
-  }
+  if (loaded || loading) return;
   
   loading = true;
   
   try {
-    if (!persistEnabled) return; // skip loading if not persisting
+    if (!persistEnabled) {
+      loaded = true;
+      return;
+    }
     
     const data = storage.load();
     

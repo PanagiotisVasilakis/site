@@ -50,7 +50,19 @@ class SecurityHeadersMiddleware {
     this.applyCspHeaders(response, nonce);
     this.logSecurityContext(request);
 
-    return response;
+    const requestHeaders = new Headers(request.headers);
+    const csp = response.headers.get('Content-Security-Policy')
+      || response.headers.get('Content-Security-Policy-Report-Only');
+    if (csp) {
+      requestHeaders.set('Content-Security-Policy', csp);
+    }
+    if (nonce) {
+      requestHeaders.set('x-nonce', nonce);
+    }
+
+    const forwarded = NextResponse.next({ request: { headers: requestHeaders } });
+    response.headers.forEach((value, key) => forwarded.headers.set(key, value));
+    return forwarded;
   }
 
   private shouldSkipPath(pathname: string): boolean {
@@ -114,11 +126,10 @@ class SecurityHeadersMiddleware {
   private applyCspHeaders(response: NextResponse, nonce?: string): void {
     if (!this.config.csp.enabled) return;
 
-    let csp = buildCSPDirective(this.config.csp.directives, this.config.csp.useNonce);
-
-    if (nonce && this.config.csp.useNonce) {
-      csp = csp.replace("script-src 'self' 'unsafe-inline'", `script-src 'self' 'nonce-${nonce}'`);
-    }
+    let csp = buildCSPDirective(
+      this.config.csp.directives,
+      this.config.csp.useNonce ? nonce : undefined,
+    );
 
     if (this.config.csp.reportUri) {
       csp += `; report-uri ${this.config.csp.reportUri}`;

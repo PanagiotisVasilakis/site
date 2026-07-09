@@ -132,7 +132,8 @@ set_default_env_values() {
   export SECURITY_PEPPER="${SECURITY_PEPPER:-ci-security-pepper}"
   export NEXT_PUBLIC_SITE_URL="${NEXT_PUBLIC_SITE_URL:-https://example.test}"
   export ALLOWED_ORIGINS="${ALLOWED_ORIGINS:-https://example.test}"
-  export VALID_API_KEYS="${VALID_API_KEYS:-ci-read-key}"
+  export VALID_API_KEYS="${VALID_API_KEYS:-0123456789abcdef0123456789abcdef}"
+  export INTERNAL_API_KEYS="${INTERNAL_API_KEYS:-fedcba9876543210fedcba9876543210}"
   export ALERT_WEBHOOK_TOKEN="${ALERT_WEBHOOK_TOKEN:-ci-alert-webhook-token}"
 
   if [[ -z "${DATABASE_URL:-}" ]]; then
