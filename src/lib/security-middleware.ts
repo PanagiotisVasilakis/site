@@ -216,6 +216,7 @@ export class RateLimitMiddleware {
   private memoryStore = new Map<string, { count: number; resetTime: number }>();
   public async handle(request: NextRequest): Promise<NextResponse | null> {
     if (!this.config.enabled) return null;
+    if (!request.nextUrl.pathname.startsWith('/api/')) return null;
 
     const key = this.generateKey(request);
     const now = Date.now();
