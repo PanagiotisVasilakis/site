@@ -188,6 +188,12 @@ function num(value: unknown): number | null {
   return value;
 }
 
+function auditNumericValue(audits: Record<string, unknown> | undefined, auditId: string): number | null {
+  const audit = audits?.[auditId];
+  if (!audit || typeof audit !== 'object' || !('numericValue' in audit)) return null;
+  return num(audit.numericValue);
+}
+
 function formatMs(value: number | null): string {
   if (value === null) return 'n/a';
   return `${Math.round(value)}ms`;
@@ -403,15 +409,13 @@ async function run() {
           const lhr = result.lhr;
           const score = Math.round((lhr.categories?.performance?.score ?? 0) * 100);
 
-          const lcpMs = num(lhr.audits?.['largest-contentful-paint']?.numericValue);
-          const cls = num(lhr.audits?.['cumulative-layout-shift']?.numericValue);
-          const inpMs = num(
-            lhr.audits?.['interaction-to-next-paint']?.numericValue ??
-              lhr.audits?.['experimental-interaction-to-next-paint']?.numericValue,
-          );
-          const tbtMs = num(lhr.audits?.['total-blocking-time']?.numericValue);
-          const ttfbMs = num(lhr.audits?.['server-response-time']?.numericValue);
-          const fcpMs = num(lhr.audits?.['first-contentful-paint']?.numericValue);
+          const lcpMs = auditNumericValue(lhr.audits, 'largest-contentful-paint');
+          const cls = auditNumericValue(lhr.audits, 'cumulative-layout-shift');
+          const inpMs = auditNumericValue(lhr.audits, 'interaction-to-next-paint')
+            ?? auditNumericValue(lhr.audits, 'experimental-interaction-to-next-paint');
+          const tbtMs = auditNumericValue(lhr.audits, 'total-blocking-time');
+          const ttfbMs = auditNumericValue(lhr.audits, 'server-response-time');
+          const fcpMs = auditNumericValue(lhr.audits, 'first-contentful-paint');
 
           const severity = evaluateSeverity(score, lcpMs, cls, inpMs);
 
