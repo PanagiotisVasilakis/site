@@ -190,7 +190,7 @@ export const guestStore = {
     }
   },
 
-  // Refresh tokens (development store only)
+  // Refresh tokens
   async issueRefreshToken(user_id: string, ttlDays = 60, opts?: { family_id?: string; device_hint?: string; ip_hint?: string }): Promise<{ rec: GuestRefreshTokenRec; token: string }> {
     try {
       const rawSecret = crypto.randomBytes(32).toString('base64url');
@@ -245,30 +245,34 @@ export const guestStore = {
     }
   },
   
-  async rotateRefreshToken(oldToken: string, ttlDays = 60): Promise<{ old?: GuestRefreshTokenRec; rec?: GuestRefreshTokenRec; token?: string }> {
+  async rotateRefreshToken(oldToken: string, ttlDays = 60): Promise<{
+    status: 'rotated' | 'invalid' | 'replayed';
+    old?: GuestRefreshTokenRec;
+    rec?: GuestRefreshTokenRec;
+    token?: string;
+  }> {
     try {
-      const old = await this.verifyRefreshToken(oldToken);
-      if (!old) return {};
-      
-      // Revoke the old token
-      await refreshTokenRepository.revoke(old.id);
-      
-      // Issue a new token
-      const { rec, token } = await this.issueRefreshToken(old.user_id, ttlDays, { 
-        family_id: old.family_id, 
-        device_hint: old.device_hint, 
-        ip_hint: old.ip_hint 
+      const rawSecret = crypto.randomBytes(32).toString('base64url');
+      const { hash, salt } = hashSensitive(rawSecret);
+      const result = await refreshTokenRepository.rotate(oldToken, {
+        tokenHash: hash,
+        salt,
+        expiresAt: Date.now() + ttlDays * 24 * 60 * 60 * 1000,
       });
-      
-      rec.rotated_from_id = old.id;
-      
-      // Update the new token record
-      await refreshTokenRepository.updateRotatedFromId(rec.id, old.id);
-      
-      return { old, rec, token };
+
+      if (result.status !== 'rotated') {
+        return { status: result.status };
+      }
+
+      return {
+        status: 'rotated',
+        old: result.old,
+        rec: result.rec,
+        token: `${result.rec.id}.${rawSecret}`,
+      };
     } catch (error) {
       logger.error('guestStore: failed to rotate refresh token', error);
-      return {};
+      return { status: 'invalid' };
     }
   },
   
