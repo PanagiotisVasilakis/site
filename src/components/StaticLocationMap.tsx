@@ -13,9 +13,26 @@ interface StaticLocationMapProps {
 
 // Fallback component when JavaScript or tiles are unavailable
 import { getDictionary } from '@/i18n/dictionaries';
-// Local type for highlights and prefer the structured dictionary source.
-type LocationHighlight = { icon?: string; title: string; description: string };
+import { getKalamataLandmarks } from '@/data/mapLocations';
 import type { Locale } from '@/i18n/config';
+import type { MapMarkerType } from '@/data/mapLocations';
+
+type LocationHighlight = { icon?: string; title: string; description: string };
+
+function iconForMarkerType(markerType: MapMarkerType): string {
+  switch (markerType) {
+    case 'beach':
+      return '🏖️';
+    case 'city-center':
+      return '🏙️';
+    case 'church':
+      return '⛪';
+    case 'shop':
+      return '🛒';
+    default:
+      return '📍';
+  }
+}
 
 export default function StaticLocationMap({
   height = "400px",
@@ -29,7 +46,11 @@ export default function StaticLocationMap({
   const eff: Locale = locale === 'el' ? 'el' : 'en';
   const t = getDictionary(eff);
   const lp = t.locationPanel;
-  const highlights: LocationHighlight[] = (lp?.highlights ?? []) as LocationHighlight[];
+  const highlights: LocationHighlight[] = getKalamataLandmarks(eff).map((landmark) => ({
+    icon: iconForMarkerType(landmark.markerType),
+    title: landmark.name,
+    description: landmark.description ?? '',
+  }));
   const Panel = () => (
     <div className="space-y-3 text-sm">
       <section className="rounded-lg border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] p-4">

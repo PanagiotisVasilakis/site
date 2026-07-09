@@ -160,6 +160,24 @@ export interface CommonDictionary {
         deferredInteractiveLabel: string;
         travelPrompt: string;
         openMap?: string;
+        loadMap: string;
+        address: string;
+        phone: string;
+        directions: string;
+        website: string;
+        locateMe: string;
+        fitToMarkers: string;
+        zoomIn: string;
+        zoomOut: string;
+        approximate: string;
+        travelUnavailable: string;
+        travelUnavailableWithDirections: string;
+        clearRoute: string;
+        route: string;
+        driving: string;
+        walking: string;
+        cycling: string;
+        unavailable: string;
     };
 }
 
@@ -347,7 +365,25 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             tokenMissing: "Interactive map temporarily unavailable",
             deferredInteractiveLabel: "The interactive map will load here to keep things speedy.",
             travelPrompt: "Tap a marker to calculate travel time.",
-            openMap: "Open map"
+            openMap: "Open map",
+            loadMap: "Load map",
+            address: "Address",
+            phone: "Phone",
+            directions: "Directions",
+            website: "Website",
+            locateMe: "Locate me",
+            fitToMarkers: "Fit to markers",
+            zoomIn: "Zoom in",
+            zoomOut: "Zoom out",
+            approximate: "Approximate – OSRM",
+            travelUnavailable: "Travel times unavailable.",
+            travelUnavailableWithDirections: "Travel times unavailable. Use Directions for live navigation.",
+            clearRoute: "Clear route",
+            route: "Route",
+            driving: "Driving",
+            walking: "Walking",
+            cycling: "Cycling",
+            unavailable: "Unavailable"
         },
     },
     el: {
@@ -529,7 +565,25 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             tokenMissing: "Ο διαδραστικός χάρτης είναι προσωρινά μη διαθέσιμος",
             deferredInteractiveLabel: "Ο διαδραστικός χάρτης θα φορτώσει εδώ για να διατηρηθεί η ταχύτητα.",
             travelPrompt: "Πατήστε έναν δείκτη για να υπολογίσουμε τον χρόνο διαδρομής.",
-            openMap: "Άνοιγμα χάρτη"
+            openMap: "Άνοιγμα χάρτη",
+            loadMap: "Φόρτωση χάρτη",
+            address: "Διεύθυνση",
+            phone: "Τηλέφωνο",
+            directions: "Οδηγίες",
+            website: "Ιστότοπος",
+            locateMe: "Εντοπισμός θέσης",
+            fitToMarkers: "Προβολή όλων των σημείων",
+            zoomIn: "Μεγέθυνση",
+            zoomOut: "Σμίκρυνση",
+            approximate: "Κατά προσέγγιση – OSRM",
+            travelUnavailable: "Οι χρόνοι διαδρομής δεν είναι διαθέσιμοι.",
+            travelUnavailableWithDirections: "Οι χρόνοι διαδρομής δεν είναι διαθέσιμοι. Χρησιμοποιήστε τις Οδηγίες για ζωντανή πλοήγηση.",
+            clearRoute: "Εκκαθάριση διαδρομής",
+            route: "Διαδρομή",
+            driving: "Οδήγηση",
+            walking: "Πεζή",
+            cycling: "Ποδήλατο",
+            unavailable: "Μη διαθέσιμο"
         },
     },
 };

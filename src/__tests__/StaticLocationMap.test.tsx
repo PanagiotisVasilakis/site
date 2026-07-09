@@ -18,4 +18,14 @@ describe('StaticLocationMap', () => {
     expect(title).toHaveTextContent(/Τοποθεσία & Κοντινά/i);
     expect(screen.getByText(/Καλαμάτα/)).toBeInTheDocument();
   });
+
+  it('uses the shared landmark catalog for the complete fallback panel', () => {
+    const { rerender } = render(<StaticLocationMap locale="en" />);
+    expect(screen.getByText('Almyros Beach')).toBeInTheDocument();
+    expect(screen.getByText('Sklavenitis Supermarket')).toBeInTheDocument();
+
+    rerender(<StaticLocationMap locale="el" />);
+    expect(screen.getByText('Παραλία Αλμυρού')).toBeInTheDocument();
+    expect(screen.getByText('Ιερός Ναός Αγίας Τριάδας')).toBeInTheDocument();
+  });
 });

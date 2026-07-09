@@ -260,9 +260,8 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
               locale={locale}
               height="420px"
               zoom={13}
-              showNearbyAttractions={true}
               className="moments-map-frame"
-              nearbyRestaurants={momentsFiltered}
+              contentItems={momentsFiltered.map((item) => ({ item, categorySlug }))}
             />
             <p className="moments-map-caption">
               {(t.moments?.mapCaption ?? 'Apartment location and nearby {category}. Zoom and click markers for details.').replace('{category}', categoryLabel)}
@@ -283,11 +282,8 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
             locale={locale}
             height="400px"
             zoom={13}
-            showNearbyAttractions={true}
             className="rounded-lg overflow-hidden shadow-sm"
-            nearbyRestaurants={categorySlug === 'moments' ? items : []}
-            nearbyServices={categorySlug === 'phones' ? items : []}
-            nearbyAttractions={categorySlug === 'sightseeing' ? items : []}
+            contentItems={filtered.map((item) => ({ item, categorySlug }))}
           />
           <div className="mt-3 text-center">
             <p className="text-sm text-subtle">

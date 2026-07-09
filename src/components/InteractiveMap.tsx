@@ -4,9 +4,15 @@ import dynamic from 'next/dynamic';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
 import StaticLocationMap from './StaticLocationMap';
-import { MarkerData, APARTMENT_LOCATION, markerFromMapLocation } from '@/lib/mapUtils';
+import {
+  APARTMENT_LOCATION,
+  dedupeMarkers,
+  markerFromMapLocation,
+  toLeafletMarker,
+  type MarkerData,
+} from '@/lib/mapUtils';
 import { getApartmentMapLocation } from '@/data/mapLocations';
-import type { LeafletMarkerData } from '@/components/LeafletMap';
+import type { LeafletMapLabels, LeafletMarkerData } from '@/components/LeafletMap';
 
 const LeafletMap = dynamic(() => import('@/components/LeafletMap'), { ssr: false });
 
@@ -22,6 +28,7 @@ interface InteractiveMapProps {
   onMarkerClick?: (marker: MarkerData) => void;
   locale?: string; // for localized static fallback
   activation?: 'viewport' | 'intent';
+  clusterMin?: number;
 }
 
 export default function InteractiveMap({
@@ -32,11 +39,33 @@ export default function InteractiveMap({
   className = "",
   onMarkerClick,
   locale = 'en',
-  activation = 'viewport'
+  activation = 'viewport',
+  clusterMin
 }: InteractiveMapProps) {
   const eff: Locale = locale === 'el' ? 'el' : 'en';
-  const dict = getDictionary(eff);
+  const dict = useMemo(() => getDictionary(eff), [eff]);
   const mapT = dict.map;
+  const leafletLabels = useMemo<LeafletMapLabels>(() => ({
+    address: mapT?.address ?? 'Address',
+    phone: mapT?.phone ?? 'Phone',
+    directions: mapT?.directions ?? 'Directions',
+    website: mapT?.website ?? 'Website',
+    details: mapT?.viewDetails ?? 'Details',
+    locateMe: mapT?.locateMe ?? 'Locate me',
+    fitToMarkers: mapT?.fitToMarkers ?? 'Fit to markers',
+    zoomIn: mapT?.zoomIn ?? 'Zoom in',
+    zoomOut: mapT?.zoomOut ?? 'Zoom out',
+    apartment: mapT?.apartmentMarkerTitle ?? 'Apartment',
+    approximate: mapT?.approximate ?? 'Approximate – OSRM',
+    travelUnavailable: mapT?.travelUnavailable ?? 'Travel times unavailable.',
+    travelUnavailableWithDirections: mapT?.travelUnavailableWithDirections ?? 'Travel times unavailable. Use Directions for live navigation.',
+    clearRoute: mapT?.clearRoute ?? 'Clear route',
+    route: mapT?.route ?? 'Route',
+    driving: mapT?.driving ?? 'Driving',
+    walking: mapT?.walking ?? 'Walking',
+    cycling: mapT?.cycling ?? 'Cycling',
+    unavailable: mapT?.unavailable ?? 'Unavailable',
+  }), [mapT]);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [shouldRenderInteractive, setShouldRenderInteractive] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
@@ -73,13 +102,7 @@ export default function InteractiveMap({
   }, [hasMounted, activation]);
 
   const leafletMarkers = useMemo<LeafletMarkerData[]>(() => {
-    const deduped: MarkerData[] = [];
-    const seen = new Set<string>();
-    markers.forEach(marker => {
-      if (seen.has(marker.id)) return;
-      seen.add(marker.id);
-      deduped.push(marker);
-    });
+    const deduped = dedupeMarkers(markers);
 
     if (!deduped.some(marker => marker.id === 'apartment' || marker.type === 'apartment')) {
       const apartment = markerFromMapLocation(getApartmentMapLocation(eff));
@@ -90,20 +113,7 @@ export default function InteractiveMap({
       });
     }
 
-    return deduped.map<LeafletMarkerData>(marker => ({
-      id: marker.id,
-      name: marker.name,
-      description: marker.description,
-      address: marker.address,
-      phone: marker.phone,
-      phones: marker.phones,
-      website: marker.website,
-      directionsUrl: marker.directionsUrl,
-      coordinates: marker.coordinates,
-      type: marker.type,
-      price: marker.price,
-      href: marker.href,
-    }));
+    return deduped.map(toLeafletMarker);
   }, [markers, mapT, eff]);
 
   const handleMarkerClick = useMemo(() => {
@@ -141,6 +151,9 @@ export default function InteractiveMap({
           autoFitToOriginAndMarkers
           refitOnMarkerChange
           lazyTravelMetrics
+          clusterMin={clusterMin}
+          travelPrompt={mapT?.travelPrompt}
+          labels={leafletLabels}
         />
       ) : (
         <div className="absolute inset-0 flex flex-col items-center justify-center rounded-lg border border-[color:var(--border-soft)] surface-subtle text-center text-sm text-[color:var(--text-accent)]">
@@ -156,7 +169,7 @@ export default function InteractiveMap({
               className="btn-tint mt-4 min-h-11"
               onClick={() => setShouldRenderInteractive(true)}
             >
-              Load map
+              {mapT?.loadMap || 'Load map'}
             </button>
           )}
         </div>

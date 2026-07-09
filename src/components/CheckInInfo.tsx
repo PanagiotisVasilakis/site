@@ -1,9 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { getApartmentContent } from '@/data/apartmentData';
-import { getApartmentMapLocation } from '@/data/mapLocations';
+import {
+  getApartmentMapLocation,
+  type CategoryMapItem,
+  type MapContentItem,
+} from '@/data/mapLocations';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
 import internalFetch from '@/lib/internalFetchClient';
@@ -12,21 +16,7 @@ import { MAP_DEFAULTS } from '@/lib/mapConstants';
 
 type LocationHighlight = { title: string; description: string };
 
-type NearbyCategoryItem = {
-  id: string;
-  name: string;
-  summary?: string;
-  slug?: string;
-  rating?: number;
-  priceLevel?: number;
-  location?: { lat: number; lng: number };
-  phone?: string;
-  phones?: string[];
-  address?: string;
-  website?: string;
-  directionsUrl?: string;
-  sourceUrls?: string[];
-};
+type NearbyCategoryItem = CategoryMapItem;
 
 type IconName =
   | 'air'
@@ -78,7 +68,6 @@ interface CheckInInfoProps {
   locale: string;
   nearbyRestaurants?: NearbyCategoryItem[];
   nearbyServices?: NearbyCategoryItem[];
-  nearbyAttractions?: NearbyCategoryItem[];
 }
 
 function Icon({ name, className = 'h-5 w-5' }: { name: IconName; className?: string }) {
@@ -306,12 +295,18 @@ export default function CheckInInfo({
   locale,
   nearbyRestaurants = [],
   nearbyServices = [],
-  nearbyAttractions = [],
 }: CheckInInfoProps) {
   const effLocale: Locale = locale === 'el' ? 'el' : 'en';
   const t = getDictionary(effLocale);
   const apartment = getApartmentContent(effLocale);
   const apartmentLocation = getApartmentMapLocation(effLocale);
+  const mapContentItems = useMemo<MapContentItem[]>(
+    () => [
+      ...nearbyRestaurants.map((item) => ({ item, categorySlug: 'moments' })),
+      ...nearbyServices.map((item) => ({ item, categorySlug: 'phones' })),
+    ],
+    [nearbyRestaurants, nearbyServices]
+  );
   const checkinStrings = ({ ...(t.checkinInfo ?? {}), ...(t.locationPanel ?? {}) }) as Record<string, string | undefined>;
   const isGreek = effLocale === 'el';
 
@@ -1078,11 +1073,8 @@ export default function CheckInInfo({
                   locale={locale}
                   height={MAP_HEIGHT}
                   zoom={12}
-                  showNearbyAttractions
                   className="min-h-[240px]"
-                  nearbyRestaurants={nearbyRestaurants}
-                  nearbyServices={nearbyServices}
-                  nearbyAttractions={nearbyAttractions}
+                  contentItems={mapContentItems}
                 />
               </div>
               {locationHighlights.length > 0 && (

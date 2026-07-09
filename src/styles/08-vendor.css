@@ -406,6 +406,10 @@
   background: #0b998b;
 }
 
+.leaflet-container-custom .lmk[data-type='church'] {
+  background: #7c3aed;
+}
+
 .leaflet-container-custom .lmk[data-type='park'] {
   background: #237f75;
 }

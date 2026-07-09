@@ -29,6 +29,50 @@ export interface LeafletMarkerData {
   price?: string;
 }
 
+export interface LeafletMapLabels {
+  address: string;
+  phone: string;
+  directions: string;
+  website: string;
+  details: string;
+  locateMe: string;
+  fitToMarkers: string;
+  zoomIn: string;
+  zoomOut: string;
+  apartment: string;
+  approximate: string;
+  travelUnavailable: string;
+  travelUnavailableWithDirections: string;
+  clearRoute: string;
+  route: string;
+  driving: string;
+  walking: string;
+  cycling: string;
+  unavailable: string;
+}
+
+const DEFAULT_MAP_LABELS: LeafletMapLabels = {
+  address: 'Address',
+  phone: 'Phone',
+  directions: 'Directions',
+  website: 'Website',
+  details: 'Details',
+  locateMe: 'Locate me',
+  fitToMarkers: 'Fit to markers',
+  zoomIn: 'Zoom in',
+  zoomOut: 'Zoom out',
+  apartment: 'Apartment',
+  approximate: 'Approximate – OSRM',
+  travelUnavailable: 'Travel times unavailable.',
+  travelUnavailableWithDirections: 'Travel times unavailable. Use Directions for live navigation.',
+  clearRoute: 'Clear route',
+  route: 'Route',
+  driving: 'Driving',
+  walking: 'Walking',
+  cycling: 'Cycling',
+  unavailable: 'Unavailable',
+};
+
 export interface LeafletMapProps {
   center: [number, number];
   zoom?: number;
@@ -59,6 +103,7 @@ export interface LeafletMapProps {
   routeColor?: string;
   lazyTravelMetrics?: boolean;
   travelPrompt?: string;
+  labels?: Partial<LeafletMapLabels>;
 }
 
 const CATEGORY_ICON: Record<string, string> = {
@@ -73,7 +118,8 @@ const CATEGORY_ICON: Record<string, string> = {
   bar: 'M11 13.83l-3.83 3.83L6 16.51l3.83-3.83L6 8.83 7.17 7.66 11 11.5l3.83-3.84L16 8.83l-3.83 3.83L16 16.51l-1.17 1.17L11 13.83zM12 2a9 9 0 00-9 9c0 2.3.86 4.4 2.28 6L12 23.72 18.72 17A9 9 0 0012 2z',
   park: 'M12 2L9.5 5.5 11 6l-2 4-1-1-2 4h12l-2-4-1 1-2-4 1.5-.5L12 2z',
   police: 'M12 3l7 3v5.5c0 4.4-2.8 7.5-7 9.5-4.2-2-7-5.1-7-9.5V6l7-3z',
-  'city-center': 'M15 11V5l-3-3-3 3v2H3v14h18V11h-6zm-8 8H5v-2h2v2zm0-4H5v-2h2v2zm0-4H5V9h2v2zm6 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V9h2v2zm0-4h-2V5h2v2zm6 8h-2v-2h2v2zm0-4h-2v-2h2v2z'
+  'city-center': 'M15 11V5l-3-3-3 3v2H3v14h18V11h-6zm-8 8H5v-2h2v2zm0-4H5v-2h2v2zm0-4H5V9h2v2zm6 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V9h2v2zm0-4h-2V5h2v2zm6 8h-2v-2h2v2zm0-4h-2v-2h2v2z',
+  church: 'M11 2h2v4h4v2h-4v14h-2V8H7V6h4z',
 };
 
 function escapeHtml(value: string): string {
@@ -113,23 +159,23 @@ function sameCoordinates(a?: [number, number], b?: [number, number]) {
   return Math.abs(a[0] - b[0]) < 0.00001 && Math.abs(a[1] - b[1]) < 0.00001;
 }
 
-function buildBasePopupHtml(marker: LeafletMarkerData) {
+function buildBasePopupHtml(marker: LeafletMarkerData, labels: LeafletMapLabels) {
   const phones = marker.phones?.length ? marker.phones : marker.phone ? [marker.phone] : [];
   const phoneHtml = phones.map(phone => (
     `<a class="map-popup-contact" href="${escapeHtml(phoneHref(phone))}">${escapeHtml(phone)}</a>`
   )).join('');
   const actionLinks = [
-    popupLink(marker.directionsUrl, 'Directions'),
-    popupLink(marker.website, 'Website'),
-    popupLink(marker.href, 'Details'),
+    popupLink(marker.directionsUrl, labels.directions),
+    popupLink(marker.website, labels.website),
+    popupLink(marker.href, labels.details),
   ].filter(Boolean).join('');
 
   return `
     <article class="map-popup">
       <h3>${escapeHtml(marker.name)}</h3>
       ${marker.description ? `<p>${escapeHtml(marker.description)}</p>` : ''}
-      ${marker.address ? `<div class="map-popup-row"><strong>Address</strong><span>${escapeHtml(marker.address)}</span></div>` : ''}
-      ${phoneHtml ? `<div class="map-popup-row"><strong>Phone</strong><span class="map-popup-contacts">${phoneHtml}</span></div>` : ''}
+      ${marker.address ? `<div class="map-popup-row"><strong>${escapeHtml(labels.address)}</strong><span>${escapeHtml(marker.address)}</span></div>` : ''}
+      ${phoneHtml ? `<div class="map-popup-row"><strong>${escapeHtml(labels.phone)}</strong><span class="map-popup-contacts">${phoneHtml}</span></div>` : ''}
       ${marker.price ? `<div class="map-popup-price">${escapeHtml(marker.price)}</div>` : ''}
       ${actionLinks ? `<div class="map-popup-actions">${actionLinks}</div>` : ''}
     </article>
@@ -173,6 +219,7 @@ export default function LeafletMap({
   routeColor = '#2563eb',
   lazyTravelMetrics = false,
   travelPrompt = 'Tap a marker to calculate travel time.',
+  labels,
 }: LeafletMapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -188,6 +235,10 @@ export default function LeafletMap({
   const [shouldFetchTravel, setShouldFetchTravel] = useState(() => !lazyTravelMetrics);
   const [failedModes, setFailedModes] = useState<TravelMode[]>([]);
   const [hasRoute, setHasRoute] = useState(false);
+  const mapLabels = useMemo<LeafletMapLabels>(
+    () => ({ ...DEFAULT_MAP_LABELS, ...labels }),
+    [labels]
+  );
 
   useEffect(() => {
     markersRef.current = markers;
@@ -278,7 +329,7 @@ export default function LeafletMap({
       if (metrics?.distance && metrics.duration) return formatTravelChip(mode, metrics.distance, metrics.duration);
       if (failedModes.includes(mode)) {
         const icon = mode === 'driving' ? '🚗' : mode === 'foot' ? '🚶' : '🚲';
-        return `<span class="inline-flex items-center gap-1 bg-red-500/10 text-red-700 dark:text-red-300 px-2 py-[2px] rounded-full">${icon}<span>n/a</span></span>`;
+        return `<span class="inline-flex items-center gap-1 bg-red-500/10 text-red-700 dark:text-red-300 px-2 py-[2px] rounded-full">${icon}<span>${escapeHtml(mapLabels.unavailable)}</span></span>`;
       }
       if (travel.loading) {
         const icon = mode === 'driving' ? '🚗' : mode === 'foot' ? '🚶' : '🚲';
@@ -288,15 +339,15 @@ export default function LeafletMap({
     }).filter(Boolean);
 
     if (chips.length) {
-      return `<div class="map-popup-travel" role="list" aria-live="polite">${chips.map(chip => `<span role="listitem">${chip}</span>`).join(' ')}<span class="map-popup-travel-note">Approximate - OSRM</span></div>`;
+      return `<div class="map-popup-travel" role="list" aria-live="polite">${chips.map(chip => `<span role="listitem">${chip}</span>`).join(' ')}<span class="map-popup-travel-note">${escapeHtml(mapLabels.approximate)}</span></div>`;
     }
 
     if (travel.error) {
-      return `<div class="map-popup-travel muted">Travel times unavailable. Use Directions for live navigation.</div>`;
+      return `<div class="map-popup-travel muted">${escapeHtml(mapLabels.travelUnavailableWithDirections)}</div>`;
     }
 
-    return shouldFetchTravel ? `<div class="map-popup-travel muted">Travel times unavailable.</div>` : '';
-  }, [effectiveModes, failedModes, lazyTravelMetrics, origin, shouldFetchTravel, travel.data, travel.error, travel.loading, travelPrompt]);
+    return shouldFetchTravel ? `<div class="map-popup-travel muted">${escapeHtml(mapLabels.travelUnavailable)}</div>` : '';
+  }, [effectiveModes, failedModes, lazyTravelMetrics, mapLabels, origin, shouldFetchTravel, travel.data, travel.error, travel.loading, travelPrompt]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -320,10 +371,15 @@ export default function LeafletMap({
       center: initialCenter,
       zoom: initialZoom,
       attributionControl: true,
-      zoomControl: true,
+      zoomControl: false,
     });
     mapRef.current = map;
     applyTiles(computeIsDark());
+    L.control.zoom({
+      position: 'topleft',
+      zoomInTitle: mapLabels.zoomIn,
+      zoomOutTitle: mapLabels.zoomOut,
+    }).addTo(map);
 
     if (persistKey) {
       map.on('moveend', () => {
@@ -349,7 +405,8 @@ export default function LeafletMap({
       onAdd: () => {
         const div = L.DomUtil.create('button', 'leaflet-bar leaflet-control map-control-button') as HTMLButtonElement;
         div.type = 'button';
-        div.title = 'Locate me';
+        div.title = mapLabels.locateMe;
+        div.setAttribute('aria-label', mapLabels.locateMe);
         div.innerHTML = '📍';
         div.onclick = () => {
           if (!navigator.geolocation) return;
@@ -366,11 +423,12 @@ export default function LeafletMap({
 
     if (showFitButton) {
       const FitControl = (L.Control as unknown as ControlExtender).extend({
-      options: { position: 'topleft' },
-      onAdd: () => {
+        options: { position: 'topleft' },
+        onAdd: () => {
           const div = L.DomUtil.create('button', 'leaflet-bar leaflet-control map-control-button') as HTMLButtonElement;
           div.type = 'button';
-          div.title = 'Fit to markers';
+        div.title = mapLabels.fitToMarkers;
+          div.setAttribute('aria-label', mapLabels.fitToMarkers);
           div.innerHTML = '⌖';
           div.onclick = fitOriginAndMarkers;
           return div;
@@ -389,7 +447,7 @@ export default function LeafletMap({
       markersLayerRef.current = null;
       markerInstancesRef.current = {};
     };
-  }, [applyTiles, center, computeIsDark, darkTiles, fitOriginAndMarkers, persistKey, showFitButton, zoom]);
+  }, [applyTiles, center, computeIsDark, darkTiles, fitOriginAndMarkers, mapLabels, persistKey, showFitButton, zoom]);
 
   useEffect(() => {
     const map = mapRef.current as MapWithOrigin | null;
@@ -403,22 +461,22 @@ export default function LeafletMap({
     const marker = L.marker([origin[1], origin[0]], {
       icon: L.divIcon({
         className: 'leaflet-origin-marker',
-        html: `<div class="lmk" data-type="apartment" title="Apartment location">${svgIcon(CATEGORY_ICON.apartment, '#fff')}</div>`,
+        html: `<div class="lmk" data-type="apartment" title="${escapeHtml(mapLabels.apartment)}">${svgIcon(CATEGORY_ICON.apartment, '#fff')}</div>`,
         iconSize: [42, 42],
         iconAnchor: [21, 40],
       }),
     }).addTo(map);
     const popupMarker: LeafletMarkerData = {
       id: 'origin',
-      name: originPopup?.name || 'Apartment',
+      name: originPopup?.name || mapLabels.apartment,
       description: originPopup?.description,
       address: originPopup?.address,
       coordinates: origin,
       type: 'apartment',
     };
-    marker.bindPopup(buildBasePopupHtml(popupMarker));
+    marker.bindPopup(buildBasePopupHtml(popupMarker, mapLabels));
     map._originMarker = marker;
-  }, [origin, originPopup, showOriginMarker]);
+  }, [mapLabels, origin, originPopup, showOriginMarker]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -440,8 +498,12 @@ export default function LeafletMap({
       : L.layerGroup();
 
     markers.forEach(markerData => {
-      const marker = L.marker([markerData.coordinates[1], markerData.coordinates[0]], { icon: buildIcon(markerData.type) });
-      const baseHtml = buildBasePopupHtml(markerData);
+      const marker = L.marker([markerData.coordinates[1], markerData.coordinates[0]], {
+        icon: buildIcon(markerData.type),
+        title: markerData.name,
+        alt: markerData.name,
+      });
+      const baseHtml = buildBasePopupHtml(markerData, mapLabels);
       marker.bindPopup(baseHtml);
       marker.on('click', () => {
         onMarkerClick?.(markerData);
@@ -475,6 +537,7 @@ export default function LeafletMap({
         marker.on('add', () => {
           const el = marker.getElement();
           if (!el) return;
+          el.setAttribute('aria-label', markerData.name);
           el.classList.add('marker-pop');
           setTimeout(() => el.classList.remove('marker-pop'), 600);
         });
@@ -513,7 +576,7 @@ export default function LeafletMap({
         autoFitDoneRef.current = true;
       }
     }
-  }, [animateMarkers, autoFitToOriginAndMarkers, clusterMin, effectiveModes, enableRouting, fitOriginAndMarkers, lazyTravelMetrics, markers, onMarkerClick, origin, osrmBase, persistKey, routeColor, routeProfile]);
+  }, [animateMarkers, autoFitToOriginAndMarkers, clusterMin, effectiveModes, enableRouting, fitOriginAndMarkers, lazyTravelMetrics, mapLabels, markers, onMarkerClick, origin, osrmBase, persistKey, routeColor, routeProfile]);
 
   useEffect(() => {
     Object.values(markerInstancesRef.current).forEach(({ marker, baseHtml, data }) => {
@@ -545,9 +608,9 @@ export default function LeafletMap({
             }
           }}
           className="absolute top-2 left-2 z-[5000] bg-white/80 dark:bg-zinc-800/80 backdrop-blur px-3 py-1 rounded-full text-xs font-medium shadow hover:bg-white dark:hover:bg-zinc-700 transition"
-          aria-label="Clear route"
+          aria-label={mapLabels.clearRoute}
         >
-          x Route
+          × {mapLabels.route}
         </button>
       )}
       {enableTravelModeToggle && origin && (
@@ -562,7 +625,7 @@ export default function LeafletMap({
                 className={`px-2 py-[2px] rounded-full flex items-center gap-1 transition ${active ? 'bg-black/80 text-white dark:bg-white/80 dark:text-black' : 'bg-black/10 dark:bg-white/10 text-black dark:text-white'}`}
                 aria-pressed={active}
               >
-                {mode === 'driving' ? '🚗' : mode === 'foot' ? '🚶' : '🚲'} {mode}
+                {mode === 'driving' ? '🚗' : mode === 'foot' ? '🚶' : '🚲'} {mode === 'driving' ? mapLabels.driving : mode === 'foot' ? mapLabels.walking : mapLabels.cycling}
               </button>
             );
           })}

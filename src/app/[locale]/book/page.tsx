@@ -202,12 +202,8 @@ export default async function BookingPage({
               locale={eff}
               height="360px"
               zoom={15}
-              showNearbyAttractions={false}
               activation="intent"
               className="rounded-xl overflow-hidden"
-              nearbyRestaurants={[]}
-              nearbyServices={[]}
-              nearbyAttractions={[]}
             />
           </ClientBoundary>
           <div className="mt-4">
