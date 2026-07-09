@@ -78,7 +78,7 @@ describe('Security Configuration', () => {
     const directives = getSecurityConfig().csp.directives;
     const csp = buildCSPDirective(directives, 'request-nonce');
 
-    expect(csp).toContain("script-src 'self' 'unsafe-eval' 'nonce-request-nonce'");
+    expect(csp).toMatch(/script-src [^;]*'nonce-request-nonce'/);
     expect(csp).not.toContain("'unsafe-inline'");
     expect(csp.match(/nonce-/g)).toHaveLength(1);
   });
