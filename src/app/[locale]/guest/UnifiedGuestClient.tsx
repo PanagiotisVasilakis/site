@@ -10,9 +10,13 @@ import ErrorSummary from '@/components/ErrorSummary';
 import { mapApiErrorToUI } from '@/lib/userFacingErrors';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { DEFAULT_ABROAD_DIAL, phoneCountriesPrioritized } from '@/lib/phoneCountries';
-
-type Mode = 'signin' | 'signup';
-type Origin = 'GR' | 'ABROAD' | '';
+import {
+  isGuestFormValid,
+  validateAfm,
+  validatePassport,
+  type GuestMode as Mode,
+  type GuestOrigin as Origin,
+} from '@/components/guest/guestValidation';
 
 export default function UnifiedGuestClient() {
   const params = useParams() as { locale: string };
@@ -38,6 +42,14 @@ export default function UnifiedGuestClient() {
   const [lastName, setLastName] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState<{ summary: string; details?: string[] } | null>(null);
+  const formIsValid = isGuestFormValid(mode, {
+    origin,
+    phone,
+    lastName,
+    password,
+    afm,
+    passport,
+  });
   
   // Custom dropdown state
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -45,16 +57,6 @@ export default function UnifiedGuestClient() {
   
   // Optional section collapse state
   const [isOptionalExpanded, setIsOptionalExpanded] = useState(false);
-
-  // Validation functions
-  const validateAfm = (value: string): boolean => {
-    // Simple validation: exactly 9 digits (0-9), no checksum validation
-    return /^\d{9}$/.test(value);
-  };
-
-  const validatePassport = (value: string): boolean => {
-    return /^[A-Za-z0-9]{5,20}$/.test(value);
-  };
 
   // Input handlers with validation
   const handleAfmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -69,19 +71,6 @@ export default function UnifiedGuestClient() {
     if (value.length <= 20) {
       setPassport(value.toUpperCase());
     }
-  };
-
-  // Form validation
-  const isFormValid = (): boolean => {
-    // Sign-in: only phone and password required
-    if (mode === 'signin') {
-      return phone.length > 0 && password.length >= 8;
-    }
-    // Sign-up: all fields required
-    if (!origin || !phone || !lastName || !password || password.length < 8) return false;
-    if (origin === 'GR' && !validateAfm(afm)) return false;
-    if (origin === 'ABROAD' && !validatePassport(passport)) return false;
-    return true;
   };
 
   // Close dropdown when clicking outside
@@ -789,7 +778,7 @@ export default function UnifiedGuestClient() {
                             <label className="inline-flex items-center gap-2 text-sm" style={{ color: 'var(--fg-default)' }}><input type="checkbox" checked={remember} onChange={e=>setRemember(e.target.checked)} /> {dict.portal?.rememberMe || 'Remember me on this device'}</label>
                           </div>
 
-                          <button className="btn-primary w-full mt-6" type="submit" disabled={loading || (mode === 'signup' && (!origin || !isFormValid())) || (mode === 'signin' && (!phone || password.length < 8))} aria-busy={loading}>
+                          <button className="btn-primary w-full mt-6" type="submit" disabled={loading || !formIsValid} aria-busy={loading}>
                             {loading ? (dict.portal?.working ?? 'Working…') : (dict.portal?.continueBtn || 'Continue')}
                           </button>
                         </div>

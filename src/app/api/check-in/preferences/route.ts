@@ -66,7 +66,14 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
 
   const prefs = readPreferences();
   const correlationId = request.headers.get('x-correlation-id') ?? undefined;
-  return createSuccessResponse({ ...prefs, canEdit: adminAccess }, undefined, correlationId);
+  return createSuccessResponse({
+    ...prefs,
+    canEdit: adminAccess,
+    wifi: {
+      network: process.env.GUEST_WIFI_NETWORK || '',
+      password: process.env.GUEST_WIFI_PASSWORD || '',
+    },
+  }, undefined, correlationId);
 });
 
 // POST: Update preferences (admin-only)

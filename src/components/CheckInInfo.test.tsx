@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import CheckInInfo from './CheckInInfo';
 
 const { dynamicMapMock, internalFetchMock } = vi.hoisted(() => ({
@@ -62,5 +62,29 @@ describe('CheckInInfo map integration', () => {
       expect.objectContaining({ categorySlug: 'phones', item: expect.objectContaining({ id: 'police' }) }),
       expect.objectContaining({ categorySlug: 'phones', item: expect.objectContaining({ id: 'emergency-112' }) }),
     ]));
+  });
+
+  it('renders Wi-Fi credentials only after the authenticated preferences response', async () => {
+    internalFetchMock.mockImplementation(async (input: string) => {
+      if (input === '/api/check-in/preferences') {
+        return {
+          ok: true,
+          json: async () => ({
+            data: {
+              checkInTime: '15:00',
+              checkOutTime: '11:00',
+              wifi: { network: 'GuestNetwork', password: 'private-password' },
+            },
+          }),
+        };
+      }
+      return { ok: false };
+    });
+
+    render(<CheckInInfo locale="en" />);
+
+    expect(screen.queryByText('private-password')).not.toBeInTheDocument();
+    expect(await screen.findByText('private-password')).toBeInTheDocument();
+    expect(screen.getAllByText('GuestNetwork').length).toBeGreaterThan(0);
   });
 });

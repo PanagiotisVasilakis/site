@@ -20,6 +20,8 @@ const envSchema = z.object({
   SECURITY_ENC_KEY_HEX: z.string().length(64, 'SECURITY_ENC_KEY_HEX must be exactly 64 hex characters'),
   SECURITY_PEPPER: z.string().min(16, 'SECURITY_PEPPER must be at least 16 characters'),
   SESSION_SECRET: z.string().min(32, 'SESSION_SECRET must be at least 32 characters'),
+  GUEST_WIFI_NETWORK: z.string().min(1, 'GUEST_WIFI_NETWORK is required'),
+  GUEST_WIFI_PASSWORD: z.string().min(8, 'GUEST_WIFI_PASSWORD must be at least 8 characters'),
 
   // API keys (optional but validated format if present)
   VALID_API_KEYS: z.string().optional(),
