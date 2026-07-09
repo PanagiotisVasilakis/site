@@ -47,6 +47,9 @@ main() {
   log 'Applying migrations'
   bash ./scripts/system-orchestrator.sh migrate --profile production --no-docker-fallback
 
+  log 'Restoring development test dependencies'
+  npm ci --include=dev --no-audit --no-fund
+
   log 'Running database-backed tests'
   npm run ci:test:db
 

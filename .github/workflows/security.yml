@@ -197,20 +197,7 @@ jobs:
         run: npm ci --audit=false
 
       - name: License compliance check
-        run: |
-          npx license-checker --onlyAllow 'MIT;Apache-2.0;BSD-2-Clause;BSD-3-Clause;ISC;Unlicense;WTFPL' --excludePrivatePackages --json > license-report.json || {
-            echo "License compliance check failed"
-            npx license-checker --summary
-            exit 1
-          }
-
-      - name: Upload license report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: license-compliance-report
-          path: license-report.json
-          retention-days: 30
+        run: npm run security:license-check
 
   security-summary:
     name: Security Summary
