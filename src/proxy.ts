@@ -13,7 +13,9 @@ function hasLocale(pathname: string) {
 // Initialize security middleware
 const securityMiddleware = createSecurityMiddleware({
   skipPaths: ['/api/health', '/favicon.ico', '/_next'],
-  enableNonce: true,
+  // Localized pages are statically generated, so their inline Next.js bootstrap
+  // scripts cannot receive a per-request nonce.
+  enableNonce: false,
 });
 
 export async function proxy(req: NextRequest) {

@@ -121,7 +121,7 @@ const developmentConfig: SecurityConfig = {
       baseUri: ["'self'"],
       formAction: ["'self'"],
     },
-    useNonce: true,
+    useNonce: false,
     reportUri: '/api/security/csp-report',
   },
   headers: {
@@ -206,7 +206,7 @@ const productionConfig: SecurityConfig = {
       baseUri: ["'self'"],
       formAction: ["'self'"],
     },
-    useNonce: true,
+    useNonce: false,
     reportUri: '/api/security/csp-report',
   },
   headers: {
