@@ -23,3 +23,32 @@ CI / Production
 Rotation & leakage
 
 - If `SECURITY_PEPPER` is ever leaked, rotate it in your secret store and reissue/rehash any dependent tokens as necessary.
+
+## Database credential incident response
+
+If a database URL or password is committed, deleting the file in a later commit is
+not sufficient because the value remains in Git history and existing clones.
+
+1. Revoke or rotate the exposed database credential at the provider immediately.
+2. Create separate least-privilege credentials for production, staging, and test.
+3. Update deployment and CI secret stores, then verify connectivity and review
+   provider access logs for unexpected activity.
+4. Remove tracked environment files and keep only `.env.example` in the repository.
+5. Run secret scanning against the current tree and Git history.
+
+History removal is a separate repository-owner operation. It rewrites commit IDs
+and requires a coordinated maintenance window:
+
+```bash
+git clone --mirror <repository-url> site-cleanup.git
+cd site-cleanup.git
+git filter-repo --invert-paths \
+  --path .env.production \
+  --path .env.staging \
+  --path .env.test
+# Review the rewritten repository before an explicitly approved force-push.
+```
+
+After an approved history rewrite, invalidate open pull-request branches that
+retain the old objects and require contributors to replace existing clones.
+Credential rotation must happen before any history rewrite.
