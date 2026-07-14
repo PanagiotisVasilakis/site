@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAdmin, signAdmin } from '@/lib/auth/admin';
+import { refreshAdminSession, signAdmin, verifyAdminSession } from '@/lib/auth/admin';
 import { withErrorHandler } from '@/lib/apiErrorHandler';
 import { logger } from '@/lib/logger-enterprise';
 import crypto from 'node:crypto';
@@ -13,30 +13,35 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return NextResponse.json({ error: 'No session found' }, { status: 401 });
   }
   
-  const payload = verifyAdmin(jwt);
+  const payload = await verifyAdminSession(jwt);
   if (!payload) {
     return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
   }
   
   // Validate that the token contains expected structure
-  if (!payload.role || payload.role !== 'admin') {
-    return NextResponse.json({ error: 'Invalid role' }, { status: 401 });
+  if (payload.type !== 'admin' || payload.role !== 'admin') {
+    return NextResponse.json({ error: 'Invalid admin session' }, { status: 401 });
   }
   
-  // Check token age - don't allow refresh of very old tokens
-  const tokenAge = Date.now() / 1000 - (payload.iat || 0);
-  if (tokenAge > 86400) { // 24 hours max token age
+  const loginAt = payload.login_at;
+  const sessionId = payload.session_id;
+  if (!loginAt || !sessionId || Date.now() / 1000 - loginAt > 86400) {
     return NextResponse.json({ error: 'Token too old' }, { status: 401 });
   }
-  
-  // Generate new session with clean payload and unique JTI
+
+  const expiresAt = await refreshAdminSession(sessionId);
+  if (!expiresAt) {
+    return NextResponse.json({ error: 'Session expired' }, { status: 401 });
+  }
+
   const cleanPayload = {
-    role: 'admin' as const, // Only preserve validated, expected claims
-    jti: crypto.randomUUID(), // Unique token identifier
-    refreshed_at: Math.floor(Date.now() / 1000)
+    jti: crypto.randomUUID(),
+    session_id: sessionId,
+    login_at: loginAt,
+    refreshed_at: Math.floor(Date.now() / 1000),
   };
-  
-  const fresh = signAdmin(cleanPayload, '2h');
+  const ttlSeconds = Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
+  const fresh = signAdmin(cleanPayload, ttlSeconds);
   const res = NextResponse.json({ success: true }, { status: 200 });
   
   // Enhanced cookie security

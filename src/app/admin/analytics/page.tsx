@@ -1,6 +1,6 @@
 import { topPaths, hourBuckets, dayBuckets, rollingAverage, percentile, vitalsSummary, stats, dailyNewPaths, vitalsRecent } from '@/lib/analyticsStore';
 import AdminSessionManager from '@/components/AdminSessionManager';
-import { verifyAdmin } from '@/lib/auth/admin';
+import { verifyAdminSession } from '@/lib/auth/admin';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
@@ -11,7 +11,7 @@ export default async function AnalyticsAdminPage() {
   const cookieStore = await cookies();
   const jwtCookie = cookieStore.get('admin_jwt');
 
-  if (!jwtCookie?.value || !verifyAdmin(jwtCookie.value)) {
+  if (!jwtCookie?.value || !(await verifyAdminSession(jwtCookie.value))) {
     // JWT is missing or invalid, redirect to login
     redirect('/admin/login?error=session_expired');
   }

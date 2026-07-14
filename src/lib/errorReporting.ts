@@ -47,7 +47,9 @@ class ErrorReporter {
 
   constructor() {
     this.sessionId = this.generateSessionId();
-    this.setupGlobalErrorHandlers();
+    if (typeof window !== 'undefined') {
+      this.setupGlobalErrorHandlers();
+    }
     this.addBreadcrumb('session', 'Session started', 'info');
   }
 
@@ -313,4 +315,3 @@ export function useErrorReporting() {
     trackUserInteraction: errorReporter.trackUserInteraction.bind(errorReporter),
   };
 }
-

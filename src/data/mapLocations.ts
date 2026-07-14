@@ -34,7 +34,6 @@ export interface MapLocation {
   category: string;
   markerType: MapMarkerType;
   href?: string;
-  price?: string;
   rating?: number;
   sourceUrls?: string[];
 }
@@ -59,8 +58,6 @@ export interface CategoryMapItem {
   directionsUrl?: string;
   sourceUrls?: string[];
   rating?: number;
-  price?: string;
-  priceLevel?: number;
   tags?: string[];
   location?: { lat: number; lng: number };
   slug?: string;
@@ -289,7 +286,6 @@ export function createMapLocationFromItem(
     category: categorySlug,
     markerType: markerTypeForItem(item, categorySlug),
     rating: item.rating,
-    price: item.price ?? (item.priceLevel ? '€'.repeat(item.priceLevel) : undefined),
     href: `/${eff}/${categorySlug}/${item.slug || item.id}`,
     sourceUrls: item.sourceUrls,
   };

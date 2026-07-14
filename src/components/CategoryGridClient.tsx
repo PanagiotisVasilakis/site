@@ -27,7 +27,6 @@ interface Item {
   name: string;
   summary?: string;
   rating?: number;
-  price?: string;
   tags?: string[];
   featured?: boolean;
   icon?: string;
@@ -42,7 +41,6 @@ interface Item {
   website?: string;
   directionsUrl?: string;
   sourceUrls?: string[];
-  priceLevel?: number;
   hideAddressOnFront?: boolean;
   categorySlug: string;
 }
@@ -142,7 +140,6 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
       summary={i.summary}
       description={i.description}
       rating={i.rating}
-      price={i.price}
       icon={i.icon}
       image={i.image}
       heroImage={i.heroImage}
@@ -192,7 +189,6 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
             title={i.name}
             subtitle={i.summary}
             rating={i.rating}
-            price={i.price}
             icon={i.icon}
             href={`/${locale}/${categorySlug}/${i.slug}`}
             favoriteId={`${categorySlug}:${i.id}`}

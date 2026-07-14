@@ -3,10 +3,12 @@
 beforeEach(() => {
   vi.resetModules();
   vi.restoreAllMocks();
+  process.env.TRUST_PROXY_HOPS = '1';
 });
 
 afterEach(() => {
   delete process.env.RATE_LIMIT_BACKEND;
+  delete process.env.TRUST_PROXY_HOPS;
 });
 
 function makeReq(path = '/'): any {
@@ -91,5 +93,19 @@ describe('RateLimitMiddleware', () => {
     (mw as any).config = { enabled: true, windowMs: 1000, maxRequests: 0, standardHeaders: true, legacyHeaders: false };
 
     expect(await mw.handle(makeReq('/en/apartment'))).toBeNull();
+  });
+
+  it('does not collapse requests into a shared bucket when no trusted client IP exists', async () => {
+    delete process.env.TRUST_PROXY_HOPS;
+    process.env.RATE_LIMIT_BACKEND = 'redis';
+    const incr = vi.fn().mockResolvedValue(100);
+    vi.doMock('@/lib/upstash', () => ({ incrWithExpire: incr }));
+
+    const mod = await import('../security-middleware');
+    const mw = new mod.RateLimitMiddleware();
+    (mw as any).config = { enabled: true, windowMs: 1000, maxRequests: 1, standardHeaders: true, legacyHeaders: false };
+
+    expect(await mw.handle(makeReq('/api/no-client-ip'))).toBeNull();
+    expect(incr).not.toHaveBeenCalled();
   });
 });

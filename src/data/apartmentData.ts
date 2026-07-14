@@ -103,13 +103,6 @@ const apartmentData = {
     ]
   },
 
-  pricing: {
-    basePrice: 65, // €65/night more realistic for Kalamata 2-bedroom
-    cleaningFee: 25,
-    serviceFee: 15,
-    currency: 'EUR'
-  },
-
   houseRules: {
     en: [
       'No smoking inside',
@@ -148,7 +141,6 @@ export function getApartmentContent(locale: 'en' | 'el' = 'en') {
     distances: data.distances[locale],
     houseRules: data.houseRules[locale],
     location: data.location,
-    specs: data.specs,
-    pricing: data.pricing
+    specs: data.specs
   };
 }

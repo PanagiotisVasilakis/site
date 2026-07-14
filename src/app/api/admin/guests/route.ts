@@ -22,7 +22,7 @@ const handler = async (request: NextRequest) => {
   const earlyResponse = guard(request);
   if (earlyResponse) return earlyResponse;
 
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     throw new ApiError(ApiErrorCode.FORBIDDEN, 'Admin credentials required');
   }
 

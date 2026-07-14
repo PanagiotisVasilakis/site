@@ -18,7 +18,14 @@ export function createBookingLastNameTokens(lastName: string): {
   lastNameToken: string;
   lastNameTokenNoWs: string;
 } {
-  const normalized = normalizeBookingLastName(lastName);
+  return createBookingLastNameTokensFromNormalized(normalizeBookingLastName(lastName));
+}
+
+export function createBookingLastNameTokensFromNormalized(normalizedLastName: string): {
+  lastNameToken: string;
+  lastNameTokenNoWs: string;
+} {
+  const normalized = normalizedLastName;
   const normalizedNoWs = normalized.replace(/\s+/g, '');
   return {
     lastNameToken: hmacDeterministic(normalized),
@@ -52,18 +59,22 @@ export function hashLegacyBookingLastNameNoWsToken(value: string): string {
   return hmacDeterministic(normalizeBookingLastName(value).replace(/\s+/g, ''));
 }
 
-export function buildBookingLastNameTokenSearchValues(lastName: string): string[] {
+export function buildBookingLastNameTokenSearchValues(
+  lastName: string,
+  options: { includeLegacyRaw?: boolean } = {},
+): string[] {
+  const includeLegacyRaw = options.includeLegacyRaw ?? true;
   const normalized = normalizeBookingLastName(lastName);
   const normalizedNoWs = normalized.replace(/\s+/g, '');
   const hmacTokens = normalized
-    ? createBookingLastNameTokens(normalized)
+    ? createBookingLastNameTokensFromNormalized(normalized)
     : undefined;
 
   return unique([
     hmacTokens?.lastNameToken,
     hmacTokens?.lastNameTokenNoWs,
-    normalized || undefined,
-    normalizedNoWs || undefined,
+    includeLegacyRaw ? normalized || undefined : undefined,
+    includeLegacyRaw ? normalizedNoWs || undefined : undefined,
   ]);
 }
 

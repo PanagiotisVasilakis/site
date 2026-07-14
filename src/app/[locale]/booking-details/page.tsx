@@ -14,7 +14,7 @@ export default async function BookingDetailsPage({ params }: BookingDetailsPageP
 
   const sections = [
     { title: dp?.howToBookTitle, items: dp?.howToBook },
-    { title: dp?.pricingTitle, items: dp?.pricing },
+    { title: dp?.availabilityTitle, items: dp?.availability },
     { title: dp?.cancellationTitle, items: dp?.cancellation },
   ];
 

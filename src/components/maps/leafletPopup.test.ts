@@ -15,6 +15,7 @@ describe('leaflet popup presentation', () => {
       website: 'Website',
       details: 'Details',
       locateMe: 'Locate',
+      locationUnavailable: 'Location unavailable',
       fitToMarkers: 'Fit',
       zoomIn: 'Zoom in',
       zoomOut: 'Zoom out',

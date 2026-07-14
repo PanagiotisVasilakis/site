@@ -135,7 +135,7 @@ const developmentConfig: SecurityConfig = {
     contentTypeOptions: true,
     referrerPolicy: 'strict-origin-when-cross-origin',
     permissionsPolicy: {
-      geolocation: [],
+      geolocation: ['self'],
       microphone: [],
       camera: [],
       payment: [],
@@ -194,7 +194,9 @@ const productionConfig: SecurityConfig = {
     reportOnly: false, // Enforce in production
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"], // Remove unsafe-eval in production
+      // unsafe-inline remains as fallback for static localized pages that cannot
+      // receive a per-request nonce. Nonce-enabled routes strip it in buildCSPDirective.
+      scriptSrc: ["'self'", "'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
@@ -206,7 +208,7 @@ const productionConfig: SecurityConfig = {
       baseUri: ["'self'"],
       formAction: ["'self'"],
     },
-    useNonce: false,
+    useNonce: true,
     reportUri: '/api/security/csp-report',
   },
   headers: {
@@ -220,7 +222,7 @@ const productionConfig: SecurityConfig = {
     contentTypeOptions: true,
     referrerPolicy: 'strict-origin-when-cross-origin',
     permissionsPolicy: {
-      geolocation: [],
+      geolocation: ['self'],
       microphone: [],
       camera: [],
       payment: [],
@@ -243,9 +245,9 @@ const productionConfig: SecurityConfig = {
   },
   cors: {
     enabled: true,
-    origins: process.env.ALLOWED_ORIGINS?.split(',') || ['https://yourdomain.com'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    origins: process.env.ALLOWED_ORIGINS?.split(',').map((origin) => origin.trim()).filter(Boolean) || [],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'X-API-Key'],
     credentials: true,
     maxAge: 86400,
   },
@@ -268,7 +270,7 @@ const productionConfig: SecurityConfig = {
       enabled: true,
     },
     apiKeyAuth: {
-      enabled: true, // Enabled in production
+      enabled: true, // Available in production for routes that opt in
     },
   },
 };
@@ -398,4 +400,3 @@ export function validateSecurityConfig(): void {
     throw new Error('Security configuration validation failed - critical error');
   }
 }
-

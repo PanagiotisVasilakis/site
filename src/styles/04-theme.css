@@ -37,8 +37,8 @@
   /* Dark mode text colors - two visible tones */
   --fg-default: #e2e8f0;
   /* Primary text - light but not too bright */
-  --fg-muted: #64748b;
-  /* Secondary text - darker for more distinction */
+  --fg-muted: #94a3b8;
+  /* Secondary text remains visually distinct while meeting WCAG AA on dark surfaces. */
 
   /* Badge tokens (dark) */
   --badge-info-bg: rgba(17, 25, 26, 0.55);

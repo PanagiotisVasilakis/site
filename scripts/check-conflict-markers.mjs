@@ -13,7 +13,14 @@ if (tracked.status !== 0) {
   process.exit(2);
 }
 
-const markerPattern = /^(?:<{7}|={7}|>{7}|\|{7})(?: .*)?$/;
+function isConflictMarker(line) {
+  const markerCharacter = line[0];
+  if (!['<', '=', '>', '|'].includes(markerCharacter)) return false;
+  const marker = markerCharacter.repeat(7);
+  if (!line.startsWith(marker)) return false;
+  const suffix = line.slice(marker.length);
+  return suffix.length === 0 || suffix.startsWith(' ');
+}
 const failures = [];
 
 for (const file of tracked.stdout.split('\0').filter(Boolean)) {
@@ -28,7 +35,7 @@ for (const file of tracked.stdout.split('\0').filter(Boolean)) {
 
   const lines = content.toString('utf8').split(/\r?\n/);
   lines.forEach((line, index) => {
-    if (markerPattern.test(line)) {
+    if (isConflictMarker(line)) {
       failures.push(`${file}:${index + 1}`);
     }
   });

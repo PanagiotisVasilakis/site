@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import internalFetch from '@/lib/internalFetchClient';
-import { persistAdminSecretFromUrl } from '@/lib/adminClientSession';
 import { Badge, EmptyPanel, MetricCard, Surface } from '@/components/ui';
 
 type RequestStatus = 'pending' | 'approved' | 'rejected';
@@ -107,7 +106,6 @@ export default function AdminRequestsClient() {
   }, []);
 
   useEffect(() => {
-    persistAdminSecretFromUrl();
     loadRequests('pending');
   }, [loadRequests]);
 

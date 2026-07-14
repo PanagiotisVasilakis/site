@@ -4,6 +4,8 @@ import crypto from 'node:crypto';
 import { logger } from '@/lib/logger-enterprise';
 import type { AnalyticsHit, Vital } from './analyticsStore';
 
+// FileAdapter paths are fixed under process.cwd(); backup names are validated and confined below.
+
 export interface AnalyticsPersistenceData {
   hits: AnalyticsHit[];
   vitals: Vital[];
@@ -85,6 +87,12 @@ class FileAdapter implements AnalyticsStorageAdapter {
   private tempFile = path.join(process.cwd(), 'analytics-data.json.tmp');
   private backupDir = path.join(process.cwd(), 'analytics-backups');
   private maxBackups = 5; // Keep last 5 backups
+
+  private resolveBackupPath(backupName: string): string | null {
+    if (!/^analytics-backup-[0-9TZ-]+\.json$/.test(backupName)) return null;
+    const resolved = path.resolve(this.backupDir, backupName);
+    return resolved.startsWith(`${path.resolve(this.backupDir)}${path.sep}`) ? resolved : null;
+  }
 
   constructor() {
     // Ensure backup directory exists
@@ -223,7 +231,8 @@ class FileAdapter implements AnalyticsStorageAdapter {
       if (backups.length > this.maxBackups) {
         const toDelete = backups.slice(this.maxBackups);
         for (const backup of toDelete) {
-          const backupPath = path.join(this.backupDir, backup);
+          const backupPath = this.resolveBackupPath(backup);
+          if (!backupPath) continue;
           fs.unlinkSync(backupPath);
           logger.info(`Deleted old backup: ${backup}`);
         }
@@ -235,7 +244,8 @@ class FileAdapter implements AnalyticsStorageAdapter {
 
   restore(backupName: string): AnalyticsPersistenceData | null {
     try {
-      const backupPath = path.join(this.backupDir, backupName);
+      const backupPath = this.resolveBackupPath(backupName);
+      if (!backupPath) return null;
       if (!fs.existsSync(backupPath)) return null;
       
       const raw = fs.readFileSync(backupPath, 'utf-8');
@@ -306,10 +316,12 @@ class KvAdapter implements AnalyticsStorageAdapter {
 }
 
 export function createStorageAdapter(): AnalyticsStorageAdapter {
-  const mode = process.env.ANALYTICS_STORAGE || 'file';
-  if (process.env.VERCEL) return new NoopAdapter();
+  const mode = (process.env.ANALYTICS_STORAGE || 'file').toLowerCase();
   if (mode === 'none') return new NoopAdapter();
   if (mode === 'kv') return new KvAdapter();
-  // Future: implement 'kv' | 'cloud' adapters here
+  if (process.env.VERCEL) {
+    logger.warn('Analytics file persistence is disabled on Vercel; set ANALYTICS_STORAGE=kv or none');
+    return new NoopAdapter();
+  }
   return new FileAdapter();
 }

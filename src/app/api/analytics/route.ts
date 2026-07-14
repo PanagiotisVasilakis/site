@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { logger } from '@/lib/logger-enterprise';
 import { getClientIp } from '@/lib/net/getClientIp';
+import { isAdminRequest } from '@/lib/rbac';
 
 // Rate limiting configuration
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
@@ -174,7 +175,11 @@ export async function POST(req: NextRequest) {
 }
 
 // Lightweight stats endpoint (not listed in sitemap)
-export async function GET() {
+export async function GET(request?: NextRequest) {
+  if (!request || !(await isAdminRequest(request))) {
+    return Response.json({ error: 'Admin credentials required' }, { status: 403 });
+  }
+
   // Provide a lightweight analytics view for internal dashboards
   const hits = getHits();
   const vitals = vitalsRecent();

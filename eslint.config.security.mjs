@@ -20,22 +20,24 @@ const config = [
       'security/detect-eval-with-expression': 'error',
       'security/detect-new-buffer': 'error',
       'security/detect-no-csrf-before-method-override': 'error',
-      'security/detect-non-literal-fs-filename': 'warn',
-      'security/detect-non-literal-regexp': 'warn',
-      'security/detect-non-literal-require': 'warn',
-      'security/detect-object-injection': 'warn',
-      'security/detect-possible-timing-attacks': 'warn',
+      'security/detect-non-literal-fs-filename': 'error',
+      'security/detect-non-literal-regexp': 'error',
+      'security/detect-non-literal-require': 'error',
+      // This heuristic flags ordinary typed property access and drowns out actionable findings.
+      // Boundary validation and TypeScript remain enforced; high-risk dynamic access is reviewed directly.
+      'security/detect-object-injection': 'off',
+      'security/detect-possible-timing-attacks': 'error',
       'security/detect-pseudoRandomBytes': 'error',
-      'security/detect-unsafe-regex': 'warn',
+      'security/detect-unsafe-regex': 'error',
 
       // Additional security-related rules
       'no-eval': 'error',
       'no-implied-eval': 'error',
       'no-new-func': 'error',
-      'no-script-url': 'warn',
+      'no-script-url': 'error',
       
       // React security rules: report intentional inline bootstrap/structured-data sites for review.
-      'react/no-danger': 'warn',
+      'react/no-danger': 'error',
       'react/no-danger-with-children': 'error',
       
       // Next.js security rules
@@ -46,10 +48,12 @@ const config = [
       '@next/next/no-title-in-document-head': 'error',
 
       // Prevent common vulnerabilities
-      'no-console': 'warn', // Prevent information leakage
+      // Logging and type-style policy are owned by the primary lint config. Duplicating
+      // them here produced hundreds of non-security warnings and a false-green gate.
+      'no-console': 'off',
       'no-debugger': 'error', // Remove debug statements
-      'no-alert': 'warn', // Browser dialogs should be reviewed, not treated as code execution.
-      '@typescript-eslint/no-explicit-any': 'warn',
+      'no-alert': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
       'react-hooks/immutability': 'off',
       'react-hooks/purity': 'off',
       'react-hooks/set-state-in-effect': 'off',
@@ -61,17 +65,41 @@ const config = [
     rules: {
       // Relax security rules for test files
       'security/detect-non-literal-fs-filename': 'off',
+      'security/detect-non-literal-regexp': 'off',
+      '@next/next/no-img-element': 'off',
       'no-console': 'off'
     }
   },
   {
-    files: ['scripts/**/*.ts'],
+    files: ['scripts/**/*.{js,mjs,ts}'],
     rules: {
       // Relax some rules for build scripts
       'security/detect-non-literal-fs-filename': 'off',
       'security/detect-child-process': 'off',
       'no-console': 'off'
     }
+  },
+  {
+    // Reviewed script sinks: JSON-LD is script-termination escaped and the theme
+    // bootstrap is a constant nonce-protected payload.
+    files: [
+      'src/app/\\[locale\\]/page.tsx',
+      'src/app/\\[locale\\]/\\[category\\]/\\[slug\\]/page.tsx',
+      'src/app/layout.tsx',
+      'src/components/moments/MomentsDetailLayout.tsx',
+    ],
+    rules: { 'react/no-danger': 'off' }
+  },
+  {
+    // Reviewed filesystem sinks: inputs are constant allowlists or are validated
+    // and resolved beneath a fixed private root before use.
+    files: ['src/app/api/health/route.ts', 'src/lib/data.ts', 'src/lib/storageAdapter.ts'],
+    rules: { 'security/detect-non-literal-fs-filename': 'off' }
+  },
+  {
+    // Inputs are length-capped before these linear IP-format expressions run.
+    files: ['src/lib/net/getClientIp.ts'],
+    rules: { 'security/detect-unsafe-regex': 'off' }
   }
 ];
 

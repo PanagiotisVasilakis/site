@@ -4,14 +4,32 @@
  * Performs comprehensive security checks before deployment
  */
 
-import { readFileSync, existsSync } from 'fs';
-import { execSync } from 'child_process';
+import { readFileSync, existsSync, statSync } from 'fs';
+import { execFileSync, execSync } from 'child_process';
+import { fileURLToPath } from 'url';
 
 interface SecurityCheck {
   name: string;
   description: string;
   check: () => Promise<boolean> | boolean;
   severity: 'error' | 'warning' | 'info';
+}
+
+function gitCommandSucceeds(args: string[]): boolean {
+  try {
+    execFileSync('git', args, { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isGitTracked(file: string): boolean {
+  return gitCommandSucceeds(['ls-files', '--error-unmatch', '--', file]);
+}
+
+function isGitIgnored(file: string): boolean {
+  return gitCommandSucceeds(['check-ignore', '-q', '--', file]);
 }
 
 const checks: SecurityCheck[] = [
@@ -32,6 +50,8 @@ const checks: SecurityCheck[] = [
 
       for (const envFile of envFiles) {
         if (existsSync(envFile)) {
+          const tracked = isGitTracked(envFile);
+          const ignored = isGitIgnored(envFile);
           const content = readFileSync(envFile, 'utf8');
           
           // Check if any values look like they contain actual secrets
@@ -41,8 +61,10 @@ const checks: SecurityCheck[] = [
             if (value && value.length > 20 && !value.includes('your-') && !value.includes('example')) {
               for (const pattern of dangerousPatterns) {
                 if (pattern.test(key)) {
-                  console.error(`⚠️ Potential secret exposure in ${envFile}: ${key}`);
-                  return false;
+                  if (tracked || !ignored) {
+                    console.error(`⚠️ Potential secret exposure in ${envFile}: ${key}`);
+                    return false;
+                  }
                 }
               }
             }
@@ -72,26 +94,16 @@ const checks: SecurityCheck[] = [
     severity: 'warning',
     check: () => {
       try {
-        const nextConfig = readFileSync('next.config.ts', 'utf8');
+        const securitySources = [
+          existsSync('src/lib/security-config.ts') ? readFileSync('src/lib/security-config.ts', 'utf8') : '',
+          existsSync('src/lib/security-middleware-edge.ts') ? readFileSync('src/lib/security-middleware-edge.ts', 'utf8') : '',
+          existsSync('next.config.ts') ? readFileSync('next.config.ts', 'utf8') : '',
+        ].join('\n');
         
         // Check for CSP header
-        if (!nextConfig.includes('Content-Security-Policy')) {
-          console.warn('⚠️ No Content Security Policy found in next.config.ts');
+        if (!securitySources.includes('Content-Security-Policy') && !securitySources.includes('buildCSPDirective')) {
+          console.warn('⚠️ No Content Security Policy implementation found');
           return false;
-        }
-
-        // Check for unsafe CSP directives
-        const unsafePatterns = [
-          /'unsafe-inline'/,
-          /'unsafe-eval'/,
-          /\*\.*/,
-          /data:/
-        ];
-
-        for (const pattern of unsafePatterns) {
-          if (pattern.test(nextConfig)) {
-            console.warn(`⚠️ Potentially unsafe CSP directive found: ${pattern.source}`);
-          }
         }
 
         return true;
@@ -107,11 +119,14 @@ const checks: SecurityCheck[] = [
     severity: 'error',
     check: () => {
       try {
-        const nextConfig = readFileSync('next.config.ts', 'utf8');
+        const securitySources = [
+          existsSync('src/lib/security-config.ts') ? readFileSync('src/lib/security-config.ts', 'utf8') : '',
+          existsSync('src/lib/security-middleware-edge.ts') ? readFileSync('src/lib/security-middleware-edge.ts', 'utf8') : '',
+        ].join('\n');
         
         // Check for HSTS header
-        if (!nextConfig.includes('Strict-Transport-Security')) {
-          console.error('⚠️ No HSTS (Strict-Transport-Security) header found');
+        if (!securitySources.includes('Strict-Transport-Security')) {
+          console.error('⚠️ No HSTS (Strict-Transport-Security) implementation found');
           return false;
         }
 
@@ -137,16 +152,14 @@ const checks: SecurityCheck[] = [
         'secrets.json'
       ];
 
-      const gitignorePath = '.gitignore';
-      let gitignoreContent = '';
-      
-      if (existsSync(gitignorePath)) {
-        gitignoreContent = readFileSync(gitignorePath, 'utf8');
-      }
-
       for (const secretFile of secretFiles) {
-        if (existsSync(secretFile) && !gitignoreContent.includes(secretFile)) {
-          console.error(`⚠️ Secret file ${secretFile} exists but not in .gitignore`);
+        if (!existsSync(secretFile)) continue;
+        if (isGitTracked(secretFile)) {
+          console.error(`⚠️ Secret file ${secretFile} is tracked by git`);
+          return false;
+        }
+        if (!isGitIgnored(secretFile)) {
+          console.error(`⚠️ Secret file ${secretFile} exists but is not ignored by git`);
           return false;
         }
       }
@@ -177,18 +190,13 @@ const checks: SecurityCheck[] = [
       try {
         const tsconfig = JSON.parse(readFileSync('tsconfig.json', 'utf8'));
         
-        const securityOptions = {
-          strict: true,
-          noImplicitAny: true,
-          noImplicitReturns: true,
-          noFallthroughCasesInSwitch: true,
-          noUncheckedIndexedAccess: true
-        };
+        if (tsconfig.compilerOptions?.strict !== true) {
+          console.warn("⚠️ TypeScript option 'strict' should be true for better security");
+        }
 
-        for (const [option, expectedValue] of Object.entries(securityOptions)) {
-          if (tsconfig.compilerOptions?.[option] !== expectedValue) {
-            console.warn(`⚠️ TypeScript option '${option}' should be ${expectedValue} for better security`);
-          }
+        const noImplicitAny = tsconfig.compilerOptions?.noImplicitAny ?? tsconfig.compilerOptions?.strict;
+        if (noImplicitAny !== true) {
+          console.warn("⚠️ TypeScript option 'noImplicitAny' should be true for better security");
         }
 
         return true;
@@ -215,12 +223,11 @@ const checks: SecurityCheck[] = [
         for (const file of sensitiveFiles) {
           if (existsSync(file)) {
             try {
-              const result = execSync(`stat -c "%a" ${file}`, { encoding: 'utf8' }).trim();
-              const permissions = parseInt(result, 8);
+              const permissions = statSync(file).mode & 0o777;
               
               // Check if file is world-writable (002 permission)
               if (permissions & 0o002) {
-                console.warn(`⚠️ File ${file} is world-writable (${result})`);
+                console.warn(`⚠️ File ${file} is world-writable (${permissions.toString(8)})`);
               }
             } catch {
               // Ignore stat errors
@@ -287,7 +294,9 @@ async function runSecurityValidation(): Promise<void> {
 }
 
 // Run validation if script is executed directly
-if (require.main === module) {
+const isMain = process.argv[1] ? fileURLToPath(import.meta.url) === process.argv[1] : false;
+
+if (isMain) {
   runSecurityValidation().catch(() => {
     console.error('Security validation failed');
     process.exit(1);

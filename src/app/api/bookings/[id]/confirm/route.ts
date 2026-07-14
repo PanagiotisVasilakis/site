@@ -3,8 +3,9 @@ import { guestStore } from '@/lib/guestDataStore';
 import {
   createRefreshCookie,
   createSessionCookie,
+  issueGuestSession,
   parseGuestSession,
-  signGuestSession,
+  verifyGuestSessionAccess,
 } from '@/lib/guestSession';
 import { logger } from '@/lib/logger-enterprise';
 import { locales, defaultLocale } from '@/i18n/config';
@@ -81,7 +82,9 @@ export async function POST(request: NextRequest, context: NextAppRouteContext) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
     }
 
-    const existingSession = parseGuestSession(request.cookies.get('guest_session')?.value);
+    const existingSession = await verifyGuestSessionAccess(
+      parseGuestSession(request.cookies.get('guest_session')?.value),
+    );
     const sessionOwnsBooking = Boolean(
       existingSession?.booking?.id === booking.id
       && existingSession.user?.id
@@ -108,7 +111,7 @@ export async function POST(request: NextRequest, context: NextAppRouteContext) {
 
     await guestStore.setAccess(userId, booking.id, 'VERIFIED');
 
-    const token = signGuestSession({ user: { id: userId }, booking: { id: booking.id } });
+    const token = await issueGuestSession(userId, booking.id);
     const sessionCookie = createSessionCookie(token);
     const locale = resolveLocale(request);
     const redirectUrl = `/${locale}/check-in?bookingId=${encodeURIComponent(booking.id)}`;

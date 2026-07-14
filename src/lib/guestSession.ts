@@ -1,12 +1,18 @@
-import { sign, verify, JwtPayload, SignOptions } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
+import type { JwtPayload, SignOptions } from 'jsonwebtoken';
+import crypto from 'node:crypto';
 import { cookies } from 'next/headers';
 import { logger } from '@/lib/logger-enterprise';
+
+const { sign, verify } = jwt;
 
 export type BookingSource = 'ONSITE' | 'EXTERNAL';
 export type BookingStatus = 'PENDING' | 'VERIFIED' | 'NONE';
 
 // Minimal JWT payload: only identifiers and exp (from JWT). No PII.
 export interface GuestSessionPayload extends JwtPayload {
+  type: 'guest';
+  sid?: string;
   user?: { id: string };
   booking?: { id?: string };
 }
@@ -22,14 +28,22 @@ function getGuestJwtSecret(): string {
   return secret || 'dev-guest-secret-change-me';
 }
 
-export function signGuestSession(payload: GuestSessionPayload, expiresIn: NonNullable<SignOptions['expiresIn']> = '2h'): string {
-  return sign(payload, getGuestJwtSecret(), { expiresIn });
+export function signGuestSession(
+  payload: Omit<GuestSessionPayload, 'type'> & { type?: 'guest' },
+  expiresIn: NonNullable<SignOptions['expiresIn']> = '2h',
+): string {
+  return sign({ ...payload, type: 'guest' }, getGuestJwtSecret(), {
+    expiresIn,
+    algorithm: 'HS256',
+  });
 }
 
 export function parseGuestSession(token: string | undefined | null): GuestSessionPayload | null {
   if (!token) return null;
   try {
-    return verify(token, getGuestJwtSecret()) as GuestSessionPayload;
+    const payload = verify(token, getGuestJwtSecret(), { algorithms: ['HS256'] }) as GuestSessionPayload;
+    if (payload.type !== 'guest') return null;
+    return payload;
   } catch (error) {
     logger.warn('Failed to parse guest session token', { error });
     return null;
@@ -47,8 +61,76 @@ export async function getGuestSessionFromCookies(): Promise<GuestSessionPayload 
   }
 }
 
+const SESSION_TTL_SECONDS = 2 * 60 * 60;
+
+export async function issueGuestSession(userId: string, bookingId: string): Promise<string> {
+  const { prisma } = await import('@/lib/prisma');
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + SESSION_TTL_SECONDS * 1000);
+  const session = await prisma.session.create({
+    data: {
+      id: crypto.randomUUID(),
+      userId,
+      bookingId,
+      expiresAt,
+    },
+  });
+
+  return signGuestSession({
+    sid: session.id,
+    user: { id: userId },
+    booking: { id: bookingId },
+  }, SESSION_TTL_SECONDS);
+}
+
+export async function verifyGuestSessionAccess(
+  session: GuestSessionPayload | null | undefined,
+): Promise<GuestSessionPayload | null> {
+  const userId = session?.user?.id;
+  const bookingId = session?.booking?.id;
+  const sessionId = session?.sid;
+  if (!userId || !bookingId || !sessionId) return null;
+
+  const { prisma } = await import('@/lib/prisma');
+  const now = new Date();
+  const [sessionRecord, access] = await Promise.all([
+    prisma.session.findUnique({ where: { id: sessionId } }),
+    prisma.access.findUnique({
+      where: { userId_bookingId: { userId, bookingId } },
+      include: { booking: true },
+    }),
+  ]);
+
+  if (!sessionRecord
+    || sessionRecord.userId !== userId
+    || sessionRecord.bookingId !== bookingId
+    || sessionRecord.revokedAt
+    || sessionRecord.expiresAt <= now
+    || !access
+    || access.status !== 'VERIFIED'
+    || access.booking.userId !== userId
+    || access.booking.endDate < new Date(now.toISOString().slice(0, 10))) {
+    return null;
+  }
+
+  return session;
+}
+
+export async function getVerifiedGuestSessionFromCookies(): Promise<GuestSessionPayload | null> {
+  return verifyGuestSessionAccess(await getGuestSessionFromCookies());
+}
+
+export async function revokeGuestSession(session: GuestSessionPayload | null | undefined): Promise<void> {
+  if (!session?.sid) return;
+  const { prisma } = await import('@/lib/prisma');
+  await prisma.session.updateMany({
+    where: { id: session.sid, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+}
+
 export function hasVerifiedBookingSession(session: GuestSessionPayload | null | undefined): boolean {
-  return !!(session && session.booking && session.booking.id);
+  return !!(session?.sid && session.user?.id && session.booking?.id);
 }
 
 export function createSessionCookie(token: string): { name: string; value: string; options: { httpOnly: boolean; sameSite: 'lax'; secure: boolean; path: string; maxAge: number } } {

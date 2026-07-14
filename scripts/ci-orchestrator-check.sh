@@ -16,6 +16,53 @@ require_env() {
   }
 }
 
+trim() {
+  local value="$1"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "$value"
+}
+
+load_env_file_if_present() {
+  local file_path="$1"
+  [[ -f "$file_path" ]] || return 0
+  log "Loading env file: ${file_path#$REPO_ROOT/}"
+
+  local raw line key value first_char last_char
+  while IFS= read -r raw || [[ -n "$raw" ]]; do
+    line="${raw%$'\r'}"
+    line="$(trim "$line")"
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    [[ "$line" == export\ * ]] && line="${line#export }"
+    [[ "$line" == *=* ]] || continue
+
+    key="$(trim "${line%%=*}")"
+    value="$(trim "${line#*=}")"
+    [[ -n "$key" ]] || continue
+
+    if [[ ${#value} -ge 2 ]]; then
+      first_char="${value:0:1}"
+      last_char="${value: -1}"
+      if [[ "$first_char" == '"' && "$last_char" == '"' ]]; then
+        value="${value:1:${#value}-2}"
+      elif [[ "$first_char" == "'" && "$last_char" == "'" ]]; then
+        value="${value:1:${#value}-2}"
+      fi
+    fi
+
+    if [[ -z "${!key:-}" ]]; then
+      export "$key=$value"
+    fi
+  done < "$file_path"
+}
+
+load_environment() {
+  local candidate
+  for candidate in ".env.production.local" ".env.local" ".env.production" ".env"; do
+    load_env_file_if_present "$REPO_ROOT/$candidate"
+  done
+}
+
 set_default_test_secrets() {
   export NODE_ENV="${NODE_ENV:-production}"
   export ADMIN_JWT_SECRET="${ADMIN_JWT_SECRET:-ci-admin-jwt-secret-should-be-32-chars-0001}"
@@ -36,6 +83,7 @@ set_default_test_secrets() {
 
 main() {
   cd "$REPO_ROOT"
+  load_environment
   set_default_test_secrets
   require_env DATABASE_URL
   require_env TEST_DATABASE_URL

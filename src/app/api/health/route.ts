@@ -84,6 +84,7 @@ async function resolveMemoryLimitBytes(): Promise<number> {
 
   for (const limitFile of CGROUP_MEMORY_LIMIT_FILES) {
     try {
+      // The path comes exclusively from the module-private CGROUP_MEMORY_LIMIT_FILES allowlist.
       const raw = await readFile(/*turbopackIgnore: true*/ limitFile, 'utf8');
       const parsed = parseMemoryLimit(raw);
       if (parsed !== null) {

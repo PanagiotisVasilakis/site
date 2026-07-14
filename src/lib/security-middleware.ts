@@ -14,6 +14,7 @@ import {
 } from '@/lib/security-config';
 import { metrics } from '@/lib/metrics-collector';
 import { getClientIP } from '@/lib/requestUtils';
+import { getClientIp } from '@/lib/net/getClientIp';
 
 // Security headers cache to avoid recalculating on every request
 let securityHeadersCache: Record<string, string> | null = null;
@@ -219,6 +220,7 @@ export class RateLimitMiddleware {
     if (!request.nextUrl.pathname.startsWith('/api/')) return null;
 
     const key = this.generateKey(request);
+    if (!key) return null;
     const now = Date.now();
     const resetTime = now + this.config.windowMs;
 
@@ -253,7 +255,9 @@ export class RateLimitMiddleware {
           return null;
         } catch (err) {
           // Upstash failed - fall back to in-memory gracefully
-          console.error('Upstash rate limit error:', err);
+          if (process.env.NODE_ENV !== 'test') {
+            console.error('Upstash rate limit error:', err);
+          }
           // Record fallback occurrence
           metrics.counter('rate_limit.fallback_in_memory', 1, { backend: 'redis' });
           return this.handleInMemory(request, key, now, resetTime);
@@ -263,7 +267,9 @@ export class RateLimitMiddleware {
       // If Redis isn't configured and we're not in Edge, still fall back to in-memory
       return this.handleInMemory(request, key, now, resetTime);
     } catch (error) {
-      console.error('Rate limiting error:', error);
+      if (process.env.NODE_ENV !== 'test') {
+        console.error('Rate limiting error:', error);
+      }
       return this.handleInMemory(request, key, now, resetTime);
     }
   }
@@ -302,8 +308,9 @@ export class RateLimitMiddleware {
     return null;
   }
 
-  private generateKey(request: NextRequest): string {
-    const ip = getClientIP(request);
+  private generateKey(request: NextRequest): string | null {
+    const ip = getClientIp(request, { trustProxy: true });
+    if (ip === 'unknown') return null;
     const path = request.nextUrl.pathname;
     return `${ip}:${path}`;
   }
@@ -351,6 +358,14 @@ export class CORSMiddleware {
     return null;
   }
 
+  public applyActualRequestHeaders(request: NextRequest, response: NextResponse): void {
+    const origin = request.headers.get('origin');
+    if (!this.config.enabled || !origin || !this.isOriginAllowed(origin)) return;
+    response.headers.set('Access-Control-Allow-Origin', origin);
+    response.headers.append('Vary', 'Origin');
+    if (this.config.credentials) response.headers.set('Access-Control-Allow-Credentials', 'true');
+  }
+
   private handlePreflight(request: NextRequest, origin: string | null): NextResponse {
     const response = new NextResponse(null, { status: 200 });
 
@@ -389,9 +404,14 @@ export function createSecurityMiddleware(options?: SecurityMiddlewareOptions) {
 
     // Check rate limiting (now async)
     const rateLimitResponse = await rateLimit.handle(request);
-    if (rateLimitResponse) return rateLimitResponse;
+    if (rateLimitResponse) {
+      cors.applyActualRequestHeaders(request, rateLimitResponse);
+      return rateLimitResponse;
+    }
 
     // Apply security headers
-    return securityHeaders.handle(request);
+    const response = securityHeaders.handle(request);
+    cors.applyActualRequestHeaders(request, response);
+    return response;
   };
 }

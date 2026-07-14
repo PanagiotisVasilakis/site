@@ -466,6 +466,7 @@ export default function CheckInInfo({
   const [tempCheckOutTime, setTempCheckOutTime] = useState('11:00');
   const [savingTimes, setSavingTimes] = useState(false);
   const [timesSaved, setTimesSaved] = useState(false);
+  const [timesSaveError, setTimesSaveError] = useState('');
   const [arrivalRequest, setArrivalRequest] = useState<ArrivalRequest | null>(null);
   const [isRequestingArrival, setIsRequestingArrival] = useState(false);
   const [requestedArrivalTime, setRequestedArrivalTime] = useState('15:00');
@@ -537,6 +538,7 @@ export default function CheckInInfo({
   const handleSaveTimes = async () => {
     setSavingTimes(true);
     setTimesSaved(false);
+    setTimesSaveError('');
     try {
       const res = await internalFetch('/api/check-in/preferences', {
         method: 'POST',
@@ -558,11 +560,11 @@ export default function CheckInInfo({
       } else {
         const error = await res.json();
         const unknownError = isGreek ? 'Άγνωστο σφάλμα' : 'Unknown error';
-        alert(`${isGreek ? 'Αποτυχία αποθήκευσης' : 'Failed to save'}: ${error.error?.message || unknownError}`);
+        setTimesSaveError(`${isGreek ? 'Αποτυχία αποθήκευσης' : 'Failed to save'}: ${error.error?.message || unknownError}`);
       }
     } catch (error) {
       console.error('Failed to save preferences:', error);
-      alert(isGreek ? 'Αποτυχία αποθήκευσης προτιμήσεων. Παρακαλώ δοκιμάστε ξανά.' : 'Failed to save preferences. Please try again.');
+      setTimesSaveError(isGreek ? 'Αποτυχία αποθήκευσης προτιμήσεων. Παρακαλώ δοκιμάστε ξανά.' : 'Failed to save preferences. Please try again.');
     } finally {
       setSavingTimes(false);
     }
@@ -747,6 +749,11 @@ export default function CheckInInfo({
                   {timesSaved && (
                     <p className="mt-2 rounded-md checkin-status-success px-3 py-2 text-sm" role="status">
                       {ui.saved}
+                    </p>
+                  )}
+                  {timesSaveError && (
+                    <p role="alert" className="mt-2 text-sm text-red-600 dark:text-red-400">
+                      {timesSaveError}
                     </p>
                   )}
 

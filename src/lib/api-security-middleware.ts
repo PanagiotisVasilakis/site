@@ -138,14 +138,12 @@ export class SQLInjectionProtectionMiddleware {
     for (const [key, value] of searchParams.entries()) {
       if (this.containsSQLInjection(value, sqlPatterns)) {
         this.logSQLInjectionAttempt(request, 'query_parameter', { key, value });
-        return new NextResponse('Invalid request', { status: 400 });
       }
     }
 
     // Check URL path
     if (this.containsSQLInjection(url, sqlPatterns)) {
       this.logSQLInjectionAttempt(request, 'url_path', { url });
-      return new NextResponse('Invalid request', { status: 400 });
     }
 
     return null;
@@ -214,14 +212,12 @@ export class XSSProtectionMiddleware {
     for (const [key, value] of searchParams.entries()) {
       if (this.containsXSS(value, xssPatterns)) {
         this.logXSSAttempt(request, 'query_parameter', { key, value });
-        return new NextResponse('Invalid request', { status: 400 });
       }
     }
 
     // Check URL path
     if (this.containsXSS(url, xssPatterns)) {
       this.logXSSAttempt(request, 'url_path', { url });
-      return new NextResponse('Invalid request', { status: 400 });
     }
 
     return null;
@@ -385,6 +381,7 @@ export function createAPISecurityMiddleware(options?: {
   requireAPIKey?: boolean;
   requiredScopes?: string[];
 }) {
+  const config = getSecurityConfig();
   const inputValidation = new APIInputValidationMiddleware();
   const sqlInjectionProtection = new SQLInjectionProtectionMiddleware();
   const xssProtection = new XSSProtectionMiddleware();
@@ -403,9 +400,12 @@ export function createAPISecurityMiddleware(options?: {
     const xssResult = xssProtection.validateRequest(request);
     if (xssResult) return xssResult;
 
-    // API key authentication (if required)
-    if (options?.requireAPIKey) {
-      const authResult = apiKeyAuth.validateRequest(request, options.requiredScopes);
+    const requireAPIKey = options?.requireAPIKey ?? false;
+
+    // API key authentication is route-level opt-in. The global config controls
+    // whether the mechanism is allowed to run in this environment.
+    if (requireAPIKey && config.apiSecurity.apiKeyAuth.enabled) {
+      const authResult = apiKeyAuth.validateRequest(request, options?.requiredScopes);
       if (authResult) return authResult;
     }
 

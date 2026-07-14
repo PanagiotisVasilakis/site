@@ -18,6 +18,7 @@ type PrismaClientWithEvents = PrismaClient & {
 
 const globalThisWithPrisma = globalThis as ExtendedGlobal;
 let prismaInitLogged = false;
+const logPrismaLifecycle = process.env.PRISMA_LOG_LIFECYCLE === '1';
 
 function assertDatabaseUrl(): string {
   const databaseUrl = process.env.DATABASE_URL;
@@ -188,7 +189,7 @@ function createPrismaClient(): PrismaClient {
   
   // Log recommended pool config (actual config is in DATABASE_URL)
   const poolConfig = getRecommendedPoolConfig();
-  if (!prismaInitLogged) {
+  if (!prismaInitLogged && logPrismaLifecycle) {
       logger.info('Prisma client initialization', {
         environment: process.env.NODE_ENV,
         recommendedConnectionLimit: poolConfig.connectionLimit,
@@ -289,7 +290,9 @@ function registerPrismaShutdownHooks(client: PrismaClient): void {
     disconnecting = true;
 
     try {
-      logger.info('Disconnecting Prisma client', { trigger });
+      if (logPrismaLifecycle) {
+        logger.info('Disconnecting Prisma client', { trigger });
+      }
       if (client && typeof client.$disconnect === 'function') {
         await client.$disconnect();
       } else {

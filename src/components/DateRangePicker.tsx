@@ -4,9 +4,7 @@ import { DayPicker, type DateRange as RDPDateRange } from 'react-day-picker';
 import {
   DateRange,
   getBlockedDates,
-  getDateAvailability,
-  validateDateRange,
-  getNights
+  validateDateRange
 } from '@/lib/dateUtils';
 import { logger } from '@/lib/logger-client';
 import { getDictionary } from '@/i18n/dictionaries';
@@ -24,7 +22,6 @@ interface DateRangePickerProps {
   onChange?: (range: DateRange) => void;
   onClose?: () => void;
   isOpen?: boolean;
-  showPricing?: boolean;
   activeField?: 'arrival' | 'departure' | null;
   locale?: string;
   anchor?: {
@@ -39,7 +36,6 @@ export default function DateRangePicker({
   onChange,
   onClose,
   isOpen = false,
-  showPricing = true,
   activeField = null,
   locale = 'en',
   anchor
@@ -152,33 +148,6 @@ export default function DateRangePicker({
     });
   }, []);
 
-  // Get pricing info for selected range
-  const pricingInfo = useMemo(() => {
-    if (!selectedRange?.from || !selectedRange?.to || !showPricing) return null;
-
-    const nights = getNights(selectedRange);
-    if (nights === 0) return null;
-
-    // Calculate total price (mock calculation)
-    let total = 0;
-    const currentDate = new Date(selectedRange.from);
-
-    for (let i = 0; i < nights; i++) {
-      const availability = getDateAvailability(currentDate);
-      if (availability.available && availability.price) {
-        total += availability.price;
-      }
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-
-    return {
-      nights,
-      total,
-      avgPerNight: Math.round(total / nights)
-    };
-  }, [selectedRange, showPricing]);
-
-
   const popoverWidth = isCompact ? 320 : 360;
 
   const anchorLeft = useMemo(() => {
@@ -268,18 +237,6 @@ export default function DateRangePicker({
           hideNavigation={true}
         />
       </div>
-
-      {/* Compact pricing summary - only when both dates selected */}
-      {
-        pricingInfo && selectedRange?.from && selectedRange?.to && (
-          <div className={`surface-subtle border border-soft rounded-md px-3 py-1.5 ${isCompact ? 'px-2 py-1' : 'px-3 py-1.5'}`} role="region" aria-label={dp?.bookingSummary ?? 'Booking summary'}>
-            <div className={`flex justify-between items-center ${isCompact ? 'text-xs' : 'text-xs'}`}>
-              <span className="text-body">{pricingInfo.nights} {pricingInfo.nights !== 1 ? (t.booking?.nights ?? 'nights') : (t.booking?.night ?? 'night')}</span>
-              <span className="font-semibold text-brand-700 dark:text-brand-400">€{pricingInfo.total}</span>
-            </div>
-          </div>
-        )
-      }
 
       {/* Single action button - Apply only shows when both dates selected */}
       {

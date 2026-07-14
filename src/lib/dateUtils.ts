@@ -10,7 +10,6 @@ export interface AvailabilityInfo {
   available: boolean;
   minStay?: number;
   maxStay?: number;
-  price?: number;
   reason?: string; // Why unavailable: 'booked', 'blocked', 'maintenance'
 }
 
@@ -71,7 +70,7 @@ export function getBlockedDates(): Date[] {
   return [];
 }
 
-// Check date availability (mock implementation)
+// Check date availability using current local rules. External availability can be layered in here.
 export function getDateAvailability(date: Date): AvailabilityInfo {
   // Check if past date
   if (isPastDate(date)) {
@@ -84,17 +83,13 @@ export function getDateAvailability(date: Date): AvailabilityInfo {
     return { available: false, reason: 'booked' };
   }
   
-  // Demo pricing logic - weekend premium
   const dayOfWeek = date.getDay();
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-  const basePrice = 150;
-  const weekendMultiplier = 1.3;
   
   return {
     available: true,
     minStay: isWeekend ? 2 : 1,
     maxStay: 14,
-    price: Math.round(basePrice * (isWeekend ? weekendMultiplier : 1))
   };
 }
 

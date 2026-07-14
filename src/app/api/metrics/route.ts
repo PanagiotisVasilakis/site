@@ -90,8 +90,8 @@ function hasWriteApiKeyAccess(request: NextRequest): boolean {
   return writeKeys.includes(key);
 }
 
-function assertMetricsAccess(request: NextRequest, access: 'read' | 'write', correlationId?: string): void {
-  if (isAdminRequest(request)) return;
+async function assertMetricsAccess(request: NextRequest, access: 'read' | 'write', correlationId?: string): Promise<void> {
+  if (await isAdminRequest(request)) return;
 
   const hasAccess = access === 'write'
     ? hasWriteApiKeyAccess(request)
@@ -204,7 +204,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   const startTime = Date.now();
 
   try {
-    assertMetricsAccess(request, 'read', correlationId);
+    await assertMetricsAccess(request, 'read', correlationId);
 
     const url = new URL(request.url);
     const timeRangeRaw = url.searchParams.get('timeRange');
@@ -278,26 +278,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
       // Get specific metric
       allMetrics = metrics.getMetrics(query.metric, since);
     } else {
-      // Get all metrics (this would need to be implemented in MetricsCollector)
-      // For now, get some common metrics
-      const commonMetrics = [
-        'http.requests',
-        'http.response_time',
-        'http.errors',
-        'health_check.executed',
-        'health_check.response_time',
-        'system.memory.usage',
-        'system.cpu.usage',
-      ];
-      
-      for (const metricName of commonMetrics) {
-        try {
-          const metricData = metrics.getMetrics(metricName, since);
-          allMetrics.push(...metricData);
-        } catch {
-          // Metric might not exist, continue
-        }
-      }
+      allMetrics = metrics.getMetrics(undefined, since);
     }
 
     // Group metrics by name
@@ -411,7 +392,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   const correlationId = logger.getContext()?.correlationId;
 
   try {
-    assertMetricsAccess(request, 'write', correlationId);
+    await assertMetricsAccess(request, 'write', correlationId);
 
     const body = await request.json();
     

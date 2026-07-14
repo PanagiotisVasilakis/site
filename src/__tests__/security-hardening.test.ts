@@ -1,5 +1,9 @@
 import { NextRequest } from 'next/server';
 
+vi.mock('@/lib/featureFlags', () => ({
+  getFeatureFlagsAsync: vi.fn(async () => ({ portalEnabled: true, checkinEnabled: true })),
+}));
+
 function makeReq(url: string, init?: RequestInit & { cookies?: Record<string, string> }) {
   const base = new URL(url, 'http://localhost');
   const headers = new Headers(init?.headers);
@@ -17,7 +21,6 @@ function makeReq(url: string, init?: RequestInit & { cookies?: Record<string, st
 
 describe('Security hardening regressions', () => {
   afterEach(() => {
-    vi.doUnmock('@/lib/featureFlags');
     vi.doUnmock('@/lib/guestDataStore');
     vi.doUnmock('@/lib/prisma-repositories/checkInRequestRepository');
   });
@@ -55,7 +58,7 @@ describe('Security hardening regressions', () => {
   it('returns 404 from check-in APIs when check-in is disabled', async () => {
     vi.resetModules();
     vi.doMock('@/lib/featureFlags', () => ({
-      getFeatureFlags: () => ({ portalEnabled: true, checkinEnabled: false }),
+      getFeatureFlagsAsync: async () => ({ portalEnabled: true, checkinEnabled: false }),
     }));
     vi.doMock('@/lib/guestDataStore', () => ({
       guestStore: {},

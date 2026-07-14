@@ -3,11 +3,11 @@ import { cookies } from 'next/headers';
 import { locales, type Locale } from '@/i18n/config';
 import { getItemsByCategory } from '@/lib/data';
 import type { Item } from '@/data/schemas';
-import { getGuestSessionFromCookies, hasVerifiedBookingSession } from '@/lib/guestSession';
+import { getVerifiedGuestSessionFromCookies } from '@/lib/guestSession';
 import CheckinViewed from '@/components/analytics/CheckinViewed';
 import CheckInInfo from '@/components/CheckInInfo';
 import { notFound } from 'next/navigation';
-import { getFeatureFlags } from '@/lib/featureFlags';
+import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 
 export const metadata = {
   robots: { index: false, follow: false },
@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
 
 // Booking-scoped session guard for /check-in
 export default async function CheckInPage({ params }: { params: Promise<{ locale: string }> }) {
-  const flags = getFeatureFlags();
+  const flags = await getFeatureFlagsAsync();
   if (!flags.checkinEnabled) return notFound();
   const { locale } = await params;
   const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : 'en';
@@ -41,7 +41,6 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
     summary: pickLocalized(item, 'summary') || undefined,
     slug: item.slug,
     rating: item.rating,
-    priceLevel: item.priceLevel,
       tags: item.tags,
     location: item.location,
     phone: item.phone,
@@ -55,8 +54,8 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
   const nearbyRestaurants = getItemsByCategory('moments').map(mapItem);
   const nearbyServices = getItemsByCategory('phones').map(mapItem);
 
-  const session = await getGuestSessionFromCookies();
-  if (!hasVerifiedBookingSession(session)) {
+  const session = await getVerifiedGuestSessionFromCookies();
+  if (!session) {
     const failMsg = encodeURIComponent('Please sign in to access check-in information');
     const failurePath = `/${eff}/guest?flash=${failMsg}`;
     const cookieStore = await cookies();

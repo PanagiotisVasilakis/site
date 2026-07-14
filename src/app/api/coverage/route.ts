@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { NextRequest } from 'next/server';
-import { verifyAdmin } from '@/lib/auth/admin';
+import { verifyAdminSession } from '@/lib/auth/admin';
 import { logger } from '@/lib/logger-enterprise';
 
 export const dynamic = 'force-dynamic';
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
     // Require admin authentication in development
     const token = req.cookies.get('admin_jwt')?.value;
     if (token) {
-      const adminPayload = verifyAdmin(token);
+      const adminPayload = await verifyAdminSession(token);
       if (!adminPayload || adminPayload.role !== 'admin') {
         return new Response('Unauthorized', { status: 401 });
       }

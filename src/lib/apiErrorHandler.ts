@@ -9,6 +9,7 @@ import { z } from 'zod';
 import type { ApiErrorCode } from './apiErrorTypes';
 import { ApiErrorCode as ErrorCodes } from './apiErrorTypes';
 import { getClientIp } from './net/getClientIp';
+import { metrics } from './metrics-collector';
 
 // Re-export for backward compatibility
 export { ErrorCodes as ApiErrorCode };
@@ -258,6 +259,14 @@ export function withErrorHandler(
       // Execute handler with timeout
       const handlerPromise = handler(request, context);
       const response = await Promise.race([handlerPromise, timeoutPromise]);
+      const requestDuration = performance.now() - startTime;
+      metrics.counter('http.requests', 1, { method, route: request.nextUrl.pathname, status: String(response.status) });
+      if (response.status >= 500) {
+        metrics.counter('http.errors', 1, { method, route: request.nextUrl.pathname, status: String(response.status) });
+      } else if (response.status >= 400) {
+        metrics.counter('http.client_errors', 1, { method, route: request.nextUrl.pathname, status: String(response.status) });
+      }
+      metrics.timer('http.response_time', requestDuration, { method, route: request.nextUrl.pathname });
 
       // Performance logging
       if (mergedConfig.enablePerformanceLogging) {
@@ -274,6 +283,14 @@ export function withErrorHandler(
 
     } catch (error) {
       const duration = performance.now() - startTime;
+      const errorStatus = error instanceof ApiError ? error.statusCode : 500;
+      metrics.counter('http.requests', 1, { method, route: request.nextUrl.pathname, status: String(errorStatus) });
+      if (errorStatus >= 500) {
+        metrics.counter('http.errors', 1, { method, route: request.nextUrl.pathname, status: String(errorStatus) });
+      } else {
+        metrics.counter('http.client_errors', 1, { method, route: request.nextUrl.pathname, status: String(errorStatus) });
+      }
+      metrics.timer('http.response_time', duration, { method, route: request.nextUrl.pathname });
       
       // Handle known API errors
       if (error instanceof ApiError) {

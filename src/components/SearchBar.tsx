@@ -53,6 +53,14 @@ const LazyDateRangePicker = dynamic(() => import("@/components/DateRangePicker")
   ),
 });
 
+const scheduleFrame = (callback: FrameRequestCallback) => {
+  if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+    window.requestAnimationFrame(callback);
+    return;
+  }
+  callback(0);
+};
+
 export default function BookingBar({
   onBooking,
   locale = "en",
@@ -135,7 +143,7 @@ export default function BookingBar({
       setIsDatePickerOpen(true);
       computeAnchor(field);
       if (typeof window !== "undefined") {
-        requestAnimationFrame(() => computeAnchor(field));
+        scheduleFrame(() => computeAnchor(field));
       }
     },
     [computeAnchor]
@@ -158,7 +166,7 @@ export default function BookingBar({
       setActiveDateField(nextField);
       if (nextField) {
         if (typeof window !== "undefined") {
-          requestAnimationFrame(() => computeAnchor(nextField));
+          scheduleFrame(() => computeAnchor(nextField));
         } else {
           computeAnchor(nextField);
         }
@@ -291,7 +299,6 @@ export default function BookingBar({
           value={state.dateRange}
           onChange={handleDateChange}
           onClose={handleDatePickerClose}
-          showPricing={false}
           activeField={activeDateField}
           anchor={pickerAnchor ?? undefined}
           locale={locale}

@@ -9,14 +9,10 @@ import {
   getSecurityHealthStatus,
   securityReportGenerator 
 } from '@/lib/security-monitoring';
-import { verifyAdmin } from '@/lib/auth/admin';
+import { verifyAdminSession } from '@/lib/auth/admin';
 import { getClientIp } from '@/lib/net/getClientIp';
 
-function requireAuth(request: NextRequest): boolean {
-  // Check admin secret
-  const secret = process.env.ADMIN_DASH_SECRET;
-  const provided = request.headers.get('x-admin-secret');
-  
+async function requireAuth(request: NextRequest): Promise<boolean> {
   // Parse JWT token from cookie
   const cookieHeader = request.headers.get('cookie') || '';
   const jwt = cookieHeader
@@ -25,13 +21,12 @@ function requireAuth(request: NextRequest): boolean {
     .find(c => c.startsWith('admin_jwt='))
     ?.split('=', 2)[1];
   
-  // Require both secret and valid JWT
-  return !!(secret && provided === secret && jwt && verifyAdmin(jwt));
+  return !!(jwt && await verifyAdminSession(jwt));
 }
 
 export async function GET(request: NextRequest) {
   // Verify authentication
-  if (!requireAuth(request)) {
+  if (!(await requireAuth(request))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -103,7 +98,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   // Verify authentication
-  if (!requireAuth(request)) {
+  if (!(await requireAuth(request))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

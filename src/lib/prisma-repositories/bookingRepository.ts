@@ -96,6 +96,12 @@ async function findEligibleForUser(userId: string, nowDateISO: string): Promise<
         endDate: {
           gte: new Date(nowDateISO),
         },
+        accessRecords: {
+          some: {
+            userId,
+            status: 'VERIFIED',
+          },
+        },
       },
       orderBy: {
         startDate: 'asc',

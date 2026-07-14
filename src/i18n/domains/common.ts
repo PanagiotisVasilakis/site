@@ -171,6 +171,7 @@ export interface CommonDictionary {
         directions: string;
         website: string;
         locateMe: string;
+        locationUnavailable: string;
         fitToMarkers: string;
         zoomIn: string;
         zoomOut: string;
@@ -382,6 +383,7 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             directions: "Directions",
             website: "Website",
             locateMe: "Locate me",
+            locationUnavailable: "Your location is unavailable. Check browser location permission and try again.",
             fitToMarkers: "Fit to markers",
             zoomIn: "Zoom in",
             zoomOut: "Zoom out",
@@ -587,6 +589,7 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             directions: "Οδηγίες",
             website: "Ιστότοπος",
             locateMe: "Εντοπισμός θέσης",
+            locationUnavailable: "Η τοποθεσία σας δεν είναι διαθέσιμη. Ελέγξτε την άδεια τοποθεσίας του browser και δοκιμάστε ξανά.",
             fitToMarkers: "Προβολή όλων των σημείων",
             zoomIn: "Μεγέθυνση",
             zoomOut: "Σμίκρυνση",

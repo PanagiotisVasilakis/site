@@ -93,7 +93,7 @@ describe('Security Configuration', () => {
 
   test('should build permissions policy', () => {
     const permissions = {
-      geolocation: [],
+      geolocation: ['self'],
       microphone: ["'self'"],
       camera: [],
       payment: [],
@@ -104,7 +104,7 @@ describe('Security Configuration', () => {
     };
 
     const policy = buildPermissionsPolicy(permissions);
-    expect(policy).toContain('geolocation=()');
+    expect(policy).toContain('geolocation=("self")');
     expect(policy).toContain('microphone=("\'self\'")');
     expect(policy).toContain('camera=()');
   });
@@ -251,22 +251,22 @@ describe('SQL Injection Protection', () => {
     middleware = new SQLInjectionProtectionMiddleware();
   });
 
-  test('should detect SQL injection in URL parameters', () => {
+  test('should log SQL injection-like URL parameters without blocking', () => {
     const request = new NextRequest(
       'https://example.com/api/users?id=1 OR 1=1'
     );
 
     const response = middleware.validateRequest(request);
-    expect(response?.status).toBe(400);
+    expect(response).toBeNull();
   });
 
-  test('should detect SQL injection patterns', () => {
+  test('should log SQL injection-like patterns without blocking', () => {
     const request = new NextRequest(
       'https://example.com/api/test?query=SELECT * FROM users'
     );
 
     const response = middleware.validateRequest(request);
-    expect(response?.status).toBe(400);
+    expect(response).toBeNull();
   });
 
   test('should allow safe parameters', () => {
@@ -286,22 +286,22 @@ describe('XSS Protection', () => {
     middleware = new XSSProtectionMiddleware();
   });
 
-  test('should detect script tags', () => {
+  test('should log script tags without blocking', () => {
     const request = new NextRequest(
       'https://example.com/api/test?input=<script>alert("xss")</script>'
     );
 
     const response = middleware.validateRequest(request);
-    expect(response?.status).toBe(400);
+    expect(response).toBeNull();
   });
 
-  test('should detect event handlers', () => {
+  test('should log event handlers without blocking', () => {
     const request = new NextRequest(
       'https://example.com/api/test?input=<img src=x onerror=alert(1)>'
     );
 
     const response = middleware.validateRequest(request);
-    expect(response?.status).toBe(400);
+    expect(response).toBeNull();
   });
 
   test('should allow safe content', () => {
@@ -492,13 +492,13 @@ describe('Combined Security Middleware', () => {
     expect(typeof middleware).toBe('function');
   });
 
-  test('should block malicious API requests', () => {
+  test('should not block SQL-like API query strings in logging-only mode', () => {
     const middleware = createAPISecurityMiddleware();
     const request = new NextRequest(
       'https://example.com/api/test?query=SELECT * FROM users WHERE id=1 OR 1=1'
     );
 
     const response = middleware(request);
-    expect(response?.status).toBe(400);
+    expect(response).toBeNull();
   });
 });

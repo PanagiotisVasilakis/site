@@ -21,8 +21,8 @@ export function buildMenuLinks(
     { href: `/${locale}/booking-details`, label: dictionary.bookingDetails ?? 'Booking Details', icon: 'booking', event: 'mobile_nav_booking_details', group: 'stay' },
     { href: `/${locale}/about`, label: dictionary.aboutUs ?? 'About Us', icon: 'about', event: 'mobile_nav_about', group: 'stay' },
     { href: `/${locale}/favorites`, label: dictionary.labels?.favorites ?? 'Favorites', icon: 'favorite', event: 'mobile_nav_favorites', group: 'explore' },
-    { href: `/${locale}?category=moments`, label: dictionary.categories?.moments ?? 'Kalamata Moments', icon: 'moments', event: 'mobile_nav_moments', group: 'explore' },
-    { href: `/${locale}?category=phones`, label: dictionary.categories?.phones ?? 'Important Phones', icon: 'phone', event: 'mobile_nav_phones', group: 'explore' },
+    { href: `/${locale}/moments`, label: dictionary.categories?.moments ?? 'Kalamata Moments', icon: 'moments', event: 'mobile_nav_moments', group: 'explore' },
+    { href: `/${locale}/phones`, label: dictionary.categories?.phones ?? 'Important Phones', icon: 'phone', event: 'mobile_nav_phones', group: 'explore' },
   ];
 
   if (includeCheckIn) {

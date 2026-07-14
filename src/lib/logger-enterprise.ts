@@ -134,39 +134,34 @@ class EnterpriseLogger {
       return {};
     }
 
-    const sanitized = { ...metadata as Record<string, unknown> };
-    
-    // Redact sensitive fields
-    const redactRecursively = (obj: Record<string, unknown>): Record<string, unknown> => {
+    const seen = new WeakSet<object>();
+    const redactRecursively = (value: unknown, key = ''): unknown => {
+      const lowerKey = key.toLowerCase();
+      const isSensitive = this.config.sensitiveFields.some((field) => lowerKey.includes(field.toLowerCase()));
+      if (isSensitive) return this.config.redactionPlaceholder;
+      if (value instanceof Error) return { name: value.name, message: value.message };
+      if (!value || typeof value !== 'object') return value;
+      if (seen.has(value)) return '[CIRCULAR]';
+      seen.add(value);
+      if (Array.isArray(value)) return value.map((item) => redactRecursively(item));
+
       const result: Record<string, unknown> = {};
-      
-      for (const [key, value] of Object.entries(obj)) {
-        const lowerKey = key.toLowerCase();
-        const isSensitive = this.config.sensitiveFields.some(field => 
-          lowerKey.includes(field.toLowerCase())
-        );
-        
-        if (isSensitive) {
-          result[key] = this.config.redactionPlaceholder;
-        } else if (value && typeof value === 'object' && !Array.isArray(value)) {
-          result[key] = redactRecursively(value as Record<string, unknown>);
-        } else {
-          result[key] = value;
-        }
+      for (const [childKey, childValue] of Object.entries(value as Record<string, unknown>)) {
+        result[childKey] = redactRecursively(childValue, childKey);
       }
-      
       return result;
     };
 
-    const redacted = redactRecursively(sanitized);
+    const redacted = redactRecursively(metadata) as Record<string, unknown>;
     
     // Truncate if too large
     const serialized = JSON.stringify(redacted);
     if (serialized.length > this.config.maxMetadataSize) {
+      const previewBudget = Math.max(0, this.config.maxMetadataSize - 120);
       return {
-        ...redacted,
         _truncated: true,
         _originalSize: serialized.length,
+        _preview: serialized.slice(0, previewBudget),
       };
     }
 

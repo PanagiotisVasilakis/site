@@ -38,7 +38,13 @@ function rulesFromConfig(countryCode?: string, config?: PassportConfigByCountry)
   const cc = countryCode.toUpperCase();
   const item = config[cc];
   if (!item) return defaultPassportRules;
-  const allow = item.allowChars ? new RegExp(item.allowChars) : undefined;
+  const supportedCharacterSets: Readonly<Record<string, RegExp>> = {
+    '[A-Z0-9]': /[A-Z0-9]/,
+    '[A-Z]': /[A-Z]/,
+    '[0-9]': /[0-9]/,
+  };
+  // Configuration selects a reviewed character set; it never becomes executable regex source.
+  const allow = item.allowChars ? supportedCharacterSets[item.allowChars] : undefined;
   return mergeRules(defaultPassportRules, {
     minLength: item.minLength,
     maxLength: item.maxLength,

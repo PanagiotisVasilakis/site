@@ -1,12 +1,12 @@
 import { notFound } from 'next/navigation';
-import { getFeatureFlags } from '@/lib/featureFlags';
+import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 import UnifiedGuestClient from './UnifiedGuestClient';
 import { locales } from '@/i18n/config';
 
 export const dynamic = 'force-dynamic';
 
 export default async function GuestUnifiedPage({ params }: { params: Promise<{ locale: string }> }) {
-  const flags = getFeatureFlags();
+  const flags = await getFeatureFlagsAsync();
   if (!flags.portalEnabled) return notFound();
   const p = await params;
   // Validate locale but don't store it since component handles locale via useParams

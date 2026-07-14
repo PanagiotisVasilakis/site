@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { addVital, vitalsSummary } from '@/lib/analyticsStore';
 import { withErrorHandler, validateRequestBody, createSuccessResponse } from '@/lib/apiErrorHandler';
 import crypto from 'node:crypto';
+import { isAdminRequest } from '@/lib/rbac';
 
 // Zod schema for web vitals
 const vitalSchema = z.object({
@@ -28,6 +29,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   return createSuccessResponse({ message: 'Vital recorded' }, 201);
 });
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  if (!(await isAdminRequest(request))) return Response.json({ error: 'Admin credentials required' }, { status: 403 });
   return Response.json({ vitals: vitalsSummary() });
 }

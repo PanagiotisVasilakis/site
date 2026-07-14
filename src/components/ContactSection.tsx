@@ -115,7 +115,7 @@ export default function ContactSection({ locale }: ContactSectionProps) {
   ];
 
   return (
-    <section className="contact-section" aria-labelledby="contact-section-title">
+    <section id="contact" className="contact-section" aria-labelledby="contact-section-title">
       <div className="contact-section-inner">
         <div className="contact-panel">
           <h2 id="contact-section-title" className="contact-panel-title">

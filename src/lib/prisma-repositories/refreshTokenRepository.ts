@@ -136,7 +136,13 @@ async function verify(token: string): Promise<GuestRefreshTokenRec | undefined> 
       return mapToken({ ...candidate, lastUsedAt: new Date(now) });
     }
 
-    // Backward-compatible path for legacy tokens (secret-only format)
+    // Backward-compatible path for legacy tokens (secret-only format).
+    // Keep this off by default because it requires scanning all active tokens.
+    if (process.env.GUEST_REFRESH_ALLOW_LEGACY_SECRET_ONLY !== '1') {
+      logger.warn('Rejected legacy secret-only refresh token; enable GUEST_REFRESH_ALLOW_LEGACY_SECRET_ONLY=1 only during migration');
+      return undefined;
+    }
+
     const activeTokens = await prisma.refreshToken.findMany({
       where: {
         revokedAt: null,

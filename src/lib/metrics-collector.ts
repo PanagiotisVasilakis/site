@@ -137,6 +137,8 @@ class MetricsCollector {
   private retentionPeriod: number = 24 * 60 * 60 * 1000; // 24 hours
   private aggregationInterval: number = 60 * 1000; // 1 minute
   private lastAggregation: number = Date.now();
+  private aggregationTimer: ReturnType<typeof setInterval> | null = null;
+  private cleanupTimer: ReturnType<typeof setInterval> | null = null;
   // Simple in-process alerts
   private alerts: {
     verificationFailed: { windowMs: number; threshold: number; recent: number[] };
@@ -155,11 +157,29 @@ class MetricsCollector {
       this.aggregationInterval = config.aggregationInterval ?? this.aggregationInterval;
     }
 
-    // Start background aggregation
-    this.startAggregation();
-    
-    // Cleanup old metrics periodically
-    setInterval(() => this.cleanup(), this.retentionPeriod / 10);
+    this.start();
+  }
+
+  public start(): void {
+    if (!this.aggregationTimer) {
+      this.startAggregation();
+    }
+
+    if (!this.cleanupTimer) {
+      this.cleanupTimer = setInterval(() => this.cleanup(), this.retentionPeriod / 10);
+      this.cleanupTimer.unref?.();
+    }
+  }
+
+  public stop(): void {
+    if (this.aggregationTimer) {
+      clearInterval(this.aggregationTimer);
+      this.aggregationTimer = null;
+    }
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = null;
+    }
   }
 
   // Core metric collection methods
@@ -657,9 +677,10 @@ class MetricsCollector {
   }
 
   private startAggregation(): void {
-    setInterval(() => {
+    this.aggregationTimer = setInterval(() => {
       this.aggregateMetrics();
     }, this.aggregationInterval);
+    this.aggregationTimer.unref?.();
   }
 
   private aggregateMetrics(): void {
@@ -727,7 +748,6 @@ class MetricsCollector {
   }
 
   private getSessionId(): string {
-    // Simple session ID generation
     if (typeof window !== 'undefined' && window.sessionStorage) {
       let sessionId = window.sessionStorage.getItem('metrics_session_id');
       if (!sessionId) {
@@ -736,7 +756,15 @@ class MetricsCollector {
       }
       return sessionId;
     }
-    return `server_session_${Date.now()}`;
+
+    const context = logger.getContext();
+    if (context?.sessionId) return context.sessionId;
+    if (context?.requestId) return `server_request_${context.requestId}`;
+    if (context?.correlationId) return `server_request_${context.correlationId}`;
+
+    return typeof process !== 'undefined' && process.pid
+      ? `server_process_${process.pid}`
+      : 'server_process';
   }
 }
 
@@ -746,4 +774,3 @@ export const metrics = new MetricsCollector({
   retentionPeriod: 24 * 60 * 60 * 1000, // 24 hours
   aggregationInterval: 60 * 1000, // 1 minute
 });
-

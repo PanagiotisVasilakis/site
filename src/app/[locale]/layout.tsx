@@ -9,6 +9,7 @@ import TopControls from "@/components/TopControls";
 import DeferredRuntimeManagers from "@/components/DeferredRuntimeManagers";
 import DocumentLocale from "@/components/DocumentLocale";
 import StatusCluster from "@/components/StatusCluster";
+import { siteUrl } from '@/lib/site';
 
 // Removed font variable placeholders.
 
@@ -18,15 +19,17 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const t = getDictionary(eff);
   const languages = { en: "/en", el: "/el" } as const;
   return {
+    metadataBase: new URL(siteUrl),
     title: t.appTitle,
     description: t.homeSubtitle,
-    alternates: { languages },
+    alternates: { canonical: `/${eff}`, languages },
     openGraph: {
       title: t.appTitle,
       description: t.homeSubtitle,
       locale: eff,
       alternateLocale: ["en", "el"].filter((l) => l !== eff),
       type: "website",
+      url: `/${eff}`,
     },
   };
 }

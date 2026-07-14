@@ -500,12 +500,6 @@
   text-decoration: none;
 }
 
-.map-popup-price {
-  margin-top: 8px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
 .map-popup-actions {
   display: flex;
   flex-wrap: wrap;

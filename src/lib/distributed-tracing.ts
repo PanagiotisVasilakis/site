@@ -51,6 +51,7 @@ class DistributedTracer {
   private maxSpans: number = 10000;
   private retentionPeriod: number = 60 * 60 * 1000; // 1 hour
   private isEnabled: boolean = true;
+  private cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(config?: { maxSpans?: number; retentionPeriod?: number }) {
     if (config) {
@@ -58,8 +59,19 @@ class DistributedTracer {
       this.retentionPeriod = config.retentionPeriod ?? this.retentionPeriod;
     }
 
-    // Cleanup old spans periodically
-    setInterval(() => this.cleanup(), this.retentionPeriod / 10);
+    this.start();
+  }
+
+  public start(): void {
+    if (this.cleanupTimer) return;
+    this.cleanupTimer = setInterval(() => this.cleanup(), this.retentionPeriod / 10);
+    this.cleanupTimer.unref?.();
+  }
+
+  public stop(): void {
+    if (!this.cleanupTimer) return;
+    clearInterval(this.cleanupTimer);
+    this.cleanupTimer = null;
   }
 
   // Generate trace/span IDs

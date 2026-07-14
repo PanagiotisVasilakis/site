@@ -1,6 +1,6 @@
 /**
  * Booking-related translations.
- * Includes: booking forms, price breakdown, guest details
+ * Includes: booking forms, availability request details, guest details
  */
 
 import type { Locale } from '../config';
@@ -45,13 +45,14 @@ export interface BookingFormDictionary {
     formErrorsAnnounce: string;
     submittedAnnounce: string;
     submittingAnnounce: string;
+    submitFailed: string;
 }
 
 export interface BookingDetailsPageDictionary {
     howToBookTitle: string;
     howToBook: string[];
-    pricingTitle: string;
-    pricing: string[];
+    availabilityTitle: string;
+    availability: string[];
     cancellationTitle: string;
     cancellation: string[];
     contactTitle: string;
@@ -68,12 +69,7 @@ export interface BookingDictionary {
     durationLabel?: string;
     notSelected?: string;
     selectDatesPrompt?: string;
-    priceBreakdown?: string;
-    cleaningFee?: string;
-    serviceFee?: string;
-    total?: string;
     whatsIncluded?: string;
-    completeDetailsHint?: string;
     night?: string;
     nights?: string;
     selectDatesError?: string;
@@ -98,12 +94,7 @@ export const bookingTranslations: Record<Locale, BookingDictionary> = {
         durationLabel: "Duration",
         notSelected: "Not selected",
         selectDatesPrompt: "Please complete your booking details above to continue.",
-        priceBreakdown: "Price breakdown",
-        cleaningFee: "Cleaning fee",
-        serviceFee: "Service fee",
-        total: "Total",
         whatsIncluded: "What's included",
-        completeDetailsHint: "Select dates to see pricing",
         night: "night",
         nights: "nights",
         selectDatesError: "Please select dates",
@@ -130,11 +121,11 @@ export const bookingTranslations: Record<Locale, BookingDictionary> = {
             specialRequests: "Special requests",
             specialRequestsPlaceholder: "Any special requirements or requests...",
             fixErrors: "Please fix the following:",
-            terms: "By clicking \"Confirm booking\" you agree to our terms of service and cancellation policy. Your booking is subject to availability confirmation from the host.",
-            processing: "Processing booking...",
-            confirm: "Confirm booking",
-            confirmedTitle: "Booking Confirmed!",
-            confirmedMessage: "Thank you! Your booking request has been sent.",
+            terms: "By clicking \"Send request\" you share your stay details with the host. Your stay is subject to availability confirmation from the host.",
+            processing: "Sending request...",
+            confirm: "Send request",
+            confirmedTitle: "Request Sent",
+            confirmedMessage: "Thank you! Your request was received and recorded. The host will contact you to confirm availability; this is not a booking confirmation.",
             propertyLabel: "Property:",
             datesLabel: "Dates:",
             viewProperty: "View property details",
@@ -145,23 +136,24 @@ export const bookingTranslations: Record<Locale, BookingDictionary> = {
             emailInvalid: "Please enter a valid email address",
             phoneRequired: "Phone number is required",
             formErrorsAnnounce: "Please review and correct the highlighted fields.",
-            submittedAnnounce: "Booking submitted successfully!",
-            submittingAnnounce: "Submitting booking, please wait..."
+            submittedAnnounce: "Stay request received successfully.",
+            submittingAnnounce: "Sending stay request, please wait...",
+            submitFailed: "Unable to send your stay request right now. Please contact the host directly."
         },
         detailsPage: {
             howToBookTitle: "How to Book",
             howToBook: [
-                "Contact us directly for availability and rates",
-                "Secure your dates with a deposit",
-                "Receive confirmation and payment details",
-                "Complete payment to finalize your booking"
+                "Contact us directly for availability",
+                "Share your preferred dates and guest details",
+                "Receive host confirmation and arrival instructions",
+                "Finalize your stay directly with the host"
             ],
-            pricingTitle: "Pricing Information",
-            pricing: [
-                "Seasonal rates apply (high/low season)",
+            availabilityTitle: "Availability Information",
+            availability: [
+                "Availability is confirmed directly by the host",
                 "Minimum stay requirements may apply",
-                "Additional fees: cleaning, local taxes",
-                "Payment plans available for longer stays"
+                "Arrival details are coordinated before check-in",
+                "Longer stays can be discussed directly"
             ],
             cancellationTitle: "Cancellation Policy",
             cancellation: [
@@ -177,7 +169,7 @@ export const bookingTranslations: Record<Locale, BookingDictionary> = {
                 "📱 Phone: +30 2721 023456",
                 "💬 WhatsApp: Available for instant booking"
             ],
-            metaDescription: "Learn about our booking process, pricing, and policies for your stay at our luxury apartment."
+            metaDescription: "Learn about our booking process, availability, and policies for your stay at our luxury apartment."
         }
     },
     el: {
@@ -188,12 +180,7 @@ export const bookingTranslations: Record<Locale, BookingDictionary> = {
         durationLabel: "Διάρκεια",
         notSelected: "Δεν έχει επιλεγεί",
         selectDatesPrompt: "Συμπληρώστε τα στοιχεία κράτησης παραπάνω για να συνεχίσετε.",
-        priceBreakdown: "Ανάλυση τιμής",
-        cleaningFee: "Τέλος καθαρισμού",
-        serviceFee: "Τέλος υπηρεσίας",
-        total: "Σύνολο",
         whatsIncluded: "Τι περιλαμβάνεται",
-        completeDetailsHint: "Επιλέξτε ημερομηνίες για να δείτε τιμή",
         night: "νύχτα",
         nights: "νύχτες",
         selectDatesError: "Παρακαλώ επιλέξτε ημερομηνίες",
@@ -220,11 +207,11 @@ export const bookingTranslations: Record<Locale, BookingDictionary> = {
             specialRequests: "Ειδικά αιτήματα",
             specialRequestsPlaceholder: "Τυχόν ειδικές απαιτήσεις ή αιτήματα...",
             fixErrors: "Παρακαλώ διορθώστε τα εξής:",
-            terms: "Κάνοντας κλικ στο «Επιβεβαίωση κράτησης» συμφωνείτε με τους όρους χρήσης και την πολιτική ακύρωσης. Η κράτησή σας υπόκειται σε επιβεβαίωση διαθεσιμότητας από τον οικοδεσπότη.",
-            processing: "Γίνεται επεξεργασία κράτησης...",
-            confirm: "Επιβεβαίωση κράτησης",
-            confirmedTitle: "Η κράτηση επιβεβαιώθηκε!",
-            confirmedMessage: "Ευχαριστούμε! Το αίτημα κράτησής σας εστάλη.",
+            terms: "Κάνοντας κλικ στο «Αποστολή αιτήματος» στέλνετε τα στοιχεία διαμονής στον οικοδεσπότη. Η διαμονή υπόκειται σε επιβεβαίωση διαθεσιμότητας από τον οικοδεσπότη.",
+            processing: "Γίνεται αποστολή αιτήματος...",
+            confirm: "Αποστολή αιτήματος",
+            confirmedTitle: "Το αίτημα εστάλη",
+            confirmedMessage: "Ευχαριστούμε! Το αίτημά σας παραλήφθηκε και καταγράφηκε. Ο οικοδεσπότης θα επικοινωνήσει μαζί σας για επιβεβαίωση διαθεσιμότητας· αυτό δεν αποτελεί επιβεβαίωση κράτησης.",
             propertyLabel: "Κατάλυμα:",
             datesLabel: "Ημερομηνίες:",
             viewProperty: "Δείτε λεπτομέρειες καταλύματος",
@@ -235,23 +222,24 @@ export const bookingTranslations: Record<Locale, BookingDictionary> = {
             emailInvalid: "Παρακαλώ εισάγετε έγκυρη διεύθυνση email",
             phoneRequired: "Ο αριθμός τηλεφώνου είναι υποχρεωτικός",
             formErrorsAnnounce: "Παρακαλώ ελέγξτε και διορθώστε τα επισημασμένα πεδία.",
-            submittedAnnounce: "Η κράτηση υποβλήθηκε με επιτυχία!",
-            submittingAnnounce: "Υποβολή κράτησης, παρακαλώ περιμένετε..."
+            submittedAnnounce: "Το αίτημα διαμονής παραλήφθηκε με επιτυχία.",
+            submittingAnnounce: "Αποστολή αιτήματος, παρακαλώ περιμένετε...",
+            submitFailed: "Δεν είναι δυνατή η αποστολή του αιτήματος αυτή τη στιγμή. Παρακαλώ επικοινωνήστε απευθείας με τον οικοδεσπότη."
         },
         detailsPage: {
             howToBookTitle: "Πώς να Κάνετε Κράτηση",
             howToBook: [
-                "Επικοινωνήστε απευθείας μαζί μας για διαθεσιμότητα και τιμές",
-                "Εξασφαλίστε τις ημερομηνίες σας με προκαταβολή",
-                "Λάβετε επιβεβαίωση και στοιχεία πληρωμής",
-                "Ολοκληρώστε την πληρωμή για να οριστικοποιηθεί η κράτηση"
+                "Επικοινωνήστε απευθείας μαζί μας για διαθεσιμότητα",
+                "Στείλτε τις προτιμώμενες ημερομηνίες και τα στοιχεία επισκεπτών",
+                "Λάβετε επιβεβαίωση και οδηγίες άφιξης από τον οικοδεσπότη",
+                "Οριστικοποιήστε τη διαμονή απευθείας με τον οικοδεσπότη"
             ],
-            pricingTitle: "Πληροφορίες Τιμών",
-            pricing: [
-                "Ισχύουν εποχιακές τιμές (υψηλή/χαμηλή περίοδος)",
+            availabilityTitle: "Πληροφορίες Διαθεσιμότητας",
+            availability: [
+                "Η διαθεσιμότητα επιβεβαιώνεται απευθείας από τον οικοδεσπότη",
                 "Ενδέχεται να ισχύει ελάχιστη διάρκεια διαμονής",
-                "Επιπλέον χρεώσεις: καθαρισμός, τοπικοί φόροι",
-                "Διαθέσιμα προγράμματα πληρωμής για μεγαλύτερες διαμονές"
+                "Οι λεπτομέρειες άφιξης συντονίζονται πριν το check-in",
+                "Για μεγαλύτερες διαμονές μπορείτε να επικοινωνήσετε απευθείας"
             ],
             cancellationTitle: "Πολιτική Ακύρωσης",
             cancellation: [
@@ -267,7 +255,7 @@ export const bookingTranslations: Record<Locale, BookingDictionary> = {
                 "📱 Τηλέφωνο: +30 2721 023456",
                 "💬 WhatsApp: Διαθέσιμο για άμεση κράτηση"
             ],
-            metaDescription: "Μάθετε για τη διαδικασία κράτησης, τις τιμές και τις πολιτικές για τη διαμονή σας στο πολυτελές διαμέρισμά μας."
+            metaDescription: "Μάθετε για τη διαδικασία κράτησης, τη διαθεσιμότητα και τις πολιτικές για τη διαμονή σας στο πολυτελές διαμέρισμά μας."
         }
     },
 };

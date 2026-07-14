@@ -129,4 +129,19 @@ describe('UnifiedGuestClient', () => {
     expect(body).not.toHaveProperty('email');
     expect(pushMock).toHaveBeenCalledWith('/en/check-in');
   });
+
+  it('clears the local phone value when the dial code changes', async () => {
+    const user = userEvent.setup();
+    render(<UnifiedGuestClient />);
+
+    const phoneInput = screen.getByPlaceholderText('123 456 7890');
+    await user.type(phoneInput, '6900000002');
+    expect(phoneInput).toHaveValue('6900000002');
+
+    await user.click(screen.getByRole('button', { name: /select country code/i }));
+    await user.click(screen.getByRole('option', { name: /United States/i }));
+
+    expect(phoneInput).toHaveValue('');
+    expect(screen.getByRole('button', { name: /select country code/i })).toHaveTextContent('+1');
+  });
 });

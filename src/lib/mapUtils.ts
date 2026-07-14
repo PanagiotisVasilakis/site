@@ -26,7 +26,6 @@ export interface MarkerData {
   directionsUrl?: string;
   coordinates: [number, number]; // [lng, lat]
   type: MapMarkerType;
-  price?: string;
   rating?: number;
   category?: string;
   href?: string;
@@ -45,7 +44,6 @@ export function markerFromMapLocation(location: MapLocation): MarkerData {
     directionsUrl: location.directionsUrl,
     coordinates: location.coordinates,
     type: location.markerType,
-    price: location.price,
     rating: location.rating,
     category: location.category,
     href: location.href,
@@ -90,7 +88,6 @@ export function toLeafletMarker(marker: MarkerData): LeafletMarkerData {
     directionsUrl: marker.directionsUrl,
     coordinates: marker.coordinates,
     type: marker.type,
-    price: marker.price,
     href: marker.href,
   };
 }

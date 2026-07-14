@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import internalFetch from '@/lib/internalFetchClient';
-import { getStoredAdminSecret, persistAdminSecretFromUrl } from '@/lib/adminClientSession';
 import { Badge, Button, MetricCard, Surface } from '@/components/ui';
 
 type Summary = {
@@ -26,15 +25,8 @@ export default function AdminHomeClient() {
   const [summary, setSummary] = useState<Summary>(emptySummary);
   const [state, setState] = useState<LoadState>('idle');
   const [error, setError] = useState('');
-  const [analyticsHref, setAnalyticsHref] = useState('/admin/analytics');
 
   useEffect(() => {
-    persistAdminSecretFromUrl();
-    const secret = getStoredAdminSecret();
-    if (secret) {
-      setAnalyticsHref(`/admin/analytics?token=${encodeURIComponent(secret)}`);
-    }
-
     const loadSummary = async () => {
       setState('loading');
       setError('');
@@ -68,6 +60,13 @@ export default function AdminHomeClient() {
       action: 'Open requests',
     },
     {
+      title: 'Stay requests',
+      value: 'Durable inbox',
+      body: 'Review booking enquiries and retry failed webhook deliveries.',
+      href: '/admin/stay-requests',
+      action: 'Open stay requests',
+    },
+    {
       title: 'Guests',
       value: 'Bookings',
       body: 'Search bookings, check guest records, and review check-in activity.',
@@ -75,28 +74,21 @@ export default function AdminHomeClient() {
       action: 'Open guests',
     },
     {
-      title: 'Messages',
-      value: 'Placeholder',
-      body: 'Message management can be connected here when the workflow is ready.',
-      href: undefined,
-      action: 'Not configured',
-    },
-    {
       title: 'Settings',
-      value: 'Placeholder',
-      body: 'Operational settings can be added here without changing guest auth.',
-      href: undefined,
-      action: 'Not configured',
+      value: 'Shared state',
+      body: 'Manage guest portal and check-in availability across all app instances.',
+      href: '/admin/settings',
+      action: 'Open settings',
     },
     {
       title: 'Analytics',
       value: 'Monitoring',
       body: 'Open analytics and observability dashboards.',
-      href: analyticsHref,
+      href: '/admin/analytics',
       secondaryHref: '/admin/dashboard',
       action: 'Open analytics',
     },
-  ]), [analyticsHref, state, summary.pending]);
+  ]), [state, summary.pending]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">

@@ -1,15 +1,11 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
 import internalFetch from '@/lib/internalFetchClient';
-import { clearStoredAdminSecret, persistAdminSecretFromUrl } from '@/lib/adminClientSession';
 
 // Polls remaining time and refreshes JWT 5 minutes before 2h expiry, provides logout button.
 export default function AdminSessionManager() {
   const [status, setStatus] = useState<'ok'|'refreshing'|'error'>('ok');
   const timerRef = useRef<number | undefined>(undefined);
-  useEffect(() => {
-    persistAdminSecretFromUrl();
-  }, []);
   useEffect(() => {
     function schedule() {
       // Refresh every 105 minutes (2h - 15m) proactive
@@ -33,7 +29,6 @@ export default function AdminSessionManager() {
   }, []);
   async function logout() {
     await internalFetch('/api/admin/logout', { method: 'POST' });
-    clearStoredAdminSecret();
     window.location.reload();
   }
   return (
@@ -44,7 +39,7 @@ export default function AdminSessionManager() {
       </div>
       {status === 'error' && (
         <div className="fixed top-12 right-2 z-50 max-w-xs bg-red-600 text-white text-xs px-3 py-2 rounded shadow animate-pulse">
-          Token refresh failed. You may need to re-login (open login page or supply admin secret).<br />
+          Token refresh failed. You may need to re-login.<br />
           <button onClick={() => window.location.reload()} className="underline mt-1 inline-block">Retry</button>
         </div>
       )}

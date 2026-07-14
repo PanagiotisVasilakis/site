@@ -1,73 +1,67 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { encryptJSON, decryptJSON } from '@/lib/crypto';
+import { logger } from '@/lib/logger-enterprise';
 
 export type FeatureFlags = {
   portalEnabled: boolean;
   checkinEnabled: boolean;
 };
 
-const DEFAULT_FLAGS: FeatureFlags = {
-  portalEnabled: true,
-  checkinEnabled: true,
-};
-
-const FILE = path.join(process.cwd(), 'data', 'secure', 'feature-flags.enc.json');
-
-function readFlags(): FeatureFlags {
-  try {
-    if (!fs.existsSync(FILE)) return { ...DEFAULT_FLAGS };
-    const raw = fs.readFileSync(FILE, 'utf-8');
-    const obj = decryptJSON<Partial<FeatureFlags>>(raw);
-    return { ...DEFAULT_FLAGS, ...obj } as FeatureFlags;
-  } catch {
-    return { ...DEFAULT_FLAGS };
-  }
-}
-
-function writeFlags(flags: FeatureFlags): void {
-  const enc = encryptJSON(flags);
-  const temporaryFile = `${FILE}.${process.pid}.tmp`;
-  try {
-    fs.writeFileSync(temporaryFile, enc, { encoding: 'utf-8', mode: 0o600 });
-    fs.renameSync(temporaryFile, FILE);
-  } catch (error) {
-    try { fs.unlinkSync(temporaryFile); } catch {}
-    throw error;
-  }
-}
+const SETTING_KEY = 'feature_flags';
+const DEVELOPMENT_DEFAULTS: FeatureFlags = { portalEnabled: true, checkinEnabled: true };
+const PRODUCTION_DEFAULTS: FeatureFlags = { portalEnabled: false, checkinEnabled: false };
 
 let cache: FeatureFlags | null = null;
-let cacheMtimeMs = -1;
 
-function flagsMtimeMs(): number {
-  try {
-    return fs.statSync(FILE).mtimeMs;
-  } catch {
-    return 0;
-  }
+function defaults(): FeatureFlags {
+  return process.env.NODE_ENV === 'production'
+    ? { ...PRODUCTION_DEFAULTS }
+    : { ...DEVELOPMENT_DEFAULTS };
 }
 
+function parseFlags(value: unknown): FeatureFlags {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return defaults();
+  const record = value as Record<string, unknown>;
+  const fallback = defaults();
+  return {
+    portalEnabled: typeof record.portalEnabled === 'boolean' ? record.portalEnabled : fallback.portalEnabled,
+    checkinEnabled: typeof record.checkinEnabled === 'boolean' ? record.checkinEnabled : fallback.checkinEnabled,
+  };
+}
+
+/**
+ * Synchronous snapshot for non-request compatibility only. Runtime authorization
+ * paths must use getFeatureFlagsAsync so every process observes the shared DB value.
+ */
 export function getFeatureFlags(): FeatureFlags {
-  const currentMtimeMs = flagsMtimeMs();
-  if (!cache || currentMtimeMs !== cacheMtimeMs) {
-    cache = readFlags();
-    cacheMtimeMs = currentMtimeMs;
+  return { ...(cache ?? defaults()) };
+}
+
+export async function getFeatureFlagsAsync(): Promise<FeatureFlags> {
+  try {
+    const { prisma } = await import('@/lib/prisma');
+    const row = await prisma.operationalSetting.findUnique({ where: { key: SETTING_KEY } });
+    cache = row ? parseFlags(row.value) : defaults();
+  } catch (error) {
+    cache = defaults();
+    logger.error('Failed to read feature flags; using fail-closed production defaults', {
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
   return { ...cache };
 }
 
-export function setFeatureFlags(partial: Partial<FeatureFlags>): FeatureFlags {
-  const merged = { ...getFeatureFlags(), ...partial } as FeatureFlags;
-  writeFlags(merged);
+export async function setFeatureFlags(partial: Partial<FeatureFlags>): Promise<FeatureFlags> {
+  const { prisma } = await import('@/lib/prisma');
+  const current = await getFeatureFlagsAsync();
+  const merged = parseFlags({ ...current, ...partial });
+  await prisma.operationalSetting.upsert({
+    where: { key: SETTING_KEY },
+    create: { key: SETTING_KEY, value: merged },
+    update: { value: merged },
+  });
   cache = merged;
-  cacheMtimeMs = flagsMtimeMs();
   return { ...merged };
 }
 
 export function resetFeatureFlags(): void {
-  const defaults = { ...DEFAULT_FLAGS };
-  writeFlags(defaults);
-  cache = defaults;
-  cacheMtimeMs = flagsMtimeMs();
+  cache = null;
 }

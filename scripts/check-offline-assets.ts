@@ -2,7 +2,13 @@ import http from 'node:http';
 import { URL } from 'node:url';
 
 const PROVIDED = process.env.OFFLINE_CHECK_HOST;
-const DEFAULT_HOSTS = ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://169.254.83.107:3000'];
+const PORT = process.env.PORT || '3000';
+const HOSTNAME = process.env.HOSTNAME || 'localhost';
+const DEFAULT_HOSTS = [
+  `http://${HOSTNAME}:${PORT}`,
+  `http://127.0.0.1:${PORT}`,
+  'http://localhost:3000',
+];
 const CANDIDATE_HOSTS = PROVIDED ? [PROVIDED, ...DEFAULT_HOSTS] : DEFAULT_HOSTS;
 const PATHS = ['/sw.js', '/precache.json', '/critical-precache.json', '/version.json', '/app.webmanifest'];
 

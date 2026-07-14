@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { withErrorHandler, createSuccessResponse } from '@/lib/apiErrorHandler';
 import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
-import { getFeatureFlags } from '@/lib/featureFlags';
+import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 import { ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 
 export const dynamic = 'force-dynamic';
@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 * Returns a schema describing the guest portal form (origin + conditional fields).
  */
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const flags = getFeatureFlags();
+  const flags = await getFeatureFlagsAsync();
   if (!flags.portalEnabled) {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }

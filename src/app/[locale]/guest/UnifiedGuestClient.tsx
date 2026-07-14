@@ -85,8 +85,15 @@ export default function UnifiedGuestClient() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleCountrySelect = (dialCode: string) => {
+  const applyPhoneDial = (dialCode: string) => {
+    if (dialCode !== phoneDial) {
+      setPhone('');
+    }
     setPhoneDial(dialCode);
+  };
+
+  const handleCountrySelect = (dialCode: string) => {
+    applyPhoneDial(dialCode);
     setIsDropdownOpen(false);
   };
 
@@ -123,7 +130,7 @@ export default function UnifiedGuestClient() {
   const selectOrigin = (o: Origin) => {
     if (!o) return;
     setOrigin(o);
-    setPhoneDial(o === 'GR' ? '+30' : DEFAULT_ABROAD_DIAL);
+    applyPhoneDial(o === 'GR' ? '+30' : DEFAULT_ABROAD_DIAL);
     try { tracker.originSelected(o); } catch {}
     setTimeout(() => phoneInputRef.current?.focus(), 0);
   };
@@ -445,7 +452,7 @@ export default function UnifiedGuestClient() {
                   <div ref={panelRef} role="tabpanel" id={`panel-${mode}`} aria-labelledby={`tab-${mode}`} tabIndex={-1}>
                     {submitError ? (
                       <div className="mb-3">
-                        <ErrorSummary summary={submitError.summary} details={submitError.details} onRetry={() => { setSubmitError(null); }} supportHref={`/${locale}/contact`} locale={locale} />
+                        <ErrorSummary summary={submitError.summary} details={submitError.details} onRetry={() => { setSubmitError(null); }} supportHref={`/${locale}#contact`} locale={locale} />
                       </div>
                     ) : null}
 
@@ -572,7 +579,7 @@ export default function UnifiedGuestClient() {
                                 ref={phoneInputRef} 
                                 className="flex-1 border-none outline-none py-3 pl-3 pr-3 rounded-r-lg input" 
                                 style={{ 
-                                  color: 'var(--fg-default) !important',
+                                  color: 'var(--fg-default)',
                                   '--placeholder-color': 'var(--fg-muted)',
                                   backgroundColor: 'var(--layer-surface)',
                                   border: 'none',
@@ -596,7 +603,7 @@ export default function UnifiedGuestClient() {
                                 type={showPassword ? 'text' : 'password'}
                                 className="w-full input pr-10" 
                                 style={{ 
-                                  color: 'var(--fg-default) !important',
+                                  color: 'var(--fg-default)',
                                   '--placeholder-color': 'var(--fg-muted)',
                                 } as React.CSSProperties}
                                 value={password} 
@@ -628,7 +635,7 @@ export default function UnifiedGuestClient() {
                               <input 
                                 className="w-full input" 
                                 style={{ 
-                                  color: 'var(--fg-default) !important',
+                                  color: 'var(--fg-default)',
                                   '--placeholder-color': 'var(--fg-muted)',
                                 } as React.CSSProperties}
                                 value={afm} 
@@ -653,7 +660,7 @@ export default function UnifiedGuestClient() {
                               <input 
                                 className="w-full input" 
                                 style={{ 
-                                  color: 'var(--fg-default) !important',
+                                  color: 'var(--fg-default)',
                                   '--placeholder-color': 'var(--fg-muted)',
                                 } as React.CSSProperties}
                                 value={passport} 
@@ -679,7 +686,7 @@ export default function UnifiedGuestClient() {
                               <input 
                                 className="w-full input" 
                                 style={{ 
-                                  color: 'var(--fg-default) !important',
+                                  color: 'var(--fg-default)',
                                   '--placeholder-color': 'var(--fg-muted)',
                                 } as React.CSSProperties}
                                 value={lastName} 
@@ -758,7 +765,7 @@ export default function UnifiedGuestClient() {
                                           <input 
                                             className="w-full input" 
                                             style={{ 
-                                              color: 'var(--fg-default) !important',
+                                              color: 'var(--fg-default)',
                                               '--placeholder-color': 'var(--fg-muted)',
                                             } as React.CSSProperties}
                                             value={bookingRef} 

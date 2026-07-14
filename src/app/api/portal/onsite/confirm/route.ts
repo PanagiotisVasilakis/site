@@ -2,28 +2,50 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withErrorHandler, validateRequestBody, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
-import { guestStore } from '@/lib/guestDataStore';
-import { createRefreshCookie, createSessionCookie, signGuestSession } from '@/lib/guestSession';
+import {
+  BookingAlreadyLinkedError,
+  BookingNotFoundError,
+  OnsiteGrantRejectedError,
+  guestStore,
+} from '@/lib/guestDataStore';
+import { createRefreshCookie, createSessionCookie, issueGuestSession } from '@/lib/guestSession';
 import { locales, defaultLocale } from '@/i18n/config';
+import {
+  isOnsiteConfirmationEnabled,
+  readBearerToken,
+  verifyOnsiteGrantToken,
+} from '@/lib/onsiteGrant';
+import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
 
 export const dynamic = 'force-dynamic';
 
-// For on-site bookings, the POS passes minimal required data
 const schema = z.object({
-  phone: z.string().regex(/^\+?[1-9]\d{7,14}$/),
+  phone: z.string().trim().min(8).max(32),
   origin: z.enum(['GR', 'ABROAD']).optional(),
-  booking: z.object({
-    id: z.string().optional(),
-    reference: z.string().optional(),
-    start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    lastName: z.string().optional(),
-  }),
   remember: z.boolean().optional(),
 });
 
 export const POST = withErrorHandler(async (request: NextRequest) => {
-  // Security checks (content type, XSS/SQLi). No API key by default; enable via middleware options if desired.
+  if (!isOnsiteConfirmationEnabled()) {
+    throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
+  }
+
+  const bearer = readBearerToken(request.headers.get('authorization'));
+  const grant = bearer ? verifyOnsiteGrantToken(bearer) : null;
+  if (!grant) {
+    throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'A valid onsite confirmation grant is required');
+  }
+
+  const rateLimit = await checkSensitiveRateLimit(request, {
+    scope: 'onsite-confirm',
+    identifier: grant.bookingId,
+    limit: 5,
+    windowMs: 15 * 60_000,
+  });
+  if (!rateLimit.allowed) {
+    throw new ApiError(ApiErrorCode.RATE_LIMITED, 'Too many onsite confirmation attempts');
+  }
+
   const guard = createAPISecurityMiddleware();
   const early = guard(request);
   if (early) return early;
@@ -36,8 +58,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     body = await parseBody(request);
   } else if (contentType.toLowerCase().includes('application/x-www-form-urlencoded') || contentType.toLowerCase().includes('multipart/form-data')) {
     const fd = await request.formData();
-    // Helper to read either flat or bracketed names
-    const get = (k: string, alt?: string) => (fd.get(k) ?? (alt ? fd.get(alt) : null));
+    const get = (k: string) => fd.get(k);
     const str = (v: FormDataEntryValue | null) => (typeof v === 'string' ? v : v ? String(v) : undefined);
     const bool = (v: FormDataEntryValue | null) => {
       const s = str(v)?.toLowerCase();
@@ -46,13 +67,6 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     const parsed = {
       phone: str(get('phone')),
       origin: (str(get('origin')) as 'GR' | 'ABROAD' | undefined),
-      booking: {
-        id: str(get('booking[id]', 'booking_id')),
-        reference: str(get('booking[reference]', 'booking_reference')),
-        start_date: str(get('booking[start_date]', 'booking_start_date')),
-        end_date: str(get('booking[end_date]', 'booking_end_date')),
-        lastName: str(get('booking[lastName]', 'booking_lastName')),
-      },
       remember: bool(get('remember')),
     } as unknown;
     const res = schema.safeParse(parsed);
@@ -67,20 +81,34 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   }
 
   // Atomically register onsite guest with booking and access
-  const { user, booking } = await guestStore.registerOnsiteGuest({
-    phone: body.phone,
-    origin: body.origin || 'GR',
-    booking: {
-      id: body.booking.id,
-      reference: body.booking.reference,
-      lastName: body.booking.lastName,
-      startDate: body.booking.start_date,
-      endDate: body.booking.end_date,
-    },
-  });
+  let user;
+  let booking;
+  try {
+    ({ user, booking } = await guestStore.registerOnsiteGuest({
+      phone: body.phone,
+      origin: body.origin || 'GR',
+      bookingId: grant.bookingId,
+      grant: {
+        jti: grant.jti,
+        expiresAt: new Date(grant.exp * 1000),
+      },
+    }));
+  } catch (error) {
+    if (error instanceof BookingAlreadyLinkedError) {
+      throw new ApiError(ApiErrorCode.CONFLICT, 'Booking is already linked to another account', {
+        fields: {
+          booking: 'This booking is already linked to another guest account. Please contact support.',
+        },
+      });
+    }
+    if (error instanceof BookingNotFoundError || error instanceof OnsiteGrantRejectedError) {
+      throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Onsite confirmation grant is invalid or already used');
+    }
+    throw error;
+  }
 
-  const jwt = signGuestSession({ user: { id: user.id }, booking: { id: booking.id } });
-  const sess = createSessionCookie(jwt);
+  const sessionJwt = await issueGuestSession(user.id, booking.id);
+  const sess = createSessionCookie(sessionJwt);
 
   // Locale-aware redirect
   const lang = request.cookies.get('lang')?.value;

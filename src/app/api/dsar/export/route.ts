@@ -2,16 +2,16 @@ import { NextRequest } from 'next/server';
 import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 import { logger } from '@/lib/logger-enterprise';
 import { guestStore } from '@/lib/guestDataStore';
-import { getGuestSessionFromCookies } from '@/lib/guestSession';
-import { maskLast4 } from '@/lib/crypto';
+import { getVerifiedGuestSessionFromCookies } from '@/lib/guestSession';
 import { requireSubjectOrAdmin } from '@/lib/rbac';
+import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
   const correlationId = logger.getContext()?.correlationId;
 
-  const session = await getGuestSessionFromCookies();
+  const session = await getVerifiedGuestSessionFromCookies();
   const sessionUserId = session?.user?.id;
   const sessionUser = sessionUserId ? await guestStore.findUserById(sessionUserId) : undefined;
 
@@ -33,44 +33,78 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'No subject found (missing session or invalid query)', undefined, correlationId);
   }
 
-  const access = requireSubjectOrAdmin(req, subject.id, sessionUser?.id);
+  const access = await requireSubjectOrAdmin(req, subject.id, sessionUser?.id);
   if (!access) {
     throw new ApiError(ApiErrorCode.FORBIDDEN, 'Not authorized to export this data', undefined, correlationId);
   }
 
-  // Collect footprint
-  const eligible = await guestStore.findEligibleBookingForUser(subject.id);
-  const bookings = [eligible].filter(Boolean) as NonNullable<typeof eligible>[];
+  const footprint = await prisma.user.findUnique({
+    where: { id: subject.id },
+    select: {
+      id: true,
+      email: true,
+      phoneE164: true,
+      countryOrigin: true,
+      createdAt: true,
+      updatedAt: true,
+      identities: { select: { type: true, last4Mask: true, verifiedAt: true } },
+      bookings: {
+        select: {
+          id: true, source: true, reference: true, startDate: true, endDate: true, createdAt: true,
+          checkin: { select: { arrivalTime: true, specialRequests: true, acceptedAt: true } },
+        },
+      },
+      accessRecords: { select: { bookingId: true, status: true, createdAt: true, updatedAt: true } },
+      sessions: { select: { id: true, bookingId: true, expiresAt: true, revokedAt: true, createdAt: true } },
+      refreshTokens: {
+        select: {
+          id: true, familyId: true, createdAt: true, expiresAt: true, revokedAt: true,
+          rotatedFromId: true, lastUsedAt: true, deviceHint: true, ipHint: true,
+        },
+      },
+      checkInRequests: {
+        select: {
+          id: true, bookingId: true, guestName: true, guestEmail: true, guestPhone: true,
+          requestedTime: true, message: true, status: true, createdAt: true, updatedAt: true,
+        },
+      },
+      mfaFactors: {
+        select: { id: true, type: true, status: true, createdAt: true, activatedAt: true, lastUsedAt: true },
+      },
+      mfaChallenges: {
+        select: { id: true, factorId: true, expiresAt: true, completedAt: true, createdAt: true },
+      },
+    },
+  });
+  if (!footprint) throw new ApiError(ApiErrorCode.NOT_FOUND, 'Subject no longer exists', undefined, correlationId);
 
-  // Access records for this user (store helper)
-  const subjectAccessRecords = await guestStore.listAccessByUser(subject.id);
-  const subjectAccess = subjectAccessRecords.map(a => ({ 
-    booking_id: a.booking_id, 
-    status: a.status, 
-    updated_at: a.updated_at 
-  }));
-
-  // Sessions for user
-  // guestDataStore exposes sessions array through DB, but no direct getter; skip listing raw tokens here
-  const maskPhone = subject.phone_e164 ? maskLast4(subject.phone_e164) : undefined;
+  const stayRequests = await prisma.stayRequest.findMany({
+    where: {
+      OR: [
+        ...(footprint.email ? [{ email: footprint.email }] : []),
+        { phone: footprint.phoneE164 },
+      ],
+    },
+    select: {
+      id: true, propertyName: true, locale: true, startDate: true, endDate: true,
+      firstName: true, lastName: true, email: true, phone: true, arrivalTime: true,
+      specialRequests: true, status: true, createdAt: true, updatedAt: true,
+    },
+    orderBy: { createdAt: 'desc' },
+  });
 
   const response = {
-    subject: {
-      user_id: subject.id,
-      phone_last4: maskPhone,
-      origin: subject.country_origin,
-    },
-    // Minimal booking footprint (IDs that can be referenced elsewhere)
-    bookings: bookings.map(b => ({ 
-      id: b.id, 
-      source: b.source, 
-      start_date: b.start_date, 
-      end_date: b.end_date, 
-      reference: b.reference 
-    })),
-    access: subjectAccess,
+    subject: footprint,
+    stayRequests,
     generated_at: new Date().toISOString(),
+    excluded_secret_material: [
+      'password hashes', 'identity hashes and salts', 'refresh token hashes',
+      'MFA secrets and challenge codes', 'JWT values',
+    ],
   };
 
-  return createSuccessResponse(response, 200, correlationId);
+  const result = createSuccessResponse(response, 200, correlationId);
+  result.headers.set('content-disposition', `attachment; filename="personal-data-${subject.id}.json"`);
+  result.headers.set('cache-control', 'no-store, private');
+  return result;
 });

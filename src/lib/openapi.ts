@@ -9,10 +9,6 @@ export const openApiSpec = {
     title: 'Site API',
     description: 'Comprehensive API for analytics, content management, and administration',
     version: '1.0.0',
-    contact: {
-      name: 'API Support',
-      email: 'support@example.com',
-    },
     license: {
       name: 'MIT',
       url: 'https://opensource.org/licenses/MIT',
@@ -20,20 +16,8 @@ export const openApiSpec = {
   },
   servers: [
     {
-      url: 'https://yourdomain.com/api',
-      description: 'Production server',
-    },
-    {
-      url: 'http://localhost:3000/api',
-      description: 'Development server',
-    },
-  ],
-  security: [
-    {
-      ApiKeyAuth: [],
-    },
-    {
-      AdminJWT: [],
+      url: '/api',
+      description: 'Current deployment',
     },
   ],
   components: {

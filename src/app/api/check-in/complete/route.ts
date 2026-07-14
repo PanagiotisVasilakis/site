@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode, validateRequestBody } from '@/lib/apiErrorHandler';
-import { getGuestSessionFromCookies, hasVerifiedBookingSession } from '@/lib/guestSession';
+import { getVerifiedGuestSessionFromCookies } from '@/lib/guestSession';
 import { guestStore } from '@/lib/guestDataStore';
 import { tracer, SpanStatus } from '@/lib/distributed-tracing';
 import { metrics } from '@/lib/metrics-collector';
-import { getFeatureFlags } from '@/lib/featureFlags';
+import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +25,7 @@ async function saveCompletion(bookingId: string, data: z.infer<typeof CompleteSc
 }
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const flags = getFeatureFlags();
+  const flags = await getFeatureFlagsAsync();
   if (!flags.checkinEnabled) {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }
@@ -33,8 +33,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const start = Date.now();
   const parseBody = validateRequestBody(CompleteSchema);
   const body = await parseBody(req);
-  const session = await getGuestSessionFromCookies();
-  if (!hasVerifiedBookingSession(session) || !session?.booking?.id) {
+  const session = await getVerifiedGuestSessionFromCookies();
+  if (!session?.booking?.id) {
     tracer.finishSpan(span, SpanStatus.ERROR);
     metrics.timer('api_checkin_complete_duration_ms', Date.now() - start, { endpoint: '/api/check-in/complete', method: 'POST', result: 'unauthorized' });
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Not authorized');
@@ -44,6 +44,5 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   metrics.counter('api_checkin_complete_count', 1, { endpoint: '/api/check-in/complete', method: 'POST' });
   metrics.trackApiCall('/api/check-in/complete', 'POST', 200, Date.now() - start);
   tracer.finishSpan(span, SpanStatus.OK);
-  metrics.timer('api_checkin_complete_duration_ms', Date.now() - start, { endpoint: '/api/check-in/complete', method: 'POST', result: 'ok' });
   return createSuccessResponse({ ok: true }) as NextResponse;
 });

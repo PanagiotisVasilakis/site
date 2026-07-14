@@ -6,9 +6,12 @@ import HomeHero from "@/components/HomeHero";
 import DeferredHomeInteractiveBar from "@/components/DeferredHomeInteractiveBar";
 import DeferredContactSection from "@/components/DeferredContactSection";
 import HomeFeatureGrid, { type HomeFeature } from "@/components/home/HomeFeatureGrid";
+import { headers } from 'next/headers';
+import { serializeJsonLd } from '@/lib/jsonLd';
 
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
   const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : "en";
   const t = getDictionary(eff);
   const cats: CategoryWithCount[] = getCategoriesWithCounts();
@@ -33,10 +36,11 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   return (
     <>
       <script
+        nonce={nonce}
         type="application/ld+json"
         suppressHydrationWarning
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+          __html: serializeJsonLd({
             '@context': 'https://schema.org',
             '@type': 'Organization',
             name: t.appTitle,

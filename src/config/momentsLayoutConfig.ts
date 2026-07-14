@@ -19,7 +19,6 @@ export const momentsLayoutConfig = {
         nameClass: 'guide-option-title',
         summaryClass: 'guide-option-summary',
         ratingClass: 'guide-option-meta inline-flex items-center gap-1',
-        priceClass: 'guide-option-meta',
         wishlistBtnClass: 'wishlist-btn',
     },
 

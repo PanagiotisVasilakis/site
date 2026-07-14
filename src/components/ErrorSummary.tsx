@@ -8,7 +8,7 @@ export default function ErrorSummary({
   summary,
   details,
   onRetry,
-  supportHref = '/en/contact',
+  supportHref = '/en#contact',
   locale = 'en',
 }: {
   title?: string;

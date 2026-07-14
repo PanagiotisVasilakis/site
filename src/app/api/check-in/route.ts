@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
-import { getGuestSessionFromCookies, hasVerifiedBookingSession } from '@/lib/guestSession';
+import { getVerifiedGuestSessionFromCookies } from '@/lib/guestSession';
 import { guestStore, Booking } from '@/lib/guestDataStore';
-import { getFeatureFlags } from '@/lib/featureFlags';
+import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 
 export const dynamic = 'force-dynamic';
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
   void req; // silence unused param warning
-  const flags = getFeatureFlags();
+  const flags = await getFeatureFlagsAsync();
   if (!flags.checkinEnabled) {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }
-  const session = await getGuestSessionFromCookies();
-  if (!hasVerifiedBookingSession(session)) {
+  const session = await getVerifiedGuestSessionFromCookies();
+  if (!session) {
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Not authorized');
   }
   // Hydrate booking details from store (dates/reference) if possible

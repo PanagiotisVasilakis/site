@@ -6,6 +6,7 @@ import FavoriteButton from '@/components/FavoriteButton';
 import ShareButton from '@/components/ShareButton';
 import DescriptionBox from '@/components/DescriptionBox';
 import { momentsLayoutConfig } from '@/config/momentsLayoutConfig';
+import { serializeJsonLd } from '@/lib/jsonLd';
 
 interface MomentsItem {
     id: string;
@@ -20,6 +21,7 @@ interface MomentsItem {
 }
 
 interface MomentsDetailLayoutProps {
+    nonce?: string;
     item: MomentsItem;
     categorySlug: string;
     locale?: string;
@@ -56,6 +58,7 @@ export function MomentsDetailLayout({
     isRecentlyUpdated,
     urls,
     translations,
+    nonce,
 }: MomentsDetailLayoutProps) {
     const config = momentsLayoutConfig.detail;
     const t = translations;
@@ -64,10 +67,11 @@ export function MomentsDetailLayout({
         <div className={config.containerClass}>
             {/* Structured Data */}
             <script
+                nonce={nonce}
                 type="application/ld+json"
                 suppressHydrationWarning
                 dangerouslySetInnerHTML={{
-                    __html: JSON.stringify({
+                    __html: serializeJsonLd({
                         '@context': 'https://schema.org',
                         '@type': 'Place',
                         name: item.name,

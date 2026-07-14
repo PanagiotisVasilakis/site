@@ -13,6 +13,7 @@ type MockRepository = {
 };
 
 let repository: MockRepository;
+const originalFetch = global.fetch;
 
 function makeReq(url: string, init?: RequestInit & { cookies?: Record<string, string> }) {
   const base = new URL(url, 'http://localhost');
@@ -36,7 +37,6 @@ function validAdminCookie() {
 
 function validAdminHeaders(contentType = false) {
   return {
-    'x-admin-secret': ADMIN_SECRET,
     ...(contentType ? { 'content-type': 'application/json' } : {}),
   };
 }
@@ -70,6 +70,8 @@ describe('admin check-in requests API', () => {
     vi.resetModules();
     process.env.ADMIN_DASH_SECRET = ADMIN_SECRET;
     process.env.ADMIN_JWT_SECRET = ADMIN_JWT_SECRET;
+    delete process.env.CHECKIN_REQUEST_WEBHOOK_URL;
+    delete process.env.CHECKIN_REQUEST_WEBHOOK_TOKEN;
 
     repository = {
       list: vi.fn().mockResolvedValue([requestRecord()]),
@@ -90,6 +92,7 @@ describe('admin check-in requests API', () => {
 
   afterEach(() => {
     vi.doUnmock('@/lib/prisma-repositories/checkInRequestRepository');
+    global.fetch = originalFetch;
   });
 
   it('rejects unauthenticated admin list requests', async () => {
@@ -100,19 +103,7 @@ describe('admin check-in requests API', () => {
     expect(repository.list).not.toHaveBeenCalled();
   });
 
-  it('rejects requests with a valid JWT but missing admin secret', async () => {
-    const { GET } = await importListRoute();
-    const req = makeReq('/api/admin/check-in-requests', {
-      cookies: validAdminCookie(),
-    });
-
-    const res = await GET(req as any, { params: Promise.resolve({}) } as any);
-
-    expect(res.status).toBe(403);
-    expect(repository.list).not.toHaveBeenCalled();
-  });
-
-  it('rejects requests with the admin secret but missing or invalid JWT', async () => {
+  it('rejects requests with missing or invalid JWT', async () => {
     const { GET } = await importListRoute();
 
     const missingJwt = await GET(makeReq('/api/admin/check-in-requests', {
@@ -131,7 +122,6 @@ describe('admin check-in requests API', () => {
   it('lists requests for a valid admin and maps the status filter', async () => {
     const { GET } = await importListRoute();
     const req = makeReq('/api/admin/check-in-requests?status=approved', {
-      headers: validAdminHeaders(),
       cookies: validAdminCookie(),
     });
 
@@ -214,6 +204,36 @@ describe('admin check-in requests API', () => {
       request: { id: REQUEST_ID, status: 'approved' },
       notification: { status: 'skipped' },
     });
+  });
+
+  it('sends a status update notification when webhook is configured', async () => {
+    process.env.CHECKIN_REQUEST_WEBHOOK_URL = 'https://example.test/check-in-webhook';
+    process.env.CHECKIN_REQUEST_WEBHOOK_TOKEN = 'webhook-token';
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 202 } as Response);
+    repository.findById.mockResolvedValue(requestRecord('PENDING'));
+    repository.updateStatus.mockResolvedValue(requestRecord('APPROVED'));
+    const { PATCH } = await importPatchRoute();
+    const req = makeReq(`/api/admin/check-in-requests/${REQUEST_ID}`, {
+      method: 'PATCH',
+      headers: validAdminHeaders(true),
+      cookies: validAdminCookie(),
+      body: JSON.stringify({ status: 'approved' }),
+    });
+
+    const res = await PATCH(req as any, { params: Promise.resolve({ id: REQUEST_ID }) } as any);
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.data.notification.status).toBe('sent');
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://example.test/check-in-webhook',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer webhook-token',
+        }),
+      })
+    );
   });
 
   it('rejects pending requests', async () => {

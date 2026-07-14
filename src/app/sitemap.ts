@@ -9,7 +9,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
 	for (const locale of locales) {
 		urls.push({ url: `${siteUrl}/${locale}`, changeFrequency: 'weekly', priority: 0.8 });
 		urls.push({ url: `${siteUrl}/${locale}/book`, changeFrequency: 'weekly', priority: 0.7 });
-		urls.push({ url: `${siteUrl}/${locale}/guest`, changeFrequency: 'monthly', priority: 0.6 });
+		urls.push({ url: `${siteUrl}/${locale}/apartment`, changeFrequency: 'monthly', priority: 0.8 });
+		urls.push({ url: `${siteUrl}/${locale}/booking-details`, changeFrequency: 'monthly', priority: 0.5 });
+		urls.push({ url: `${siteUrl}/${locale}/about`, changeFrequency: 'monthly', priority: 0.5 });
+		urls.push({ url: `${siteUrl}/${locale}/favorites`, changeFrequency: 'monthly', priority: 0.4 });
 		for (const c of categories) {
 			urls.push({ url: `${siteUrl}/${locale}/${c.slug}`, changeFrequency: 'weekly', priority: 0.7 });
 			const items = getItemsByCategory(c.id);
@@ -18,7 +21,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
 				urls.push({ url: `${siteUrl}/${locale}/${c.slug}/${itemSlug}`, changeFrequency: 'weekly', priority: 0.5 });
 			}
 		}
-		urls.push({ url: `${siteUrl}/${locale}/offline`, changeFrequency: 'yearly', priority: 0.3 });
 	}
 	// Intentionally exclude /check-in and other protected paths
 	return urls;

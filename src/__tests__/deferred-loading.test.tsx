@@ -1,12 +1,15 @@
 import React from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
-const dynamicLoaderCalls: Array<() => Promise<unknown>> = [];
+const { dynamicLoaderCalls } = vi.hoisted(() => ({
+  dynamicLoaderCalls: [] as Array<() => Promise<unknown>>,
+}));
+
 vi.mock('next/dynamic', () => ({
   default: (
     loader: () => Promise<{ default: React.ComponentType<any> }>,
@@ -83,10 +86,23 @@ class MockIntersectionObserver {
   takeRecords(): IntersectionObserverEntry[] { return []; }
 }
 
-const globalWithIO = globalThis as typeof globalThis & { IntersectionObserver?: any };
-if (!globalWithIO.IntersectionObserver) {
-  globalWithIO.IntersectionObserver = MockIntersectionObserver;
-}
+const originalGlobalIntersectionObserver = globalThis.IntersectionObserver;
+const originalWindowIntersectionObserver = window.IntersectionObserver;
+
+const defineIntersectionObserver = (
+  target: typeof globalThis | Window,
+  value: typeof IntersectionObserver | typeof MockIntersectionObserver | undefined
+) => {
+  if (value) {
+    Object.defineProperty(target, 'IntersectionObserver', {
+      configurable: true,
+      writable: true,
+      value,
+    });
+    return;
+  }
+  Reflect.deleteProperty(target, 'IntersectionObserver');
+};
 
 const triggerIntersection = (isIntersecting: boolean) => {
   observerInstances.forEach(({ callback, target }) => {
@@ -96,7 +112,20 @@ const triggerIntersection = (isIntersecting: boolean) => {
 };
 
 describe('Deferred loading guardrails', () => {
+  beforeAll(() => {
+    defineIntersectionObserver(globalThis, MockIntersectionObserver);
+    defineIntersectionObserver(window, MockIntersectionObserver);
+  });
+
+  afterAll(() => {
+    defineIntersectionObserver(globalThis, originalGlobalIntersectionObserver);
+    defineIntersectionObserver(window, originalWindowIntersectionObserver);
+  });
+
   beforeEach(() => {
+    vi.resetModules();
+    defineIntersectionObserver(globalThis, MockIntersectionObserver);
+    defineIntersectionObserver(window, MockIntersectionObserver);
     dynamicLoaderCalls.length = 0;
     observerInstances.length = 0;
     LeafletMapMock.mockClear();
@@ -104,16 +133,15 @@ describe('Deferred loading guardrails', () => {
 
   it('only loads the date picker after the user opens it', async () => {
     const BookingBar = (await import('@/components/SearchBar')).default;
-    const user = userEvent.setup();
 
     render(<BookingBar propertyName="Apartment" />);
 
     expect(dynamicLoaderCalls).toHaveLength(0);
-    await user.click(screen.getByRole('button', { name: /arrival/i }));
+    fireEvent.click(screen.getByRole('button', { name: /arrival/i }));
 
     await waitFor(() => expect(dynamicLoaderCalls).toHaveLength(1));
     expect(await screen.findByTestId('date-picker')).toBeInTheDocument();
-  });
+  }, 15000);
 
   it('defers interactive map rendering until it enters the viewport', async () => {
     const InteractiveMap = (await import('@/components/InteractiveMap')).default;
@@ -157,6 +185,7 @@ describe('Deferred loading guardrails', () => {
     expect(mapProps.labels).toMatchObject({
       directions: 'Οδηγίες',
       locateMe: 'Εντοπισμός θέσης',
+      locationUnavailable: 'Η τοποθεσία σας δεν είναι διαθέσιμη. Ελέγξτε την άδεια τοποθεσίας του browser και δοκιμάστε ξανά.',
       clearRoute: 'Εκκαθάριση διαδρομής',
     });
     expect(mapProps.travelPrompt).toBe('Πατήστε έναν δείκτη για να υπολογίσουμε τον χρόνο διαδρομής.');

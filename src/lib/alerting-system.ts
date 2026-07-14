@@ -13,6 +13,7 @@ export interface AlertRule {
   metric: string;
   condition: 'greater_than' | 'less_than' | 'equals' | 'not_equals' | 'anomaly';
   threshold?: number;
+  aggregation?: 'average' | 'sum';
   timeWindow: number; // milliseconds
   severity: 'low' | 'medium' | 'high' | 'critical';
   enabled: boolean;
@@ -156,10 +157,12 @@ export class AlertingSystem {
   private anomalyDetector = new AnomalyDetector();
   private evaluationInterval: NodeJS.Timeout | null = null;
   
-  constructor() {
+  constructor(options: { autoStart?: boolean } = {}) {
     this.setupDefaultRules();
     this.setupDefaultChannels();
-    this.startEvaluation();
+    if (options.autoStart !== false) {
+      this.startEvaluation();
+    }
   }
   
   private setupDefaultRules(): void {
@@ -167,10 +170,11 @@ export class AlertingSystem {
     this.addRule({
       id: 'high-error-rate',
       name: 'High Error Rate',
-      description: 'Alert when error rate exceeds 5%',
+      description: 'Alert when more than five server errors are recorded in five minutes',
       metric: 'http.errors',
       condition: 'greater_than',
-      threshold: 5, // 5% error rate
+      threshold: 5,
+      aggregation: 'sum',
       timeWindow: 300000, // 5 minutes
       severity: 'high',
       enabled: true,
@@ -182,7 +186,7 @@ export class AlertingSystem {
           channels: ['webhook'],
         },
       },
-    });
+    }, false);
     
     // Slow response time alert
     this.addRule({
@@ -199,14 +203,14 @@ export class AlertingSystem {
         channels: ['console', 'dashboard'],
         cooldown: 600000, // 10 minutes
       },
-    });
+    }, false);
     
     // Memory usage alert
     this.addRule({
       id: 'high-memory-usage',
       name: 'High Memory Usage',
       description: 'Alert when memory usage exceeds 85%',
-      metric: 'system.memory.usage',
+      metric: 'system.memory.percentage',
       condition: 'greater_than',
       threshold: 85,
       timeWindow: 180000, // 3 minutes
@@ -220,7 +224,7 @@ export class AlertingSystem {
           channels: ['webhook'],
         },
       },
-    });
+    }, false);
     
     // Health check failure alert
     this.addRule({
@@ -237,7 +241,7 @@ export class AlertingSystem {
         channels: ['console', 'dashboard', 'webhook'],
         cooldown: 120000, // 2 minutes
       },
-    });
+    }, false);
     
     // Anomaly detection for request volume
     this.addRule({
@@ -258,7 +262,7 @@ export class AlertingSystem {
         historicalWindow: 86400000, // 24 hours
         minDataPoints: 20,
       },
-    });
+    }, false);
   }
   
   private setupDefaultChannels(): void {
@@ -270,7 +274,7 @@ export class AlertingSystem {
           level: 'warn',
         },
       },
-    });
+    }, false);
     
     // Dashboard notification channel
     this.addNotificationChannel('dashboard', {
@@ -281,7 +285,7 @@ export class AlertingSystem {
           autoHide: 300000, // 5 minutes for non-critical alerts
         },
       },
-    });
+    }, false);
 
     // Webhook notification channel (example)
     const webhookToken = process.env.ALERT_WEBHOOK_TOKEN;
@@ -299,22 +303,24 @@ export class AlertingSystem {
             timeout: 5000,
           },
         },
-      });
-    } else {
+      }, false);
+    } else if (process.env.ALERT_WEBHOOK_REQUIRED === '1') {
       logger.warn('ALERT_WEBHOOK_TOKEN not configured; webhook channel disabled');
     }
   }
   
   private startEvaluation(): void {
+    if (this.evaluationInterval) return;
     // Evaluate rules every 30 seconds
     this.evaluationInterval = setInterval(() => {
       this.evaluateRules();
     }, 30000);
+    this.evaluationInterval.unref?.();
   }
   
-  addRule(rule: AlertRule): void {
+  addRule(rule: AlertRule, log = true): void {
     this.rules.set(rule.id, rule);
-    logger.info('Alert rule added', {
+    if (log) logger.info('Alert rule added', {
       ruleId: rule.id,
       name: rule.name,
       metric: rule.metric,
@@ -334,9 +340,9 @@ export class AlertingSystem {
     logger.info('Alert rule removed', { ruleId });
   }
   
-  addNotificationChannel(name: string, channel: NotificationChannel): void {
+  addNotificationChannel(name: string, channel: NotificationChannel, log = true): void {
     this.notificationChannels.set(name, channel);
-    logger.info('Notification channel added', {
+    if (log) logger.info('Notification channel added', {
       name,
       type: channel.type,
     });
@@ -373,8 +379,8 @@ export class AlertingSystem {
         return; // No data to evaluate
       }
       
-      // Calculate the value to compare (average for the time window)
-      const currentValue = metricData.reduce((sum, m) => sum + m.value, 0) / metricData.length;
+      const total = metricData.reduce((sum, metric) => sum + metric.value, 0);
+      const currentValue = rule.aggregation === 'sum' ? total : total / metricData.length;
       
       let shouldAlert = false;
       let alertMessage = '';

@@ -52,7 +52,6 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
           categorySlug: cat.slug,
           description: pickLocale(i, 'description', eff) ?? i.description,
           rating: i.rating,
-          price: i.priceLevel ? '€'.repeat(i.priceLevel) : undefined,
           icon: i.icon ?? cat.icon,
           image: i.image,
           heroImage: i.heroImage,
@@ -64,7 +63,6 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
           website: i.website,
           directionsUrl: i.directionsUrl,
           sourceUrls: i.sourceUrls,
-          priceLevel: i.priceLevel,
           hideAddressOnFront: cat.slug === 'phones',
         }))}
         locale={eff}

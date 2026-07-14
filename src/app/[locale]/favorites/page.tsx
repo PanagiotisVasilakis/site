@@ -19,7 +19,6 @@ export default async function FavoritesPage({ params }: { params: Promise<{ loca
         title: pickLocale(itemRecord, 'name', eff) || i.name,
         subtitle: pickLocale(itemRecord, 'summary', eff) || i.summary,
         rating: i.rating,
-        price: i.priceLevel ? '€'.repeat(i.priceLevel) : undefined,
         icon: cat.icon,
         href: `/${eff}/${cat.slug}/${i.slug || toSlug(i.name)}`,
         favoriteId: `${cat.slug}:${i.id}`,

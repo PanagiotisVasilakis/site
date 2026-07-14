@@ -37,7 +37,7 @@ async function create(input: Omit<UserRecord, 'id' | 'created_at' | 'updated_at'
 
 async function findByPhone(phone: string): Promise<UserRecord | undefined> {
   try {
-    const user = await prisma.user.findFirst({ where: { phoneE164: phone } });
+    const user = await prisma.user.findUnique({ where: { phoneE164: phone } });
     return user ? mapUserFromDb(user) : undefined;
   } catch (error) {
     logger.error('userRepository(prisma): findByPhone failed', error);

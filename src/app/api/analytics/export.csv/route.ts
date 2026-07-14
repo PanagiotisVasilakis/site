@@ -1,5 +1,5 @@
 import { topPaths, hourBuckets, dayBuckets, dailyNewPaths } from '@/lib/analyticsStore';
-import { verifyAdmin } from '@/lib/auth/admin';
+import { verifyAdminSession } from '@/lib/auth/admin';
 import { NextRequest } from 'next/server';
 import { logger } from '@/lib/logger-enterprise';
 
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     }
     
     // Verify admin authentication
-    const adminPayload = verifyAdmin(token);
+    const adminPayload = await verifyAdminSession(token);
     if (!adminPayload || adminPayload.role !== 'admin') {
       logger.warn('Invalid admin token for analytics export', { 
         ip: req.headers.get('x-forwarded-for') || 'unknown'

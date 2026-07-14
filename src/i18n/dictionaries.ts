@@ -72,11 +72,24 @@ function mergeDictionary(locale: Locale): Dictionary {
   };
 }
 
+function deepFreeze<T>(value: T): T {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) {
+    return value;
+  }
+
+  Object.freeze(value);
+  for (const child of Object.values(value as Record<string, unknown>)) {
+    deepFreeze(child);
+  }
+
+  return value;
+}
+
 // Pre-build dictionaries for performance
-const dictionaries: Record<Locale, Dictionary> = {
+const dictionaries: Record<Locale, Dictionary> = deepFreeze({
   en: mergeDictionary('en'),
   el: mergeDictionary('el'),
-};
+});
 
 // ============================================================================
 // Public API
@@ -84,12 +97,10 @@ const dictionaries: Record<Locale, Dictionary> = {
 
 /**
  * Gets the dictionary for a given locale.
- * Returns a deep copy to prevent mutation of the canonical source.
+ * Returns an immutable canonical dictionary.
  */
 export function getDictionary(locale: Locale): Dictionary {
-  const base = dictionaries[locale] ?? dictionaries.en;
-  // JSON clone for immutability
-  return JSON.parse(JSON.stringify(base)) as Dictionary;
+  return dictionaries[locale] ?? dictionaries.en;
 }
 
 // Re-export domain types for convenience

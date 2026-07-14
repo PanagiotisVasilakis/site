@@ -10,12 +10,20 @@ function hasLocale(pathname: string) {
   return locales.some((l) => pathname === `/${l}` || pathname.startsWith(`/${l}/`));
 }
 
-// Initialize security middleware
-const securityMiddleware = createSecurityMiddleware({
-  skipPaths: ['/api/health', '/favicon.ico', '/_next'],
-  // Localized pages are statically generated, so their inline Next.js bootstrap
-  // scripts cannot receive a per-request nonce.
-  enableNonce: false,
+const NON_LOCALIZED_ROUTE_PREFIXES = [
+  '/admin',
+  '/qr-info',
+  '/qr/image',
+  '/offline',
+];
+
+function isNonLocalizedRoute(pathname: string) {
+  return NON_LOCALIZED_ROUTE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+const nonceSecurityMiddleware = createSecurityMiddleware({
+  skipPaths: ['/favicon.ico', '/_next'],
+  enableNonce: true,
 });
 
 export async function proxy(req: NextRequest) {
@@ -46,7 +54,7 @@ export async function proxy(req: NextRequest) {
     });
 
     // Apply security headers first (will skip if path is in skipPaths) - now async
-    const response = await securityMiddleware(req);
+    const response = await nonceSecurityMiddleware(req);
     
     // Add tracing headers to response
     const traceHeaders = tracer.injectTraceContext({
@@ -66,8 +74,8 @@ export async function proxy(req: NextRequest) {
       response.headers.set('X-Robots-Tag', 'noindex, nofollow');
     }
 
-    // Skip routing logic for Next.js internals, API routes, and QR page
-    if (pathname.startsWith("/_next") || pathname.startsWith("/api") || pathname === "/qr") {
+    // Skip locale routing for Next.js internals, API routes, and root-level operational pages.
+    if (pathname.startsWith("/_next") || pathname.startsWith("/api") || pathname === "/qr" || isNonLocalizedRoute(pathname)) {
       tracer.addTags(span, { 'middleware.action': 'skip_routing' });
       tracer.finishSpan(span);
       
@@ -77,56 +85,7 @@ export async function proxy(req: NextRequest) {
       
       return response;
     }
-    
-    const url = new URL(req.url);
-    // Basic auth gate for /admin/analytics - requires secret, JWT validation happens server-side
-    if (url.pathname.startsWith('/admin/analytics')) {
-      tracer.addTags(span, { 'middleware.action': 'admin_auth_basic' });
-      
-      const secret = process.env.ADMIN_DASH_SECRET;
-      const provided = req.headers.get('x-admin-secret') || url.searchParams.get('token');
-      
-      // Check if admin dashboard is configured
-      if (!secret) {
-        tracer.addLog(span, 'error', 'Admin dashboard not configured');
-        tracer.finishSpan(span, SpanStatus.ERROR);
-        
-        metrics.counter('middleware.admin_auth_failures', 1, { reason: 'not_configured' });
-        
-        const errorResponse = new NextResponse('Admin dashboard not configured', { status: 503 });
-        // Copy security headers from original response
-        response.headers.forEach((value, key) => {
-          errorResponse.headers.set(key, value);
-        });
-        return errorResponse;
-      }
-      
-      // Basic secret check in middleware (JWT verification happens server-side in page)
-      if (provided !== secret) {
-        tracer.addLog(span, 'warn', 'Admin secret authentication failed');
-        tracer.finishSpan(span, SpanStatus.ERROR);
-        
-        metrics.counter('middleware.admin_auth_failures', 1, { reason: 'invalid_secret' });
-        
-        const unauthorizedResponse = new NextResponse('Unauthorized', { status: 401 });
-        // Copy security headers from original response
-        response.headers.forEach((value, key) => {
-          unauthorizedResponse.headers.set(key, value);
-        });
-        return unauthorizedResponse;
-      }
-      
-      // Secret is valid, allow through to page for JWT verification
-      tracer.addTags(span, { 'auth.secret_valid': true });
-      tracer.finishSpan(span);
-      
-      metrics.counter('middleware.admin_secret_success', 1);
-      const duration = Date.now() - startTime;
-      metrics.timer('middleware.duration', duration, { action: 'admin_secret_success' });
-      
-      return response;
-    }
-    
+
     const cookieLocale = req.cookies.get("lang")?.value as string | undefined;
     const isValidCookie = cookieLocale ? (locales as readonly string[]).includes(cookieLocale) : false;
 
@@ -141,7 +100,8 @@ export async function proxy(req: NextRequest) {
       } else {
         url.pathname = `/${target}${pathname}`;
       }
-      const redirectResponse = NextResponse.redirect(url);
+      // Temporary locale selection redirect.
+      const redirectResponse = NextResponse.redirect(url, 302);
       
       // Copy security headers to redirect response
       response.headers.forEach((value, key) => {

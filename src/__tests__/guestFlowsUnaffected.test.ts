@@ -6,6 +6,7 @@ const BOOKING_ID = '22222222-2222-4222-8222-222222222222';
 
 type GuestStoreMock = {
   findUserByPhone: ReturnType<typeof vi.fn>;
+  findBookingByReferenceAndLastName: ReturnType<typeof vi.fn>;
   findEligibleBookingForUser: ReturnType<typeof vi.fn>;
   issueRefreshToken: ReturnType<typeof vi.fn>;
   createUser: ReturnType<typeof vi.fn>;
@@ -50,6 +51,7 @@ function jsonPost(url: string, body: unknown, cookies?: Record<string, string>) 
 function mockGuestDependencies() {
   guestStore = {
     findUserByPhone: vi.fn(),
+    findBookingByReferenceAndLastName: vi.fn().mockResolvedValue({ id: BOOKING_ID }),
     findEligibleBookingForUser: vi.fn(),
     issueRefreshToken: vi.fn(),
     createUser: vi.fn(),
@@ -65,7 +67,7 @@ function mockGuestDependencies() {
   bcryptHash = vi.fn();
 
   vi.doMock('@/lib/featureFlags', () => ({
-    getFeatureFlags: () => ({ portalEnabled: true, checkinEnabled: true }),
+    getFeatureFlagsAsync: async () => ({ portalEnabled: true, checkinEnabled: true }),
   }));
   vi.doMock('@/lib/guestDataStore', () => ({
     guestStore,
@@ -78,6 +80,26 @@ function mockGuestDependencies() {
   }));
   vi.doMock('@/lib/prisma-repositories/checkInRequestRepository', () => ({
     checkInRequestRepository,
+  }));
+  vi.doMock('@/lib/prisma', () => ({
+    prisma: {
+      session: {
+        create: vi.fn(async ({ data }: any) => ({ ...data })),
+        findUnique: vi.fn(async () => ({
+          id: '44444444-4444-4444-8444-444444444444',
+          userId: USER_ID,
+          bookingId: BOOKING_ID,
+          expiresAt: new Date(Date.now() + 60_000),
+          revokedAt: null,
+        })),
+      },
+      access: {
+        findUnique: vi.fn(async () => ({
+          status: 'VERIFIED',
+          booking: { userId: USER_ID, endDate: new Date(Date.now() + 86_400_000) },
+        })),
+      },
+    },
   }));
 }
 
@@ -134,6 +156,7 @@ describe('guest auth and arrival request flows remain separate from admin', () =
       country_origin: 'ABROAD',
     });
     guestStore.linkUserToBookingWithAccess.mockResolvedValue({
+      userId: USER_ID,
       booking: {
         id: BOOKING_ID,
         source: 'EXTERNAL',
@@ -158,13 +181,13 @@ describe('guest auth and arrival request flows remain separate from admin', () =
     expect(res.status).toBe(200);
     expect(json.data.bookingId).toBe(BOOKING_ID);
     expect(res.headers.get('set-cookie')).toContain('guest_session=');
-    expect(guestStore.createUser).toHaveBeenCalledWith({
-      phone_e164: '+306900000002',
-      country_origin: 'ABROAD',
-      password_hash: 'new-password-hash',
-    });
     expect(guestStore.linkUserToBookingWithAccess).toHaveBeenCalledWith(expect.objectContaining({
-      userId: USER_ID,
+      userId: undefined,
+      newUser: {
+        phoneE164: '+306900000002',
+        countryOrigin: 'ABROAD',
+        passwordHash: 'new-password-hash',
+      },
       origin: 'ABROAD',
       identityValue: 'AB12345',
       bookingRef: 'BOOK-2',
@@ -246,6 +269,7 @@ describe('guest auth and arrival request flows remain separate from admin', () =
       country_origin: 'ABROAD',
     });
     guestStore.linkUserToBookingWithAccess.mockResolvedValue({
+      userId: USER_ID,
       booking: {
         id: BOOKING_ID,
         source: 'EXTERNAL',
@@ -276,6 +300,7 @@ describe('guest auth and arrival request flows remain separate from admin', () =
 
   it('keeps guest arrival request creation on guest_session auth only', async () => {
     const token = signGuestSession({
+      sid: '44444444-4444-4444-8444-444444444444',
       user: { id: USER_ID },
       booking: { id: BOOKING_ID },
     });

@@ -1,6 +1,7 @@
 import {
   buildBookingLastNameTokenSearchValues,
   createBookingLastNameTokens,
+  createBookingLastNameTokensFromNormalized,
   createBookingLastNameTokensFromStoredLegacyValues,
   isLegacyRawBookingLastNameToken,
   normalizeBookingLastName,
@@ -31,6 +32,18 @@ describe('booking last-name lookup tokens', () => {
     expect(candidates).toContain('papa dopoulos');
     expect(candidates).toContain('papadopoulos');
     expect(candidates.filter((value) => /^[a-f0-9]{64}$/i.test(value))).toHaveLength(2);
+  });
+
+  it('can build canonical-only search candidates after legacy raw migration', () => {
+    const candidates = buildBookingLastNameTokenSearchValues('  Papa Dopoulos  ', {
+      includeLegacyRaw: false,
+    });
+
+    expect(candidates).not.toContain('papa dopoulos');
+    expect(candidates).not.toContain('papadopoulos');
+    expect(candidates).toHaveLength(2);
+    expect(candidates.every((value) => /^[a-f0-9]{64}$/i.test(value))).toBe(true);
+    expect(candidates).toEqual(Object.values(createBookingLastNameTokensFromNormalized('papa dopoulos')));
   });
 
   it('detects and repairs legacy raw tokens', () => {

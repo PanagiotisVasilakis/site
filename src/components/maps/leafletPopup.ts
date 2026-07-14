@@ -38,7 +38,6 @@ export function buildBasePopupHtml(
       ${marker.description ? `<p>${escapeMapHtml(marker.description)}</p>` : ''}
       ${marker.address ? `<div class="map-popup-row"><strong>${escapeMapHtml(labels.address)}</strong><span>${escapeMapHtml(marker.address)}</span></div>` : ''}
       ${phoneHtml ? `<div class="map-popup-row"><strong>${escapeMapHtml(labels.phone)}</strong><span class="map-popup-contacts">${phoneHtml}</span></div>` : ''}
-      ${marker.price ? `<div class="map-popup-price">${escapeMapHtml(marker.price)}</div>` : ''}
       ${actionLinks ? `<div class="map-popup-actions">${actionLinks}</div>` : ''}
     </article>
   `;

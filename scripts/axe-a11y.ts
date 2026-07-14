@@ -19,9 +19,11 @@ interface ViolationSummary { id: string; impact: string | null; help: string; no
 
 process.on('unhandledRejection', (err) => {
   console.error('[axe-a11y] UnhandledRejection:', err);
+  process.exit(1);
 });
 process.on('uncaughtException', (err) => {
   console.error('[axe-a11y] UncaughtException:', err);
+  process.exit(1);
 });
 
 (async () => {
@@ -68,7 +70,12 @@ process.on('uncaughtException', (err) => {
       }
       if (!navigated) continue;
     }
-    await page.addScriptTag({ content: axeSource });
+    // Runtime.evaluate is intentionally used here: a script tag is blocked by the
+    // application's production CSP, while Puppeteer's isolated execution context
+    // is the trusted audit harness.
+    await page.evaluate(axeSource);
+    const axeAvailable = await page.evaluate(() => 'axe' in globalThis);
+    if (!axeAvailable) throw new Error('axe-core injection failed');
     console.log('[axe-a11y] axe injected, running...');
     const result = await page.evaluate(async () => {
       // @ts-expect-error axe injected globally at runtime
@@ -116,5 +123,3 @@ process.on('uncaughtException', (err) => {
   }
   console.log('[axe-a11y] done');
 })();
-
-

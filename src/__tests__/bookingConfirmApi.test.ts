@@ -12,6 +12,30 @@ const findBookingByReferenceAndLastName = vi.fn();
 const setAccess = vi.fn();
 const issueRefreshToken = vi.fn();
 
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
+    session: {
+      create: vi.fn(async ({ data }: any) => ({ ...data, createdAt: new Date(), revokedAt: null })),
+      findUnique: vi.fn(async () => ({
+        id: '44444444-4444-4444-8444-444444444444',
+        userId: 'usr_test_5',
+        bookingId: 'bkg_test_5',
+        expiresAt: new Date(Date.now() + 60_000),
+        revokedAt: null,
+      })),
+    },
+    access: {
+      findUnique: vi.fn(async ({ where }: any) => {
+        const { userId, bookingId } = where.userId_bookingId;
+        const booking = memStore.bookings.get(bookingId);
+        return booking && booking.user_id === userId
+          ? { status: 'VERIFIED', booking: { userId: booking.user_id, endDate: new Date(Date.now() + 86_400_000) } }
+          : null;
+      }),
+    },
+  },
+}));
+
 vi.mock('@/lib/guestDataStore', () => ({
   guestStore: {
     findBookingById: (id: string) => memStore.bookings.get(id),
@@ -135,6 +159,7 @@ describe.sequential('POST /api/bookings/[id]/confirm', () => {
     const booking = { id: 'bkg_test_5', reference: 'REF-5', user_id: 'usr_test_5' };
     memStore.bookings.set(booking.id, booking);
     const validToken = signGuestSession({
+      sid: '44444444-4444-4444-8444-444444444444',
       user: { id: booking.user_id },
       booking: { id: booking.id },
     });
@@ -147,6 +172,7 @@ describe.sequential('POST /api/bookings/[id]/confirm', () => {
     expect(validRes.status).toBe(303);
 
     const mismatchedToken = signGuestSession({
+      sid: '44444444-4444-4444-8444-444444444444',
       user: { id: 'different-user' },
       booking: { id: booking.id },
     });

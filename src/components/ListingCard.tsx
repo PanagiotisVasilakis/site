@@ -8,9 +8,8 @@ interface ListingCardProps {
   id: string;
   title: string;
   subtitle?: string;
-  image?: string; // placeholder now
+  image?: string;
   rating?: number;
-  price?: string; // generic label (e.g., price category or phone)
   href?: string;
   icon?: string;
   footer?: string;
@@ -21,7 +20,7 @@ interface ListingCardProps {
   removedToast?: string;
 }
 
-function ListingCardComponent({ id, title, subtitle, image, rating, price, href = '#', icon, footer, favoriteId, favLabelAdd = 'Add to favorites', favLabelRemove = 'Remove from favorites', addedToast = 'Added to favorites', removedToast = 'Removed from favorites' }: ListingCardProps) {
+function ListingCardComponent({ id, title, subtitle, image, rating, href = '#', icon, footer, favoriteId, favLabelAdd = 'Add to favorites', favLabelRemove = 'Remove from favorites', addedToast = 'Added to favorites', removedToast = 'Removed from favorites' }: ListingCardProps) {
   const fid = favoriteId || id;
   const { isFavorite, toggle } = useFavorites();
   const { push } = useToast();
@@ -32,7 +31,8 @@ function ListingCardComponent({ id, title, subtitle, image, rating, price, href 
     describedby: `desc-${id}`
   }), [id]);
   return (
-    <a href={href} className="listing-card group h-full flex flex-col" data-id={id} aria-labelledby={aria.labelledby} aria-describedby={aria.describedby}> 
+    <article className="listing-card group h-full flex flex-col relative" data-id={id}>
+      <a href={href} className="h-full flex flex-col" aria-labelledby={aria.labelledby} aria-describedby={aria.describedby}>
       <div className="relative">
         {image ? (
           <Image src={image} alt="" width={600} height={400} className="w-full h-auto" />
@@ -41,9 +41,6 @@ function ListingCardComponent({ id, title, subtitle, image, rating, price, href 
             <span aria-hidden>{icon || '📍'}</span>
           </div>
         )}
-        <button type="button" aria-label={wish ? favLabelRemove : favLabelAdd} className="wishlist-btn" onClick={e => { e.preventDefault(); toggleLocal(); }}>
-          <span aria-hidden>{wish ? '❤️' : '🤍'}</span>
-        </button>
       </div>
   <div className="listing-info mt-auto text-center">
         <div className="flex items-start justify-center gap-3">
@@ -56,11 +53,14 @@ function ListingCardComponent({ id, title, subtitle, image, rating, price, href 
         </div>
   {subtitle && <p id={`desc-${id}`} className="text-[0.68rem] text-small-strong line-clamp-2" style={{fontWeight:500}}>{subtitle}</p>}
         <div className="mt-1 text-[0.7rem] font-medium opacity-80 flex items-center gap-2">
-          {price && <span>{price}</span>}
           {footer && <span className="ml-auto truncate max-w-[8rem] opacity-60">{footer}</span>}
         </div>
       </div>
-    </a>
+      </a>
+      <button type="button" aria-label={wish ? favLabelRemove : favLabelAdd} className="wishlist-btn" onClick={toggleLocal}>
+        <span aria-hidden>{wish ? '❤️' : '🤍'}</span>
+      </button>
+    </article>
   );
 }
 export default memo(ListingCardComponent);

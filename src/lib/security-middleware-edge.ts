@@ -60,6 +60,8 @@ class SecurityHeadersMiddleware {
     if (nonce) {
       requestHeaders.set('x-nonce', nonce);
     }
+    const localeMatch = request.nextUrl.pathname.match(/^\/(en|el)(?:\/|$)/);
+    requestHeaders.set('x-locale', localeMatch?.[1] ?? 'en');
 
     const forwarded = NextResponse.next({ request: { headers: requestHeaders } });
     response.headers.forEach((value, key) => forwarded.headers.set(key, value));
@@ -197,6 +199,7 @@ class RateLimitMiddleware {
     if (!request.nextUrl.pathname.startsWith('/api/')) return null;
 
     const key = this.generateKey(request);
+    if (!key) return null;
     const now = Date.now();
     const resetTime = now + this.config.windowMs;
 
@@ -217,7 +220,9 @@ class RateLimitMiddleware {
         metrics.counter('rate_limit.allowed', 1, { backend: 'redis' });
         return null;
       } catch (error) {
-        console.error('Upstash rate limit error:', error);
+        if (process.env.NODE_ENV !== 'test') {
+          console.error('Upstash rate limit error:', error);
+        }
         metrics.counter('rate_limit.fallback_in_memory', 1, { backend: 'redis' });
         return this.handleInMemory(key, now, resetTime);
       }
@@ -268,8 +273,9 @@ class RateLimitMiddleware {
     return response;
   }
 
-  private generateKey(request: NextRequest): string {
-    return getClientIp(request, { trustProxy: true });
+  private generateKey(request: NextRequest): string | null {
+    const ip = getClientIp(request, { trustProxy: true });
+    return ip === 'unknown' ? null : `${ip}:${request.nextUrl.pathname}`;
   }
 }
 
@@ -305,6 +311,14 @@ class CORSMiddleware {
     }
 
     return null;
+  }
+
+  public applyActualRequestHeaders(request: NextRequest, response: NextResponse): void {
+    const origin = request.headers.get('origin');
+    if (!this.config.enabled || !origin || !this.isOriginAllowed(origin)) return;
+    response.headers.set('Access-Control-Allow-Origin', origin);
+    response.headers.append('Vary', 'Origin');
+    if (this.config.credentials) response.headers.set('Access-Control-Allow-Credentials', 'true');
   }
 
   private handlePreflight(_request: NextRequest, origin: string | null): NextResponse {
@@ -343,10 +357,13 @@ export function createSecurityMiddleware(options?: SecurityMiddlewareOptions) {
 
     const rateLimitResponse = await rateLimit.handle(request);
     if (rateLimitResponse) {
+      cors.applyActualRequestHeaders(request, rateLimitResponse);
       return rateLimitResponse;
     }
 
-    return securityHeaders.handle(request);
+    const response = securityHeaders.handle(request);
+    cors.applyActualRequestHeaders(request, response);
+    return response;
   };
 }
 

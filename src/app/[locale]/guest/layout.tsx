@@ -1,10 +1,10 @@
 import { notFound } from 'next/navigation';
-import { getFeatureFlags } from '@/lib/featureFlags';
+import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 
 export const dynamic = 'force-dynamic';
 
-export default function GuestSegmentLayout({ children }: { children: React.ReactNode }) {
-  const flags = getFeatureFlags();
+export default async function GuestSegmentLayout({ children }: { children: React.ReactNode }) {
+  const flags = await getFeatureFlagsAsync();
   if (!flags.portalEnabled) return notFound();
   return children;
 }

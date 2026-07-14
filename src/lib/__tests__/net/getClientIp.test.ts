@@ -22,14 +22,14 @@ describe('getClientIp', () => {
     vi.clearAllMocks();
   });
 
-  it('should return client IP from x-client-ip header when trusted', () => {
+  it('rejects the client-spoofable x-client-ip header', () => {
     vi.mocked(mockRequest.headers.get).mockImplementation((name: string) => {
       if (name === 'x-client-ip') return '192.168.1.100';
       return null;
     });
 
-    const result = getClientIp(mockRequest, { trustProxy: true });
-    expect(result).toBe('192.168.1.100');
+    const result = getClientIp(mockRequest, { trustProxy: true, trustedHops: 1, clientIpHeader: 'x-client-ip' });
+    expect(result).toBe('unknown');
   });
 
   it('should return CF-Connecting-IP when available', () => {
@@ -38,7 +38,7 @@ describe('getClientIp', () => {
       return null;
     });
 
-    const result = getClientIp(mockRequest, { trustProxy: true });
+    const result = getClientIp(mockRequest, { trustProxy: true, trustedHops: 1, clientIpHeader: 'cf-connecting-ip' });
     expect(result).toBe('203.0.113.195');
   });
 
@@ -48,7 +48,7 @@ describe('getClientIp', () => {
       return null;
     });
 
-    const result = getClientIp(mockRequest, { trustProxy: true });
+    const result = getClientIp(mockRequest, { trustProxy: true, trustedHops: 1, clientIpHeader: 'x-real-ip' });
     expect(result).toBe('198.51.100.42');
   });
 
@@ -58,7 +58,7 @@ describe('getClientIp', () => {
       return null;
     });
 
-    const result = getClientIp(mockRequest, { trustProxy: true });
+    const result = getClientIp(mockRequest, { trustProxy: true, trustedHops: 3 });
     expect(result).toBe('203.0.113.195');
   });
 
@@ -72,7 +72,7 @@ describe('getClientIp', () => {
   it('should return unknown when no headers are available', () => {
     vi.mocked(mockRequest.headers.get).mockReturnValue(null);
 
-    const result = getClientIp(mockRequest, { trustProxy: true });
+    const result = getClientIp(mockRequest, { trustProxy: true, trustedHops: 1 });
     expect(result).toBe('unknown');
   });
 
@@ -82,7 +82,7 @@ describe('getClientIp', () => {
       return null;
     });
 
-    const result = getClientIp(mockRequest, { trustProxy: true });
+    const result = getClientIp(mockRequest, { trustProxy: true, trustedHops: 1 });
     expect(result).toBe('203.0.113.195');
   });
 
@@ -93,7 +93,11 @@ describe('getClientIp', () => {
       return null;
     });
 
-    expect(getClientIp(mockRequest, { trustProxy: true })).toBe('198.51.100.42');
+    expect(getClientIp(mockRequest, {
+      trustProxy: true,
+      trustedHops: 1,
+      clientIpHeader: 'x-real-ip',
+    })).toBe('198.51.100.42');
   });
 
   it('should normalize IPv4-mapped IPv6 addresses', () => {
@@ -101,6 +105,10 @@ describe('getClientIp', () => {
       name === 'cf-connecting-ip' ? '::ffff:203.0.113.10' : null
     ));
 
-    expect(getClientIp(mockRequest, { trustProxy: true })).toBe('203.0.113.10');
+    expect(getClientIp(mockRequest, {
+      trustProxy: true,
+      trustedHops: 1,
+      clientIpHeader: 'cf-connecting-ip',
+    })).toBe('203.0.113.10');
   });
 });

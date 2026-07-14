@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 import { metrics } from '@/lib/metrics-collector';
 import { logger } from '@/lib/logger-enterprise';
+import { timingSafeEqual } from 'node:crypto';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,8 +12,10 @@ function requireDevAndSecret(req: NextRequest) {
   }
   const secret = process.env.ADMIN_DASH_SECRET;
   if (secret) {
-    const provided = req.headers.get('x-admin-secret') || req.nextUrl.searchParams.get('token') || '';
-    if (provided !== secret) {
+    const provided = req.headers.get('x-admin-secret') || '';
+    const providedBuffer = Buffer.from(provided);
+    const secretBuffer = Buffer.from(secret);
+    if (providedBuffer.length !== secretBuffer.length || !timingSafeEqual(providedBuffer, secretBuffer)) {
       throw new ApiError(ApiErrorCode.FORBIDDEN, 'Invalid admin secret for dev endpoint');
     }
   }

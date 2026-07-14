@@ -27,7 +27,6 @@ export interface LeafletMarkerData {
   href?: string;
   coordinates: [number, number]; // [lng, lat]
   type?: string;
-  price?: string;
 }
 
 export interface LeafletMapLabels {
@@ -37,6 +36,7 @@ export interface LeafletMapLabels {
   website: string;
   details: string;
   locateMe: string;
+  locationUnavailable: string;
   fitToMarkers: string;
   zoomIn: string;
   zoomOut: string;
@@ -59,6 +59,7 @@ const DEFAULT_MAP_LABELS: LeafletMapLabels = {
   website: 'Website',
   details: 'Details',
   locateMe: 'Locate me',
+  locationUnavailable: 'Your location is unavailable. Check browser location permission and try again.',
   fitToMarkers: 'Fit to markers',
   zoomIn: 'Zoom in',
   zoomOut: 'Zoom out',
@@ -195,6 +196,7 @@ export default function LeafletMap({
   const [shouldFetchTravel, setShouldFetchTravel] = useState(() => !lazyTravelMetrics);
   const [failedModes, setFailedModes] = useState<TravelMode[]>([]);
   const [hasRoute, setHasRoute] = useState(false);
+  const [locationError, setLocationError] = useState('');
   const mapLabels = useMemo<LeafletMapLabels>(
     () => ({ ...DEFAULT_MAP_LABELS, ...labels }),
     [labels]
@@ -369,11 +371,19 @@ export default function LeafletMap({
         div.setAttribute('aria-label', mapLabels.locateMe);
         div.innerHTML = '📍';
         div.onclick = () => {
-          if (!navigator.geolocation) return;
+          setLocationError('');
+          if (!navigator.geolocation) {
+            setLocationError(mapLabels.locationUnavailable);
+            return;
+          }
           navigator.geolocation.getCurrentPosition(pos => {
             const { latitude, longitude } = pos.coords;
             mapRef.current?.setView([latitude, longitude], 15);
             L.marker([latitude, longitude], { icon: buildIcon('service') }).addTo(mapRef.current!);
+          }, () => setLocationError(mapLabels.locationUnavailable), {
+            enableHighAccuracy: false,
+            timeout: 10_000,
+            maximumAge: 60_000,
           });
         };
         return div;
@@ -552,6 +562,11 @@ export default function LeafletMap({
   return (
     <div className={`${className} relative`} style={{ height }}>
       <div ref={containerRef} className="w-full h-full rounded-lg overflow-hidden leaflet-container-custom" />
+      {locationError && (
+        <div className="absolute bottom-2 left-2 right-2 z-[5000] rounded bg-red-50 border border-red-200 p-2 text-sm text-red-800" role="alert">
+          {locationError}
+        </div>
+      )}
       {enableRouting && hasRoute && (
         <button
           type="button"

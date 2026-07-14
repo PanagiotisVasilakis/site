@@ -13,12 +13,14 @@ const vitals: Vital[] = [];
 let loaded = false;
 let loading = false; // Prevent concurrent loading
 let lastBackup = 0; // Track last backup time
+let lastLoadFailureAt = 0;
 
-const persistEnabled = process.env.ANALYTICS_PERSIST === '1' && !process.env.VERCEL; // opt-in persistence
+const persistEnabled = process.env.ANALYTICS_PERSIST === '1'; // opt-in persistence
 const retentionDays = Math.max(1, parseInt(process.env.ANALYTICS_RETENTION_DAYS || '30', 10));
 const storage = createStorageAdapter();
 const hashPaths = process.env.ANALYTICS_HASH_PATHS === '1';
 const backupIntervalMs = 24 * 60 * 60 * 1000; // 24 hours
+const loadRetryDelayMs = Math.max(1000, parseInt(process.env.ANALYTICS_LOAD_RETRY_MS || '30000', 10));
 
 function maybeHash(p: string) {
   if (!hashPaths) return p;
@@ -27,6 +29,7 @@ function maybeHash(p: string) {
 
 function loadHits() {
   if (loaded || loading) return;
+  if (lastLoadFailureAt && Date.now() - lastLoadFailureAt < loadRetryDelayMs) return;
   
   loading = true;
   
@@ -82,10 +85,12 @@ function loadHits() {
     }
     
     loaded = true;
+    lastLoadFailureAt = 0;
     
   } catch (err) { 
     logger.error('loadHits failed', err);
-    loaded = true; // Mark as loaded even on error to prevent infinite retries
+    loaded = false;
+    lastLoadFailureAt = Date.now();
   } finally {
     loading = false;
   }
@@ -93,6 +98,10 @@ function loadHits() {
 
 function persist() {
   if (!persistEnabled) return;
+  if (!loaded) {
+    logger.warn('Analytics persistence skipped until the store loads successfully');
+    return;
+  }
   
   try {
     storage.save({ hits, vitals, firstSeen });
@@ -300,6 +309,8 @@ export function dailyNewPaths(lastDays = 30) {
 }
 
 export function addVital(v: Vital) {
+  loadHits();
+
   // Validate vital data before adding
   if (!v || typeof v !== 'object') {
     logger.warn('Invalid vital object skipped', v);

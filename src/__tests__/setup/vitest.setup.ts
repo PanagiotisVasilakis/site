@@ -1,5 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 
+process.env.SECURITY_PEPPER ??= 'vitest-security-pepper-0001';
+process.env.SECURITY_ENC_KEY_HEX ??= '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+
 // Filter noisy styled-jsx boolean attribute warnings (React 19 change)
 const originalError = console.error;
 console.error = (...args: unknown[]) => {

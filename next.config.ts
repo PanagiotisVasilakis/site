@@ -1,14 +1,5 @@
 import type { NextConfig } from "next";
 
-const securityHeaders = [
-  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
-  { key: 'X-Content-Type-Options', value: 'nosniff' },
-  { key: 'X-DNS-Prefetch-Control', value: 'on' },
-  { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
-  { key: 'Permissions-Policy', value: 'geolocation=(self), microphone=(), camera=()' },
-];
-
 const nextConfig: NextConfig = {
   output: 'standalone',
   images: {
@@ -32,15 +23,6 @@ const nextConfig: NextConfig = {
       config.cache = { type: 'memory' } as { type: 'memory' };
     }
     return config;
-  },
-  // Allow accessing dev server assets from local network IP (suppress forthcoming warning)
-  async headers() {
-    return [
-      {
-        source: '/:path*',
-        headers: securityHeaders,
-      },
-    ];
   },
 };
 

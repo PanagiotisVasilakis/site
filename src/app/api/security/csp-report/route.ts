@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     await handleCSPViolation(violationReport, clientInfo);
 
     // Return success response
-    return NextResponse.json({ status: 'received' }, { status: 204 });
+    return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error('Error processing CSP violation report:', error);
     return NextResponse.json(
@@ -35,9 +35,8 @@ export async function POST(request: NextRequest) {
 // Handle preflight requests
 export async function OPTIONS() {
   return new NextResponse(null, {
-    status: 200,
+    status: 204,
     headers: {
-      'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     },

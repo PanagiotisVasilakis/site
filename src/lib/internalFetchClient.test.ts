@@ -50,7 +50,7 @@ describe('internalFetch', () => {
     expect(errorSpy).toHaveBeenCalled();
   });
 
-  it('attaches stored admin secret to known admin-protected API paths', async () => {
+  it('does not attach stored admin secrets to known admin-protected API paths', async () => {
     window.sessionStorage.setItem('admin_secret', 'stored-admin-secret');
     global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, statusText: 'OK', url: '/api/metrics', headers: new Map() } as any);
 
@@ -58,7 +58,7 @@ describe('internalFetch', () => {
 
     const [, init] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const headers = new Headers(init?.headers as HeadersInit);
-    expect(headers.get('x-admin-secret')).toBe('stored-admin-secret');
+    expect(headers.get('x-admin-secret')).toBeNull();
   });
 
   it('does not attach admin secret to alert webhook submissions', async () => {

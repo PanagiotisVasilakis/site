@@ -3,21 +3,23 @@ import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode, ValidationError } from '@/lib/apiErrorHandler';
 import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
-import { guestStore } from '@/lib/guestDataStore';
-import { signGuestSession, createSessionCookie, createRefreshCookie } from '@/lib/guestSession';
+import { BookingAlreadyLinkedError, BookingNotFoundError, guestStore } from '@/lib/guestDataStore';
+import { issueGuestSession, createSessionCookie, createRefreshCookie } from '@/lib/guestSession';
 import { locales, defaultLocale } from '@/i18n/config';
 import { logger as elogger } from '@/lib/logger-enterprise';
 import { metrics } from '@/lib/metrics-collector';
-import { getFeatureFlags } from '@/lib/featureFlags';
+import { getFeatureFlagsAsync } from '@/lib/featureFlags';
+import { normalizePhone } from '@/lib/phone';
+import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
 
-const phoneE164 = z.string().regex(/^\+?[1-9]\d{7,14}$/); // basic E.164 (8-15 digits with leading +)
+const phoneInput = z.string().trim().min(8).max(32);
 const originEnum = z.enum(['GR', 'ABROAD']);
 const passwordSchema = z.string().min(8, 'Password must be at least 8 characters').max(128);
 
 // Sign-in schema: ONLY phone and password
 const signInSchema = z.object({
   mode: z.literal('signin'),
-  phone: phoneE164,
+  phone: phoneInput,
   password: passwordSchema,
   remember: z.boolean().optional(),
 });
@@ -26,9 +28,9 @@ const signInSchema = z.object({
 const baseSignUpSchema = z.object({
   mode: z.literal('signup'),
   origin: originEnum,
-  phone: phoneE164,
+  phone: phoneInput,
   password: passwordSchema,
-  bookingRef: z.string().trim().min(3).max(64).optional(),
+  bookingRef: z.string().trim().min(3).max(64),
   lastName: z.string().trim().min(1).max(100),
   remember: z.boolean().optional(),
 });
@@ -50,7 +52,7 @@ const signUpSchema = z.union([signUpSchemaGR, signUpSchemaAbroad]);
 export const dynamic = 'force-dynamic';
 
 export const POST = withErrorHandler(async (request: NextRequest) => {
-  const flags = getFeatureFlags();
+  const flags = await getFeatureFlagsAsync();
   if (!flags.portalEnabled) {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }
@@ -75,25 +77,37 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   }
   const body = parseResult.data;
 
+  const rateLimit = await checkSensitiveRateLimit(request, {
+    scope: body.mode === 'signin' ? 'portal-signin' : 'portal-signup',
+    identifier: typeof body.phone === 'string' ? body.phone : undefined,
+    limit: body.mode === 'signin' ? 5 : 3,
+    windowMs: body.mode === 'signin' ? 15 * 60_000 : 60 * 60_000,
+  });
+  if (!rateLimit.allowed) {
+    throw new ApiError(ApiErrorCode.RATE_LIMITED, 'Too many authentication attempts', {
+      retryAfter: Math.max(1, Math.ceil((rateLimit.resetAt.getTime() - Date.now()) / 1000)),
+    });
+  }
+
   const lang = request.cookies.get('lang')?.value;
   const effLocale = lang && (locales as readonly string[]).includes(lang) ? lang : (defaultLocale as string);
 
   // **SIGN-IN MODE**: Only phone + password
   if (body.mode === 'signin') {
+    const normalizedPhone = normalizePhone(body.phone);
+    if (!normalizedPhone) {
+      throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Invalid phone number or password');
+    }
     // Find user by phone
-    const user = await guestStore.findUserByPhone(body.phone);
+    const user = await guestStore.findUserByPhone(normalizedPhone.e164);
     if (!user || !user.password_hash) {
-      throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Invalid phone number or password', {
-        fields: { phone: 'No account found with this phone number' }
-      });
+      throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Invalid phone number or password');
     }
 
     // Verify password
     const passwordMatch = await bcrypt.compare(body.password, user.password_hash);
     if (!passwordMatch) {
-      throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Invalid phone number or password', {
-        fields: { password: 'Incorrect password' }
-      });
+      throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Invalid phone number or password');
     }
 
     // Find an eligible booking for this user
@@ -103,7 +117,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     }
 
     // Issue session
-    const token = signGuestSession({ user: { id: user.id }, booking: { id: booking.id } });
+    const token = await issueGuestSession(user.id, booking.id);
     const cookie = createSessionCookie(token);
     elogger.info('session.issued', { correlationId: elogger.getContext()?.correlationId, user_id: user.id, booking_id: booking.id, source: 'signin', remember: !!body.remember });
     metrics.counter('session.issued', 1, { source: 'signin' });
@@ -129,23 +143,26 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   }
 
   // **SIGN-UP MODE**: All fields + password
-  // Resolve existing user and reconcile password state
-  let user = await guestStore.findUserByPhone(body.phone);
+  const normalizedPhone = normalizePhone(body.phone, body.origin);
+  if (!normalizedPhone) {
+    throw new ApiError(ApiErrorCode.VALIDATION_ERROR, 'Invalid phone number');
+  }
 
-  if (!user) {
-    const saltRounds = 10;
-    const password_hash = await bcrypt.hash(body.password, saltRounds);
-    user = await guestStore.createUser({
-      phone_e164: body.phone,
-      country_origin: body.origin,
-      password_hash,
-    });
-  } else if (!user.password_hash) {
+  // A public signup can only claim a reservation that already exists.
+  const existingBooking = await guestStore.findBookingByReferenceAndLastName(body.bookingRef, body.lastName);
+  if (!existingBooking) {
+    throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Unable to verify reservation details');
+  }
+
+  // Resolve existing user and reconcile password state
+  const user = await guestStore.findUserByPhone(normalizedPhone.e164);
+
+  if (user && !user.password_hash) {
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Existing account requires password verification', {
       fields: { password: 'This phone number is already linked to an account without password sign-in. Please contact support.' }
     });
-  } else {
-    const matches = await bcrypt.compare(body.password, user.password_hash);
+  } else if (user) {
+    const matches = await bcrypt.compare(body.password, user.password_hash!);
     if (!matches) {
       throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Incorrect password for existing account', {
         fields: { password: 'Password does not match existing account. Please sign in or reset your password.' }
@@ -154,24 +171,42 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   }
 
   // Atomically link user to booking with identity verification and access grant
-  const nowISO = new Date().toISOString().slice(0, 10);
-  const endDate = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const identityValue = body.origin === 'GR' ? body.afm : body.passport;
+  const passwordHash = user ? undefined : await bcrypt.hash(body.password, 12);
   
-  const { booking } = await guestStore.linkUserToBookingWithAccess({
-    userId: user.id,
-    origin: body.origin,
-    identityValue,
-    bookingRef: body.bookingRef,
-    lastName: body.lastName,
-    startDate: nowISO,
-    endDate,
-  });
+  let booking;
+  let linkedUserId: string;
+  try {
+    ({ booking, userId: linkedUserId } = await guestStore.linkUserToBookingWithAccess({
+      userId: user?.id,
+      newUser: passwordHash ? {
+        phoneE164: normalizedPhone.e164,
+        countryOrigin: body.origin,
+        passwordHash,
+      } : undefined,
+      origin: body.origin,
+      identityValue,
+      bookingRef: body.bookingRef,
+      lastName: body.lastName,
+    }));
+  } catch (error) {
+    if (error instanceof BookingAlreadyLinkedError) {
+      throw new ApiError(ApiErrorCode.CONFLICT, 'Booking is already linked to another account', {
+        fields: {
+          bookingRef: 'This booking is already linked to another guest account. Please contact support.',
+        },
+      });
+    }
+    if (error instanceof BookingNotFoundError) {
+      throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Unable to verify reservation details');
+    }
+    throw error;
+  }
 
   // Issue session
-  const token = signGuestSession({ user: { id: user.id }, booking: { id: booking.id } });
+  const token = await issueGuestSession(linkedUserId, booking.id);
   const cookie = createSessionCookie(token);
-  elogger.info('session.issued', { correlationId: elogger.getContext()?.correlationId, user_id: user.id, booking_id: booking.id, source: booking.source, remember: !!body.remember });
+  elogger.info('session.issued', { correlationId: elogger.getContext()?.correlationId, user_id: linkedUserId, booking_id: booking.id, source: booking.source, remember: !!body.remember });
   metrics.counter('session.issued', 1, { source: booking.source });
 
   const res = createSuccessResponse({ redirect: `/${effLocale}/check-in`, bookingId: booking.id });
@@ -186,7 +221,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   // Handle Remember Me with longer refresh token
   if (body.remember) {
-    const issued = await guestStore.issueRefreshToken(user.id, 30); // 30 days
+    const issued = await guestStore.issueRefreshToken(linkedUserId, 30); // 30 days
     const rtCookie = createRefreshCookie(issued.token);
     res.cookies.set(rtCookie.name, rtCookie.value, rtCookie.options);
   }

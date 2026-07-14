@@ -6,8 +6,9 @@ import {
   createRefreshCookie,
   clearSessionCookie,
   clearRefreshCookie,
-  signGuestSession,
-  GuestSessionPayload,
+  issueGuestSession,
+  parseGuestSession,
+  revokeGuestSession,
 } from '@/lib/guestSession';
 import { logger as elogger } from '@/lib/logger-enterprise';
 import { metrics } from '@/lib/metrics-collector';
@@ -74,14 +75,14 @@ async function issueRefreshedSession(refreshToken: string): Promise<{ jwt: strin
     return null;
   }
 
-  const payload: GuestSessionPayload = {
-    user: { id: user.id },
-    booking: { id: booking.id },
-  };
   return {
-    jwt: signGuestSession(payload),
+    jwt: await issueGuestSession(user.id, booking.id),
     refreshToken: rotated.token,
   };
+}
+
+async function revokeCurrentSession(req: NextRequest): Promise<void> {
+  await revokeGuestSession(parseGuestSession(req.cookies.get('guest_session')?.value));
 }
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
@@ -98,6 +99,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   if (!refreshed) {
     return unauthorizedResponse(req);
   }
+  await revokeCurrentSession(req);
 
   const res = success({ refreshed: true });
   applyAuthCookies(res, refreshed.jwt, refreshed.refreshToken);
@@ -128,6 +130,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   if (!refreshed) {
     return unauthorizedResponse(req, failureParam);
   }
+  await revokeCurrentSession(req);
 
   if (nextParam) {
     const redirectResponse = NextResponse.redirect(new URL(nextParam, req.url), 302);

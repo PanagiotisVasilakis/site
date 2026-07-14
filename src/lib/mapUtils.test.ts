@@ -90,7 +90,7 @@ describe('mapUtils', () => {
         directionsUrl: 'https://www.google.com/maps/dir/?api=1&destination=37.1,22.1',
       }),
     ]));
-    expect(markers.find((marker) => marker.id === 'apartment')?.price).toBeUndefined();
+    expect(markers.find((marker) => marker.id === 'apartment')).not.toHaveProperty('price');
   });
 
   it('maps only phone services with verified physical locations', () => {

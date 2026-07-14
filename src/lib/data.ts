@@ -26,7 +26,9 @@ export function getItemsByCategory(categoryId: string): Item[] {
     return [];
   }
   
-  const file = path.join(dataRoot, `${categoryId}.json`);
+  const file = path.resolve(dataRoot, `${categoryId}.json`);
+  if (!file.startsWith(`${path.resolve(dataRoot)}${path.sep}`)) return [];
+  // categoryId is allowlisted above and the resolved path is confined to dataRoot.
   if (!fs.existsSync(file)) return [];
   const raw = fs.readFileSync(file, "utf-8");
   let parsed: unknown[] = [];

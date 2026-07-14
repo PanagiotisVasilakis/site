@@ -116,8 +116,14 @@ export function hashSensitive(value: string): { hash: string; salt: string } {
 }
 
 export function verifySensitive(value: string, salt: string, expectedHash: string): boolean {
+  if (!/^[a-f0-9]{64}$/i.test(expectedHash)) {
+    return false;
+  }
+
   const h = crypto.createHash('sha256').update(PEPPER + ':' + salt + ':' + value).digest('hex');
-  return crypto.timingSafeEqual(Buffer.from(h, 'hex'), Buffer.from(expectedHash, 'hex'));
+  const actual = Buffer.from(h, 'hex');
+  const expected = Buffer.from(expectedHash, 'hex');
+  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
 }
 
 export function encryptJSON<T>(obj: T): string {

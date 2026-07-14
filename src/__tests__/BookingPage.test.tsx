@@ -17,7 +17,11 @@ vi.mock('@/components/ApartmentLocationMap', () => ({
 
 vi.mock('next/image', () => ({
   __esModule: true,
-  default: ((props: React.ImgHTMLAttributes<HTMLImageElement>) => <img {...props} />) as MockComponent<React.ImgHTMLAttributes<HTMLImageElement>>
+  default: ((props: React.ImgHTMLAttributes<HTMLImageElement> & { fill?: boolean; priority?: boolean }) => {
+    const { fill: _fill, priority: _priority, ...rest } = props;
+    void _fill; void _priority;
+    return <img alt="" {...rest} />;
+  }) as MockComponent<React.ImgHTMLAttributes<HTMLImageElement> & { fill?: boolean; priority?: boolean }>
 }));
 
 vi.mock('@/lib/analyticsClient', () => ({
@@ -41,6 +45,21 @@ function makeSearchParams(values: Record<string, string>): Promise<Record<string
 }
 
 describe('BookingPage (server component harness)', () => {
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 201,
+      headers: new Headers(),
+      json: async () => ({ success: true, data: { status: 'sent' } }),
+    } as Response);
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
   it('renders heading and summary prompt when no dates selected (EN)', async () => {
     const ui = await BookingPage({ params: makeParams('en'), searchParams: makeSearchParams({ guests: '2' }) });
     render(ui);
@@ -71,7 +90,7 @@ describe('BookingPage (server component harness)', () => {
 
     // With React Hook Form (mode: 'onBlur'), the submit button is enabled
     // but validation happens when fields are touched or on submit
-    const submitBtn = screen.getByRole('button', { name: /Confirm booking/i });
+    const submitBtn = screen.getByRole('button', { name: /Send request/i });
     expect(submitBtn).toBeInTheDocument();
 
     const user = userEvent.setup();
@@ -84,7 +103,7 @@ describe('BookingPage (server component harness)', () => {
 
     // Button should still be present and functional after filling fields
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Confirm booking/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Send request/i })).toBeInTheDocument();
     });
   });
 
@@ -106,10 +125,10 @@ describe('BookingPage (server component harness)', () => {
     await user.type(screen.getByLabelText(/Last name/i), 'Doe');
     await user.type(screen.getByLabelText(/Email address/i), 'john@example.com');
     await user.type(screen.getByLabelText(/Phone number/i), '+30 2100000000');
-    const submit = screen.getByRole('button', { name: /Confirm booking/i });
+    const submit = screen.getByRole('button', { name: /Send request/i });
     await waitFor(() => expect(submit).toBeEnabled());
     await user.click(submit);
-    expect(await screen.findByRole('heading', { name: /Booking Confirmed/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /Request Sent/i })).toBeInTheDocument();
     // Submission confirmation renders
   });
 });

@@ -4,39 +4,9 @@ import { logger } from '@/lib/logger-client';
 
 const CORRELATION_STORAGE_KEY = 'correlation_id';
 
-export const ADMIN_SECRET_STORAGE_KEY = 'admin_secret';
-
-const ADMIN_SECRET_EXACT_PATHS = new Set([
-  '/api/alerts',
-  '/api/check-in/preferences',
-  '/api/metrics',
-  '/api/security/dashboard',
-]);
-
-function getRequestPath(input: string): string {
-  try {
-    const base = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
-    return new URL(input, base).pathname;
-  } catch {
-    return input.split('?')[0] || input;
-  }
-}
-
-function shouldAttachAdminSecret(input: string): boolean {
-  const path = getRequestPath(input);
-  return path.startsWith('/api/admin/') || ADMIN_SECRET_EXACT_PATHS.has(path);
-}
-
 /**
- * Get correlation ID from server-side logger context if available
- * Falls back to undefined in browser context
- * 
- * For now, correlation ID propagation is handled at the API route level
- * via middleware. Client-side internal fetches don't have access to
- * server-side AsyncLocalStorage context.
- * 
- * TODO: Consider adding correlation ID to response headers and storing
- * in browser context for subsequent requests.
+ * Read the last response correlation ID stored by this client wrapper.
+ * Client-side fetches cannot access server-side AsyncLocalStorage context.
  */
 function readStoredCorrelationId(): string | undefined {
   if (typeof window === 'undefined') return undefined;
@@ -65,33 +35,15 @@ function getCorrelationId(): string | undefined {
   return readStoredCorrelationId();
 }
 
-function getAdminSecret(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    return window.sessionStorage?.getItem(ADMIN_SECRET_STORAGE_KEY) || null;
-  } catch (err) {
-    logger.warn('internalFetch admin secret access failed', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    return null;
-  }
-}
-
-function buildHeaders(init?: RequestInit, adminSecret?: string): HeadersInit | undefined {
-  const shouldAttachSecret = Boolean(adminSecret);
+function buildHeaders(init?: RequestInit): HeadersInit | undefined {
   const correlationId = getCorrelationId();
   
   // Only create headers if we have something to add
-  if (!shouldAttachSecret && !correlationId && !init?.headers) {
+  if (!correlationId && !init?.headers) {
     return init?.headers;
   }
 
   const headers = new Headers(init?.headers as HeadersInit | undefined);
-  
-  // Attach admin secret for admin API calls
-  if (shouldAttachSecret && adminSecret) {
-    headers.set('x-admin-secret', adminSecret);
-  }
   
   // Propagate correlation ID for request tracing (client-side stored)
   if (correlationId) {
@@ -102,15 +54,13 @@ function buildHeaders(init?: RequestInit, adminSecret?: string): HeadersInit | u
 }
 
 async function internalFetch(input: string, init?: RequestInit) {
-  const isAdminAPI = typeof input === 'string' && shouldAttachAdminSecret(input);
-  const adminSecret = isAdminAPI ? getAdminSecret() : null;
   const finalInit: RequestInit = { ...init };
 
   if (typeof window !== 'undefined') {
     finalInit.credentials = finalInit.credentials ?? 'same-origin';
   }
 
-  const headers = buildHeaders(init, adminSecret ?? undefined);
+  const headers = buildHeaders(init);
   if (headers) {
     finalInit.headers = headers;
   }

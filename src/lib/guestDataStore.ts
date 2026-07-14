@@ -10,7 +10,9 @@ import { logger } from '@/lib/logger-enterprise';
 import { prisma } from '@/lib/prisma';
 import { guestDataCache } from '@/lib/guestDataCache';
 import { mapAccessFromDb, mapBookingFromDb, mapUserFromDb } from '@/lib/mappers/domainMappers';
+import type { Booking as PrismaBooking, Prisma } from '@/generated/prisma/client';
 import crypto from 'node:crypto';
+import { normalizePhone } from '@/lib/phone';
 
 export type IdentityType = 'AFM' | 'PASSPORT';
 export type BookingSource = 'ONSITE' | 'EXTERNAL';
@@ -24,11 +26,113 @@ export type BookingAccess = AccessRecord;
 export type CheckinCompletionRec = CheckinRecord;
 export type GuestRefreshTokenRec = PrismaGuestRefreshTokenRec;
 
+export class BookingAlreadyLinkedError extends Error {
+  readonly code = 'BOOKING_ALREADY_LINKED';
+
+  constructor(
+    readonly bookingId: string,
+    readonly existingUserId: string,
+    readonly attemptedUserId: string,
+  ) {
+    super('Booking is already linked to another user');
+    this.name = 'BookingAlreadyLinkedError';
+  }
+}
+
+export class BookingNotFoundError extends Error {
+  readonly code = 'BOOKING_NOT_FOUND';
+
+  constructor() {
+    super('No matching booking was found');
+    this.name = 'BookingNotFoundError';
+  }
+}
+
+export class OnsiteGrantRejectedError extends Error {
+  readonly code = 'ONSITE_GRANT_REJECTED';
+
+  constructor() {
+    super('Onsite grant is invalid, expired, or already consumed');
+    this.name = 'OnsiteGrantRejectedError';
+  }
+}
+
+function bookingLookupClauses(lastName: string): Array<{ lastNameToken?: string; lastNameTokenNoWs?: string }> {
+  const tokenCandidates = buildBookingLastNameTokenSearchValues(lastName);
+  return tokenCandidates.flatMap((token) => [
+    { lastNameToken: token },
+    { lastNameTokenNoWs: token },
+  ]);
+}
+
+async function claimBookingForUser(
+  tx: Prisma.TransactionClient,
+  bookingDb: PrismaBooking,
+  userId: string,
+): Promise<PrismaBooking> {
+  if (bookingDb.userId === userId) {
+    return bookingDb;
+  }
+
+  if (bookingDb.userId) {
+    throw new BookingAlreadyLinkedError(bookingDb.id, bookingDb.userId, userId);
+  }
+
+  const claimed = await tx.booking.updateMany({
+    where: { id: bookingDb.id, userId: null },
+    data: { userId },
+  });
+
+  if (claimed.count === 1) {
+    const updated = await tx.booking.findUnique({ where: { id: bookingDb.id } });
+    if (updated) return updated;
+  }
+
+  const current = await tx.booking.findUnique({ where: { id: bookingDb.id } });
+  if (current?.userId === userId) return current;
+  throw new BookingAlreadyLinkedError(bookingDb.id, current?.userId ?? 'unknown', userId);
+}
+
+async function findAndClaimExistingBooking(
+  tx: Prisma.TransactionClient,
+  params: {
+    userId: string;
+    bookingId?: string;
+    reference?: string;
+    lastName?: string;
+  },
+): Promise<PrismaBooking> {
+  let bookingDb: PrismaBooking | null = null;
+
+  if (params.bookingId) {
+    bookingDb = await tx.booking.findUnique({
+      where: { id: params.bookingId },
+    });
+  }
+
+  if (!bookingDb && params.reference && params.lastName) {
+    bookingDb = await tx.booking.findFirst({
+      where: {
+        reference: params.reference,
+        OR: bookingLookupClauses(params.lastName),
+      },
+    });
+  }
+
+  if (bookingDb) {
+    return claimBookingForUser(tx, bookingDb, params.userId);
+  }
+
+  throw new BookingNotFoundError();
+}
+
 export const guestStore = {
   // Users
   async createUser(input: Omit<User, 'id' | 'created_at' | 'updated_at'>): Promise<User> {
     try {
-      const user = await userRepository.create(input);
+      const normalized = normalizePhone(input.phone_e164, input.country_origin);
+      if (!normalized) throw new Error('Invalid E.164 phone number');
+      const user = await userRepository.create({ ...input, phone_e164: normalized.e164 });
       guestDataCache.invalidate(['users']);
       return user;
     } catch (error) {
@@ -39,7 +143,9 @@ export const guestStore = {
   
   async findUserByPhone(phone: string): Promise<User | undefined> {
     try {
-      return await userRepository.findByPhone(phone);
+      const normalized = normalizePhone(phone);
+      if (!normalized) return undefined;
+      return await userRepository.findByPhone(normalized.e164);
     } catch (error) {
       logger.error('guestStore: failed to find user by phone', error);
       return undefined;
@@ -92,7 +198,30 @@ export const guestStore = {
           params.reference,
           tokenCandidates
         );
-        if (existing) return existing;
+        if (existing) {
+          if (params.user_id && existing.user_id && existing.user_id !== params.user_id) {
+            throw new BookingAlreadyLinkedError(existing.id, existing.user_id, params.user_id);
+          }
+
+          if (params.user_id && !existing.user_id) {
+            const claimed = await prisma.booking.updateMany({
+              where: { id: existing.id, userId: null },
+              data: { userId: params.user_id },
+            });
+            const updated = await prisma.booking.findUnique({ where: { id: existing.id } });
+            if (claimed.count !== 1 || !updated || updated.userId !== params.user_id) {
+              throw new BookingAlreadyLinkedError(
+                existing.id,
+                updated?.userId ?? 'unknown',
+                params.user_id,
+              );
+            }
+            guestDataCache.invalidate(['bookings']);
+            return mapBookingFromDb(updated);
+          }
+
+          return existing;
+        }
       }
       
       let last_name_hash: string | undefined;
@@ -356,16 +485,29 @@ export const guestStore = {
    * @returns Booking and access records (snake_case)
    */
   async linkUserToBookingWithAccess(params: {
-    userId: string;
+    userId?: string;
+    newUser?: { phoneE164: string; countryOrigin: 'GR' | 'ABROAD'; passwordHash: string };
     origin: string;
     identityValue: string; // AFM or PASSPORT value
-    bookingRef?: string;
-    lastName?: string;
-    startDate: string;
-    endDate: string;
-  }): Promise<{ booking: Booking; access: BookingAccess }> {
+    bookingRef: string;
+    lastName: string;
+  }): Promise<{ booking: Booking; access: BookingAccess; userId: string }> {
     try {
       const result = await prisma.$transaction(async (tx) => {
+        let userId = params.userId;
+        if (!userId && params.newUser) {
+          const created = await tx.user.create({
+            data: {
+              id: crypto.randomUUID(),
+              phoneE164: params.newUser.phoneE164,
+              countryOrigin: params.newUser.countryOrigin,
+              passwordHash: params.newUser.passwordHash,
+            },
+          });
+          userId = created.id;
+        }
+        if (!userId) throw new Error('A user or new-user payload is required');
+
         // 1. Upsert identity
         const identityType: IdentityType = params.origin === 'GR' ? 'AFM' : 'PASSPORT';
         const { hash: valueHash, salt: valueSalt } = hashSensitive(params.identityValue);
@@ -374,74 +516,43 @@ export const guestStore = {
         await tx.identity.upsert({
           where: {
             userId_type: {
-              userId: params.userId,
+              userId,
               type: identityType,
             },
           },
           create: {
-            userId: params.userId,
+            userId,
             type: identityType,
             valueHash,
             salt: valueSalt,
             last4Mask,
-            verifiedAt: new Date(),
+            verifiedAt: null,
           },
           update: {
             valueHash,
             salt: valueSalt,
             last4Mask,
-            verifiedAt: new Date(),
+            verifiedAt: null,
           },
         });
 
-        // 2. Find or create booking
-        let bookingDb = null;
-        
-        if (params.bookingRef && params.lastName) {
-          // Search by reference - use same logic as repositories
-          const tokenCandidates = buildBookingLastNameTokenSearchValues(params.lastName);
-          bookingDb = await tx.booking.findFirst({
-            where: {
-              reference: params.bookingRef,
-              OR: tokenCandidates.flatMap((token) => [
-                { lastNameToken: token },
-                { lastNameTokenNoWs: token },
-              ]),
-            },
-          });
-        }
-
-        if (!bookingDb) {
-          // PostgreSQL UUID column requires pure UUID format (no prefix)
-          const id = crypto.randomUUID();
-          const lookupTokens = params.lastName ? createBookingLastNameTokens(params.lastName) : undefined;
-          const lastNameHashed = params.lastName ? hashSensitive(params.lastName) : null;
-          bookingDb = await tx.booking.create({
-            data: {
-              id,
-              source: params.bookingRef ? 'EXTERNAL' : 'ONSITE',
-              reference: params.bookingRef ?? null,
-              lastNameHash: lastNameHashed?.hash ?? null,
-              lastNameSalt: lastNameHashed?.salt ?? null,
-              lastNameToken: lookupTokens?.lastNameToken ?? null,
-              lastNameTokenNoWs: lookupTokens?.lastNameTokenNoWs ?? null,
-              startDate: new Date(params.startDate),
-              endDate: new Date(params.endDate),
-              userId: params.userId,
-            },
-          });
-        }
+        // 2. Only a pre-existing reservation may grant portal access.
+        const bookingDb = await findAndClaimExistingBooking(tx, {
+          userId,
+          reference: params.bookingRef,
+          lastName: params.lastName,
+        });
 
         // 3. Grant access
         const accessDb = await tx.access.upsert({
           where: {
             userId_bookingId: {
-              userId: params.userId,
+              userId,
               bookingId: bookingDb.id,
             },
           },
           create: {
-            userId: params.userId,
+            userId,
             bookingId: bookingDb.id,
             status: 'VERIFIED',
           },
@@ -453,11 +564,11 @@ export const guestStore = {
         const booking: Booking = mapBookingFromDb(bookingDb);
         const access: BookingAccess = mapAccessFromDb(accessDb);
 
-        return { booking, access };
+        return { booking, access, userId };
       });
 
       logger.info('guestStore: linkUserToBookingWithAccess completed', {
-        userId: params.userId,
+        userId: result.userId,
         bookingId: result.booking.id,
       });
 
@@ -481,76 +592,48 @@ export const guestStore = {
   async registerOnsiteGuest(params: {
     phone: string;
     origin: string;
-    booking: {
-      id?: string;
-      reference?: string;
-      lastName?: string;
-      startDate: string;
-      endDate: string;
-    };
+    bookingId: string;
+    grant: { jti: string; expiresAt: Date };
   }): Promise<{ user: User; booking: Booking; access: BookingAccess }> {
     try {
       const result = await prisma.$transaction(async (tx) => {
-        // 1. Find or create user
-        let userDb = await tx.user.findFirst({
-          where: { phoneE164: params.phone },
+        const now = new Date();
+        if (params.grant.expiresAt <= now) throw new OnsiteGrantRejectedError();
+
+        // The unique grant record makes a signed POS token one-use.
+        try {
+          await tx.onsiteGrant.create({
+            data: {
+              jti: params.grant.jti,
+              bookingId: params.bookingId,
+              expiresAt: params.grant.expiresAt,
+              consumedAt: now,
+            },
+          });
+        } catch {
+          throw new OnsiteGrantRejectedError();
+        }
+
+        const normalized = normalizePhone(params.phone, params.origin as 'GR' | 'ABROAD');
+        if (!normalized) throw new Error('Invalid E.164 phone number');
+
+        // 1. Find or create a uniquely identified user.
+        const userDb = await tx.user.upsert({
+          where: { phoneE164: normalized.e164 },
+          create: {
+            id: crypto.randomUUID(),
+            phoneE164: normalized.e164,
+            countryOrigin: params.origin as 'GR' | 'ABROAD',
+            passwordHash: null,
+          },
+          update: {},
         });
 
-        if (!userDb) {
-          // PostgreSQL UUID column requires pure UUID format (no prefix)
-          const id = crypto.randomUUID();
-          userDb = await tx.user.create({
-            data: {
-              id,
-              phoneE164: params.phone,
-              countryOrigin: params.origin as 'GR' | 'ABROAD',
-              passwordHash: null,
-            },
-          });
-        }
-
-        // 2. Find or create booking
-        let bookingDb = null;
-
-        if (params.booking.id) {
-          bookingDb = await tx.booking.findUnique({
-            where: { id: params.booking.id },
-          });
-        }
-
-        if (!bookingDb && params.booking.reference && params.booking.lastName) {
-          const tokenCandidates = buildBookingLastNameTokenSearchValues(params.booking.lastName);
-          bookingDb = await tx.booking.findFirst({
-            where: {
-              reference: params.booking.reference,
-              OR: tokenCandidates.flatMap((token) => [
-                { lastNameToken: token },
-                { lastNameTokenNoWs: token },
-              ]),
-            },
-          });
-        }
-
-        if (!bookingDb) {
-          // PostgreSQL UUID column requires pure UUID format (no prefix)
-          const id = crypto.randomUUID();
-          const lookupTokens = params.booking.lastName ? createBookingLastNameTokens(params.booking.lastName) : undefined;
-          const lastNameHashed = params.booking.lastName ? hashSensitive(params.booking.lastName) : null;
-          bookingDb = await tx.booking.create({
-            data: {
-              id,
-              source: 'ONSITE',
-              reference: params.booking.reference ?? null,
-              lastNameHash: lastNameHashed?.hash ?? null,
-              lastNameSalt: lastNameHashed?.salt ?? null,
-              lastNameToken: lookupTokens?.lastNameToken ?? null,
-              lastNameTokenNoWs: lookupTokens?.lastNameTokenNoWs ?? null,
-              startDate: new Date(params.booking.startDate),
-              endDate: new Date(params.booking.endDate),
-              userId: userDb.id,
-            },
-          });
-        }
+        // 2. A POS grant may only claim the booking named in the signed token.
+        const bookingDb = await findAndClaimExistingBooking(tx, {
+          userId: userDb.id,
+          bookingId: params.bookingId,
+        });
 
         // 3. Grant access
         const accessDb = await tx.access.upsert({

@@ -26,10 +26,26 @@ const envSchema = z.object({
   // API keys (optional but validated format if present)
   VALID_API_KEYS: z.string().optional(),
   INTERNAL_API_KEYS: z.string().optional(),
+  METRICS_WRITE_API_KEYS: z.string().optional(),
   
   // CORS and origins
   ALLOWED_ORIGINS: z.string().optional(),
   NEXT_PUBLIC_SITE_URL: z.string().url().optional(),
+  TRUST_PROXY_HOPS: z.string().regex(/^\d+$/).optional().default('0'),
+  CLIENT_IP_HEADER: z.enum(['cf-connecting-ip', 'x-real-ip']).optional(),
+
+  // Controlled onsite access grants
+  ONSITE_CONFIRM_ENABLED: z.enum(['0', '1']).optional().default('0'),
+  ONSITE_CONFIRM_JWT_SECRET: z.string().min(32).optional(),
+
+  // Durable booking request delivery
+  BOOKING_REQUEST_WEBHOOK_URL: z.string().url().optional(),
+  BOOKING_REQUEST_WEBHOOK_TOKEN: z.string().optional(),
+  CRON_SECRET: z.string().min(32).optional(),
+
+  // Explicitly gated development-only session minting
+  DEV_SESSION_MINT_ENABLED: z.enum(['0', '1']).optional().default('0'),
+  DEV_SESSION_MINT_SECRET: z.string().min(32).optional(),
 
   // Analytics and monitoring (optional)
   ENABLE_ANALYTICS: z.enum(['true', 'false']).optional().default('false'),
@@ -40,6 +56,21 @@ const envSchema = z.object({
 
   // Testing (optional)
   TEST_DATABASE_URL: z.string().url().optional(),
+}).superRefine((env, context) => {
+  if (env.ONSITE_CONFIRM_ENABLED === '1' && !env.ONSITE_CONFIRM_JWT_SECRET) {
+    context.addIssue({
+      code: 'custom',
+      path: ['ONSITE_CONFIRM_JWT_SECRET'],
+      message: 'ONSITE_CONFIRM_JWT_SECRET is required when onsite confirmation is enabled',
+    });
+  }
+  if (env.DEV_SESSION_MINT_ENABLED === '1' && !env.DEV_SESSION_MINT_SECRET) {
+    context.addIssue({
+      code: 'custom',
+      path: ['DEV_SESSION_MINT_SECRET'],
+      message: 'DEV_SESSION_MINT_SECRET is required when development session minting is enabled',
+    });
+  }
 });
 
 type Env = z.infer<typeof envSchema>;

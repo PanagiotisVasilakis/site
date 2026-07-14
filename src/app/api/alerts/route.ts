@@ -13,8 +13,8 @@ import { isAdminRequest } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
 
-function assertAdminAccess(request: NextRequest, correlationId?: string): void {
-  if (!isAdminRequest(request)) {
+async function assertAdminAccess(request: NextRequest, correlationId?: string): Promise<void> {
+  if (!(await isAdminRequest(request))) {
     throw new ApiError(
       ApiErrorCode.FORBIDDEN,
       'Admin credentials required',
@@ -35,7 +35,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   const correlationId = logger.getContext()?.correlationId;
 
   try {
-    assertAdminAccess(request, correlationId);
+    await assertAdminAccess(request, correlationId);
 
     const url = new URL(request.url);
     const type = url.searchParams.get('type') || 'active'; // active, history, rules
@@ -170,7 +170,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   const correlationId = logger.getContext()?.correlationId;
 
   try {
-    assertAdminAccess(request, correlationId);
+    await assertAdminAccess(request, correlationId);
 
     const body = await request.json();
     const { action, data } = body;
@@ -297,7 +297,7 @@ export const PUT = withErrorHandler(async (request: NextRequest) => {
   const correlationId = logger.getContext()?.correlationId;
 
   try {
-    assertAdminAccess(request, correlationId);
+    await assertAdminAccess(request, correlationId);
 
     const body = await request.json();
     const { ruleId, updates } = body;
@@ -380,7 +380,7 @@ export const DELETE = withErrorHandler(async (request: NextRequest) => {
   const correlationId = logger.getContext()?.correlationId;
 
   try {
-    assertAdminAccess(request, correlationId);
+    await assertAdminAccess(request, correlationId);
 
     const url = new URL(request.url);
     const ruleId = url.searchParams.get('ruleId');

@@ -2,19 +2,16 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { withErrorHandler, validateRequestBody, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
-import fs from 'node:fs';
-import path from 'node:path';
-import { encryptJSON, decryptJSON } from '@/lib/crypto';
-import { hasVerifiedBookingSession, parseGuestSession } from '@/lib/guestSession';
+import { parseGuestSession, verifyGuestSessionAccess } from '@/lib/guestSession';
 import { isAdminRequest } from '@/lib/rbac';
-import { getFeatureFlags } from '@/lib/featureFlags';
+import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 
 const preferencesSchema = z.object({
   checkInTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Check-in time must be in HH:MM format'),
   checkOutTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Check-out time must be in HH:MM format'),
 });
 
-const PREFERENCES_FILE = path.join(process.cwd(), 'data', 'secure', 'checkin-preferences.enc.json');
+const PREFERENCES_KEY = 'checkin_preferences';
 
 interface CheckInPreferences {
   checkInTime: string;
@@ -22,49 +19,53 @@ interface CheckInPreferences {
   updatedAt: number;
 }
 
-function readPreferences(): CheckInPreferences {
-  if (!fs.existsSync(PREFERENCES_FILE)) {
-    // Default times
-    return {
-      checkInTime: '15:00',
-      checkOutTime: '11:00',
-      updatedAt: Date.now(),
-    };
-  }
-  try {
-    const raw = fs.readFileSync(PREFERENCES_FILE, 'utf-8');
-    return decryptJSON<CheckInPreferences>(raw);
-  } catch {
-    return {
-      checkInTime: '15:00',
-      checkOutTime: '11:00',
-      updatedAt: Date.now(),
-    };
-  }
+function defaultPreferences(): CheckInPreferences {
+  return { checkInTime: '15:00', checkOutTime: '11:00', updatedAt: 0 };
 }
 
-function writePreferences(prefs: CheckInPreferences) {
-  const encrypted = encryptJSON(prefs);
-  fs.writeFileSync(PREFERENCES_FILE, encrypted, 'utf-8');
+async function readPreferences(): Promise<CheckInPreferences> {
+  const { prisma } = await import('@/lib/prisma');
+  const row = await prisma.operationalSetting.findUnique({ where: { key: PREFERENCES_KEY } });
+  const parsed = preferencesSchema.safeParse(row?.value);
+  if (!parsed.success) return defaultPreferences();
+  const value = row?.value as Record<string, unknown>;
+  return {
+    ...parsed.data,
+    updatedAt: typeof value.updatedAt === 'number' ? value.updatedAt : row?.updatedAt.getTime() ?? 0,
+  };
+}
+
+async function writePreferences(prefs: CheckInPreferences): Promise<void> {
+  const { prisma } = await import('@/lib/prisma');
+  const value = {
+    checkInTime: prefs.checkInTime,
+    checkOutTime: prefs.checkOutTime,
+    updatedAt: prefs.updatedAt,
+  };
+  await prisma.operationalSetting.upsert({
+    where: { key: PREFERENCES_KEY },
+    create: { key: PREFERENCES_KEY, value },
+    update: { value },
+  });
 }
 
 export const dynamic = 'force-dynamic';
 
 // GET: Retrieve current preferences
 export const GET = withErrorHandler(async (request: NextRequest) => {
-  const flags = getFeatureFlags();
+  const flags = await getFeatureFlagsAsync();
   if (!flags.checkinEnabled) {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }
 
-  const adminAccess = isAdminRequest(request);
+  const adminAccess = await isAdminRequest(request);
   const guestSession = parseGuestSession(request.cookies.get('guest_session')?.value);
-  const guestAccess = hasVerifiedBookingSession(guestSession);
+  const guestAccess = await verifyGuestSessionAccess(guestSession);
   if (!adminAccess && !guestAccess) {
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Authentication required to view preferences');
   }
 
-  const prefs = readPreferences();
+  const prefs = await readPreferences();
   const correlationId = request.headers.get('x-correlation-id') ?? undefined;
   return createSuccessResponse({
     ...prefs,
@@ -78,7 +79,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
 
 // POST: Update preferences (admin-only)
 export const POST = withErrorHandler(async (request: NextRequest) => {
-  const flags = getFeatureFlags();
+  const flags = await getFeatureFlagsAsync();
   if (!flags.checkinEnabled) {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }
@@ -88,7 +89,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   const early = guard(request);
   if (early) return early;
 
-  if (!isAdminRequest(request)) {
+  if (!(await isAdminRequest(request))) {
     throw new ApiError(ApiErrorCode.FORBIDDEN, 'Admin credentials required to update preferences');
   }
 
@@ -101,7 +102,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     updatedAt: Date.now(),
   };
 
-  writePreferences(prefs);
+  await writePreferences(prefs);
 
   const correlationId = request.headers.get('x-correlation-id') ?? undefined;
 

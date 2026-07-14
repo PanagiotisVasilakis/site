@@ -1,50 +1,75 @@
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 import { logger } from '@/lib/logger-client';
 
 const KEY = 'favorites:v1';
+const EMPTY = new Set<string>();
+let snapshot = EMPTY;
+let initialized = false;
+let storageListenerInstalled = false;
+const listeners = new Set<() => void>();
 
 function readSet(): Set<string> {
-  if (typeof window === 'undefined') return new Set();
+  if (typeof window === 'undefined') return EMPTY;
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return new Set();
-    return new Set(JSON.parse(raw));
-  } catch (err) {
-    logger.warn('Favorites read failed', err instanceof Error ? err : { error: String(err) });
+    const value: unknown = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []);
+  } catch (error) {
+    logger.warn('Favorites read failed', error instanceof Error ? error : { error: String(error) });
     return new Set();
   }
 }
 
-function writeSet(s: Set<string>) {
+function emit(): void {
+  listeners.forEach((listener) => listener());
+}
+
+function initialize(): void {
+  if (initialized || typeof window === 'undefined') return;
+  snapshot = readSet();
+  initialized = true;
+  if (!storageListenerInstalled) {
+    window.addEventListener('storage', (event) => {
+      if (event.key !== KEY && event.key !== null) return;
+      snapshot = readSet();
+      emit();
+    });
+    storageListenerInstalled = true;
+  }
+}
+
+function subscribe(listener: () => void): () => void {
+  initialize();
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function getSnapshot(): Set<string> {
+  return snapshot;
+}
+
+function writeSet(value: Set<string>): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(Array.from(s)));
-  } catch (err) {
-    logger.warn('Favorites write failed', err instanceof Error ? err : { error: String(err) });
+    localStorage.setItem(KEY, JSON.stringify([...value]));
+  } catch (error) {
+    logger.warn('Favorites write failed', error instanceof Error ? error : { error: String(error) });
   }
 }
 
 export function useFavorites() {
-  const [fav, setFav] = useState<Set<string>>(() => new Set());
-
-  useEffect(() => {
-    setFav(readSet());
-    const handler = () => setFav(readSet());
-    window.addEventListener('storage', handler);
-    return () => window.removeEventListener('storage', handler);
-  }, []);
+  const favorites = useSyncExternalStore(subscribe, getSnapshot, () => EMPTY);
 
   const toggle = useCallback((id: string) => {
-    setFav(prev => {
-      const ns = new Set(prev);
-      if (ns.has(id)) ns.delete(id); else ns.add(id);
-      writeSet(ns);
-      return ns;
-    });
+    initialize();
+    const next = new Set(snapshot);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    snapshot = next;
+    writeSet(next);
+    emit();
   }, []);
 
-  const isFavorite = useCallback((id: string) => fav.has(id), [fav]);
-
-  return { favorites: fav, toggle, isFavorite };
+  const isFavorite = useCallback((id: string) => favorites.has(id), [favorites]);
+  return { favorites, toggle, isFavorite };
 }

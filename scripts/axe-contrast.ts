@@ -25,9 +25,11 @@ console.log('[axe-contrast] starting');
 // Extra hardening: capture unhandled errors so the script never fails silently
 process.on('unhandledRejection', (err) => {
   console.error('[axe-contrast] UnhandledRejection:', err);
+  process.exit(1);
 });
 process.on('uncaughtException', (err) => {
   console.error('[axe-contrast] UncaughtException:', err);
+  process.exit(1);
 });
 
 (async () => {
@@ -78,8 +80,12 @@ process.on('uncaughtException', (err) => {
       }
       if (!navigated) continue;
     }
-    // Inject axe
-    await page.addScriptTag({ content: axeSource });
+    // Runtime.evaluate is intentionally used here: a script tag is blocked by the
+    // application's production CSP, while Puppeteer's isolated execution context
+    // is the trusted audit harness.
+    await page.evaluate(axeSource);
+    const axeAvailable = await page.evaluate(() => 'axe' in globalThis);
+    if (!axeAvailable) throw new Error('axe-core injection failed');
     console.log('[axe-contrast] axe injected, running...');
     // Run axe restricted to color-contrast to keep runtime minimal
     const result = await page.evaluate(async () => {

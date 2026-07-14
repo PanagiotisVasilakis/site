@@ -7,6 +7,7 @@ import * as z from 'zod';
 import clsx from 'clsx';
 import { DateRange, formatDateRange, getNights } from '@/lib/dateUtils';
 import { trackEvent } from '@/lib/analyticsClient';
+import internalFetch from '@/lib/internalFetchClient';
 import { logger } from '@/lib/logger-client';
 import type { BookingFormDictionary } from '@/i18n/domains/booking';
 
@@ -16,8 +17,7 @@ interface BookingFormProps {
   labels: BookingFormDictionary;
   propertyName: string;
   /**
-   * Optional override for the artificial submission delay (ms). Defaults to 2000 for UX realism.
-   * Tests can pass a much smaller value to avoid long waits.
+   * Optional delay after successful delivery. Tests can use this to exercise loading state.
    */
   submissionDelayMs?: number;
 }
@@ -31,8 +31,10 @@ interface BookingFormData {
   specialRequests?: string;
 }
 
-export default function BookingForm({ dateRange, locale, labels, propertyName, submissionDelayMs = 2000 }: BookingFormProps) {
+export default function BookingForm({ dateRange, locale, labels, propertyName, submissionDelayMs = 0 }: BookingFormProps) {
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [idempotencyKey] = useState(() => globalThis.crypto.randomUUID());
 
   // Build the validation schema with localized messages
   const bookingSchema = useMemo(
@@ -66,6 +68,7 @@ export default function BookingForm({ dateRange, locale, labels, propertyName, s
   });
 
   const onSubmit = async (data: BookingFormData) => {
+    setSubmitError('');
     try {
       // Track booking attempt
       trackEvent('booking_submitted', {
@@ -73,16 +76,41 @@ export default function BookingForm({ dateRange, locale, labels, propertyName, s
         arrivalTime: data.arrivalTime || 'not_specified'
       });
 
-      // Simulate API call with realistic delay
-      await new Promise(resolve => setTimeout(resolve, submissionDelayMs));
+      const response = await internalFetch('/api/booking-requests', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'idempotency-key': idempotencyKey,
+        },
+        body: JSON.stringify({
+          propertyName,
+          locale,
+          dateRange: {
+            from: dateRange.from?.toISOString(),
+            to: dateRange.to?.toISOString(),
+          },
+          guest: {
+            ...data,
+            arrivalTime: data.arrivalTime || undefined,
+            specialRequests: data.specialRequests?.trim() || undefined,
+          },
+        }),
+      });
 
-      // In a real app, you would:
-      // const response = await fetch('/api/bookings', { ... });
+      const responseBody = await response.json().catch(() => null);
+      if (!response.ok || !responseBody?.success) {
+        setSubmitError(responseBody?.error?.message || labels.submitFailed);
+        return;
+      }
 
+      if (submissionDelayMs > 0) {
+        await new Promise(resolve => setTimeout(resolve, submissionDelayMs));
+      }
       setSubmitted(true);
 
     } catch (err) {
       logger.error('Booking submission failed', err instanceof Error ? err : { error: String(err) });
+      setSubmitError(labels.submitFailed);
     }
   };
 
@@ -130,6 +158,7 @@ export default function BookingForm({ dateRange, locale, labels, propertyName, s
       {/* Live region for form-wide announcements */}
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {Object.keys(errors).length > 0 && labels.formErrorsAnnounce}
+        {submitError && labels.submitFailed}
         {submitted && labels.submittedAnnounce}
         {isSubmitting && labels.submittingAnnounce}
       </div>
@@ -252,6 +281,12 @@ export default function BookingForm({ dateRange, locale, labels, propertyName, s
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {submitError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700" role="alert">
+          {submitError}
         </div>
       )}
 

@@ -1,9 +1,12 @@
 // Vitest globals are enabled; no named imports needed.
+vi.mock('../lib/prisma', () => ({ prisma: {} }));
 import { signGuestSession, parseGuestSession, hasVerifiedBookingSession, type GuestSessionPayload } from '../lib/guestSession';
 
 describe('guest session helpers', () => {
   it('signs and parses a minimal session token', () => {
     const payload: GuestSessionPayload = {
+      type: 'guest',
+      sid: 'session_1',
       user: { id: 'usr_1' },
       booking: { id: 'bkg_1' },
     };
@@ -15,9 +18,9 @@ describe('guest session helpers', () => {
   });
 
   it('hasVerifiedBookingSession returns true only when booking id is present', () => {
-    const p1: GuestSessionPayload = { booking: { id: 'x' } };
-    const p2: GuestSessionPayload = { booking: {} };
-    const p3: GuestSessionPayload = {};
+    const p1: GuestSessionPayload = { type: 'guest', sid: 'session_1', user: { id: 'usr_1' }, booking: { id: 'x' } };
+    const p2: GuestSessionPayload = { type: 'guest', sid: 'session_1', user: { id: 'usr_1' }, booking: {} };
+    const p3: GuestSessionPayload = { type: 'guest' };
     expect(hasVerifiedBookingSession(p1)).toBe(true);
     expect(hasVerifiedBookingSession(p2)).toBe(false);
     expect(hasVerifiedBookingSession(p3 as any)).toBe(false);

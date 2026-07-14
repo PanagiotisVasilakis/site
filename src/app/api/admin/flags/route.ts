@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 import { isAdminRequest } from '@/lib/rbac';
-import { getFeatureFlags, setFeatureFlags, type FeatureFlags } from '@/lib/featureFlags';
+import { getFeatureFlagsAsync, setFeatureFlags, type FeatureFlags } from '@/lib/featureFlags';
 import { metrics } from '@/lib/metrics-collector';
 import { logger } from '@/lib/logger-enterprise';
 
@@ -14,20 +14,20 @@ const schema = z.object({
 }).refine((obj) => Object.keys(obj).length > 0, { message: 'At least one flag must be provided' });
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
-  if (!isAdminRequest(req)) throw new ApiError(ApiErrorCode.FORBIDDEN, 'Admin credentials required');
-  const flags = getFeatureFlags();
+  if (!(await isAdminRequest(req))) throw new ApiError(ApiErrorCode.FORBIDDEN, 'Admin credentials required');
+  const flags = await getFeatureFlagsAsync();
   return createSuccessResponse<FeatureFlags>(flags) as NextResponse;
 });
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  if (!isAdminRequest(req)) throw new ApiError(ApiErrorCode.FORBIDDEN, 'Admin credentials required');
+  if (!(await isAdminRequest(req))) throw new ApiError(ApiErrorCode.FORBIDDEN, 'Admin credentials required');
   const body = await req.json().catch(() => ({}));
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
     throw new ApiError(ApiErrorCode.VALIDATION_ERROR, 'Invalid flags payload', { issues: parsed.error.issues });
   }
-  const before = getFeatureFlags();
-  const updated = setFeatureFlags(parsed.data);
+  const before = await getFeatureFlagsAsync();
+  const updated = await setFeatureFlags(parsed.data);
 
   // Determine which flags actually changed
   const changed: string[] = [];

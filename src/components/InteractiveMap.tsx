@@ -52,6 +52,7 @@ export default function InteractiveMap({
     website: mapT?.website ?? 'Website',
     details: mapT?.viewDetails ?? 'Details',
     locateMe: mapT?.locateMe ?? 'Locate me',
+    locationUnavailable: mapT?.locationUnavailable ?? 'Your location is unavailable. Check browser location permission and try again.',
     fitToMarkers: mapT?.fitToMarkers ?? 'Fit to markers',
     zoomIn: mapT?.zoomIn ?? 'Zoom in',
     zoomOut: mapT?.zoomOut ?? 'Zoom out',
@@ -80,12 +81,17 @@ export default function InteractiveMap({
     const el = containerRef.current;
     if (!el) return;
 
-    if (typeof window === 'undefined' || !('IntersectionObserver' in window)) {
+    const IntersectionObserverCtor =
+      typeof window !== 'undefined'
+        ? window.IntersectionObserver ?? globalThis.IntersectionObserver
+        : undefined;
+
+    if (!IntersectionObserverCtor) {
       setShouldRenderInteractive(true);
       return;
     }
 
-    const observer = new IntersectionObserver(
+    const observer = new IntersectionObserverCtor(
       entries => {
         entries.forEach(entry => {
           if (entry.isIntersecting) {
@@ -130,7 +136,6 @@ export default function InteractiveMap({
         directionsUrl: marker.directionsUrl,
         coordinates: marker.coordinates,
         type: (marker.type as MarkerData['type']) ?? 'attraction',
-        price: marker.price,
         href: marker.href,
       };
       onMarkerClick(typed);

@@ -9,7 +9,6 @@ interface FavItem {
   title: string;
   subtitle?: string;
   rating?: number;
-  price?: string;
   icon?: string;
   href: string;
   favoriteId: string;
@@ -37,7 +36,7 @@ export default function FavoritesClient({ allItems, emptyLabel, titleLabel }: Pr
       {list.length > 0 && (
         <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(170px,1fr))]">
           {list.map(i => (
-            <ListingCard key={i.favoriteId} id={i.id} title={i.title} subtitle={i.subtitle} rating={i.rating} price={i.price} icon={i.icon} href={i.href} favoriteId={i.favoriteId} />
+            <ListingCard key={i.favoriteId} id={i.id} title={i.title} subtitle={i.subtitle} rating={i.rating} icon={i.icon} href={i.href} favoriteId={i.favoriteId} />
           ))}
         </div>
       )}

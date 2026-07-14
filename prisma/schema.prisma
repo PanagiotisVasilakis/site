@@ -8,22 +8,22 @@ datasource db {
 }
 
 model User {
-  id            String         @id @db.Uuid
-  email         String?        @unique
-  phoneE164     String         @map("phone_e164") @db.VarChar(32)
-  passwordHash  String?        @map("password_hash")
-  countryOrigin CountryOrigin  @map("country_origin")
-  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
-  accessRecords Access[]
-  bookings      Booking[]
-  identities    Identity[]
-  mfaChallenges MfaChallenge[]
-  mfaFactors    MfaFactor[]
-  refreshTokens RefreshToken[]
-  sessions      Session[]
+  id              String           @id @db.Uuid
+  email           String?          @unique
+  phoneE164       String           @unique(map: "users_phone_e164_key") @map("phone_e164") @db.VarChar(32)
+  passwordHash    String?          @map("password_hash")
+  countryOrigin   CountryOrigin    @map("country_origin")
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  accessRecords   Access[]
+  bookings        Booking[]
+  identities      Identity[]
+  mfaChallenges   MfaChallenge[]
+  mfaFactors      MfaFactor[]
+  refreshTokens   RefreshToken[]
+  sessions        Session[]
+  checkInRequests CheckInRequest[]
 
-  @@index([phoneE164], map: "idx_users_phone")
   @@index([countryOrigin], map: "idx_users_country_origin")
   @@index([createdAt], map: "idx_users_created_at")
   @@index([updatedAt], map: "idx_users_updated_at")
@@ -48,21 +48,23 @@ model Identity {
 }
 
 model Booking {
-  id                String        @id @db.Uuid
+  id                String           @id @db.Uuid
   source            BookingSource
   reference         String?
-  lastNameHash      String?       @map("last_name_hash")
-  lastNameSalt      String?       @map("last_name_salt")
-  lastNameToken     String?       @map("last_name_token")
-  lastNameTokenNoWs String?       @map("last_name_token_nows")
-  startDate         DateTime      @map("start_date") @db.Date
-  endDate           DateTime      @map("end_date") @db.Date
-  userId            String?       @map("user_id") @db.Uuid
-  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastNameHash      String?          @map("last_name_hash")
+  lastNameSalt      String?          @map("last_name_salt")
+  lastNameToken     String?          @map("last_name_token")
+  lastNameTokenNoWs String?          @map("last_name_token_nows")
+  startDate         DateTime         @map("start_date") @db.Date
+  endDate           DateTime         @map("end_date") @db.Date
+  userId            String?          @map("user_id") @db.Uuid
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   accessRecords     Access[]
-  user              User?         @relation(fields: [userId], references: [id])
+  user              User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
   checkin           Checkin?
   sessions          Session[]
+  checkInRequests   CheckInRequest[]
+  onsiteGrants      OnsiteGrant[]
 
   @@index([reference], map: "idx_bookings_reference")
   @@index([userId], map: "idx_bookings_user")
@@ -131,11 +133,89 @@ model CheckInRequest {
   status        CheckInRequestStatus @default(PENDING)
   createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  booking       Booking?             @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  user          User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([bookingId], map: "idx_check_in_requests_booking")
   @@index([userId], map: "idx_check_in_requests_user")
   @@index([status, createdAt], map: "idx_check_in_requests_status_created")
   @@map("check_in_requests")
+}
+
+model OnsiteGrant {
+  jti        String    @id @db.Uuid
+  bookingId  String    @map("booking_id") @db.Uuid
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  booking    Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId], map: "idx_onsite_grants_booking")
+  @@index([expiresAt], map: "idx_onsite_grants_expires")
+  @@map("onsite_grants")
+}
+
+model StayRequest {
+  id              String            @id @db.Uuid
+  propertyName    String            @map("property_name")
+  locale          String            @db.VarChar(8)
+  startDate       DateTime          @map("start_date") @db.Date
+  endDate         DateTime          @map("end_date") @db.Date
+  firstName       String            @map("first_name")
+  lastName        String            @map("last_name")
+  email           String
+  phone           String            @db.VarChar(32)
+  arrivalTime     String?           @map("arrival_time")
+  specialRequests String?           @map("special_requests")
+  idempotencyKey  String            @unique(map: "stay_requests_idempotency_key") @map("idempotency_key")
+  status          StayRequestStatus @default(PENDING)
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  outboxEvents    WebhookOutbox[]
+
+  @@index([status, createdAt], map: "idx_stay_requests_status_created")
+  @@index([email], map: "idx_stay_requests_email")
+  @@map("stay_requests")
+}
+
+model WebhookOutbox {
+  id            String       @id @db.Uuid
+  stayRequestId String       @map("stay_request_id") @db.Uuid
+  eventType     String       @map("event_type")
+  payload       Json
+  status        OutboxStatus @default(PENDING)
+  attemptCount  Int          @default(0) @map("attempt_count")
+  nextAttemptAt DateTime     @default(now()) @map("next_attempt_at") @db.Timestamptz(6)
+  lastError     String?      @map("last_error")
+  deliveredAt   DateTime?    @map("delivered_at") @db.Timestamptz(6)
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  stayRequest   StayRequest  @relation(fields: [stayRequestId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt], map: "idx_webhook_outbox_delivery")
+  @@index([stayRequestId], map: "idx_webhook_outbox_stay_request")
+  @@map("webhook_outbox")
+}
+
+model OperationalSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("operational_settings")
+}
+
+model AdminSession {
+  id                String    @id @db.Uuid
+  absoluteExpiresAt DateTime  @map("absolute_expires_at") @db.Timestamptz(6)
+  expiresAt         DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([expiresAt], map: "idx_admin_sessions_expires")
+  @@index([absoluteExpiresAt], map: "idx_admin_sessions_absolute_expires")
+  @@map("admin_sessions")
 }
 
 model RefreshToken {
@@ -221,6 +301,16 @@ model CacheEntry {
   @@map("cache")
 }
 
+model RateLimit {
+  key       String   @id
+  count     Int
+  resetTime DateTime @map("reset_time") @db.Timestamptz(6)
+
+  @@index([resetTime], map: "idx_rate_limits_reset_time")
+  @@index([count], map: "idx_rate_limits_count")
+  @@map("rate_limits")
+}
+
 model Metric {
   id         String   @id @db.Uuid
   metricName String   @map("metric_name")
@@ -269,6 +359,20 @@ enum CheckInRequestStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+enum StayRequestStatus {
+  PENDING
+  DELIVERED
+  DELIVERY_FAILED
+  CLOSED
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  DELIVERED
+  FAILED
 }
 
 enum MfaFactorType {

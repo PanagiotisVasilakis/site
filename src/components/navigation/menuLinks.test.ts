@@ -11,8 +11,8 @@ describe('buildMenuLinks', () => {
       '/el/booking-details',
       '/el/about',
       '/el/favorites',
-      '/el?category=moments',
-      '/el?category=phones',
+      '/el/moments',
+      '/el/phones',
     ]);
     expect(links.find((link) => link.href === '/el/book')?.featured).toBe(true);
   });

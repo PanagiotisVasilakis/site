@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import internalFetch, { ADMIN_SECRET_STORAGE_KEY } from '@/lib/internalFetchClient'
+import internalFetch from '@/lib/internalFetchClient'
 import { Badge } from '@/components/ui'
 
 interface BookingData {
@@ -64,23 +64,6 @@ export default function GuestDataViewer() {
   const [error, setError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [searchType, setSearchType] = useState<'reference' | 'phone' | 'date'>('reference')
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    try {
-      const params = new URLSearchParams(window.location.search)
-      const token = params.get('token')?.trim()
-      if (token) {
-        window.sessionStorage?.setItem(ADMIN_SECRET_STORAGE_KEY, token)
-        params.delete('token')
-        const url = new URL(window.location.href)
-        url.search = params.toString()
-        window.history.replaceState({}, document.title, url.toString())
-      }
-    } catch (err) {
-      console.warn('Failed to persist admin token', err)
-    }
-  }, [])
 
   const fetchAllBookings = async () => {
     setLoading(true)

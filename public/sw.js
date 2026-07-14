@@ -57,6 +57,8 @@ async function manageCacheStorage(cache) {
 // Simple IndexedDB wrapper for queueing failed analytics POSTs
 const DB_NAME = 'analytics-queue-db';
 const STORE = 'queue';
+const MAX_ANALYTICS_REPLAY_ATTEMPTS = 5;
+const MAX_ANALYTICS_QUEUE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 function openQueueDb() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, 1);
@@ -138,35 +140,86 @@ async function enqueue(body) {
 async function flushQueue() {
   try {
     const db = await openQueueDb();
-    const tx = db.transaction(STORE, 'readwrite');
+    const tx = db.transaction(STORE, 'readonly');
     const store = tx.objectStore(STORE);
-  const payloads = [];
-    await new Promise((resolve) => {
-      store.openCursor().onsuccess = (e) => {
+    const payloads = [];
+    await new Promise((resolve, reject) => {
+      const cursorRequest = store.openCursor();
+      cursorRequest.onsuccess = (e) => {
         const cursor = e.target.result;
         if (cursor) {
-          payloads.push(cursor.value.body);
-          store.delete(cursor.primaryKey);
+          payloads.push({
+            key: cursor.primaryKey,
+            value: cursor.value,
+            body: cursor.value.body,
+          });
           cursor.continue();
         } else {
           resolve();
         }
       };
+      cursorRequest.onerror = () => reject(cursorRequest.error);
     });
     if (payloads.length) {
       // Send payloads individually to support servers that expect single-event POSTs.
-      for (const body of payloads) {
+      for (const item of payloads) {
+        const attempts = Number(item.value.attempts || 0);
+        const timestamp = Number(item.value.timestamp || Date.now());
         try {
           // body is stored as a JSON string
-          await fetchInternal('/api/analytics', { method: 'POST', body, headers: { 'content-type': 'application/json' } });
-        } catch {
-          // Re-enqueue failed payload for next sync attempt
-          try { await enqueue(body); } catch {}
+          const response = await fetchInternal('/api/analytics', {
+            method: 'POST',
+            body: item.body,
+            headers: { 'content-type': 'application/json' },
+          });
+          if (!response.ok) {
+            throw new Error(`analytics replay failed with ${response.status}`);
+          }
+          await deleteQueueEntry(item.key);
+        } catch (err) {
+          const nextAttempts = attempts + 1;
+          const expired = Date.now() - timestamp > MAX_ANALYTICS_QUEUE_AGE_MS;
+          if (nextAttempts >= MAX_ANALYTICS_REPLAY_ATTEMPTS || expired) {
+            console.warn('Dropping analytics payload after replay limit', {
+              attempts: nextAttempts,
+              expired,
+              error: err instanceof Error ? err.message : String(err),
+            });
+            await deleteQueueEntry(item.key);
+          } else {
+            await updateQueueEntry(item.key, {
+              ...item.value,
+              attempts: nextAttempts,
+              lastAttempt: Date.now(),
+            });
+          }
         }
       }
     }
     broadcastQueueSize();
   } catch {}
+}
+
+async function deleteQueueEntry(key) {
+  const db = await openQueueDb();
+  const tx = db.transaction(STORE, 'readwrite');
+  const store = tx.objectStore(STORE);
+  await new Promise((resolve, reject) => {
+    const req = store.delete(key);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function updateQueueEntry(key, value) {
+  const db = await openQueueDb();
+  const tx = db.transaction(STORE, 'readwrite');
+  const store = tx.objectStore(STORE);
+  await new Promise((resolve, reject) => {
+    const req = store.put(value, key);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
 }
 
 async function getQueueSize() {

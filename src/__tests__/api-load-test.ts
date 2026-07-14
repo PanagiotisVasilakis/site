@@ -4,7 +4,12 @@
  */
 
 import { performance } from 'perf_hooks';
-import { MockData } from './api-comprehensive.test';
+import { fileURLToPath } from 'url';
+
+const mockData = {
+  analyticsEvent: { path: '/en/apartment', ts: Date.now(), locale: 'en' },
+  webVital: { name: 'LCP', value: 2500, path: '/en/apartment', ts: Date.now(), id: 'load-test-metric' },
+};
 
 interface LoadTestConfig {
   baseUrl: string;
@@ -281,9 +286,7 @@ const LoadTestConfigs = {
     rampUp: 10,
     endpoints: [
       { path: '/api/categories', method: 'GET' as const, weight: 10 },
-      { path: '/api/analytics', method: 'GET' as const, weight: 5 },
       { path: '/api/vitals', method: 'GET' as const, weight: 3 },
-      { path: '/api/security/dashboard', method: 'GET' as const, weight: 2 },
     ],
   },
 
@@ -296,11 +299,9 @@ const LoadTestConfigs = {
     endpoints: [
       { path: '/api/categories', method: 'GET' as const, weight: 15 },
       { path: '/api/categories/moments/items', method: 'GET' as const, weight: 10 },
-      { path: '/api/analytics', method: 'GET' as const, weight: 8 },
-      { path: '/api/analytics', method: 'POST' as const, weight: 5, payload: MockData.analyticsEvent },
+      { path: '/api/analytics', method: 'POST' as const, weight: 5, payload: mockData.analyticsEvent },
       { path: '/api/vitals', method: 'GET' as const, weight: 5 },
-      { path: '/api/vitals', method: 'POST' as const, weight: 3, payload: MockData.webVital },
-      { path: '/api/security/dashboard', method: 'GET' as const, weight: 4 },
+      { path: '/api/vitals', method: 'POST' as const, weight: 3, payload: mockData.webVital },
     ],
   },
 
@@ -314,18 +315,16 @@ const LoadTestConfigs = {
       { path: '/api/categories', method: 'GET' as const, weight: 20 },
       { path: '/api/categories/moments/items', method: 'GET' as const, weight: 15 },
       { path: '/api/categories/hotels/items', method: 'GET' as const, weight: 15 },
-      { path: '/api/analytics', method: 'GET' as const, weight: 10 },
-      { path: '/api/analytics', method: 'POST' as const, weight: 8, payload: MockData.analyticsEvent },
+      { path: '/api/analytics', method: 'POST' as const, weight: 8, payload: mockData.analyticsEvent },
       { path: '/api/vitals', method: 'GET' as const, weight: 8 },
-      { path: '/api/vitals', method: 'POST' as const, weight: 6, payload: MockData.webVital },
-      { path: '/api/security/dashboard', method: 'GET' as const, weight: 6 },
+      { path: '/api/vitals', method: 'POST' as const, weight: 6, payload: mockData.webVital },
       { path: '/api/security/csp-report', method: 'POST' as const, weight: 2, payload: { 'document-uri': 'test', 'violated-directive': 'script-src' } },
     ],
   },
 };
 
 // CLI interface for load testing
-if (require.main === module) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const testType = process.argv[2] || 'light';
   const config = LoadTestConfigs[testType as keyof typeof LoadTestConfigs];
 

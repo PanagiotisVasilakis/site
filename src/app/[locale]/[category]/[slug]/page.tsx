@@ -12,10 +12,13 @@ import { MomentsDetailLayout } from "@/components/moments";
 import { notFound } from "next/navigation";
 import { getDictionary } from "@/i18n/dictionaries";
 import { locales, type Locale } from "@/i18n/config";
+import { headers } from 'next/headers';
+import { serializeJsonLd } from '@/lib/jsonLd';
 
 export const dynamic = 'force-dynamic';
 export default async function ItemPage({ params }: { params: Promise<{ locale: string; category: string; slug: string }> }) {
   const { locale, category, slug } = await params;
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
   const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : "en";
   const t = getDictionary(eff ?? "en");
   const cat = categories.find((c) => c.slug === category);
@@ -67,6 +70,7 @@ export default async function ItemPage({ params }: { params: Promise<{ locale: s
           cta: t.cta,
           labels: t.labels,
         }}
+        nonce={nonce}
       />
     );
   }
@@ -80,10 +84,11 @@ export default async function ItemPage({ params }: { params: Promise<{ locale: s
   return (
     <div className="page-container mx-auto max-w-7xl space-y-6 safe-bottom">
       <script
+        nonce={nonce}
         type="application/ld+json"
         suppressHydrationWarning
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+          __html: serializeJsonLd({
             '@context': 'https://schema.org',
             '@type': 'Place',
             name,

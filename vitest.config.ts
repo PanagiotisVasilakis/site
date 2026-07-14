@@ -12,13 +12,21 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}', 'scripts/__tests__/**/*.test.ts'],
-    exclude: ['src/__tests__/api-comprehensive.test.ts'],
     setupFiles: ['./src/__tests__/setup/vitest.setup.ts'],
     globals: true, // Enable global test functions
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
       all: true,
+      include: ['src/**/*.{ts,tsx}', 'scripts/**/*.ts'],
+      // Generated Prisma clients and declaration-only modules are not authored logic.
+      exclude: [
+        'src/generated/**',
+        'src/types/**',
+        '**/*.d.ts',
+        '**/*.test.{ts,tsx}',
+        '**/__tests__/**',
+      ],
       thresholds: {
         // Baseline gate for the currently instrumented repository. Raise as coverage grows.
         lines: 30,

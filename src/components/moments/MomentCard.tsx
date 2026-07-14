@@ -17,7 +17,6 @@ interface MomentCardProps {
     summary?: string;
     description?: string;
     rating?: number;
-    price?: string;
     icon?: string;
     image?: string;
     heroImage?: string;
@@ -172,7 +171,6 @@ export function MomentCard({
     summary,
     description,
     rating,
-    price,
     icon,
     image,
     heroImage,
@@ -217,7 +215,6 @@ export function MomentCard({
     const metadata = [
         tag,
         rating ? (t.labels?.rating ?? '{value} rating').replace('{value}', rating.toFixed(1)) : undefined,
-        price,
         hideAddressOnFront ? undefined : address,
     ].filter((item): item is string => Boolean(item));
 
