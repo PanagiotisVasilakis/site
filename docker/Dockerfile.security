@@ -1,86 +1,55 @@
-# Multi-stage Docker build for enhanced security
-# Stage 1: Build dependencies and application
-FROM node:22.19-alpine AS builder
+FROM node:22.19-alpine@sha256:d2166de198f26e17e5a442f537754dd616ab069c47cc57b889310a717e0abbf9 AS builder
 
-# Add security labels
-LABEL maintainer="security@villa-app.com"
-LABEL version="1.0"
-LABEL description="Villa booking application - secure build"
-
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init && \
-    npm install --global npm@11.18.0
-
-# Create non-root user for build
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nextjs -u 1001
-
-# Set working directory
+ARG NEXT_PUBLIC_SITE_URL
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+RUN case "$NEXT_PUBLIC_SITE_URL" in https://*) ;; *) echo 'NEXT_PUBLIC_SITE_URL HTTPS build argument is required' >&2; exit 1 ;; esac
+
+RUN npm install --global npm@11.18.0
+COPY package.json package-lock.json ./
 COPY prisma ./prisma
 COPY prisma.config.ts ./
-
-# Install dependencies with security flags
-RUN npm ci --audit=false --fund=false && \
-    npm cache clean --force
-
-# Copy source code with proper ownership
-COPY --chown=nextjs:nodejs . .
-
-# Build application. Next.js standalone output contains the required runtime modules.
+RUN npm ci --audit=false --fund=false && npm cache clean --force
+COPY . .
 RUN npm run build
 
-# Stage 2: Production runtime
-FROM node:22.19-alpine AS runner
+FROM node:22.19-alpine@sha256:d2166de198f26e17e5a442f537754dd616ab069c47cc57b889310a717e0abbf9 AS runner
 
-# Install security updates
-RUN apk upgrade --no-cache && \
-    apk add --no-cache dumb-init curl && \
-    rm -rf /var/cache/apk/*
+ARG NEXT_PUBLIC_SITE_URL
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nextjs -u 1001
+LABEL org.opencontainers.image.title="QR City Guest Guide" \
+      org.opencontainers.image.description="Guest guide and booking request application" \
+      org.opencontainers.image.version="0.1.1" \
+      org.opencontainers.image.licenses="UNLICENSED"
+
+RUN apk add --no-cache dumb-init \
+  && addgroup --system --gid 1001 nodejs \
+  && adduser --system --uid 1001 --ingroup nodejs nextjs
 
 WORKDIR /app
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL} \
+    BUILD_SITE_URL=${NEXT_PUBLIC_SITE_URL} \
+    HOSTNAME=0.0.0.0 \
+    PORT=3000
 
-# Set environment variables
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3000
-
-# Copy built application from builder stage
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/scripts/start-standalone.mjs ./scripts/start-standalone.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/src/lib/runtime-env-schema.js ./src/lib/runtime-env-schema.js
 
-# Security: Remove write permissions
-RUN chmod -R 755 /app && \
-    find /app -type d -exec chmod 755 {} \; && \
-    find /app -type f -exec chmod 644 {} \; && \
-    chmod +x /app/server.js
+RUN find /app -type d -exec chmod 0555 {} + \
+  && find /app -type f -exec chmod 0444 {} + \
+  && chmod 0555 /app/server.js
 
-# Switch to non-root user
-USER nextjs
-
-# Expose port
+USER 1001:1001
 EXPOSE 3000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3000/api/health/ready || exit 1
-
-# Use dumb-init for proper signal handling
-ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "server.js"]
-
-# Security: Run as non-root, minimal base image, no unnecessary tools
-# Metadata for security scanning
-LABEL org.opencontainers.image.title="Villa Booking App"
-LABEL org.opencontainers.image.description="Secure containerized villa booking application"
-LABEL org.opencontainers.image.version="1.0.0"
-LABEL org.opencontainers.image.vendor="Villa App Inc."
-LABEL org.opencontainers.image.licenses="MIT"
+STOPSIGNAL SIGTERM
+HEALTHCHECK --interval=30s --timeout=4s --start-period=15s --retries=3 \
+  CMD wget --quiet --spider http://127.0.0.1:3000/api/health/ready || exit 1
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+CMD ["node", "scripts/start-standalone.mjs", "server.js"]

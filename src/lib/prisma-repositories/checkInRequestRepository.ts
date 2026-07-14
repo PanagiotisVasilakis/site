@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger-enterprise';
-import { CheckInRequestStatus } from '@/generated/prisma/client';
+import { CheckInRequestStatus, Prisma } from '@/generated/prisma/client';
 import type { CheckInRequest } from '@/generated/prisma/client';
 import crypto from 'node:crypto';
 
@@ -26,6 +26,12 @@ type CreateCheckInRequestInput = {
   guestPhone?: string;
   requestedTime: string;
   message?: string;
+};
+
+type NotificationEvent = {
+  eventType: 'check_in_time_request.created' | 'check_in_time_request.updated';
+  previousStatus?: CheckInRequestStatus;
+  nextStatus: CheckInRequestStatus;
 };
 
 type ListCheckInRequestParams = {
@@ -56,11 +62,18 @@ function mapRequest(request: CheckInRequest): CheckInRequestRecord {
   };
 }
 
-async function create(input: CreateCheckInRequestInput): Promise<CheckInRequestRecord> {
+async function create(
+  input: CreateCheckInRequestInput,
+  notification?: NotificationEvent,
+): Promise<{ request: CheckInRequestRecord; notificationEventId?: string }> {
   try {
+    const requestId = crypto.randomUUID();
+    const notificationEventId = notification && process.env.CHECKIN_REQUEST_WEBHOOK_URL
+      ? crypto.randomUUID()
+      : undefined;
     const request = await prisma.checkInRequest.create({
       data: {
-        id: crypto.randomUUID(),
+        id: requestId,
         bookingId: input.bookingId ?? null,
         userId: input.userId ?? null,
         guestName: input.guestName ?? null,
@@ -68,6 +81,22 @@ async function create(input: CreateCheckInRequestInput): Promise<CheckInRequestR
         guestPhone: input.guestPhone ?? null,
         requestedTime: input.requestedTime,
         message: input.message ?? null,
+        ...(notificationEventId && notification ? {
+          outboxEvents: {
+            create: {
+              id: notificationEventId,
+              eventType: notification.eventType,
+              destination: 'checkin_request_webhook',
+              aggregateType: 'check_in_request',
+              aggregateId: requestId,
+              idempotencyKey: `${notification.eventType}:${requestId}`,
+              payload: {
+                previousStatus: notification.previousStatus ?? null,
+                status: notification.nextStatus,
+              },
+            },
+          },
+        } : {}),
       },
     });
 
@@ -76,7 +105,7 @@ async function create(input: CreateCheckInRequestInput): Promise<CheckInRequestR
       bookingId: input.bookingId,
       userId: input.userId,
     });
-    return mapRequest(request);
+    return { request: mapRequest(request), notificationEventId };
   } catch (error) {
     logger.error('checkInRequestRepository(prisma): create failed', error);
     throw error;
@@ -132,21 +161,63 @@ async function list(params: ListCheckInRequestParams = {}): Promise<CheckInReque
   }
 }
 
-async function updateStatus(id: string, status: CheckInRequestStatus): Promise<CheckInRequestRecord> {
+async function updateStatus(
+  id: string,
+  status: CheckInRequestStatus,
+): Promise<{ request: CheckInRequestRecord; notificationEventId?: string; changed: boolean }> {
   try {
-    const request = await prisma.checkInRequest.update({
-      where: { id },
-      data: { status },
-    });
+    let result: { request: CheckInRequest; notificationEventId?: string; changed: boolean } | undefined;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        result = await prisma.$transaction(async (tx) => {
+          const current = await tx.checkInRequest.findUnique({ where: { id } });
+          if (!current) throw new CheckInRequestNotFoundError(id);
+          if (current.status === status) return { request: current, changed: false };
+
+          const updated = await tx.checkInRequest.update({ where: { id }, data: { status } });
+          const notificationEventId = process.env.CHECKIN_REQUEST_WEBHOOK_URL
+            ? crypto.randomUUID()
+            : undefined;
+          if (notificationEventId) {
+            await tx.outboxEvent.create({
+              data: {
+                id: notificationEventId,
+                eventType: 'check_in_time_request.updated',
+                destination: 'checkin_request_webhook',
+                aggregateType: 'check_in_request',
+                aggregateId: id,
+                idempotencyKey: `check_in_time_request.updated:${id}:${status}:${updated.updatedAt.toISOString()}`,
+                payload: { previousStatus: current.status, status },
+                checkInRequestId: id,
+              },
+            });
+          }
+          return { request: updated, notificationEventId, changed: true };
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        break;
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034' && attempt < 3) continue;
+        throw error;
+      }
+    }
+    if (!result) throw new Error('Check-in request update exhausted transaction retries');
 
     logger.info('Check-in request status updated', {
       requestId: id,
       status,
+      changed: result.changed,
     });
-    return mapRequest(request);
+    return { request: mapRequest(result.request), notificationEventId: result.notificationEventId, changed: result.changed };
   } catch (error) {
     logger.error('checkInRequestRepository(prisma): updateStatus failed', error);
     throw error;
+  }
+}
+
+export class CheckInRequestNotFoundError extends Error {
+  constructor(id: string) {
+    super(`Check-in request ${id} was not found`);
+    this.name = 'CheckInRequestNotFoundError';
   }
 }
 

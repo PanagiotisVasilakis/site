@@ -1,213 +1,133 @@
-# Setup and Run Guide (Development, Test, Production)
+# Setup and runtime runbook
 
-Last updated: 2026-04-17
+Last verified: 2026-07-14.
 
-This document explains how to set up this repository and run the site in development, test, and production modes.
+## Requirements
 
-## 1) Prerequisites
+- Node.js 22.19.x (`.nvmrc`)
+- npm 11.18.x
+- PostgreSQL 16+, or Docker for disposable development/test databases
+- macOS or Linux shell
 
-- Node.js 22.19+ (from `.nvmrc`)
-- npm 11.18+
-- PostgreSQL (managed or local), or Docker for local fallback/test databases
-- Linux/macOS shell (Windows via WSL is fine)
-
-### 1.1) Upgrade to Node 22.19+ (Linux/WSL)
-
-If your terminal is still below Node 22.19, use one of these paths.
-
-Option A (recommended): install nvm and switch to Node 22.19+
+Verify the active shell, because `.nvmrc` does not switch Node automatically:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-source ~/.nvm/nvm.sh
-nvm install 22.19
-nvm alias default 22.19
-nvm use 22.19
-npm install -g npm@11.18.0
-node -v && npm -v
+node --version
+npm --version
 ```
 
-Option B: system-wide Node 22 via NodeSource
-
-```bash
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt-get install -y nodejs
-sudo npm install -g npm@11.18.0
-node -v && npm -v
-```
-
-After upgrading, reinstall dependencies to align native modules and lockfile state:
-
-```bash
-rm -rf node_modules
-npm install
-```
-
-## 2) One-time setup
-
-From the repository root:
+## First-time development setup
 
 ```bash
 npm ci
 npm run ensure-pepper
+npm run system:up -- --profile development --skip-build
 ```
 
-`npm run ensure-pepper` creates missing local development secrets and guest Wi-Fi placeholders in `.env.local`.
+`ensure-pepper` only repairs local development secrets in `.env.local`. It never generates or edits production secrets.
 
-## 3) Environment files and required variables
+Environment loading order:
 
-The orchestrator reads env files by profile using this order (first file wins for each variable):
-
-- production: `.env.production.local`, `.env.local`, `.env.production`, `.env`
 - development: `.env.development.local`, `.env.local`, `.env.development`, `.env`
 - test: `.env.test.local`, `.env.test`, `.env`
+- production: `.env.production.local`, `.env.production`, `.env`
 
-For full app bootstrap/start (`up`, `bootstrap`, `build`, `migrate`), set at least:
+Production deliberately excludes `.env.local`.
 
-- `DATABASE_URL` (valid PostgreSQL URL)
-- `ADMIN_JWT_SECRET` (minimum 32 chars)
-- `ADMIN_DASH_SECRET` (minimum 20 chars)
-- `GUEST_JWT_SECRET` (minimum 32 chars)
-- `SECURITY_ENC_KEY_HEX` (64 hex chars)
-- `SECURITY_PEPPER` (minimum 16 chars)
-- `SESSION_SECRET` (minimum 32 chars)
-- `GUEST_WIFI_NETWORK` (non-empty)
-- `GUEST_WIFI_PASSWORD` (minimum 8 chars)
+## Required runtime configuration
 
-Recommended for realistic runtime checks:
+The authoritative schema is `src/lib/env.ts`. Required for the application:
 
-- `NEXT_PUBLIC_SITE_URL`
-- `ALLOWED_ORIGINS`
-- `VALID_API_KEYS` (metrics endpoint check can use the first key)
+- `DATABASE_URL`
+- `ADMIN_JWT_SECRET`, `ADMIN_DASH_SECRET`
+- `GUEST_JWT_SECRET`, `SESSION_SECRET`
+- `SECURITY_PEPPER`, `SECURITY_ENC_KEY_HEX`
+- `GUEST_WIFI_NETWORK`, `GUEST_WIFI_PASSWORD`
 
-## 4) Development mode
+Production additionally requires:
 
-### Preferred (full-stack orchestrated)
+- `CLAIM_TOKEN_PEPPER`
+- `TRUST_PROXY_MODE=hops` with a positive `TRUST_PROXY_HOPS`, or `TRUST_PROXY_MODE=header` with an explicitly trusted `CLIENT_IP_HEADER`
+
+If a booking or check-in webhook URL is configured, its token is mandatory; production webhook URLs must use HTTPS. If `RATE_LIMIT_BACKEND=redis`, both Upstash URL and token are mandatory.
+
+Never place secrets in `NEXT_PUBLIC_*` variables.
+
+## Orchestrator commands
 
 ```bash
-./scripts/system-orchestrator.sh up --profile development --skip-build
+npm run system:check -- --profile development
+npm run system:up -- --profile development --skip-build
+npm run system:verify -- --profile development
+npm run system:status -- --profile development
+npm run system:logs -- --profile development
+npm run system:down -- --profile development
 ```
 
-What this does:
+`verify` requires all of the following: liveness, database-backed readiness, and a successfully served `/en` page. A `Ready` log line alone is not considered successful startup.
 
-- Validates runtime and env contract
-- Ensures dependencies are installed
-- Ensures database connectivity (falls back to local Docker DB if needed)
-- Runs Prisma generate and migrations
-- Starts the app and verifies health/metrics endpoints
+Development/test may start a disposable Docker database when the configured database is unreachable. Production disables that fallback and fails closed.
 
-Useful follow-up commands:
+## Unit and database tests
+
+Unit tests do not require PostgreSQL:
 
 ```bash
-./scripts/system-orchestrator.sh status --profile development
-./scripts/system-orchestrator.sh logs --profile development --follow
-./scripts/system-orchestrator.sh down --profile development
+npm run test:unit
 ```
 
-### App-only development server
+Database tests use an isolated disposable service on host port 5434:
 
 ```bash
-npm run dev
-```
-
-Open `http://localhost:3000` (middleware redirects root to `/en`).
-
-## 5) Test mode
-
-Use a dedicated test database and avoid pointing tests to production/staging data.
-
-### A) Run test suites with dedicated Postgres (recommended)
-
-```bash
-# Start test DB container
-docker compose -f docker/docker-compose.test-db.yml up -d
-
-# If your machine only has docker-compose (legacy), use:
-# docker-compose -f docker/docker-compose.test-db.yml up -d
-
-# Point test tooling to the DB
-export TEST_DATABASE_URL="postgresql://testuser:testpass@localhost:5433/site_test"
-
-# Apply schema to test DB
-DATABASE_URL="$TEST_DATABASE_URL" npx prisma migrate deploy
-
-# Run tests
-NODE_ENV=test TEST_DATABASE_URL="$TEST_DATABASE_URL" npm test
-NODE_ENV=test TEST_DATABASE_URL="$TEST_DATABASE_URL" npm run test:api
-```
-
-Cleanup:
-
-```bash
+docker compose -f docker/docker-compose.test-db.yml up -d postgres-test
+export TEST_DATABASE_URL='postgresql://testuser:testpass@127.0.0.1:5434/site_test'
+DATABASE_URL="$TEST_DATABASE_URL" DIRECT_URL="$TEST_DATABASE_URL" npx prisma migrate deploy
+DATABASE_URL="$TEST_DATABASE_URL" DIRECT_URL="$TEST_DATABASE_URL" npm run test:db
 docker compose -f docker/docker-compose.test-db.yml down
 ```
 
-### B) Run the app in test profile (for runtime-style checks)
+The database name must end in `_test`. `test:db` and Prisma's test client fail before executing queries otherwise.
+
+## Production process
+
+Load secrets from the deployment secret store, then run:
 
 ```bash
-./scripts/system-orchestrator.sh up --profile test --skip-build
-./scripts/system-orchestrator.sh verify --profile test
-./scripts/system-orchestrator.sh down --profile test
+npm run system:check -- --profile production --no-docker-fallback
+npm run system:migrate -- --profile production --no-docker-fallback
+npm run system:build -- --profile production --no-docker-fallback
+npm run system:up -- --profile production --skip-build --skip-migrate --no-docker-fallback
+npm run system:verify -- --profile production --no-docker-fallback
 ```
 
-## 6) Production mode
+The production profile fails on missing configuration, database connectivity, pending migrations, build errors, or failed runtime verification.
 
-Before production startup, ensure production secrets are loaded from a secret manager or secure env file.
-
-Recommended sequence:
+## systemd deployment
 
 ```bash
-./scripts/system-orchestrator.sh check --profile production
-./scripts/system-orchestrator.sh up --profile production
-./scripts/system-orchestrator.sh verify --profile production
-./scripts/system-orchestrator.sh status --profile production
-```
-
-`up --profile production` already includes dependency checks, DB readiness, Prisma generate, migrations, and build.
-
-Stop production runtime:
-
-```bash
-./scripts/system-orchestrator.sh down --profile production
-```
-
-### Optional: systemd supervision for long-running hosts
-
-```bash
-sudo ./scripts/install-systemd-services.sh --service-name qr-city-guide
+sudo bash scripts/install-systemd-services.sh --service-name qr-city-guide
 systemctl status qr-city-guide.service
+systemctl list-timers 'qr-city-guide-*'
 journalctl -u qr-city-guide.service -f
 ```
 
-## 7) Equivalent npm and make shortcuts
+The installer creates a root-owned environment file and refuses placeholder secrets or an unspecified production proxy topology. Review and populate the generated environment file before re-running the installer.
 
-npm shortcuts:
+## Operational workers
 
-- `npm run system:up`
-- `npm run system:down`
-- `npm run system:status`
-- `npm run system:verify`
-- `npm run system:migrate`
-- `npm run db:start`
-- `npm run db:migrate`
+Manual runs:
 
-Make shortcuts:
+```bash
+npm run outbox:drain
+npm run operations:check
+```
 
-- `make up PROFILE=production`
-- `make up-dev`
-- `make status`
-- `make logs-follow`
-- `make down`
+The outbox worker uses bounded attempts, exponential backoff, leases, abandoned-lease recovery, and a terminal `DEAD` state. The operations worker evaluates database alert rules, retries failed alert notifications, and applies retention. A missing required alert webhook makes the operations run fail.
 
-## 8) Quick troubleshooting
+## Troubleshooting
 
-- Runtime fails immediately with version error: use Node 22.19+ and npm 11.18+.
-- Env validation fails: check `DATABASE_URL`, `ADMIN_JWT_SECRET`, `ADMIN_DASH_SECRET`, `GUEST_JWT_SECRET`, `SECURITY_ENC_KEY_HEX`, `SECURITY_PEPPER`, `SESSION_SECRET`, `GUEST_WIFI_NETWORK`, `GUEST_WIFI_PASSWORD`.
-- Database unreachable: start Docker and rerun orchestrator, or set a reachable managed `DATABASE_URL`.
-- Tests fail on DB connection: verify `TEST_DATABASE_URL`, run migrations again, and confirm test DB container health.
-
-## 9) Related docs
-
-- `docs/ci/db-tests.md`
-- `docs/testing/db-lookup.md`
-- `SECURITY.md`
+- Version error: switch the active shell to Node 22.19/npm 11.18 and reinstall with `npm ci`.
+- Readiness fails: inspect the SQL error and migration state; liveness alone does not prove the app is ready.
+- DB tests refuse to run: use `TEST_DATABASE_URL` and a database ending in `_test`.
+- Production proxy validation fails: configure the real reverse-proxy hop count or trusted single-value header; do not guess.
+- Outbox backlog: inspect `outbox_events.last_error`, the destination URL/token, and the outbox service journal.

@@ -29,13 +29,10 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   }
 
   const body = await validateRequestBody(schema)(request);
-  const [booking, access] = await Promise.all([
-    guestStore.findBookingById(body.bookingId),
-    guestStore.listAccessByUser(body.userId),
-  ]);
+  const booking = await guestStore.findBookingById(body.bookingId);
   if (!booking
     || booking.user_id !== body.userId
-    || !access.some((record) => record.booking_id === body.bookingId && record.status === 'VERIFIED')) {
+    || booking.access_status !== 'VERIFIED') {
     throw new ApiError(ApiErrorCode.FORBIDDEN, 'Verified booking access is required');
   }
 

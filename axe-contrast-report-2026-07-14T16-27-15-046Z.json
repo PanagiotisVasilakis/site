@@ -1,0 +1,14 @@
+{
+  "generatedAt": "2026-07-14T16:27:15.045Z",
+  "base": "http://127.0.0.1:3000",
+  "paths": [
+    "/en",
+    "/en/apartment",
+    "/en/favorites",
+    "/en/offline",
+    "/en/phones",
+    "/en/phones/emergency-112"
+  ],
+  "issues": [],
+  "errors": []
+}

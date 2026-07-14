@@ -9,7 +9,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   await revokeGuestSession(parseGuestSession(req.cookies.get('guest_session')?.value));
   const refresh = req.cookies.get('guest_rt')?.value;
   if (refresh) {
-    const revoked = await guestStore.revokeRefreshToken(refresh);
+    const revoked = await guestStore.revokeRefreshFamily(refresh);
     if (revoked) {
       elogger.info('refresh_token.revoked', { correlationId: elogger.getContext()?.correlationId });
       metrics.counter('refresh_token.revoked', 1);

@@ -49,7 +49,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     path: '/',
     httpOnly: true,
     sameSite: 'strict',
-    maxAge: 7200,
+    maxAge: ttlSeconds,
     secure: process.env.NODE_ENV === 'production',
   });
   

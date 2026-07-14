@@ -1,5 +1,5 @@
 "use client";
-import { trackEvent as baseTrack, ensureFunnel } from '@/lib/analyticsClient';
+import { trackEvent as baseTrack } from '@/lib/analyticsClient';
 
 // Allowed event names
 export type TrackerEventName =
@@ -22,7 +22,7 @@ export type EventProps =
   | { name: 'checkin_completed'; props?: Record<string, never> };
 
 function trimStr(s: string, max = 80): string {
-  return s.length > max ? s.slice(0, max) + '…' : s;
+  return s.length > max ? s.slice(0, max) : s;
 }
 
 // Collapse arbitrary reasons into coarse categories to avoid PII
@@ -64,8 +64,7 @@ function sanitize<K extends EventProps['name']>(name: K, props: PropsOf<K> | unk
     case 'no_booking_cta_clicked': {
       const p = props as PropsOf<'no_booking_cta_clicked'> | undefined;
       const from = p?.from === 'guest' || p?.from === 'home' ? p.from : undefined;
-      const ref = typeof p?.ref === 'string' ? trimStr(p.ref, 80) : undefined;
-      return { ...(from ? { from } : {}), ...(ref ? { ref } : {}) };
+      return { ...(from ? { from } : {}) };
     }
     case 'checkin_viewed':
     case 'checkin_completed':
@@ -77,7 +76,6 @@ function sanitize<K extends EventProps['name']>(name: K, props: PropsOf<K> | unk
 
 export function track(e: EventProps) {
   try {
-    ensureFunnel();
     let safe: Record<string, unknown> | undefined;
     switch (e.name) {
       case 'portal_opened':
@@ -105,7 +103,7 @@ export function track(e: EventProps) {
         safe = undefined;
     }
     baseTrack(e.name, safe);
-    if (process.env.NODE_ENV !== 'production') {
+    if (process.env.NODE_ENV === 'development') {
       // Visible in dev tools for quick verification
       console.debug('[analytics]', e.name, safe);
     }
@@ -118,7 +116,7 @@ export const tracker = {
   originSelected: (origin: 'GR' | 'ABROAD', mode?: 'signup') => track({ name: 'origin_selected', props: { origin, mode } }),
   formSubmitted: (form: 'sign-in' | 'sign-up') => track({ name: 'form_submitted', props: { form } }),
   authModeChanged: (mode: 'signin' | 'signup') => track({ name: 'auth_mode_changed', props: { mode } }),
-  noBookingCTAClicked: (ref?: string, from?: 'guest' | 'home') => track({ name: 'no_booking_cta_clicked', props: { ref, from } }),
+  noBookingCTAClicked: (_ref?: string, from?: 'guest' | 'home') => track({ name: 'no_booking_cta_clicked', props: { from } }),
   checkinViewed: () => track({ name: 'checkin_viewed' }),
   checkinCompleted: () => track({ name: 'checkin_completed' }),
 };

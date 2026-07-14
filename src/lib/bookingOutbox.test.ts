@@ -1,11 +1,11 @@
 const prismaMock = vi.hoisted(() => ({
-  webhookOutbox: {
+  outboxEvent: {
     updateMany: vi.fn(),
     findUnique: vi.fn(),
-    update: vi.fn(),
     findMany: vi.fn(),
   },
   stayRequest: { update: vi.fn() },
+  $queryRaw: vi.fn(),
   $transaction: vi.fn(),
 }));
 
@@ -14,25 +14,56 @@ vi.mock('@/lib/logger-enterprise', () => ({ logger: { warn: vi.fn() } }));
 
 import { deliverBookingOutboxEvent, drainBookingOutbox } from './bookingOutbox';
 
-const event = {
+type EventFixture = {
+  id: string;
+  eventType: string;
+  destination: string;
+  stayRequestId: string | null;
+  attemptCount: number;
+  payload: Record<string, unknown>;
+  createdAt: Date;
+  stayRequest: Record<string, unknown> | null;
+  checkInRequest: Record<string, unknown> | null;
+};
+
+const event: EventFixture = {
   id: 'event-1',
   eventType: 'stay_request.created',
+  destination: 'booking_request_webhook',
   stayRequestId: 'request-1',
   attemptCount: 1,
+  payload: { stayRequestId: 'request-1' },
   createdAt: new Date('2026-07-14T10:00:00Z'),
   stayRequest: { id: 'request-1', email: 'guest@example.com' },
+  checkInRequest: null,
 };
 
 describe('booking outbox delivery', () => {
+  let activeEvent: EventFixture = event;
+
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.BOOKING_REQUEST_WEBHOOK_URL = 'https://hooks.example.test/bookings';
     delete process.env.BOOKING_REQUEST_WEBHOOK_TOKEN;
-    prismaMock.webhookOutbox.updateMany.mockResolvedValue({ count: 1 });
-    prismaMock.webhookOutbox.findUnique.mockResolvedValue(event);
-    prismaMock.webhookOutbox.update.mockReturnValue({ operation: 'outbox-update' });
-    prismaMock.stayRequest.update.mockReturnValue({ operation: 'request-update' });
-    prismaMock.$transaction.mockResolvedValue([]);
+    activeEvent = event;
+    prismaMock.outboxEvent.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.outboxEvent.findUnique.mockImplementation(async (args: { select?: Record<string, unknown> }) => {
+      if (args.select?.attemptCount) return { attemptCount: activeEvent.attemptCount };
+      if (args.select?.destination) {
+        return { destination: activeEvent.destination, stayRequestId: activeEvent.stayRequestId };
+      }
+      return {
+        ...activeEvent,
+        status: 'LEASED',
+        leaseOwner: prismaMock.outboxEvent.updateMany.mock.calls[0]?.[0]?.data?.leaseOwner,
+      };
+    });
+    prismaMock.$queryRaw.mockResolvedValue([{ id: event.id }]);
+    prismaMock.stayRequest.update.mockResolvedValue({ id: 'request-1' });
+    prismaMock.$transaction.mockImplementation(async (callback: unknown) => {
+      if (typeof callback === 'function') return callback(prismaMock);
+      return [];
+    });
   });
 
   afterEach(() => {
@@ -55,22 +86,27 @@ describe('booking outbox delivery', () => {
       }),
     );
     expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
-    expect(prismaMock.webhookOutbox.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'DELIVERED' }) }),
+    expect(prismaMock.outboxEvent.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: 'LEASED' }),
+        data: expect.objectContaining({ status: 'DELIVERED' }),
+      }),
     );
   });
 
-  it('returns without claiming work when delivery is not configured', async () => {
+  it('backs off durably when delivery is not configured', async () => {
     delete process.env.BOOKING_REQUEST_WEBHOOK_URL;
     await expect(deliverBookingOutboxEvent(event.id)).resolves.toBe(false);
-    expect(prismaMock.webhookOutbox.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.outboxEvent.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: 'PENDING', lastError: 'Webhook destination is not configured' }),
+    }));
   });
 
   it('schedules a bounded retry after a webhook failure', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }));
 
     await expect(deliverBookingOutboxEvent(event.id)).resolves.toBe(false);
-    expect(prismaMock.webhookOutbox.update).toHaveBeenCalledWith(
+    expect(prismaMock.outboxEvent.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: 'PENDING', lastError: 'Webhook responded with 503' }),
       }),
@@ -81,13 +117,64 @@ describe('booking outbox delivery', () => {
   });
 
   it('recovers abandoned leases and caps the requested batch size', async () => {
-    prismaMock.webhookOutbox.findMany.mockResolvedValue([]);
+    prismaMock.outboxEvent.findMany.mockResolvedValue([]);
     await expect(drainBookingOutbox(500)).resolves.toEqual({ attempted: 0, delivered: 0 });
-    expect(prismaMock.webhookOutbox.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ status: 'PROCESSING' }) }),
+    expect(prismaMock.outboxEvent.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ status: 'LEASED' }) }),
     );
-    expect(prismaMock.webhookOutbox.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ take: 100 }),
+    expect(prismaMock.outboxEvent.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          destination: { in: ['booking_request_webhook', 'checkin_request_webhook'] },
+        }),
+        take: 100,
+      }),
     );
+  });
+
+  it('does not mutate the stay request after losing the delivery lease', async () => {
+    prismaMock.outboxEvent.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+
+    await expect(deliverBookingOutboxEvent(event.id)).resolves.toBe(false);
+    expect(prismaMock.stayRequest.update).not.toHaveBeenCalled();
+  });
+
+  it('delivers a check-in event without changing its business status', async () => {
+    process.env.CHECKIN_REQUEST_WEBHOOK_URL = 'https://hooks.example.test/check-in';
+    const checkInEvent = {
+      ...event,
+      eventType: 'check_in_time_request.updated',
+      destination: 'checkin_request_webhook',
+      stayRequestId: null,
+      stayRequest: null,
+      payload: { previousStatus: 'PENDING', status: 'APPROVED' },
+      checkInRequest: {
+        id: 'check-in-1',
+        bookingId: 'booking-1',
+        userId: 'user-1',
+        guestName: 'Guest',
+        guestEmail: 'guest@example.test',
+        guestPhone: '+306900000000',
+        requestedTime: '13:30',
+        message: null,
+        status: 'APPROVED',
+      },
+    };
+    activeEvent = checkInEvent;
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(deliverBookingOutboxEvent(checkInEvent.id)).resolves.toBe(true);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
+      event: 'check_in_time_request.updated',
+      previousStatus: 'PENDING',
+      status: 'APPROVED',
+      requestId: 'check-in-1',
+    });
+    expect(prismaMock.stayRequest.update).not.toHaveBeenCalled();
+    delete process.env.CHECKIN_REQUEST_WEBHOOK_URL;
   });
 });

@@ -5,7 +5,6 @@
 
 import {
   mapBookingFromDb,
-  mapAccessFromDb,
   mapUserFromDb,
   mapCheckinFromDb
 } from '@/lib/mappers/domainMappers';
@@ -18,13 +17,13 @@ describe('domainMappers', () => {
         id: 'booking-123',
         source: 'EXTERNAL' as const,
         reference: 'REF123',
-        lastNameHash: 'hashed_lastname',
-        lastNameSalt: 'salt123',
-        lastNameToken: 'token123',
-        lastNameTokenNoWs: 'token_nowhitespace',
         startDate: new Date('2023-06-01'),
         endDate: new Date('2023-06-07'),
         userId: 'user-123',
+        provider: 'booking-com',
+        externalReference: 'EXT-123',
+        accessStatus: 'VERIFIED' as const,
+        claimedAt: now,
         createdAt: now
       };
 
@@ -34,13 +33,13 @@ describe('domainMappers', () => {
         id: 'booking-123',
         source: 'EXTERNAL',
         reference: 'REF123',
-        last_name_hash: 'hashed_lastname',
-        last_name_salt: 'salt123',
-        last_name_token: 'token123',
-        last_name_token_nows: 'token_nowhitespace',
         start_date: '2023-06-01T00:00:00.000Z',
         end_date: '2023-06-07T00:00:00.000Z',
         user_id: 'user-123',
+        provider: 'booking-com',
+        external_reference: 'EXT-123',
+        access_status: 'VERIFIED',
+        claimed_at: now.getTime(),
         created_at: now.getTime()
       });
     });
@@ -51,13 +50,13 @@ describe('domainMappers', () => {
         id: 'booking-123',
         source: 'EXTERNAL' as const,
         reference: null,
-        lastNameHash: null,
-        lastNameSalt: null,
-        lastNameToken: null,
-        lastNameTokenNoWs: null,
         startDate: new Date('2023-06-01'),
         endDate: new Date('2023-06-07'),
         userId: null,
+        provider: 'legacy',
+        externalReference: null,
+        accessStatus: 'PENDING' as const,
+        claimedAt: null,
         createdAt: now
       };
 
@@ -68,33 +67,9 @@ describe('domainMappers', () => {
         source: 'EXTERNAL',
         start_date: '2023-06-01T00:00:00.000Z',
         end_date: '2023-06-07T00:00:00.000Z',
+        provider: 'legacy',
+        access_status: 'PENDING',
         created_at: now.getTime()
-      });
-    });
-  });
-
-  describe('mapAccessFromDb', () => {
-    it('should map database access to domain access', () => {
-      const now = new Date();
-      const createdAt = new Date(now.getTime() - 3600000); // 1 hour ago
-      const updatedAt = new Date(now.getTime() - 1800000); // 30 minutes ago
-
-      const accessDb = {
-        userId: 'user-123',
-        bookingId: 'booking-123',
-        status: 'VERIFIED' as const,
-        createdAt,
-        updatedAt
-      };
-
-      const result = mapAccessFromDb(accessDb);
-
-      expect(result).toEqual({
-        user_id: 'user-123',
-        booking_id: 'booking-123',
-        status: 'VERIFIED',
-        created_at: createdAt.getTime(),
-        updated_at: updatedAt.getTime()
       });
     });
   });

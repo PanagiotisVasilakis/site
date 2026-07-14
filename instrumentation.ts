@@ -5,6 +5,9 @@
  */
 
 export async function register() {
+  if (process.env.NEXT_PHASE === 'phase-production-build' || process.env.NEXT_PHASE === 'phase-export') {
+    return;
+  }
   // Only run in Node.js runtime (not Edge)
   if (process.env.NEXT_RUNTIME === 'nodejs' || !process.env.NEXT_RUNTIME) {
     const { validateEnv } = await import('@/lib/env');

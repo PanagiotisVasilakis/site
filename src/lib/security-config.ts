@@ -80,22 +80,12 @@ const SecurityConfigSchema = z.object({
     enabled: z.boolean(),
     logSecurityEvents: z.boolean(),
     alertOnViolations: z.boolean(),
-    reportToSentry: z.boolean(),
   }),
   apiSecurity: z.object({
     inputValidation: z.object({
       enabled: z.boolean(),
       maxPayloadSize: z.number(),
       allowedContentTypes: z.array(z.string()),
-    }),
-    sqlInjectionProtection: z.object({
-      enabled: z.boolean(),
-    }),
-    xssProtection: z.object({
-      enabled: z.boolean(),
-    }),
-    apiKeyAuth: z.object({
-      enabled: z.boolean(),
     }),
   }),
 });
@@ -168,22 +158,12 @@ const developmentConfig: SecurityConfig = {
     enabled: true,
     logSecurityEvents: true,
     alertOnViolations: false,
-    reportToSentry: false,
   },
   apiSecurity: {
     inputValidation: {
       enabled: true,
       maxPayloadSize: 1024 * 1024, // 1MB
-      allowedContentTypes: ['application/json', 'application/x-www-form-urlencoded', 'multipart/form-data'],
-    },
-    sqlInjectionProtection: {
-      enabled: true,
-    },
-    xssProtection: {
-      enabled: true,
-    },
-    apiKeyAuth: {
-      enabled: false, // Disabled by default in development
+      allowedContentTypes: ['application/json'],
     },
   },
 };
@@ -255,22 +235,12 @@ const productionConfig: SecurityConfig = {
     enabled: true,
     logSecurityEvents: true,
     alertOnViolations: true,
-    reportToSentry: true,
   },
   apiSecurity: {
     inputValidation: {
       enabled: true,
       maxPayloadSize: 512 * 1024, // 512KB in production (more restrictive)
-      allowedContentTypes: ['application/json', 'application/x-www-form-urlencoded'],
-    },
-    sqlInjectionProtection: {
-      enabled: true,
-    },
-    xssProtection: {
-      enabled: true,
-    },
-    apiKeyAuth: {
-      enabled: true, // Available in production for routes that opt in
+      allowedContentTypes: ['application/json'],
     },
   },
 };
@@ -288,10 +258,6 @@ export function getSecurityConfig(): SecurityConfig {
         enabled: true,
         maxRequests: 50,
         skipSuccessfulRequests: false,
-      },
-      apiSecurity: {
-        ...developmentConfig.apiSecurity,
-        apiKeyAuth: { enabled: true },
       },
     };
     const res = SecurityConfigSchema.safeParse(testConfig);
@@ -379,11 +345,10 @@ export function logSecurityEvent(event: SecurityEvent): void {
   // Use dynamic import to avoid circular dependency
   if (typeof window === 'undefined') { // Server-side only
     import('./security-monitoring').then(({ recordSecurityEvent }) => {
-      recordSecurityEvent(event);
+      void recordSecurityEvent(event);
     }).catch(error => {
       console.error('Failed to record security event:', error);
-      // Fallback to console logging
-      console.warn('🔐 Security Event:', event);
+      console.warn('Security event recording unavailable', { type: event.type, severity: event.severity });
     });
   }
 }
@@ -392,7 +357,6 @@ export function logSecurityEvent(event: SecurityEvent): void {
 export function validateSecurityConfig(): void {
   try {
     getSecurityConfig();
-    console.log('✅ Security configuration validated successfully');
   } catch (error) {
     console.error('❌ Security configuration validation failed:', error);
     

@@ -1,6 +1,9 @@
 import { getDictionary } from "@/i18n/dictionaries";
 import { locales, type Locale } from "@/i18n/config";
 import OfflineActions from "@/components/OfflineActions";
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function OfflineLocalePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;

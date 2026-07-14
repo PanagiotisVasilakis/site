@@ -7,13 +7,13 @@ export type BookingRecord = {
   id: string;
   source: 'ONSITE' | 'EXTERNAL';
   reference?: string;
-  last_name_hash?: string;
-  last_name_salt?: string;
-  last_name_token?: string;
-  last_name_token_nows?: string;
   start_date: string;
   end_date: string;
   user_id?: string;
+  provider: string;
+  external_reference?: string;
+  access_status: 'PENDING' | 'VERIFIED';
+  claimed_at?: number;
   created_at: number;
 };
 
@@ -30,13 +30,13 @@ async function create(params: Omit<BookingRecord, 'id' | 'created_at'>): Promise
         id,
         source: params.source,
         reference: params.reference ?? null,
-        lastNameHash: params.last_name_hash ?? null,
-        lastNameSalt: params.last_name_salt ?? null,
-        lastNameToken: params.last_name_token ?? null,
-        lastNameTokenNoWs: params.last_name_token_nows ?? null,
         startDate: new Date(params.start_date),
         endDate: new Date(params.end_date),
         userId: params.user_id ?? null,
+        provider: params.provider,
+        externalReference: params.external_reference ?? null,
+        accessStatus: params.access_status,
+        claimedAt: params.claimed_at ? new Date(params.claimed_at) : null,
       },
     });
 
@@ -48,32 +48,33 @@ async function create(params: Omit<BookingRecord, 'id' | 'created_at'>): Promise
   }
 }
 
-async function findByReferenceAndLastName(
-  reference: string,
-  lastNameTokenCandidates: string[],
-): Promise<BookingRecord | undefined> {
+async function findByReference(reference: string): Promise<BookingRecord | undefined> {
   try {
-    if (lastNameTokenCandidates.length === 0) {
-      return undefined;
-    }
-
-    const clauses = [] as { lastNameToken?: string; lastNameTokenNoWs?: string }[];
-
-    for (const token of lastNameTokenCandidates) {
-      clauses.push({ lastNameToken: token });
-      clauses.push({ lastNameTokenNoWs: token });
-    }
-
-    const booking = await prisma.booking.findFirst({
+    const bookings = await prisma.booking.findMany({
       where: {
-        reference,
-        OR: clauses.length > 0 ? clauses : undefined,
+        OR: [{ reference }, { externalReference: reference }],
       },
+      orderBy: { createdAt: 'desc' },
+      take: 2,
     });
+    if (bookings.length > 1) {
+      throw new Error('AMBIGUOUS_BOOKING_REFERENCE');
+    }
+    return bookings[0] ? mapBookingFromDb(bookings[0]) : undefined;
+  } catch (error) {
+    logger.error('bookingRepository(prisma): findByReference failed', error);
+    throw error;
+  }
+}
 
+async function findByProviderReference(provider: string, externalReference: string): Promise<BookingRecord | undefined> {
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { provider_externalReference: { provider, externalReference } },
+    });
     return booking ? mapBookingFromDb(booking) : undefined;
   } catch (error) {
-    logger.error('bookingRepository(prisma): findByReferenceAndLastName failed', error);
+    logger.error('bookingRepository(prisma): findByProviderReference failed', error);
     throw error;
   }
 }
@@ -90,17 +91,18 @@ async function findById(id: string): Promise<BookingRecord | undefined> {
 
 async function findEligibleForUser(userId: string, nowDateISO: string): Promise<BookingRecord | undefined> {
   try {
+    const today = new Date(nowDateISO);
+    const accessWindowEnd = new Date(today);
+    accessWindowEnd.setUTCDate(accessWindowEnd.getUTCDate() + 7);
     const booking = await prisma.booking.findFirst({
       where: {
         userId,
-        endDate: {
-          gte: new Date(nowDateISO),
+        accessStatus: 'VERIFIED',
+        startDate: {
+          lte: accessWindowEnd,
         },
-        accessRecords: {
-          some: {
-            userId,
-            status: 'VERIFIED',
-          },
+        endDate: {
+          gte: today,
         },
       },
       orderBy: {
@@ -127,7 +129,8 @@ async function getAll(): Promise<BookingRecord[]> {
 
 export const bookingRepository = {
   create,
-  findByReferenceAndLastName,
+  findByReference,
+  findByProviderReference,
   findById,
   findEligibleForUser,
   getAll,

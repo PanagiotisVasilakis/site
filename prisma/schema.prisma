@@ -8,21 +8,23 @@ datasource db {
 }
 
 model User {
-  id              String           @id @db.Uuid
-  email           String?          @unique
-  phoneE164       String           @unique(map: "users_phone_e164_key") @map("phone_e164") @db.VarChar(32)
-  passwordHash    String?          @map("password_hash")
-  countryOrigin   CountryOrigin    @map("country_origin")
-  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
-  accessRecords   Access[]
-  bookings        Booking[]
-  identities      Identity[]
-  mfaChallenges   MfaChallenge[]
-  mfaFactors      MfaFactor[]
-  refreshTokens   RefreshToken[]
-  sessions        Session[]
-  checkInRequests CheckInRequest[]
+  id               String               @id @db.Uuid
+  email            String?              @unique
+  phoneE164        String               @unique(map: "users_phone_e164_key") @map("phone_e164") @db.VarChar(32)
+  passwordHash     String?              @map("password_hash")
+  countryOrigin    CountryOrigin        @map("country_origin")
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  bookings         Booking[]
+  mfaChallenges    MfaChallenge[]
+  mfaFactors       MfaFactor[]
+  refreshFamilies  RefreshTokenFamily[]
+  refreshTokens    RefreshToken[]
+  sessions         Session[]
+  checkInRequests  CheckInRequest[]
+  termsAcceptances TermsAcceptance[]
+  privacyRequests  PrivacyRequest[]
+  privacyHolds     PrivacyHold[]
 
   @@index([countryOrigin], map: "idx_users_country_origin")
   @@index([createdAt], map: "idx_users_created_at")
@@ -32,64 +34,35 @@ model User {
   @@map("users")
 }
 
-model Identity {
-  userId     String       @map("user_id") @db.Uuid
-  type       IdentityType
-  valueHash  String       @map("value_hash")
-  salt       String
-  last4Mask  String       @map("last4_mask")
-  verifiedAt DateTime?    @map("verified_at") @db.Timestamptz(6)
-  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@id([userId, type])
-  @@index([type], map: "idx_identities_type")
-  @@index([verifiedAt], map: "idx_identities_verified_at")
-  @@map("identities")
-}
-
 model Booking {
-  id                String           @id @db.Uuid
+  id                String              @id @db.Uuid
   source            BookingSource
   reference         String?
-  lastNameHash      String?          @map("last_name_hash")
-  lastNameSalt      String?          @map("last_name_salt")
-  lastNameToken     String?          @map("last_name_token")
-  lastNameTokenNoWs String?          @map("last_name_token_nows")
-  startDate         DateTime         @map("start_date") @db.Date
-  endDate           DateTime         @map("end_date") @db.Date
-  userId            String?          @map("user_id") @db.Uuid
-  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  accessRecords     Access[]
-  user              User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  startDate         DateTime            @map("start_date") @db.Date
+  endDate           DateTime            @map("end_date") @db.Date
+  userId            String?             @map("user_id") @db.Uuid
+  provider          String              @default("legacy") @db.VarChar(32)
+  externalReference String?             @map("external_reference") @db.VarChar(128)
+  accessStatus      AccessStatus        @default(PENDING) @map("access_status")
+  claimedAt         DateTime?           @map("claimed_at") @db.Timestamptz(6)
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  user              User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
   checkin           Checkin?
   sessions          Session[]
   checkInRequests   CheckInRequest[]
-  onsiteGrants      OnsiteGrant[]
+  claimGrants       BookingClaimGrant[]
+  termsAcceptances  TermsAcceptance[]
+  privacyRequests   PrivacyRequest[]
+  privacyHolds      PrivacyHold[]
 
+  @@unique([provider, externalReference], map: "bookings_provider_external_reference_key")
   @@index([reference], map: "idx_bookings_reference")
   @@index([userId], map: "idx_bookings_user")
   @@index([startDate, endDate], map: "idx_bookings_dates")
   @@index([userId, startDate, endDate], map: "idx_bookings_user_dates")
-  @@index([reference, lastNameToken], map: "idx_bookings_lookup")
   @@index([source, createdAt], map: "idx_bookings_source_created")
+  @@index([accessStatus, startDate, endDate], map: "idx_bookings_access_window")
   @@map("bookings")
-}
-
-model Access {
-  userId    String       @map("user_id") @db.Uuid
-  bookingId String       @map("booking_id") @db.Uuid
-  status    AccessStatus
-  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
-  booking   Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@id([userId, bookingId])
-  @@index([userId], map: "idx_access_user")
-  @@index([bookingId], map: "idx_access_booking")
-  @@index([status], map: "idx_access_status")
-  @@index([userId, status], map: "idx_access_user_status")
-  @@map("access")
 }
 
 model Session {
@@ -135,6 +108,7 @@ model CheckInRequest {
   updatedAt     DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
   booking       Booking?             @relation(fields: [bookingId], references: [id], onDelete: SetNull)
   user          User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  outboxEvents  OutboxEvent[]
 
   @@index([bookingId], map: "idx_check_in_requests_booking")
   @@index([userId], map: "idx_check_in_requests_user")
@@ -142,17 +116,22 @@ model CheckInRequest {
   @@map("check_in_requests")
 }
 
-model OnsiteGrant {
-  jti        String    @id @db.Uuid
-  bookingId  String    @map("booking_id") @db.Uuid
-  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
-  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(6)
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  booking    Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+model BookingClaimGrant {
+  id                     String        @id @db.Uuid
+  bookingId              String        @map("booking_id") @db.Uuid
+  tokenDigest            String        @unique(map: "booking_claim_grants_token_digest_key") @map("token_digest") @db.Char(64)
+  channel                ClaimChannel
+  expiresAt              DateTime      @map("expires_at") @db.Timestamptz(6)
+  consumedAt             DateTime?     @map("consumed_at") @db.Timestamptz(6)
+  revokedAt              DateTime?     @map("revoked_at") @db.Timestamptz(6)
+  issuedByAdminSessionId String?       @map("issued_by_admin_session_id") @db.Uuid
+  createdAt              DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  booking                Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  issuedByAdminSession   AdminSession? @relation(fields: [issuedByAdminSessionId], references: [id], onDelete: SetNull)
 
-  @@index([bookingId], map: "idx_onsite_grants_booking")
-  @@index([expiresAt], map: "idx_onsite_grants_expires")
-  @@map("onsite_grants")
+  @@index([bookingId, expiresAt], map: "idx_claim_grants_booking_expiry")
+  @@index([expiresAt, consumedAt, revokedAt], map: "idx_claim_grants_cleanup")
+  @@map("booking_claim_grants")
 }
 
 model StayRequest {
@@ -171,30 +150,40 @@ model StayRequest {
   status          StayRequestStatus @default(PENDING)
   createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
-  outboxEvents    WebhookOutbox[]
+  outboxEvents    OutboxEvent[]
 
   @@index([status, createdAt], map: "idx_stay_requests_status_created")
   @@index([email], map: "idx_stay_requests_email")
   @@map("stay_requests")
 }
 
-model WebhookOutbox {
-  id            String       @id @db.Uuid
-  stayRequestId String       @map("stay_request_id") @db.Uuid
-  eventType     String       @map("event_type")
-  payload       Json
-  status        OutboxStatus @default(PENDING)
-  attemptCount  Int          @default(0) @map("attempt_count")
-  nextAttemptAt DateTime     @default(now()) @map("next_attempt_at") @db.Timestamptz(6)
-  lastError     String?      @map("last_error")
-  deliveredAt   DateTime?    @map("delivered_at") @db.Timestamptz(6)
-  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
-  stayRequest   StayRequest  @relation(fields: [stayRequestId], references: [id], onDelete: Cascade)
+model OutboxEvent {
+  id               String          @id @db.Uuid
+  eventType        String          @map("event_type") @db.VarChar(96)
+  destination      String          @db.VarChar(64)
+  aggregateType    String          @map("aggregate_type") @db.VarChar(64)
+  aggregateId      String          @map("aggregate_id") @db.VarChar(128)
+  idempotencyKey   String          @unique(map: "outbox_events_idempotency_key") @map("idempotency_key") @db.VarChar(191)
+  payload          Json
+  status           OutboxStatus    @default(PENDING)
+  attemptCount     Int             @default(0) @map("attempt_count")
+  nextAttemptAt    DateTime        @default(now()) @map("next_attempt_at") @db.Timestamptz(6)
+  leaseOwner       String?         @map("lease_owner") @db.VarChar(128)
+  leaseExpiresAt   DateTime?       @map("lease_expires_at") @db.Timestamptz(6)
+  lastError        String?         @map("last_error") @db.VarChar(2048)
+  deliveredAt      DateTime?       @map("delivered_at") @db.Timestamptz(6)
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  stayRequestId    String?         @map("stay_request_id") @db.Uuid
+  stayRequest      StayRequest?    @relation(fields: [stayRequestId], references: [id], onDelete: SetNull)
+  checkInRequestId String?         @map("check_in_request_id") @db.Uuid
+  checkInRequest   CheckInRequest? @relation(fields: [checkInRequestId], references: [id], onDelete: SetNull)
 
-  @@index([status, nextAttemptAt], map: "idx_webhook_outbox_delivery")
-  @@index([stayRequestId], map: "idx_webhook_outbox_stay_request")
-  @@map("webhook_outbox")
+  @@index([status, nextAttemptAt], map: "idx_outbox_events_delivery")
+  @@index([leaseExpiresAt], map: "idx_outbox_events_lease")
+  @@index([aggregateType, aggregateId], map: "idx_outbox_events_aggregate")
+  @@index([checkInRequestId], map: "idx_outbox_events_check_in_request")
+  @@map("outbox_events")
 }
 
 model OperationalSetting {
@@ -206,34 +195,53 @@ model OperationalSetting {
 }
 
 model AdminSession {
-  id                String    @id @db.Uuid
-  absoluteExpiresAt DateTime  @map("absolute_expires_at") @db.Timestamptz(6)
-  expiresAt         DateTime  @map("expires_at") @db.Timestamptz(6)
-  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz(6)
-  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                String              @id @db.Uuid
+  absoluteExpiresAt DateTime            @map("absolute_expires_at") @db.Timestamptz(6)
+  expiresAt         DateTime            @map("expires_at") @db.Timestamptz(6)
+  revokedAt         DateTime?           @map("revoked_at") @db.Timestamptz(6)
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  claimGrants       BookingClaimGrant[]
 
   @@index([expiresAt], map: "idx_admin_sessions_expires")
   @@index([absoluteExpiresAt], map: "idx_admin_sessions_absolute_expires")
   @@map("admin_sessions")
 }
 
+model RefreshTokenFamily {
+  id                String         @id @map("id") @db.VarChar(64)
+  userId            String         @map("user_id") @db.Uuid
+  absoluteExpiresAt DateTime       @map("absolute_expires_at") @db.Timestamptz(6)
+  revokedAt         DateTime?      @map("revoked_at") @db.Timestamptz(6)
+  revocationReason  String?        @map("revocation_reason") @db.VarChar(128)
+  deviceHash        String?        @map("device_hash") @db.Char(64)
+  ipHash            String?        @map("ip_hash") @db.Char(64)
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokens            RefreshToken[]
+
+  @@index([userId, absoluteExpiresAt], map: "idx_refresh_families_user_expiry")
+  @@index([revokedAt], map: "idx_refresh_families_revoked")
+  @@map("refresh_token_families")
+}
+
 model RefreshToken {
-  id            String         @id @db.Uuid
-  userId        String         @map("user_id") @db.Uuid
-  tokenHash     String         @map("token_hash")
+  id            String             @id @db.Uuid
+  userId        String             @map("user_id") @db.Uuid
+  tokenHash     String             @map("token_hash")
   salt          String
-  familyId      String         @map("family_id")
-  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  expiresAt     DateTime       @map("expires_at") @db.Timestamptz(6)
-  revokedAt     DateTime?      @map("revoked_at") @db.Timestamptz(6)
-  rotatedFromId String?        @map("rotated_from_id") @db.Uuid
-  lastUsedAt    DateTime?      @map("last_used_at") @db.Timestamptz(6)
-  deviceHint    String?        @map("device_hint")
-  ipHint        String?        @map("ip_hint")
-  rotatedFrom   RefreshToken?  @relation("RefreshTokenHistory", fields: [rotatedFromId], references: [id])
-  rotatedTo     RefreshToken[] @relation("RefreshTokenHistory")
-  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  familyId      String             @map("family_id")
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt     DateTime           @map("expires_at") @db.Timestamptz(6)
+  revokedAt     DateTime?          @map("revoked_at") @db.Timestamptz(6)
+  rotatedFromId String?            @map("rotated_from_id") @db.Uuid
+  lastUsedAt    DateTime?          @map("last_used_at") @db.Timestamptz(6)
+  deviceHint    String?            @map("device_hint")
+  ipHint        String?            @map("ip_hint")
+  rotatedFrom   RefreshToken?      @relation("RefreshTokenHistory", fields: [rotatedFromId], references: [id])
+  rotatedTo     RefreshToken[]     @relation("RefreshTokenHistory")
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  family        RefreshTokenFamily @relation(fields: [familyId], references: [id], onDelete: Cascade)
 
   @@index([userId], map: "idx_refresh_tokens_user")
   @@index([familyId], map: "idx_refresh_tokens_family")
@@ -243,6 +251,131 @@ model RefreshToken {
   @@index([expiresAt, revokedAt], map: "idx_refresh_tokens_cleanup")
   @@index([userId, expiresAt, revokedAt], map: "idx_refresh_tokens_user_active")
   @@map("refresh_tokens")
+}
+
+model TermsAcceptance {
+  id           String   @id @db.Uuid
+  bookingId    String   @map("booking_id") @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  termsVersion String   @map("terms_version") @db.VarChar(64)
+  contentHash  String   @map("content_hash") @db.Char(64)
+  acceptedAt   DateTime @default(now()) @map("accepted_at") @db.Timestamptz(6)
+  booking      Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, userId, termsVersion], map: "terms_acceptances_booking_user_version_key")
+  @@index([acceptedAt], map: "idx_terms_acceptances_accepted_at")
+  @@map("terms_acceptances")
+}
+
+model SecurityAuditEvent {
+  id            String   @id @db.Uuid
+  eventType     String   @map("event_type") @db.VarChar(96)
+  severity      String   @db.VarChar(16)
+  correlationId String?  @map("correlation_id") @db.VarChar(128)
+  ipHash        String?  @map("ip_hash") @db.Char(64)
+  path          String?  @db.VarChar(512)
+  details       Json
+  occurredAt    DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  @@index([eventType, occurredAt], map: "idx_security_events_type_time")
+  @@index([severity, occurredAt], map: "idx_security_events_severity_time")
+  @@map("security_audit_events")
+}
+
+model AlertRule {
+  id            String   @id @db.Uuid
+  name          String   @unique @db.VarChar(128)
+  description   String   @db.VarChar(512)
+  metricName    String   @map("metric_name") @db.VarChar(128)
+  comparison    String   @db.VarChar(8)
+  threshold     Float
+  windowMinutes Int      @map("window_minutes")
+  severity      String   @default("medium") @db.VarChar(16)
+  enabled       Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  alerts        Alert[]
+
+  @@index([enabled], map: "idx_alert_rules_enabled")
+  @@map("alert_rules")
+}
+
+model Alert {
+  id                      String      @id @db.Uuid
+  ruleId                  String      @map("rule_id") @db.Uuid
+  status                  AlertStatus @default(OPEN)
+  value                   Float
+  openedAt                DateTime    @default(now()) @map("opened_at") @db.Timestamptz(6)
+  acknowledgedAt          DateTime?   @map("acknowledged_at") @db.Timestamptz(6)
+  resolvedAt              DateTime?   @map("resolved_at") @db.Timestamptz(6)
+  notificationDeliveredAt DateTime?   @map("notification_delivered_at") @db.Timestamptz(6)
+  notificationAttempts    Int         @default(0) @map("notification_attempts")
+  notificationLastError   String?     @map("notification_last_error") @db.VarChar(1024)
+  rule                    AlertRule   @relation(fields: [ruleId], references: [id], onDelete: Restrict)
+
+  @@index([status, openedAt], map: "idx_alerts_status_opened")
+  @@map("alerts")
+}
+
+model AnalyticsHit {
+  id         String   @id @db.Uuid
+  path       String   @db.VarChar(512)
+  locale     String?  @db.VarChar(8)
+  eventName  String?  @map("event_name") @db.VarChar(96)
+  properties Json?
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  @@index([occurredAt], map: "idx_analytics_hits_occurred")
+  @@index([path, occurredAt], map: "idx_analytics_hits_path_time")
+  @@map("analytics_hits")
+}
+
+model AnalyticsVital {
+  id         String   @id @db.Uuid
+  name       String   @db.VarChar(16)
+  value      Float
+  path       String   @db.VarChar(512)
+  metricId   String?  @map("metric_id") @db.VarChar(128)
+  occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  @@index([occurredAt], map: "idx_analytics_vitals_occurred")
+  @@index([name, occurredAt], map: "idx_analytics_vitals_name_time")
+  @@map("analytics_vitals")
+}
+
+model PrivacyRequest {
+  id            String               @id @db.Uuid
+  userId        String?              @map("user_id") @db.Uuid
+  bookingId     String?              @map("booking_id") @db.Uuid
+  subjectDigest String               @map("subject_digest") @db.Char(64)
+  requestType   PrivacyRequestType   @map("request_type")
+  status        PrivacyRequestStatus @default(PENDING)
+  requestedAt   DateTime             @default(now()) @map("requested_at") @db.Timestamptz(6)
+  completedAt   DateTime?            @map("completed_at") @db.Timestamptz(6)
+  auditNote     String?              @map("audit_note") @db.VarChar(1024)
+  user          User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  booking       Booking?             @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@index([status, requestedAt], map: "idx_privacy_requests_status_time")
+  @@index([subjectDigest, requestedAt], map: "idx_privacy_requests_subject_time")
+  @@map("privacy_requests")
+}
+
+model PrivacyHold {
+  id         String    @id @db.Uuid
+  userId     String?   @map("user_id") @db.Uuid
+  bookingId  String?   @map("booking_id") @db.Uuid
+  reason     String    @db.VarChar(512)
+  expiresAt  DateTime? @map("expires_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  releasedAt DateTime? @map("released_at") @db.Timestamptz(6)
+  user       User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking    Booking?  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([userId, releasedAt], map: "idx_privacy_holds_user")
+  @@index([bookingId, releasedAt], map: "idx_privacy_holds_booking")
+  @@map("privacy_holds")
 }
 
 model MfaFactor {
@@ -340,11 +473,6 @@ enum CountryOrigin {
   ABROAD
 }
 
-enum IdentityType {
-  AFM
-  PASSPORT
-}
-
 enum BookingSource {
   ONSITE
   EXTERNAL
@@ -353,6 +481,11 @@ enum BookingSource {
 enum AccessStatus {
   PENDING
   VERIFIED
+}
+
+enum ClaimChannel {
+  REMOTE
+  ONSITE
 }
 
 enum CheckInRequestStatus {
@@ -370,9 +503,27 @@ enum StayRequestStatus {
 
 enum OutboxStatus {
   PENDING
-  PROCESSING
+  LEASED
   DELIVERED
-  FAILED
+  DEAD
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum PrivacyRequestType {
+  EXPORT
+  ERASURE
+}
+
+enum PrivacyRequestStatus {
+  PENDING
+  VERIFIED
+  COMPLETED
+  REJECTED
 }
 
 enum MfaFactorType {

@@ -1,0 +1,12 @@
+[Unit]
+Description=Evaluate QR City Guide operations every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Persistent=true
+Unit=__SERVICE_NAME__-operations.service
+
+[Install]
+WantedBy=timers.target

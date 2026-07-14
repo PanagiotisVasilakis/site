@@ -3,8 +3,10 @@
  * Provides access to collected metrics data for dashboard visualization
  */
 
+import crypto from 'node:crypto';
 import { NextRequest } from 'next/server';
-import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
+import { z } from 'zod';
+import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode, validateRequestBody } from '@/lib/apiErrorHandler';
 import { logger } from '@/lib/logger-enterprise';
 import { metrics } from '@/lib/metrics-collector';
 import { tracer, SpanStatus } from '@/lib/distributed-tracing';
@@ -75,20 +77,39 @@ function extractApiKey(request: NextRequest): string | undefined {
   return undefined;
 }
 
+function matchesConfiguredKey(key: string, candidates: readonly string[]): boolean {
+  const supplied = Buffer.from(key);
+  return candidates.some((candidate) => {
+    const expected = Buffer.from(candidate);
+    return supplied.length === expected.length && crypto.timingSafeEqual(supplied, expected);
+  });
+}
+
 function hasReadApiKeyAccess(request: NextRequest): boolean {
   const key = extractApiKey(request);
   if (!key) return false;
   const readKeys = parseCsvEnv('VALID_API_KEYS');
   const writeKeys = parseCsvEnv('METRICS_WRITE_API_KEYS');
-  return readKeys.includes(key) || writeKeys.includes(key);
+  return matchesConfiguredKey(key, [...readKeys, ...writeKeys]);
 }
 
 function hasWriteApiKeyAccess(request: NextRequest): boolean {
   const key = extractApiKey(request);
   if (!key) return false;
   const writeKeys = parseCsvEnv('METRICS_WRITE_API_KEYS');
-  return writeKeys.includes(key);
+  return matchesConfiguredKey(key, writeKeys);
 }
+
+const metricSubmissionSchema = z.object({
+  metric: z.string().regex(/^[A-Za-z][A-Za-z0-9_.-]{0,99}$/),
+  value: z.number().finite().min(-1e12).max(1e12),
+  type: z.enum(['counter', 'gauge', 'timer', 'histogram']).optional().default('gauge'),
+  tags: z.record(z.string().max(50), z.string().max(200)).optional(),
+}).strict().superRefine((value, context) => {
+  if (value.tags && Object.keys(value.tags).length > 30) {
+    context.addIssue({ code: 'custom', path: ['tags'], message: 'At most 30 tags are allowed' });
+  }
+});
 
 async function assertMetricsAccess(request: NextRequest, access: 'read' | 'write', correlationId?: string): Promise<void> {
   if (await isAdminRequest(request)) return;
@@ -197,7 +218,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   const span = tracer.startSpan('metrics_query', undefined, {
     component: 'metrics',
     'http.method': request.method,
-    'http.url': request.url,
+    'http.url': request.nextUrl.pathname,
   });
 
   const correlationId = logger.getContext()?.correlationId;
@@ -227,8 +248,10 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
           throw new Error('tags must be an object');
         }
 
-        parsedTags = Object.entries(decoded as Record<string, unknown>).reduce<Record<string, string>>((acc, [k, v]) => {
-          if (typeof v === 'string') {
+        const entries = Object.entries(decoded as Record<string, unknown>);
+        if (entries.length > 30) throw new Error('too many tags');
+        parsedTags = entries.reduce<Record<string, string>>((acc, [k, v]) => {
+          if (/^[A-Za-z0-9_.-]{1,50}$/.test(k) && typeof v === 'string' && v.length <= 200) {
             acc[k] = v;
           }
           return acc;
@@ -237,7 +260,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
         throw new ApiError(
           ApiErrorCode.VALIDATION_ERROR,
           'tags must be a valid JSON object',
-          { tags: tagsRaw },
+          undefined,
           correlationId
         );
       }
@@ -264,7 +287,6 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
       metric: query.metric,
       timeRange: timeRange,
       aggregation: aggregation,
-      tags: query.tags,
     });
 
     // Calculate time range
@@ -352,6 +374,16 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     return createSuccessResponse(response, 200, correlationId);
 
   } catch (error) {
+    if (error instanceof ApiError) {
+      tracer.addLog(span, 'info', 'Metrics query rejected', {
+        code: error.code,
+        status: error.statusCode,
+      });
+      tracer.finishSpan(span);
+      logger.debug('Metrics query rejected', { code: error.code, status: error.statusCode });
+      throw error;
+    }
+
     tracer.addLog(span, 'error', 'Metrics query failed', {
       error: error instanceof Error ? error.message : String(error),
     });
@@ -360,10 +392,6 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     logger.error('Metrics query failed', {}, error instanceof Error ? error : new Error(String(error)));
 
     metrics.counter('metrics_query.errors', 1);
-
-    if (error instanceof ApiError) {
-      throw error;
-    }
 
     throw new ApiError(
       ApiErrorCode.INTERNAL_ERROR,
@@ -394,18 +422,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   try {
     await assertMetricsAccess(request, 'write', correlationId);
 
-    const body = await request.json();
-    
-    const { metric, value, tags, type = 'gauge' } = body;
-    
-    if (!metric || typeof value !== 'number') {
-      throw new ApiError(
-        ApiErrorCode.VALIDATION_ERROR,
-        'Invalid metric data',
-        { required: ['metric', 'value'] },
-        correlationId
-      );
-    }
+    const { metric, value, tags, type } = await validateRequestBody(metricSubmissionSchema, 64 * 1_024)(request);
 
     tracer.addTags(span, {
       'metrics.submit.metric': metric,
@@ -453,16 +470,22 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     );
 
   } catch (error) {
+    if (error instanceof ApiError) {
+      tracer.addLog(span, 'info', 'Metric submission rejected', {
+        code: error.code,
+        status: error.statusCode,
+      });
+      tracer.finishSpan(span);
+      logger.debug('Metric submission rejected', { code: error.code, status: error.statusCode });
+      throw error;
+    }
+
     tracer.addLog(span, 'error', 'Metric submission failed', {
       error: error instanceof Error ? error.message : String(error),
     });
     tracer.finishSpan(span, SpanStatus.ERROR);
 
     logger.error('Metric submission failed', {}, error instanceof Error ? error : new Error(String(error)));
-
-    if (error instanceof ApiError) {
-      throw error;
-    }
 
     throw new ApiError(
       ApiErrorCode.INTERNAL_ERROR,

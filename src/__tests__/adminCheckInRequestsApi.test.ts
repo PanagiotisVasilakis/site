@@ -1,6 +1,9 @@
 import { NextRequest } from 'next/server';
 import { signAdmin } from '@/lib/auth/admin';
 
+const outbox = vi.hoisted(() => ({ deliverOutboxEvent: vi.fn() }));
+vi.mock('@/lib/bookingOutbox', () => outbox);
+
 const ADMIN_SECRET = 'test-admin-secret-for-requests';
 const ADMIN_JWT_SECRET = 'a'.repeat(32);
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
@@ -84,6 +87,8 @@ describe('admin check-in requests API', () => {
       findById: vi.fn(),
       updateStatus: vi.fn(),
     };
+    outbox.deliverOutboxEvent.mockReset();
+    outbox.deliverOutboxEvent.mockResolvedValue(false);
 
     vi.doMock('@/lib/prisma-repositories/checkInRequestRepository', () => ({
       checkInRequestRepository: repository,
@@ -186,7 +191,7 @@ describe('admin check-in requests API', () => {
 
   it('approves pending requests', async () => {
     repository.findById.mockResolvedValue(requestRecord('PENDING'));
-    repository.updateStatus.mockResolvedValue(requestRecord('APPROVED'));
+    repository.updateStatus.mockResolvedValue({ request: requestRecord('APPROVED'), changed: true });
     const { PATCH } = await importPatchRoute();
     const req = makeReq(`/api/admin/check-in-requests/${REQUEST_ID}`, {
       method: 'PATCH',
@@ -209,9 +214,13 @@ describe('admin check-in requests API', () => {
   it('sends a status update notification when webhook is configured', async () => {
     process.env.CHECKIN_REQUEST_WEBHOOK_URL = 'https://example.test/check-in-webhook';
     process.env.CHECKIN_REQUEST_WEBHOOK_TOKEN = 'webhook-token';
-    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 202 } as Response);
     repository.findById.mockResolvedValue(requestRecord('PENDING'));
-    repository.updateStatus.mockResolvedValue(requestRecord('APPROVED'));
+    repository.updateStatus.mockResolvedValue({
+      request: requestRecord('APPROVED'),
+      notificationEventId: 'event-1',
+      changed: true,
+    });
+    outbox.deliverOutboxEvent.mockResolvedValue(true);
     const { PATCH } = await importPatchRoute();
     const req = makeReq(`/api/admin/check-in-requests/${REQUEST_ID}`, {
       method: 'PATCH',
@@ -225,20 +234,12 @@ describe('admin check-in requests API', () => {
 
     expect(res.status).toBe(200);
     expect(json.data.notification.status).toBe('sent');
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://example.test/check-in-webhook',
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({
-          Authorization: 'Bearer webhook-token',
-        }),
-      })
-    );
+    expect(outbox.deliverOutboxEvent).toHaveBeenCalledWith('event-1');
   });
 
   it('rejects pending requests', async () => {
     repository.findById.mockResolvedValue(requestRecord('PENDING'));
-    repository.updateStatus.mockResolvedValue(requestRecord('REJECTED'));
+    repository.updateStatus.mockResolvedValue({ request: requestRecord('REJECTED'), changed: true });
     const { PATCH } = await importPatchRoute();
     const req = makeReq(`/api/admin/check-in-requests/${REQUEST_ID}`, {
       method: 'PATCH',

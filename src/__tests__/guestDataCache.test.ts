@@ -2,7 +2,7 @@
 export { };
 
 
-const DATASET_KEYS = ['bookings', 'users', 'identities', 'checkins', 'access'] as const;
+const DATASET_KEYS = ['bookings', 'users', 'checkins'] as const;
 
 type GuestDatasetKey = typeof DATASET_KEYS[number];
 type GuestDatasetSnapshot = {
@@ -29,16 +29,12 @@ describe('GuestDataCache', () => {
     const rowCounts: Record<GuestDatasetKey, number> = {
       bookings: 2,
       users: 0,
-      identities: 0,
       checkins: 0,
-      access: 0,
     };
     const versionTokens: Record<GuestDatasetKey, string> = {
       bookings: 'v1',
       users: 'v0',
-      identities: 'v0',
       checkins: 'v0',
-      access: 'v0',
     };
 
     const config = Object.fromEntries(

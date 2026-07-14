@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger-enterprise';
 
-export const GUEST_DATASET_KEYS = ['bookings', 'users', 'identities', 'checkins', 'access'] as const;
+export const GUEST_DATASET_KEYS = ['bookings', 'users', 'checkins'] as const;
 export type GuestDatasetKey = typeof GUEST_DATASET_KEYS[number];
 
 export type GuestDatasetSnapshot = {
@@ -42,14 +42,6 @@ async function computeUserSnapshot(): Promise<GuestDatasetSnapshot> {
   return formatSnapshot('users', aggregate._count?._all ?? 0, aggregate._max?.updatedAt);
 }
 
-async function computeIdentitySnapshot(): Promise<GuestDatasetSnapshot> {
-  const aggregate = await prisma.identity.aggregate({
-    _count: { _all: true },
-    _max: { verifiedAt: true },
-  });
-  return formatSnapshot('identities', aggregate._count?._all ?? 0, aggregate._max?.verifiedAt);
-}
-
 async function computeCheckinSnapshot(): Promise<GuestDatasetSnapshot> {
   const aggregate = await prisma.checkin.aggregate({
     _count: { _all: true },
@@ -58,20 +50,10 @@ async function computeCheckinSnapshot(): Promise<GuestDatasetSnapshot> {
   return formatSnapshot('checkins', aggregate._count?._all ?? 0, aggregate._max?.acceptedAt);
 }
 
-async function computeAccessSnapshot(): Promise<GuestDatasetSnapshot> {
-  const aggregate = await prisma.access.aggregate({
-    _count: { _all: true },
-    _max: { updatedAt: true },
-  });
-  return formatSnapshot('access', aggregate._count?._all ?? 0, aggregate._max?.updatedAt);
-}
-
 const COMPUTE_SNAPSHOT: Record<GuestDatasetKey, () => Promise<GuestDatasetSnapshot>> = {
   bookings: computeBookingSnapshot,
   users: computeUserSnapshot,
-  identities: computeIdentitySnapshot,
   checkins: computeCheckinSnapshot,
-  access: computeAccessSnapshot,
 };
 
 export async function getGuestDatasetSnapshot(key: GuestDatasetKey): Promise<GuestDatasetSnapshot> {

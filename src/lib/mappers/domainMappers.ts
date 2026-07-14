@@ -15,67 +15,39 @@ export function mapBookingFromDb(bookingDb: {
   id: string;
   source: 'ONSITE' | 'EXTERNAL';
   reference: string | null;
-  lastNameHash: string | null;
-  lastNameSalt: string | null;
-  lastNameToken: string | null;
-  lastNameTokenNoWs: string | null;
   startDate: Date;
   endDate: Date;
   userId: string | null;
+  provider: string;
+  externalReference: string | null;
+  accessStatus: 'PENDING' | 'VERIFIED';
+  claimedAt: Date | null;
   createdAt: Date;
 }): {
   id: string;
   source: 'ONSITE' | 'EXTERNAL';
   reference?: string;
-  last_name_hash?: string;
-  last_name_salt?: string;
-  last_name_token?: string;
-  last_name_token_nows?: string;
   start_date: string;
   end_date: string;
   user_id?: string;
+  provider: string;
+  external_reference?: string;
+  access_status: 'PENDING' | 'VERIFIED';
+  claimed_at?: number;
   created_at: number;
 } {
   return {
     id: bookingDb.id,
     source: bookingDb.source,
     reference: bookingDb.reference ?? undefined,
-    last_name_hash: bookingDb.lastNameHash ?? undefined,
-    last_name_salt: bookingDb.lastNameSalt ?? undefined,
-    last_name_token: bookingDb.lastNameToken ?? undefined,
-    last_name_token_nows: bookingDb.lastNameTokenNoWs ?? undefined,
     start_date: bookingDb.startDate.toISOString(),
     end_date: bookingDb.endDate.toISOString(),
     user_id: bookingDb.userId ?? undefined,
+    provider: bookingDb.provider,
+    external_reference: bookingDb.externalReference ?? undefined,
+    access_status: bookingDb.accessStatus,
+    claimed_at: bookingDb.claimedAt?.getTime(),
     created_at: bookingDb.createdAt.getTime(),
-  };
-}
-
-/**
- * Map database access record to domain access model
- * 
- * @param accessDb - Raw database access record
- * @returns Domain access model
- */
-export function mapAccessFromDb(accessDb: {
-  userId: string;
-  bookingId: string;
-  status: 'PENDING' | 'VERIFIED';
-  createdAt: Date;
-  updatedAt: Date;
-}): {
-  user_id: string;
-  booking_id: string;
-  status: 'PENDING' | 'VERIFIED';
-  created_at: number;
-  updated_at: number;
-} {
-  return {
-    user_id: accessDb.userId,
-    booking_id: accessDb.bookingId,
-    status: accessDb.status,
-    created_at: accessDb.createdAt.getTime(),
-    updated_at: accessDb.updatedAt.getTime(),
   };
 }
 

@@ -15,6 +15,7 @@ export const ApiErrorCode = {
   RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
   RATE_LIMITED: 'RATE_LIMITED', // Alias
   PAYLOAD_TOO_LARGE: 'PAYLOAD_TOO_LARGE',
+  UNSUPPORTED_MEDIA_TYPE: 'UNSUPPORTED_MEDIA_TYPE',
   
   // Server errors
   INTERNAL_ERROR: 'INTERNAL_ERROR',
@@ -26,5 +27,4 @@ export const ApiErrorCode = {
 } as const;
 
 export type ApiErrorCode = typeof ApiErrorCode[keyof typeof ApiErrorCode];
-
 

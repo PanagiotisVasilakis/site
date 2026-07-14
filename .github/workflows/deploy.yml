@@ -1,11 +1,10 @@
 name: Secure Image Publication
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
-    tags: ['v*']
-  release:
-    types: [published]
 
 env:
   REGISTRY: ghcr.io
@@ -19,96 +18,133 @@ permissions:
   security-events: write
 
 jobs:
-  validate:
-    name: Validate release source
+  candidate:
+    name: Build and scan ${{ matrix.platform }} candidate
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux/amd64, linux/arm64]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm install --global npm@11.18.0
-      - run: npm ci --audit=false --fund=false
-      - run: npm run check:conflicts
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npx prisma validate
-      - run: npm audit --audit-level=critical --omit=dev
-
-  publish:
-    name: Build, publish, and attest image
-    runs-on: ubuntu-latest
-    needs: validate
-    timeout-minutes: 30
-    outputs:
-      digest: ${{ steps.build.outputs.digest }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca # v3.9.0
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Prepare platform identifier
+        run: echo "PLATFORM_PAIR=${PLATFORM//\//-}" >> "$GITHUB_ENV"
+        env:
+          PLATFORM: ${{ matrix.platform }}
       - id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6.9.0
         with:
           context: .
           file: docker/Dockerfile.security
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64,linux/arm64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          build-args: |
+            NEXT_PUBLIC_SITE_URL=${{ vars.NEXT_PUBLIC_SITE_URL }}
+          platforms: ${{ matrix.platform }}
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
+          cache-to: type=gha,mode=max,scope=${{ env.PLATFORM_PAIR }}
           provenance: true
           sbom: true
-      - uses: actions/attest-build-provenance@v2
+      - name: Scan untagged immutable candidate
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          format: sarif
+          output: trivy-${{ env.PLATFORM_PAIR }}.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+      - name: Upload scan result
+        if: always()
+        uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
+        with:
+          sarif_file: trivy-${{ env.PLATFORM_PAIR }}.sarif
+          category: trivy-${{ env.PLATFORM_PAIR }}
+      - name: Record scanned digest
+        run: |
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${DIGEST#sha256:}"
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  promote:
+    name: Promote scanned immutable manifest
+    needs: candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      digest: ${{ steps.inspect.outputs.digest }}
+    steps:
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          pattern: digests-*
+          path: /tmp/digests
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca # v3.9.0
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Promote only scanned digests
+        working-directory: /tmp/digests
+        run: |
+          sources=()
+          for digest in *; do
+            sources+=("${IMAGE}@sha256:${digest}")
+          done
+          docker buildx imagetools create \
+            --tag "${IMAGE}:main" \
+            --tag "${IMAGE}:main-${HEAD_SHA}" \
+            --tag "${IMAGE}:latest" \
+            "${sources[@]}"
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      - id: inspect
+        name: Resolve promoted digest
+        run: |
+          digest="$(docker buildx imagetools inspect "${IMAGE}:main-${HEAD_SHA}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
+          test -n "$digest"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          subject-digest: ${{ steps.build.outputs.digest }}
+          subject-digest: ${{ steps.inspect.outputs.digest }}
           push-to-registry: true
       - name: Record immutable release reference
         run: |
           mkdir -p release-artifact
-          printf '%s\n' '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}' > release-artifact/image.txt
-      - uses: actions/upload-artifact@v4
+          printf '%s\n' "${IMAGE}@${DIGEST}" > release-artifact/image.txt
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          DIGEST: ${{ steps.inspect.outputs.digest }}
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
-          name: release-image-${{ github.sha }}
+          name: release-image-${{ github.event.workflow_run.head_sha }}
           path: release-artifact/image.txt
           retention-days: 90
 
-  scan:
-    name: Scan published image
-    runs-on: ubuntu-latest
-    needs: publish
-    timeout-minutes: 15
-    steps:
-      - uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.publish.outputs.digest }}
-          format: sarif
-          output: trivy-results.sarif
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          exit-code: '1'
-      - if: always()
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: trivy-results.sarif
-
-# This workflow intentionally stops after publishing a verified immutable image.
-# Deployment belongs in the platform repository/tool that owns cluster credentials;
-# no job here claims to deploy when no deployment target is configured.
+# This repository publishes a verified immutable image only. The deployment
+# target and its credentials are intentionally owned by the external platform.

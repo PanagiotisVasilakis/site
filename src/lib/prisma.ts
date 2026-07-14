@@ -114,22 +114,20 @@ function addPrismaInstrumentation(client: PrismaClient): void {
 function createTestPrismaClient(): PrismaClient {
   // NOTE: pg-mem is incompatible with @prisma/adapter-pg v6+
   // Use a real PostgreSQL test database instead
-  const testDbUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
+  const testDbUrl = process.env.TEST_DATABASE_URL;
   
   if (!testDbUrl) {
-    logger.error('TEST_DATABASE_URL or DATABASE_URL must be set for test environment');
-    throw new Error('TEST_DATABASE_URL or DATABASE_URL env var missing for tests');
+    throw new Error('TEST_DATABASE_URL is required for database-backed tests');
   }
 
-  const usingDedicatedTestDb = !!process.env.TEST_DATABASE_URL;
-  if (!usingDedicatedTestDb) {
-    logger.warn('TEST_DATABASE_URL not set; falling back to DATABASE_URL (use a dedicated test database!)');
+  const databaseName = new URL(testDbUrl).pathname.replace(/^\//, '');
+  if (!databaseName.endsWith('_test')) {
+    throw new Error('Refusing to run tests: TEST_DATABASE_URL database name must end with _test');
   }
 
   logger.info('Initialized Prisma client for tests', { 
-    usingDedicatedTestDb,
-    // Log database name without credentials
-    database: testDbUrl.split('/').pop()?.split('?')[0] 
+    usingDedicatedTestDb: true,
+    database: databaseName,
   });
 
   const client = new PrismaClient({

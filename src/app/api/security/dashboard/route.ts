@@ -1,160 +1,106 @@
-/**
- * Security Dashboard API
- * Provides security metrics and status for admin dashboard
- */
+import { NextRequest } from 'next/server';
 
-import { NextRequest, NextResponse } from 'next/server';
-import { 
-  getSecurityMonitor, 
-  getSecurityHealthStatus,
-  securityReportGenerator 
-} from '@/lib/security-monitoring';
-import { verifyAdminSession } from '@/lib/auth/admin';
-import { getClientIp } from '@/lib/net/getClientIp';
+import { isAdminRequest } from '@/lib/rbac';
+import { getSecurityConfig } from '@/lib/security-config';
 
-async function requireAuth(request: NextRequest): Promise<boolean> {
-  // Parse JWT token from cookie
-  const cookieHeader = request.headers.get('cookie') || '';
-  const jwt = cookieHeader
-    .split(';')
-    .map(c => c.trim())
-    .find(c => c.startsWith('admin_jwt='))
-    ?.split('=', 2)[1];
-  
-  return !!(jwt && await verifyAdminSession(jwt));
+type PrismaClient = typeof import('@/lib/prisma').prisma;
+
+async function unauthorized(request: NextRequest): Promise<Response | null> {
+  return await isAdminRequest(request) ? null : Response.json({ error: 'Unauthorized' }, { status: 401 });
+}
+
+async function metricsSince(prisma: PrismaClient, since: Date) {
+  const [totalEvents, byType, bySeverity, activeAlerts] = await Promise.all([
+    prisma.securityAuditEvent.count({ where: { occurredAt: { gte: since } } }),
+    prisma.securityAuditEvent.groupBy({
+      by: ['eventType'], where: { occurredAt: { gte: since } }, _count: { _all: true },
+      orderBy: { _count: { eventType: 'desc' } },
+    }),
+    prisma.securityAuditEvent.groupBy({
+      by: ['severity'], where: { occurredAt: { gte: since } }, _count: { _all: true },
+      orderBy: { _count: { severity: 'desc' } },
+    }),
+    prisma.alert.count({ where: { status: { in: ['OPEN', 'ACKNOWLEDGED'] } } }),
+  ]);
+  return {
+    totalEvents,
+    eventsByType: Object.fromEntries(byType.map((row) => [row.eventType, row._count._all])),
+    eventsBySeverity: Object.fromEntries(bySeverity.map((row) => [row.severity, row._count._all])),
+    activeAlerts,
+    since: since.toISOString(),
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+function minutesParam(request: NextRequest): number {
+  const value = Number.parseInt(request.nextUrl.searchParams.get('minutes') || '60', 10);
+  return Number.isFinite(value) ? Math.min(Math.max(value, 1), 10_080) : 60;
 }
 
 export async function GET(request: NextRequest) {
-  // Verify authentication
-  if (!(await requireAuth(request))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const rejected = await unauthorized(request);
+  if (rejected) return rejected;
+  const { prisma } = await import('@/lib/prisma');
 
-  try {
-    const { searchParams } = new URL(request.url);
-    const endpoint = searchParams.get('endpoint');
-
-    const monitor = getSecurityMonitor();
-
-    switch (endpoint) {
-      case 'metrics':
-        return NextResponse.json(monitor.getMetrics());
-
-      case 'health':
-        return NextResponse.json(getSecurityHealthStatus());
-
-      case 'events':
-        const minutes = parseInt(searchParams.get('minutes') || '60', 10);
-        const events = monitor.getRecentEvents(minutes);
-        return NextResponse.json({ events, count: events.length });
-
-      case 'report':
-        const reportType = searchParams.get('type') || 'daily';
-        
-        if (reportType === 'daily') {
-          const report = securityReportGenerator.generateDailyReport();
-          return NextResponse.json({ report, type: 'daily' });
-        } else if (reportType === 'trends') {
-          const trends = securityReportGenerator.generateWeeklyTrends();
-          return NextResponse.json({ trends, type: 'weekly' });
-        } else {
-          return NextResponse.json({ error: 'Invalid report type' }, { status: 400 });
-        }
-
-      case 'dashboard':
-        // Return comprehensive dashboard data
-        const [metrics, health, recentEvents] = [
-          monitor.getMetrics(),
-          getSecurityHealthStatus(),
-          monitor.getRecentEvents(60),
-        ];
-
-        return NextResponse.json({
-          metrics,
-          health,
-          recentEvents: recentEvents.slice(-20), // Last 20 events
-          summary: {
-            totalEvents: metrics.totalEvents,
-            alertsTriggered: metrics.alertsTriggered,
-            healthStatus: health.status,
-            topThreats: Object.entries(metrics.eventsByType)
-              .sort(([,a], [,b]) => b - a)
-              .slice(0, 5)
-              .map(([type, count]) => ({ type, count })),
-          },
-        });
-
-      default:
-        return NextResponse.json({ error: 'Invalid endpoint' }, { status: 400 });
-    }
-  } catch (error) {
-    console.error('Security dashboard API error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' }, 
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(request: NextRequest) {
-  // Verify authentication
-  if (!(await requireAuth(request))) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  try {
-    const body = await request.json();
-    const { action } = body;
-
-    const monitor = getSecurityMonitor();
-
-    switch (action) {
-      case 'clear_metrics':
-        monitor.clearMetrics();
-        return NextResponse.json({ success: true, message: 'Metrics cleared' });
-
-      case 'test_alert':
-        // Trigger a test security event for testing alerts
-        const testEvent = {
-          type: 'suspicious_activity' as const,
-          severity: 'medium' as const,
-          timestamp: new Date().toISOString(),
-          ip: getClientIp(request, { trustProxy: true }),
-          userAgent: request.headers.get('user-agent') || undefined,
-          url: request.url,
-          details: {
-            reason: 'Test alert triggered from admin dashboard',
-            source: 'admin_dashboard',
-          },
-        };
-        
-        monitor.recordEvent(testEvent);
-        return NextResponse.json({ 
-          success: true, 
-          message: 'Test alert triggered',
-          event: testEvent,
-        });
-
-      default:
-        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
-    }
-  } catch (error) {
-    console.error('Security dashboard POST error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' }, 
-      { status: 500 }
-    );
-  }
-}
-
-// Handle preflight requests
-export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Admin-Secret',
+  const endpoint = request.nextUrl.searchParams.get('endpoint') || 'dashboard';
+  const minutes = minutesParam(request);
+  const since = new Date(Date.now() - minutes * 60_000);
+  const recentEvents = () => prisma.securityAuditEvent.findMany({
+    where: { occurredAt: { gte: since } },
+    orderBy: { occurredAt: 'desc' },
+    take: 200,
+    select: {
+      id: true,
+      eventType: true,
+      severity: true,
+      correlationId: true,
+      path: true,
+      details: true,
+      occurredAt: true,
     },
   });
+
+  if (endpoint === 'metrics') return Response.json(await metricsSince(prisma, since));
+  if (endpoint === 'events') {
+    const events = await recentEvents();
+    return Response.json({ events, count: events.length, minutes });
+  }
+  if (endpoint === 'health') {
+    const config = getSecurityConfig();
+    const critical = await prisma.securityAuditEvent.count({
+      where: { severity: 'critical', occurredAt: { gte: new Date(Date.now() - 15 * 60_000) } },
+    });
+    const checks = {
+      monitoringEnabled: config.monitoring.enabled,
+      cspEnabled: config.csp.enabled,
+      hstsEnabled: config.headers.hsts.enabled,
+      rateLimitEnabled: config.rateLimit.enabled,
+      recentCriticalEvents: critical === 0,
+    };
+    return Response.json({
+      status: critical > 0 ? 'critical' : Object.values(checks).every(Boolean) ? 'healthy' : 'warning',
+      checks,
+      criticalEventsLast15Minutes: critical,
+    });
+  }
+  if (endpoint === 'report') {
+    const type = request.nextUrl.searchParams.get('type') || 'daily';
+    if (type !== 'daily' && type !== 'trends') return Response.json({ error: 'Invalid report type' }, { status: 400 });
+    const reportMinutes = type === 'daily' ? 1_440 : 10_080;
+    const reportSince = new Date(Date.now() - reportMinutes * 60_000);
+    return Response.json({ type, report: await metricsSince(prisma, reportSince) });
+  }
+  if (endpoint === 'dashboard') {
+    const [metrics, events] = await Promise.all([metricsSince(prisma, since), recentEvents()]);
+    return Response.json({
+      metrics,
+      recentEvents: events.slice(0, 20),
+      summary: {
+        totalEvents: metrics.totalEvents,
+        activeAlerts: metrics.activeAlerts,
+        topThreats: Object.entries(metrics.eventsByType).slice(0, 5).map(([type, count]) => ({ type, count })),
+      },
+    });
+  }
+  return Response.json({ error: 'Invalid endpoint' }, { status: 400 });
 }

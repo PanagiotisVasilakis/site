@@ -8,20 +8,20 @@ export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/portal/start
-* Returns a schema describing the guest portal form (origin + conditional fields).
+* Returns the current host-issued claim flow schema.
  */
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const flags = await getFeatureFlagsAsync();
   if (!flags.portalEnabled) {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }
-  // Apply input/CORS/SQLi/XSS safeguards (no API key required)
+  // Enforce the shared request content-type and payload-size contract.
   const guard = createAPISecurityMiddleware();
   const early = guard(req);
   if (early) return early;
 
   const schema = {
-    version: 1,
+    version: 2,
     steps: [
       {
         id: 'origin',
@@ -48,18 +48,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
             pattern: '^\\+?[1-9]\\d{7,14}$', // E.164-like
           },
           {
-            name: 'afm',
+            name: 'claimToken',
             type: 'text',
-            requiredWhen: { origin: 'GR' },
-            pattern: '^\\d{9}$',
-            help: 'Greek Tax ID (9 digits).',
-          },
-          {
-            name: 'passport',
-            type: 'text',
-            requiredWhen: { origin: 'ABROAD' },
-            pattern: '^[A-Za-z0-9]{5,20}$',
-            help: 'Passport number (letters/numbers only, 5–20 chars).',
+            required: true,
+            help: 'One-time token issued by the host for this booking.',
           },
           {
             name: 'password',
@@ -68,16 +60,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
             help: 'Required for sign up and future sign in.',
           },
           {
-            name: 'bookingRef',
-            type: 'text',
-            required: false,
-            help: 'Optional booking reference if you have one.',
-          },
-          {
-            name: 'lastName',
-            type: 'text',
+            name: 'acceptTerms',
+            type: 'checkbox',
             required: true,
-            help: 'Surname as it appears on the booking.',
+            help: 'Confirm the current portal terms and data processing notice.',
           },
           {
             name: 'remember',

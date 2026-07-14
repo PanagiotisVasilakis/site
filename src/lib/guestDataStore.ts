@@ -1,27 +1,20 @@
-import { accessRepository, type AccessRecord } from '@/lib/prisma-repositories/accessRepository';
 import { checkinRepository, type CheckinRecord } from '@/lib/prisma-repositories/checkinRepository';
 import { userRepository, type UserRecord } from '@/lib/prisma-repositories/userRepository';
-import { identityRepository, type IdentityRecord } from '@/lib/prisma-repositories/identityRepository';
 import { bookingRepository, type BookingRecord } from '@/lib/prisma-repositories/bookingRepository';
 import { refreshTokenRepository, type GuestRefreshTokenRec as PrismaGuestRefreshTokenRec } from '@/lib/prisma-repositories/refreshTokenRepository';
-import { hashSensitive, maskLast4 } from '@/lib/crypto';
-import { buildBookingLastNameTokenSearchValues, createBookingLastNameTokens } from '@/lib/bookingLastNameTokens';
+import { hashSensitive } from '@/lib/crypto';
 import { logger } from '@/lib/logger-enterprise';
 import { prisma } from '@/lib/prisma';
 import { guestDataCache } from '@/lib/guestDataCache';
-import { mapAccessFromDb, mapBookingFromDb, mapUserFromDb } from '@/lib/mappers/domainMappers';
-import type { Booking as PrismaBooking, Prisma } from '@/generated/prisma/client';
+import { mapBookingFromDb } from '@/lib/mappers/domainMappers';
 import crypto from 'node:crypto';
 import { normalizePhone } from '@/lib/phone';
 
-export type IdentityType = 'AFM' | 'PASSPORT';
 export type BookingSource = 'ONSITE' | 'EXTERNAL';
 export type AccessStatus = 'PENDING' | 'VERIFIED';
 
 export type User = UserRecord;
-export type Identity = IdentityRecord;
 export type Booking = BookingRecord;
-export type BookingAccess = AccessRecord;
 
 export type CheckinCompletionRec = CheckinRecord;
 export type GuestRefreshTokenRec = PrismaGuestRefreshTokenRec;
@@ -48,84 +41,6 @@ export class BookingNotFoundError extends Error {
   }
 }
 
-export class OnsiteGrantRejectedError extends Error {
-  readonly code = 'ONSITE_GRANT_REJECTED';
-
-  constructor() {
-    super('Onsite grant is invalid, expired, or already consumed');
-    this.name = 'OnsiteGrantRejectedError';
-  }
-}
-
-function bookingLookupClauses(lastName: string): Array<{ lastNameToken?: string; lastNameTokenNoWs?: string }> {
-  const tokenCandidates = buildBookingLastNameTokenSearchValues(lastName);
-  return tokenCandidates.flatMap((token) => [
-    { lastNameToken: token },
-    { lastNameTokenNoWs: token },
-  ]);
-}
-
-async function claimBookingForUser(
-  tx: Prisma.TransactionClient,
-  bookingDb: PrismaBooking,
-  userId: string,
-): Promise<PrismaBooking> {
-  if (bookingDb.userId === userId) {
-    return bookingDb;
-  }
-
-  if (bookingDb.userId) {
-    throw new BookingAlreadyLinkedError(bookingDb.id, bookingDb.userId, userId);
-  }
-
-  const claimed = await tx.booking.updateMany({
-    where: { id: bookingDb.id, userId: null },
-    data: { userId },
-  });
-
-  if (claimed.count === 1) {
-    const updated = await tx.booking.findUnique({ where: { id: bookingDb.id } });
-    if (updated) return updated;
-  }
-
-  const current = await tx.booking.findUnique({ where: { id: bookingDb.id } });
-  if (current?.userId === userId) return current;
-  throw new BookingAlreadyLinkedError(bookingDb.id, current?.userId ?? 'unknown', userId);
-}
-
-async function findAndClaimExistingBooking(
-  tx: Prisma.TransactionClient,
-  params: {
-    userId: string;
-    bookingId?: string;
-    reference?: string;
-    lastName?: string;
-  },
-): Promise<PrismaBooking> {
-  let bookingDb: PrismaBooking | null = null;
-
-  if (params.bookingId) {
-    bookingDb = await tx.booking.findUnique({
-      where: { id: params.bookingId },
-    });
-  }
-
-  if (!bookingDb && params.reference && params.lastName) {
-    bookingDb = await tx.booking.findFirst({
-      where: {
-        reference: params.reference,
-        OR: bookingLookupClauses(params.lastName),
-      },
-    });
-  }
-
-  if (bookingDb) {
-    return claimBookingForUser(tx, bookingDb, params.userId);
-  }
-
-  throw new BookingNotFoundError();
-}
-
 export const guestStore = {
   // Users
   async createUser(input: Omit<User, 'id' | 'created_at' | 'updated_at'>): Promise<User> {
@@ -142,62 +57,40 @@ export const guestStore = {
   },
   
   async findUserByPhone(phone: string): Promise<User | undefined> {
-    try {
-      const normalized = normalizePhone(phone);
-      if (!normalized) return undefined;
-      return await userRepository.findByPhone(normalized.e164);
-    } catch (error) {
-      logger.error('guestStore: failed to find user by phone', error);
-      return undefined;
-    }
+    const normalized = normalizePhone(phone);
+    if (!normalized) return undefined;
+    return userRepository.findByPhone(normalized.e164);
   },
   
   async findUserById(user_id: string): Promise<User | undefined> {
-    try {
-      return await userRepository.findById(user_id);
-    } catch (error) {
-      logger.error('guestStore: failed to find user by ID', error);
-      return undefined;
-    }
+    return userRepository.findById(user_id);
   },
   
   async updateUserPassword(user_id: string, password_hash: string): Promise<User | undefined> {
-    try {
-      const user = await userRepository.updatePassword(user_id, password_hash);
-      guestDataCache.invalidate(['users']);
-      return user;
-    } catch (error) {
-      logger.error('guestStore: failed to update user password', error);
-      return undefined;
-    }
-  },
-
-  // Identity
-  async upsertIdentity(user_id: string, type: IdentityType, rawValue: string): Promise<Identity> {
-    try {
-      const { hash, salt } = hashSensitive(rawValue);
-      const last4 = maskLast4(rawValue);
-      const identity = await identityRepository.upsert(user_id, type, hash, salt, last4);
-      guestDataCache.invalidate(['identities']);
-      return identity;
-    } catch (error) {
-      logger.error('guestStore: failed to upsert identity', error);
-      throw error;
-    }
+    const user = await userRepository.updatePassword(user_id, password_hash);
+    guestDataCache.invalidate(['users']);
+    return user;
   },
 
   // Booking
-  async linkOrCreateBooking(params: Omit<Booking, 'id' | 'created_at' | 'last_name_hash' | 'last_name_salt' | 'last_name_token' | 'last_name_token_nows'> & { last_name?: string }): Promise<Booking> {
+  async linkOrCreateBooking(params: {
+    source: BookingSource;
+    reference?: string;
+    provider?: string;
+    external_reference?: string;
+    start_date: string;
+    end_date: string;
+    user_id?: string;
+    access_status?: AccessStatus;
+  }): Promise<Booking> {
     try {
       // Check if booking already exists
-      if (params.reference) {
-        const tokenCandidates = params.last_name
-          ? buildBookingLastNameTokenSearchValues(params.last_name)
-          : [];
-        const existing = await bookingRepository.findByReferenceAndLastName(
-          params.reference,
-          tokenCandidates
-        );
+      if (params.reference || params.external_reference) {
+        const provider = params.provider ?? params.source.toLowerCase();
+        const externalReference = params.external_reference ?? params.reference;
+        const existing = externalReference
+          ? await bookingRepository.findByProviderReference(provider, externalReference)
+          : undefined;
         if (existing) {
           if (params.user_id && existing.user_id && existing.user_id !== params.user_id) {
             throw new BookingAlreadyLinkedError(existing.id, existing.user_id, params.user_id);
@@ -206,7 +99,7 @@ export const guestStore = {
           if (params.user_id && !existing.user_id) {
             const claimed = await prisma.booking.updateMany({
               where: { id: existing.id, userId: null },
-              data: { userId: params.user_id },
+              data: { userId: params.user_id, accessStatus: 'VERIFIED', claimedAt: new Date() },
             });
             const updated = await prisma.booking.findUnique({ where: { id: existing.id } });
             if (claimed.count !== 1 || !updated || updated.userId !== params.user_id) {
@@ -224,27 +117,16 @@ export const guestStore = {
         }
       }
       
-      let last_name_hash: string | undefined;
-      let last_name_salt: string | undefined;
-      
-      if (params.last_name) {
-        const r = hashSensitive(params.last_name);
-        last_name_hash = r.hash;
-        last_name_salt = r.salt;
-      }
-      
-      const lookupTokens = params.last_name ? createBookingLastNameTokens(params.last_name) : undefined;
-      
       const booking = await bookingRepository.create({
         source: params.source,
         reference: params.reference,
         start_date: params.start_date,
         end_date: params.end_date,
         user_id: params.user_id,
-        last_name_hash,
-        last_name_salt,
-        last_name_token: lookupTokens?.lastNameToken,
-        last_name_token_nows: lookupTokens?.lastNameTokenNoWs
+        provider: params.provider ?? params.source.toLowerCase(),
+        external_reference: params.external_reference ?? params.reference,
+        access_status: params.access_status ?? (params.user_id ? 'VERIFIED' : 'PENDING'),
+        claimed_at: params.user_id ? Date.now() : undefined,
       });
       guestDataCache.invalidate(['bookings']);
       return booking;
@@ -254,49 +136,16 @@ export const guestStore = {
     }
   },
   
-  async findBookingByReferenceAndLastName(reference: string, lastName: string): Promise<Booking | undefined> {
-    try {
-      const tokenCandidates = buildBookingLastNameTokenSearchValues(lastName);
-      
-      // Accept matches where either stored token equals either input token variant
-      return await bookingRepository.findByReferenceAndLastName(
-        reference,
-        tokenCandidates
-      );
-    } catch (error) {
-      logger.error('guestStore: failed to find booking by reference and last name', error);
-      return undefined;
-    }
+  async findBookingByReference(reference: string): Promise<Booking | undefined> {
+    return bookingRepository.findByReference(reference);
   },
   
   async findBookingById(id: string): Promise<Booking | undefined> {
-    try {
-      return await bookingRepository.findById(id);
-    } catch (error) {
-      logger.error('guestStore: failed to find booking by ID', error);
-      return undefined;
-    }
+    return bookingRepository.findById(id);
   },
   
   async findEligibleBookingForUser(user_id: string, nowDateISO: string = new Date().toISOString().slice(0,10)): Promise<Booking | undefined> {
-    try {
-      return await bookingRepository.findEligibleForUser(user_id, nowDateISO);
-    } catch (error) {
-      logger.error('guestStore: failed to find eligible booking for user', error);
-      return undefined;
-    }
-  },
-
-  // Access
-  async setAccess(user_id: string, booking_id: string, status: AccessStatus): Promise<BookingAccess> {
-    try {
-      const access = await accessRepository.set(user_id, booking_id, status);
-      guestDataCache.invalidate(['access']);
-      return access;
-    } catch (error) {
-      logger.error('guestStore: failed to set access', error);
-      throw error;
-    }
+    return bookingRepository.findEligibleForUser(user_id, nowDateISO);
   },
 
   // Check-in completion (development store only)
@@ -312,20 +161,15 @@ export const guestStore = {
   },
   
   async getCheckinCompletionByBooking(booking_id: string): Promise<CheckinCompletionRec | undefined> {
-    try {
-      return await checkinRepository.getByBookingId(booking_id);
-    } catch (error) {
-      logger.error('guestStore: failed to get checkin completion by booking', error);
-      return undefined;
-    }
+    return checkinRepository.getByBookingId(booking_id);
   },
 
   // Refresh tokens
-  async issueRefreshToken(user_id: string, ttlDays = 60, opts?: { family_id?: string; device_hint?: string; ip_hint?: string }): Promise<{ rec: GuestRefreshTokenRec; token: string }> {
+  async issueRefreshToken(user_id: string, ttlDays = 7, opts?: { family_id?: string; device_hint?: string; ip_hint?: string }): Promise<{ rec: GuestRefreshTokenRec; token: string }> {
     try {
       const rawSecret = crypto.randomBytes(32).toString('base64url');
       const { hash, salt } = hashSensitive(rawSecret);
-      const family_id = opts?.family_id || `rtfam_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+      const family_id = opts?.family_id || crypto.randomUUID();
       
       const rec = await refreshTokenRepository.create(
         user_id,
@@ -350,33 +194,24 @@ export const guestStore = {
   },
   
   async verifyRefreshToken(token: string): Promise<GuestRefreshTokenRec | undefined> {
-    try {
-      return await refreshTokenRepository.verify(token);
-    } catch (error) {
-      logger.error('guestStore: failed to verify refresh token', error);
-      return undefined;
-    }
+    return refreshTokenRepository.verify(token);
   },
   
   async revokeRefreshToken(idOrToken: string): Promise<boolean> {
-    try {
-      // Try to revoke by ID first
-      const byIdResult = await refreshTokenRepository.revoke(idOrToken);
-      if (byIdResult) return true;
-      
-      // If that fails, try verifying the token to locate the record
-      const record = await refreshTokenRepository.verify(idOrToken);
-      if (!record) return false;
+    // Try to revoke by ID first, then treat the value as a composite token.
+    const byIdResult = await refreshTokenRepository.revoke(idOrToken);
+    if (byIdResult) return true;
+    const record = await refreshTokenRepository.verify(idOrToken);
+    if (!record) return false;
+    return refreshTokenRepository.revoke(record.id);
+  },
 
-      return await refreshTokenRepository.revoke(record.id);
-    } catch (error) {
-      logger.error('guestStore: failed to revoke refresh token', error);
-      return false;
-    }
+  async revokeRefreshFamily(token: string): Promise<boolean> {
+    return refreshTokenRepository.revokeFamilyForToken(token);
   },
   
-  async rotateRefreshToken(oldToken: string, ttlDays = 60): Promise<{
-    status: 'rotated' | 'invalid' | 'replayed';
+  async rotateRefreshToken(oldToken: string, ttlDays = 7, context?: { device_hint?: string; ip_hint?: string }): Promise<{
+    status: 'rotated' | 'invalid' | 'concurrent' | 'replayed';
     old?: GuestRefreshTokenRec;
     rec?: GuestRefreshTokenRec;
     token?: string;
@@ -388,6 +223,8 @@ export const guestStore = {
         tokenHash: hash,
         salt,
         expiresAt: Date.now() + ttlDays * 24 * 60 * 60 * 1000,
+        deviceHash: context?.device_hint,
+        ipHash: context?.ip_hint,
       });
 
       if (result.status !== 'rotated') {
@@ -402,274 +239,25 @@ export const guestStore = {
       };
     } catch (error) {
       logger.error('guestStore: failed to rotate refresh token', error);
-      return { status: 'invalid' };
+      throw error;
     }
   },
   
   async purgeExpiredRefreshTokens(maxAgeDaysPastExpiry = 30): Promise<number> {
-    try {
-      return await refreshTokenRepository.purgeExpired(maxAgeDaysPastExpiry);
-    } catch (error) {
-      logger.error('guestStore: failed to purge expired refresh tokens', error);
-      return 0;
-    }
+    return refreshTokenRepository.purgeExpired(maxAgeDaysPastExpiry);
   },
   
-  // DSAR helpers (read-only)
-  async listAccessByUser(user_id: string): Promise<BookingAccess[]> {
-    try {
-      return await accessRepository.listByUser(user_id);
-    } catch (error) {
-      logger.error('guestStore: failed to list access by user', error);
-      return [];
-    }
-  },
-
   // Admin helpers - get all data for export/analysis
   async getAllBookings(): Promise<Booking[]> {
-    try {
-      return await guestDataCache.get('bookings', () => bookingRepository.getAll());
-    } catch (error) {
-      logger.error('guestStore: failed to get all bookings', error);
-      return [];
-    }
+    return guestDataCache.get('bookings', () => bookingRepository.getAll());
   },
 
   async getAllUsers(): Promise<User[]> {
-    try {
-      return await guestDataCache.get('users', () => userRepository.getAll());
-    } catch (error) {
-      logger.error('guestStore: failed to get all users', error);
-      return [];
-    }
-  },
-
-  async getAllIdentities(): Promise<Identity[]> {
-    try {
-      return await guestDataCache.get('identities', () => identityRepository.getAll());
-    } catch (error) {
-      logger.error('guestStore: failed to get all identities', error);
-      return [];
-    }
+    return guestDataCache.get('users', () => userRepository.getAll());
   },
 
   async getAllCheckins(): Promise<CheckinCompletionRec[]> {
-    try {
-      return await guestDataCache.get('checkins', () => checkinRepository.getAll());
-    } catch (error) {
-      logger.error('guestStore: failed to get all checkins', error);
-      return [];
-    }
+    return guestDataCache.get('checkins', () => checkinRepository.getAll());
   },
 
-  async getAllAccess(): Promise<BookingAccess[]> {
-    try {
-      return await guestDataCache.get('access', () => accessRepository.getAll());
-    } catch (error) {
-      logger.error('guestStore: failed to get all access records', error);
-      return [];
-    }
-  },
-
-  // ============================================================================
-  // TRANSACTION METHODS - Atomic multi-step operations
-  // ============================================================================
-
-  /**
-   * Links a user to a booking with identity verification and access grant.
-   * All operations are atomic - if any fails, all are rolled back.
-   * 
-   * Used by: portal/verify/route.ts after user authentication
-   * 
-   * @param params - User linkage parameters
-   * @returns Booking and access records (snake_case)
-   */
-  async linkUserToBookingWithAccess(params: {
-    userId?: string;
-    newUser?: { phoneE164: string; countryOrigin: 'GR' | 'ABROAD'; passwordHash: string };
-    origin: string;
-    identityValue: string; // AFM or PASSPORT value
-    bookingRef: string;
-    lastName: string;
-  }): Promise<{ booking: Booking; access: BookingAccess; userId: string }> {
-    try {
-      const result = await prisma.$transaction(async (tx) => {
-        let userId = params.userId;
-        if (!userId && params.newUser) {
-          const created = await tx.user.create({
-            data: {
-              id: crypto.randomUUID(),
-              phoneE164: params.newUser.phoneE164,
-              countryOrigin: params.newUser.countryOrigin,
-              passwordHash: params.newUser.passwordHash,
-            },
-          });
-          userId = created.id;
-        }
-        if (!userId) throw new Error('A user or new-user payload is required');
-
-        // 1. Upsert identity
-        const identityType: IdentityType = params.origin === 'GR' ? 'AFM' : 'PASSPORT';
-        const { hash: valueHash, salt: valueSalt } = hashSensitive(params.identityValue);
-        const last4Mask = maskLast4(params.identityValue);
-        
-        await tx.identity.upsert({
-          where: {
-            userId_type: {
-              userId,
-              type: identityType,
-            },
-          },
-          create: {
-            userId,
-            type: identityType,
-            valueHash,
-            salt: valueSalt,
-            last4Mask,
-            verifiedAt: null,
-          },
-          update: {
-            valueHash,
-            salt: valueSalt,
-            last4Mask,
-            verifiedAt: null,
-          },
-        });
-
-        // 2. Only a pre-existing reservation may grant portal access.
-        const bookingDb = await findAndClaimExistingBooking(tx, {
-          userId,
-          reference: params.bookingRef,
-          lastName: params.lastName,
-        });
-
-        // 3. Grant access
-        const accessDb = await tx.access.upsert({
-          where: {
-            userId_bookingId: {
-              userId,
-              bookingId: bookingDb.id,
-            },
-          },
-          create: {
-            userId,
-            bookingId: bookingDb.id,
-            status: 'VERIFIED',
-          },
-          update: {
-            status: 'VERIFIED',
-          },
-        });
-
-        const booking: Booking = mapBookingFromDb(bookingDb);
-        const access: BookingAccess = mapAccessFromDb(accessDb);
-
-        return { booking, access, userId };
-      });
-
-      logger.info('guestStore: linkUserToBookingWithAccess completed', {
-        userId: result.userId,
-        bookingId: result.booking.id,
-      });
-
-      guestDataCache.invalidate(['identities', 'bookings', 'access']);
-      return result;
-    } catch (error) {
-      logger.error('guestStore: failed to link user to booking with access (transaction rolled back)', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Registers an onsite guest with booking and access in one atomic operation.
-   * All operations succeed or fail together.
-   * 
-   * Used by: portal/onsite/confirm/route.ts
-   * 
-   * @param params - Guest registration parameters
-   * @returns User, booking, and access records (snake_case)
-   */
-  async registerOnsiteGuest(params: {
-    phone: string;
-    origin: string;
-    bookingId: string;
-    grant: { jti: string; expiresAt: Date };
-  }): Promise<{ user: User; booking: Booking; access: BookingAccess }> {
-    try {
-      const result = await prisma.$transaction(async (tx) => {
-        const now = new Date();
-        if (params.grant.expiresAt <= now) throw new OnsiteGrantRejectedError();
-
-        // The unique grant record makes a signed POS token one-use.
-        try {
-          await tx.onsiteGrant.create({
-            data: {
-              jti: params.grant.jti,
-              bookingId: params.bookingId,
-              expiresAt: params.grant.expiresAt,
-              consumedAt: now,
-            },
-          });
-        } catch {
-          throw new OnsiteGrantRejectedError();
-        }
-
-        const normalized = normalizePhone(params.phone, params.origin as 'GR' | 'ABROAD');
-        if (!normalized) throw new Error('Invalid E.164 phone number');
-
-        // 1. Find or create a uniquely identified user.
-        const userDb = await tx.user.upsert({
-          where: { phoneE164: normalized.e164 },
-          create: {
-            id: crypto.randomUUID(),
-            phoneE164: normalized.e164,
-            countryOrigin: params.origin as 'GR' | 'ABROAD',
-            passwordHash: null,
-          },
-          update: {},
-        });
-
-        // 2. A POS grant may only claim the booking named in the signed token.
-        const bookingDb = await findAndClaimExistingBooking(tx, {
-          userId: userDb.id,
-          bookingId: params.bookingId,
-        });
-
-        // 3. Grant access
-        const accessDb = await tx.access.upsert({
-          where: {
-            userId_bookingId: {
-              userId: userDb.id,
-              bookingId: bookingDb.id,
-            },
-          },
-          create: {
-            userId: userDb.id,
-            bookingId: bookingDb.id,
-            status: 'VERIFIED',
-          },
-          update: {
-            status: 'VERIFIED',
-          },
-        });
-
-        const user: User = mapUserFromDb(userDb);
-        const booking: Booking = mapBookingFromDb(bookingDb);
-        const access: BookingAccess = mapAccessFromDb(accessDb);
-
-        return { user, booking, access };
-      });
-
-      logger.info('guestStore: registerOnsiteGuest completed', {
-        userId: result.user.id,
-        bookingId: result.booking.id,
-      });
-
-      guestDataCache.invalidate(['users', 'bookings', 'access']);
-      return result;
-    } catch (error) {
-      logger.error('guestStore: failed to register onsite guest (transaction rolled back)', error);
-      throw error;
-    }
-  },
 };

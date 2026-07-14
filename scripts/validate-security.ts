@@ -80,7 +80,7 @@ const checks: SecurityCheck[] = [
     severity: 'error',
     check: async () => {
       try {
-        execSync('npm audit --audit-level=high --production', { stdio: 'pipe' });
+        execSync('npm audit --audit-level=high --omit=dev', { stdio: 'pipe' });
         return true;
       } catch {
         console.error('⚠️ High/Critical vulnerabilities found in dependencies');
@@ -174,7 +174,7 @@ const checks: SecurityCheck[] = [
     check: async () => {
       try {
         console.log('Building application...');
-        execSync('npm run build', { stdio: 'pipe' });
+        execSync('npm run build', { stdio: 'inherit' });
         return true;
       } catch {
         console.error('⚠️ Production build failed');
@@ -190,16 +190,19 @@ const checks: SecurityCheck[] = [
       try {
         const tsconfig = JSON.parse(readFileSync('tsconfig.json', 'utf8'));
         
+        let valid = true;
         if (tsconfig.compilerOptions?.strict !== true) {
           console.warn("⚠️ TypeScript option 'strict' should be true for better security");
+          valid = false;
         }
 
         const noImplicitAny = tsconfig.compilerOptions?.noImplicitAny ?? tsconfig.compilerOptions?.strict;
         if (noImplicitAny !== true) {
           console.warn("⚠️ TypeScript option 'noImplicitAny' should be true for better security");
+          valid = false;
         }
 
-        return true;
+        return valid;
       } catch {
         console.warn('⚠️ Could not validate TypeScript configuration');
         return false;
@@ -209,7 +212,7 @@ const checks: SecurityCheck[] = [
   {
     name: 'File Permissions',
     description: 'Check for overly permissive file permissions',
-    severity: 'info',
+    severity: 'error',
     check: () => {
       try {
         // Check if we're on a Unix-like system
@@ -228,6 +231,7 @@ const checks: SecurityCheck[] = [
               // Check if file is world-writable (002 permission)
               if (permissions & 0o002) {
                 console.warn(`⚠️ File ${file} is world-writable (${permissions.toString(8)})`);
+                return false;
               }
             } catch {
               // Ignore stat errors
@@ -237,8 +241,8 @@ const checks: SecurityCheck[] = [
 
         return true;
       } catch {
-        console.info('ℹ️ File permission check failed');
-        return true; // Non-critical
+        console.error('⚠️ File permission check failed');
+        return false;
       }
     }
   }
@@ -286,8 +290,8 @@ async function runSecurityValidation(): Promise<void> {
     console.log('Please fix the errors above before deploying to production.');
     process.exit(1);
   } else if (warningCount > 0) {
-    console.log('\n⚠️ Security validation passed with warnings.');
-    console.log('Consider addressing the warnings above for better security.');
+    console.log('\n❌ Security validation failed because warnings are treated as unresolved findings.');
+    process.exit(1);
   } else {
     console.log('\n✅ All security checks passed!');
   }

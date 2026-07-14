@@ -66,14 +66,38 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   }
 
   const prefs = await readPreferences();
+  let wifi: { network: string; password: string } | null = null;
+  let wifiAvailableAt: string | null = null;
+  if (adminAccess) {
+    wifi = {
+      network: process.env.GUEST_WIFI_NETWORK || '',
+      password: process.env.GUEST_WIFI_PASSWORD || '',
+    };
+  } else if (guestAccess?.booking?.id) {
+    const { prisma } = await import('@/lib/prisma');
+    const booking = await prisma.booking.findUnique({
+      where: { id: guestAccess.booking.id },
+      select: { startDate: true, endDate: true },
+    });
+    if (booking) {
+      const revealAt = new Date(booking.startDate);
+      revealAt.setUTCHours(revealAt.getUTCHours() - 24);
+      wifiAvailableAt = revealAt.toISOString();
+      const now = new Date();
+      if (now >= revealAt && now <= booking.endDate) {
+        wifi = {
+          network: process.env.GUEST_WIFI_NETWORK || '',
+          password: process.env.GUEST_WIFI_PASSWORD || '',
+        };
+      }
+    }
+  }
   const correlationId = request.headers.get('x-correlation-id') ?? undefined;
   return createSuccessResponse({
     ...prefs,
     canEdit: adminAccess,
-    wifi: {
-      network: process.env.GUEST_WIFI_NETWORK || '',
-      password: process.env.GUEST_WIFI_PASSWORD || '',
-    },
+    wifi,
+    wifiAvailableAt,
   }, undefined, correlationId);
 });
 

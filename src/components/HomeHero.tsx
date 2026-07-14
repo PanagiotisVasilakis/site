@@ -12,17 +12,21 @@ export default function HomeHero({ title, subtitle }: HomeHeroProps) {
       aria-label={title}
       style={{ minHeight: 'min(760px, 88svh)' }}
     >
-      <div className="absolute inset-0 z-0" aria-hidden>
+      <picture className="absolute inset-0 z-0 block" aria-hidden>
+        <source media="(max-width: 767px)" srcSet="/house/balcony/balcony_1_hero_720.webp" />
+        <source media="(max-width: 1599px)" srcSet="/house/balcony/balcony_1_hero_1440.webp" />
         <Image
           src="/house/balcony/balcony_1_hero.webp"
           alt=""
           fill
-          priority
+          loading="eager"
+          fetchPriority="high"
+          unoptimized
           sizes="100vw"
           className="object-cover object-center"
           draggable={false}
         />
-      </div>
+      </picture>
 
       <div className="absolute inset-0 z-[1] bg-[linear-gradient(180deg,rgba(0,0,0,0.48)_0%,rgba(0,0,0,0.24)_48%,rgba(0,0,0,0.46)_100%)]" />
 

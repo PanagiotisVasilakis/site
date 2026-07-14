@@ -22,6 +22,10 @@ REQUIRED_ENV_VARS=(
   SECURITY_ENC_KEY_HEX
   SESSION_SECRET
   SECURITY_PEPPER
+  CLAIM_TOKEN_PEPPER
+  NEXT_PUBLIC_SITE_URL
+  TRUST_PROXY_MODE
+  TRUST_PROXY_HOPS
 )
 
 usage() {
@@ -41,6 +45,10 @@ Options:
 This installer creates:
 - /etc/systemd/system/<service>.service
 - /etc/systemd/system/<service>-bootstrap.service
+- /etc/systemd/system/<service>-outbox.service
+- /etc/systemd/system/<service>-outbox.timer
+- /etc/systemd/system/<service>-operations.service
+- /etc/systemd/system/<service>-operations.timer
 - /etc/<service>/<service>.env (if it does not exist)
 USAGE
 }
@@ -113,6 +121,10 @@ assert_root() {
 validate_inputs() {
   [[ -f "$REPO_ROOT/deploy/systemd/qr-city-guide.service" ]] || die "Missing template: deploy/systemd/qr-city-guide.service"
   [[ -f "$REPO_ROOT/deploy/systemd/qr-city-guide-bootstrap.service" ]] || die "Missing template: deploy/systemd/qr-city-guide-bootstrap.service"
+  [[ -f "$REPO_ROOT/deploy/systemd/qr-city-guide-outbox.service" ]] || die "Missing template: deploy/systemd/qr-city-guide-outbox.service"
+  [[ -f "$REPO_ROOT/deploy/systemd/qr-city-guide-outbox.timer" ]] || die "Missing template: deploy/systemd/qr-city-guide-outbox.timer"
+  [[ -f "$REPO_ROOT/deploy/systemd/qr-city-guide-operations.service" ]] || die "Missing template: deploy/systemd/qr-city-guide-operations.service"
+  [[ -f "$REPO_ROOT/deploy/systemd/qr-city-guide-operations.timer" ]] || die "Missing template: deploy/systemd/qr-city-guide-operations.timer"
   [[ -f "$REPO_ROOT/scripts/system-orchestrator.sh" ]] || die "Missing orchestrator: scripts/system-orchestrator.sh"
 
   id -u "$APP_USER" >/dev/null 2>&1 || die "App user does not exist: $APP_USER"
@@ -146,6 +158,7 @@ ADMIN_DASH_SECRET=
 SECURITY_ENC_KEY_HEX=
 SESSION_SECRET=
 SECURITY_PEPPER=
+CLAIM_TOKEN_PEPPER=
 GUEST_JWT_SECRET=
 GUEST_WIFI_NETWORK=
 GUEST_WIFI_PASSWORD=
@@ -154,14 +167,23 @@ ALLOWED_ORIGINS=
 # Optional
 VALID_API_KEYS=
 METRICS_WRITE_API_KEYS=
+INTERNAL_API_KEYS=
+RATE_LIMIT_BACKEND=
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+ALERT_WEBHOOK_URL=
 ALERT_WEBHOOK_TOKEN=
-TRUST_PROXY_HOPS=0
+ALERT_WEBHOOK_REQUIRED=0
+# Required in production. For one trusted reverse proxy use hops/1.
+TRUST_PROXY_MODE=
+TRUST_PROXY_HOPS=
 CLIENT_IP_HEADER=
-ONSITE_CONFIRM_ENABLED=0
-ONSITE_CONFIRM_JWT_SECRET=
 BOOKING_REQUEST_WEBHOOK_URL=
 BOOKING_REQUEST_WEBHOOK_TOKEN=
+CHECKIN_REQUEST_WEBHOOK_URL=
+CHECKIN_REQUEST_WEBHOOK_TOKEN=
 CRON_SECRET=
+ANALYTICS_RETENTION_DAYS=30
 ENVFILE
 
   chmod 600 "$ENV_FILE"
@@ -174,6 +196,7 @@ render_unit() {
   local target_file="$2"
 
   sed \
+    -e "s|__SERVICE_NAME__|$(escape_sed "$SERVICE_NAME")|g" \
     -e "s|__APP_USER__|$(escape_sed "$APP_USER")|g" \
     -e "s|__APP_GROUP__|$(escape_sed "$APP_GROUP")|g" \
     -e "s|__REPO_ROOT__|$(escape_sed "$REPO_ROOT")|g" \
@@ -184,13 +207,25 @@ render_unit() {
 install_units() {
   local app_unit_target="/etc/systemd/system/${SERVICE_NAME}.service"
   local bootstrap_unit_target="/etc/systemd/system/${SERVICE_NAME}-bootstrap.service"
+  local outbox_unit_target="/etc/systemd/system/${SERVICE_NAME}-outbox.service"
+  local outbox_timer_target="/etc/systemd/system/${SERVICE_NAME}-outbox.timer"
+  local operations_unit_target="/etc/systemd/system/${SERVICE_NAME}-operations.service"
+  local operations_timer_target="/etc/systemd/system/${SERVICE_NAME}-operations.timer"
 
   render_unit "$REPO_ROOT/deploy/systemd/qr-city-guide.service" "$app_unit_target"
   render_unit "$REPO_ROOT/deploy/systemd/qr-city-guide-bootstrap.service" "$bootstrap_unit_target"
+  render_unit "$REPO_ROOT/deploy/systemd/qr-city-guide-outbox.service" "$outbox_unit_target"
+  render_unit "$REPO_ROOT/deploy/systemd/qr-city-guide-outbox.timer" "$outbox_timer_target"
+  render_unit "$REPO_ROOT/deploy/systemd/qr-city-guide-operations.service" "$operations_unit_target"
+  render_unit "$REPO_ROOT/deploy/systemd/qr-city-guide-operations.timer" "$operations_timer_target"
 
-  chmod 644 "$app_unit_target" "$bootstrap_unit_target"
+  chmod 644 "$app_unit_target" "$bootstrap_unit_target" "$outbox_unit_target" "$outbox_timer_target" "$operations_unit_target" "$operations_timer_target"
   log "Installed unit: $app_unit_target"
   log "Installed unit: $bootstrap_unit_target"
+  log "Installed unit: $outbox_unit_target"
+  log "Installed unit: $outbox_timer_target"
+  log "Installed unit: $operations_unit_target"
+  log "Installed unit: $operations_timer_target"
 }
 
 reload_systemd() {
@@ -213,6 +248,14 @@ run_bootstrap() {
     fi
   done
 
+  local proxy_mode proxy_hops
+  proxy_mode="$(grep -E '^TRUST_PROXY_MODE=' "$ENV_FILE" | tail -n 1 | cut -d= -f2-)"
+  proxy_hops="$(grep -E '^TRUST_PROXY_HOPS=' "$ENV_FILE" | tail -n 1 | cut -d= -f2-)"
+  [[ "$proxy_mode" == "hops" || "$proxy_mode" == "header" ]] \
+    || die "TRUST_PROXY_MODE must be hops or header in production"
+  [[ "$proxy_hops" =~ ^[1-9][0-9]*$ ]] \
+    || die "TRUST_PROXY_HOPS must be a positive integer in production"
+
   log "Running one-time bootstrap: ${SERVICE_NAME}-bootstrap.service"
   systemctl start "${SERVICE_NAME}-bootstrap.service"
 }
@@ -224,7 +267,11 @@ enable_service() {
   fi
 
   systemctl enable "${SERVICE_NAME}.service"
+  systemctl enable "${SERVICE_NAME}-outbox.timer"
+  systemctl enable "${SERVICE_NAME}-operations.timer"
   log "Enabled service: ${SERVICE_NAME}.service"
+  log "Enabled timer: ${SERVICE_NAME}-outbox.timer"
+  log "Enabled timer: ${SERVICE_NAME}-operations.timer"
 }
 
 start_service() {
@@ -234,7 +281,11 @@ start_service() {
   fi
 
   systemctl restart "${SERVICE_NAME}.service"
+  systemctl restart "${SERVICE_NAME}-outbox.timer"
+  systemctl restart "${SERVICE_NAME}-operations.timer"
   log "Started service: ${SERVICE_NAME}.service"
+  log "Started timer: ${SERVICE_NAME}-outbox.timer"
+  log "Started timer: ${SERVICE_NAME}-operations.timer"
 }
 
 print_next_steps() {
@@ -247,6 +298,8 @@ Service commands:
   journalctl -u ${SERVICE_NAME}.service -f
   systemctl restart ${SERVICE_NAME}.service
   systemctl stop ${SERVICE_NAME}.service
+  systemctl status ${SERVICE_NAME}-outbox.timer
+  systemctl status ${SERVICE_NAME}-operations.timer
 
 Bootstrap command:
   systemctl start ${SERVICE_NAME}-bootstrap.service

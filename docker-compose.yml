@@ -1,13 +1,13 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
     container_name: site-dev-db
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-devuser}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpass}
       POSTGRES_DB: ${POSTGRES_DB:-site_dev}
     ports:
-      - "5433:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
     volumes:
       - postgres-dev-data:/var/lib/postgresql/data
     healthcheck:
@@ -15,14 +15,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    command:
-      - "postgres"
-      - "-c"
-      - "fsync=off"
-      - "-c"
-      - "synchronous_commit=off"
-      - "-c"
-      - "full_page_writes=off"
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+      - /run/postgresql
 
 volumes:
   postgres-dev-data:

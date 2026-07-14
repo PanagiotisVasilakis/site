@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { drainBookingOutbox } from '@/lib/bookingOutbox';
+import { drainOutbox } from '@/lib/bookingOutbox';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +15,6 @@ export async function POST(request: NextRequest) {
   if (!validCronSecret(request)) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
-  const result = await drainBookingOutbox();
+  const result = await drainOutbox();
   return NextResponse.json({ success: true, ...result }, { status: 200 });
 }

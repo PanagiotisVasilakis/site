@@ -3,12 +3,12 @@
  * Features: Structured error responses, correlation tracking, rate limiting, validation
  */
 
+import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from './logger-enterprise';
 import { z } from 'zod';
 import type { ApiErrorCode } from './apiErrorTypes';
 import { ApiErrorCode as ErrorCodes } from './apiErrorTypes';
-import { getClientIp } from './net/getClientIp';
 import { metrics } from './metrics-collector';
 
 // Re-export for backward compatibility
@@ -48,6 +48,7 @@ const ERROR_STATUS_MAP: Record<ApiErrorCode, number> = {
   [ErrorCodes.RATE_LIMITED]: HttpStatusCodes.TOO_MANY_REQUESTS,
   [ErrorCodes.RATE_LIMIT_EXCEEDED]: HttpStatusCodes.TOO_MANY_REQUESTS,
   [ErrorCodes.PAYLOAD_TOO_LARGE]: HttpStatusCodes.PAYLOAD_TOO_LARGE,
+  [ErrorCodes.UNSUPPORTED_MEDIA_TYPE]: 415,
   [ErrorCodes.INTERNAL_ERROR]: HttpStatusCodes.INTERNAL_SERVER_ERROR,
   [ErrorCodes.NOT_IMPLEMENTED]: HttpStatusCodes.NOT_IMPLEMENTED,
   [ErrorCodes.SERVICE_UNAVAILABLE]: HttpStatusCodes.SERVICE_UNAVAILABLE,
@@ -217,15 +218,13 @@ export function withErrorHandler(
     const startTime = performance.now();
     const correlationId = generateCorrelationId();
     const method = request.method;
-    const url = request.url;
+    const url = request.nextUrl.pathname;
 
     // Set logging context
     logger.setContext({
       correlationId,
       requestId: correlationId,
-      route: new URL(url).pathname,
-      userAgent: request.headers.get('user-agent') || undefined,
-      ip: getClientIp(request, { trustProxy: true }),
+      route: url,
     });
 
     try {
@@ -250,15 +249,21 @@ export function withErrorHandler(
       }
 
       // Request timeout
+      let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => {
+        timeoutHandle = setTimeout(() => {
           reject(new TimeoutError(mergedConfig.requestTimeoutMs, correlationId));
         }, mergedConfig.requestTimeoutMs);
       });
 
       // Execute handler with timeout
       const handlerPromise = handler(request, context);
-      const response = await Promise.race([handlerPromise, timeoutPromise]);
+      let response: NextResponse;
+      try {
+        response = await Promise.race([handlerPromise, timeoutPromise]);
+      } finally {
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+      }
       const requestDuration = performance.now() - startTime;
       metrics.counter('http.requests', 1, { method, route: request.nextUrl.pathname, status: String(response.status) });
       if (response.status >= 500) {
@@ -295,27 +300,15 @@ export function withErrorHandler(
       // Handle known API errors
       if (error instanceof ApiError) {
         if (mergedConfig.enableErrorLogging) {
-          // Reduce noisy warnings for common auth failures (401)
-          if (error.statusCode === HttpStatusCodes.UNAUTHORIZED || error.code === ErrorCodes.UNAUTHORIZED) {
-            // Log at debug level with minimal context to avoid spamming WARNs
-            logger.debug('API unauthorized', {
-              method,
-              url,
-              status: error.statusCode,
-              duration: Math.round(duration * 100) / 100,
-            });
-          } else {
-            logger.warn('API error occurred', {
-              method,
-              url,
-              error: {
-                code: error.code,
-                message: error.message,
-                details: error.details,
-              },
-              duration: Math.round(duration * 100) / 100,
-            });
-          }
+          // A handled 4xx is a client outcome, not an application warning. The
+          // status/code remain observable through counters and response logs.
+          logger.debug('API client error', {
+            method,
+            url,
+            status: error.statusCode,
+            code: error.code,
+            duration: Math.round(duration * 100) / 100,
+          });
         }
 
         const headers: Record<string, string> = {
@@ -341,10 +334,9 @@ export function withErrorHandler(
         const validationError = new ValidationError(error.issues, correlationId);
         
         if (mergedConfig.enableErrorLogging) {
-          logger.warn('Validation error occurred', {
+          logger.debug('Validation error occurred', {
             method,
             url,
-            validationErrors: validationError.details,
             duration: Math.round(duration * 100) / 100,
           });
         }
@@ -426,14 +418,67 @@ export function createSuccessResponse<T>(
 /**
  * Validation middleware for request bodies
  */
-export function validateRequestBody<T>(schema: z.ZodSchema<T>) {
+export async function readJsonBody(
+  request: Request,
+  maxBytes = DEFAULT_CONFIG.maxRequestBodySize,
+  allowedMediaTypes: readonly string[] = ['application/json'],
+): Promise<unknown> {
+  const mediaType = (request.headers.get('content-type') || '').split(';', 1)[0].trim().toLowerCase();
+  if (!allowedMediaTypes.includes(mediaType)) {
+    throw new ApiError(ErrorCodes.UNSUPPORTED_MEDIA_TYPE, 'Unsupported media type');
+  }
+  const contentLength = request.headers.get('content-length');
+  if (contentLength) {
+    const parsedLength = Number(contentLength);
+    if (!Number.isSafeInteger(parsedLength) || parsedLength < 0) {
+      throw new ApiError(ErrorCodes.BAD_REQUEST, 'Invalid content length');
+    }
+    if (parsedLength > maxBytes) {
+      throw new ApiError(ErrorCodes.PAYLOAD_TOO_LARGE, `Request body too large. Maximum size: ${maxBytes} bytes`);
+    }
+  }
+
+  if (!request.body) throw new ApiError(ErrorCodes.BAD_REQUEST, 'Invalid JSON in request body');
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        throw new ApiError(ErrorCodes.PAYLOAD_TOO_LARGE, `Request body too large. Maximum size: ${maxBytes} bytes`);
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(body)) as unknown;
+  } catch {
+    throw new ApiError(ErrorCodes.BAD_REQUEST, 'Invalid JSON in request body');
+  }
+}
+
+export function validateRequestBody<T>(schema: z.ZodSchema<T>, maxBytes = DEFAULT_CONFIG.maxRequestBodySize) {
   return async (request: NextRequest): Promise<T> => {
     const correlationId = logger.getContext()?.correlationId;
     
     try {
-      const body = await request.json();
+      const body = await readJsonBody(request, maxBytes);
       return schema.parse(body);
     } catch (error) {
+      if (error instanceof ApiError) throw error;
       if (error instanceof z.ZodError) {
         throw new ValidationError(error.issues, correlationId);
       }
@@ -452,7 +497,7 @@ export function validateRequestBody<T>(schema: z.ZodSchema<T>) {
  * Helper functions
  */
 function generateCorrelationId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  return crypto.randomUUID();
 }
 
 function sanitizeHeaders(headers: Headers): Record<string, string> {

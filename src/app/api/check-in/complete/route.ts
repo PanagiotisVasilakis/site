@@ -16,7 +16,7 @@ const CompleteSchema = z.object({
   acceptTerms: z.boolean().refine(v => v === true, 'terms_required'),
 });
 
-// Dev-only persistence via store check-ins collection
+// Persist the completion through the database-backed guest store.
 async function saveCompletion(bookingId: string, data: z.infer<typeof CompleteSchema>): Promise<void> {
   await guestStore.upsertCheckinCompletion(bookingId, {
     arrival_time: data.arrivalTime,

@@ -51,15 +51,8 @@ export async function GET(req: NextRequest) {
     
     // Require admin authentication in development
     const token = req.cookies.get('admin_jwt')?.value;
-    if (token) {
-      const adminPayload = await verifyAdminSession(token);
-      if (!adminPayload || adminPayload.role !== 'admin') {
-        return new Response('Unauthorized', { status: 401 });
-      }
-    } else {
-      // In development without auth, add warning header
-      logger.warn('Coverage endpoint accessed without authentication');
-    }
+    const adminPayload = token ? await verifyAdminSession(token) : null;
+    if (!adminPayload || adminPayload.role !== 'admin') return new Response('Unauthorized', { status: 401 });
     
     const pct = parseLcovSummary(path.join(process.cwd(), 'coverage', 'lcov.info'));
     const value = pct != null ? `${pct}%` : 'n/a';

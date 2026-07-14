@@ -1,5 +1,5 @@
 [Unit]
-Description=QR City Guide Bootstrap (Build and Migrate)
+Description=QR City Guide Build and Migration Gate
 After=network-online.target
 Wants=network-online.target
 
@@ -12,6 +12,17 @@ Environment=NODE_ENV=production
 EnvironmentFile=__ENV_FILE__
 ExecStart=/usr/bin/env bash __REPO_ROOT__/scripts/system-orchestrator.sh bootstrap --profile production --no-docker-fallback
 TimeoutStartSec=1800
-RemainAfterExit=yes
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0077
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 StandardOutput=journal
 StandardError=journal

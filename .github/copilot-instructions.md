@@ -1,64 +1,51 @@
-# AI agent guide for this repo
+# Repository engineering guide
 
-This is a Next.js 15 (App Router) TypeScript app with strong security, i18n, and observability. Follow these concrete patterns to stay productive and consistent.
+This is a Next.js 16 App Router application using TypeScript, PostgreSQL, Prisma 7, React 19, and locale-prefixed routes (`en`, `el`). Request routing and security headers live in `src/proxy.ts`; there is no `src/middleware.ts`.
 
-## Big picture
-- App structure: `src/app/**` (routes and API), shared libs in `src/lib/**`, i18n in `src/i18n/**`.
-- Locale-first routing: URLs are prefixed with `/{locale}`. Middleware manages a `lang` cookie and redirects non-prefixed paths to the default locale (`en`). See `src/middleware.ts` and `src/i18n/config.ts`.
-- Security & observability are first-class:
-  - Security headers, CSP (nonce support), CORS, and rate limiting live in `src/lib/security-*.ts` and are applied centrally via `createSecurityMiddleware` in `src/middleware.ts`.
-  - Distributed tracing (`src/lib/distributed-tracing.ts`) and metrics (`src/lib/metrics-collector.ts`) instrument requests and business events.
-  - API handlers share a standard error/response layer in `src/lib/apiErrorHandler.ts`.
-- Guest portal architecture: Direct verification flow without challenge steps. Unified page at `/{locale}/guest` supports Sign-in/Sign-up modes with origin selection, phone + AFM/Passport details, and session cookies on success.
-- Data model: PostgreSQL with Prisma, featuring users, bookings, identities, MFA, sessions, and access control with comprehensive indexing for performance.
+## Supported architecture
 
-## Developer workflows
-- Dev server: `npm run dev` (Turbopack).
-- Build: `npm run build` runs pre-build scripts (`scripts/generate-precache.ts`, `scripts/validate-content.ts`, `scripts/generate-version.ts`) then `next build --turbopack`.
-- Tests:
-  - Unit/UI: `npm test` (Vitest jsdom). Config: `vitest.config.ts` and `vitest.setup.ts`. Coverage: v8 + lcov with thresholds (70% lines, 60% branches, 70% functions/statements).
-  - API: `npm run test:api` (custom runner), plus load tests `npm run test:api:load[:normal|:stress]`.
-- Linting: `npm run lint`. Security scan: `npm run security:scan` (audit + license + security ESLint).
-- Coverage badge: `/api/coverage` serves Shields JSON from `coverage/lcov.info` (generate via tests before build/CI).
+- Public content is under `src/app/[locale]`.
+- Guest activation requires an administrator-issued, short-lived, one-time booking claim token. Do not restore document, surname, or untrusted booking-reference authentication.
+- Guest/admin JWT cookies are backed by database sessions. Guest refresh tokens belong to rotating families with absolute expiry and replay revocation.
+- Booking and check-in webhook notifications use `OutboxEvent`; writes and events must be transactional. Do not replace the worker with best-effort inline fetches.
+- Sensitive rate limits are PostgreSQL-backed and independently limit IP and normalized identifiers. The proxy-wide limiter can use Upstash with an in-process fallback.
+- Analytics, Web Vitals, security audit events, alerts, and privacy workflows are database-backed. Do not add filesystem or module-memory persistence as a production source of truth.
 
-## Core conventions
-- Path alias: import app code via `@/...` (see `tsconfig.json` and `vitest.config.ts`).
-- API routes:
-  - Export `GET/POST/...` and wrap with `withErrorHandler(handler, config)` from `src/lib/apiErrorHandler.ts`.
-  - For input JSON, validate with Zod via `validateRequestBody(schema)`.
-  - When stricter checks are needed (API key, SQLi/XSS), call `createAPISecurityMiddleware({ requireAPIKey, requiredScopes })` at the start of the handler and return early if it responds.
-- Errors & responses:
-  - Throw `ApiError` (see `ApiErrorCode`) or Zod errors; `withErrorHandler` converts to structured JSON and sets `X-Correlation-ID`.
-  - Use `createSuccessResponse(data, status?)` for successful JSON with metadata.
-- Observability:
-  - Create spans with `tracer.startSpan(name, parent?, tags)` and always `tracer.finishSpan(span, status)`; add logs/tags (`tracer.addLog`, `tracer.addTags`).
-  - Record metrics with `metrics.counter/gauge/timer(...)` and high-level helpers like `trackApiCall` and `trackWebVital`.
-- Middleware order (in `src/middleware.ts`): security headers/CSP → tracing headers → locale routing/redirects → special redirects. Uses Node.js runtime for server-only modules.
+## API conventions
 
-## Security specifics
-- Admin analytics gate: `/admin/analytics` requires BOTH `x-admin-secret` (or `?token=`) AND a valid `admin_jwt` cookie verified by `verifyAdmin`. Do not add bypasses.
-- Configure CSP/headers in `src/lib/security-config.ts` (per-env). If adding external resources (CDNs, APIs), update the appropriate directive there instead of hardcoding headers.
-- Rate limiting: Database-backed (Redis/Upstash) with in-memory fallback; configurable via `src/lib/security-config.ts`.
-- Common env vars: `ADMIN_DASH_SECRET`, `ADMIN_JWT_SECRET`, `VALID_API_KEYS` (comma-separated), `ALLOWED_ORIGINS`, `NEXT_PUBLIC_SITE_URL`.
+- Validate request bodies with strict Zod schemas and enforce explicit body-size limits.
+- Use `withErrorHandler`, `ApiError`, and `createSuccessResponse` where the route uses the shared response contract.
+- Route-level `requireAPIKey` is mandatory in every environment. Never add query-parameter secrets or development auth bypasses.
+- Administrator routes use a valid `admin_jwt` backed by an active `AdminSession`.
+- Use Prisma parameterization. Do not add regex SQLi/XSS blacklist middleware; rely on schemas, output encoding, and nonce-based CSP.
+- Never persist raw IP addresses, user agents, cookies, tokens, full URLs with query strings, or arbitrary client metadata.
 
-## i18n & routing
-- Supported locales: `en`, `el` (`src/i18n/config.ts`). Non-localized paths redirect to `/{defaultLocale}`; the `lang` cookie is kept in sync with URL.
-- Legacy redirect: `/{locale}/house` → `/{locale}/villa` (308). Keep redirects centralized in `src/middleware.ts`.
+## Database changes
 
-## Analytics & metrics
-- PII-safe analytics with minimal set: portal_opened, origin_selected, form_submitted, auth_mode_changed, no_booking_cta_clicked, checkin_viewed, checkin_completed.
-- Metrics collection: counters, timers, gauges for system monitoring and performance tracking.
-- Health checks: Comprehensive `/api/health` with memory, storage, environment, analytics, and metrics checks.
+- Update `prisma/schema.prisma` and add a forward migration.
+- Migrations must fail on ambiguous legacy data rather than silently dropping or guessing ownership.
+- Database tests require `TEST_DATABASE_URL`, and the database name must end in `_test`.
+- Keep leased work ownership checks inside the same transaction as aggregate status updates.
 
-## When adding features
-- New API: create `src/app/api/<name>/route.ts`, wrap with `withErrorHandler`, add Zod validation, apply `createAPISecurityMiddleware` for sensitive endpoints, and instrument with tracing/metrics.
-- UI pages: keep locale prefixing in mind; default routes redirect to `/en` (`src/app/page.tsx`). If using inline scripts, rely on CSP nonces from middleware.
-- Database changes: Use Prisma migrations; add appropriate indexes for query patterns; follow existing composite index conventions.
-- If a new integration needs external origins, update `src/lib/security-config.ts` directives (e.g., `connectSrc`, `imgSrc`).
+## Validation
 
-## Testing patterns
-- API tests: Use custom test runner in `src/__tests__/api-test-runner.ts` for comprehensive endpoint testing.
-- Load tests: `npm run test:api:load` with normal/stress modes for performance validation.
-- Coverage: Enforced thresholds with lcov output; badge served via `/api/coverage`.
+Use the active Node 22.19/npm 11.18 runtime. Normal gates are:
 
-If something here seems off or you see a competing pattern in code, point it out so we can refine these rules.
+```bash
+npm run typecheck
+npm run lint -- --max-warnings=0
+npm run lint:security
+npm run check:dead-code
+npm run test:unit
+npm run test:db
+npm run validate:security
+```
+
+The CI browser job additionally starts the production build and gates accessibility, responsive UX, Lighthouse, and PWA behavior. Do not mask warnings or failures with `continue-on-error` or `|| true`.
+
+## Runtime and deployment
+
+- Development/test may use the disposable Docker fallback database. Production must use a configured reachable database and `--no-docker-fallback`.
+- Production does not load `.env.local` and requires an explicit trusted-proxy mode/hop count.
+- `/api/health/live` is process liveness. `/api/health/ready` checks SQL connectivity and migration state. Do not treat liveness as readiness.
+- The systemd timers drain the outbox every minute and run alert/retention maintenance every five minutes.

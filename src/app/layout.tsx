@@ -1,19 +1,6 @@
 import type { Metadata, Viewport } from "next";
 // Replacing Google font import (Geist) with system stack to avoid external fetch failures during build.
 import "./globals.css";
-import "../styles/01-tokens.css";
-import "../styles/02-layout.css";
-import "../styles/03-home.css";
-import "../styles/04-theme.css";
-import "../styles/05-primitives.css";
-import "../styles/06-semantic-surfaces.css";
-import "../styles/07-search-listing.css";
-import "../styles/08-vendor.css";
-import "../styles/09-utilities.css";
-import "../styles/10-moments.css";
-import "../styles/11-contact.css";
-import "../styles/12-apartment-checkin.css";
-import "../styles/13-compatibility-admin.css";
 import WebVitalsReporter from '@/components/WebVitalsReporter';
 import DataWarmup from '@/components/DataWarmup';
 import { headers } from 'next/headers';
@@ -25,9 +12,9 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/favicon.ico" },
-      { url: "/qr/site.png", sizes: "512x512", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
     ],
-    apple: "/qr/site.png",
+    apple: { url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
   },
   appleWebApp: {
     capable: true,

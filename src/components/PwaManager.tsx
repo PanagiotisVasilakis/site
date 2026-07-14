@@ -13,6 +13,8 @@ export default function PwaManager() {
         }
         return;
       }
+    const eventController = new AbortController();
+    const { signal } = eventController;
   try { document.documentElement.lang = document.documentElement.getAttribute('lang') || 'en'; } catch (err) { logger.warn('Set document lang failed', err instanceof Error ? err : { error: String(err) }); }
     // SW registration & update banner
     if ('serviceWorker' in navigator) {
@@ -36,14 +38,14 @@ export default function PwaManager() {
               const nw = reg.installing; if (!nw) return;
               nw.addEventListener('statechange', () => {
                 if (nw.state === 'installed' && navigator.serviceWorker.controller) showBanner();
-              });
-            });
+              }, { signal });
+            }, { signal });
   } catch (err) { logger.error('Service worker registration failed', err instanceof Error ? err : { error: String(err) }); }
       };
       if (document.readyState === 'complete') {
         void registerServiceWorker();
       } else {
-        window.addEventListener('load', () => { void registerServiceWorker(); }, { once: true });
+        window.addEventListener('load', () => { void registerServiceWorker(); }, { once: true, signal });
       }
     }
     // iOS A2HS tip
@@ -57,7 +59,7 @@ export default function PwaManager() {
       const tip = document.getElementById('ios-a2hs-tip'); if (tip) tip.style.display = 'flex';
     }
     const close = document.getElementById('ios-tip-close');
-    close?.addEventListener('click', () => { localStorage.setItem('ios-a2hs-dismissed','1'); const t = document.getElementById('ios-a2hs-tip'); if (t) t.style.display='none'; });
+    close?.addEventListener('click', () => { localStorage.setItem('ios-a2hs-dismissed','1'); const t = document.getElementById('ios-a2hs-tip'); if (t) t.style.display='none'; }, { signal });
     const reload = document.getElementById('update-reload-btn');
     reload?.addEventListener('click', async () => {
       try {
@@ -70,7 +72,7 @@ export default function PwaManager() {
         if (newHash) localStorage.setItem('app-precache-hash', newHash);
   } catch (err) { logger.error('Update reload handler failed', err instanceof Error ? err : { error: String(err) }); }
       window.location.reload();
-    });
+    }, { signal });
     const dismiss = document.getElementById('update-dismiss-btn');
     dismiss?.addEventListener('click', () => {
       const banner = document.getElementById('update-banner');
@@ -79,7 +81,7 @@ export default function PwaManager() {
         if (ver) localStorage.setItem('update-dismissed-version', ver);
         banner.style.display = 'none';
       }
-    });
+    }, { signal });
     // Install prompt button
   // Track deferred install prompt event
   interface BeforeInstallPromptEvent extends Event {
@@ -98,14 +100,14 @@ export default function PwaManager() {
         deferred = e as BeforeInstallPromptEvent;
   if (btn && !isIOS && isMobile) btn.style.display = 'inline-flex';
       }
-    });
+    }, { signal });
     btn?.addEventListener('click', async () => {
       if (!deferred) return;
       deferred.prompt();
       await deferred.userChoice;
   deferred = null;
       if (btn) btn.style.display = 'none';
-    });
+    }, { signal });
     // Listen for version messages from SW
     navigator.serviceWorker?.addEventListener('message', (e: MessageEvent) => {
       if (e.data?.type === 'RUNTIME_VERSION') {
@@ -155,7 +157,7 @@ export default function PwaManager() {
           }
         }
       }
-    });
+    }, { signal });
     // Manual update check
     const manual = document.getElementById('manual-update-check');
     manual?.addEventListener('click', async () => {
@@ -165,7 +167,8 @@ export default function PwaManager() {
   // Ask SW to refresh precache opportunistically
   reg?.active?.postMessage({ type: 'BG_SYNC_TRIGGER' });
   } catch (err) { logger.error('Manual update check failed', err instanceof Error ? err : { error: String(err) }); }
-    });
+    }, { signal });
+    return () => eventController.abort();
   }, []);
   return null;
 }

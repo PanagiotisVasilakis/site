@@ -3,27 +3,46 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
+// This must be updated whenever a schema migration is added. Readiness is not
+// merely a TCP/SELECT probe: the running binary and database schema must agree.
+export const EXPECTED_MIGRATION = '20260714150000_trustworthy_portal_and_operations';
+
 async function databaseReady(): Promise<boolean> {
   try {
-    await Promise.race([
-      prisma.$queryRaw`SELECT 1`,
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Database readiness timeout')), 2000)),
-    ]);
-    return true;
+    const rows = await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe("SET LOCAL statement_timeout = '1800ms'");
+      await tx.$queryRaw`SELECT 1`;
+      return tx.$queryRaw<Array<{ migration_name: string }>>`
+        SELECT migration_name
+        FROM _prisma_migrations
+        WHERE migration_name = ${EXPECTED_MIGRATION}
+          AND finished_at IS NOT NULL
+          AND rolled_back_at IS NULL
+        LIMIT 1
+      `;
+    }, { timeout: 2_500 });
+
+    return rows.length === 1;
   } catch {
     return false;
   }
 }
 
-export async function GET() {
+async function readinessResponse(head = false) {
   const ready = await databaseReady();
-  return NextResponse.json(
-    { status: ready ? 'ready' : 'not_ready', dependencies: { database: ready } },
-    { status: ready ? 200 : 503, headers: { 'cache-control': 'no-store' } },
-  );
+  const init = {
+    status: ready ? 200 : 503,
+    headers: { 'cache-control': 'no-store' },
+  };
+  return head
+    ? new Response(null, init)
+    : NextResponse.json({ status: ready ? 'ready' : 'not_ready' }, init);
 }
 
-export async function HEAD() {
-  const ready = await databaseReady();
-  return new Response(null, { status: ready ? 200 : 503, headers: { 'cache-control': 'no-store' } });
+export function GET() {
+  return readinessResponse();
+}
+
+export function HEAD() {
+  return readinessResponse(true);
 }

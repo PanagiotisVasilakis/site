@@ -14,6 +14,21 @@ import AmenitiesList from '@/components/AmenitiesList';
 import { getApartmentContent } from '@/data/apartmentData';
 import MapLoadingSkeleton from '@/components/MapLoadingSkeleton';
 import { MAP_DEFAULTS } from '@/lib/mapConstants';
+import type { Metadata } from 'next';
+import { localizedAlternates, normalizeLocale } from '@/lib/seo';
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params;
+  const eff = normalizeLocale(locale);
+  const dictionary = getDictionary(eff);
+  const title = dictionary.booking?.completeTitle ?? (eff === 'el' ? 'Αίτημα κράτησης' : 'Booking request');
+  return {
+    title: `${title} | ${dictionary.appTitle}`,
+    description: dictionary.booking?.locationDesc,
+    alternates: localizedAlternates(eff, '/book'),
+    openGraph: { title, description: dictionary.booking?.locationDesc, url: `/${eff}/book`, locale: eff, type: 'website' },
+  };
+}
 
 // Dynamic import for map component - only loads when needed
 const ApartmentLocationMap = dynamic(() => import('@/components/ApartmentLocationMap'), {
@@ -57,7 +72,7 @@ export default async function BookingPage({
   const property = {
     name: apartmentContent.name,
     location: `${apartmentContent.location.city}, ${apartmentContent.location.country}`,
-    image: '/house/living/living_1.jpeg'
+    image: '/house/living/living_1_booking.webp'
   };
 
   // Check if booking is valid
@@ -163,6 +178,8 @@ export default async function BookingPage({
                   sizes="(max-width: 1024px) 100vw, 420px"
                   className="object-cover"
                   priority
+                  fetchPriority="high"
+                  unoptimized
                 />
               </div>
               <div className="p-5">

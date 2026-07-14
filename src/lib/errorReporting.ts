@@ -15,10 +15,7 @@ interface ErrorBreadcrumb {
 
 interface ErrorContext {
   url: string;
-  userAgent: string;
   timestamp: string;
-  userId?: string;
-  sessionId?: string;
   buildVersion?: string;
   environment?: 'development' | 'staging' | 'production';
 }
@@ -33,28 +30,20 @@ interface ErrorReport {
     columnNumber?: number;
   };
   context: ErrorContext;
-  metadata?: Record<string, unknown>;
-  breadcrumbs?: ErrorBreadcrumb[];
+  category?: string;
 }
 
 class ErrorReporter {
   private breadcrumbs: ErrorBreadcrumb[] = [];
   private maxBreadcrumbs = 20;
-  private sessionId: string;
-  private userId?: string;
   private isEnabled = true;
   private reportingEndpoint = '/api/errors';
 
   constructor() {
-    this.sessionId = this.generateSessionId();
     if (typeof window !== 'undefined') {
       this.setupGlobalErrorHandlers();
     }
     this.addBreadcrumb('session', 'Session started', 'info');
-  }
-
-  private generateSessionId(): string {
-    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
   private setupGlobalErrorHandlers(): void {
@@ -87,11 +76,6 @@ class ErrorReporter {
     }) as EventListener);
   }
 
-  setUserId(userId: string): void {
-    this.userId = userId;
-    this.addBreadcrumb('user', `User set: ${userId}`, 'info');
-  }
-
   setEnabled(enabled: boolean): void {
     this.isEnabled = enabled;
     this.addBreadcrumb('config', `Error reporting ${enabled ? 'enabled' : 'disabled'}`, 'info');
@@ -119,10 +103,7 @@ class ErrorReporter {
   private getErrorContext(): ErrorContext {
     return {
       url: window.location.href,
-      userAgent: navigator.userAgent,
       timestamp: new Date().toISOString(),
-      userId: this.userId,
-      sessionId: this.sessionId,
       buildVersion: process.env.NEXT_PUBLIC_BUILD_VERSION,
       environment: process.env.NODE_ENV as 'development' | 'staging' | 'production',
     };
@@ -137,6 +118,7 @@ class ErrorReporter {
     } = {}
   ): Promise<boolean> {
     if (!this.isEnabled) return false;
+    void metadata; // Arbitrary UI metadata is intentionally not transmitted.
 
     try {
       const truncate = (value: string | undefined, max: number): string | undefined => {
@@ -144,26 +126,13 @@ class ErrorReporter {
         return value.length > max ? value.slice(0, max) : value;
       };
 
-      const safeMetadata = (() => {
-        if (!metadata) return undefined;
-        try {
-          const str = JSON.stringify(metadata);
-          if (str.length > 2000) {
-            return { _truncated: true, _originalSize: str.length } as Record<string, unknown>;
-          }
-          return metadata;
-        } catch {
-          return { _truncated: true } as Record<string, unknown>;
-        }
-      })();
-
       // Add breadcrumb for this error unless skipped
       if (!options.skipBreadcrumb) {
         this.addBreadcrumb(
           options.category || 'error',
           truncate(`Error: ${error.name}: ${error.message}`, 200) || 'Error',
           'error',
-          safeMetadata
+          undefined
         );
       }
 
@@ -172,7 +141,6 @@ class ErrorReporter {
       const boundedContext = {
         ...rawContext,
         url: truncate(rawContext.url, 500) || rawContext.url,
-        userAgent: truncate(rawContext.userAgent, 500) || rawContext.userAgent,
         buildVersion: truncate(rawContext.buildVersion, 50),
       };
 
@@ -190,12 +158,7 @@ class ErrorReporter {
           columnNumber: this.extractColumnFromStack(error.stack),
         },
         context: boundedContext,
-        metadata: safeMetadata,
-        breadcrumbs: this.breadcrumbs.slice(-20).map(b => ({
-          ...b,
-          category: truncate(b.category, 50) || b.category,
-          message: truncate(b.message, 200) || b.message,
-        })),
+        category: truncate(options.category, 50),
       };
 
       const response = await fetch(this.reportingEndpoint, {
@@ -287,14 +250,10 @@ class ErrorReporter {
 
   // Get current state for debugging
   getState(): {
-    sessionId: string;
-    userId?: string;
     breadcrumbsCount: number;
     isEnabled: boolean;
   } {
     return {
-      sessionId: this.sessionId,
-      userId: this.userId,
       breadcrumbsCount: this.breadcrumbs.length,
       isEnabled: this.isEnabled,
     };

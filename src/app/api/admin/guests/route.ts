@@ -9,7 +9,6 @@ import { checkInRequestRepository } from '@/lib/prisma-repositories/checkInReque
 interface QueryParams {
   action?: string;
   reference?: string;
-  lastName?: string;
   phone?: string;
   bookingId?: string;
   startDate?: string;
@@ -30,7 +29,6 @@ const handler = async (request: NextRequest) => {
   const params: QueryParams = {
     action: searchParams.get('action') || undefined,
     reference: searchParams.get('reference') || undefined,
-    lastName: searchParams.get('lastName') || undefined,
     phone: searchParams.get('phone') || undefined,
     bookingId: searchParams.get('bookingId') || undefined,
     startDate: searchParams.get('startDate') || undefined,
@@ -47,13 +45,13 @@ const handler = async (request: NextRequest) => {
         });
 
       case 'find':
-        if (!params.reference || !params.lastName) {
+        if (!params.reference) {
           throw new ApiError(
             ApiErrorCode.VALIDATION_ERROR,
-            'Missing required parameters: reference and lastName'
+            'Missing required parameter: reference'
           );
         }
-  const booking = await guestDataExport.getBookingByReference(params.reference, params.lastName);
+  const booking = await guestDataExport.getBookingByReference(params.reference);
         if (!booking) {
           throw new ApiError(
             ApiErrorCode.NOT_FOUND,

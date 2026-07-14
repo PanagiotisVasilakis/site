@@ -4,7 +4,7 @@
  */
 
 import { guestStore } from '@/lib/guestDataStore';
-import type { Booking, CheckinCompletionRec, Identity, User } from '@/lib/guestDataStore';
+import type { Booking, CheckinCompletionRec, User } from '@/lib/guestDataStore';
 import { logger } from '@/lib/logger-enterprise';
 
 interface BookingExport {
@@ -14,9 +14,13 @@ interface BookingExport {
     source: string;
     startDate: string;
     endDate: string;
+    provider: string;
+    externalReference?: string;
+    accessStatus: 'PENDING' | 'VERIFIED';
+    claimedAt?: Date;
     createdAt: Date;
   };
-  user: {
+  user?: {
     id: string;
     email?: string;
     phone: string;
@@ -24,16 +28,6 @@ interface BookingExport {
     createdAt: Date;
     updatedAt: Date;
   };
-  identities: Array<{
-    type: string;
-    last4Mask: string;
-    verifiedAt?: Date;
-  }>;
-  access: Array<{
-    status: string;
-    createdAt: Date;
-    updatedAt: Date;
-  }>;
   checkin?: {
     arrivalTime: string;
     specialRequests?: string;
@@ -48,184 +42,131 @@ export class GuestDataExport {
    * Get all bookings with full details
    */
   async getAllBookings(): Promise<BookingExport[]> {
-    try {
-      const bookings = await this.getAllBookingsRaw();
-      const detailed = await Promise.all(
-        bookings.map((booking) => this.getBookingDetails(booking.id))
-      );
-      return detailed.filter(isDefined);
-    } catch (error) {
-      logger.error('Failed to get all bookings', { error });
-      return [];
-    }
+    const bookings = await this.getAllBookingsRaw();
+    const detailed = await Promise.all(
+      bookings.map((booking) => this.getBookingDetails(booking.id))
+    );
+    return detailed.filter(isDefined);
   }
 
   /**
    * Get booking by reference number
    */
-  async getBookingByReference(reference: string, lastName: string): Promise<BookingExport | null> {
-    try {
-      const booking = await guestStore.findBookingByReferenceAndLastName(reference, lastName);
-      if (!booking) {
-        logger.info('Booking not found', { reference, lastName: lastName.substring(0, 2) + '***' });
-        return null;
-      }
-
-      return await this.getBookingDetails(booking.id);
-    } catch (error) {
-      logger.error('Failed to get booking by reference', { error, reference });
+  async getBookingByReference(reference: string): Promise<BookingExport | null> {
+    const booking = await guestStore.findBookingByReference(reference);
+    if (!booking) {
+      logger.info('Booking not found', { reference });
       return null;
     }
+    return this.getBookingDetails(booking.id);
   }
 
   /**
    * Get booking by booking ID
    */
   async getBookingById(bookingId: string): Promise<BookingExport | null> {
-    try {
-      const booking = await guestStore.findBookingById(bookingId);
-      if (!booking) {
-        logger.info('Booking not found', { bookingId });
-        return null;
-      }
-
-      return await this.getBookingDetails(bookingId);
-    } catch (error) {
-      logger.error('Failed to get booking by ID', { error, bookingId });
+    const booking = await guestStore.findBookingById(bookingId);
+    if (!booking) {
+      logger.info('Booking not found', { bookingId });
       return null;
     }
+    return this.getBookingDetails(bookingId);
   }
 
   /**
    * Get all bookings for a specific user
    */
   async getBookingsByUser(userId: string): Promise<BookingExport[]> {
-    try {
-      const bookings = (await this.getAllBookingsRaw()).filter((b) => b.user_id === userId);
-      const detailed = await Promise.all(
-        bookings.map((booking) => this.getBookingDetails(booking.id))
-      );
-      return detailed.filter(isDefined);
-    } catch (error) {
-      logger.error('Failed to get bookings by user', { error, userId });
-      return [];
-    }
+    const bookings = (await this.getAllBookingsRaw()).filter((b) => b.user_id === userId);
+    const detailed = await Promise.all(
+      bookings.map((booking) => this.getBookingDetails(booking.id))
+    );
+    return detailed.filter(isDefined);
   }
 
   /**
    * Get booking by user phone number
    */
   async getBookingsByPhone(phone: string): Promise<BookingExport[]> {
-    try {
-      const user = await guestStore.findUserByPhone(phone);
-      if (!user) {
-        logger.info('User not found by phone', { phone: phone.substring(0, 3) + '***' });
-        return [];
-      }
-
-      return await this.getBookingsByUser(user.id);
-    } catch (error) {
-      logger.error('Failed to get bookings by phone', { error });
+    const user = await guestStore.findUserByPhone(phone);
+    if (!user) {
+      logger.info('User not found by phone', { phone: phone.substring(0, 3) + '***' });
       return [];
     }
+    return this.getBookingsByUser(user.id);
   }
 
   /**
    * Get detailed booking information
    */
   async getBookingDetails(bookingId: string): Promise<BookingExport | null> {
-    try {
-      const booking = await guestStore.findBookingById(bookingId);
-      if (!booking) return null;
+    const booking = await guestStore.findBookingById(bookingId);
+    if (!booking) return null;
 
-      const user = booking.user_id ? await guestStore.findUserById(booking.user_id) : null;
-      if (!user) return null;
+    const user = booking.user_id ? await guestStore.findUserById(booking.user_id) : null;
 
-      // Get identities
-      const identities = await this.getUserIdentities(user.id);
+    const checkin = await guestStore.getCheckinCompletionByBooking(bookingId);
 
-      // Get access records
-      const accessRecords = await guestStore.listAccessByUser(user.id);
-      const access = accessRecords
-        .filter((record) => record.booking_id === bookingId)
-        .map((record) => ({
-          status: record.status,
-          createdAt: new Date(record.created_at),
-          updatedAt: new Date(record.updated_at),
-        }));
-
-      // Get checkin completion
-      const checkin = await guestStore.getCheckinCompletionByBooking(bookingId);
-
-      const result: BookingExport = {
+    const result: BookingExport = {
         booking: {
           id: booking.id,
           reference: booking.reference,
           source: booking.source,
           startDate: booking.start_date,
           endDate: booking.end_date,
+          provider: booking.provider,
+          externalReference: booking.external_reference,
+          accessStatus: booking.access_status,
+          claimedAt: booking.claimed_at ? new Date(booking.claimed_at) : undefined,
           createdAt: new Date(booking.created_at),
         },
-        user: {
+        user: user ? {
           id: user.id,
           email: user.email,
           phone: user.phone_e164,
           countryOrigin: user.country_origin,
           createdAt: new Date(user.created_at),
           updatedAt: new Date(user.updated_at),
-        },
-        identities,
-        access,
+        } : undefined,
         checkin: checkin ? {
           arrivalTime: checkin.arrival_time,
           specialRequests: checkin.special_requests,
           acceptedAt: new Date(checkin.accepted_at),
         } : undefined,
-      };
-
-      return result;
-    } catch (error) {
-      logger.error('Failed to get booking details', { error, bookingId });
-      return null;
-    }
+    };
+    return result;
   }
 
   /**
    * Export booking data to JSON file
    */
   async exportBookingToFile(bookingId: string, filePath?: string): Promise<string | null> {
-    try {
-      const bookingData = await this.getBookingDetails(bookingId);
-      if (!bookingData) {
-        logger.error('Booking not found for export', { bookingId });
-        return null;
-      }
+    const bookingData = await this.getBookingDetails(bookingId);
+    if (!bookingData) {
+      logger.info('Booking not found for export', { bookingId });
+      return null;
+    }
 
-      const jsonData = JSON.stringify(bookingData, null, 2);
-      const fileName = filePath || `booking_${bookingData.booking.reference || bookingId}_${Date.now()}.json`;
+    const jsonData = JSON.stringify(bookingData, null, 2);
+    const fileName = filePath || `booking_${bookingData.booking.reference || bookingId}_${Date.now()}.json`;
 
       // In a Node.js environment, you could write to file:
       // fs.writeFileSync(fileName, jsonData, 'utf8');
       
-      logger.info('Booking data exported', { 
-        bookingId, 
-        reference: bookingData.booking.reference,
-        fileName 
-      });
+    logger.info('Booking data exported', {
+      bookingId,
+      reference: bookingData.booking.reference,
+      fileName,
+    });
 
-      return jsonData;
-    } catch (error) {
-      logger.error('Failed to export booking', { error, bookingId });
-      return null;
-    }
+    return jsonData;
   }
 
   /**
    * Search bookings by date range
    */
   async searchBookingsByDateRange(startDate: string, endDate?: string): Promise<BookingExport[]> {
-    try {
-      const bookings = (await this.getAllBookingsRaw()).filter((booking) => {
+    const bookings = (await this.getAllBookingsRaw()).filter((booking) => {
         const bookingStart = booking.start_date;
         const bookingEnd = booking.end_date;
         
@@ -235,17 +176,13 @@ export class GuestDataExport {
           return bookingStart === startDate || bookingEnd === startDate ||
                  (bookingStart <= startDate && bookingEnd >= startDate);
         }
-      });
+    });
 
-      const detailed = await Promise.all(
-        bookings.map((booking) => this.getBookingDetails(booking.id))
-      );
+    const detailed = await Promise.all(
+      bookings.map((booking) => this.getBookingDetails(booking.id))
+    );
 
-      return detailed.filter(isDefined);
-    } catch (error) {
-      logger.error('Failed to search bookings by date', { error, startDate, endDate });
-      return [];
-    }
+    return detailed.filter(isDefined);
   }
 
   /**
@@ -254,16 +191,14 @@ export class GuestDataExport {
   async getStatistics(): Promise<{
     totalBookings: number;
     totalUsers: number;
-    totalIdentities: number;
+    totalClaimedBookings: number;
     totalCheckins: number;
     bookingsBySource: Record<string, number>;
     bookingsByStatus: Record<string, number>;
   }> {
-    try {
-      const [bookings, users, identities, checkins] = await Promise.all([
+    const [bookings, users, checkins] = await Promise.all([
         this.getAllBookingsRaw(),
         this.getAllUsersRaw(),
-        this.getAllIdentitiesRaw(),
         this.getAllCheckinsRaw(),
       ]);
 
@@ -287,70 +222,29 @@ export class GuestDataExport {
         bookingsByStatus[status] = (bookingsByStatus[status] || 0) + 1;
       });
 
-      return {
+    return {
         totalBookings: bookings.length,
         totalUsers: users.length,
-        totalIdentities: identities.length,
+        totalClaimedBookings: bookings.filter((booking) => booking.access_status === 'VERIFIED').length,
         totalCheckins: checkins.length,
         bookingsBySource,
         bookingsByStatus,
-      };
-    } catch (error) {
-      logger.error('Failed to get statistics', { error });
-      return {
-        totalBookings: 0,
-        totalUsers: 0,
-        totalIdentities: 0,
-        totalCheckins: 0,
-        bookingsBySource: {},
-        bookingsByStatus: {},
-      };
-    }
+    };
   }
 
   // Private helper methods
   private async getAllBookingsRaw(): Promise<Booking[]> {
-    try {
-      return await guestStore.getAllBookings();
-    } catch {
-      return [];
-    }
+    return guestStore.getAllBookings();
   }
 
   private async getAllUsersRaw(): Promise<User[]> {
-    try {
-      return await guestStore.getAllUsers();
-    } catch {
-      return [];
-    }
-  }
-
-  private async getAllIdentitiesRaw(): Promise<Identity[]> {
-    try {
-      return await guestStore.getAllIdentities();
-    } catch {
-      return [];
-    }
+    return guestStore.getAllUsers();
   }
 
   private async getAllCheckinsRaw(): Promise<CheckinCompletionRec[]> {
-    try {
-      return await guestStore.getAllCheckins();
-    } catch {
-      return [];
-    }
+    return guestStore.getAllCheckins();
   }
 
-  private async getUserIdentities(userId: string): Promise<BookingExport['identities']> {
-    const identities = await this.getAllIdentitiesRaw();
-    return identities
-      .filter((identity) => identity.user_id === userId)
-      .map((identity) => ({
-        type: identity.type,
-        last4Mask: identity.last4_mask,
-        verifiedAt: identity.verified_at ? new Date(identity.verified_at) : undefined,
-      }));
-  }
 }
 
 // Export singleton instance

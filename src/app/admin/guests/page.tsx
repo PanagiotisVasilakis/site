@@ -11,21 +11,20 @@ interface BookingData {
     id: string
     reference?: string
     source: string
+    provider: string
+    externalReference?: string
+    accessStatus: 'PENDING' | 'VERIFIED'
+    claimedAt?: string
     startDate: string
     endDate: string
     createdAt: string
   }
-  user: {
+  user?: {
     id: string
     email?: string
     phone: string
     countryOrigin: string
   }
-  identities: Array<{
-    type: string
-    last4Mask: string
-    verifiedAt?: string
-  }>
   checkin?: {
     arrivalTime: string
     specialRequests?: string
@@ -50,7 +49,7 @@ interface CheckInRequestData {
 interface Statistics {
   totalBookings: number
   totalUsers: number
-  totalIdentities: number
+  totalClaimedBookings: number
   totalCheckins: number
   bookingsBySource: Record<string, number>
   bookingsByStatus: Record<string, number>
@@ -64,6 +63,7 @@ export default function GuestDataViewer() {
   const [error, setError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [searchType, setSearchType] = useState<'reference' | 'phone' | 'date'>('reference')
+  const [claimGrant, setClaimGrant] = useState<{ bookingId: string; token: string; expiresAt: string } | null>(null)
 
   const fetchAllBookings = async () => {
     setLoading(true)
@@ -122,14 +122,7 @@ export default function GuestDataViewer() {
     try {
       let url = ''
       if (searchType === 'reference') {
-        // For reference search, we need lastName too
-        const [reference, lastName] = searchQuery.split(' ')
-        if (!lastName) {
-          setError('For reference search, please provide: "REFERENCE LASTNAME"')
-          setLoading(false)
-          return
-        }
-        url = `/api/admin/guests?action=find&reference=${reference}&lastName=${lastName}`
+        url = `/api/admin/guests?action=find&reference=${encodeURIComponent(searchQuery.trim())}`
       } else if (searchType === 'phone') {
         url = `/api/admin/guests?action=phone&phone=${encodeURIComponent(searchQuery)}`
       } else if (searchType === 'date') {
@@ -176,6 +169,25 @@ export default function GuestDataViewer() {
     }
   }
 
+  const issueClaimGrant = async (bookingId: string, channel: 'REMOTE' | 'ONSITE' = 'REMOTE') => {
+    setLoading(true)
+    setError('')
+    try {
+      const response = await internalFetch(`/api/admin/bookings/${bookingId}/claim-grants`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ channel, ttlMinutes: 30 }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.success) throw new Error(data.error?.message || 'Claim grant failed')
+      setClaimGrant({ bookingId, token: data.data.claimToken, expiresAt: data.data.expiresAt })
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Claim grant failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     fetchAllBookings()
     fetchStatistics()
@@ -217,8 +229,8 @@ export default function GuestDataViewer() {
               <div className="text-sm text-subtle">Total Users</div>
             </div>
             <div className="surface-card p-4 rounded-lg shadow">
-              <div className="text-2xl font-bold text-purple-600">{stats.totalIdentities}</div>
-              <div className="text-sm text-subtle">Verified IDs</div>
+              <div className="text-2xl font-bold text-purple-600">{stats.totalClaimedBookings}</div>
+              <div className="text-sm text-subtle">Claimed Bookings</div>
             </div>
             <div className="surface-card p-4 rounded-lg shadow">
               <div className="text-2xl font-bold text-orange-600">{stats.totalCheckins}</div>
@@ -301,7 +313,7 @@ export default function GuestDataViewer() {
               onChange={(e) => setSearchType(e.target.value as 'reference' | 'phone' | 'date')}
               className="px-4 py-2 border border-soft rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent surface-interactive"
             >
-              <option value="reference">Reference + Last Name</option>
+              <option value="reference">Booking Reference</option>
               <option value="phone">Phone Number</option>
               <option value="date">Date (YYYY-MM-DD)</option>
             </select>
@@ -310,7 +322,7 @@ export default function GuestDataViewer() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={
-                searchType === 'reference' ? 'ABC123 Smith' :
+                searchType === 'reference' ? 'ABC123' :
                   searchType === 'phone' ? '+306912345678' :
                     '2024-12-25'
               }
@@ -342,6 +354,18 @@ export default function GuestDataViewer() {
           >
             {error}
           </motion.div>
+        )}
+
+        {claimGrant && (
+          <div className="surface-card mb-6 rounded-lg border border-soft p-4" role="status">
+            <h2 className="font-semibold">One-time claim token</h2>
+            <p className="mt-1 text-sm text-subtle">Booking {claimGrant.bookingId} · expires {new Date(claimGrant.expiresAt).toLocaleString()}</p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <code className="min-w-0 flex-1 overflow-x-auto rounded bg-black/10 p-3 text-sm">{claimGrant.token}</code>
+              <button type="button" className="btn btn-primary" onClick={() => navigator.clipboard.writeText(claimGrant.token)}>Copy</button>
+            </div>
+            <p className="mt-2 text-xs text-subtle">The token is shown once. Send it only through the intended guest channel.</p>
+          </div>
         )}
 
         {/* Bookings List */}
@@ -383,9 +407,18 @@ export default function GuestDataViewer() {
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <Badge variant={booking.checkin ? 'approved' : 'pending'}>
-                      {booking.checkin ? 'Checked In' : 'Pending'}
+                    <Badge variant={booking.booking.accessStatus === 'VERIFIED' ? 'approved' : 'pending'}>
+                      {booking.booking.accessStatus === 'VERIFIED' ? 'Claimed' : 'Unclaimed'}
                     </Badge>
+                    {booking.booking.accessStatus !== 'VERIFIED' && (
+                      <button
+                        type="button"
+                        onClick={() => issueClaimGrant(booking.booking.id)}
+                        className="rounded-full bg-emerald-100 px-3 py-1 text-sm text-emerald-900 hover:bg-emerald-200"
+                      >
+                        Issue claim
+                      </button>
+                    )}
                     <button
                       onClick={() => exportBooking(booking.booking.id)}
                       className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300"
@@ -396,16 +429,23 @@ export default function GuestDataViewer() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div>
-                    <h4 className="font-medium text-text-accent">Guest Info</h4>
-                    <p className="text-sm text-body">📱 {booking.user.phone}</p>
-                    <p className="text-sm text-body">📧 {booking.user.email || 'Not provided'}</p>
-                    <p className="text-sm text-body">🌍 {booking.user.countryOrigin}</p>
-                  </div>
+                  {booking.user ? (
+                    <div>
+                      <h4 className="font-medium text-text-accent">Guest Info</h4>
+                      <p className="text-sm text-body">📱 {booking.user.phone}</p>
+                      <p className="text-sm text-body">📧 {booking.user.email || 'Not provided'}</p>
+                      <p className="text-sm text-body">🌍 {booking.user.countryOrigin}</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <h4 className="font-medium text-text-accent">Guest Info</h4>
+                      <p className="text-sm text-body">No guest account linked yet.</p>
+                    </div>
+                  )}
                   <div>
                     <h4 className="font-medium text-text-accent">Booking Details</h4>
                     <p className="text-sm text-body">📄 Source: {booking.booking.source}</p>
-                    <p className="text-sm text-body">🆔 IDs: {booking.identities.length} verified</p>
+                    <p className="text-sm text-body">🔗 Provider: {booking.booking.provider}</p>
                     <p className="text-sm text-body">📝 Created: {new Date(booking.booking.createdAt).toLocaleDateString()}</p>
                   </div>
                   {booking.checkin && (
@@ -419,21 +459,6 @@ export default function GuestDataViewer() {
                   )}
                 </div>
 
-                {booking.identities.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-soft">
-                    <h4 className="font-medium text-text-accent mb-2">Verified Documents</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {booking.identities.map((identity, i) => (
-                        <span
-                          key={i}
-                          className="px-2 py-1 surface-subtle text-body rounded text-sm"
-                        >
-                          {identity.type} ***{identity.last4Mask}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </motion.div>
             ))
           )}

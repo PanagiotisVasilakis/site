@@ -1,6 +1,7 @@
 /* basic offline-first service worker for Next.js static assets and pages */
 // Version bump strategy: use package.json version if available (from version.json), else fallback CACHE_VERSION; bump package version to invalidate.
 const CACHE_VERSION = self.__CACHE_VERSION || 'v4';
+const CACHE_PREFIX = 'guest-guide-';
 let RUNTIME_META = { version: CACHE_VERSION, pkgVersion: undefined, precacheHash: undefined };
 let ACTIVE_CACHE_NAME = `guest-guide-${CACHE_VERSION}`; // updated after reading version.json
 // Keep core shell + locale root + offline pages for all supported locales.
@@ -12,10 +13,30 @@ const CORE_ASSETS = [
   '/favicon.ico',
   '/app.webmanifest',
   // Key icons / imagery likely referenced above the fold (add more as needed)
-  '/qr/site.png'
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+  '/icons/apple-touch-icon.png'
 ];
 // Internal fetch helper to centralize internal route calls (for lint compliance)
 function fetchInternal(input, init) { return fetch(input, init); }
+
+const PRIVATE_PAGE_PREFIXES = [
+  '/admin',
+  '/en/check-in', '/el/check-in',
+  '/en/guest', '/el/guest',
+  '/en/portal', '/el/portal',
+];
+function isPrivatePage(pathname) {
+  return PRIVATE_PAGE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+function isPublicDataPath(pathname) {
+  return pathname === '/api/categories' || pathname.startsWith('/api/categories/');
+}
+function canStore(response) {
+  if (!response?.ok) return false;
+  const cacheControl = response.headers.get('cache-control')?.toLowerCase() || '';
+  return !cacheControl.includes('no-store') && !cacheControl.includes('private');
+}
 
 // Cache validation helper to prevent serving corrupted responses
 async function validateCachedResponse(response) {
@@ -71,7 +92,19 @@ function openQueueDb() {
   });
 }
 
+function isQueueableAnalyticsBody(body) {
+  if (typeof body !== 'string' || body.length === 0 || body.length > 100 * 1024) return false;
+  try {
+    if (new TextEncoder().encode(body).byteLength > 100 * 1024) return false;
+    const parsed = JSON.parse(body);
+    return !Array.isArray(parsed) || parsed.length <= 50;
+  } catch {
+    return false;
+  }
+}
+
 async function enqueue(body) {
+  if (!isQueueableAnalyticsBody(body)) return false;
   try {
     const db = await openQueueDb();
     
@@ -133,8 +166,10 @@ async function enqueue(body) {
     });
     
     broadcastQueueSize();
+    return true;
   } catch (err) {
     console.error('Failed to enqueue analytics:', err);
+    return false;
   }
 }
 async function flushQueue() {
@@ -290,7 +325,9 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.map((k) => (k === ACTIVE_CACHE_NAME ? null : caches.delete(k))))).then(() => self.clients.claim())
+    caches.keys().then((keys) => Promise.all(keys.map((k) => (
+      k.startsWith(CACHE_PREFIX) && k !== ACTIVE_CACHE_NAME ? caches.delete(k) : null
+    )))).then(() => self.clients.claim())
   );
   // Fetch runtime version metadata (non-fatal if missing)
   event.waitUntil((async () => {
@@ -306,7 +343,9 @@ self.addEventListener('activate', (event) => {
         // remove any older caches not caught by initial pass.
         try {
           const keys = await caches.keys();
-          await Promise.all(keys.map(k => (k === ACTIVE_CACHE_NAME ? null : caches.delete(k))));
+          await Promise.all(keys.map(k => (
+            k.startsWith(CACHE_PREFIX) && k !== ACTIVE_CACHE_NAME ? caches.delete(k) : null
+          )));
         } catch {}
       }
     } catch {}
@@ -338,7 +377,7 @@ async function prewarmData() {
     const fetchAndStore = async (canonicalUrl) => {
       try {
         const res = await fetchInternal(withBust(canonicalUrl), { cache: 'no-store' });
-        if (res.ok) {
+        if (canStore(res)) {
           const clone = res.clone();
           // Store response under canonical URL key
           cache.put(canonicalUrl, clone).catch(()=>{});
@@ -415,7 +454,8 @@ self.addEventListener('message', (event) => {
     }).catch(()=>{});
   }
   if (event.data.type === 'QUEUE_ANALYTICS' && event.data.body) {
-    enqueue(event.data.body).then(() => {
+    enqueue(event.data.body).then((queued) => {
+      if (!queued) return;
       broadcastQueueSize();
       if ('sync' in registration) {
     // @ts-expect-error Background Sync type missing
@@ -457,7 +497,8 @@ self.addEventListener('fetch', (event) => {
         return await fetch(request.clone());
       } catch {
         const body = await request.clone().text();
-        await enqueue(body);
+        const queued = await enqueue(body);
+        if (!queued) return new Response('invalid analytics payload', { status: 400 });
         if ('sync' in registration) {
           // @ts-expect-error Background Sync type missing
           registration.sync.register('analytics-sync').catch(()=>{});
@@ -468,10 +509,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Never cache authenticated, administrative, or privacy-related routes.
+  if (url.pathname.startsWith('/api/') && !isPublicDataPath(url.pathname)) return;
+  if (isPrivatePage(url.pathname)) return;
+
   // Prefer network for dynamic data (JSON) routes; cache-first for static/page GETs
   if (request.method === 'GET') {
     // JSON / API data: stale-while-revalidate so previously fetched data is available offline.
-    if (request.headers.get('accept')?.includes('application/json') || url.pathname.endsWith('.json')) {
+    if (isPublicDataPath(url.pathname) || url.pathname.endsWith('.json')) {
       event.respondWith((async () => {
         const cache = await caches.open(ACTIVE_CACHE_NAME);
         const cached = await cache.match(request);
@@ -481,7 +526,7 @@ self.addEventListener('fetch', (event) => {
         };
         if (cached) report('cache');
         const fetchPromise = fetchInternal(request).then(res => {
-          if (res.ok) cache.put(request, res.clone()).catch(()=>{});
+          if (canStore(res)) cache.put(request, res.clone()).catch(()=>{});
           if (!cached) report('network');
           return res;
         }).catch(() => cached || new Response('offline', { status: 503 }));
@@ -496,13 +541,15 @@ self.addEventListener('fetch', (event) => {
         const cached = await caches.match(request);
         if (cached) {
           // Revalidate in background
-          fetchInternal(request).then((res) => caches.open(ACTIVE_CACHE_NAME).then((c) => c.put(request, res))).catch(() => {});
+          fetchInternal(request).then((res) => {
+            if (canStore(res)) return caches.open(ACTIVE_CACHE_NAME).then((c) => c.put(request, res));
+          }).catch(() => {});
           return cached;
         }
         try {
           const res = await fetch(request);
           // Only cache successful responses to avoid storing 404s/errors
-          if (res && res.ok) {
+          if (canStore(res)) {
             const copy = res.clone();
             caches.open(ACTIVE_CACHE_NAME).then((c) => c.put(request, copy)).catch(()=>{});
           }
@@ -527,7 +574,7 @@ self.addEventListener('fetch', (event) => {
         const validCached = cached && await validateCachedResponse(cached) ? cached : null;
         
         const fetchPromise = fetchInternal(request).then(res => {
-          if (res.ok) {
+          if (canStore(res)) {
             cache.put(request, res.clone()).catch(async (err) => {
               // Handle storage quota exceeded
               if (err.name === 'QuotaExceededError') {
@@ -549,7 +596,7 @@ self.addEventListener('fetch', (event) => {
         caches.match(request).then(async (cached) => {
           const validCached = cached && await validateCachedResponse(cached) ? cached : null;
           return validCached || fetchInternal(request).then(async (res) => {
-            if (res.ok) {
+            if (canStore(res)) {
               try {
                 const cache = await caches.open(ACTIVE_CACHE_NAME);
                 await cache.put(request, res.clone());

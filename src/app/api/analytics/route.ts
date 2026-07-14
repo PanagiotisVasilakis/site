@@ -1,196 +1,165 @@
 import { NextRequest } from 'next/server';
-import { addHits, getHits, vitalsRecent } from '@/lib/analyticsStore';
-import fs from 'node:fs';
-import path from 'node:path';
+
+import {
+  recordAnalyticsHits,
+  recentAnalytics,
+  vitalsRecent,
+  type AnalyticsInput,
+} from '@/lib/analyticsRepository';
 import { logger } from '@/lib/logger-enterprise';
-import { getClientIp } from '@/lib/net/getClientIp';
 import { isAdminRequest } from '@/lib/rbac';
+import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
+import { ApiError, readJsonBody } from '@/lib/apiErrorHandler';
 
-// Rate limiting configuration
-const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
-const MAX_EVENTS_PER_WINDOW = 120; // generous limit
-const RATE_LIMIT_PERSIST_INTERVAL_MS = 30_000; // 30 seconds
+const BOT_PATTERN = /(bot|crawl|spider|slurp|headless|instrumented)/i;
+const ALLOWED_EVENTS = new Set([
+  'portal_opened',
+  'origin_selected',
+  'form_submitted',
+  'auth_mode_changed',
+  'no_booking_cta_clicked',
+  'checkin_viewed',
+  'checkin_completed',
+  'booking_submitted',
+  'booking_check_availability',
+  'mobile_nav_house',
+  'mobile_nav_book',
+  'mobile_nav_booking_details',
+  'mobile_nav_about',
+  'mobile_nav_favorites',
+  'mobile_nav_moments',
+  'mobile_nav_phones',
+  'mobile_nav_checkin',
+]);
 
-// Bot detection patterns
-const BOT_PATTERNS = /(bot|crawl|spider|slurp|headless|instrumented)/i;
-
-// Very lightweight in-memory rate limit / bot filter (non-production grade)
-const recentByIp: Record<string, number[]> = {};
-let lastPersist = 0;
-
-// Use path.join for safe file operations
-const RATE_LIMIT_FILE = path.join(process.cwd(), 'analytics-ratelimit.json');
-const RATE_LIMIT_TEMP_FILE = path.join(process.cwd(), 'analytics-ratelimit.json.tmp');
-
-// Add memory cleanup for rate limiting data
-function cleanupRateLimit() {
-  const now = Date.now();
-  const cutoff = now - RATE_LIMIT_WINDOW_MS;
-  
-  for (const ip of Object.keys(recentByIp)) {
-    recentByIp[ip] = recentByIp[ip].filter(t => t > cutoff);
-    
-    // Remove IPs with no recent requests to prevent memory leaks
-    if (recentByIp[ip].length === 0) {
-      delete recentByIp[ip];
-    }
+function normalizePath(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 2_048) return null;
+  try {
+    const pathname = new URL(value, 'https://analytics.invalid').pathname;
+    if (!pathname.startsWith('/') || pathname.length > 512) return null;
+    return pathname.replace(/\/{2,}/g, '/');
+  } catch {
+    return null;
   }
 }
 
-function persistRateLimit() {
-  if (process.env.ANALYTICS_PERSIST !== '1') return;
-  const now = Date.now();
-  if (now - lastPersist < RATE_LIMIT_PERSIST_INTERVAL_MS) return; // throttle
-  lastPersist = now;
-  
-  try {
-    // Clean up before persisting to avoid saving stale data
-    cleanupRateLimit();
-    
-    // Atomic write using temp file
-    fs.writeFileSync(RATE_LIMIT_TEMP_FILE, JSON.stringify(recentByIp));
-    fs.renameSync(RATE_LIMIT_TEMP_FILE, RATE_LIMIT_FILE);
-  } catch (err) { 
-    logger.error('Persist ratelimit failed', err);
-    // Clean up temp file on error
-    try {
-      if (fs.existsSync(RATE_LIMIT_TEMP_FILE)) {
-        fs.unlinkSync(RATE_LIMIT_TEMP_FILE);
+function safeLocale(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const [language, region, extra] = value.split('-');
+  const lowercaseLanguage = language.length === 2 && language.split('').every((character) => character >= 'a' && character <= 'z');
+  const uppercaseRegion = !region || (region.length === 2 && region.split('').every((character) => character >= 'A' && character <= 'Z'));
+  return !extra && lowercaseLanguage && uppercaseRegion ? value : undefined;
+}
+
+function integer(value: unknown, min: number, max: number): number | undefined {
+  return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max
+    ? value
+    : undefined;
+}
+
+function sanitizeEvent(value: unknown): Pick<AnalyticsInput, 'eventName' | 'properties'> {
+  if (!value || typeof value !== 'object') return {};
+  const event = value as { name?: unknown; props?: unknown };
+  if (typeof event.name !== 'string' || !ALLOWED_EVENTS.has(event.name)) return {};
+  const raw = event.props && typeof event.props === 'object' && !Array.isArray(event.props)
+    ? event.props as Record<string, unknown>
+    : {};
+
+  let properties: Record<string, unknown> = {};
+  switch (event.name) {
+    case 'portal_opened':
+      if (typeof raw.source === 'string' && /^[a-z0-9_-]{1,20}$/i.test(raw.source)) {
+        properties = { source: raw.source };
       }
-    } catch {}
+      break;
+    case 'origin_selected':
+      if (raw.origin === 'GR' || raw.origin === 'ABROAD') properties.origin = raw.origin;
+      if (raw.mode === 'signup') properties.mode = raw.mode;
+      break;
+    case 'form_submitted':
+      if (raw.form === 'sign-in' || raw.form === 'sign-up') properties.form = raw.form;
+      break;
+    case 'auth_mode_changed':
+      if (raw.mode === 'signin' || raw.mode === 'signup') properties.mode = raw.mode;
+      break;
+    case 'no_booking_cta_clicked':
+      if (raw.from === 'guest' || raw.from === 'home') properties.from = raw.from;
+      break;
+    case 'booking_submitted': {
+      const nights = integer(raw.nights, 0, 365);
+      if (nights !== undefined) properties.nights = nights;
+      if (typeof raw.hasArrivalTime === 'boolean') properties.hasArrivalTime = raw.hasArrivalTime;
+      break;
+    }
+    case 'booking_check_availability': {
+      const nights = integer(raw.nights, 0, 365);
+      if (nights !== undefined) properties.nights = nights;
+      if (typeof raw.hasDates === 'boolean') properties.hasDates = raw.hasDates;
+      break;
+    }
+  }
+
+  return { eventName: event.name, properties };
+}
+
+function normalizeHit(value: unknown): AnalyticsInput | null {
+  if (!value || typeof value !== 'object') return null;
+  const record = value as { path?: unknown; locale?: unknown; event?: unknown };
+  const path = normalizePath(record.path);
+  if (!path) return null;
+  return {
+    path,
+    locale: safeLocale(record.locale),
+    ...sanitizeEvent(record.event),
+  };
+}
+
+export async function POST(request: NextRequest) {
+  const userAgent = request.headers.get('user-agent') || '';
+  if (BOT_PATTERN.test(userAgent)) return new Response(null, { status: 202 });
+
+  const contentLength = Number.parseInt(request.headers.get('content-length') || '0', 10);
+  if (Number.isFinite(contentLength) && contentLength > 100 * 1_024) {
+    return Response.json({ error: 'Payload too large' }, { status: 413 });
+  }
+
+  const decision = await checkSensitiveRateLimit(request, {
+    scope: 'analytics-ingest',
+    limit: 120,
+    windowMs: 60_000,
+  });
+  if (!decision.allowed) {
+    return Response.json(
+      { error: 'Rate limited' },
+      { status: 429, headers: { 'retry-after': String(Math.max(1, Math.ceil((decision.resetAt.getTime() - Date.now()) / 1_000))) } },
+    );
+  }
+
+  try {
+    const parsed = await readJsonBody(request, 100 * 1_024);
+    const entries = Array.isArray(parsed) ? parsed : [parsed];
+    if (entries.length > 50) return Response.json({ error: 'Too many entries' }, { status: 413 });
+
+    const normalized = entries.map(normalizeHit).filter((hit): hit is AnalyticsInput => hit !== null);
+    if (normalized.length === 0) return Response.json({ error: 'No valid entries' }, { status: 422 });
+    const accepted = await recordAnalyticsHits(normalized);
+    return Response.json({ accepted }, { status: 201 });
+  } catch (error) {
+    if (error instanceof ApiError) return Response.json({ error: error.message }, { status: error.statusCode });
+    logger.error('Analytics ingestion failed', { error: error instanceof Error ? error.message : String(error) });
+    return Response.json({ error: 'Analytics temporarily unavailable' }, { status: 503 });
   }
 }
 
-function loadRateLimit() {
-  if (process.env.ANALYTICS_PERSIST !== '1') return;
-  try {
-    if (fs.existsSync(RATE_LIMIT_FILE)) {
-      const data = JSON.parse(fs.readFileSync(RATE_LIMIT_FILE,'utf-8'));
-      if (data && typeof data === 'object') {
-        const cutoff = Date.now() - RATE_LIMIT_WINDOW_MS;
-        for (const k of Object.keys(data as Record<string, unknown>)) {
-          const arr = (data as Record<string, unknown>)[k];
-          if (Array.isArray(arr)) {
-            // Filter out stale entries during load
-            const validTimes = (arr as number[]).filter((t) => typeof t === 'number' && t > cutoff);
-            if (validTimes.length > 0) {
-              recentByIp[k] = validTimes;
-            }
-          }
-        }
-      }
-    }
-  } catch (err) { logger.error('Load ratelimit failed', err); }
-}
-loadRateLimit();
-
-export async function POST(req: NextRequest) {
-  const ip = getClientIp(req, { trustProxy: true });
-  
-  try {
-    const ua = req.headers.get('user-agent') || '';
-    if (BOT_PATTERNS.test(ua)) return new Response('ignored', { status: 202 });
-    
-    const now = Date.now();
-    
-    // Thread-safe rate limiting with atomic operations
-    const currentTimes = recentByIp[ip] || [];
-    const validTimes = currentTimes.filter(t => now - t < RATE_LIMIT_WINDOW_MS);
-    
-    // Check rate limit BEFORE modifying state
-    if (validTimes.length >= MAX_EVENTS_PER_WINDOW) {
-      recentByIp[ip] = validTimes; // Update with filtered times
-      return new Response('rate limited', { status: 429 });
-    }
-    
-    const body = await req.text();
-    if (!body) return new Response('empty', { status: 400 });
-    
-    // Prevent memory amplification attacks
-    if (body.length > 1024 * 100) { // 100KB limit
-      return new Response('payload too large', { status: 413 });
-    }
-    
-    let parsed: unknown;
-    try { 
-      parsed = JSON.parse(body); 
-    } catch { 
-      return new Response('bad json', { status: 400 }); 
-    }
-    
-    const arr = Array.isArray(parsed) ? parsed : [parsed];
-    
-    // Prevent DOS via large arrays
-    if (arr.length > 50) {
-      return new Response('too many entries', { status: 413 });
-    }
-    
-    const normalized = arr
-      .filter(d => d && typeof d === 'object' && typeof (d as { path?: unknown }).path === 'string')
-      .slice(0, 50) // Hard limit to prevent memory exhaustion
-      .map(d => {
-        const rec = d as { path: string; ts?: unknown; locale?: unknown; event?: { name?: unknown; props?: unknown } };
-        
-        // Validate and sanitize path
-        const path = typeof rec.path === 'string' && rec.path.length <= 500 ? rec.path : '/';
-        
-        return {
-          path,
-          ts: typeof rec.ts === 'number' && rec.ts > 0 ? rec.ts : Date.now(),
-          locale: typeof rec.locale === 'string' && rec.locale.length <= 10 ? rec.locale : undefined,
-          // Validate event data more strictly
-          event: (rec.event && 
-                  typeof rec.event === 'object' && 
-                  typeof rec.event.name === 'string' && 
-                  rec.event.name.length <= 100) 
-                  ? { 
-                      name: rec.event.name, 
-                      props: rec.event.props && typeof rec.event.props === 'object' ? rec.event.props : undefined 
-                    } 
-                  : undefined,
-        };
-      });
-    
-    // Atomic operation: only update rate limit after successful processing
-    const accepted = addHits(normalized, ua);
-    
-    // Update rate limit state atomically after successful processing
-    const newTimes = [...validTimes];
-    for (let i = 0; i < accepted; i++) {
-      newTimes.push(now);
-    }
-    recentByIp[ip] = newTimes;
-    
-    persistRateLimit();
-    return new Response(JSON.stringify({ accepted }), { status: 201, headers: { 'content-type': 'application/json' } });
-  } catch (err) {
-    logger.error('Analytics POST failed', { 
-      error: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : undefined,
-      endpoint: '/api/analytics',
-      ip
-    });
-    return new Response('internal_server_error', { status: 500 });
-  }
-}
-
-// Lightweight stats endpoint (not listed in sitemap)
-export async function GET(request?: NextRequest) {
-  if (!request || !(await isAdminRequest(request))) {
+export async function GET(request: NextRequest) {
+  if (!(await isAdminRequest(request))) {
     return Response.json({ error: 'Admin credentials required' }, { status: 403 });
   }
 
-  // Provide a lightweight analytics view for internal dashboards
-  const hits = getHits();
-  const vitals = vitalsRecent();
-
-  // Flatten vitals into array shape for dashboard consumption
-  const vitalsArr = Object.entries(vitals).flatMap(([name, arr]) => arr.map(v => ({ name, value: v.value, ts: v.ts, id: v.id })));
-
-  // Return anonymized hits summary; include only path and optional locale
-  const response = {
-    hits: hits.slice(-1000).map(h => ({ path: h.path, locale: h.locale })),
-    vitals: vitalsArr.slice(-500),
-  };
-  return Response.json(response, { headers: { 'cache-control': 'no-store' } });
+  const [hits, groupedVitals] = await Promise.all([recentAnalytics(), vitalsRecent()]);
+  const vitals = Object.values(groupedVitals).flat().sort((a, b) => a.ts - b.ts).slice(-500);
+  return Response.json({
+    hits: hits.reverse().map((hit) => ({ path: hit.path, locale: hit.locale ?? undefined })),
+    vitals,
+  }, { headers: { 'cache-control': 'no-store, private' } });
 }

@@ -1,7 +1,8 @@
 [Unit]
 Description=QR City Guide Web Service
-After=network-online.target
+After=network-online.target __SERVICE_NAME__-bootstrap.service
 Wants=network-online.target
+Requires=__SERVICE_NAME__-bootstrap.service
 
 [Service]
 Type=simple
@@ -12,7 +13,7 @@ Environment=NODE_ENV=production
 EnvironmentFile=__ENV_FILE__
 ExecStartPre=/usr/bin/env bash __REPO_ROOT__/scripts/system-orchestrator.sh check --profile production --no-docker-fallback
 ExecStart=/usr/bin/env bash __REPO_ROOT__/scripts/system-orchestrator.sh up --profile production --skip-build --skip-migrate --skip-verify --foreground --no-docker-fallback
-ExecReload=/usr/bin/env bash __REPO_ROOT__/scripts/system-orchestrator.sh verify --profile production
+ExecStartPost=/usr/bin/env bash __REPO_ROOT__/scripts/system-orchestrator.sh verify --profile production --no-docker-fallback
 Restart=on-failure
 RestartSec=5
 TimeoutStartSec=300
@@ -20,6 +21,20 @@ TimeoutStopSec=45
 KillMode=mixed
 NoNewPrivileges=true
 PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=-__REPO_ROOT__/.runtime
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictNamespaces=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0077
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 LimitNOFILE=65535
 StandardOutput=journal
 StandardError=journal

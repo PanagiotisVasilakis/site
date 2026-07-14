@@ -59,9 +59,7 @@ function getPepper(): string {
     if (!loggedDevPepperWarning && shouldLogDevWarnings) {
       loggedDevPepperWarning = true;
       devSecretGlobal.__devPepperWarned = true;
-      console.warn('⚠️  Generated random SECURITY_PEPPER for development session');
-      console.warn(`⚠️  Pepper preview: ${generatedDevPepper.slice(0, 16)}...`);
-      console.warn('⚠️  Set SECURITY_PEPPER in .env to persist across restarts');
+      console.warn('Generated an ephemeral SECURITY_PEPPER for this development process; set it in .env.local to preserve encrypted data across restarts.');
     }
   } else if (!loggedDevPepperWarning && shouldLogDevWarnings) {
     loggedDevPepperWarning = true;
@@ -84,9 +82,7 @@ function getEncKey(): Buffer {
       if (!loggedDevEncKeyWarning && shouldLogDevWarnings) {
         loggedDevEncKeyWarning = true;
         devSecretGlobal.__devEncKeyWarned = true;
-        console.warn('⚠️  Generated random SECURITY_ENC_KEY for development session');
-        console.warn(`⚠️  Key preview: ${generatedDevEncKey.toString('hex').slice(0, 16)}...`);
-        console.warn('⚠️  Set SECURITY_ENC_KEY_HEX in .env to persist across restarts');
+        console.warn('Generated an ephemeral SECURITY_ENC_KEY_HEX for this development process; set it in .env.local to preserve encrypted data across restarts.');
       }
     } else if (!loggedDevEncKeyWarning && shouldLogDevWarnings) {
       loggedDevEncKeyWarning = true;

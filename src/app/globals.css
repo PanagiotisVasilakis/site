@@ -1,4 +1,17 @@
 @import "tailwindcss";
+@import "../styles/01-tokens.css";
+@import "../styles/02-layout.css";
+@import "../styles/03-home.css";
+@import "../styles/04-theme.css";
+@import "../styles/05-primitives.css";
+@import "../styles/06-semantic-surfaces.css";
+@import "../styles/07-search-listing.css";
+@import "../styles/08-vendor.css";
+@import "../styles/09-utilities.css";
+@import "../styles/10-moments.css";
+@import "../styles/11-contact.css";
+@import "../styles/12-apartment-checkin.css";
+@import "../styles/13-compatibility-admin.css";
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-/* Global CSS is split into ordered partials imported from src/app/layout.tsx. */
+/* Keep one ordered global CSS entrypoint so critical styles require one request. */

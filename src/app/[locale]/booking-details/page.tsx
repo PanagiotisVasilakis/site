@@ -1,5 +1,6 @@
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
+import { localizedAlternates, normalizeLocale } from '@/lib/seo';
 
 interface BookingDetailsPageProps {
   params: Promise<{
@@ -62,9 +63,18 @@ export default async function BookingDetailsPage({ params }: BookingDetailsPageP
 
 export async function generateMetadata({ params }: BookingDetailsPageProps) {
   const { locale } = await params;
-  const dictionary = getDictionary(locale as Locale);
+  const eff = normalizeLocale(locale);
+  const dictionary = getDictionary(eff);
   return {
     title: `${dictionary.bookingDetails || 'Booking Details'} | Dolce Far Niente`,
     description: dictionary.booking?.detailsPage?.metaDescription,
+    alternates: localizedAlternates(eff, '/booking-details'),
+    openGraph: {
+      title: dictionary.bookingDetails || 'Booking Details',
+      description: dictionary.booking?.detailsPage?.metaDescription,
+      url: `/${eff}/booking-details`,
+      locale: eff,
+      type: 'website',
+    },
   };
 }

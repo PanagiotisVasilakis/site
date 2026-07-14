@@ -12,6 +12,7 @@ import {
 } from '@/lib/guestSession';
 import { logger as elogger } from '@/lib/logger-enterprise';
 import { metrics } from '@/lib/metrics-collector';
+import { requestAuthContext } from '@/lib/portalAuthHttp';
 
 const isSafePath = (p?: string | null): p is string =>
   typeof p === 'string' && p.startsWith('/') && !p.startsWith('//');
@@ -45,8 +46,12 @@ function unauthorizedResponse(request: NextRequest, failurePath?: string): NextR
   return response;
 }
 
-async function issueRefreshedSession(refreshToken: string): Promise<{ jwt: string; refreshToken: string } | null> {
-  const rotated = await guestStore.rotateRefreshToken(refreshToken);
+async function issueRefreshedSession(request: NextRequest, refreshToken: string): Promise<{ jwt: string; refreshToken: string } | null> {
+  const context = requestAuthContext(request);
+  const rotated = await guestStore.rotateRefreshToken(refreshToken, 7, {
+    device_hint: context.deviceHint,
+    ip_hint: context.ipHint,
+  });
   if (rotated.status === 'replayed') {
     elogger.warn('refresh_token.replay_detected', {
       correlationId: elogger.getContext()?.correlationId,
@@ -95,7 +100,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return unauthorizedResponse(req);
   }
 
-  const refreshed = await issueRefreshedSession(refresh);
+  const refreshed = await issueRefreshedSession(req, refresh);
   if (!refreshed) {
     return unauthorizedResponse(req);
   }
@@ -112,33 +117,4 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
 
   return res;
-});
-
-export const GET = withErrorHandler(async (req: NextRequest) => {
-  // Proxy GET to POST logic for convenience but handle redirects explicitly.
-  const refresh = req.cookies.get('guest_rt')?.value;
-  const nextRaw = req.nextUrl.searchParams.get('next');
-  const failureRaw = req.nextUrl.searchParams.get('failure');
-  const nextParam = isSafePath(nextRaw) ? nextRaw : undefined;
-  const failureParam = isSafePath(failureRaw) ? failureRaw : undefined;
-
-  if (!refresh) {
-    return unauthorizedResponse(req, failureParam);
-  }
-
-  const refreshed = await issueRefreshedSession(refresh);
-  if (!refreshed) {
-    return unauthorizedResponse(req, failureParam);
-  }
-  await revokeCurrentSession(req);
-
-  if (nextParam) {
-    const redirectResponse = NextResponse.redirect(new URL(nextParam, req.url), 302);
-    applyAuthCookies(redirectResponse, refreshed.jwt, refreshed.refreshToken);
-    return redirectResponse;
-  }
-
-  const response = new NextResponse(null, { status: 204 });
-  applyAuthCookies(response, refreshed.jwt, refreshed.refreshToken);
-  return response;
 });

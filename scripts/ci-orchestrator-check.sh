@@ -58,7 +58,7 @@ load_env_file_if_present() {
 
 load_environment() {
   local candidate
-  for candidate in ".env.production.local" ".env.local" ".env.production" ".env"; do
+  for candidate in ".env.production.local" ".env.production" ".env"; do
     load_env_file_if_present "$REPO_ROOT/$candidate"
   done
 }
@@ -72,12 +72,15 @@ set_default_test_secrets() {
   export GUEST_WIFI_PASSWORD="${GUEST_WIFI_PASSWORD:-ci-guest-password}"
   export SECURITY_ENC_KEY_HEX="${SECURITY_ENC_KEY_HEX:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}"
   export SECURITY_PEPPER="${SECURITY_PEPPER:-ci-security-pepper}"
+  export CLAIM_TOKEN_PEPPER="${CLAIM_TOKEN_PEPPER:-ci-claim-token-pepper-at-least-32-chars-0001}"
   export SESSION_SECRET="${SESSION_SECRET:-ci-session-secret-should-be-32-chars-0001}"
   export NEXT_PUBLIC_SITE_URL="${NEXT_PUBLIC_SITE_URL:-https://example.test}"
   export ALLOWED_ORIGINS="${ALLOWED_ORIGINS:-https://example.test}"
   export VALID_API_KEYS="${VALID_API_KEYS:-0123456789abcdef0123456789abcdef}"
   export INTERNAL_API_KEYS="${INTERNAL_API_KEYS:-fedcba9876543210fedcba9876543210}"
   export ALERT_WEBHOOK_TOKEN="${ALERT_WEBHOOK_TOKEN:-ci-alert-webhook-token}"
+  export TRUST_PROXY_MODE="${TRUST_PROXY_MODE:-hops}"
+  export TRUST_PROXY_HOPS="${TRUST_PROXY_HOPS:-1}"
   export TEST_DATABASE_URL="${TEST_DATABASE_URL:-${DATABASE_URL:-}}"
 }
 

@@ -1,0 +1,31 @@
+[Unit]
+Description=QR City Guide Durable Outbox Drain
+After=network-online.target __SERVICE_NAME__.service
+Requires=__SERVICE_NAME__.service
+
+[Service]
+Type=oneshot
+User=__APP_USER__
+Group=__APP_GROUP__
+WorkingDirectory=__REPO_ROOT__
+Environment=NODE_ENV=production
+EnvironmentFile=__ENV_FILE__
+ExecStart=/usr/bin/env npm run outbox:drain
+TimeoutStartSec=120
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictNamespaces=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0077
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+StandardOutput=journal
+StandardError=journal

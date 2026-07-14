@@ -1,25 +1,22 @@
-import { type Booking, type LookupByPhoneParams, type LookupByRefParams, type BookingLookupProvider } from '@/lib/bookingLookup';
 import { type MarkerData as InteractiveMarkerData } from '@/components/InteractiveMap';
 import { type BookingSource as SessionBookingSource, type BookingStatus } from '@/lib/guestSession';
 import { type PerformanceBudget } from '@/lib/performanceBudget';
 import { type SecurityConfig } from '@/lib/security-config';
 import { type SecurityMetrics } from '@/lib/security-monitoring';
 import { type ApiResponse, type ApiRouteHandler, type ErrorHandlerConfig } from '@/lib/apiErrorHandler';
-import { type Alert, type NotificationChannel } from '@/lib/alerting-system';
 import { type AvailabilityInfo } from '@/lib/dateUtils';
 import { type Dictionary as IndexDictionary } from '@/i18n';
 import { type Dictionary as I18nDictionary } from '@/i18n/dictionaries';
 import { type TrackerEventName, type EventProps } from '@/lib/tracker';
 import { type Origin } from '@/lib/phone';
 import { type LogContext, type LogLevel, type LogEntry } from '@/lib/logger-enterprise';
-import { type IdentityType, type BookingSource, type AccessStatus, type BookingAccess, type GuestRefreshTokenRec } from '@/lib/guestDataStore';
+import { type BookingSource, type AccessStatus, type GuestRefreshTokenRec } from '@/lib/guestDataStore';
 import { type VillaPhoto } from '@/types/villa';
 import { type AppConfig } from '@/lib/config';
 import { type Role } from '@/lib/rbac';
 import { type LeafletMapProps } from '@/components/LeafletMap';
 import { type MarkerData as LazyMapMarkerData } from '@/components/InteractiveMap';
 import { type TravelMode } from '@/lib/travelFormat';
-import { type AnalyticsPersistenceData, type AnalyticsStorageAdapter } from '@/lib/storageAdapter';
 
 // Browser-only globals used by imported client utilities.
 vi.stubGlobal('BroadcastChannel', class {
@@ -34,7 +31,6 @@ const hasDbUrl = !!(process.env.TEST_DATABASE_URL || process.env.DATABASE_URL);
 describe.skipIf(!hasDbUrl)('public API surface remains reachable', () => {
   it('validates utilities and classes are importable', async () => {
     const { validateOpenAPISpec } = await import('@/lib/openapi');
-    const { DevStoreBookingLookup } = await import('@/lib/bookingLookup');
     const { createMarkerFromItem } = await import('@/components/InteractiveMap');
     const { clearSessionCookie, clearRefreshCookie } = await import('@/lib/guestSession');
     const { PerformanceBudgetValidator, performanceBudgetSchema } = await import('@/lib/performanceBudget');
@@ -53,19 +49,14 @@ describe.skipIf(!hasDbUrl)('public API surface remains reachable', () => {
       rateLimitError,
       timeoutError,
     } = await import('@/lib/apiErrorHandler');
-    const { AlertingSystem } = await import('@/lib/alerting-system');
     const { formatDateRangeCompact, parseDate, isPastDate } = await import('@/lib/dateUtils');
     const { locales, defaultLocale } = await import('@/i18n');
     const { GuestDataExport } = await import('@/lib/guestDataExport');
-    const { resetFunnel } = await import('@/lib/analyticsClient');
     const { categorizeReason, track, tracker } = await import('@/lib/tracker');
     const { emitGuestSessionChanged } = await import('@/lib/sessionSignals');
     const { SpanStatus } = await import('@/lib/distributed-tracing');
 
     expect(validateOpenAPISpec()).toBe(true);
-
-    const lookup = new DevStoreBookingLookup();
-    expect(typeof lookup.lookupByReference).toBe('function');
 
     const marker = createMarkerFromItem(
       {
@@ -103,7 +94,6 @@ describe.skipIf(!hasDbUrl)('public API surface remains reachable', () => {
     expect(rateLimitError).toBe(RateLimitError);
     expect(timeoutError).toBe(TimeoutError);
 
-    expect(typeof AlertingSystem).toBe('function');
 
     expect(formatDateRangeCompact({ from: new Date('2024-01-01'), to: new Date('2024-01-05') })).toMatch(/\d/);
     expect(parseDate('2024-01-01')).toBeInstanceOf(Date);
@@ -114,7 +104,6 @@ describe.skipIf(!hasDbUrl)('public API surface remains reachable', () => {
     const exporter = new GuestDataExport();
     const exportedBookings = await exporter.getAllBookings();
     expect(Array.isArray(exportedBookings)).toBe(true);
-    resetFunnel();
     expect(typeof categorizeReason).toBe('function');
     tracker.portalOpened('test');
     expect(() => track({ name: 'checkin_viewed', props: {} })).not.toThrow();
@@ -128,14 +117,8 @@ describe.skipIf(!hasDbUrl)('public API surface remains reachable', () => {
     expectTypeOf<LogContext>().toBeObject();
     expectTypeOf<LogLevel>().toEqualTypeOf<'debug' | 'info' | 'warn' | 'error' | 'trace' | 'fatal'>();
     expectTypeOf<LogEntry>().toMatchTypeOf<{ level: LogLevel }>();
-    expectTypeOf<Booking>().toMatchTypeOf<Record<string, any>>();
-    expectTypeOf<LookupByRefParams>().toMatchTypeOf<{ bookingRef: string }>();
-    expectTypeOf<LookupByPhoneParams>().toMatchTypeOf<{ phone: string }>();
-    expectTypeOf<BookingLookupProvider>().toMatchTypeOf<Record<string, any>>();
-    expectTypeOf<IdentityType>().toMatchTypeOf<'AFM' | 'PASSPORT'>();
     expectTypeOf<BookingSource>().toMatchTypeOf<'ONSITE' | 'EXTERNAL'>();
     expectTypeOf<AccessStatus>().toMatchTypeOf<string>();
-    expectTypeOf<BookingAccess>().toMatchTypeOf<{ status: AccessStatus }>();
 
     expectTypeOf<GuestRefreshTokenRec>().toMatchTypeOf<{ id: string }>();
     expectTypeOf<InteractiveMarkerData>().toMatchTypeOf<{ id: string }>();
@@ -149,8 +132,6 @@ describe.skipIf(!hasDbUrl)('public API surface remains reachable', () => {
     expectTypeOf<ApiResponse<unknown>>().toMatchTypeOf<Record<string, any>>();
     expectTypeOf<ApiRouteHandler>().toMatchTypeOf<(...args: any[]) => any>();
     expectTypeOf<ErrorHandlerConfig>().toMatchTypeOf<Record<string, any>>();
-    expectTypeOf<Alert>().toMatchTypeOf<{ id: string }>();
-    expectTypeOf<NotificationChannel>().toMatchTypeOf<{ type: string }>();
     expectTypeOf<AppConfig>().toMatchTypeOf<Record<string, any>>();
     expectTypeOf<AvailabilityInfo>().toMatchTypeOf<Record<string, any>>();
     expectTypeOf<IndexDictionary>().toMatchTypeOf<Record<string, any>>();
@@ -161,8 +142,6 @@ describe.skipIf(!hasDbUrl)('public API surface remains reachable', () => {
     expectTypeOf<LeafletMapProps>().toMatchTypeOf<Record<string, any>>();
     expectTypeOf<LazyMapMarkerData>().toMatchTypeOf<{ id: string }>();
     expectTypeOf<TravelMode>().toMatchTypeOf<'driving' | 'foot' | 'cycling'>();
-    expectTypeOf<AnalyticsPersistenceData>().toMatchTypeOf<Record<string, any>>();
-    expectTypeOf<AnalyticsStorageAdapter>().toMatchTypeOf<Record<string, any>>();
   });
 });
 

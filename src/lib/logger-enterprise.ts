@@ -4,6 +4,7 @@
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
+import crypto from 'node:crypto';
 
 // AsyncLocalStorage for proper context propagation across async operations
 // Note: This requires Node.js runtime (not Edge). For Edge routes, use fallback.
@@ -76,7 +77,9 @@ class EnterpriseLogger {
   constructor(config?: Partial<LoggerConfig>) {
     this.config = {
       level: (process.env.LOG_LEVEL as LogLevel) || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
-      enableConsole: process.env.LOG_CONSOLE !== 'false',
+      enableConsole: process.env.NODE_ENV === 'test'
+        ? process.env.LOG_CONSOLE === 'true'
+        : process.env.LOG_CONSOLE !== 'false',
       enableStructured: process.env.LOG_STRUCTURED === 'true',
       enablePerformanceMetrics: process.env.LOG_PERFORMANCE === 'true',
       maxMetadataSize: parseInt(process.env.LOG_MAX_METADATA_SIZE || '1000', 10),
@@ -109,7 +112,7 @@ class EnterpriseLogger {
    * Generate unique correlation ID
    */
   private generateCorrelationId(): string {
-    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return crypto.randomUUID();
   }
 
   /**
@@ -186,16 +189,8 @@ class EnterpriseLogger {
           },
           duration: Date.now() - this.startTime,
         };
-      } else {
-        // Fallback for Edge Runtime
-        return {
-          memory: {
-            used: 0,
-            total: 0,
-          },
-          duration: Date.now() - this.startTime,
-        };
       }
+      return undefined;
     } catch {
       return undefined;
     }
@@ -211,8 +206,8 @@ class EnterpriseLogger {
 
       const lines = stack.split('\n');
       // Skip logger internal calls to find actual caller
-      const callerLine = lines.find(line => 
-        line.includes('.tsx') || line.includes('.ts') && 
+      const callerLine = lines.find(line =>
+        (line.includes('.tsx') || line.includes('.ts')) &&
         !line.includes('logger.ts') && 
         !line.includes('node_modules')
       );

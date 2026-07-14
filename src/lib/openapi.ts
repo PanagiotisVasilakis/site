@@ -1,123 +1,67 @@
-/**
- * OpenAPI 3.0 Specification and utilities
- */
-
-// OpenAPI 3.0 specification
+/** OpenAPI contract for the HTTP surface that is supported outside the UI. */
 export const openApiSpec = {
   openapi: '3.0.3',
   info: {
-    title: 'Site API',
-    description: 'Comprehensive API for analytics, content management, and administration',
-    version: '1.0.0',
-    license: {
-      name: 'MIT',
-      url: 'https://opensource.org/licenses/MIT',
-    },
+    title: 'Guest Guide API',
+    description: 'Public content, booking, guest portal, privacy, analytics, health, and operator endpoints.',
+    version: '2.0.0',
   },
-  servers: [
-    {
-      url: '/api',
-      description: 'Current deployment',
-    },
-  ],
+  servers: [{ url: '/api', description: 'Current deployment' }],
   components: {
     securitySchemes: {
-      ApiKeyAuth: {
-        type: 'apiKey',
-        in: 'header',
-        name: 'X-API-Key',
-        description: 'API key for authenticated requests',
-      },
-      AdminJWT: {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        description: 'JWT token for admin authentication',
-      },
+      AdminCookie: { type: 'apiKey', in: 'cookie', name: 'admin_jwt' },
+      GuestCookie: { type: 'apiKey', in: 'cookie', name: 'guest_session' },
+      ApiKeyAuth: { type: 'apiKey', in: 'header', name: 'X-API-Key' },
+      CronBearer: { type: 'http', scheme: 'bearer', bearerFormat: 'opaque' },
+      WebhookBearer: { type: 'http', scheme: 'bearer', bearerFormat: 'opaque' },
     },
     schemas: {
       Error: {
         type: 'object',
-        required: ['error'],
+        description: 'Routes using the shared handler return a structured error object; small ingestion routes may return a string message.',
         properties: {
+          success: { type: 'boolean', enum: [false] },
           error: {
-            type: 'string',
-            description: 'Error message',
-          },
-          code: {
-            type: 'string',
-            description: 'Error code',
-          },
-          details: {
-            type: 'object',
-            description: 'Additional error details',
+            oneOf: [
+              { type: 'string' },
+              {
+                type: 'object',
+                properties: {
+                  code: { type: 'string' },
+                  message: { type: 'string' },
+                  details: { type: 'object', additionalProperties: true },
+                  correlationId: { type: 'string' },
+                  timestamp: { type: 'string', format: 'date-time' },
+                },
+              },
+            ],
           },
         },
       },
       Category: {
         type: 'object',
-        required: ['id', 'slug', 'title', 'count'],
+        required: ['id', 'slug'],
         properties: {
-          id: {
-            type: 'string',
-            description: 'Category identifier',
-          },
-          slug: {
-            type: 'string',
-            description: 'URL-friendly category slug',
-            pattern: '^[a-z0-9\\-_]+$',
-          },
-          title: {
-            type: 'string',
-            description: 'Category display title',
-          },
-          count: {
-            type: 'integer',
-            minimum: 0,
-            description: 'Number of items in category',
-          },
+          id: { type: 'string' },
+          slug: { type: 'string', pattern: '^[a-z0-9_-]+$' },
+          title: { type: 'string' },
+          count: { type: 'integer', minimum: 0 },
         },
       },
       Item: {
         type: 'object',
-        required: ['id', 'slug', 'name', 'categoryId'],
+        required: ['id', 'slug', 'name'],
         properties: {
-          id: {
-            type: 'string',
-            description: 'Item identifier',
-          },
-          slug: {
-            type: 'string',
-            description: 'URL-friendly item slug',
-            pattern: '^[a-z0-9\\-_]+$',
-          },
-          name: {
-            type: 'string',
-            description: 'Item name',
-          },
-          summary: {
-            type: 'string',
-            description: 'Item summary',
-          },
-          address: {
-            type: 'string',
-            description: 'Item address',
-          },
-          phone: {
-            type: 'string',
-            description: 'Contact phone number',
-          },
+          id: { type: 'string' },
+          slug: { type: 'string' },
+          name: { type: 'string' },
+          summary: { type: 'string' },
+          address: { type: 'string' },
+          phone: { type: 'string' },
+          categoryId: { type: 'string' },
           location: {
             type: 'object',
-            properties: {
-              lat: { type: 'number' },
-              lng: { type: 'number' },
-            },
-            description: 'Geographic coordinates',
-          },
-          categoryId: {
-            type: 'string',
-            description: 'Parent category identifier',
+            properties: { lat: { type: 'number' }, lng: { type: 'number' } },
           },
         },
       },
@@ -125,601 +69,313 @@ export const openApiSpec = {
         type: 'object',
         required: ['path'],
         properties: {
-          path: {
-            type: 'string',
-            description: 'Page path',
-            maxLength: 200,
-          },
-          ts: {
-            type: 'integer',
-            description: 'Timestamp (Unix milliseconds)',
-          },
-          locale: {
-            type: 'string',
-            description: 'Page locale',
-            pattern: '^[a-z]{2}(-[A-Z]{2})?$',
-          },
+          path: { type: 'string', maxLength: 2048, description: 'Query and fragment are discarded before storage.' },
+          locale: { type: 'string', pattern: '^[a-z]{2}(-[A-Z]{2})?$' },
           event: {
             type: 'object',
             properties: {
               name: {
                 type: 'string',
-                description: 'Event name',
+                enum: [
+                  'portal_opened', 'origin_selected', 'form_submitted', 'auth_mode_changed',
+                  'no_booking_cta_clicked', 'checkin_viewed', 'checkin_completed',
+                  'booking_submitted', 'booking_check_availability',
+                  'mobile_nav_house', 'mobile_nav_book', 'mobile_nav_booking_details',
+                  'mobile_nav_about', 'mobile_nav_favorites', 'mobile_nav_moments',
+                  'mobile_nav_phones', 'mobile_nav_checkin',
+                ],
               },
-              props: {
-                type: 'object',
-                description: 'Event properties',
-              },
+              props: { type: 'object', additionalProperties: true, description: 'Only per-event allowlisted properties are retained.' },
             },
           },
         },
       },
       WebVital: {
         type: 'object',
-        required: ['name', 'value', 'path'],
+        required: ['name', 'value'],
+        additionalProperties: false,
         properties: {
-          name: {
-            type: 'string',
-            enum: ['CLS', 'FCP', 'FID', 'INP', 'LCP', 'TTFB'],
-            description: 'Web vital metric name',
-          },
-          value: {
-            type: 'number',
-            minimum: 0,
-            description: 'Metric value',
-          },
-          path: {
-            type: 'string',
-            description: 'Page path where metric was recorded',
-          },
-          ts: {
-            type: 'integer',
-            description: 'Timestamp',
-          },
-          id: {
-            type: 'string',
-            description: 'Unique metric identifier',
-          },
+          name: { type: 'string', enum: ['CLS', 'FCP', 'FID', 'INP', 'LCP', 'TTFB'] },
+          value: { type: 'number', minimum: 0, maximum: 1000000000 },
+          id: { type: 'string', maxLength: 100 },
+          path: { type: 'string', maxLength: 2048 },
         },
       },
-      SecurityEvent: {
+      PortalClaim: {
         type: 'object',
-        required: ['type', 'severity', 'timestamp', 'ip', 'url'],
+        required: ['claimToken', 'origin', 'phone', 'password', 'acceptTerms'],
         properties: {
-          type: {
-            type: 'string',
-            enum: [
-              'csp_violation',
-              'rate_limit_exceeded',
-              'cors_violation',
-              'auth_failure',
-              'suspicious_activity',
-              'api_security_violation',
-              'sql_injection_attempt',
-              'xss_attempt',
-              'api_auth_failure'
-            ],
-            description: 'Security event type',
+          claimToken: { type: 'string', minLength: 32, maxLength: 256 },
+          origin: { type: 'string', enum: ['GR', 'ABROAD'] },
+          phone: { type: 'string', minLength: 8, maxLength: 32 },
+          password: { type: 'string', minLength: 8, maxLength: 128, format: 'password' },
+          remember: { type: 'boolean', default: false },
+          acceptTerms: { type: 'boolean', enum: [true] },
+        },
+      },
+      PortalSession: {
+        type: 'object',
+        required: ['phone', 'password'],
+        properties: {
+          phone: { type: 'string', minLength: 8, maxLength: 32 },
+          password: { type: 'string', minLength: 8, maxLength: 128, format: 'password' },
+          remember: { type: 'boolean', default: false },
+        },
+      },
+      BookingRequest: {
+        type: 'object',
+        required: ['propertyName', 'locale', 'dateRange', 'guest'],
+        properties: {
+          propertyName: { type: 'string', maxLength: 200 },
+          locale: { type: 'string', maxLength: 8 },
+          dateRange: {
+            type: 'object', required: ['from', 'to'],
+            properties: { from: { type: 'string', format: 'date-time' }, to: { type: 'string', format: 'date-time' } },
           },
-          severity: {
-            type: 'string',
-            enum: ['low', 'medium', 'high', 'critical'],
-            description: 'Event severity level',
-          },
-          timestamp: {
-            type: 'string',
-            format: 'date-time',
-            description: 'Event timestamp in ISO format',
-          },
-          ip: {
-            type: 'string',
-            description: 'Client IP address',
-          },
-          userAgent: {
-            type: 'string',
-            description: 'Client user agent',
-          },
-          url: {
-            type: 'string',
-            description: 'Request URL',
-          },
-          details: {
-            type: 'object',
-            description: 'Additional event details',
+          guest: {
+            type: 'object', required: ['firstName', 'lastName', 'email', 'phone'],
+            properties: {
+              firstName: { type: 'string', maxLength: 100 },
+              lastName: { type: 'string', maxLength: 100 },
+              email: { type: 'string', format: 'email', maxLength: 320 },
+              phone: { type: 'string', maxLength: 32 },
+              arrivalTime: { type: 'string', maxLength: 40 },
+              specialRequests: { type: 'string', maxLength: 1000 },
+            },
           },
         },
       },
     },
     responses: {
-      BadRequest: {
-        description: 'Bad request - invalid parameters',
-        content: {
-          'application/json': {
-            schema: { $ref: '#/components/schemas/Error' },
-            example: {
-              error: 'invalid_params',
-              details: { field: 'Expected string, received number' },
-            },
-          },
-        },
-      },
-      Unauthorized: {
-        description: 'Authentication required',
-        content: {
-          'application/json': {
-            schema: { $ref: '#/components/schemas/Error' },
-            example: { error: 'Unauthorized' },
-          },
-        },
-      },
-      Forbidden: {
-        description: 'Access forbidden',
-        content: {
-          'application/json': {
-            schema: { $ref: '#/components/schemas/Error' },
-            example: { error: 'Forbidden' },
-          },
-        },
-      },
-      NotFound: {
-        description: 'Resource not found',
-        content: {
-          'application/json': {
-            schema: { $ref: '#/components/schemas/Error' },
-            example: { error: 'not_found' },
-          },
-        },
-      },
-      TooManyRequests: {
-        description: 'Rate limit exceeded',
-        content: {
-          'application/json': {
-            schema: { $ref: '#/components/schemas/Error' },
-            example: { error: 'Too Many Requests' },
-          },
-        },
-      },
-      InternalServerError: {
-        description: 'Internal server error',
-        content: {
-          'application/json': {
-            schema: { $ref: '#/components/schemas/Error' },
-            example: { error: 'internal_server_error' },
-          },
-        },
-      },
+      BadRequest: { description: 'Invalid request', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+      Unauthorized: { description: 'Authentication required or credentials invalid', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+      Forbidden: { description: 'Authenticated principal is not authorized', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+      NotFound: { description: 'Resource not found', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+      Conflict: { description: 'Request conflicts with current state', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+      RateLimited: { description: 'Rate limit exceeded', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+      Unavailable: { description: 'Required database or delivery dependency is unavailable', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
     },
   },
   paths: {
+    '/health': {
+      get: { summary: 'Process health', tags: ['Health'], responses: { '200': { description: 'Process is alive' } } },
+      head: { summary: 'Process health without a body', tags: ['Health'], responses: { '200': { description: 'Process is alive' } } },
+    },
+    '/health/live': {
+      get: { summary: 'Liveness probe', tags: ['Health'], responses: { '200': { description: 'Process is alive' } } },
+      head: { summary: 'Liveness probe without a body', tags: ['Health'], responses: { '200': { description: 'Process is alive' } } },
+    },
+    '/health/ready': {
+      get: { summary: 'Database and migration readiness probe', tags: ['Health'], responses: { '200': { description: 'Ready' }, '503': { $ref: '#/components/responses/Unavailable' } } },
+      head: { summary: 'Readiness probe without a body', tags: ['Health'], responses: { '200': { description: 'Ready' }, '503': { description: 'Not ready' } } },
+    },
     '/categories': {
-      get: {
-        summary: 'Get all categories',
-        description: 'Retrieve a list of all categories with item counts',
-        tags: ['Content'],
-        responses: {
-          '200': {
-            description: 'List of categories',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    categories: {
-                      type: 'array',
-                      items: { $ref: '#/components/schemas/Category' },
-                    },
-                  },
-                },
-                example: {
-                  categories: [
-                    {
-                      id: 'moments',
-                      slug: 'moments',
-                      title: 'Kalamata Moments',
-                      count: 25,
-                    },
-                  ],
-                },
-              },
-            },
-            headers: {
-              'Cache-Control': {
-                schema: { type: 'string' },
-                description: 'Cache control header',
-              },
-            },
-          },
-          '500': { $ref: '#/components/responses/InternalServerError' },
-        },
-      },
+      get: { summary: 'List public categories', tags: ['Content'], responses: { '200': { description: 'Category list', content: { 'application/json': { schema: { type: 'object', properties: { categories: { type: 'array', items: { $ref: '#/components/schemas/Category' } } } } } } } } },
     },
     '/categories/{category}/items': {
       get: {
-        summary: 'Get items by category',
-        description: 'Retrieve all items in a specific category',
-        tags: ['Content'],
-        parameters: [
-          {
-            name: 'category',
-            in: 'path',
-            required: true,
-            schema: {
-              type: 'string',
-              pattern: '^[a-z0-9\\-_]+$',
-            },
-            description: 'Category slug',
-          },
-        ],
-        responses: {
-          '200': {
-            description: 'List of items in category',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    items: {
-                      type: 'array',
-                      items: { $ref: '#/components/schemas/Item' },
-                    },
-                  },
-                },
-              },
-            },
-          },
-          '400': { $ref: '#/components/responses/BadRequest' },
-          '404': { $ref: '#/components/responses/NotFound' },
-          '500': { $ref: '#/components/responses/InternalServerError' },
-        },
+        summary: 'List public items in a category', tags: ['Content'],
+        parameters: [{ name: 'category', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { '200': { description: 'Item list' }, '404': { $ref: '#/components/responses/NotFound' } },
       },
     },
     '/categories/{category}/items/{slug}': {
       get: {
-        summary: 'Get specific item',
-        description: 'Retrieve details for a specific item',
-        tags: ['Content'],
+        summary: 'Read a public item', tags: ['Content'],
         parameters: [
-          {
-            name: 'category',
-            in: 'path',
-            required: true,
-            schema: {
-              type: 'string',
-              pattern: '^[a-z0-9\\-_]+$',
-            },
-            description: 'Category slug',
-          },
-          {
-            name: 'slug',
-            in: 'path',
-            required: true,
-            schema: {
-              type: 'string',
-              pattern: '^[a-z0-9\\-_]+$',
-            },
-            description: 'Item slug',
-          },
+          { name: 'category', in: 'path', required: true, schema: { type: 'string' } },
+          { name: 'slug', in: 'path', required: true, schema: { type: 'string' } },
         ],
+        responses: { '200': { description: 'Item detail' }, '404': { $ref: '#/components/responses/NotFound' } },
+      },
+    },
+    '/booking-requests': {
+      post: {
+        summary: 'Create a durable booking request', tags: ['Booking'],
+        parameters: [{ name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', minLength: 16, maxLength: 128 } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/BookingRequest' } } } },
         responses: {
-          '200': {
-            description: 'Item details',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    item: { $ref: '#/components/schemas/Item' },
-                  },
-                },
-              },
-            },
-          },
-          '400': { $ref: '#/components/responses/BadRequest' },
-          '404': { $ref: '#/components/responses/NotFound' },
-          '500': { $ref: '#/components/responses/InternalServerError' },
+          '200': { description: 'Existing idempotent request' }, '202': { description: 'Request durably queued' },
+          '400': { $ref: '#/components/responses/BadRequest' }, '422': { $ref: '#/components/responses/BadRequest' },
+          '429': { $ref: '#/components/responses/RateLimited' }, '503': { $ref: '#/components/responses/Unavailable' },
         },
       },
+    },
+    '/portal/claims': {
+      post: {
+        summary: 'Consume a one-time host-issued booking claim', tags: ['Portal'],
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/PortalClaim' } } } },
+        responses: { '200': { description: 'Guest and refresh cookies issued' }, '401': { $ref: '#/components/responses/Unauthorized' }, '409': { $ref: '#/components/responses/Conflict' }, '429': { $ref: '#/components/responses/RateLimited' } },
+      },
+    },
+    '/portal/sessions': {
+      post: {
+        summary: 'Sign in to an eligible claimed booking', tags: ['Portal'],
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/PortalSession' } } } },
+        responses: { '200': { description: 'Guest and refresh cookies issued' }, '401': { $ref: '#/components/responses/Unauthorized' }, '429': { $ref: '#/components/responses/RateLimited' } },
+      },
+    },
+    '/portal/refresh': {
+      post: { summary: 'Rotate the refresh token family', tags: ['Portal'], security: [{ GuestCookie: [] }], responses: { '200': { description: 'Session refreshed' }, '401': { $ref: '#/components/responses/Unauthorized' }, '409': { $ref: '#/components/responses/Conflict' } } },
+    },
+    '/portal/logout': {
+      post: { summary: 'Revoke the refresh family and clear guest cookies', tags: ['Portal'], security: [{ GuestCookie: [] }], responses: { '200': { description: 'Signed out' } } },
+    },
+    '/portal/start': {
+      post: { summary: 'Read the current host-issued claim form schema', tags: ['Portal'], responses: { '200': { description: 'Claim flow schema' }, '404': { $ref: '#/components/responses/NotFound' } } },
+    },
+    '/portal/verify': {
+      post: {
+        deprecated: true,
+        summary: 'Compatibility sign-in endpoint; public lookup signup is gone',
+        description: 'Requests with mode=signin are forwarded to /portal/sessions. All former signup modes return 410.',
+        tags: ['Portal'],
+        responses: { '200': { description: 'Sign-in completed' }, '401': { $ref: '#/components/responses/Unauthorized' }, '410': { description: 'Host-issued claim grant required' } },
+      },
+    },
+    '/portal/onsite/confirm': {
+      post: { deprecated: true, summary: 'Removed legacy onsite confirmation endpoint', tags: ['Portal'], responses: { '410': { description: 'Host-issued claim grant required' } } },
+    },
+    '/check-in': {
+      get: { summary: 'Read the verified booking and check-in state', tags: ['Guest'], security: [{ GuestCookie: [] }], responses: { '200': { description: 'Booking state' }, '401': { $ref: '#/components/responses/Unauthorized' } } },
+    },
+    '/check-in/preferences': {
+      get: { summary: 'Read guest preferences and time-gated Wi-Fi details', tags: ['Guest'], security: [{ GuestCookie: [] }, { AdminCookie: [] }], responses: { '200': { description: 'Preferences' }, '401': { $ref: '#/components/responses/Unauthorized' } } },
+      post: { summary: 'Update preferences as an administrator', tags: ['Guest'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Preferences updated' }, '403': { $ref: '#/components/responses/Forbidden' } } },
+    },
+    '/check-in/arrival-request': {
+      get: { summary: 'Read the guest latest requested arrival time', tags: ['Guest'], security: [{ GuestCookie: [] }], responses: { '200': { description: 'Latest request or null' }, '401': { $ref: '#/components/responses/Unauthorized' } } },
+      post: { summary: 'Create a durable arrival-time request', tags: ['Guest'], security: [{ GuestCookie: [] }], responses: { '200': { description: 'Request stored; delivery state is sent, queued, or skipped' }, '401': { $ref: '#/components/responses/Unauthorized' }, '422': { $ref: '#/components/responses/BadRequest' } } },
+    },
+    '/check-in/complete': {
+      post: { summary: 'Persist check-in completion details', tags: ['Guest'], security: [{ GuestCookie: [] }], responses: { '200': { description: 'Completion stored' }, '401': { $ref: '#/components/responses/Unauthorized' }, '422': { $ref: '#/components/responses/BadRequest' } } },
+    },
+    '/check-in/complete/get': {
+      get: { summary: 'Read persisted check-in completion details', tags: ['Guest'], security: [{ GuestCookie: [] }], responses: { '200': { description: 'Completion or null' }, '401': { $ref: '#/components/responses/Unauthorized' } } },
+    },
+    '/dsar/export': {
+      get: { summary: 'Export the authenticated subject data', tags: ['Privacy'], security: [{ GuestCookie: [] }, { AdminCookie: [] }], responses: { '200': { description: 'Personal data JSON attachment' }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' } } },
+    },
+    '/dsar/requests': {
+      get: { summary: 'List the guest privacy requests', tags: ['Privacy'], security: [{ GuestCookie: [] }], responses: { '200': { description: 'Privacy requests' }, '401': { $ref: '#/components/responses/Unauthorized' } } },
+      post: { summary: 'Submit a verified erasure request', tags: ['Privacy'], security: [{ GuestCookie: [] }], responses: { '200': { description: 'Existing open request' }, '202': { description: 'Request accepted for operator review' }, '429': { $ref: '#/components/responses/RateLimited' } } },
     },
     '/analytics': {
       post: {
-        summary: 'Track analytics events',
-        description: 'Submit analytics events for tracking',
-        tags: ['Analytics'],
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: {
-                oneOf: [
-                  { $ref: '#/components/schemas/AnalyticsEvent' },
-                  {
-                    type: 'array',
-                    items: { $ref: '#/components/schemas/AnalyticsEvent' },
-                    maxItems: 50,
-                  },
-                ],
-              },
-              examples: {
-                single: {
-                  summary: 'Single event',
-                  value: {
-                    path: '/en/apartment',
-                    ts: 1695648000000,
-                    locale: 'en',
-                  },
-                },
-                batch: {
-                  summary: 'Multiple events',
-                  value: [
-                    { path: '/en/apartment', ts: 1695648000000 },
-                    { path: '/en/amenities', ts: 1695648060000 },
-                  ],
-                },
-              },
-            },
-          },
-        },
-        responses: {
-          '204': {
-            description: 'Events recorded successfully',
-          },
-          '400': { $ref: '#/components/responses/BadRequest' },
-          '413': {
-            description: 'Payload too large',
-            content: {
-              'text/plain': {
-                schema: { type: 'string' },
-                example: 'payload too large',
-              },
-            },
-          },
-          '429': { $ref: '#/components/responses/TooManyRequests' },
-          '500': { $ref: '#/components/responses/InternalServerError' },
-        },
+        summary: 'Ingest privacy-minimized analytics', tags: ['Analytics'],
+        requestBody: { required: true, content: { 'application/json': { schema: { oneOf: [{ $ref: '#/components/schemas/AnalyticsEvent' }, { type: 'array', maxItems: 50, items: { $ref: '#/components/schemas/AnalyticsEvent' } }] } } } },
+        responses: { '201': { description: 'Events stored' }, '413': { $ref: '#/components/responses/BadRequest' }, '422': { $ref: '#/components/responses/BadRequest' }, '429': { $ref: '#/components/responses/RateLimited' }, '503': { $ref: '#/components/responses/Unavailable' } },
       },
-      get: {
-        summary: 'Get analytics summary',
-        description: 'Get basic analytics count',
-        tags: ['Analytics'],
-        responses: {
-          '200': {
-            description: 'Analytics summary',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    count: {
-                      type: 'integer',
-                      description: 'Total number of tracked events',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      get: { summary: 'Read recent analytics as an administrator', tags: ['Analytics'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Recent analytics' }, '403': { $ref: '#/components/responses/Forbidden' } } },
+    },
+    '/analytics/stats': {
+      get: { summary: 'Read hourly and daily analytics buckets', tags: ['Analytics'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Analytics buckets' }, '403': { $ref: '#/components/responses/Forbidden' } } },
+    },
+    '/analytics/top': {
+      get: { summary: 'Read top query-free paths', tags: ['Analytics'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Top paths' }, '403': { $ref: '#/components/responses/Forbidden' } } },
+    },
+    '/analytics/export.csv': {
+      get: { summary: 'Export privacy-minimized analytics as formula-safe CSV', tags: ['Analytics'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'CSV attachment', content: { 'text/csv': { schema: { type: 'string' } } } }, '401': { $ref: '#/components/responses/Unauthorized' } } },
     },
     '/vitals': {
-      post: {
-        summary: 'Track web vitals',
-        description: 'Submit Core Web Vitals metrics',
-        tags: ['Analytics'],
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: { $ref: '#/components/schemas/WebVital' },
-              example: {
-                name: 'LCP',
-                value: 2500,
-                path: '/en/apartment',
-                ts: 1695648000000,
-                id: 'unique-metric-id',
-              },
-            },
-          },
-        },
-        responses: {
-          '204': { description: 'Web vital recorded successfully' },
-          '400': { $ref: '#/components/responses/BadRequest' },
-          '500': { $ref: '#/components/responses/InternalServerError' },
-        },
-      },
-      get: {
-        summary: 'Get web vitals summary',
-        description: 'Get Core Web Vitals metrics summary',
-        tags: ['Analytics'],
-        responses: {
-          '200': {
-            description: 'Web vitals summary',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    summary: {
-                      type: 'object',
-                      description: 'Web vitals aggregated data',
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      post: { summary: 'Ingest a Core Web Vital', tags: ['Analytics'], requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/WebVital' } } } }, responses: { '201': { description: 'Vital stored' }, '422': { $ref: '#/components/responses/BadRequest' }, '429': { $ref: '#/components/responses/RateLimited' } } },
+      get: { summary: 'Read vital aggregates as an administrator', tags: ['Analytics'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Vital aggregates' }, '403': { $ref: '#/components/responses/Forbidden' } } },
+    },
+    '/vitals/export.csv': {
+      get: { summary: 'Export Core Web Vitals as formula-safe CSV', tags: ['Analytics'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'CSV attachment', content: { 'text/csv': { schema: { type: 'string' } } } }, '401': { $ref: '#/components/responses/Unauthorized' } } },
     },
     '/admin/login': {
-      post: {
-        summary: 'Admin authentication',
-        description: 'Authenticate admin user and receive JWT token',
-        tags: ['Admin'],
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: {
-                type: 'object',
-                required: ['secret'],
-                properties: {
-                  secret: {
-                    type: 'string',
-                    description: 'Admin secret key',
-                  },
-                },
-              },
-            },
-          },
-        },
-        responses: {
-          '200': {
-            description: 'Authentication successful',
-            headers: {
-              'Set-Cookie': {
-                schema: { type: 'string' },
-                description: 'JWT token cookie',
-              },
-            },
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    success: { type: 'boolean' },
-                    message: { type: 'string' },
-                  },
-                },
-              },
-            },
-          },
-          '401': { $ref: '#/components/responses/Unauthorized' },
-          '500': { $ref: '#/components/responses/InternalServerError' },
-        },
+      post: { summary: 'Create an administrator session', tags: ['Admin'], responses: { '200': { description: 'Admin cookie issued' }, '401': { $ref: '#/components/responses/Unauthorized' }, '429': { $ref: '#/components/responses/RateLimited' } } },
+    },
+    '/admin/logout': {
+      post: { summary: 'Revoke the current administrator session and clear its cookie', tags: ['Admin'], responses: { '200': { description: 'Signed out' } } },
+    },
+    '/admin/refresh': {
+      post: { summary: 'Rotate the administrator JWT for an active server-side session', tags: ['Admin'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Session refreshed' }, '401': { $ref: '#/components/responses/Unauthorized' } } },
+    },
+    '/admin/flags': {
+      get: { summary: 'Read persisted runtime feature flags', tags: ['Admin'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Feature flags' }, '403': { $ref: '#/components/responses/Forbidden' } } },
+      post: { summary: 'Update persisted runtime feature flags', tags: ['Admin'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Updated flags' }, '403': { $ref: '#/components/responses/Forbidden' }, '422': { $ref: '#/components/responses/BadRequest' } } },
+    },
+    '/admin/guests': {
+      get: { summary: 'Query or export booking and guest records', tags: ['Admin'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Requested administrator data view' }, '403': { $ref: '#/components/responses/Forbidden' }, '422': { $ref: '#/components/responses/BadRequest' } } },
+    },
+    '/admin/check-in-requests': {
+      get: { summary: 'List check-in arrival-time requests', tags: ['Admin'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Requests and status counts' }, '403': { $ref: '#/components/responses/Forbidden' } } },
+    },
+    '/admin/check-in-requests/{id}': {
+      patch: {
+        summary: 'Approve or reject a check-in arrival-time request', tags: ['Admin'], security: [{ AdminCookie: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { '200': { description: 'Status changed transactionally; notification delivery state included' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '422': { $ref: '#/components/responses/BadRequest' } },
       },
     },
-    '/security/dashboard': {
-      get: {
-        summary: 'Get security dashboard data',
-        description: 'Retrieve security metrics and status (admin only)',
-        tags: ['Security'],
-        security: [{ AdminJWT: [] }],
-        parameters: [
-          {
-            name: 'endpoint',
-            in: 'query',
-            schema: {
-              type: 'string',
-              enum: ['metrics', 'health', 'events', 'report', 'dashboard'],
-            },
-            description: 'Specific data endpoint',
-          },
-          {
-            name: 'minutes',
-            in: 'query',
-            schema: { type: 'integer', minimum: 1, maximum: 10080 },
-            description: 'Time window in minutes (for events endpoint)',
-          },
-          {
-            name: 'type',
-            in: 'query',
-            schema: {
-              type: 'string',
-              enum: ['daily', 'trends'],
-            },
-            description: 'Report type (for report endpoint)',
-          },
-        ],
-        responses: {
-          '200': {
-            description: 'Security dashboard data',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  description: 'Response varies by endpoint parameter',
-                },
-              },
-            },
-          },
-          '400': { $ref: '#/components/responses/BadRequest' },
-          '401': { $ref: '#/components/responses/Unauthorized' },
-          '500': { $ref: '#/components/responses/InternalServerError' },
-        },
+    '/admin/stay-requests': {
+      get: { summary: 'List durable booking requests and latest delivery state', tags: ['Admin', 'Booking'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Stay requests' }, '403': { $ref: '#/components/responses/Forbidden' } } },
+    },
+    '/admin/stay-requests/{id}': {
+      patch: {
+        summary: 'Retry dead booking delivery or close a completed request', tags: ['Admin', 'Booking'], security: [{ AdminCookie: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { '200': { description: 'Requested action applied transactionally' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '422': { $ref: '#/components/responses/BadRequest' } },
       },
+    },
+    '/admin/bookings/{id}/claim-grants': {
+      post: {
+        summary: 'Issue a one-time booking claim token', tags: ['Admin'], security: [{ AdminCookie: [] }],
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: { '201': { description: 'Plaintext token returned once' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' }, '409': { $ref: '#/components/responses/Conflict' } },
+      },
+    },
+    '/admin/privacy-requests': {
+      get: { summary: 'List privacy requests', tags: ['Admin', 'Privacy'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Privacy requests' }, '403': { $ref: '#/components/responses/Forbidden' } } },
+      post: { summary: 'Complete/reject erasure or manage a privacy hold', tags: ['Admin', 'Privacy'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Action completed' }, '201': { description: 'Hold created' }, '409': { $ref: '#/components/responses/Conflict' } } },
+    },
+    '/alerts': {
+      get: { summary: 'Read operational alerts or managed rules', tags: ['Operations'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Alerts or rules' }, '403': { $ref: '#/components/responses/Forbidden' } } },
+      post: { summary: 'Acknowledge an operational alert', tags: ['Operations'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Alert acknowledged' }, '404': { $ref: '#/components/responses/NotFound' } } },
+      put: { summary: 'Update a managed alert rule', tags: ['Operations'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Rule updated' }, '404': { $ref: '#/components/responses/NotFound' } } },
+      delete: { summary: 'Reject deletion of built-in rules; disable them instead', tags: ['Operations'], security: [{ AdminCookie: [] }], responses: { '405': { description: 'Built-in rules cannot be deleted' } } },
+    },
+    '/alerts/webhook': {
+      get: { summary: 'Read the external alert receiver capability status', tags: ['Operations'], responses: { '200': { description: 'Receiver capability status' } } },
+      post: { summary: 'Store an authenticated external alert', tags: ['Operations'], security: [{ WebhookBearer: [] }], responses: { '200': { description: 'Alert stored' }, '401': { $ref: '#/components/responses/Unauthorized' }, '429': { $ref: '#/components/responses/RateLimited' }, '503': { $ref: '#/components/responses/Unavailable' } } },
+    },
+    '/errors': {
+      post: { summary: 'Ingest a bounded and redacted client error report', tags: ['Operations'], responses: { '201': { description: 'Report stored' }, '413': { description: 'Report exceeds 16 KiB' }, '415': { description: 'JSON content type required' }, '422': { $ref: '#/components/responses/BadRequest' }, '429': { $ref: '#/components/responses/RateLimited' } } },
+    },
+    '/metrics': {
+      get: { summary: 'Read in-process metrics', tags: ['Operations'], security: [{ AdminCookie: [] }, { ApiKeyAuth: [] }], responses: { '200': { description: 'Metrics snapshot' }, '403': { $ref: '#/components/responses/Forbidden' } } },
+      post: { summary: 'Submit a bounded custom in-process metric', tags: ['Operations'], security: [{ AdminCookie: [] }, { ApiKeyAuth: [] }], responses: { '200': { description: 'Metric accepted' }, '403': { $ref: '#/components/responses/Forbidden' }, '422': { $ref: '#/components/responses/BadRequest' } } },
     },
     '/security/csp-report': {
-      post: {
-        summary: 'Report CSP violations',
-        description: 'Endpoint for Content Security Policy violation reports',
-        tags: ['Security'],
-        requestBody: {
-          required: true,
-          content: {
-            'application/json': {
-              schema: {
-                type: 'object',
-                properties: {
-                  'document-uri': { type: 'string' },
-                  'violated-directive': { type: 'string' },
-                  'blocked-uri': { type: 'string' },
-                  'original-policy': { type: 'string' },
-                  'source-file': { type: 'string' },
-                  'line-number': { type: 'integer' },
-                  'column-number': { type: 'integer' },
-                },
-              },
-            },
-          },
-        },
-        responses: {
-          '204': { description: 'CSP violation recorded' },
-          '500': { $ref: '#/components/responses/InternalServerError' },
-        },
-      },
+      post: { summary: 'Store a bounded browser CSP violation report', tags: ['Operations'], responses: { '204': { description: 'Report accepted' }, '400': { $ref: '#/components/responses/BadRequest' }, '413': { description: 'Report exceeds 16 KiB' }, '429': { $ref: '#/components/responses/RateLimited' } } },
+      options: { summary: 'CSP reporting preflight', tags: ['Operations'], responses: { '204': { description: 'Preflight accepted' } } },
+    },
+    '/security/dashboard': {
+      get: { summary: 'Read persisted security events, alerts, health, or reports', tags: ['Operations'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Requested security view' }, '400': { $ref: '#/components/responses/BadRequest' }, '401': { $ref: '#/components/responses/Unauthorized' } } },
+    },
+    '/internal/cache-metrics': {
+      get: { summary: 'Read internal cache and dataset-version diagnostics', description: 'Requires an API key from INTERNAL_API_KEYS.', tags: ['Operations'], security: [{ ApiKeyAuth: [] }], responses: { '200': { description: 'Internal cache diagnostics' }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' } } },
+    },
+    '/internal/booking-outbox': {
+      post: { summary: 'Drain durable booking and check-in webhook deliveries', tags: ['Operations'], security: [{ CronBearer: [] }], responses: { '200': { description: 'Drain result' }, '404': { description: 'Hidden when the bearer secret is invalid' } } },
     },
   },
   tags: [
-    {
-      name: 'Content',
-      description: 'Content management and retrieval',
-    },
-    {
-      name: 'Analytics',
-      description: 'Analytics and performance tracking',
-    },
-    {
-      name: 'Admin',
-      description: 'Administrative operations',
-    },
-    {
-      name: 'Security',
-      description: 'Security monitoring and reporting',
-    },
+    { name: 'Health' }, { name: 'Content' }, { name: 'Booking' }, { name: 'Portal' },
+    { name: 'Guest' }, { name: 'Privacy' }, { name: 'Analytics' }, { name: 'Admin' }, { name: 'Operations' },
   ],
 } as const;
 
-// Validate OpenAPI spec (optional utility for tests/build scripts)
 export function validateOpenAPISpec(): boolean {
-  try {
-    // Basic validation - ensure required fields exist
-    const required = ['openapi', 'info', 'paths'] as const;
-    for (const field of required) {
-      if (!(field in openApiSpec)) {
-        throw new Error(`Missing required field: ${field}`);
-      }
+  if (!/^3\.\d+\.\d+$/.test(openApiSpec.openapi)) return false;
+  const methods = new Set(['get', 'post', 'put', 'patch', 'delete', 'head', 'options']);
+  for (const [path, operations] of Object.entries(openApiSpec.paths)) {
+    if (!path.startsWith('/')) return false;
+    for (const [method, operation] of Object.entries(operations)) {
+      if (!methods.has(method) || !('responses' in operation) || Object.keys(operation.responses).length === 0) return false;
     }
-
-    // Validate version format
-    if (!openApiSpec.openapi.match(/^3\.\d+\.\d+$/)) {
-      throw new Error('Invalid OpenAPI version format');
-    }
-
-    console.log('✅ OpenAPI specification validated successfully');
-    return true;
-  } catch (error) {
-    console.error('❌ OpenAPI specification validation failed:', error);
-    return false;
   }
+  return true;
 }

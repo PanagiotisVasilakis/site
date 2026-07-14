@@ -4,78 +4,15 @@
  */
 
 import { z } from 'zod';
+import { runtimeEnvSchema } from './runtime-env-schema.js';
 
-// Schema for all required environment variables
-const envSchema = z.object({
-  // Node environment
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-
-  // Database
-  DATABASE_URL: z.string().url().min(1, 'DATABASE_URL is required'),
-
-  // Security secrets (must be strong in production)
-  ADMIN_JWT_SECRET: z.string().min(32, 'ADMIN_JWT_SECRET must be at least 32 characters'),
-  ADMIN_DASH_SECRET: z.string().min(20, 'ADMIN_DASH_SECRET must be at least 20 characters'),
-  GUEST_JWT_SECRET: z.string().min(32, 'GUEST_JWT_SECRET must be at least 32 characters'),
-  SECURITY_ENC_KEY_HEX: z.string().length(64, 'SECURITY_ENC_KEY_HEX must be exactly 64 hex characters'),
-  SECURITY_PEPPER: z.string().min(16, 'SECURITY_PEPPER must be at least 16 characters'),
-  SESSION_SECRET: z.string().min(32, 'SESSION_SECRET must be at least 32 characters'),
-  GUEST_WIFI_NETWORK: z.string().min(1, 'GUEST_WIFI_NETWORK is required'),
-  GUEST_WIFI_PASSWORD: z.string().min(8, 'GUEST_WIFI_PASSWORD must be at least 8 characters'),
-
-  // API keys (optional but validated format if present)
-  VALID_API_KEYS: z.string().optional(),
-  INTERNAL_API_KEYS: z.string().optional(),
-  METRICS_WRITE_API_KEYS: z.string().optional(),
-  
-  // CORS and origins
-  ALLOWED_ORIGINS: z.string().optional(),
-  NEXT_PUBLIC_SITE_URL: z.string().url().optional(),
-  TRUST_PROXY_HOPS: z.string().regex(/^\d+$/).optional().default('0'),
-  CLIENT_IP_HEADER: z.enum(['cf-connecting-ip', 'x-real-ip']).optional(),
-
-  // Controlled onsite access grants
-  ONSITE_CONFIRM_ENABLED: z.enum(['0', '1']).optional().default('0'),
-  ONSITE_CONFIRM_JWT_SECRET: z.string().min(32).optional(),
-
-  // Durable booking request delivery
-  BOOKING_REQUEST_WEBHOOK_URL: z.string().url().optional(),
-  BOOKING_REQUEST_WEBHOOK_TOKEN: z.string().optional(),
-  CRON_SECRET: z.string().min(32).optional(),
-
-  // Explicitly gated development-only session minting
-  DEV_SESSION_MINT_ENABLED: z.enum(['0', '1']).optional().default('0'),
-  DEV_SESSION_MINT_SECRET: z.string().min(32).optional(),
-
-  // Analytics and monitoring (optional)
-  ENABLE_ANALYTICS: z.enum(['true', 'false']).optional().default('false'),
-  
-  // Rate limiting (optional with defaults)
-  RATE_LIMIT_MAX_REQUESTS: z.string().regex(/^\d+$/).optional().default('100'),
-  RATE_LIMIT_WINDOW_MS: z.string().regex(/^\d+$/).optional().default('60000'),
-
-  // Testing (optional)
-  TEST_DATABASE_URL: z.string().url().optional(),
-}).superRefine((env, context) => {
-  if (env.ONSITE_CONFIRM_ENABLED === '1' && !env.ONSITE_CONFIRM_JWT_SECRET) {
-    context.addIssue({
-      code: 'custom',
-      path: ['ONSITE_CONFIRM_JWT_SECRET'],
-      message: 'ONSITE_CONFIRM_JWT_SECRET is required when onsite confirmation is enabled',
-    });
-  }
-  if (env.DEV_SESSION_MINT_ENABLED === '1' && !env.DEV_SESSION_MINT_SECRET) {
-    context.addIssue({
-      code: 'custom',
-      path: ['DEV_SESSION_MINT_SECRET'],
-      message: 'DEV_SESSION_MINT_SECRET is required when development session minting is enabled',
-    });
-  }
-});
-
-type Env = z.infer<typeof envSchema>;
+type Env = z.infer<typeof runtimeEnvSchema>;
 
 let validatedEnv: Env | null = null;
+
+export function parseEnv(input: Record<string, string | undefined>): Env {
+  return runtimeEnvSchema.parse(input);
+}
 
 /**
  * Validate environment variables
@@ -87,7 +24,7 @@ export function validateEnv(): Env {
   }
 
   try {
-    validatedEnv = envSchema.parse(process.env);
+    validatedEnv = parseEnv(process.env);
     return validatedEnv;
   } catch (error) {
     if (error instanceof z.ZodError) {

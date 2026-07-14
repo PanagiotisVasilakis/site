@@ -4,6 +4,7 @@
  */
 
 import { logger } from '@/lib/logger-enterprise';
+import type { MetricSink } from '@/lib/observability-contracts';
 
 // Core metric types
 interface BaseMetric {
@@ -59,34 +60,6 @@ interface BusinessMetric {
   event: string;
   value?: number;
   properties?: Record<string, unknown>;
-  userId?: string;
-  sessionId?: string;
-  timestamp: number;
-}
-
-// System metrics interface
-interface SystemMetrics {
-  cpu: {
-    usage: number;
-    loadAverage: number[];
-  };
-  memory: {
-    total: number;
-    used: number;
-    free: number;
-    percentage: number;
-  };
-  network: {
-    bytesIn: number;
-    bytesOut: number;
-    connections: number;
-  };
-  disk: {
-    total: number;
-    used: number;
-    free: number;
-    percentage: number;
-  };
   timestamp: number;
 }
 
@@ -128,7 +101,7 @@ interface ApplicationMetrics {
   timestamp: number;
 }
 
-class MetricsCollector {
+class MetricsCollector implements MetricSink {
   private metrics: Map<string, Metric[]> = new Map();
   private businessMetrics: BusinessMetric[] = [];
   private aggregations: Map<string, MetricAggregation> = new Map();
@@ -297,7 +270,6 @@ class MetricsCollector {
       value,
       properties,
       timestamp: Date.now(),
-      sessionId: this.getSessionId(),
     };
 
     this.businessMetrics.push(businessMetric);
@@ -341,12 +313,13 @@ class MetricsCollector {
     this.trackEvent('user_action', { action, category, value });
   }
 
-  public trackError(error: Error, context?: Record<string, unknown>): void {
+  public trackError(error: Error): void {
     this.counter('errors.total', 1, { type: error.name });
     this.trackEvent('error', {
-      message: error.message,
-      stack: error.stack,
-      context,
+      message: error.message
+        .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[REDACTED_EMAIL]')
+        .replace(/\+?[1-9][0-9 ()-]{7,20}/g, '[REDACTED_PHONE]')
+        .slice(0, 500),
     });
   }
 
@@ -354,66 +327,6 @@ class MetricsCollector {
   public trackWebVital(name: string, value: number, rating: string): void {
     this.gauge(`web_vitals.${name.toLowerCase()}`, value, { rating });
     this.trackEvent('web_vital', { name, value, rating });
-  }
-
-  // System metrics collection (Node.js specific)
-  public collectSystemMetrics(): SystemMetrics | null {
-    // Check if we're in Node.js environment
-    if (typeof process === 'undefined' || process.env?.NODE_ENV === undefined) {
-      return null;
-    }
-
-    try {
-      // Edge Runtime compatible system metrics collection
-      let memUsage = { heapUsed: 0, heapTotal: 0, external: 0, rss: 0 };
-      let cpuUsage = { user: 0, system: 0 };
-      
-      if (typeof globalThis.process?.memoryUsage === 'function') {
-        memUsage = globalThis.process.memoryUsage();
-      }
-      
-      if (typeof globalThis.process?.cpuUsage === 'function') {
-        cpuUsage = globalThis.process.cpuUsage();
-      }
-      
-      const systemMetrics: SystemMetrics = {
-        cpu: {
-          usage: (cpuUsage.user + cpuUsage.system) / 1000000, // Convert to seconds
-          loadAverage: [], // Not available in browser
-        },
-        memory: {
-          total: memUsage.heapTotal,
-          used: memUsage.heapUsed,
-          free: memUsage.heapTotal - memUsage.heapUsed,
-          percentage: memUsage.heapTotal > 0 ? (memUsage.heapUsed / memUsage.heapTotal) * 100 : 0,
-        },
-        network: {
-          bytesIn: 0, // Would need additional monitoring
-          bytesOut: 0,
-          connections: 0,
-        },
-        disk: {
-          total: 0, // Would need additional monitoring
-          used: 0,
-          free: 0,
-          percentage: 0,
-        },
-        timestamp: Date.now(),
-      };
-
-      // Record as gauges
-      this.gauge('system.memory.used', systemMetrics.memory.used);
-      this.gauge('system.memory.percentage', systemMetrics.memory.percentage);
-      this.gauge('system.cpu.usage', systemMetrics.cpu.usage);
-
-      return systemMetrics;
-    } catch (error) {
-      logger.error('Failed to collect system metrics', { 
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
-      });
-      return null;
-    }
   }
 
   // Application metrics aggregation
@@ -747,25 +660,6 @@ class MetricsCollector {
     }
   }
 
-  private getSessionId(): string {
-    if (typeof window !== 'undefined' && window.sessionStorage) {
-      let sessionId = window.sessionStorage.getItem('metrics_session_id');
-      if (!sessionId) {
-        sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        window.sessionStorage.setItem('metrics_session_id', sessionId);
-      }
-      return sessionId;
-    }
-
-    const context = logger.getContext();
-    if (context?.sessionId) return context.sessionId;
-    if (context?.requestId) return `server_request_${context.requestId}`;
-    if (context?.correlationId) return `server_request_${context.correlationId}`;
-
-    return typeof process !== 'undefined' && process.pid
-      ? `server_process_${process.pid}`
-      : 'server_process';
-  }
 }
 
 // Global metrics instance

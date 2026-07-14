@@ -93,23 +93,25 @@ export async function verifyGuestSessionAccess(
 
   const { prisma } = await import('@/lib/prisma');
   const now = new Date();
-  const [sessionRecord, access] = await Promise.all([
+  const [sessionRecord, booking] = await Promise.all([
     prisma.session.findUnique({ where: { id: sessionId } }),
-    prisma.access.findUnique({
-      where: { userId_bookingId: { userId, bookingId } },
-      include: { booking: true },
-    }),
+    prisma.booking.findUnique({ where: { id: bookingId } }),
   ]);
+
+  const accessWindowStart = new Date(booking?.startDate ?? now);
+  accessWindowStart.setUTCDate(accessWindowStart.getUTCDate() - 7);
+  const today = new Date(now.toISOString().slice(0, 10));
 
   if (!sessionRecord
     || sessionRecord.userId !== userId
     || sessionRecord.bookingId !== bookingId
     || sessionRecord.revokedAt
     || sessionRecord.expiresAt <= now
-    || !access
-    || access.status !== 'VERIFIED'
-    || access.booking.userId !== userId
-    || access.booking.endDate < new Date(now.toISOString().slice(0, 10))) {
+    || !booking
+    || booking.accessStatus !== 'VERIFIED'
+    || booking.userId !== userId
+    || now < accessWindowStart
+    || booking.endDate < today) {
     return null;
   }
 
@@ -162,7 +164,7 @@ export function clearSessionCookie(): { name: string; value: string; options: { 
 }
 
 // Refresh cookie helpers
-export function createRefreshCookie(token: string, maxAgeDays = 60): { name: string; value: string; options: { httpOnly: boolean; sameSite: 'lax'; secure: boolean; path: string; maxAge: number } } {
+export function createRefreshCookie(token: string, maxAgeDays = 7): { name: string; value: string; options: { httpOnly: boolean; sameSite: 'lax'; secure: boolean; path: string; maxAge: number } } {
   return {
     name: REFRESH_COOKIE,
     value: token,

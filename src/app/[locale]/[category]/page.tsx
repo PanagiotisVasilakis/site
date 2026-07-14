@@ -5,6 +5,29 @@ import { getItemsByCategory, toSlug, pickLocale, pickCategoryLocale } from "@/li
 import { notFound } from "next/navigation";
 import { getDictionary } from "@/i18n/dictionaries";
 import { locales, type Locale } from "@/i18n/config";
+import { localizedAlternates, normalizeLocale } from '@/lib/seo';
+import type { Metadata } from 'next';
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string; category: string }> }): Promise<Metadata> {
+  const { locale, category } = await params;
+  const eff = normalizeLocale(locale);
+  const dictionary = getDictionary(eff);
+  const cat = categories.find((candidate) => candidate.slug === category);
+  if (!cat) return { robots: { index: false, follow: false } };
+  const title = dictionary.categories[cat.slug as 'phones' | 'moments']
+    ?? pickCategoryLocale(cat, 'title', eff)
+    ?? cat.title;
+  const description = cat.slug === 'moments'
+    ? dictionary.moments?.subtitle
+    : pickCategoryLocale(cat, 'description', eff) ?? cat.description;
+  const suffix = `/${cat.slug}`;
+  return {
+    title: `${title} | ${dictionary.appTitle}`,
+    description,
+    alternates: localizedAlternates(eff, suffix),
+    openGraph: { title, description, url: `/${eff}${suffix}`, locale: eff, type: 'website' },
+  };
+}
 
 export default async function CategoryPage({ params }: { params: Promise<{ locale: string; category: string }> }) {
   const { locale, category } = await params;

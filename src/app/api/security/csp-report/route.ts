@@ -4,31 +4,59 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { handleCSPViolation } from '@/lib/security-monitoring';
-import { getClientIP } from '@/lib/requestUtils';
+import { getClientIp } from '@/lib/net/getClientIp';
+import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
+import { ApiError, readJsonBody } from '@/lib/apiErrorHandler';
+
+const MAX_REPORT_BYTES = 16 * 1_024;
+const cspReportSchema = z.object({
+  'document-uri': z.string().max(2_000).optional(),
+  'violated-directive': z.string().max(500).optional(),
+  'effective-directive': z.string().max(500).optional(),
+  'blocked-uri': z.string().max(2_000).optional(),
+  'original-policy': z.string().max(8_000).optional(),
+  'source-file': z.string().max(2_000).optional(),
+  'line-number': z.number().int().nonnegative().optional(),
+  'column-number': z.number().int().nonnegative().optional(),
+}).strict();
 
 export async function POST(request: NextRequest) {
   try {
-    // Parse the CSP violation report
-    const violationReport = await request.json();
+    const contentLength = Number.parseInt(request.headers.get('content-length') || '0', 10);
+    if (contentLength > MAX_REPORT_BYTES) {
+      return NextResponse.json({ error: 'Report too large' }, { status: 413 });
+    }
+    const decision = await checkSensitiveRateLimit(request, {
+      scope: 'csp-report', limit: 30, windowMs: 60_000,
+    });
+    if (!decision.allowed) return NextResponse.json({ error: 'Too many reports' }, { status: 429 });
 
-    // Extract client information
+    const raw = await readJsonBody(
+      request,
+      MAX_REPORT_BYTES,
+      ['application/csp-report', 'application/json'],
+    );
+    const candidate = typeof raw === 'object' && raw !== null && 'csp-report' in raw
+      ? (raw as { 'csp-report': unknown })['csp-report']
+      : raw;
+    const parsed = cspReportSchema.safeParse(candidate);
+    if (!parsed.success) return NextResponse.json({ error: 'Invalid CSP report' }, { status: 400 });
+
     const clientInfo = {
-      ip: getClientIP(request),
-      userAgent: request.headers.get('user-agent') || undefined,
+      ip: getClientIp(request),
     };
 
-    // Handle the violation
-    await handleCSPViolation(violationReport, clientInfo);
+    await handleCSPViolation(parsed.data, clientInfo);
 
     // Return success response
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    console.error('Error processing CSP violation report:', error);
-    return NextResponse.json(
-      { error: 'Failed to process report' },
-      { status: 500 }
-    );
+    if (error instanceof ApiError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
+    return NextResponse.json({ error: 'Invalid CSP report' }, { status: 400 });
   }
 }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
+import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode, readJsonBody } from '@/lib/apiErrorHandler';
 import { isAdminRequest } from '@/lib/rbac';
 import { getFeatureFlagsAsync, setFeatureFlags, type FeatureFlags } from '@/lib/featureFlags';
 import { metrics } from '@/lib/metrics-collector';
@@ -21,7 +21,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   if (!(await isAdminRequest(req))) throw new ApiError(ApiErrorCode.FORBIDDEN, 'Admin credentials required');
-  const body = await req.json().catch(() => ({}));
+  const body = await readJsonBody(req, 8 * 1_024);
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
     throw new ApiError(ApiErrorCode.VALIDATION_ERROR, 'Invalid flags payload', { issues: parsed.error.issues });
@@ -38,16 +38,13 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     changed.push('checkinEnabled');
   }
 
-  // Emit observability signals (best-effort)
-  try {
-    metrics.counter('feature_flags.updated', 1, {
-      changed: changed.join(',') || 'none',
-      endpoint: '/api/admin/flags',
-      method: 'POST',
-    });
+  metrics.counter('feature_flags.updated', 1, {
+    changed: changed.join(',') || 'none',
+    endpoint: '/api/admin/flags',
+    method: 'POST',
+  });
   metrics.trackEvent('feature_flags_updated', { changed, before, after: updated });
-    logger.info('Feature flags updated', { changed, before, after: updated });
-  } catch {}
+  logger.info('Feature flags updated', { changed, before, after: updated });
 
   return createSuccessResponse<FeatureFlags>(updated) as NextResponse;
 });

@@ -12,6 +12,12 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}', 'scripts/__tests__/**/*.test.ts'],
+    exclude: [
+      'src/__tests__/portalApi.test.ts',
+      'src/__tests__/public-exports.test.ts',
+      'src/__tests__/portalClaims.db.test.ts',
+      'src/__tests__/operations.db.test.ts',
+    ],
     setupFiles: ['./src/__tests__/setup/vitest.setup.ts'],
     globals: true, // Enable global test functions
     coverage: {

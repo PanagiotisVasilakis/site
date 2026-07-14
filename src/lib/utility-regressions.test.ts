@@ -5,14 +5,11 @@ import { serializeJsonLd } from '@/lib/jsonLd';
 import { formatTravelChip } from '@/lib/travelFormat';
 import { mapApiErrorToUI } from '@/lib/userFacingErrors';
 import { internalGet, internalPost } from '@/lib/internalFetch';
-import { createStorageAdapter } from '@/lib/storageAdapter';
 import { useFavorites } from '@/lib/favorites';
 
 describe('small shared utility regressions', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-    delete process.env.ANALYTICS_STORAGE;
-    delete (globalThis as typeof globalThis & { ANALYTICS_KV?: unknown }).ANALYTICS_KV;
     localStorage.clear();
   });
 
@@ -64,27 +61,6 @@ describe('small shared utility regressions', () => {
     await expect(internalPost<{ value: number }>('/api/value', { input: true })).resolves.toEqual({ value: 2 });
     await expect(internalGet('/api/failure')).rejects.toThrow('Request failed: 503');
     await expect(internalGet('https://external.test')).rejects.toThrow('relative path');
-  });
-
-  it('provides safe no-op and KV analytics persistence adapters', () => {
-    process.env.ANALYTICS_STORAGE = 'none';
-    const noop = createStorageAdapter();
-    expect(noop.load()).toEqual({ hits: [], vitals: [], firstSeen: {} });
-    expect(noop.save({ hits: [], vitals: [], firstSeen: {} })).toBeUndefined();
-    expect(noop.backup?.()).toBeUndefined();
-    expect(noop.restore?.('anything')).toBeNull();
-    expect(noop.listBackups?.()).toEqual([]);
-
-    const put = vi.fn();
-    (globalThis as typeof globalThis & { ANALYTICS_KV?: { get: () => string; put: typeof put } }).ANALYTICS_KV = {
-      get: () => JSON.stringify({ hits: [], vitals: [], firstSeen: { '/': 1 } }),
-      put,
-    };
-    process.env.ANALYTICS_STORAGE = 'kv';
-    const kv = createStorageAdapter();
-    expect(kv.load().firstSeen).toEqual({ '/': 1 });
-    kv.save({ hits: [], vitals: [], firstSeen: { '/': 1 } });
-    expect(put).toHaveBeenCalledWith('analytics:data:v1', expect.any(String));
   });
 
   it('synchronizes favorite toggles with local storage', () => {

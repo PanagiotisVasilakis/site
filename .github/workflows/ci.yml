@@ -2,87 +2,171 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION_FILE: .nvmrc
+  NPM_VERSION: 11.18.0
+  NODE_ENV: production
+  GUEST_JWT_SECRET: ci-guest-jwt-secret-should-be-32-chars-0001
+  GUEST_WIFI_NETWORK: ci-guest-network
+  GUEST_WIFI_PASSWORD: ci-guest-password
+  ADMIN_JWT_SECRET: ci-admin-jwt-secret-should-be-32-chars-0001
+  ADMIN_DASH_SECRET: ci-admin-dash-secret-0001
+  SECURITY_ENC_KEY_HEX: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+  SESSION_SECRET: ci-session-secret-should-be-32-chars-0001
+  SECURITY_PEPPER: ci-security-pepper-0001
+  CLAIM_TOKEN_PEPPER: ci-claim-token-pepper-at-least-32-chars-0001
+  NEXT_PUBLIC_SITE_URL: https://example.test
+  ALLOWED_ORIGINS: https://example.test
+  VALID_API_KEYS: 0123456789abcdef0123456789abcdef
+  INTERNAL_API_KEYS: fedcba9876543210fedcba9876543210
+  TRUST_PROXY_MODE: hops
+  TRUST_PROXY_HOPS: '1'
 
 jobs:
   build-test:
+    name: Static, unit, security, and build gates
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
-          node-version-file: .nvmrc
+          node-version-file: ${{ env.NODE_VERSION_FILE }}
           cache: npm
-      - name: Install required npm
-        run: npm install --global npm@11.18.0
-      - name: Reject unresolved merge conflicts
-        run: npm run check:conflicts
-      - name: Install deps
-        run: npm ci --no-audit --no-fund
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Lint
-        run: npm run lint
-      - name: Test with coverage
-        run: npm run test:coverage -- --reporter=default
-      - name: API contract smoke tests
-        run: npm run test:api
-      - name: Coverage Artifact
+      - run: npm install --global "npm@${NPM_VERSION}"
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check:conflicts
+      - run: npm run typecheck
+      - run: npm run lint -- --max-warnings=0
+      - run: npm run lint:security
+      - run: npm run check:dead-code
+      - run: npm run test:coverage -- --reporter=default
+      - run: npm run test:api
+      - run: npm audit --audit-level=high
+      - run: npm run security:license-check
+      - run: npx prisma validate
+      - run: npm run build
+      - name: Upload coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: coverage-lcov
           path: coverage/lcov.info
           if-no-files-found: error
-      - name: Build
-        run: npm run build
 
-  orchestrator-check:
+  database:
+    name: Database, migrations, and orchestrator gates
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
         env:
           POSTGRES_USER: ci_user
           POSTGRES_PASSWORD: ci_pass
-          POSTGRES_DB: site_ci
+          POSTGRES_DB: site_ci_test
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U ci_user -d site_ci"
+          --health-cmd "pg_isready -U ci_user -d site_ci_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
     env:
-      NODE_ENV: production
-      DATABASE_URL: postgresql://ci_user:ci_pass@localhost:5432/site_ci
-      TEST_DATABASE_URL: postgresql://ci_user:ci_pass@localhost:5432/site_ci
-      GUEST_JWT_SECRET: ci-guest-jwt-secret-should-be-32-chars-0001
-      GUEST_WIFI_NETWORK: ci-guest-network
-      GUEST_WIFI_PASSWORD: ci-guest-password
-      ADMIN_JWT_SECRET: ci-admin-jwt-secret-should-be-32-chars-0001
-      ADMIN_DASH_SECRET: ci-admin-dash-secret-0001
-      SECURITY_ENC_KEY_HEX: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-      SESSION_SECRET: ci-session-secret-should-be-32-chars-0001
-      SECURITY_PEPPER: ci-security-pepper
-      NEXT_PUBLIC_SITE_URL: https://example.test
-      ALLOWED_ORIGINS: https://example.test
-      VALID_API_KEYS: 0123456789abcdef0123456789abcdef
-      INTERNAL_API_KEYS: fedcba9876543210fedcba9876543210
+      DATABASE_URL: postgresql://ci_user:ci_pass@localhost:5432/site_ci_test
+      DIRECT_URL: postgresql://ci_user:ci_pass@localhost:5432/site_ci_test
+      TEST_DATABASE_URL: postgresql://ci_user:ci_pass@localhost:5432/site_ci_test
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
-          node-version-file: .nvmrc
+          node-version-file: ${{ env.NODE_VERSION_FILE }}
           cache: npm
-      - name: Install required npm
-        run: npm install --global npm@11.18.0
+      - run: npm install --global "npm@${NPM_VERSION}"
+      - run: npm ci --no-audit --no-fund
+      - run: npm run prisma:migrate:deploy
+      - run: npm run test:db
+      - run: npm run ci:orchestrator-check
 
-      - name: Install deps
-        run: npm ci --no-audit --no-fund
+  browser:
+    name: Accessibility, responsive, Lighthouse, and PWA gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+        env:
+          POSTGRES_USER: browser_user
+          POSTGRES_PASSWORD: browser_pass
+          POSTGRES_DB: site_browser_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U browser_user -d site_browser_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://browser_user:browser_pass@localhost:5432/site_browser_test
+      DIRECT_URL: postgresql://browser_user:browser_pass@localhost:5432/site_browser_test
+      TEST_DATABASE_URL: postgresql://browser_user:browser_pass@localhost:5432/site_browser_test
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      ALLOWED_ORIGINS: http://localhost:3000
+      CI: 'true'
+      AXE_BASE: http://localhost:3000
+      RESPONSIVE_BASE_URL: http://localhost:3000
+      LH_BASE_URL: http://localhost:3000
+      RESPONSIVE_UX_FAIL_ON_ISSUES: '1'
+      LH_MATRIX_FAIL_ON_ISSUES: '1'
+      LH_MATRIX_MIN_SCORE: '70'
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version-file: ${{ env.NODE_VERSION_FILE }}
+          cache: npm
+      - run: npm install --global "npm@${NPM_VERSION}"
+      - run: npm ci --no-audit --no-fund
+      - run: npm run prisma:migrate:deploy
+      - run: npm run build
+      - name: Start application
+        run: npm start > /tmp/next-server.log 2>&1 &
+      - run: npm run wait:http -- http://localhost:3000/api/health/ready 120000
+      - run: npm run ci:accessibility
+      - run: npm run ci:responsive:ux
+      - run: npm run ci:lighthouse:matrix
+      - name: Upload browser reports
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: browser-audit-reports
+          path: |
+            axe-a11y-report-*.json
+            axe-contrast-report-*.json
+            reports/responsive-ux/**
+            reports/lighthouse-matrix/**
+            /tmp/next-server.log
+          if-no-files-found: warn
 
-      - name: Orchestrator check mode
-        run: npm run ci:orchestrator-check
+  quality-gate:
+    name: Required quality gate
+    if: always()
+    needs: [build-test, database, browser]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every gate
+        env:
+          BUILD_RESULT: ${{ needs.build-test.result }}
+          DATABASE_RESULT: ${{ needs.database.result }}
+          BROWSER_RESULT: ${{ needs.browser.result }}
+        run: |
+          test "$BUILD_RESULT" = success
+          test "$DATABASE_RESULT" = success
+          test "$BROWSER_RESULT" = success

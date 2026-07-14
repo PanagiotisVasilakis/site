@@ -38,9 +38,7 @@ function getJwtSecret(): string {
   if (!secret && process.env.NODE_ENV !== 'production') {
     if (!generatedDevSecret) {
       generatedDevSecret = crypto.randomBytes(32).toString('hex');
-      console.warn('⚠️  Generated random JWT secret for development session');
-      console.warn(`⚠️  Secret preview: ${generatedDevSecret.slice(0, 16)}...`);
-      console.warn('⚠️  Set ADMIN_JWT_SECRET in .env to persist across restarts');
+      console.warn('Generated an ephemeral ADMIN_JWT_SECRET for this development process; set it in .env.local to preserve sessions across restarts.');
     }
     return generatedDevSecret;
   }

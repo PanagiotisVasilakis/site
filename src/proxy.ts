@@ -32,16 +32,17 @@ export async function proxy(req: NextRequest) {
   
   // Extract trace context from headers
   const traceHeaders: Record<string, string> = {};
-  req.headers.forEach((value, key) => {
-    traceHeaders[key] = value;
-  });
+  const traceparent = req.headers.get('traceparent');
+  const legacyTrace = req.headers.get('x-trace-id');
+  if (traceparent) traceHeaders.traceparent = traceparent;
+  if (legacyTrace) traceHeaders['x-trace-id'] = legacyTrace;
   
   const parentContext = tracer.extractTraceContext(traceHeaders);
   
   // Start middleware span
   const span = tracer.startSpan('middleware', parentContext || undefined, {
     'http.method': req.method,
-    'http.url': req.url,
+    'http.url': pathname,
     'http.pathname': pathname,
     component: 'middleware',
   });

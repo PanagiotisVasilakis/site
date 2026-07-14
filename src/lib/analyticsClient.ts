@@ -1,39 +1,5 @@
 import { logger } from '@/lib/logger-client';
 
-// Simple, session-scoped funnel id that persists across pages in a session
-// Namespaced so we can have multiple funnels if needed; default is 'portal'
-const DEFAULT_FUNNEL_NS = 'portal';
-
-function safeSS(): Storage | null {
-  try { return typeof window !== 'undefined' ? window.sessionStorage : null; } catch { return null; }
-}
-
-function genId(len = 12): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  let out = '';
-  for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)];
-  return out;
-}
-
-export function ensureFunnel(ns = DEFAULT_FUNNEL_NS): string | undefined {
-  const ss = safeSS();
-  if (!ss) return undefined;
-  const key = `funnel:${ns}`;
-  let val = ss.getItem(key);
-  if (!val) {
-    val = genId();
-    try { ss.setItem(key, val); } catch {}
-  }
-  return val;
-}
-
-export function resetFunnel(ns = DEFAULT_FUNNEL_NS) {
-  const ss = safeSS();
-  if (!ss) return;
-  const key = `funnel:${ns}`;
-  try { ss.removeItem(key); } catch {}
-}
-
 function dntEnabled(): boolean {
   try {
     const nav = navigator as Navigator & { doNotTrack?: string };
@@ -49,7 +15,7 @@ async function post(body: unknown) {
   const json = JSON.stringify(body);
   try {
     if (navigator.sendBeacon) {
-      const ok = navigator.sendBeacon(endpoint, json);
+      const ok = navigator.sendBeacon(endpoint, new Blob([json], { type: 'application/json' }));
       if (ok) return;
     }
   } catch (err) {
@@ -80,10 +46,5 @@ export function trackPageview(pathname: string, locale?: string) {
 export function trackEvent(name: string, props?: Record<string, unknown>) {
   if (typeof window === 'undefined') return;
   if (dntEnabled()) return;
-  const funnelId = ensureFunnel(DEFAULT_FUNNEL_NS);
-  const mergedProps = { ...props } as Record<string, unknown>;
-  if (funnelId && mergedProps.funnelId == null) mergedProps.funnelId = funnelId;
-  post({ path: location.pathname, ts: Date.now(), locale: location.pathname.split('/')[1], event: { name, props: mergedProps } });
+  post({ path: location.pathname, locale: location.pathname.split('/')[1], event: { name, props } });
 }
-
-

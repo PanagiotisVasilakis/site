@@ -92,7 +92,7 @@ describe('UnifiedGuestClient', () => {
     expect(replaceMock).toHaveBeenLastCalledWith('/en/guest?mode=signup', { scroll: false });
   });
 
-  it('uses last-name signup wording and submits lastName without unused email data', async () => {
+  it('uses the host-issued claim flow and sends no identity-document data', async () => {
     const user = userEvent.setup();
     internalFetchMock.mockResolvedValue(new Response(JSON.stringify({
       data: { redirect: '/en/check-in' },
@@ -104,44 +104,45 @@ describe('UnifiedGuestClient', () => {
     render(<UnifiedGuestClient />);
 
     await user.click(document.getElementById('tab-signup') as HTMLButtonElement);
-    await user.click(screen.getByRole('radio', { name: /world/i }));
-
-    expect(screen.getByText(/Last name/)).toBeInTheDocument();
-
-    await user.type(screen.getByPlaceholderText('123 456 7890'), '6900000002');
+    await user.type(screen.getByLabelText(/booking claim token/i), `claim_${'a'.repeat(43)}`);
+    await user.selectOptions(screen.getByLabelText(/where are you traveling from/i), 'ABROAD');
+    await user.type(screen.getByPlaceholderText('+30 690 000 0000'), '+16900000002');
     await user.type(screen.getByPlaceholderText('At least 8 characters'), 'new-password');
-    await user.type(screen.getByPlaceholderText('A12345678'), 'AB12345');
-    await user.type(screen.getByPlaceholderText('Doe'), 'Guest');
+    await user.click(screen.getByText(/I confirm my details/i));
     await user.click(screen.getByRole('button', { name: /continue/i }));
 
-    await waitFor(() => expect(internalFetchMock).toHaveBeenCalledWith('/api/portal/verify', expect.any(Object)));
+    await waitFor(() => expect(internalFetchMock).toHaveBeenCalledWith('/api/portal/claims', expect.any(Object)));
 
     const [, init] = internalFetchMock.mock.calls[0];
     const body = JSON.parse(init.body as string);
     expect(body).toMatchObject({
-      mode: 'signup',
       origin: 'ABROAD',
       phone: '+16900000002',
       password: 'new-password',
-      passport: 'AB12345',
-      lastName: 'Guest',
+      claimToken: `claim_${'a'.repeat(43)}`,
+      acceptTerms: true,
     });
-    expect(body).not.toHaveProperty('email');
+    expect(body).not.toHaveProperty('afm');
+    expect(body).not.toHaveProperty('passport');
+    expect(body).not.toHaveProperty('bookingRef');
+    expect(body).not.toHaveProperty('lastName');
     expect(pushMock).toHaveBeenCalledWith('/en/check-in');
   });
 
-  it('clears the local phone value when the dial code changes', async () => {
+  it('submits sign-in directly to the session endpoint', async () => {
     const user = userEvent.setup();
+    internalFetchMock.mockResolvedValue(new Response(JSON.stringify({ data: { redirect: '/en/check-in' } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
     render(<UnifiedGuestClient />);
 
-    const phoneInput = screen.getByPlaceholderText('123 456 7890');
-    await user.type(phoneInput, '6900000002');
-    expect(phoneInput).toHaveValue('6900000002');
+    await user.type(screen.getByPlaceholderText('+30 690 000 0000'), '+306900000002');
+    await user.type(screen.getByPlaceholderText('At least 8 characters'), 'password');
+    await user.click(screen.getByRole('button', { name: /continue/i }));
 
-    await user.click(screen.getByRole('button', { name: /select country code/i }));
-    await user.click(screen.getByRole('option', { name: /United States/i }));
-
-    expect(phoneInput).toHaveValue('');
-    expect(screen.getByRole('button', { name: /select country code/i })).toHaveTextContent('+1');
+    await waitFor(() => expect(internalFetchMock).toHaveBeenCalledWith('/api/portal/sessions', expect.any(Object)));
+    const body = JSON.parse(internalFetchMock.mock.calls[0][1].body as string);
+    expect(body).toMatchObject({ phone: '+306900000002', password: 'password' });
   });
 });

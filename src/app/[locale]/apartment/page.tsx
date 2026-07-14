@@ -3,6 +3,29 @@ import { getDictionary } from '@/i18n/dictionaries';
 import { housePhotosByRoom, type HousePhotoRoomKey } from '@/data/housePhotos';
 import ApartmentCinematic from '@/components/ApartmentCinematic';
 import type { ApartmentPhotoWithAlt } from '@/types/apartment';
+import type { Metadata } from 'next';
+import { localizedAlternates, normalizeLocale } from '@/lib/seo';
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params;
+  const eff = normalizeLocale(locale);
+  const dictionary = getDictionary(eff);
+  const title = dictionary.house?.title ?? (eff === 'el' ? 'Το διαμέρισμα' : 'The apartment');
+  const description = dictionary.house?.intro ?? dictionary.homeSubtitle;
+  return {
+    title: `${title} | ${dictionary.appTitle}`,
+    description,
+    alternates: localizedAlternates(eff, '/apartment'),
+    openGraph: {
+      title,
+      description,
+      url: `/${eff}/apartment`,
+      locale: eff,
+      type: 'website',
+      images: [{ url: '/house/balcony/balcony_1_hero.webp', alt: title }],
+    },
+  };
+}
 
 // Remove force-static to allow client components with dynamic imports
 export const dynamic = 'auto';

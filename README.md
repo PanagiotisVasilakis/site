@@ -1,43 +1,58 @@
 # QR City Guide
 
-This README is intentionally concise and points to the canonical runbooks.
+Localized Next.js guest guide, booking-request site, and authenticated guest check-in portal backed by PostgreSQL and Prisma.
 
-## Setup and Runtime
+## Core flows
 
-For complete setup and run instructions (development, test, production), use:
+- Public guide: locale-prefixed content under `/en` and `/el`.
+- Booking requests: persisted with an idempotency key and a transactional, leased webhook outbox.
+- Guest access: an administrator issues a short-lived, one-time booking claim token. The guest claims the booking with a phone number and password; later sign-ins use those credentials.
+- Sessions: short-lived guest/admin cookies, server-side session records, rotating refresh-token families, absolute expiry, logout revocation, and replay detection.
+- Check-in requests: persisted with transactional outbox notifications for creation and status changes.
+- Operations: database-backed analytics, Web Vitals, security audit events, alert rules, privacy requests/holds, retention, and retry workers.
 
-- [scripts/README.md](scripts/README.md)
+Legacy phone plus surname/document verification is intentionally not part of the supported authentication flow.
 
-## Use Flows
+## Quick start
 
-The guest portal uses the localized `/{locale}/guest` entry point. Operational
-setup and the available guest/admin commands are documented in
-[scripts/README.md](scripts/README.md).
+Use Node 22.19 and npm 11.18, then:
 
-## Deployment and Operations
+```bash
+npm ci
+npm run ensure-pepper
+npm run system:up -- --profile development --skip-build
+```
 
+The development orchestrator validates the environment, provisions a local PostgreSQL fallback when needed, applies migrations, starts the app, and verifies readiness plus a localized page. See [scripts/README.md](scripts/README.md) for the complete runbook.
+
+## Validation
+
+```bash
+npm run typecheck
+npm run lint -- --max-warnings=0
+npm run check:dead-code
+npm run test:unit
+npm run test:db
+npm run validate:security
+```
+
+Database tests require a dedicated database whose name ends in `_test`; they refuse other database names. Browser, accessibility, responsive, Lighthouse, migration, and production-build gates are defined in `.github/workflows/ci.yml`.
+
+## Operations
+
+The systemd installer creates the app service plus two timers:
+
+- a one-minute leased outbox drain for booking and check-in webhooks;
+- a five-minute operational alert and retention run.
+
+Production startup never loads `.env.local`, never provisions a Docker fallback database, and requires an explicit trusted-proxy topology. Secrets belong in the deployment secret store or the root-owned systemd environment file.
+
+The production container runs as a non-root user. Its build requires an HTTPS `NEXT_PUBLIC_SITE_URL` because Next.js compiles canonical URLs and the sitemap into the output. Configure the GitHub repository variable `NEXT_PUBLIC_SITE_URL`; for a local image use `NEXT_PUBLIC_SITE_URL=https://your-host.example npm run docker:build`.
+
+## Documentation
+
+- [Setup and runtime](scripts/README.md)
 - [Database CI](docs/ci/db-tests.md)
-- [Database lookup testing](docs/testing/db-lookup.md)
-- [Security and secret handling](SECURITY.md)
-
-## Coverage Badge Endpoint
-
-The route `/api/coverage` returns Shields.io style JSON computed from `coverage/lcov.info`. Run `npm run test:coverage` before build/deploy to refresh coverage values.
-
-## Architecture Summary
-
-The guest portal uses a direct verification flow on `/{locale}/guest`:
-
-- Select origin (Greece or Abroad)
-- Submit phone + AFM/passport details to `/api/portal/verify`
-- Receive session cookies on success and redirect to `/{locale}/check-in`
-
-Analytics events are intentionally minimal and PII-safe:
-
-- `portal_opened`
-- `origin_selected`
-- `form_submitted`
-- `auth_mode_changed`
-- `no_booking_cta_clicked`
-- `checkin_viewed`
-- `checkin_completed`
+- [Local database verification](docs/testing/db-lookup.md)
+- [Secret handling and incident response](SECURITY.md)
+- Runtime OpenAPI UI: `/api/docs`

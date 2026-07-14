@@ -9,11 +9,9 @@ import {
   RateLimitMiddleware,
   CORSMiddleware,
   createSecurityMiddleware
-} from '@/lib/security-middleware';
+} from '@/lib/security-middleware-edge';
 import {
   APIInputValidationMiddleware,
-  SQLInjectionProtectionMiddleware,
-  XSSProtectionMiddleware,
   APIKeyAuthMiddleware,
   createAPISecurityMiddleware
 } from '@/lib/api-security-middleware';
@@ -164,21 +162,30 @@ describe('Rate Limiting Middleware', () => {
     expect(response).toBeNull(); // No blocking response
   });
 
-  test.skip('should block requests exceeding limit', async () => {
-    // Temporarily set NODE_ENV to production for stricter limits (100 req/min)
-    vi.stubEnv('NODE_ENV', 'production');
+  test('should block requests exceeding limit', async () => {
     const strictMiddleware = new RateLimitMiddleware();
-    vi.unstubAllEnvs();
+    (strictMiddleware as unknown as { config: Record<string, unknown> }).config = {
+      enabled: true,
+      windowMs: 60_000,
+      maxRequests: 2,
+      skipSuccessfulRequests: false,
+      standardHeaders: true,
+      legacyHeaders: false,
+    };
+    process.env.TRUST_PROXY_MODE = 'hops';
+    process.env.TRUST_PROXY_HOPS = '1';
 
-    const request = new NextRequest('https://example.com/api/test');
+    const request = new NextRequest('https://example.com/api/test', {
+      headers: { 'x-forwarded-for': '192.0.2.10' },
+    });
 
-    // Simulate multiple requests exceeding the production limit
-    for (let i = 0; i < 101; i++) {
-      await strictMiddleware.handle(request);
-    }
+    expect(await strictMiddleware.handle(request)).toBeNull();
+    expect(await strictMiddleware.handle(request)).toBeNull();
 
     const response = await strictMiddleware.handle(request);
     expect(response?.status).toBe(429);
+    delete process.env.TRUST_PROXY_MODE;
+    delete process.env.TRUST_PROXY_HOPS;
   });
 });
 
@@ -213,6 +220,39 @@ describe('CORS Middleware', () => {
     const response = middleware.handle(request);
     expect(response?.status).toBe(403);
   });
+
+  test('should always allow the request own origin', () => {
+    const request = new NextRequest('https://same-origin.example/api/test', {
+      method: 'POST',
+      headers: { origin: 'https://same-origin.example' },
+    });
+
+    expect(middleware.handle(request)).toBeNull();
+  });
+
+  test('uses the contacted Host header when Next normalizes the request URL origin', () => {
+    const request = new NextRequest('http://localhost:3000/api/test', {
+      method: 'POST',
+      headers: {
+        host: '127.0.0.1:3000',
+        origin: 'http://127.0.0.1:3000',
+      },
+    });
+
+    expect(middleware.handle(request)).toBeNull();
+  });
+
+  test('does not treat a Host match with a different protocol as same-origin', () => {
+    const request = new NextRequest('https://example.com/api/test', {
+      method: 'POST',
+      headers: {
+        host: 'example.com',
+        origin: 'http://example.com',
+      },
+    });
+
+    expect(middleware.handle(request)?.status).toBe(403);
+  });
 });
 
 describe('API Security Middleware', () => {
@@ -242,75 +282,15 @@ describe('API Security Middleware', () => {
     const response = middleware.validateRequest(request);
     expect(response?.status).toBe(415);
   });
-});
 
-describe('SQL Injection Protection', () => {
-  let middleware: SQLInjectionProtectionMiddleware;
+  test('should require an exact media type match', () => {
+    const middleware = new APIInputValidationMiddleware();
+    const request = new NextRequest('https://example.com/api/test', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json-malicious' },
+    });
 
-  beforeEach(() => {
-    middleware = new SQLInjectionProtectionMiddleware();
-  });
-
-  test('should log SQL injection-like URL parameters without blocking', () => {
-    const request = new NextRequest(
-      'https://example.com/api/users?id=1 OR 1=1'
-    );
-
-    const response = middleware.validateRequest(request);
-    expect(response).toBeNull();
-  });
-
-  test('should log SQL injection-like patterns without blocking', () => {
-    const request = new NextRequest(
-      'https://example.com/api/test?query=SELECT * FROM users'
-    );
-
-    const response = middleware.validateRequest(request);
-    expect(response).toBeNull();
-  });
-
-  test('should allow safe parameters', () => {
-    const request = new NextRequest(
-      'https://example.com/api/users?name=john&age=25'
-    );
-
-    const response = middleware.validateRequest(request);
-    expect(response).toBeNull();
-  });
-});
-
-describe('XSS Protection', () => {
-  let middleware: XSSProtectionMiddleware;
-
-  beforeEach(() => {
-    middleware = new XSSProtectionMiddleware();
-  });
-
-  test('should log script tags without blocking', () => {
-    const request = new NextRequest(
-      'https://example.com/api/test?input=<script>alert("xss")</script>'
-    );
-
-    const response = middleware.validateRequest(request);
-    expect(response).toBeNull();
-  });
-
-  test('should log event handlers without blocking', () => {
-    const request = new NextRequest(
-      'https://example.com/api/test?input=<img src=x onerror=alert(1)>'
-    );
-
-    const response = middleware.validateRequest(request);
-    expect(response).toBeNull();
-  });
-
-  test('should allow safe content', () => {
-    const request = new NextRequest(
-      'https://example.com/api/test?message=Hello World'
-    );
-
-    const response = middleware.validateRequest(request);
-    expect(response).toBeNull();
+    expect(middleware.validateRequest(request)?.status).toBe(415);
   });
 });
 
@@ -466,6 +446,28 @@ describe('Security Monitoring', () => {
     const recentEvents = monitor.getRecentEvents(60);
     expect(recentEvents).toHaveLength(5);
   });
+
+  test('deduplicates repeated threshold alerts during the cooldown window', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const monitor = getSecurityMonitor();
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    for (let i = 0; i < 51; i++) {
+      monitor.recordEvent({
+        type: 'rate_limit_exceeded',
+        severity: 'medium',
+        timestamp: new Date().toISOString(),
+        ip: '192.168.1.100',
+        url: 'https://example.com/api',
+        details: { attempt: i + 1 },
+      });
+    }
+
+    expect(monitor.getMetrics().alertsTriggered).toBe(1);
+    expect(consoleSpy).toHaveBeenCalledTimes(1);
+    consoleSpy.mockRestore();
+    vi.unstubAllEnvs();
+  });
 });
 
 describe('Combined Security Middleware', () => {
@@ -500,5 +502,13 @@ describe('Combined Security Middleware', () => {
 
     const response = middleware(request);
     expect(response).toBeNull();
+  });
+
+  test('should enforce route-level API keys in every environment', () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    const middleware = createAPISecurityMiddleware({ requireAPIKey: true });
+    const response = middleware(new NextRequest('https://example.com/api/internal'));
+    expect(response?.status).toBe(401);
+    vi.unstubAllEnvs();
   });
 });

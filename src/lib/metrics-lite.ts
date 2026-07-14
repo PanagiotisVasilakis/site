@@ -3,20 +3,13 @@
  * Provides no-op collectors so middleware code can run without Node-only dependencies.
  */
 
-type MetricTags = Record<string, string> | undefined;
-
-type MetricsLite = {
-  counter: (name: string, value?: number, tags?: MetricTags) => void;
-  gauge: (name: string, value: number, tags?: MetricTags) => void;
-  histogram: (name: string, value: number, tags?: MetricTags) => void;
-  timer: (name: string, duration: number, tags?: MetricTags) => void;
-};
+import type { MetricSink } from '@/lib/observability-contracts';
 
 function noop(): void {
   // No-op implementation for Lite version
 }
 
-const metricsLite: MetricsLite = {
+const metricsLite: MetricSink = {
   counter: () => noop(),
   gauge: () => noop(),
   histogram: () => noop(),

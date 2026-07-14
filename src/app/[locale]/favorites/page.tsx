@@ -4,6 +4,18 @@ import { getDictionary } from '@/i18n/dictionaries';
 import { locales, type Locale } from '@/i18n/config';
 import Link from 'next/link';
 import FavoritesClient from '@/components/FavoritesClient';
+import type { Metadata } from 'next';
+import { normalizeLocale } from '@/lib/seo';
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params;
+  const eff = normalizeLocale(locale);
+  const dictionary = getDictionary(eff);
+  return {
+    title: `${dictionary.labels?.favorites ?? 'Favorites'} | ${dictionary.appTitle}`,
+    robots: { index: false, follow: false },
+  };
+}
 
 export default async function FavoritesPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;

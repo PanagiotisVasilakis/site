@@ -1,0 +1,12 @@
+[Unit]
+Description=Drain QR City Guide outbox every minute
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+AccuracySec=10s
+Persistent=true
+Unit=__SERVICE_NAME__-outbox.service
+
+[Install]
+WantedBy=timers.target

@@ -208,7 +208,6 @@ export default function BookingBar({
     void import("@/lib/analyticsClient")
       .then(({ trackEvent }) => {
         trackEvent("booking_check_availability", {
-          property: propertyName,
           hasDates: !!(state.dateRange?.from && state.dateRange?.to),
           nights: getNights(state.dateRange),
         });
@@ -217,7 +216,7 @@ export default function BookingBar({
 
     const bookingUrl = `/${locale}/book?${params.toString()}`;
     router.push(bookingUrl);
-  }, [onBooking, state, locale, propertyName, router]);
+  }, [onBooking, state, locale, router]);
 
   const arrivalLabel = labels?.arrivalLabel || t.search?.arrivalLabel || "Arrival";
   const departureLabel = labels?.departureLabel || t.search?.departureLabel || "Departure";

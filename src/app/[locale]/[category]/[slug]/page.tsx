@@ -14,6 +14,34 @@ import { getDictionary } from "@/i18n/dictionaries";
 import { locales, type Locale } from "@/i18n/config";
 import { headers } from 'next/headers';
 import { serializeJsonLd } from '@/lib/jsonLd';
+import { localizedAlternates, normalizeLocale } from '@/lib/seo';
+import type { Metadata } from 'next';
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string; category: string; slug: string }> }): Promise<Metadata> {
+  const { locale, category, slug } = await params;
+  const eff = normalizeLocale(locale);
+  const cat = categories.find((candidate) => candidate.slug === category);
+  const item = cat ? getItem(cat.id, slug) : undefined;
+  if (!cat || !item) return { robots: { index: false, follow: false } };
+  const dictionary = getDictionary(eff);
+  const title = pickLocale(item, 'name', eff) ?? item.name;
+  const description = pickLocale(item, 'summary', eff) ?? item.summary;
+  const suffix = `/${cat.slug}/${slug}`;
+  const image = item.heroImage ?? item.image;
+  return {
+    title: `${title} | ${dictionary.appTitle}`,
+    description,
+    alternates: localizedAlternates(eff, suffix),
+    openGraph: {
+      title,
+      description,
+      url: `/${eff}${suffix}`,
+      locale: eff,
+      type: 'website',
+      images: image ? [{ url: image, alt: title }] : undefined,
+    },
+  };
+}
 
 export const dynamic = 'force-dynamic';
 export default async function ItemPage({ params }: { params: Promise<{ locale: string; category: string; slug: string }> }) {

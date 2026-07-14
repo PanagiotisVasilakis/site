@@ -4,7 +4,8 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { getClientIp } from '@/lib/net/getClientIp';
 import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
-import { deliverBookingOutboxEvent } from '@/lib/bookingOutbox';
+import { deliverOutboxEvent } from '@/lib/bookingOutbox';
+import { ApiError, readJsonBody } from '@/lib/apiErrorHandler';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,10 +51,20 @@ function idempotencyKey(request: NextRequest): string | null {
 }
 
 export async function POST(request: NextRequest) {
+  if (!process.env.BOOKING_REQUEST_WEBHOOK_URL) {
+    return errorResponse('Booking requests are temporarily unavailable', 503);
+  }
   const key = idempotencyKey(request);
   if (!key) return errorResponse('A valid Idempotency-Key header is required', 400);
 
-  const parsed = bookingRequestSchema.safeParse(await request.json().catch(() => null));
+  let raw: unknown;
+  try {
+    raw = await readJsonBody(request, 32 * 1_024);
+  } catch (error) {
+    if (error instanceof ApiError) return errorResponse(error.message, error.statusCode);
+    throw error;
+  }
+  const parsed = bookingRequestSchema.safeParse(raw);
   if (!parsed.success) return errorResponse('Invalid booking request payload', 422);
 
   const clientIp = getClientIp(request);
@@ -91,6 +102,10 @@ export async function POST(request: NextRequest) {
           create: {
             id: eventId,
             eventType: 'booking_request.created',
+            destination: 'booking_request_webhook',
+            aggregateType: 'stay_request',
+            aggregateId: id,
+            idempotencyKey: `booking-request:${key}`,
             payload: { stayRequestId: id },
           },
         },
@@ -106,6 +121,6 @@ export async function POST(request: NextRequest) {
     throw error;
   }
 
-  await deliverBookingOutboxEvent(eventId);
+  await deliverOutboxEvent(eventId);
   return NextResponse.json({ success: true, data: { id, status: 'queued' } }, { status: 202 });
 }

@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
 import { locales, type Locale } from "@/i18n/config";
-// Removed Google font imports (Geist) to prevent build-time external fetch failures.
-import "../globals.css";
 import { getDictionary } from "@/i18n/dictionaries";
 import { ToastProvider } from "@/components/Toast";
 import JsonFetchHud from "@/components/JsonFetchHud";

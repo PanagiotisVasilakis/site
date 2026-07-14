@@ -1,203 +1,68 @@
-/**
- * Alert Webhook Receiver
- * Receives and processes alert notifications from external systems
- */
-
-import { NextRequest } from 'next/server';
-import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
-import { logger } from '@/lib/logger-enterprise';
-import { metrics } from '@/lib/metrics-collector';
-import { tracer, SpanStatus } from '@/lib/distributed-tracing';
 import crypto from 'node:crypto';
+import { NextRequest } from 'next/server';
+import { z } from 'zod';
 
-export const dynamic = 'force-dynamic';
+import { ApiError, ApiErrorCode, createSuccessResponse, readJsonBody, ValidationError, withErrorHandler } from '@/lib/apiErrorHandler';
+import { logger } from '@/lib/logger-enterprise';
+import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
 
-interface WebhookAlert {
-  alert: {
-    id: string;
-    rule: string;
-    metric: string;
-    value: number;
-    threshold?: number;
-    severity: 'low' | 'medium' | 'high' | 'critical';
-    status: 'active' | 'resolved' | 'acknowledged';
-    message: string;
-    timestamp: number;
-  };
-  timestamp: number;
+const webhookSchema = z.object({
+  alert: z.object({
+    id: z.string().min(1).max(128),
+    rule: z.string().min(1).max(128),
+    metric: z.string().min(1).max(128),
+    value: z.number().finite(),
+    threshold: z.number().finite().optional(),
+    severity: z.enum(['low', 'medium', 'high', 'critical']),
+    status: z.enum(['active', 'resolved', 'acknowledged']),
+    message: z.string().max(1_000),
+    timestamp: z.number().int().positive(),
+  }).strict(),
+  timestamp: z.number().int().positive(),
+}).strict();
+
+function bearerMatches(request: NextRequest, expected: string): boolean {
+  const supplied = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? '';
+  if (supplied.length !== expected.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(expected));
 }
 
-// POST /api/alerts/webhook - Receive alert webhook notifications
 export const POST = withErrorHandler(async (request: NextRequest) => {
-  const span = tracer.startSpan('alerts_webhook', undefined, {
-    component: 'alerts',
-    'http.method': request.method,
+  const expected = process.env.ALERT_WEBHOOK_TOKEN;
+  if (!expected) throw new ApiError(ApiErrorCode.SERVICE_UNAVAILABLE, 'Webhook token is not configured');
+  const decision = await checkSensitiveRateLimit(request, {
+    scope: 'alert-webhook-ingest', limit: 30, windowMs: 60_000,
   });
+  if (!decision.allowed) throw new ApiError(ApiErrorCode.RATE_LIMITED, 'Too many webhook requests');
+  if (!bearerMatches(request, expected)) throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Invalid webhook token');
 
-  const correlationId = logger.getContext()?.correlationId;
-
-  try {
-    // Validate webhook authentication
-    const authHeader = request.headers.get('authorization');
-    const expectedToken = process.env.ALERT_WEBHOOK_TOKEN;
-
-    if (!expectedToken) {
-      throw new ApiError(
-        ApiErrorCode.SERVICE_UNAVAILABLE,
-        'Webhook token is not configured',
-        {},
-        correlationId
-      );
-    }
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new ApiError(
-        ApiErrorCode.UNAUTHORIZED,
-        'Missing or invalid authorization header',
-        {},
-        correlationId
-      );
-    }
-    
-    const token = authHeader.substring(7); // Remove 'Bearer '
-    const tokenBuffer = Buffer.from(token, 'utf8');
-    const expectedBuffer = Buffer.from(expectedToken, 'utf8');
-    const isValidToken = tokenBuffer.length === expectedBuffer.length
-      && crypto.timingSafeEqual(tokenBuffer, expectedBuffer);
-    if (!isValidToken) {
-      throw new ApiError(
-        ApiErrorCode.UNAUTHORIZED,
-        'Invalid webhook token',
-        {},
-        correlationId
-      );
-    }
-
-    const webhookData: WebhookAlert = await request.json();
-    
-    if (!webhookData.alert || !webhookData.alert.id) {
-      throw new ApiError(
-        ApiErrorCode.VALIDATION_ERROR,
-        'Invalid webhook payload',
-        { required: ['alert.id', 'alert.rule', 'alert.severity'] },
-        correlationId
-      );
-    }
-
-    tracer.addTags(span, {
-      'alerts.webhook.id': webhookData.alert.id,
-      'alerts.webhook.severity': webhookData.alert.severity,
-      'alerts.webhook.status': webhookData.alert.status,
-    });
-
-    // Process the webhook alert
-    const alert = webhookData.alert;
-    
-    // Log the webhook alert
-    logger.info('Webhook alert received', {
-      alertId: alert.id,
-      rule: alert.rule,
-      metric: alert.metric,
-      value: alert.value,
+  const parsed = webhookSchema.safeParse(await readJsonBody(request, 32 * 1_024));
+  if (!parsed.success) throw new ValidationError(parsed.error.issues);
+  const alert = parsed.data.alert;
+  const { prisma } = await import('@/lib/prisma');
+  await prisma.securityAuditEvent.create({
+    data: {
+      id: crypto.randomUUID(),
+      eventType: 'external.alert.received',
       severity: alert.severity,
-      status: alert.status,
-      message: alert.message,
-    });
-
-    // Track webhook metrics
-    metrics.counter('alerts.webhook.received', 1, {
-      severity: alert.severity,
-      status: alert.status,
-    });
-
-    // In a real implementation, you might:
-    // 1. Store the alert in a database
-    // 2. Forward to other notification systems
-    // 3. Trigger additional automations
-    // 4. Update monitoring dashboards
-
-    // Example: Forward critical alerts to additional channels
-    if (alert.severity === 'critical') {
-      logger.error('Critical alert received via webhook', {
-        alertId: alert.id,
+      details: {
+        externalId: alert.id,
         rule: alert.rule,
         metric: alert.metric,
         value: alert.value,
+        threshold: alert.threshold,
+        status: alert.status,
         message: alert.message,
-      });
-      
-      metrics.counter('alerts.webhook.critical', 1);
-      
-      // Here you could integrate with:
-      // - PagerDuty
-      // - Slack
-      // - Email services
-      // - SMS gateways
-    }
-
-    // Response data
-    const responseData = {
-      success: true,
-      alertId: alert.id,
-      processed: true,
-      timestamp: Date.now(),
-      actions: {
-        logged: true,
-        metricsTracked: true,
-        criticalEscalation: alert.severity === 'critical',
+        sourceTimestamp: alert.timestamp,
       },
-    };
-
-    tracer.finishSpan(span);
-
-    return createSuccessResponse(responseData, 200, correlationId);
-
-  } catch (error) {
-    tracer.addLog(span, 'error', 'Webhook processing failed', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    tracer.finishSpan(span, SpanStatus.ERROR);
-
-    logger.error('Webhook processing failed', {}, error instanceof Error ? error : new Error(String(error)));
-
-    metrics.counter('alerts.webhook.errors', 1);
-
-    if (error instanceof ApiError) {
-      throw error;
-    }
-
-    throw new ApiError(
-      ApiErrorCode.INTERNAL_ERROR,
-      'Webhook processing failed',
-      {
-        timestamp: new Date().toISOString(),
-        error: error instanceof Error ? error.message : String(error),
-      },
-      correlationId
-    );
-  }
-}, {
-  enableErrorLogging: true,
-  enablePerformanceLogging: true,
-  enableRequestLogging: true,
-  requestTimeoutMs: 10000,
+    },
+  });
+  logger.info('External alert stored', { alertId: alert.id, severity: alert.severity, status: alert.status });
+  return createSuccessResponse({ alertId: alert.id, processed: true });
 });
 
-// GET /api/alerts/webhook - Health check for webhook endpoint
-export const GET = withErrorHandler(async () => {
-  const responseData = {
-    status: 'healthy',
-    endpoint: 'alerts-webhook',
-    timestamp: Date.now(),
-    version: '1.0.0',
-    accepts: ['POST'],
-    authentication: 'Bearer token required',
-  };
-
-  return createSuccessResponse(responseData, 200);
-}, {
-  enableErrorLogging: false,
-  enablePerformanceLogging: false,
-  enableRequestLogging: false,
-  requestTimeoutMs: 5000,
-});
+export const GET = withErrorHandler(async () => createSuccessResponse({
+  status: 'healthy',
+  accepts: ['POST'],
+  authentication: 'Bearer token required',
+}));

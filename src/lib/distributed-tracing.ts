@@ -6,43 +6,11 @@
 import { logger } from '@/lib/logger-enterprise';
 import { metrics } from '@/lib/metrics-collector';
 import crypto from 'node:crypto';
+import { formatTraceContextHeaders, parseTraceContextHeaders, SpanStatus } from '@/lib/observability-contracts';
+import type { Span, SpanLogLevel, TraceContext } from '@/lib/observability-contracts';
 
-// Trace interfaces
-interface TraceContext {
-  traceId: string;
-  spanId: string;
-  parentSpanId?: string;
-  flags: number;
-  baggage?: Record<string, string>;
-}
-
-interface Span {
-  traceId: string;
-  spanId: string;
-  parentSpanId?: string;
-  operationName: string;
-  startTime: number;
-  endTime?: number;
-  duration?: number;
-  tags: Record<string, unknown>;
-  logs: SpanLog[];
-  status: SpanStatus;
-  component: string;
-}
-
-interface SpanLog {
-  timestamp: number;
-  level: 'info' | 'warn' | 'error' | 'debug';
-  message: string;
-  fields?: Record<string, unknown>;
-}
-
-export enum SpanStatus {
-  OK = 'ok',
-  ERROR = 'error',
-  TIMEOUT = 'timeout',
-  CANCELLED = 'cancelled',
-}
+export { SpanStatus } from '@/lib/observability-contracts';
+export type { Span, TraceContext } from '@/lib/observability-contracts';
 
 // Tracer class for distributed tracing
 class DistributedTracer {
@@ -87,41 +55,12 @@ class DistributedTracer {
 
   // Extract trace context from headers
   public extractTraceContext(headers: Record<string, string>): TraceContext | null {
-    const traceHeader = headers['x-trace-id'] || headers['traceparent'];
-    
-    if (traceHeader && traceHeader.startsWith('00-')) {
-      // W3C Trace Context format: 00-traceId-spanId-flags
-      const parts = traceHeader.split('-');
-      if (parts.length === 4) {
-        return {
-          traceId: parts[1],
-          spanId: parts[2],
-          flags: parseInt(parts[3], 16),
-        };
-      }
-    }
-    
-    // Simple format
-    if (traceHeader) {
-      const [traceId, spanId] = traceHeader.split(':');
-      if (traceId && spanId) {
-        return {
-          traceId,
-          spanId,
-          flags: 1,
-        };
-      }
-    }
-
-    return null;
+    return parseTraceContextHeaders(headers);
   }
 
   // Inject trace context into headers
   public injectTraceContext(context: TraceContext): Record<string, string> {
-    return {
-      'x-trace-id': `${context.traceId}:${context.spanId}`,
-      'traceparent': `00-${context.traceId}-${context.spanId}-${context.flags.toString(16).padStart(2, '0')}`,
-    };
+    return formatTraceContextHeaders(context);
   }
 
   // Start a new span
@@ -242,7 +181,7 @@ class DistributedTracer {
   // Add log to span
   public addLog(
     span: Span,
-    level: 'info' | 'warn' | 'error' | 'debug',
+    level: SpanLogLevel,
     message: string,
     fields?: Record<string, unknown>
   ): void {

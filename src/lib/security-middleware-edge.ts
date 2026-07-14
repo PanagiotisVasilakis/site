@@ -26,7 +26,7 @@ interface SecurityMiddlewareOptions {
   customHeaders?: Record<string, string>;
 }
 
-class SecurityHeadersMiddleware {
+export class SecurityHeadersMiddleware {
   private readonly config = getSecurityConfig();
   private readonly options: SecurityMiddlewareOptions;
 
@@ -49,7 +49,6 @@ class SecurityHeadersMiddleware {
 
     this.applySecurityHeaders(response, nonce);
     this.applyCspHeaders(response, nonce);
-    this.logSecurityContext(request);
 
     const requestHeaders = new Headers(request.headers);
     const csp = response.headers.get('Content-Security-Policy')
@@ -146,51 +145,9 @@ class SecurityHeadersMiddleware {
     }
   }
 
-  private logSecurityContext(request: NextRequest): void {
-    const config = this.config;
-    if (!config.monitoring.enabled || !config.monitoring.logSecurityEvents) return;
-
-    const suspiciousPatterns = [
-      /<script/i,
-      /javascript:/i,
-      /vbscript:/i,
-      /onload=/i,
-      /onerror=/i,
-      /eval\(/i,
-      /document\.cookie/i,
-    ];
-
-    const url = request.nextUrl.toString();
-    const userAgent = request.headers.get('user-agent') || '';
-    const referer = request.headers.get('referer') || '';
-
-    const hasSuspiciousContent = suspiciousPatterns.some((pattern) =>
-      pattern.test(url) || pattern.test(userAgent) || pattern.test(referer),
-    );
-
-    if (!hasSuspiciousContent) return;
-
-    const event: SecurityEvent = {
-      type: 'suspicious_activity',
-      severity: 'medium',
-      timestamp: new Date().toISOString(),
-      ip: getClientIp(request, { trustProxy: true }),
-      userAgent,
-      url,
-      details: {
-        referer,
-        method: request.method,
-        suspiciousPatterns: suspiciousPatterns
-          .filter((pattern) => pattern.test(url) || pattern.test(userAgent) || pattern.test(referer))
-          .map((pattern) => pattern.toString()),
-      },
-    };
-
-    logSecurityEvent(event);
-  }
 }
 
-class RateLimitMiddleware {
+export class RateLimitMiddleware {
   private readonly config = getSecurityConfig().rateLimit;
   private readonly memoryStore = new Map<string, { count: number; resetTime: number }>();
 
@@ -223,8 +180,11 @@ class RateLimitMiddleware {
         if (process.env.NODE_ENV !== 'test') {
           console.error('Upstash rate limit error:', error);
         }
-        metrics.counter('rate_limit.fallback_in_memory', 1, { backend: 'redis' });
-        return this.handleInMemory(key, now, resetTime);
+        metrics.counter('rate_limit.backend_unavailable', 1, { backend: 'redis' });
+        return new NextResponse('Rate limit service unavailable', {
+          status: 503,
+          headers: { 'Retry-After': '5' },
+        });
       }
     }
 
@@ -279,7 +239,7 @@ class RateLimitMiddleware {
   }
 }
 
-class CORSMiddleware {
+export class CORSMiddleware {
   private readonly config = getSecurityConfig().cors;
 
   public handle(request: NextRequest): NextResponse | null {
@@ -292,14 +252,13 @@ class CORSMiddleware {
       return this.handlePreflight(request, origin);
     }
 
-    if (origin && !this.isOriginAllowed(origin)) {
+    if (origin && !this.isOriginAllowed(origin, request)) {
       const event: SecurityEvent = {
         type: 'cors_violation',
         severity: 'medium',
         timestamp: new Date().toISOString(),
         ip: getClientIp(request, { trustProxy: true }),
-        userAgent: request.headers.get('user-agent') || undefined,
-        url: request.nextUrl.toString(),
+        url: request.nextUrl.pathname,
         details: {
           origin,
           allowedOrigins: this.config.origins,
@@ -315,7 +274,7 @@ class CORSMiddleware {
 
   public applyActualRequestHeaders(request: NextRequest, response: NextResponse): void {
     const origin = request.headers.get('origin');
-    if (!this.config.enabled || !origin || !this.isOriginAllowed(origin)) return;
+    if (!this.config.enabled || !origin || !this.isOriginAllowed(origin, request)) return;
     response.headers.set('Access-Control-Allow-Origin', origin);
     response.headers.append('Vary', 'Origin');
     if (this.config.credentials) response.headers.set('Access-Control-Allow-Credentials', 'true');
@@ -324,7 +283,7 @@ class CORSMiddleware {
   private handlePreflight(_request: NextRequest, origin: string | null): NextResponse {
     const response = new NextResponse(null, { status: 200 });
 
-    if (origin && this.isOriginAllowed(origin)) {
+    if (origin && this.isOriginAllowed(origin, _request)) {
       response.headers.set('Access-Control-Allow-Origin', origin);
     }
 
@@ -339,8 +298,28 @@ class CORSMiddleware {
     return response;
   }
 
-  private isOriginAllowed(origin: string): boolean {
-    return this.config.origins.includes(origin) || this.config.origins.includes('*');
+  private isOriginAllowed(origin: string, request: NextRequest): boolean {
+    if (this.config.origins.includes(origin) || this.config.origins.includes('*')) return true;
+    if (origin === request.nextUrl.origin) return true;
+
+    // Next can normalize nextUrl to its configured public origin. The HTTP Host
+    // header still represents the origin the browser actually contacted.
+    try {
+      const parsedOrigin = new URL(origin);
+      const requestHost = request.headers.get('host')?.toLowerCase();
+      if (!requestHost || parsedOrigin.host.toLowerCase() !== requestHost) return false;
+
+      const trustsProxy = (process.env.TRUST_PROXY_MODE || 'none') !== 'none';
+      const forwardedProtocol = trustsProxy
+        ? request.headers.get('x-forwarded-proto')?.split(',', 1)[0]?.trim().toLowerCase()
+        : undefined;
+      const requestProtocol = forwardedProtocol
+        ? `${forwardedProtocol}:`
+        : request.nextUrl.protocol;
+      return parsedOrigin.protocol === requestProtocol;
+    } catch {
+      return false;
+    }
   }
 }
 

@@ -1,4 +1,4 @@
-import { topPaths, hourBuckets, dayBuckets, rollingAverage, percentile, vitalsSummary, stats, dailyNewPaths, vitalsRecent } from '@/lib/analyticsStore';
+import { topPaths, hourBuckets, dayBuckets, rollingAverage, percentile, vitalsSummary, analyticsStats, dailyNewPaths, vitalsRecent } from '@/lib/analyticsRepository';
 import AdminSessionManager from '@/components/AdminSessionManager';
 import { verifyAdminSession } from '@/lib/auth/admin';
 import { cookies } from 'next/headers';
@@ -17,13 +17,15 @@ export default async function AnalyticsAdminPage() {
   }
 
   // If we reach here, both secret (from middleware) and JWT are valid
-  const top = topPaths(20);
-  const summary = stats();
-  const newPaths = dailyNewPaths(14);
-  const vitals = vitalsSummary();
-  const recentVitals = vitalsRecent(30);
-  const hoursRaw = hourBuckets();
-  const daysRaw = dayBuckets();
+  const [top, summary, newPaths, vitals, recentVitals, hoursRaw, daysRaw] = await Promise.all([
+    topPaths(20),
+    analyticsStats(),
+    dailyNewPaths(14),
+    vitalsSummary(),
+    vitalsRecent(30),
+    hourBuckets(),
+    dayBuckets(),
+  ]);
   const hours = rollingAverage(hoursRaw, 3);
   const days = rollingAverage(daysRaw, 7);
   const hourCounts = hoursRaw.map(h => h.count);

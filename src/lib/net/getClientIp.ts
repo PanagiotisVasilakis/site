@@ -44,9 +44,13 @@ export interface GetClientIpOptions {
  * @returns Client IP address or 'unknown' if not determinable
  */
 export function getClientIp(request: NextRequest, options?: GetClientIpOptions): string {
-  const trustProxy = options?.trustProxy ?? process.env.NODE_ENV === 'production';
+  const proxyMode = process.env.TRUST_PROXY_MODE || 'none';
+  const hasExplicitTestOverride = options?.trustedHops !== undefined || options?.clientIpHeader !== undefined;
+  const trustProxy = options?.trustProxy ?? proxyMode !== 'none';
   const configuredHops = Number.parseInt(process.env.TRUST_PROXY_HOPS || '0', 10);
-  const trustedHops = options?.trustedHops ?? (Number.isFinite(configuredHops) ? configuredHops : 0);
+  const trustedHops = options?.trustedHops ?? (
+    proxyMode === 'none' ? 0 : (Number.isFinite(configuredHops) ? configuredHops : 0)
+  );
   const clientIpHeader = options?.clientIpHeader || process.env.CLIENT_IP_HEADER;
   
   // Don't trust proxy headers unless explicitly configured to do so
@@ -56,12 +60,16 @@ export function getClientIp(request: NextRequest, options?: GetClientIpOptions):
 
   // A single-value header is trusted only when the operator explicitly names it.
   // x-client-ip is intentionally rejected because clients can set it directly.
-  if (clientIpHeader && ['cf-connecting-ip', 'x-real-ip'].includes(clientIpHeader.toLowerCase())) {
+  if ((proxyMode === 'header' || hasExplicitTestOverride)
+    && clientIpHeader
+    && ['cf-connecting-ip', 'x-real-ip'].includes(clientIpHeader.toLowerCase())) {
     const candidate = request.headers.get(clientIpHeader)?.trim();
     if (candidate && isValidIpAddress(candidate)) {
       return normalizeIpAddress(candidate);
     }
   }
+
+  if (proxyMode !== 'hops' && !hasExplicitTestOverride) return 'unknown';
 
   const forwarded = request.headers.get('x-forwarded-for')
     ?.split(',')

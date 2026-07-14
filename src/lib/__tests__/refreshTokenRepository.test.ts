@@ -7,6 +7,9 @@ const { tx, prismaMock } = vi.hoisted(() => {
       updateMany: vi.fn(),
       create: vi.fn(),
     },
+    refreshTokenFamily: {
+      update: vi.fn(),
+    },
   };
 
   return {
@@ -49,6 +52,16 @@ function tokenRecord(overrides: Record<string, unknown> = {}) {
     lastUsedAt: null,
     deviceHint: null,
     ipHint: null,
+    family: {
+      id: 'family-1',
+      userId: USER_ID,
+      absoluteExpiresAt: new Date(Date.now() + 600_000),
+      revokedAt: null,
+      revocationReason: null,
+      deviceHash: null,
+      ipHash: null,
+      createdAt: new Date(Date.now() - 1_000),
+    },
     ...overrides,
   };
 }
@@ -109,6 +122,9 @@ describe('refreshTokenRepository.rotate', () => {
       where: { familyId: 'family-1', revokedAt: null },
       data: { revokedAt: expect.any(Date) },
     });
+    expect(tx.refreshTokenFamily.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ revocationReason: 'refresh_token_replay' }),
+    }));
     expect(tx.refreshToken.create).not.toHaveBeenCalled();
   });
 
@@ -127,6 +143,9 @@ describe('refreshTokenRepository.rotate', () => {
 
     expect(result).toEqual({ status: 'replayed', familyId: 'family-1' });
     expect(tx.refreshToken.updateMany).toHaveBeenCalledTimes(2);
+    expect(tx.refreshTokenFamily.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ revocationReason: 'concurrent_rotation_conflict' }),
+    }));
     expect(tx.refreshToken.create).not.toHaveBeenCalled();
   });
 

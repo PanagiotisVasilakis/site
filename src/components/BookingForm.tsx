@@ -73,7 +73,7 @@ export default function BookingForm({ dateRange, locale, labels, propertyName, s
       // Track booking attempt
       trackEvent('booking_submitted', {
         nights: getNights(dateRange),
-        arrivalTime: data.arrivalTime || 'not_specified'
+        hasArrivalTime: Boolean(data.arrivalTime),
       });
 
       const response = await internalFetch('/api/booking-requests', {

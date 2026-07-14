@@ -1,32 +1,20 @@
 export type GuestMode = 'signin' | 'signup';
 export type GuestOrigin = 'GR' | 'ABROAD' | '';
 
-export function validateAfm(value: string): boolean {
-  return /^\d{9}$/.test(value);
-}
-
-export function validatePassport(value: string): boolean {
-  return /^[A-Za-z0-9]{5,20}$/.test(value);
-}
-
 export function isGuestFormValid(
   mode: GuestMode,
   values: {
     origin: GuestOrigin;
+    claimToken: string;
     phone: string;
-    lastName: string;
     password: string;
-    afm: string;
-    passport: string;
+    acceptTerms: boolean;
   },
 ): boolean {
-  if (mode === 'signin') {
-    return values.phone.length > 0 && values.password.length >= 8;
-  }
-
-  if (!values.origin || !values.phone || !values.lastName || values.password.length < 8) {
-    return false;
-  }
-  if (values.origin === 'GR') return validateAfm(values.afm);
-  return validatePassport(values.passport);
+  const credentialsValid = values.phone.trim().length >= 8 && values.password.length >= 8;
+  if (mode === 'signin') return credentialsValid;
+  return credentialsValid
+    && values.origin !== ''
+    && values.claimToken.trim().length >= 32
+    && values.acceptTerms;
 }

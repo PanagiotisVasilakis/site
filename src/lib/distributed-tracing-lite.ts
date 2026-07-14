@@ -1,53 +1,17 @@
-/**
- * Minimal distributed tracing implementation compatible with the Edge runtime.
- * Mirrors the public API used by middleware without depending on Node-only features.
- */
+import { formatTraceContextHeaders, parseTraceContextHeaders, SpanStatus } from '@/lib/observability-contracts';
+import type { Span, SpanLogLevel, TraceApi, TraceContext } from '@/lib/observability-contracts';
 
-type TraceContext = {
-  traceId: string;
-  spanId: string;
-  parentSpanId?: string;
-  flags: number;
-};
-
-type SpanLogLevel = 'info' | 'warn' | 'error' | 'debug';
-
-type Span = {
-  traceId: string;
-  spanId: string;
-  parentSpanId?: string;
-  operationName: string;
-  startTime: number;
-  endTime?: number;
-  duration?: number;
-  tags: Record<string, unknown>;
-  logs: Array<{
-    timestamp: number;
-    level: SpanLogLevel;
-    message: string;
-    fields?: Record<string, unknown>;
-  }>;
-  component?: string;
-};
+export { SpanStatus } from '@/lib/observability-contracts';
+export type { Span, TraceContext } from '@/lib/observability-contracts';
 
 const HEX_CHARS = '0123456789abcdef';
 
 function randomHex(length: number): string {
   let result = '';
-  const cryptoObj = typeof crypto !== 'undefined' ? crypto : undefined;
-
-  if (cryptoObj && typeof cryptoObj.getRandomValues === 'function') {
-    const bytes = new Uint8Array(length);
-    cryptoObj.getRandomValues(bytes);
-    for (let i = 0; i < length; i++) {
-      result += HEX_CHARS[bytes[i] % 16];
-    }
-    return result;
-  }
-
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
   for (let i = 0; i < length; i++) {
-    const idx = Math.floor(Math.random() * 16);
-    result += HEX_CHARS[idx];
+    result += HEX_CHARS[bytes[i] % 16];
   }
   return result;
 }
@@ -60,44 +24,15 @@ function createSpanId(): string {
   return randomHex(16);
 }
 
-export enum SpanStatus {
-  OK = 'ok',
-  ERROR = 'error',
-  TIMEOUT = 'timeout',
-  CANCELLED = 'cancelled',
-}
-
 type StartSpanTags = Record<string, unknown> | undefined;
 
-export const tracer = {
+export const tracer: TraceApi = {
   extractTraceContext(headers: Record<string, string>): TraceContext | null {
-    const header = headers['traceparent'] || headers['x-trace-id'];
-    if (!header) return null;
-
-    if (header.startsWith('00-')) {
-      const parts = header.split('-');
-      if (parts.length === 4) {
-        return {
-          traceId: parts[1],
-          spanId: parts[2],
-          flags: parseInt(parts[3], 16) || 1,
-        };
-      }
-    }
-
-    const [traceId, spanId] = header.split(':');
-    if (traceId && spanId) {
-      return { traceId, spanId, flags: 1 };
-    }
-
-    return null;
+    return parseTraceContextHeaders(headers);
   },
 
   injectTraceContext(context: TraceContext): Record<string, string> {
-    return {
-      'traceparent': `00-${context.traceId}-${context.spanId}-${context.flags.toString(16).padStart(2, '0')}`,
-      'x-trace-id': `${context.traceId}:${context.spanId}`,
-    };
+    return formatTraceContextHeaders(context);
   },
 
   startSpan(operationName: string, parentContext?: TraceContext | null, tags: StartSpanTags = {}): Span {
@@ -109,14 +44,15 @@ export const tracer = {
       startTime: Date.now(),
       tags: { ...tags },
       logs: [],
-      component: typeof tags?.component === 'string' ? (tags.component as string) : undefined,
+      status: SpanStatus.OK,
+      component: typeof tags?.component === 'string' ? tags.component : 'edge',
     };
   },
 
   finishSpan(span: Span, status: SpanStatus = SpanStatus.OK): void {
     span.endTime = Date.now();
     span.duration = span.endTime - span.startTime;
-    span.tags.status = status;
+    span.status = status;
   },
 
   addTags(span: Span, tags: Record<string, unknown>): void {
@@ -127,5 +63,3 @@ export const tracer = {
     span.logs.push({ timestamp: Date.now(), level, message, fields });
   },
 };
-
-export type { TraceContext, Span };

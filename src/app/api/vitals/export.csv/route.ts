@@ -1,7 +1,8 @@
-import { vitalsSummary, vitalsRecent } from '@/lib/analyticsStore';
+import { vitalsSummary, vitalsRecent } from '@/lib/analyticsRepository';
 import { verifyAdminSession } from '@/lib/auth/admin';
 import { NextRequest } from 'next/server';
 import { logger } from '@/lib/logger-enterprise';
+import { csvRow } from '@/lib/csv';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,45 +11,40 @@ export async function GET(req: NextRequest) {
     // Extract JWT token from cookies
     const token = req.cookies.get('admin_jwt')?.value;
     if (!token) {
-      logger.warn('Vitals export attempt without token', { 
-        ip: req.headers.get('x-forwarded-for') || 'unknown',
-        userAgent: req.headers.get('user-agent') || 'unknown'
-      });
+      logger.warn('Vitals export attempt without token');
       return new Response('Unauthorized', { status: 401 });
     }
     
     // Verify admin authentication
     const adminPayload = await verifyAdminSession(token);
     if (!adminPayload || adminPayload.role !== 'admin') {
-      logger.warn('Invalid admin token for vitals export', { 
-        ip: req.headers.get('x-forwarded-for') || 'unknown'
-      });
+      logger.warn('Invalid admin token for vitals export');
       return new Response('Unauthorized', { status: 401 });
     }
     
-    const summary = vitalsSummary();
-    const recent = vitalsRecent(100); // up to 100 recent per metric
+    const [summary, recent] = await Promise.all([
+      vitalsSummary(),
+      vitalsRecent(100),
+    ]); // up to 100 recent per metric
     
-    let csv = 'metric,avg,p90,count\n';
+    let csv = csvRow(['metric', 'avg', 'p90', 'count']);
     for (const v of summary) {
-      // Sanitize metric names to prevent CSV injection
-      const sanitizedName = String(v.name).replace(/[",\r\n]/g, '').substring(0, 50);
-      csv += `"${sanitizedName}",${v.avg.toFixed(3)},${v.p90?.toFixed(3) || 'N/A'},${v.count}\n`;
+      csv += csvRow([String(v.name).slice(0, 50), v.avg.toFixed(3), v.p90?.toFixed(3) ?? 'N/A', v.count]);
     }
     
-    csv += '\nmetric,id,timestamp,value\n';
+    csv += `\n${csvRow(['metric', 'id', 'timestamp', 'value'])}`;
     for (const [name, list] of Object.entries(recent)) {
-      const sanitizedMetricName = String(name).replace(/[",\r\n]/g, '').substring(0, 50);
       for (const v of list) {
-        const sanitizedId = String(v.id).replace(/[",\r\n]/g, '').substring(0, 100);
-        csv += `"${sanitizedMetricName}","${sanitizedId}",${new Date(v.ts).toISOString()},${v.value}\n`;
+        csv += csvRow([
+          String(name).slice(0, 50),
+          String(v.id).slice(0, 100),
+          new Date(v.ts).toISOString(),
+          v.value,
+        ]);
       }
     }
     
-    logger.info('Vitals export accessed by admin', { 
-      admin: adminPayload.role,
-      jti: adminPayload.jti
-    });
+    logger.info('Vitals export accessed by admin', { admin: adminPayload.role });
     
     return new Response(csv, { 
       headers: { 
@@ -59,10 +55,7 @@ export async function GET(req: NextRequest) {
     });
     
   } catch (error) {
-    logger.error('Vitals export failed', { 
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined
-    });
+    logger.error('Vitals export failed', {}, error instanceof Error ? error : new Error(String(error)));
     return new Response('Internal Server Error', { status: 500 });
   }
 }

@@ -18,9 +18,13 @@ describe('edge-compatible tracing', () => {
   });
 
   it('supports the legacy trace header and rejects malformed context', () => {
-    expect(tracer.extractTraceContext({ 'x-trace-id': 'trace-id:span-id' }))
-      .toEqual({ traceId: 'trace-id', spanId: 'span-id', flags: 1 });
+    expect(tracer.extractTraceContext({ 'x-trace-id': `${'a'.repeat(32)}:${'b'.repeat(16)}` }))
+      .toEqual({ traceId: 'a'.repeat(32), spanId: 'b'.repeat(16), flags: 1 });
+    expect(tracer.extractTraceContext({ 'x-trace-id': 'trace-id:span-id' })).toBeNull();
     expect(tracer.extractTraceContext({ traceparent: 'invalid' })).toBeNull();
+    expect(tracer.extractTraceContext({
+      traceparent: `00-${'0'.repeat(32)}-${'2'.repeat(16)}-01`,
+    })).toBeNull();
   });
 
   it('creates, enriches, logs, and finishes a child span', () => {
@@ -35,7 +39,8 @@ describe('edge-compatible tracing', () => {
     tracer.addTags(span, { attempt: 1 });
     tracer.addLog(span, 'info', 'delivery started', { eventId: 'event-1' });
     tracer.finishSpan(span, SpanStatus.OK);
-    expect(span.tags).toEqual(expect.objectContaining({ attempt: 1, status: 'ok' }));
+    expect(span.tags).toEqual(expect.objectContaining({ attempt: 1 }));
+    expect(span.status).toBe(SpanStatus.OK);
     expect(span.logs).toHaveLength(1);
     expect(span.duration).toBeGreaterThanOrEqual(0);
   });

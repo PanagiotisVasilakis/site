@@ -1,4 +1,4 @@
-const analytics = vi.hoisted(() => ({ trackEvent: vi.fn(), ensureFunnel: vi.fn() }));
+const analytics = vi.hoisted(() => ({ trackEvent: vi.fn() }));
 vi.mock('@/lib/analyticsClient', () => analytics);
 
 import { categorizeReason, track, tracker } from './tracker';
@@ -25,10 +25,10 @@ describe('PII-safe analytics tracker', () => {
     track({ name: 'checkin_viewed' });
     track({ name: 'checkin_completed' });
 
-    expect(analytics.ensureFunnel).toHaveBeenCalledTimes(7);
     expect(analytics.trackEvent).toHaveBeenCalledWith('portal_opened', {
-      source: `${'x'.repeat(20)}…`,
+      source: 'x'.repeat(20),
     });
+    expect(analytics.trackEvent).toHaveBeenCalledWith('no_booking_cta_clicked', { from: 'guest' });
     expect(analytics.trackEvent).toHaveBeenCalledWith('checkin_completed', {});
   });
 

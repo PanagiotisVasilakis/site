@@ -65,38 +65,17 @@ function sendMetric(metric: { name: string; value: number; id: string; rating: s
       }
     }
     if (!shouldSend) return;
-    // Use sendBeacon for reliable reporting
+    const payload = JSON.stringify({
+      name: metric.name,
+      value: metric.value,
+      id: metric.id,
+      path: window.location.pathname,
+    });
+    // Only metric data and a query-free path are collected. User agent and full URLs are excluded.
     if (navigator.sendBeacon) {
-      navigator.sendBeacon('/api/performance', JSON.stringify({
-        type: 'core-web-vital',
-        sessionId: 'web-vitals-session',
-        metric: {
-          name: metric.name,
-          value: metric.value,
-          rating: metric.rating,
-          timestamp: Date.now(),
-          id: metric.id,
-          url: window.location.href,
-          userAgent: navigator.userAgent,
-          connection: (navigator as unknown as { connection?: { effectiveType?: string; downlink?: number; rtt?: number } }).connection,
-        },
-      }));
+      navigator.sendBeacon('/api/vitals', new Blob([payload], { type: 'application/json' }));
     } else {
-      // Fallback to helper
-      internalPost('/api/performance', {
-        type: 'core-web-vital',
-        sessionId: 'web-vitals-session',
-        metric: {
-          name: metric.name,
-          value: metric.value,
-          rating: metric.rating,
-          timestamp: Date.now(),
-          id: metric.id,
-          url: window.location.href,
-          userAgent: navigator.userAgent,
-          connection: (navigator as unknown as { connection?: { effectiveType?: string; downlink?: number; rtt?: number } }).connection,
-        },
-      }).catch(err => {
+      internalPost('/api/vitals', JSON.parse(payload)).catch(err => {
         console.warn('Failed to send web vital metric', { metric, error: err });
       });
     }

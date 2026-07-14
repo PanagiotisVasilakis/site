@@ -5,13 +5,10 @@ import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import { parseGuestSession, verifyGuestSessionAccess, type GuestSessionPayload } from '@/lib/guestSession';
 import { guestStore } from '@/lib/guestDataStore';
 import { checkInRequestRepository, type CheckInRequestRecord } from '@/lib/prisma-repositories/checkInRequestRepository';
-import { logger } from '@/lib/logger-enterprise';
 import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 
 const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const webhookMaxAttempts = 3;
-const webhookRetryDelaysMs = [250, 1000];
 
 const requestSchema = z.object({
   requestedTime: z.string().regex(timeRegex, 'Requested time must be in HH:MM format'),
@@ -43,94 +40,6 @@ async function getVerifiedSession(request: NextRequest): Promise<GuestSessionPay
 
 function safeUuid(value: string | undefined): string | undefined {
   return value && uuidRegex.test(value) ? value : undefined;
-}
-
-async function notifyHost(payload: {
-  request: CheckInRequestRecord;
-  rawBookingId?: string;
-  rawUserId?: string;
-}): Promise<{
-  status: 'skipped' | 'sent' | 'failed';
-  attempts: number;
-  statusCode?: number;
-  error?: string;
-}> {
-  const webhookUrl = process.env.CHECKIN_REQUEST_WEBHOOK_URL;
-  if (!webhookUrl) return { status: 'skipped', attempts: 0 };
-
-  const headers: HeadersInit = { 'Content-Type': 'application/json' };
-  const token = process.env.CHECKIN_REQUEST_WEBHOOK_TOKEN;
-  if (token) headers.Authorization = `Bearer ${token}`;
-
-  const body = JSON.stringify({
-    event: 'check_in_time_request.created',
-    requestId: payload.request.id,
-    bookingId: payload.rawBookingId ?? payload.request.booking_id,
-    userId: payload.rawUserId ?? payload.request.user_id,
-    guestName: payload.request.guest_name,
-    guestEmail: payload.request.guest_email,
-    guestPhone: payload.request.guest_phone,
-    requestedTime: payload.request.requested_time,
-    message: payload.request.message,
-    status: payload.request.status,
-    createdAt: new Date(payload.request.created_at).toISOString(),
-  });
-
-  let lastStatusCode: number | undefined;
-  let lastError: string | undefined;
-
-  for (let attempt = 1; attempt <= webhookMaxAttempts; attempt += 1) {
-    try {
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers,
-        body,
-        signal: AbortSignal.timeout(5000),
-      });
-
-      if (response.ok) {
-        return { status: 'sent', attempts: attempt, statusCode: response.status };
-      }
-
-      lastStatusCode = response.status;
-      lastError = `HTTP ${response.status}`;
-      logger.warn('Check-in request webhook returned non-OK status', {
-        requestId: payload.request.id,
-        status: response.status,
-        attempt,
-      });
-
-      if (response.status < 500 && response.status !== 429) {
-        break;
-      }
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error);
-      logger.warn('Check-in request webhook attempt failed', {
-        requestId: payload.request.id,
-        attempt,
-        error: lastError,
-      });
-    }
-
-    const delay = webhookRetryDelaysMs[attempt - 1];
-    if (delay) {
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-  }
-
-  logger.error('Check-in request webhook delivery dead-lettered', {
-    requestId: payload.request.id,
-    attempts: webhookMaxAttempts,
-    statusCode: lastStatusCode,
-    error: lastError,
-  });
-
-  return {
-    status: 'failed',
-    attempts: webhookMaxAttempts,
-    statusCode: lastStatusCode,
-    error: lastError,
-  };
 }
 
 export const GET = withErrorHandler(async (request: NextRequest) => {
@@ -172,14 +81,17 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     guestPhone: user?.phone_e164,
     requestedTime: body.requestedTime,
     message,
+  }, {
+    eventType: 'check_in_time_request.created',
+    nextStatus: 'PENDING',
   });
-
-  const notification = await notifyHost({
-    request: created,
-    rawBookingId: session.booking?.id,
-    rawUserId: session.user?.id,
-  });
+  const delivered = created.notificationEventId
+    ? await (await import('@/lib/bookingOutbox')).deliverOutboxEvent(created.notificationEventId)
+    : false;
+  const notification = !created.notificationEventId
+    ? { status: 'skipped' as const, reason: 'webhook_not_configured' }
+    : { status: delivered ? 'sent' as const : 'queued' as const };
 
   const correlationId = request.headers.get('x-correlation-id') ?? undefined;
-  return createSuccessResponse({ request: normalizeRequest(created), notification }, undefined, correlationId);
+  return createSuccessResponse({ request: normalizeRequest(created.request), notification }, undefined, correlationId);
 });

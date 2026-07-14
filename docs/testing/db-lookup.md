@@ -1,50 +1,35 @@
-# Test DB lookup verification
+# Local database verification
 
-This guide documents the quick smoke test that verifies whether the Docker-based test database is reachable and migrated before running assertions. It is intended to accompany the scripted workflow introduced in Issue 1 and provides additional context for manual troubleshooting.
-
-## Issue 1 lookup smoke test workflow
-
-The commands below replicate the CI lookup locally. They target the `postgres-test` service defined in [`docker/docker-compose.test-db.yml`](../../docker/docker-compose.test-db.yml) and rely on the same `TEST_DATABASE_URL` string that Vitest expects.
-
-### 1. Ensure the Docker service is running
-
-Bring up the Postgres service that ships with the repository:
+Start the disposable PostgreSQL service:
 
 ```bash
 docker compose -f docker/docker-compose.test-db.yml up -d postgres-test
+docker compose -f docker/docker-compose.test-db.yml ps
 ```
 
-The compose file exposes the container as `site-test-db` on host port `5433` with credentials `testuser` / `testpass` and database `site_test`.
-
-### 2. Export the expected URL
-
-The smoke test and Prisma migrations assume the following connection string. Export it into your current shell session before proceeding:
+It listens only on `127.0.0.1:5434` and stores data in tmpfs. Configure and migrate it:
 
 ```bash
-export TEST_DATABASE_URL="postgresql://testuser:testpass@localhost:5433/site_test"
+export TEST_DATABASE_URL='postgresql://testuser:testpass@127.0.0.1:5434/site_test'
+DATABASE_URL="$TEST_DATABASE_URL" DIRECT_URL="$TEST_DATABASE_URL" npx prisma migrate deploy
 ```
 
-### 3. Run migrations exactly as scripted
-
-Issue 1’s helper script runs Prisma migrations against the test database prior to executing assertions. Replicate the same step manually so the schema matches your application:
+Run the database suite and a direct SQL readiness check:
 
 ```bash
-DATABASE_URL="$TEST_DATABASE_URL" npx prisma migrate deploy
+DATABASE_URL="$TEST_DATABASE_URL" DIRECT_URL="$TEST_DATABASE_URL" npm run test:db
+docker compose -f docker/docker-compose.test-db.yml exec postgres-test pg_isready -U testuser -d site_test
 ```
 
-### 4. Execute the scripted lookup check
-
-Use the exact command emitted by the Issue 1 script to run the lookup/creation assertions with the correct environment variables:
+If it fails, inspect container health and migration state:
 
 ```bash
-NODE_ENV=test TEST_DATABASE_URL="postgresql://testuser:testpass@localhost:5433/site_test" npm test
+docker compose -f docker/docker-compose.test-db.yml logs postgres-test
+DATABASE_URL="$TEST_DATABASE_URL" npx prisma migrate status
 ```
 
-This runs the Vitest suite against the Docker-hosted database, ensuring Prisma uses the dedicated test URL instead of your development database.
+Stop and discard it with:
 
-### 5. Interpreting results
-
-- ✅ **All assertions green** – The test runner connected to `postgres-test`, applied migrations, and successfully exercised the database-backed code paths. Your test database is reachable.
-- ❌ **Failures or hangs** – Most commonly indicate a connection problem (container not running, wrong `TEST_DATABASE_URL`) or unapplied migrations (the schema Prisma expects is missing). Re-run the migration command above and confirm the Docker service is healthy with `docker ps` and `docker logs site-test-db`.
-
-If problems persist after verifying connectivity, inspect Prisma logs (`DEBUG=prisma:*`) or run `psql "$TEST_DATABASE_URL" -c "\\dt"` to confirm the schema state.
+```bash
+docker compose -f docker/docker-compose.test-db.yml down
+```

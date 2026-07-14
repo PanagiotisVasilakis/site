@@ -201,6 +201,12 @@ parse_args() {
   done
 
   validate_profile
+
+  # Production must never replace its configured database with a local
+  # development container. This is an invariant, not an opt-out flag.
+  if [[ "$PROFILE" == "production" ]]; then
+    DOCKER_FALLBACK=0
+  fi
 }
 
 parse_major_version() {
@@ -312,7 +318,8 @@ compose() {
 env_candidates() {
   case "$PROFILE" in
     production)
-      printf '%s\n' ".env.production.local" ".env.local" ".env.production" ".env"
+      # Never load developer-local overrides in production mode.
+      printf '%s\n' ".env.production.local" ".env.production" ".env"
       ;;
     development)
       printf '%s\n' ".env.development.local" ".env.local" ".env.development" ".env"
@@ -385,6 +392,10 @@ maybe_ensure_pepper() {
     return
   fi
 
+  if [[ "$PROFILE" == "production" ]]; then
+    die "SECURITY_ENC_KEY_HEX missing or invalid; production configuration is never auto-repaired" 14
+  fi
+
   warn "SECURITY_ENC_KEY_HEX missing or invalid; running npm run ensure-pepper"
   (
     cd "$REPO_ROOT"
@@ -401,12 +412,22 @@ is_valid_url() {
   node --input-type=module -e "try { new URL(process.argv[1]); process.exit(0); } catch { process.exit(1); }" "$value"
 }
 
+is_postgres_url() {
+  local value="$1"
+  node --input-type=module -e "try { const protocol = new URL(process.argv[1]).protocol; process.exit(protocol === 'postgres:' || protocol === 'postgresql:' ? 0 : 1); } catch { process.exit(1); }" "$value"
+}
+
+is_exact_origin() {
+  local value="$1"
+  node --input-type=module -e "try { const url = new URL(process.argv[1]); process.exit(url.origin === process.argv[1] ? 0 : 1); } catch { process.exit(1); }" "$value"
+}
+
 validate_environment_contract() {
   local failed=0
 
   if (( DB_ONLY_MODE )); then
-    if [[ -n "${DATABASE_URL:-}" ]] && ! is_valid_url "$DATABASE_URL"; then
-      error "DATABASE_URL is not a valid URL"
+    if [[ -n "${DATABASE_URL:-}" ]] && ! is_postgres_url "$DATABASE_URL"; then
+      error "DATABASE_URL must be a valid postgres or postgresql URL"
       failed=1
     fi
 
@@ -421,8 +442,8 @@ validate_environment_contract() {
   if [[ -z "${DATABASE_URL:-}" ]]; then
     error "DATABASE_URL is required"
     failed=1
-  elif ! is_valid_url "$DATABASE_URL"; then
-    error "DATABASE_URL is not a valid URL"
+  elif ! is_postgres_url "$DATABASE_URL"; then
+    error "DATABASE_URL must be a valid postgres or postgresql URL"
     failed=1
   fi
 
@@ -436,13 +457,188 @@ validate_environment_contract() {
     failed=1
   fi
 
+  if [[ -z "${GUEST_JWT_SECRET:-}" || ${#GUEST_JWT_SECRET} -lt 32 ]]; then
+    error "GUEST_JWT_SECRET must be at least 32 characters"
+    failed=1
+  fi
+
   if [[ -z "${SECURITY_ENC_KEY_HEX:-}" || ! "${SECURITY_ENC_KEY_HEX}" =~ ^[0-9a-fA-F]{64}$ ]]; then
     error "SECURITY_ENC_KEY_HEX must be exactly 64 hex characters"
     failed=1
   fi
 
+  if [[ -z "${SECURITY_PEPPER:-}" || ${#SECURITY_PEPPER} -lt 16 ]]; then
+    error "SECURITY_PEPPER must be at least 16 characters"
+    failed=1
+  fi
+
   if [[ -z "${SESSION_SECRET:-}" || ${#SESSION_SECRET} -lt 32 ]]; then
     error "SESSION_SECRET must be at least 32 characters"
+    failed=1
+  fi
+
+  if [[ -z "${GUEST_WIFI_NETWORK:-}" ]]; then
+    error "GUEST_WIFI_NETWORK is required"
+    failed=1
+  fi
+
+  if [[ -z "${GUEST_WIFI_PASSWORD:-}" || ${#GUEST_WIFI_PASSWORD} -lt 8 ]]; then
+    error "GUEST_WIFI_PASSWORD must be at least 8 characters"
+    failed=1
+  fi
+
+  if [[ "$PROFILE" == "production" && -z "${NEXT_PUBLIC_SITE_URL:-}" ]]; then
+    error "NEXT_PUBLIC_SITE_URL is required in production"
+    failed=1
+  elif [[ -n "${NEXT_PUBLIC_SITE_URL:-}" ]] && ! is_valid_url "$NEXT_PUBLIC_SITE_URL"; then
+    error "NEXT_PUBLIC_SITE_URL is not a valid URL"
+    failed=1
+  elif [[ "$PROFILE" == "production" && -n "${NEXT_PUBLIC_SITE_URL:-}" && "$NEXT_PUBLIC_SITE_URL" != https://* ]]; then
+    if [[ "${CI:-false}" != "true" || ! "$NEXT_PUBLIC_SITE_URL" =~ ^http://(localhost|127\.0\.0\.1)(:[0-9]+)?$ ]]; then
+      error "NEXT_PUBLIC_SITE_URL must use HTTPS in production"
+      failed=1
+    fi
+  fi
+  if [[ -n "${BUILD_SITE_URL:-}" && "${NEXT_PUBLIC_SITE_URL:-}" != "$BUILD_SITE_URL" ]]; then
+    error "NEXT_PUBLIC_SITE_URL does not match the URL compiled into this image"
+    failed=1
+  fi
+
+  local configured_origin
+  local -a configured_origins configured_keys
+  IFS=',' read -r -a configured_origins <<< "${ALLOWED_ORIGINS:-}"
+  for configured_origin in "${configured_origins[@]}"; do
+    configured_origin="$(trim "$configured_origin")"
+    [[ -n "$configured_origin" ]] || continue
+    if ! is_exact_origin "$configured_origin"; then
+      error "ALLOWED_ORIGINS contains an invalid origin"
+      failed=1
+    elif [[ "$PROFILE" == "production" && "$configured_origin" != https://* ]]; then
+      if [[ "${CI:-false}" != "true" || ! "$configured_origin" =~ ^http://(localhost|127\.0\.0\.1)(:[0-9]+)?$ ]]; then
+        error "ALLOWED_ORIGINS must use HTTPS in production"
+        failed=1
+      fi
+    fi
+  done
+
+  local api_key_env raw_key
+  for api_key_env in VALID_API_KEYS INTERNAL_API_KEYS METRICS_WRITE_API_KEYS; do
+    [[ -n "${!api_key_env:-}" ]] || continue
+    IFS=',' read -r -a configured_keys <<< "${!api_key_env}"
+    for raw_key in "${configured_keys[@]}"; do
+      raw_key="$(trim "$raw_key")"
+      if [[ ! "$raw_key" =~ ^[A-Za-z0-9]{32,64}$ ]]; then
+        error "$api_key_env contains an invalid key"
+        failed=1
+      fi
+    done
+  done
+
+  if [[ "$PROFILE" == "production" && ( -z "${CLAIM_TOKEN_PEPPER:-}" || ${#CLAIM_TOKEN_PEPPER} -lt 32 ) ]]; then
+    error "CLAIM_TOKEN_PEPPER must be at least 32 characters in production"
+    failed=1
+  fi
+
+  local proxy_mode="${TRUST_PROXY_MODE:-none}"
+  local proxy_hops="${TRUST_PROXY_HOPS:-0}"
+  if [[ ! "$proxy_mode" =~ ^(none|hops|header)$ ]]; then
+    error "TRUST_PROXY_MODE must be one of: none, hops, header"
+    failed=1
+  elif [[ "$PROFILE" == "production" && "$proxy_mode" == "none" ]]; then
+    error "TRUST_PROXY_MODE must explicitly describe the trusted production reverse proxy"
+    failed=1
+  fi
+
+  if [[ ! "$proxy_hops" =~ ^[0-9]+$ ]]; then
+    error "TRUST_PROXY_HOPS must be a non-negative integer"
+    failed=1
+  elif [[ "$proxy_mode" != "none" && "$proxy_hops" -lt 1 ]]; then
+    error "TRUST_PROXY_HOPS must be at least 1 when proxy trust is enabled"
+    failed=1
+  fi
+
+  if [[ "$proxy_mode" == "header" && ! "${CLIENT_IP_HEADER:-}" =~ ^(cf-connecting-ip|x-real-ip)$ ]]; then
+    error "CLIENT_IP_HEADER must be cf-connecting-ip or x-real-ip in header proxy mode"
+    failed=1
+  fi
+
+  local url_key token_key url_value token_value
+  for url_key in BOOKING_REQUEST_WEBHOOK_URL CHECKIN_REQUEST_WEBHOOK_URL; do
+    if [[ "$url_key" == "BOOKING_REQUEST_WEBHOOK_URL" ]]; then
+      token_key="BOOKING_REQUEST_WEBHOOK_TOKEN"
+    else
+      token_key="CHECKIN_REQUEST_WEBHOOK_TOKEN"
+    fi
+    url_value="${!url_key:-}"
+    token_value="${!token_key:-}"
+
+    if [[ -n "$url_value" ]] && ! is_valid_url "$url_value"; then
+      error "$url_key is not a valid URL"
+      failed=1
+    fi
+    if [[ -n "$url_value" && ${#token_value} -lt 20 ]]; then
+      error "$token_key must be at least 20 characters when $url_key is configured"
+      failed=1
+    fi
+    if [[ "$PROFILE" == "production" && -n "$url_value" && "$url_value" != https://* ]]; then
+      error "$url_key must use HTTPS in production"
+      failed=1
+    fi
+  done
+
+  if [[ -n "${ALERT_WEBHOOK_URL:-}" ]] && ! is_valid_url "$ALERT_WEBHOOK_URL"; then
+    error "ALERT_WEBHOOK_URL is not a valid URL"
+    failed=1
+  fi
+  if [[ "$PROFILE" == "production" && -n "${ALERT_WEBHOOK_URL:-}" && "$ALERT_WEBHOOK_URL" != https://* ]]; then
+    error "ALERT_WEBHOOK_URL must use HTTPS in production"
+    failed=1
+  fi
+  if [[ -n "${ALERT_WEBHOOK_TOKEN:-}" && ${#ALERT_WEBHOOK_TOKEN} -lt 20 ]]; then
+    error "ALERT_WEBHOOK_TOKEN must be at least 20 characters"
+    failed=1
+  fi
+  if [[ "${ALERT_WEBHOOK_REQUIRED:-0}" == "1" && -z "${ALERT_WEBHOOK_URL:-}" ]]; then
+    error "ALERT_WEBHOOK_URL is required when ALERT_WEBHOOK_REQUIRED=1"
+    failed=1
+  fi
+  if [[ ! "${ALERT_WEBHOOK_REQUIRED:-0}" =~ ^(0|1)$ ]]; then
+    error "ALERT_WEBHOOK_REQUIRED must be 0 or 1"
+    failed=1
+  fi
+
+  if [[ -n "${RATE_LIMIT_BACKEND:-}" && "${RATE_LIMIT_BACKEND}" != "redis" ]]; then
+    error "RATE_LIMIT_BACKEND must be redis when configured"
+    failed=1
+  elif [[ "${RATE_LIMIT_BACKEND:-}" == "redis" ]]; then
+    if [[ -z "${UPSTASH_REDIS_REST_URL:-}" ]] || ! is_valid_url "$UPSTASH_REDIS_REST_URL"; then
+      error "UPSTASH_REDIS_REST_URL must be a valid URL for Redis rate limiting"
+      failed=1
+    fi
+    if [[ "$PROFILE" == "production" && -n "${UPSTASH_REDIS_REST_URL:-}" && "$UPSTASH_REDIS_REST_URL" != https://* ]]; then
+      error "UPSTASH_REDIS_REST_URL must use HTTPS in production"
+      failed=1
+    fi
+    if [[ -z "${UPSTASH_REDIS_REST_TOKEN:-}" || ${#UPSTASH_REDIS_REST_TOKEN} -lt 20 ]]; then
+      error "UPSTASH_REDIS_REST_TOKEN must be at least 20 characters for Redis rate limiting"
+      failed=1
+    fi
+  fi
+
+  if [[ "${DEV_SESSION_MINT_ENABLED:-0}" == "1" && ( -z "${DEV_SESSION_MINT_SECRET:-}" || ${#DEV_SESSION_MINT_SECRET} -lt 32 ) ]]; then
+    error "DEV_SESSION_MINT_SECRET must be at least 32 characters when development session minting is enabled"
+    failed=1
+  fi
+  if [[ ! "${DEV_SESSION_MINT_ENABLED:-0}" =~ ^(0|1)$ ]]; then
+    error "DEV_SESSION_MINT_ENABLED must be 0 or 1"
+    failed=1
+  fi
+  if [[ -n "${CRON_SECRET:-}" && ${#CRON_SECRET} -lt 32 ]]; then
+    error "CRON_SECRET must be at least 32 characters"
+    failed=1
+  fi
+  if [[ -n "${ANALYTICS_RETENTION_DAYS:-}" && ! "${ANALYTICS_RETENTION_DAYS}" =~ ^[0-9]+$ ]]; then
+    error "ANALYTICS_RETENTION_DAYS must be a non-negative integer"
     failed=1
   fi
 
@@ -457,36 +653,19 @@ database_reachable() {
   local db_url="$1"
 
   DATABASE_URL_TO_TEST="$db_url" node --input-type=module <<'NODE'
-import net from 'node:net';
+import pg from 'pg';
 
-const raw = process.env.DATABASE_URL_TO_TEST;
+const connectionString = process.env.DATABASE_URL_TO_TEST;
+if (!connectionString) process.exit(1);
 
+const client = new pg.Client({ connectionString, connectionTimeoutMillis: 3000 });
 try {
-  const parsed = new URL(raw);
-  const host = parsed.hostname;
-  const port = Number(parsed.port || '5432');
-
-  if (!host || !Number.isFinite(port)) {
-    process.exit(1);
-  }
-
-  const socket = net.createConnection({ host, port });
-  const timer = setTimeout(() => {
-    socket.destroy();
-    process.exit(1);
-  }, 3000);
-
-  socket.once('connect', () => {
-    clearTimeout(timer);
-    socket.end();
-    process.exit(0);
-  });
-
-  socket.once('error', () => {
-    clearTimeout(timer);
-    process.exit(1);
-  });
+  await client.connect();
+  await client.query({ text: 'SELECT 1', query_timeout: 3000 });
+  await client.end();
+  process.exit(0);
 } catch {
+  try { await client.end(); } catch {}
   process.exit(1);
 }
 NODE
@@ -496,8 +675,8 @@ choose_fallback_database() {
   if [[ "$PROFILE" == "test" ]]; then
     DB_COMPOSE_FILE="docker/docker-compose.test-db.yml"
     DB_SERVICE="postgres-test"
-    DB_CONTAINER="site-test-db"
-    DB_LOCAL_URL="postgresql://testuser:testpass@localhost:5433/site_test"
+    DB_CONTAINER=""
+    DB_LOCAL_URL="postgresql://testuser:testpass@localhost:5434/site_test"
     return
   fi
 
@@ -544,12 +723,21 @@ wait_for_container_ready() {
 }
 
 start_fallback_database() {
+  if [[ "$PROFILE" == "production" ]]; then
+    die "Invariant violation: local database fallback is forbidden in production" 17
+  fi
+
   choose_fallback_database
   ensure_docker_available
   resolve_compose_impl
 
   log "Starting fallback database using $DB_COMPOSE_FILE"
   compose -f "$REPO_ROOT/$DB_COMPOSE_FILE" up -d "$DB_SERVICE"
+
+  if [[ -z "$DB_CONTAINER" ]]; then
+    DB_CONTAINER="$(compose -f "$REPO_ROOT/$DB_COMPOSE_FILE" ps -q "$DB_SERVICE")"
+    [[ -n "$DB_CONTAINER" ]] || die "Unable to resolve fallback database container" 16
+  fi
 
   wait_for_container_ready "$DB_CONTAINER" 90 || die "Fallback database failed to become ready" 16
 
@@ -762,9 +950,19 @@ start_app() {
   log "App log file: ${APP_LOG_FILE#$REPO_ROOT/}"
 }
 
-health_url() {
+live_url() {
   local port="${PORT:-3000}"
-  printf '%s' "http://127.0.0.1:${port}/api/health"
+  printf '%s' "http://127.0.0.1:${port}/api/health/live"
+}
+
+ready_url() {
+  local port="${PORT:-3000}"
+  printf '%s' "http://127.0.0.1:${port}/api/health/ready"
+}
+
+public_page_url() {
+  local port="${PORT:-3000}"
+  printf '%s' "http://127.0.0.1:${port}/en"
 }
 
 metrics_url() {
@@ -772,18 +970,22 @@ metrics_url() {
   printf '%s' "http://127.0.0.1:${port}/api/metrics"
 }
 
-wait_for_health() {
+wait_for_runtime() {
   require_cmd curl
 
-  local url
-  url="$(health_url)"
+  local live ready page
+  live="$(live_url)"
+  ready="$(ready_url)"
+  page="$(public_page_url)"
   local elapsed=0
-  local code=""
+  local live_code="" ready_code="" page_code=""
 
   while (( elapsed < START_TIMEOUT )); do
-    code="$(curl -s -o /dev/null -w '%{http_code}' "$url" || true)"
-    if [[ "$code" == "200" ]]; then
-      log "Health endpoint is ready ($url)"
+    live_code="$(curl -s -o /dev/null -w '%{http_code}' "$live" || true)"
+    ready_code="$(curl -s -o /dev/null -w '%{http_code}' "$ready" || true)"
+    page_code="$(curl -s -o /dev/null -w '%{http_code}' "$page" || true)"
+    if [[ "$live_code" == "200" && "$ready_code" == "200" && "$page_code" == "200" ]]; then
+      log "Runtime endpoints are ready (live, ready, public page)"
       return 0
     fi
 
@@ -791,7 +993,7 @@ wait_for_health() {
     elapsed=$((elapsed + 2))
   done
 
-  error "Health endpoint did not become ready in ${START_TIMEOUT}s (last code: ${code:-none})"
+  error "Runtime did not become ready in ${START_TIMEOUT}s (live=${live_code:-none}, ready=${ready_code:-none}, page=${page_code:-none})"
   tail -n 120 "$APP_LOG_FILE" || true
   return 1
 }
@@ -837,7 +1039,7 @@ verify_metrics_endpoint() {
 }
 
 verify_runtime() {
-  wait_for_health || die "Runtime verification failed: health endpoint not ready" 20
+  wait_for_runtime || die "Runtime verification failed: live/ready/page checks did not pass" 20
   verify_metrics_endpoint || die "Runtime verification failed: metrics endpoint check failed" 20
   log "Runtime verification passed"
 }
@@ -909,6 +1111,7 @@ stop_fallback_database_if_needed() {
 }
 
 run_preflight() {
+  set_node_env_for_profile
   check_node_and_npm_versions
 
   if (( DOCKER_FALLBACK )) && ! command -v docker >/dev/null 2>&1; then
@@ -1008,8 +1211,8 @@ cmd_status() {
   if app_is_running; then
     if command -v curl >/dev/null 2>&1; then
       local code
-      code="$(curl -s -o /dev/null -w '%{http_code}' "$(health_url)" || true)"
-      printf 'Health endpoint: HTTP %s\n' "${code:-unreachable}"
+      code="$(curl -s -o /dev/null -w '%{http_code}' "$(ready_url)" || true)"
+      printf 'Readiness endpoint: HTTP %s\n' "${code:-unreachable}"
     else
       printf 'Health endpoint: curl not installed\n'
     fi
@@ -1053,11 +1256,9 @@ cmd_migrate() {
 cmd_check() {
   run_preflight
   if database_reachable "$DATABASE_URL"; then
-    log "Check passed: DATABASE_URL reachable"
-  elif (( DOCKER_FALLBACK )); then
-    warn "DATABASE_URL is currently unreachable but docker fallback is enabled"
+    log "Check passed: DATABASE_URL accepted a SQL query"
   else
-    die "Check failed: DATABASE_URL unreachable and fallback disabled" 22
+    die "Check failed: DATABASE_URL did not accept a SQL query" 22
   fi
 }
 

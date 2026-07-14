@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
+import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode, readJsonBody } from '@/lib/apiErrorHandler';
 import { metrics } from '@/lib/metrics-collector';
 import { logger } from '@/lib/logger-enterprise';
 import { timingSafeEqual } from 'node:crypto';
@@ -11,13 +11,12 @@ function requireDevAndSecret(req: NextRequest) {
     throw new ApiError(ApiErrorCode.FORBIDDEN, 'This endpoint is only available in non-production environments');
   }
   const secret = process.env.ADMIN_DASH_SECRET;
-  if (secret) {
-    const provided = req.headers.get('x-admin-secret') || '';
-    const providedBuffer = Buffer.from(provided);
-    const secretBuffer = Buffer.from(secret);
-    if (providedBuffer.length !== secretBuffer.length || !timingSafeEqual(providedBuffer, secretBuffer)) {
-      throw new ApiError(ApiErrorCode.FORBIDDEN, 'Invalid admin secret for dev endpoint');
-    }
+  const provided = req.headers.get('x-admin-secret') || '';
+  if (!secret) throw new ApiError(ApiErrorCode.SERVICE_UNAVAILABLE, 'Development endpoint secret is not configured');
+  const providedBuffer = Buffer.from(provided);
+  const secretBuffer = Buffer.from(secret);
+  if (providedBuffer.length !== secretBuffer.length || !timingSafeEqual(providedBuffer, secretBuffer)) {
+    throw new ApiError(ApiErrorCode.FORBIDDEN, 'Invalid admin secret for dev endpoint');
   }
 }
 
@@ -36,7 +35,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 export const POST = withErrorHandler(async (req: NextRequest) => {
   requireDevAndSecret(req);
 
-  const body = await req.json().catch(() => ({} as Record<string, unknown>));
+  const body = await readJsonBody(req, 8 * 1_024) as Record<string, unknown>;
   const count = Math.max(1, Math.min(1000, Number((body as { count?: unknown }).count) || 25));
   const delayMs = Math.max(0, Math.min(1000, Number((body as { delayMs?: unknown }).delayMs) || 0));
   const threshold = (body as { threshold?: unknown }).threshold as number | undefined;
