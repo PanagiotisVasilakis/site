@@ -17,11 +17,11 @@ vi.mock('@/components/ApartmentLocationMap', () => ({
 
 vi.mock('next/image', () => ({
   __esModule: true,
-  default: ((props: React.ImgHTMLAttributes<HTMLImageElement> & { fill?: boolean; priority?: boolean }) => {
-    const { fill: _fill, priority: _priority, ...rest } = props;
-    void _fill; void _priority;
+  default: ((props: React.ImgHTMLAttributes<HTMLImageElement> & { fill?: boolean; priority?: boolean; unoptimized?: boolean }) => {
+    const { fill: _fill, priority: _priority, unoptimized: _unoptimized, ...rest } = props;
+    void _fill; void _priority; void _unoptimized;
     return <img alt="" {...rest} />;
-  }) as MockComponent<React.ImgHTMLAttributes<HTMLImageElement> & { fill?: boolean; priority?: boolean }>
+  }) as MockComponent<React.ImgHTMLAttributes<HTMLImageElement> & { fill?: boolean; priority?: boolean; unoptimized?: boolean }>
 }));
 
 vi.mock('@/lib/analyticsClient', () => ({

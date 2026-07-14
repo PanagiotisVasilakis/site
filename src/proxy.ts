@@ -12,8 +12,6 @@ function hasLocale(pathname: string) {
 
 const NON_LOCALIZED_ROUTE_PREFIXES = [
   '/admin',
-  '/qr-info',
-  '/qr/image',
   '/offline',
 ];
 
@@ -76,7 +74,7 @@ export async function proxy(req: NextRequest) {
     }
 
     // Skip locale routing for Next.js internals, API routes, and root-level operational pages.
-    if (pathname.startsWith("/_next") || pathname.startsWith("/api") || pathname === "/qr" || isNonLocalizedRoute(pathname)) {
+    if (pathname.startsWith("/_next") || pathname.startsWith("/api") || isNonLocalizedRoute(pathname)) {
       tracer.addTags(span, { 'middleware.action': 'skip_routing' });
       tracer.finishSpan(span);
       

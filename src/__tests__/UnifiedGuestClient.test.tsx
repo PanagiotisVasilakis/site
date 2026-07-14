@@ -78,8 +78,8 @@ describe('UnifiedGuestClient', () => {
     expect(signInPanel).toBeTruthy();
     expect(signInPanel.getAttribute('role')).toBe('tabpanel');
     expect(signInPanel.getAttribute('aria-labelledby')).toBe('tab-signin');
-    // Router.replace called on mount and on mode changes
-    expect(replaceMock).toHaveBeenCalledWith('/en/guest?mode=signin', { scroll: false });
+    // The initial URL already matches the active tab, so no redundant replace is issued.
+    expect(replaceMock).not.toHaveBeenCalled();
 
     // Switch to Sign up
     await user.click(document.getElementById('tab-signup') as HTMLButtonElement);

@@ -12,7 +12,7 @@ export default function HomeHero({ title, subtitle }: HomeHeroProps) {
       aria-label={title}
       style={{ minHeight: 'min(760px, 88svh)' }}
     >
-      <picture className="absolute inset-0 z-0 block" aria-hidden>
+      <picture className="absolute inset-0 z-0 block">
         <source media="(max-width: 767px)" srcSet="/house/balcony/balcony_1_hero_720.webp" />
         <source media="(max-width: 1599px)" srcSet="/house/balcony/balcony_1_hero_1440.webp" />
         <Image

@@ -33,7 +33,7 @@ describe('PII-safe analytics tracker', () => {
   });
 
   it('keeps convenience helpers on the same sanitized path', () => {
-    tracker.portalOpened('qr');
+    tracker.portalOpened('direct');
     tracker.originSelected('ABROAD');
     tracker.formSubmitted('sign-up');
     tracker.authModeChanged('signin');
