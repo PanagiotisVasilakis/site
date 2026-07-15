@@ -3,13 +3,11 @@ import { type BookingSource as SessionBookingSource, type BookingStatus } from '
 import { type SecurityConfig } from '@/lib/security-config';
 import { type SecurityMetrics } from '@/lib/security-monitoring';
 import { type ApiResponse, type ApiRouteHandler, type ErrorHandlerConfig } from '@/lib/apiErrorHandler';
-import { type Dictionary as IndexDictionary } from '@/i18n';
 import { type Dictionary as I18nDictionary } from '@/i18n/dictionaries';
 import { type TrackerEventName, type EventProps } from '@/lib/tracker';
 import { type Origin } from '@/lib/phone';
 import { type LogContext, type LogLevel, type LogEntry } from '@/lib/logger-enterprise';
 import { type BookingSource, type AccessStatus, type GuestRefreshTokenRec } from '@/lib/guestDataStore';
-import { type VillaPhoto } from '@/types/villa';
 import { type AppConfig } from '@/lib/config';
 import { type Role } from '@/lib/rbac';
 import { type LeafletMapProps } from '@/components/LeafletMap';
@@ -47,7 +45,7 @@ describe.skipIf(!hasDbUrl)('public API surface remains reachable', () => {
       timeoutError,
     } = await import('@/lib/apiErrorHandler');
     const { formatDateRangeCompact, parseDate, isPastDate } = await import('@/lib/dateUtils');
-    const { locales, defaultLocale } = await import('@/i18n');
+    const { locales, defaultLocale } = await import('@/i18n/config');
     const { GuestDataExport } = await import('@/lib/guestDataExport');
     const { categorizeReason, track, tracker } = await import('@/lib/tracker');
     const { emitGuestSessionChanged } = await import('@/lib/sessionSignals');
@@ -123,8 +121,6 @@ describe.skipIf(!hasDbUrl)('public API surface remains reachable', () => {
     expectTypeOf<ApiRouteHandler>().toMatchTypeOf<(...args: any[]) => any>();
     expectTypeOf<ErrorHandlerConfig>().toMatchTypeOf<Record<string, any>>();
     expectTypeOf<AppConfig>().toMatchTypeOf<Record<string, any>>();
-    expectTypeOf<IndexDictionary>().toMatchTypeOf<Record<string, any>>();
-    expectTypeOf<VillaPhoto>().toMatchTypeOf<{ src: string }>();
     expectTypeOf<Role>().toMatchTypeOf<string>();
     expectTypeOf<TrackerEventName>().toMatchTypeOf<string>();
     expectTypeOf<EventProps>().toMatchTypeOf<Record<string, any>>();

@@ -33,11 +33,29 @@ describe('production tooling contracts', () => {
 
   it('runs the served PWA asset gate in browser CI', () => {
     const workflow = readRepoFile('.github/workflows/ci.yml');
+    const offlineBrowserCheck = readRepoFile('scripts/check-browser-offline.ts');
 
     expect(workflow).toContain('name: Verify served PWA assets');
     expect(workflow).toContain('OFFLINE_CHECK_ORIGIN: http://localhost:3000');
     expect(workflow).toContain('name: Verify real browser offline navigation');
     expect(workflow).toContain('OFFLINE_BROWSER_ORIGIN: http://localhost:3000');
+
+    const workerOfflineSetup = offlineBrowserCheck.slice(
+      offlineBrowserCheck.indexOf("target.type() === 'service_worker'"),
+      offlineBrowserCheck.indexOf('await page.setOfflineMode(true);'),
+    );
+    const workerCleanup = offlineBrowserCheck.slice(
+      offlineBrowserCheck.indexOf('if (serviceWorkerSession) {'),
+      offlineBrowserCheck.indexOf('await browser.close();'),
+    );
+
+    expect(workerOfflineSetup).toContain('serviceWorkerTarget.createCDPSession()');
+    expect(workerOfflineSetup).toContain("serviceWorkerSession.send('Network.enable')");
+    expect(workerOfflineSetup).toContain("serviceWorkerSession.send('Network.emulateNetworkConditions'");
+    expect(workerOfflineSetup).toContain('offline: true');
+    expect(workerCleanup).toContain("serviceWorkerSession.send('Network.emulateNetworkConditions'");
+    expect(workerCleanup).toContain('offline: false');
+    expect(workerCleanup).toContain('serviceWorkerSession.detach()');
   });
 
   it('makes the strict container scan part of the required CI gate', () => {

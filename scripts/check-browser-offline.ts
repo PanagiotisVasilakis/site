@@ -2,7 +2,7 @@
 
 import path from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
-import puppeteer from 'puppeteer';
+import puppeteer, { type CDPSession } from 'puppeteer';
 
 type OfflineSmokeReport = {
   generatedAt: string;
@@ -34,6 +34,7 @@ async function main() {
     executablePath: process.env.CHROME_PATH,
     args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
   });
+  let serviceWorkerSession: CDPSession | undefined;
 
   try {
     const page = await browser.newPage();
@@ -63,6 +64,22 @@ async function main() {
       throw new Error(`service worker did not control the page or cache /en/offline: ${JSON.stringify(workerState)}`);
     }
 
+    // Page.setOfflineMode() only affects the page/frame CDP sessions. A service
+    // worker is a separate target, so its own network session must be taken
+    // offline as well or its fetch() can still reach the live Next.js server.
+    const serviceWorkerTarget = await browser.waitForTarget(
+      (target) => target.type() === 'service_worker'
+        && target.url() === workerState.serviceWorkerScript,
+      { timeout: 30_000 },
+    );
+    serviceWorkerSession = await serviceWorkerTarget.createCDPSession();
+    await serviceWorkerSession.send('Network.enable');
+    await serviceWorkerSession.send('Network.emulateNetworkConditions', {
+      offline: true,
+      latency: 0,
+      downloadThroughput: -1,
+      uploadThroughput: -1,
+    });
     await page.setOfflineMode(true);
     const offlineNavigationUrl = `${origin}/en/offline-smoke-${Date.now()}`;
     const response = await page.goto(offlineNavigationUrl, {
@@ -96,6 +113,15 @@ async function main() {
     console.log(`[offline-browser] PASS: controlled service worker served locale fallback while offline (${response.status()})`);
     console.log(`[offline-browser] report: ${path.relative(process.cwd(), reportPath)}`);
   } finally {
+    if (serviceWorkerSession) {
+      await serviceWorkerSession.send('Network.emulateNetworkConditions', {
+        offline: false,
+        latency: 0,
+        downloadThroughput: -1,
+        uploadThroughput: -1,
+      }).catch(() => undefined);
+      await serviceWorkerSession.detach().catch(() => undefined);
+    }
     await browser.close();
   }
 }
