@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { PrismaClient } from '@/generated/prisma/client';
 
@@ -36,6 +36,13 @@ const REQUEST_HEADERS = {
   'user-agent': 'pr02-synthetic-refresh-client',
   'x-forwarded-for': '198.51.100.42',
 } as const;
+const DIFFERENT_CONTEXT_HEADERS = {
+  'user-agent': 'pr02d-suspicious-refresh-client',
+  'x-forwarded-for': '203.0.113.99',
+} as const;
+const CONTROLLED_REPLAY_NOW = new Date('2030-06-15T12:34:56.789Z');
+const DATABASE_WAIT_TIMEOUT_MS = 4_000;
+const RESPONSE_WAIT_TIMEOUT_MS = 4_000;
 
 const managedEnvironment = [
   'DATABASE_URL',
@@ -63,10 +70,87 @@ interface BoundAuthorizationChain {
   refreshToken: string;
 }
 
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (reason?: unknown) => void;
+}
+
+interface LockActivity {
+  pid: number;
+  waitEventType: string | null;
+  waitEvent: string | null;
+  query: string;
+  blockingPids: number[];
+}
+
 let target: DisposableDatabaseTarget | undefined;
 let applicationPrisma: PrismaClient | undefined;
 let databaseReady = false;
 const originalEnvironment = new Map<ManagedEnvironmentName, string | undefined>();
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve!: Deferred<T>['resolve'];
+  let reject!: Deferred<T>['reject'];
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+async function withBoundedWait<T>(promise: Promise<T>, label: string): Promise<T> {
+  let timeout: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(() => {
+          reject(new Error(`Timed out waiting for ${label}.`));
+        }, RESPONSE_WAIT_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+async function waitForDatabaseLock(
+  monitor: PrismaClient,
+  predicate: (activity: LockActivity) => boolean,
+  label: string,
+): Promise<LockActivity> {
+  const deadline = performance.now() + DATABASE_WAIT_TIMEOUT_MS;
+  while (performance.now() < deadline) {
+    const rows = await monitor.$queryRaw<LockActivity[]>`
+      SELECT
+        activity."pid" AS "pid",
+        activity."wait_event_type" AS "waitEventType",
+        activity."wait_event" AS "waitEvent",
+        activity."query" AS "query",
+        pg_blocking_pids(activity."pid") AS "blockingPids"
+      FROM "pg_stat_activity" AS activity
+      WHERE activity."datname" = current_database()
+        AND activity."pid" <> pg_backend_pid()
+        AND activity."state" = 'active'
+    `;
+    const match = rows.find((row) => row.waitEventType === 'Lock' && predicate(row));
+    if (match) return match;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+  throw new Error(`Timed out waiting for the database-observed ${label} barrier.`);
+}
+
+async function advisoryLocksHeld(monitor: PrismaClient, pid: number): Promise<number> {
+  const rows = await monitor.$queryRaw<Array<{ count: number }>>`
+    SELECT COUNT(*)::int AS "count"
+    FROM "pg_locks"
+    WHERE "pid" = ${pid}
+      AND "locktype" = 'advisory'
+      AND "granted" = TRUE
+  `;
+  return rows[0]?.count ?? 0;
+}
 
 function setApplicationEnvironment(databaseUrl: string): void {
   for (const name of managedEnvironment) originalEnvironment.set(name, process.env[name]);
@@ -107,10 +191,13 @@ function requireTarget(): DisposableDatabaseTarget {
   return target;
 }
 
-function authContext(modules: AuthModules): { deviceHint: string; ipHint: string } {
+function authContext(
+  modules: AuthModules,
+  requestHeaders: HeadersInit = REQUEST_HEADERS,
+): { deviceHint: string; ipHint: string } {
   const request = new modules.NextRequest(REFRESH_URL, {
     method: 'POST',
-    headers: REQUEST_HEADERS,
+    headers: requestHeaders,
   });
   return modules.requestAuthContext(request);
 }
@@ -148,8 +235,9 @@ function refreshRequest(
   modules: AuthModules,
   refreshToken: string,
   sessionToken?: string,
+  requestHeaders: HeadersInit = REQUEST_HEADERS,
 ): InstanceType<AuthModules['NextRequest']> {
-  const headers = new Headers(REQUEST_HEADERS);
+  const headers = new Headers(requestHeaders);
   const cookies = [`guest_rt=${refreshToken}`];
   if (sessionToken !== undefined) cookies.unshift(`guest_session=${sessionToken}`);
   headers.set('cookie', cookies.join('; '));
@@ -160,9 +248,10 @@ async function performRefresh(
   modules: AuthModules,
   refreshToken: string,
   sessionToken?: string,
+  requestHeaders: HeadersInit = REQUEST_HEADERS,
 ): Promise<RefreshResponse> {
   return modules.refreshRoute.POST(
-    refreshRequest(modules, refreshToken, sessionToken),
+    refreshRequest(modules, refreshToken, sessionToken, requestHeaders),
     { params: Promise.resolve({}) },
   );
 }
@@ -220,6 +309,150 @@ async function safeSuccessEvidence(
       ),
     ),
   };
+}
+
+async function safeConcurrentEvidence(response: RefreshResponse): Promise<{
+  status: number;
+  retryAfter: string | null;
+  errorCode: string | null;
+  retryable: boolean;
+  sessionCookiePresent: boolean;
+  refreshCookiePresent: boolean;
+}> {
+  const body = JSON.parse(await response.text()) as {
+    error?: { code?: string; details?: { retryable?: boolean } };
+  };
+  return {
+    status: response.status,
+    retryAfter: response.headers.get('retry-after'),
+    errorCode: body.error?.code ?? null,
+    retryable: body.error?.details?.retryable === true,
+    sessionCookiePresent: Boolean(response.cookies.get('guest_session')),
+    refreshCookiePresent: Boolean(response.cookies.get('guest_rt')),
+  };
+}
+
+function safeIssuedCookieEvidence(
+  response: RefreshResponse,
+  sessionModule: SessionModule,
+): {
+  status: number;
+  sessionCookieSet: boolean;
+  refreshCookieSet: boolean;
+  generationPaired: boolean;
+} {
+  const sessionCookie = response.cookies.get('guest_session')?.value;
+  const refreshCookie = response.cookies.get('guest_rt')?.value;
+  const sessionId = sessionModule.parseGuestSession(sessionCookie)?.sid;
+  const refreshId = refreshCookie?.split('.', 1)[0];
+  return {
+    status: response.status,
+    sessionCookieSet: Boolean(sessionCookie),
+    refreshCookieSet: Boolean(refreshCookie),
+    generationPaired: Boolean(sessionId && refreshId && sessionId === refreshId),
+  };
+}
+
+async function executeRouteOverlap(
+  authTarget: DisposableDatabaseTarget,
+  modules: AuthModules,
+  chain: BoundAuthorizationChain,
+  mode: 'same-context' | 'different-context' | 'invalid-binding',
+): Promise<{
+  winnerResponse: RefreshResponse;
+  loserResponse: RefreshResponse;
+  markerLocksObserved: number;
+  stateWhileWinnerBlocked: Awaited<ReturnType<typeof safeAuthStateSnapshot>>;
+}> {
+  return withTestPrismaClient(authTarget, async (blocker) => (
+    withTestPrismaClient(authTarget, async (monitor) => {
+      const blockerReady = createDeferred<number>();
+      const releaseBlocker = createDeferred<void>();
+      let winnerPromise: Promise<RefreshResponse> | undefined;
+      let loserPromise: Promise<RefreshResponse> | undefined;
+
+      const blockerPromise = blocker.$transaction(async (tx) => {
+        const backendRows = await tx.$queryRaw<Array<{ pid: number }>>`
+          SELECT pg_backend_pid() AS "pid"
+        `;
+        const lockedRows = await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT "id"
+          FROM "users"
+          WHERE "id" = ${REVOKED_SESSION_FIXTURE.userId}::uuid
+          FOR UPDATE
+        `;
+        if (backendRows.length !== 1 || lockedRows.length !== 1) {
+          throw new Error('Synthetic route-overlap blocker did not lock exactly one user.');
+        }
+        blockerReady.resolve(backendRows[0].pid);
+        await releaseBlocker.promise;
+      }, { timeout: 10_000 });
+      void blockerPromise.catch((error: unknown) => blockerReady.reject(error));
+
+      try {
+        const blockerPid = await blockerReady.promise;
+        winnerPromise = performRefresh(modules, chain.refreshToken, chain.sessionToken);
+        void winnerPromise.catch(() => undefined);
+        const winnerWait = await waitForDatabaseLock(
+          monitor,
+          (activity) => activity.blockingPids.includes(blockerPid)
+            && activity.query.includes('"users"')
+            && /FOR\s+UPDATE/i.test(activity.query),
+          'winner User-row',
+        );
+        const markerLocksObserved = await advisoryLocksHeld(monitor, winnerWait.pid);
+        if (markerLocksObserved < 1) {
+          throw new Error('Winner reached the User row without owning a generation marker.');
+        }
+
+        loserPromise = performRefresh(
+          modules,
+          chain.refreshToken,
+          mode === 'invalid-binding' ? 'synthetic-malformed-session-cookie' : chain.sessionToken,
+          mode === 'different-context' ? DIFFERENT_CONTEXT_HEADERS : REQUEST_HEADERS,
+        );
+        void loserPromise.catch(() => undefined);
+
+        const stateWhileWinnerBlocked = await safeAuthStateSnapshot(authTarget, new Date());
+        let loserResponse: RefreshResponse;
+        if (mode !== 'same-context') {
+          await waitForDatabaseLock(
+            monitor,
+            (activity) => activity.pid !== winnerWait.pid
+              && (activity.blockingPids.includes(blockerPid)
+                || activity.blockingPids.includes(winnerWait.pid))
+              && activity.query.includes('"users"')
+              && /FOR\s+UPDATE/i.test(activity.query),
+            'unapproved contender User-row cleanup',
+          );
+          releaseBlocker.resolve(undefined);
+          [loserResponse] = await Promise.all([
+            withBoundedWait(loserPromise, 'unapproved loser response'),
+            withBoundedWait(winnerPromise, 'approved winner response'),
+          ]);
+        } else {
+          loserResponse = await withBoundedWait(loserPromise, 'same-context loser response');
+          releaseBlocker.resolve(undefined);
+        }
+
+        const winnerResponse = await withBoundedWait(winnerPromise, 'winner response');
+        await blockerPromise;
+        return {
+          winnerResponse,
+          loserResponse,
+          markerLocksObserved,
+          stateWhileWinnerBlocked,
+        };
+      } finally {
+        releaseBlocker.resolve(undefined);
+        await Promise.allSettled([
+          blockerPromise,
+          ...(winnerPromise ? [winnerPromise] : []),
+          ...(loserPromise ? [loserPromise] : []),
+        ]);
+      }
+    })
+  ));
 }
 
 const EXPECTED_UNAUTHORIZED = {
@@ -470,6 +703,291 @@ describe.sequential('refresh authorization generation regressions', () => {
       revoked: 1,
       descendants: 1,
       activeDescendants: 1,
+    });
+  });
+
+  it('revokes the family when a predecessor is replayed after its rotation completed', async () => {
+    const authTarget = requireTarget();
+    await seedRevokedSessionEligibilityFixture(authTarget, new Date());
+    const modules = await loadAuthModules();
+    const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
+
+    const rotationResponse = await performRefresh(
+      modules,
+      chain.refreshToken,
+      chain.sessionToken,
+    );
+    const rotation = await safeSuccessEvidence(rotationResponse, modules.sessionModule);
+    const rotationBody = await rotationResponse.text();
+    const beforeReplay = await safeAuthStateSnapshot(authTarget, new Date());
+
+    const replayResponse = await performRefresh(
+      modules,
+      chain.refreshToken,
+      chain.sessionToken,
+    );
+    const replay = await safeFailureEvidence(replayResponse, modules.sessionModule);
+    const afterReplay = await safeAuthStateSnapshot(authTarget, new Date());
+
+    expect(rotationBody).not.toContain(chain.refreshToken);
+    expect({ rotation, beforeReplay, replay, afterReplay }).toEqual({
+      rotation: {
+        status: 200,
+        sessionCookieSet: true,
+        refreshCookieSet: true,
+        replacementSessionValid: true,
+      },
+      beforeReplay: {
+        users: 1,
+        bookings: 1,
+        sessions: { total: 2, active: 1, expired: 0, revoked: 1 },
+        refreshFamilies: { total: 1, active: 1, expired: 0, revoked: 0 },
+        refreshTokens: {
+          total: 2,
+          active: 1,
+          expired: 0,
+          revoked: 1,
+          descendants: 1,
+          activeDescendants: 1,
+        },
+      },
+      replay: EXPECTED_UNAUTHORIZED,
+      afterReplay: {
+        users: 1,
+        bookings: 1,
+        sessions: { total: 2, active: 0, expired: 0, revoked: 2 },
+        refreshFamilies: { total: 1, active: 0, expired: 0, revoked: 1 },
+        refreshTokens: {
+          total: 2,
+          active: 0,
+          expired: 0,
+          revoked: 2,
+          descendants: 1,
+          activeDescendants: 0,
+        },
+      },
+    });
+  });
+
+  it.each([
+    ['immediately after commit', 0],
+    ['inside the former grace window', 4_999],
+    ['at the former grace boundary', 5_000],
+    ['after the former grace window', 5_001],
+  ])('classifies completed replay %s without using revokedAt age', async (_label, ageMs) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(CONTROLLED_REPLAY_NOW);
+    try {
+      const authTarget = requireTarget();
+      await seedRevokedSessionEligibilityFixture(authTarget, new Date());
+      const modules = await loadAuthModules();
+      const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
+      const rotationResponse = await performRefresh(
+        modules,
+        chain.refreshToken,
+        chain.sessionToken,
+      );
+      const rotation = await safeSuccessEvidence(rotationResponse, modules.sessionModule);
+      await withTestPrismaClient(authTarget, async (prisma) => {
+        await prisma.refreshToken.update({
+          where: { id: chain.sessionId },
+          data: { revokedAt: new Date(CONTROLLED_REPLAY_NOW.getTime() - ageMs) },
+        });
+      }, 'failure-fixture');
+
+      const replayResponse = await performRefresh(
+        modules,
+        chain.refreshToken,
+        chain.sessionToken,
+      );
+      const replay = await safeFailureEvidence(replayResponse, modules.sessionModule);
+      const afterReplay = await safeAuthStateSnapshot(authTarget, new Date());
+
+      expect({ rotation, replay, afterReplay }).toEqual({
+        rotation: {
+          status: 200,
+          sessionCookieSet: true,
+          refreshCookieSet: true,
+          replacementSessionValid: true,
+        },
+        replay: EXPECTED_UNAUTHORIZED,
+        afterReplay: {
+          users: 1,
+          bookings: 1,
+          sessions: { total: 2, active: 0, expired: 0, revoked: 2 },
+          refreshFamilies: { total: 1, active: 0, expired: 0, revoked: 1 },
+          refreshTokens: {
+            total: 2,
+            active: 0,
+            expired: 0,
+            revoked: 2,
+            descendants: 1,
+            activeDescendants: 0,
+          },
+        },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('returns 200 plus cookie-free 409 only for database-observed same-context overlap', async () => {
+    const authTarget = requireTarget();
+    await seedRevokedSessionEligibilityFixture(authTarget, new Date());
+    const modules = await loadAuthModules();
+    const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
+
+    const overlap = await executeRouteOverlap(authTarget, modules, chain, 'same-context');
+    const winner = safeIssuedCookieEvidence(overlap.winnerResponse, modules.sessionModule);
+    const loser = await safeConcurrentEvidence(overlap.loserResponse);
+    const winnerRefresh = overlap.winnerResponse.cookies.get('guest_rt')?.value;
+    const winnerRefreshValid = Boolean(
+      winnerRefresh && await modules.guestStore.verifyRefreshToken(winnerRefresh),
+    );
+    const after = await safeAuthStateSnapshot(authTarget, new Date());
+
+    expect({
+      markerObserved: overlap.markerLocksObserved > 0,
+      whileBlocked: overlap.stateWhileWinnerBlocked,
+      winner,
+      loser,
+      winnerRefreshValid,
+      after,
+    }).toEqual({
+      markerObserved: true,
+      whileBlocked: {
+        users: 1,
+        bookings: 1,
+        sessions: { total: 1, active: 1, expired: 0, revoked: 0 },
+        refreshFamilies: { total: 1, active: 1, expired: 0, revoked: 0 },
+        refreshTokens: {
+          total: 1,
+          active: 1,
+          expired: 0,
+          revoked: 0,
+          descendants: 0,
+          activeDescendants: 0,
+        },
+      },
+      winner: {
+        status: 200,
+        sessionCookieSet: true,
+        refreshCookieSet: true,
+        generationPaired: true,
+      },
+      loser: {
+        status: 409,
+        retryAfter: '1',
+        errorCode: 'REFRESH_IN_PROGRESS',
+        retryable: true,
+        sessionCookiePresent: false,
+        refreshCookiePresent: false,
+      },
+      winnerRefreshValid: true,
+      after: {
+        users: 1,
+        bookings: 1,
+        sessions: { total: 2, active: 1, expired: 0, revoked: 1 },
+        refreshFamilies: { total: 1, active: 1, expired: 0, revoked: 0 },
+        refreshTokens: {
+          total: 2,
+          active: 1,
+          expired: 0,
+          revoked: 1,
+          descendants: 1,
+          activeDescendants: 1,
+        },
+      },
+    });
+  });
+
+  it('waits out a different-context overlap, revokes the winner graph, and returns 401', async () => {
+    const authTarget = requireTarget();
+    await seedRevokedSessionEligibilityFixture(authTarget, new Date());
+    const modules = await loadAuthModules();
+    const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
+
+    const overlap = await executeRouteOverlap(authTarget, modules, chain, 'different-context');
+    const winner = safeIssuedCookieEvidence(overlap.winnerResponse, modules.sessionModule);
+    const loser = await safeFailureEvidence(overlap.loserResponse, modules.sessionModule);
+    const winnerSession = modules.sessionModule.parseGuestSession(
+      overlap.winnerResponse.cookies.get('guest_session')?.value,
+    );
+    const winnerRefresh = overlap.winnerResponse.cookies.get('guest_rt')?.value;
+    const winnerCredentialsValidAfter = {
+      session: Boolean(await modules.sessionModule.verifyGuestSessionAccess(winnerSession)),
+      refresh: Boolean(winnerRefresh && await modules.guestStore.verifyRefreshToken(winnerRefresh)),
+    };
+    const after = await safeAuthStateSnapshot(authTarget, new Date());
+
+    expect({ winner, loser, winnerCredentialsValidAfter, after }).toEqual({
+      winner: {
+        status: 200,
+        sessionCookieSet: true,
+        refreshCookieSet: true,
+        generationPaired: true,
+      },
+      loser: EXPECTED_UNAUTHORIZED,
+      winnerCredentialsValidAfter: { session: false, refresh: false },
+      after: {
+        users: 1,
+        bookings: 1,
+        sessions: { total: 2, active: 0, expired: 0, revoked: 2 },
+        refreshFamilies: { total: 1, active: 0, expired: 0, revoked: 1 },
+        refreshTokens: {
+          total: 2,
+          active: 0,
+          expired: 0,
+          revoked: 2,
+          descendants: 1,
+          activeDescendants: 0,
+        },
+      },
+    });
+  });
+
+  it('rejects same-context overlap with an invalid session binding instead of returning 409', async () => {
+    const authTarget = requireTarget();
+    await seedRevokedSessionEligibilityFixture(authTarget, new Date());
+    const modules = await loadAuthModules();
+    const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
+
+    const overlap = await executeRouteOverlap(authTarget, modules, chain, 'invalid-binding');
+    const winner = safeIssuedCookieEvidence(overlap.winnerResponse, modules.sessionModule);
+    const loser = await safeFailureEvidence(overlap.loserResponse, modules.sessionModule);
+    const winnerSession = modules.sessionModule.parseGuestSession(
+      overlap.winnerResponse.cookies.get('guest_session')?.value,
+    );
+    const winnerRefresh = overlap.winnerResponse.cookies.get('guest_rt')?.value;
+    const winnerCredentialsValidAfter = {
+      session: Boolean(await modules.sessionModule.verifyGuestSessionAccess(winnerSession)),
+      refresh: Boolean(winnerRefresh && await modules.guestStore.verifyRefreshToken(winnerRefresh)),
+    };
+    const after = await safeAuthStateSnapshot(authTarget, new Date());
+
+    expect({ winner, loser, winnerCredentialsValidAfter, after }).toEqual({
+      winner: {
+        status: 200,
+        sessionCookieSet: true,
+        refreshCookieSet: true,
+        generationPaired: true,
+      },
+      loser: EXPECTED_UNAUTHORIZED,
+      winnerCredentialsValidAfter: { session: false, refresh: false },
+      after: {
+        users: 1,
+        bookings: 1,
+        sessions: { total: 2, active: 0, expired: 0, revoked: 2 },
+        refreshFamilies: { total: 1, active: 0, expired: 0, revoked: 1 },
+        refreshTokens: {
+          total: 2,
+          active: 0,
+          expired: 0,
+          revoked: 2,
+          descendants: 1,
+          activeDescendants: 0,
+        },
+      },
     });
   });
 

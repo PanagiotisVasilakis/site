@@ -1,6 +1,6 @@
 # Testing strategy
 
-Last verified: 2026-07-15.
+Last verified: 2026-07-16.
 
 ## Purpose
 
@@ -31,6 +31,7 @@ npm run test:integration # disposable PostgreSQL migration/integration foundatio
 npm run test:watch       # interactive local development
 npm run test:coverage    # suite plus enforced coverage gate
 npm run validate:local   # typecheck, lint, coverage, security/build validation
+npm run hash:prisma-integrity # deterministic Prisma integrity hashes
 ```
 
 The system orchestrator's `--strict` option also runs lint, typecheck, and the coverage gate before build or startup.
@@ -79,6 +80,25 @@ AND startDate <= endDate
 ```
 
 Each operation captures its clock once, derives the window with UTC calendar arithmetic, and uses `src/lib/portalBookingEligibility.ts`. Claim consumption applies the predicate to the booking re-read inside its Serializable transaction before user, password, ownership, grant, terms, or audit mutations. Login, refresh issuance/rotation, and session-access verification use the same temporal policy while retaining their separate `VERIFIED` and ownership requirements. The PostgreSQL integration matrix covers ended-yesterday, ends-today, starts-today, `+1`, `+7`, `+8`, and inverted ranges across those flows.
+
+## Refresh rotation overlap and replay policy
+
+Refresh concurrency uses a transaction-scoped PostgreSQL advisory try-lock derived from the immutable predecessor generation UUID. Raw refresh credentials, elapsed time, IP, and device fingerprints do not prove overlap. The marker is attempted before the canonical `User → RefreshTokenFamily` row-lock order and is released automatically on commit or rollback.
+
+Only a contender whose committed preflight shows an active generation, valid session/booking binding, and approved same context may map observed marker contention to cookie-free `409 REFRESH_IN_PROGRESS`; the owner remains the sole `200` winner. Every different-context, invalid-binding, revoked, or ambiguous contender ends its try-lock transaction and enters a separately bounded cleanup transaction using `User → RefreshTokenFamily`. If the owner locks User first, cleanup revokes every committed descendant; if cleanup locks User first, the owner later observes the revoked family and cannot issue a credential.
+
+A request that owns the marker and authoritatively re-reads an already-revoked predecessor is completed replay: it atomically revokes the family, all family tokens, and paired sessions before returning `401` and clearing both auth cookies. Integration coverage uses PostgreSQL lock barriers rather than ordering sleeps and includes 20 same-context overlaps, 15 different-context overlaps, completed-replay timing boundaries and post-commit contention, invalid bindings, family/generation isolation, and owner rollback/retry.
+
+## Prisma integrity hashing
+
+Run `npm run hash:prisma-integrity` from the repository root. The schema hash covers the raw `prisma/schema.prisma` bytes. The migration-tree hash recursively includes every regular file below `prisma/migrations`, including `migration_lock.toml`; it byte-sorts UTF-8 relative paths and hashes a versioned, length-prefixed path/content stream. Ambiguous or duplicate paths, symbolic links, and special files fail closed; filesystem traversal order, timestamps, and metadata are excluded.
+
+Current verified values:
+
+- Prisma schema SHA-256: `55e5f6c9ec3230009b60d2331f0b9d04a4acc143f65e72c376fd1a7c31df044b`.
+- Prisma migration tree SHA-256: `be2f0a33cd4d80f9eb71b7c1f2916b56600fd3cbc325fbf8ad8a7684c83a3d8f` across 15 files.
+
+The earlier `b1763086454bf563257bbba8b092b89cea1bdd962e442da0bec49af9bbd6450c` / `bcb0d280c005f31d08a1c98a46cd3e2301b97256c5b68b88d52907c6c5bc8bd2` discrepancy was file-scope drift, not a migration change: the first command included `migration_lock.toml` among all 15 files, while the second selected only the 14 `*.sql` files. The versioned utility above is the canonical process for subsequent reports.
 
 ## Coverage policy
 

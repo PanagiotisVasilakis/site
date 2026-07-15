@@ -2,6 +2,7 @@ import type { Prisma, PrismaClient } from '@/generated/prisma/client';
 import { verifySensitive } from '@/lib/crypto';
 import { logger } from '@/lib/logger-enterprise';
 import { prisma } from '@/lib/prisma';
+import { refreshGenerationAdvisoryLockKey } from '@/lib/refreshRotationLock';
 import {
   createPortalBookingEligibilityWindow,
   isPortalBookingTemporallyEligible,
@@ -56,6 +57,12 @@ type RefreshTokenRotationResult =
   | { status: 'concurrent'; familyId: string }
   | { status: 'replayed'; familyId: string };
 
+type RefreshGenerationContention = {
+  status: 'generation_contended';
+  familyId: string;
+  disposition: 'suspicious' | 'authoritative_recheck';
+};
+
 type RefreshTokenReplacement = {
   id: string;
   tokenHash: string;
@@ -69,7 +76,9 @@ type RefreshTokenReplacement = {
 };
 
 const REFRESH_FAMILY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const CONCURRENT_ROTATION_GRACE_MS = 5_000;
+const ROTATION_TRANSACTION_MAX_WAIT_MS = 2_000;
+const ROTATION_TRANSACTION_TIMEOUT_MS = 10_000;
+const CONTENTION_CLEANUP_TRANSACTION_TIMEOUT_MS = 15_000;
 
 function mapToken(token: {
   id: string;
@@ -140,6 +149,23 @@ async function lockFamily(tx: Prisma.TransactionClient, familyId: string): Promi
     FOR UPDATE
   `;
   return rows.length === 1;
+}
+
+async function tryLockRefreshGeneration(
+  tx: Prisma.TransactionClient,
+  lockKey: bigint,
+): Promise<boolean> {
+  const rows = await tx.$queryRaw<Array<{ acquired: boolean }>>`
+    SELECT pg_try_advisory_xact_lock(${lockKey}::bigint) AS "acquired"
+  `;
+  return rows.length === 1 && rows[0].acquired;
+}
+
+async function configureContentionLockTimeout(tx: Prisma.TransactionClient): Promise<void> {
+  // A normal rotation transaction is bounded to ten seconds. The cleanup
+  // transaction starts later and receives one extra second for the owner to
+  // release its canonical row locks, while remaining bounded independently.
+  await tx.$executeRaw`SET LOCAL lock_timeout = '11s'`;
 }
 
 async function revokeFamilyGraph(
@@ -359,8 +385,56 @@ async function rotate(
     return { status: 'invalid' };
   }
 
+  const initialNow = new Date();
+  const initialSession = await database.session.findUnique({ where: { id: initial.id } });
+  const initialBooking = initialSession
+    ? await database.booking.findUnique({ where: { id: initialSession.bookingId } })
+    : null;
+  const initialGenerationActive = !initial.revokedAt
+    && !initial.family.revokedAt
+    && initial.expiresAt > initialNow
+    && initial.family.absoluteExpiresAt > initialNow;
+  const initialBindingApproved = replacement.presentedSession.status === 'missing'
+    || (replacement.presentedSession.status === 'present'
+      && initialSession?.id === replacement.presentedSession.sessionId
+      && initialSession.userId === replacement.presentedSession.userId
+      && initialSession.bookingId === replacement.presentedSession.bookingId);
+  const initialAuthorizationApproved = initialGenerationActive
+    && initialSession !== null
+    && initialSession.userId === initial.userId
+    && !initialSession.revokedAt
+    && initialBooking !== null
+    && bookingIsEligible(
+      initialBooking,
+      initial.userId,
+      createPortalBookingEligibilityWindow(initialNow),
+    )
+    && initialBindingApproved;
+  const generationLockKey = refreshGenerationAdvisoryLockKey(initial.id);
+  const sameRefreshContext = !!replacement.deviceHash
+    && replacement.deviceHash === initial.family.deviceHash
+    && (!initial.family.ipHash || replacement.ipHash === initial.family.ipHash);
+
   try {
-    return await database.$transaction(async (tx) => {
+    const result: RefreshTokenRotationResult | RefreshGenerationContention =
+      await database.$transaction(async (tx) => {
+      const ownsGeneration = await tryLockRefreshGeneration(tx, generationLockKey);
+      if (!ownsGeneration) {
+        if (sameRefreshContext && initialAuthorizationApproved) {
+          logger.info('Concurrent refresh observed through database contention', {
+            tokenId: initial.id,
+            familyId: initial.familyId,
+          });
+          return { status: 'concurrent', familyId: initial.familyId } as const;
+        }
+
+        return {
+          status: 'generation_contended',
+          familyId: initial.familyId,
+          disposition: initialGenerationActive ? 'suspicious' : 'authoritative_recheck',
+        } as const;
+      }
+
       if (!(await lockUser(tx, initial.userId)) || !(await lockFamily(tx, initial.familyId))) {
         return { status: 'invalid' } as const;
       }
@@ -370,6 +444,8 @@ async function rotate(
         include: { family: true },
       });
       if (!candidate
+        || candidate.userId !== initial.userId
+        || candidate.familyId !== initial.familyId
         || candidate.family.userId !== candidate.userId
         || !verifySensitive(parsed.secret, candidate.salt, candidate.tokenHash)) {
         return { status: 'invalid' } as const;
@@ -383,19 +459,7 @@ async function rotate(
       }
       if (candidate.family.absoluteExpiresAt <= now) return { status: 'invalid' } as const;
 
-      const sameRefreshContext = !!replacement.deviceHash
-        && replacement.deviceHash === candidate.family.deviceHash
-        && (!candidate.family.ipHash || replacement.ipHash === candidate.family.ipHash);
-
       if (candidate.revokedAt) {
-        if (sameRefreshContext
-          && now.getTime() - candidate.revokedAt.getTime() <= CONCURRENT_ROTATION_GRACE_MS) {
-          logger.info('Concurrent refresh within same-device grace window', {
-            tokenId: candidate.id,
-            familyId: candidate.familyId,
-          });
-          return { status: 'concurrent', familyId: candidate.familyId } as const;
-        }
         await revokeFamilyGraph(tx, candidate.familyId, now, 'refresh_token_replay');
         logger.warn('Refresh token replay detected; family revoked', {
           tokenId: candidate.id,
@@ -488,6 +552,72 @@ async function rotate(
         session: rotatedSession,
         sessionToken,
       } as const;
+    }, {
+      isolationLevel: 'ReadCommitted',
+      maxWait: ROTATION_TRANSACTION_MAX_WAIT_MS,
+      timeout: ROTATION_TRANSACTION_TIMEOUT_MS,
+    });
+
+    if (result.status !== 'generation_contended') return result;
+
+    // The try-lock transaction held no User/Family rows and has now ended.
+    // A separate, longer bounded transaction preserves User -> Family order
+    // for the authoritative fail-closed recheck and revocation. It does not
+    // wait for the advisory marker: if it reaches User first, the owner later
+    // observes the revoked family; if the owner reaches User first, cleanup
+    // waits and revokes every committed descendant before returning.
+    return await database.$transaction(async (tx) => {
+      await configureContentionLockTimeout(tx);
+      if (!(await lockUser(tx, initial.userId)) || !(await lockFamily(tx, initial.familyId))) {
+        return { status: 'invalid' } as const;
+      }
+
+      const candidate = await tx.refreshToken.findUnique({
+        where: { id: parsed.id },
+        include: { family: true },
+      });
+      if (!candidate
+        || candidate.userId !== initial.userId
+        || candidate.familyId !== initial.familyId
+        || candidate.family.userId !== candidate.userId
+        || !verifySensitive(parsed.secret, candidate.salt, candidate.tokenHash)) {
+        return { status: 'invalid' } as const;
+      }
+
+      const now = new Date();
+      if (result.disposition === 'suspicious') {
+        await revokeFamilyGraph(tx, candidate.familyId, now, 'suspicious_refresh_overlap');
+        logger.warn('Unapproved refresh overlap detected; family revoked', {
+          tokenId: candidate.id,
+          familyId: candidate.familyId,
+        });
+        return { status: 'replayed', familyId: candidate.familyId } as const;
+      }
+
+      if (candidate.family.revokedAt) {
+        await revokeFamilyGraph(tx, candidate.familyId, now, 'authorization_chain_revoked');
+        return { status: 'invalid' } as const;
+      }
+      if (candidate.family.absoluteExpiresAt <= now || candidate.expiresAt <= now) {
+        return { status: 'invalid' } as const;
+      }
+      if (candidate.revokedAt) {
+        await revokeFamilyGraph(tx, candidate.familyId, now, 'refresh_token_replay');
+        logger.warn('Refresh token replay detected after generation contention; family revoked', {
+          tokenId: candidate.id,
+          familyId: candidate.familyId,
+        });
+        return { status: 'replayed', familyId: candidate.familyId } as const;
+      }
+
+      // An initially inactive generation cannot become active while the
+      // immutable predecessor row and its family remain the same. Refuse any
+      // unexpected state transition instead of issuing a credential.
+      return { status: 'invalid' } as const;
+    }, {
+      isolationLevel: 'ReadCommitted',
+      maxWait: ROTATION_TRANSACTION_MAX_WAIT_MS,
+      timeout: CONTENTION_CLEANUP_TRANSACTION_TIMEOUT_MS,
     });
   } catch (error) {
     logger.error('refreshTokenRepository(prisma): rotate failed', error);
