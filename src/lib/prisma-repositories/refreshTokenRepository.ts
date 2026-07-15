@@ -1,8 +1,12 @@
-import crypto from 'node:crypto';
-
+import type { Prisma, PrismaClient } from '@/generated/prisma/client';
 import { verifySensitive } from '@/lib/crypto';
 import { logger } from '@/lib/logger-enterprise';
 import { prisma } from '@/lib/prisma';
+import {
+  createPortalBookingEligibilityWindow,
+  isPortalBookingTemporallyEligible,
+  type PortalBookingEligibilityWindow,
+} from '@/lib/portalBookingEligibility';
 
 export type GuestRefreshTokenRec = {
   id: string;
@@ -19,18 +23,49 @@ export type GuestRefreshTokenRec = {
   ip_hint?: string;
 };
 
+export type RefreshSessionBinding =
+  | { status: 'missing' }
+  | { status: 'invalid' }
+  | {
+    status: 'present';
+    sessionId: string;
+    userId: string;
+    bookingId: string;
+  };
+
+export type RefreshSessionRecord = {
+  id: string;
+  userId: string;
+  bookingId: string;
+  expiresAt: Date;
+};
+
+// Durable schema-free authorization binding: every remember-me generation uses
+// one UUID for both RefreshToken.id and Session.id. Session expiry is natural;
+// explicit revocation invalidates the exact family graph resolved through it.
+
 type RefreshTokenRotationResult =
-  | { status: 'rotated'; old: GuestRefreshTokenRec; rec: GuestRefreshTokenRec }
+  | {
+    status: 'rotated';
+    old: GuestRefreshTokenRec;
+    rec: GuestRefreshTokenRec;
+    session: RefreshSessionRecord;
+    sessionToken: string;
+  }
   | { status: 'invalid' }
   | { status: 'concurrent'; familyId: string }
   | { status: 'replayed'; familyId: string };
 
 type RefreshTokenReplacement = {
+  id: string;
   tokenHash: string;
   salt: string;
-  expiresAt: number;
+  tokenExpiresAt: number;
+  sessionExpiresAt: Date;
   deviceHash?: string;
   ipHash?: string;
+  presentedSession: RefreshSessionBinding;
+  createSessionToken: (session: RefreshSessionRecord) => string;
 };
 
 const REFRESH_FAMILY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -74,48 +109,121 @@ function parseCompositeToken(token: string): { id?: string; secret: string } | n
 
   const separatorIndex = normalized.indexOf('.');
   if (separatorIndex <= 0) {
-    // Legacy token format (secret only)
     return { secret: normalized };
   }
 
   const id = normalized.slice(0, separatorIndex);
   const secret = normalized.slice(separatorIndex + 1);
-  if (!UUID_REGEX.test(id) || !secret) {
-    return null;
-  }
-
+  if (!UUID_REGEX.test(id) || !secret) return null;
   return { id, secret };
 }
 
+async function lockUser(tx: Prisma.TransactionClient, userId: string): Promise<boolean> {
+  const rows = await tx.$queryRaw<Array<{ id: string }>>`
+    SELECT "id"
+    FROM "users"
+    WHERE "id" = ${userId}::uuid
+    FOR UPDATE
+  `;
+  return rows.length === 1;
+}
+
+// Every issuance, rotation, and revocation path acquires shared rows in the
+// same user -> family order so PostgreSQL provides the cross-instance
+// linearization boundary without an in-memory mutex.
+
+async function lockFamily(tx: Prisma.TransactionClient, familyId: string): Promise<boolean> {
+  const rows = await tx.$queryRaw<Array<{ id: string }>>`
+    SELECT "id"
+    FROM "refresh_token_families"
+    WHERE "id" = ${familyId}
+    FOR UPDATE
+  `;
+  return rows.length === 1;
+}
+
+async function revokeFamilyGraph(
+  tx: Prisma.TransactionClient,
+  familyId: string,
+  now: Date,
+  reason: string,
+): Promise<void> {
+  await tx.refreshTokenFamily.updateMany({
+    where: { id: familyId, revokedAt: null },
+    data: { revokedAt: now, revocationReason: reason },
+  });
+  await tx.refreshToken.updateMany({
+    where: { familyId, revokedAt: null },
+    data: { revokedAt: now },
+  });
+  await tx.$executeRaw`
+    UPDATE "sessions"
+    SET "revoked_at" = ${now}
+    WHERE "revoked_at" IS NULL
+      AND "id" IN (
+        SELECT "id"
+        FROM "refresh_tokens"
+        WHERE "family_id" = ${familyId}
+      )
+  `;
+}
+
+function bookingIsEligible(booking: {
+  userId: string | null;
+  accessStatus: string;
+  startDate: Date;
+  endDate: Date;
+}, userId: string, eligibilityWindow: PortalBookingEligibilityWindow): boolean {
+  return booking.userId === userId
+    && booking.accessStatus === 'VERIFIED'
+    && isPortalBookingTemporallyEligible(booking, eligibilityWindow);
+}
+
 async function create(
+  database: PrismaClient,
   userId: string,
+  tokenId: string,
   tokenHash: string,
   salt: string,
   familyId: string,
   expiresAt: number,
-  opts?: { deviceHint?: string; ipHint?: string }
+  opts?: { deviceHint?: string; ipHint?: string },
 ): Promise<GuestRefreshTokenRec> {
   try {
-    const token = await prisma.$transaction(async (tx) => {
+    const token = await database.$transaction(async (tx) => {
+      if (!(await lockUser(tx, userId))) {
+        throw new Error('Refresh authorization user does not exist');
+      }
+
       const now = new Date();
-      let family = await tx.refreshTokenFamily.findUnique({ where: { id: familyId } });
-      if (!family) {
-        family = await tx.refreshTokenFamily.create({
-          data: {
-            id: familyId,
-            userId,
-            absoluteExpiresAt: new Date(now.getTime() + REFRESH_FAMILY_TTL_MS),
-            deviceHash: opts?.deviceHint ?? null,
-            ipHash: opts?.ipHint ?? null,
-          },
-        });
+      const eligibilityWindow = createPortalBookingEligibilityWindow(now);
+      const session = await tx.session.findUnique({ where: { id: tokenId } });
+      if (!session
+        || session.userId !== userId
+        || session.revokedAt
+        || session.expiresAt <= now) {
+        throw new Error('Refresh authorization session is invalid');
       }
-      if (family.userId !== userId || family.revokedAt || family.absoluteExpiresAt <= now) {
-        throw new Error('Refresh token family is invalid or expired');
+      const booking = await tx.booking.findUnique({ where: { id: session.bookingId } });
+      if (!booking || !bookingIsEligible(booking, userId, eligibilityWindow)) {
+        throw new Error('Refresh authorization booking is invalid');
       }
+      if (await tx.refreshTokenFamily.findUnique({ where: { id: familyId } })) {
+        throw new Error('Refresh token family already exists');
+      }
+
+      const family = await tx.refreshTokenFamily.create({
+        data: {
+          id: familyId,
+          userId,
+          absoluteExpiresAt: new Date(now.getTime() + REFRESH_FAMILY_TTL_MS),
+          deviceHash: opts?.deviceHint ?? null,
+          ipHash: opts?.ipHint ?? null,
+        },
+      });
       return tx.refreshToken.create({
         data: {
-          id: crypto.randomUUID(),
+          id: tokenId,
           userId,
           tokenHash,
           salt,
@@ -135,66 +243,69 @@ async function create(
   }
 }
 
-async function verify(token: string): Promise<GuestRefreshTokenRec | undefined> {
+async function verify(
+  database: PrismaClient,
+  token: string,
+): Promise<GuestRefreshTokenRec | undefined> {
   try {
     const parsed = parseCompositeToken(token);
     if (!parsed) return undefined;
-
     const now = Date.now();
 
-    // O(1) path for modern token format: <token-id>.<secret>
     if (parsed.id) {
-      const candidate = await prisma.refreshToken.findUnique({
+      const candidate = await database.refreshToken.findUnique({
         where: { id: parsed.id },
         include: { family: true },
       });
+      const session = candidate
+        ? await database.session.findUnique({ where: { id: candidate.id } })
+        : null;
       if (!candidate
+        || !session
+        || session.userId !== candidate.userId
+        || session.revokedAt
         || candidate.revokedAt
         || candidate.expiresAt.getTime() <= now
         || candidate.family.revokedAt
-        || candidate.family.absoluteExpiresAt.getTime() <= now) {
+        || candidate.family.absoluteExpiresAt.getTime() <= now
+        || !verifySensitive(parsed.secret, candidate.salt, candidate.tokenHash)) {
         return undefined;
       }
 
-      if (!verifySensitive(parsed.secret, candidate.salt, candidate.tokenHash)) {
-        return undefined;
-      }
-
-      await prisma.refreshToken.update({
+      await database.refreshToken.update({
         where: { id: candidate.id },
         data: { lastUsedAt: new Date(now) },
       });
       return mapToken({ ...candidate, lastUsedAt: new Date(now) });
     }
 
-    // Backward-compatible path for legacy tokens (secret-only format).
-    // Keep this off by default because it requires scanning all active tokens.
     if (process.env.GUEST_REFRESH_ALLOW_LEGACY_SECRET_ONLY !== '1') {
       logger.warn('Rejected legacy secret-only refresh token; enable GUEST_REFRESH_ALLOW_LEGACY_SECRET_ONLY=1 only during migration');
       return undefined;
     }
 
-    const activeTokens = await prisma.refreshToken.findMany({
+    const activeTokens = await database.refreshToken.findMany({
       where: {
         revokedAt: null,
         family: { revokedAt: null, absoluteExpiresAt: { gt: new Date() } },
-        expiresAt: {
-          gt: new Date(),
-        },
+        expiresAt: { gt: new Date() },
       },
       orderBy: { createdAt: 'desc' },
     });
 
     for (const candidate of activeTokens) {
-      if (verifySensitive(parsed.secret, candidate.salt, candidate.tokenHash)) {
-        await prisma.refreshToken.update({
+      const session = await database.session.findUnique({ where: { id: candidate.id } });
+      if (session
+        && session.userId === candidate.userId
+        && !session.revokedAt
+        && verifySensitive(parsed.secret, candidate.salt, candidate.tokenHash)) {
+        await database.refreshToken.update({
           where: { id: candidate.id },
           data: { lastUsedAt: new Date(now) },
         });
         return mapToken({ ...candidate, lastUsedAt: new Date(now) });
       }
     }
-
     return undefined;
   } catch (error) {
     logger.error('refreshTokenRepository(prisma): verify failed', error);
@@ -202,23 +313,27 @@ async function verify(token: string): Promise<GuestRefreshTokenRec | undefined> 
   }
 }
 
-async function revoke(id: string): Promise<boolean> {
+async function revoke(database: PrismaClient, id: string): Promise<boolean> {
   try {
-    const result = await prisma.refreshToken.updateMany({
-      where: {
-        id,
-        revokedAt: null,
-      },
-      data: {
-        revokedAt: new Date(),
-      },
+    const initial = await database.refreshToken.findUnique({ where: { id } });
+    if (!initial) return false;
+    const revoked = await database.$transaction(async (tx) => {
+      if (!(await lockUser(tx, initial.userId)) || !(await lockFamily(tx, initial.familyId))) {
+        return false;
+      }
+      const token = await tx.refreshToken.findUnique({ where: { id } });
+      if (!token || token.userId !== initial.userId || token.familyId !== initial.familyId) {
+        return false;
+      }
+      const family = await tx.refreshTokenFamily.findUnique({ where: { id: token.familyId } });
+      if (!family || family.userId !== token.userId) return false;
+      await revokeFamilyGraph(tx, token.familyId, new Date(), 'refresh_token_revoked');
+      return true;
     });
-
-    if (result.count > 0) {
+    if (revoked) {
       logger.info('Refresh token revoked (prisma)', { tokenId: id });
       return true;
     }
-
     return false;
   } catch (error) {
     logger.error('refreshTokenRepository(prisma): revoke failed', error);
@@ -227,50 +342,61 @@ async function revoke(id: string): Promise<boolean> {
 }
 
 async function rotate(
+  database: PrismaClient,
   token: string,
   replacement: RefreshTokenReplacement,
 ): Promise<RefreshTokenRotationResult> {
   const parsed = parseCompositeToken(token);
-  if (!parsed?.id) {
+  if (!parsed?.id) return { status: 'invalid' };
+
+  const initial = await database.refreshToken.findUnique({
+    where: { id: parsed.id },
+    include: { family: true },
+  });
+  if (!initial
+    || initial.family.userId !== initial.userId
+    || !verifySensitive(parsed.secret, initial.salt, initial.tokenHash)) {
     return { status: 'invalid' };
   }
 
-  const now = new Date();
-
   try {
-    return await prisma.$transaction(async (tx) => {
+    return await database.$transaction(async (tx) => {
+      if (!(await lockUser(tx, initial.userId)) || !(await lockFamily(tx, initial.familyId))) {
+        return { status: 'invalid' } as const;
+      }
+
       const candidate = await tx.refreshToken.findUnique({
         where: { id: parsed.id },
         include: { family: true },
       });
-      if (!candidate || !verifySensitive(parsed.secret, candidate.salt, candidate.tokenHash)) {
+      if (!candidate
+        || candidate.family.userId !== candidate.userId
+        || !verifySensitive(parsed.secret, candidate.salt, candidate.tokenHash)) {
         return { status: 'invalid' } as const;
       }
 
-      if (candidate.family.revokedAt || candidate.family.absoluteExpiresAt <= now) {
+      const now = new Date();
+      const eligibilityWindow = createPortalBookingEligibilityWindow(now);
+      if (candidate.family.revokedAt) {
+        await revokeFamilyGraph(tx, candidate.familyId, now, 'authorization_chain_revoked');
         return { status: 'invalid' } as const;
       }
+      if (candidate.family.absoluteExpiresAt <= now) return { status: 'invalid' } as const;
 
       const sameRefreshContext = !!replacement.deviceHash
         && replacement.deviceHash === candidate.family.deviceHash
         && (!candidate.family.ipHash || replacement.ipHash === candidate.family.ipHash);
 
       if (candidate.revokedAt) {
-        if (sameRefreshContext && now.getTime() - candidate.revokedAt.getTime() <= CONCURRENT_ROTATION_GRACE_MS) {
+        if (sameRefreshContext
+          && now.getTime() - candidate.revokedAt.getTime() <= CONCURRENT_ROTATION_GRACE_MS) {
           logger.info('Concurrent refresh within same-device grace window', {
             tokenId: candidate.id,
             familyId: candidate.familyId,
           });
           return { status: 'concurrent', familyId: candidate.familyId } as const;
         }
-        await tx.refreshTokenFamily.update({
-          where: { id: candidate.familyId },
-          data: { revokedAt: now, revocationReason: 'refresh_token_replay' },
-        });
-        await tx.refreshToken.updateMany({
-          where: { familyId: candidate.familyId, revokedAt: null },
-          data: { revokedAt: now },
-        });
+        await revokeFamilyGraph(tx, candidate.familyId, now, 'refresh_token_replay');
         logger.warn('Refresh token replay detected; family revoked', {
           tokenId: candidate.id,
           familyId: candidate.familyId,
@@ -278,61 +404,89 @@ async function rotate(
         return { status: 'replayed', familyId: candidate.familyId } as const;
       }
 
-      if (candidate.expiresAt.getTime() <= now.getTime()) {
+      if (candidate.expiresAt <= now) return { status: 'invalid' } as const;
+
+      const session = await tx.session.findUnique({ where: { id: candidate.id } });
+      if (!session || session.userId !== candidate.userId) {
+        // Pre-binding generations cannot be associated with one exact booking,
+        // session, or family without guessing. Revoke them fail-closed and
+        // require a one-time sign-in instead of accepting cookie substitution.
+        await revokeFamilyGraph(tx, candidate.familyId, now, 'unbound_refresh_token');
         return { status: 'invalid' } as const;
       }
 
-      const revoked = await tx.refreshToken.updateMany({
-        where: {
-          id: candidate.id,
-          revokedAt: null,
-          expiresAt: { gt: now },
-        },
+      const binding = replacement.presentedSession;
+      if (binding.status === 'invalid'
+        || (binding.status === 'present'
+          && (binding.sessionId !== session.id
+            || binding.userId !== session.userId
+            || binding.bookingId !== session.bookingId))) {
+        await revokeFamilyGraph(tx, candidate.familyId, now, 'session_binding_mismatch');
+        return { status: 'invalid' } as const;
+      }
+      if (session.revokedAt) {
+        await revokeFamilyGraph(tx, candidate.familyId, now, 'session_revoked');
+        return { status: 'invalid' } as const;
+      }
+
+      const booking = await tx.booking.findUnique({ where: { id: session.bookingId } });
+      if (!booking || !bookingIsEligible(booking, candidate.userId, eligibilityWindow)) {
+        await revokeFamilyGraph(tx, candidate.familyId, now, 'booking_ineligible');
+        return { status: 'invalid' } as const;
+      }
+
+      const revokedToken = await tx.refreshToken.updateMany({
+        where: { id: candidate.id, revokedAt: null, expiresAt: { gt: now } },
         data: { revokedAt: now, lastUsedAt: now },
       });
-
-      if (revoked.count !== 1) {
-        if (sameRefreshContext) {
-          logger.info('Concurrent refresh lost the conditional revoke race', {
-            tokenId: candidate.id,
-            familyId: candidate.familyId,
-          });
-          return { status: 'concurrent', familyId: candidate.familyId } as const;
-        }
-
-        await tx.refreshTokenFamily.update({
-          where: { id: candidate.familyId },
-          data: { revokedAt: now, revocationReason: 'refresh_token_replay' },
-        });
-        await tx.refreshToken.updateMany({
-          where: { familyId: candidate.familyId, revokedAt: null },
-          data: { revokedAt: now },
-        });
-        logger.warn('Cross-context refresh race detected; family revoked', {
-          tokenId: candidate.id,
-          familyId: candidate.familyId,
-        });
+      const revokedSession = await tx.session.updateMany({
+        where: { id: session.id, revokedAt: null },
+        data: { revokedAt: now },
+      });
+      if (revokedToken.count !== 1 || revokedSession.count !== 1) {
+        await revokeFamilyGraph(tx, candidate.familyId, now, 'authorization_race');
         return { status: 'replayed', familyId: candidate.familyId } as const;
       }
 
-      const created = await tx.refreshToken.create({
+      const createdSession = await tx.session.create({
         data: {
-          id: crypto.randomUUID(),
+          id: replacement.id,
+          userId: candidate.userId,
+          bookingId: session.bookingId,
+          expiresAt: replacement.sessionExpiresAt,
+        },
+      });
+      const createdToken = await tx.refreshToken.create({
+        data: {
+          id: replacement.id,
           userId: candidate.userId,
           tokenHash: replacement.tokenHash,
           salt: replacement.salt,
           familyId: candidate.familyId,
-          expiresAt: new Date(Math.min(replacement.expiresAt, candidate.family.absoluteExpiresAt.getTime())),
+          expiresAt: new Date(Math.min(
+            replacement.tokenExpiresAt,
+            candidate.family.absoluteExpiresAt.getTime(),
+          )),
           rotatedFromId: candidate.id,
           deviceHint: candidate.deviceHint,
           ipHint: candidate.ipHint,
         },
       });
 
+      const rotatedSession = {
+        id: createdSession.id,
+        userId: createdSession.userId,
+        bookingId: createdSession.bookingId,
+        expiresAt: createdSession.expiresAt,
+      };
+      const sessionToken = replacement.createSessionToken(rotatedSession);
+
       return {
         status: 'rotated',
         old: mapToken({ ...candidate, revokedAt: now, lastUsedAt: now }),
-        rec: mapToken(created),
+        rec: mapToken(createdToken),
+        session: rotatedSession,
+        sessionToken,
       } as const;
     });
   } catch (error) {
@@ -341,40 +495,92 @@ async function rotate(
   }
 }
 
-async function revokeFamilyForToken(token: string, reason = 'logout'): Promise<boolean> {
-  const parsed = parseCompositeToken(token);
-  if (!parsed?.id) return false;
-  const candidate = await prisma.refreshToken.findUnique({ where: { id: parsed.id } });
-  if (!candidate || !verifySensitive(parsed.secret, candidate.salt, candidate.tokenHash)) return false;
-  const now = new Date();
-  await prisma.$transaction([
-    prisma.refreshTokenFamily.updateMany({
-      where: { id: candidate.familyId, revokedAt: null },
-      data: { revokedAt: now, revocationReason: reason },
-    }),
-    prisma.refreshToken.updateMany({
-      where: { familyId: candidate.familyId, revokedAt: null },
-      data: { revokedAt: now },
-    }),
-  ]);
-  return true;
+async function revokeAuthorizationForSession(
+  database: PrismaClient,
+  sessionId: string,
+  reason = 'session_revoked',
+): Promise<boolean> {
+  try {
+    return await database.$transaction(async (tx) => {
+      const initialSession = await tx.session.findUnique({ where: { id: sessionId } });
+      if (!initialSession || !(await lockUser(tx, initialSession.userId))) return false;
+
+      const session = await tx.session.findUnique({ where: { id: sessionId } });
+      if (!session) return false;
+      const token = await tx.refreshToken.findUnique({ where: { id: sessionId } });
+      if (!token || token.userId !== session.userId || !(await lockFamily(tx, token.familyId))) {
+        await tx.session.updateMany({
+          where: { id: sessionId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+        return true;
+      }
+
+      const family = await tx.refreshTokenFamily.findUnique({ where: { id: token.familyId } });
+      if (!family || family.userId !== token.userId) {
+        await tx.session.updateMany({
+          where: { id: sessionId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+        await tx.refreshToken.updateMany({
+          where: { id: token.id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+        return true;
+      }
+
+      await revokeFamilyGraph(tx, token.familyId, new Date(), reason);
+      return true;
+    });
+  } catch (error) {
+    logger.error('refreshTokenRepository(prisma): session authorization revoke failed', error);
+    throw error;
+  }
 }
 
-async function purgeExpired(maxAgeDaysPastExpiry: number = 30): Promise<number> {
+async function revokeFamilyForToken(
+  database: PrismaClient,
+  token: string,
+  reason = 'logout',
+): Promise<boolean> {
+  const parsed = parseCompositeToken(token);
+  if (!parsed?.id) return false;
+  const initial = await database.refreshToken.findUnique({
+    where: { id: parsed.id },
+    include: { family: true },
+  });
+  if (!initial
+    || initial.family.userId !== initial.userId
+    || !verifySensitive(parsed.secret, initial.salt, initial.tokenHash)) return false;
+
+  return database.$transaction(async (tx) => {
+    if (!(await lockUser(tx, initial.userId)) || !(await lockFamily(tx, initial.familyId))) {
+      return false;
+    }
+    const candidate = await tx.refreshToken.findUnique({
+      where: { id: parsed.id },
+      include: { family: true },
+    });
+    if (!candidate
+      || candidate.family.userId !== candidate.userId
+      || !verifySensitive(parsed.secret, candidate.salt, candidate.tokenHash)) {
+      return false;
+    }
+    await revokeFamilyGraph(tx, candidate.familyId, new Date(), reason);
+    return true;
+  });
+}
+
+async function purgeExpired(
+  database: PrismaClient,
+  maxAgeDaysPastExpiry = 30,
+): Promise<number> {
   try {
     const cutoff = new Date(Date.now() - maxAgeDaysPastExpiry * 24 * 60 * 60 * 1000);
-    const result = await prisma.refreshToken.deleteMany({
-      where: {
-        expiresAt: {
-          lt: cutoff,
-        },
-      },
+    const result = await database.refreshToken.deleteMany({
+      where: { expiresAt: { lt: cutoff } },
     });
-
-    if (result.count > 0) {
-      logger.info('Expired refresh tokens purged (prisma)', { count: result.count });
-    }
-
+    if (result.count > 0) logger.info('Expired refresh tokens purged (prisma)', { count: result.count });
     return result.count;
   } catch (error) {
     logger.error('refreshTokenRepository(prisma): purgeExpired failed', error);
@@ -382,11 +588,16 @@ async function purgeExpired(maxAgeDaysPastExpiry: number = 30): Promise<number> 
   }
 }
 
-export const refreshTokenRepository = {
-  create,
-  verify,
-  revoke,
-  rotate,
-  revokeFamilyForToken,
-  purgeExpired,
-};
+export function createRefreshTokenRepository(database: PrismaClient) {
+  return {
+    create: create.bind(undefined, database),
+    verify: verify.bind(undefined, database),
+    revoke: revoke.bind(undefined, database),
+    rotate: rotate.bind(undefined, database),
+    revokeAuthorizationForSession: revokeAuthorizationForSession.bind(undefined, database),
+    revokeFamilyForToken: revokeFamilyForToken.bind(undefined, database),
+    purgeExpired: purgeExpired.bind(undefined, database),
+  };
+}
+
+export const refreshTokenRepository = createRefreshTokenRepository(prisma);

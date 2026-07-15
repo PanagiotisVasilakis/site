@@ -3,10 +3,13 @@ import { withErrorHandler } from '@/lib/apiErrorHandler';
 import { guestStore } from '@/lib/guestDataStore';
 import { logger as elogger } from '@/lib/logger-enterprise';
 import { metrics } from '@/lib/metrics-collector';
-import { parseGuestSession, revokeGuestSession } from '@/lib/guestSession';
+import { parseGuestSessionBinding, revokeGuestSessionById } from '@/lib/guestSession';
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  await revokeGuestSession(parseGuestSession(req.cookies.get('guest_session')?.value));
+  const sessionBinding = parseGuestSessionBinding(req.cookies.get('guest_session')?.value);
+  await revokeGuestSessionById(
+    sessionBinding.status === 'present' ? sessionBinding.sessionId : undefined,
+  );
   const refresh = req.cookies.get('guest_rt')?.value;
   if (refresh) {
     const revoked = await guestStore.revokeRefreshFamily(refresh);

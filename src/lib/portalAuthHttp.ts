@@ -6,6 +6,7 @@ import {
   createRefreshCookie,
   createSessionCookie,
   issueGuestSession,
+  parseGuestSession,
 } from '@/lib/guestSession';
 import { getClientIp } from '@/lib/net/getClientIp';
 import { privacyHmac } from '@/lib/privacyHash';
@@ -40,8 +41,13 @@ export async function attachPortalAuthCookies(
   response.cookies.set(sessionCookie.name, sessionCookie.value, sessionCookie.options);
 
   if (input.remember) {
+    const sessionId = parseGuestSession(sessionToken)?.sid;
+    if (!sessionId) {
+      throw new Error('Failed to bind refresh authorization to guest session');
+    }
     const context = requestAuthContext(request);
     const issued = await guestStore.issueRefreshToken(input.userId, 7, {
+      session_id: sessionId,
       device_hint: context.deviceHint,
       ip_hint: context.ipHint,
     });

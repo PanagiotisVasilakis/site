@@ -6,9 +6,7 @@ import {
   createRefreshCookie,
   clearSessionCookie,
   clearRefreshCookie,
-  issueGuestSession,
-  parseGuestSession,
-  revokeGuestSession,
+  parseGuestSessionBinding,
 } from '@/lib/guestSession';
 import { logger as elogger } from '@/lib/logger-enterprise';
 import { metrics } from '@/lib/metrics-collector';
@@ -74,6 +72,9 @@ async function issueRefreshedSession(
   const rotated = await guestStore.rotateRefreshToken(refreshToken, 7, {
     device_hint: context.deviceHint,
     ip_hint: context.ipHint,
+    presented_session: parseGuestSessionBinding(
+      request.cookies.get('guest_session')?.value,
+    ),
   });
   if (rotated.status === 'concurrent') {
     elogger.info('refresh_token.concurrent', {
@@ -91,7 +92,12 @@ async function issueRefreshedSession(
     return { status: 'failed' };
   }
 
-  if (rotated.status !== 'rotated' || !rotated.old || !rotated.rec || !rotated.token) {
+  if (rotated.status !== 'rotated'
+    || !rotated.old
+    || !rotated.rec
+    || !rotated.token
+    || !rotated.session
+    || !rotated.sessionToken) {
     return { status: 'failed' };
   }
 
@@ -104,22 +110,11 @@ async function issueRefreshedSession(
   });
   metrics.counter('refresh_token.rotated', 1);
 
-  const user = await guestStore.findUserById(rotated.old.user_id);
-  const booking = user ? await guestStore.findEligibleBookingForUser(user.id) : undefined;
-  if (!user || !booking) {
-    await guestStore.revokeRefreshToken(rotated.rec.id);
-    return { status: 'failed' };
-  }
-
   return {
     status: 'refreshed',
-    jwt: await issueGuestSession(user.id, booking.id),
+    jwt: rotated.sessionToken,
     refreshToken: rotated.token,
   };
-}
-
-async function revokeCurrentSession(req: NextRequest): Promise<void> {
-  await revokeGuestSession(parseGuestSession(req.cookies.get('guest_session')?.value));
 }
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
@@ -139,8 +134,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   if (refreshed.status === 'failed') {
     return unauthorizedResponse(req);
   }
-  await revokeCurrentSession(req);
-
   const res = success({ refreshed: true });
   applyAuthCookies(res, refreshed.jwt, refreshed.refreshToken);
 

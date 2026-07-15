@@ -50,6 +50,7 @@ export default defineConfig({
         'src/lib/net/getClientIp.ts',
         'src/lib/observability-contracts.ts',
         'src/lib/phone.ts',
+        'src/lib/portalBookingEligibility.ts',
         'src/lib/portalRefreshClient.ts',
         'src/lib/propertyTime.ts',
         'src/lib/prismaPgConfig.ts',

@@ -4,6 +4,11 @@ import crypto from 'node:crypto';
 import { prisma } from '@/lib/prisma';
 import { normalizePhone, type Origin } from '@/lib/phone';
 import { GUEST_TERMS_CONTENT_HASH, GUEST_TERMS_VERSION } from '@/lib/guestTerms';
+import {
+  createPortalBookingEligibilityWindow,
+  isPortalBookingTemporallyEligible,
+  portalBookingTemporalWhere,
+} from '@/lib/portalBookingEligibility';
 
 const CLAIM_TOKEN_TTL_MINUTES = 30;
 const BCRYPT_ROUNDS = 12;
@@ -99,6 +104,7 @@ export async function consumeBookingClaimGrant(input: {
   const tokenDigest = digestClaimToken(input.token.trim());
   const newPasswordHash = await bcrypt.hash(input.password, BCRYPT_ROUNDS);
   const now = new Date();
+  const eligibilityWindow = createPortalBookingEligibilityWindow(now);
 
   const consume = () => prisma.$transaction(async (tx) => {
     const grant = await tx.bookingClaimGrant.findUnique({
@@ -109,7 +115,7 @@ export async function consumeBookingClaimGrant(input: {
       || grant.consumedAt
       || grant.revokedAt
       || grant.expiresAt <= now
-      || grant.booking.endDate < new Date(now.toISOString().slice(0, 10))) {
+      || !isPortalBookingTemporallyEligible(grant.booking, eligibilityWindow)) {
       throw new PortalAuthError('INVALID_CLAIM');
     }
 
@@ -214,6 +220,8 @@ export async function authenticatePortalUser(input: {
 }): Promise<{ userId: string; bookingId: string }> {
   const primaryPhone = normalizePhone(input.phone);
   if (!primaryPhone) throw new PortalAuthError('INVALID_CREDENTIALS');
+  const now = new Date();
+  const eligibilityWindow = createPortalBookingEligibilityWindow(now);
 
   // Preserve the existing international-without-plus interpretation first,
   // then support the local 10-digit format used by Greek guests at claim time.
@@ -228,18 +236,19 @@ export async function authenticatePortalUser(input: {
     throw new PortalAuthError('INVALID_CREDENTIALS');
   }
 
-  const today = new Date(new Date().toISOString().slice(0, 10));
-  const accessWindowEnd = new Date(today);
-  accessWindowEnd.setUTCDate(accessWindowEnd.getUTCDate() + 7);
-  const booking = await prisma.booking.findFirst({
+  const bookingCandidates = await prisma.booking.findMany({
     where: {
       userId: user.id,
       accessStatus: 'VERIFIED',
-      startDate: { lte: accessWindowEnd },
-      endDate: { gte: today },
+      ...portalBookingTemporalWhere(eligibilityWindow),
     },
     orderBy: { startDate: 'asc' },
   });
-  if (!booking) throw new PortalAuthError('NO_ELIGIBLE_BOOKING');
+  const booking = bookingCandidates.find((candidate) => (
+    isPortalBookingTemporallyEligible(candidate, eligibilityWindow)
+  ));
+  if (!booking) {
+    throw new PortalAuthError('NO_ELIGIBLE_BOOKING');
+  }
   return { userId: user.id, bookingId: booking.id };
 }

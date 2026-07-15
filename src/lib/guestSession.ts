@@ -3,6 +3,14 @@ import type { JwtPayload, SignOptions } from 'jsonwebtoken';
 import crypto from 'node:crypto';
 import { cookies } from 'next/headers';
 import { logger } from '@/lib/logger-enterprise';
+import type {
+  RefreshSessionBinding,
+  RefreshSessionRecord,
+} from '@/lib/prisma-repositories/refreshTokenRepository';
+import {
+  createPortalBookingEligibilityWindow,
+  isPortalBookingTemporallyEligible,
+} from '@/lib/portalBookingEligibility';
 
 const { sign, verify } = jwt;
 
@@ -47,6 +55,36 @@ export function parseGuestSession(token: string | undefined | null): GuestSessio
   }
 }
 
+/**
+ * Parses the short-session assertion without treating natural JWT expiry as a
+ * security revocation. The repository compares this assertion with the
+ * generation-bound DB session inside the refresh transaction.
+ */
+export function parseGuestSessionBinding(
+  token: string | undefined | null,
+): RefreshSessionBinding {
+  const secret = getGuestJwtSecret();
+  if (!token) return { status: 'missing' };
+  try {
+    const payload = verify(token, secret, {
+      algorithms: ['HS256'],
+      ignoreExpiration: true,
+    }) as GuestSessionPayload;
+    const sessionId = payload.sid;
+    const userId = payload.user?.id;
+    const bookingId = payload.booking?.id;
+    if (payload.type !== 'guest'
+      || typeof sessionId !== 'string'
+      || typeof userId !== 'string'
+      || typeof bookingId !== 'string') {
+      return { status: 'invalid' };
+    }
+    return { status: 'present', sessionId, userId, bookingId };
+  } catch {
+    return { status: 'invalid' };
+  }
+}
+
 async function getGuestSessionFromCookies(): Promise<GuestSessionPayload | null> {
   try {
     const jar = await cookies();
@@ -58,12 +96,24 @@ async function getGuestSessionFromCookies(): Promise<GuestSessionPayload | null>
   }
 }
 
-const SESSION_TTL_SECONDS = 2 * 60 * 60;
+export const GUEST_SESSION_TTL_SECONDS = 2 * 60 * 60;
+
+export function createGuestSessionToken(session: RefreshSessionRecord): string {
+  const expiresIn = Math.max(
+    1,
+    Math.floor((session.expiresAt.getTime() - Date.now()) / 1000),
+  );
+  return signGuestSession({
+    sid: session.id,
+    user: { id: session.userId },
+    booking: { id: session.bookingId },
+  }, expiresIn);
+}
 
 export async function issueGuestSession(userId: string, bookingId: string): Promise<string> {
   const { prisma } = await import('@/lib/prisma');
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + SESSION_TTL_SECONDS * 1000);
+  const expiresAt = new Date(now.getTime() + GUEST_SESSION_TTL_SECONDS * 1000);
   const session = await prisma.session.create({
     data: {
       id: crypto.randomUUID(),
@@ -73,11 +123,7 @@ export async function issueGuestSession(userId: string, bookingId: string): Prom
     },
   });
 
-  return signGuestSession({
-    sid: session.id,
-    user: { id: userId },
-    booking: { id: bookingId },
-  }, SESSION_TTL_SECONDS);
+  return createGuestSessionToken(session);
 }
 
 export async function verifyGuestSessionAccess(
@@ -90,14 +136,11 @@ export async function verifyGuestSessionAccess(
 
   const { prisma } = await import('@/lib/prisma');
   const now = new Date();
+  const eligibilityWindow = createPortalBookingEligibilityWindow(now);
   const [sessionRecord, booking] = await Promise.all([
     prisma.session.findUnique({ where: { id: sessionId } }),
     prisma.booking.findUnique({ where: { id: bookingId } }),
   ]);
-
-  const accessWindowStart = new Date(booking?.startDate ?? now);
-  accessWindowStart.setUTCDate(accessWindowStart.getUTCDate() - 7);
-  const today = new Date(now.toISOString().slice(0, 10));
 
   if (!sessionRecord
     || sessionRecord.userId !== userId
@@ -107,8 +150,7 @@ export async function verifyGuestSessionAccess(
     || !booking
     || booking.accessStatus !== 'VERIFIED'
     || booking.userId !== userId
-    || now < accessWindowStart
-    || booking.endDate < today) {
+    || !isPortalBookingTemporallyEligible(booking, eligibilityWindow)) {
     return null;
   }
 
@@ -120,12 +162,13 @@ export async function getVerifiedGuestSessionFromCookies(): Promise<GuestSession
 }
 
 export async function revokeGuestSession(session: GuestSessionPayload | null | undefined): Promise<void> {
-  if (!session?.sid) return;
-  const { prisma } = await import('@/lib/prisma');
-  await prisma.session.updateMany({
-    where: { id: session.sid, revokedAt: null },
-    data: { revokedAt: new Date() },
-  });
+  await revokeGuestSessionById(session?.sid);
+}
+
+export async function revokeGuestSessionById(sessionId: string | undefined): Promise<void> {
+  if (!sessionId) return;
+  const { refreshTokenRepository } = await import('@/lib/prisma-repositories/refreshTokenRepository');
+  await refreshTokenRepository.revokeAuthorizationForSession(sessionId);
 }
 
 export function createSessionCookie(token: string): { name: string; value: string; options: { httpOnly: boolean; sameSite: 'lax'; secure: boolean; path: string; maxAge: number } } {

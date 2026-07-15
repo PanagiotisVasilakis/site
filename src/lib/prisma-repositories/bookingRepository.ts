@@ -2,6 +2,11 @@ import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger-enterprise';
 import crypto from 'node:crypto';
 import { mapBookingFromDb } from '@/lib/mappers/domainMappers';
+import {
+  createPortalBookingEligibilityWindow,
+  isPortalBookingTemporallyEligible,
+  portalBookingTemporalWhere,
+} from '@/lib/portalBookingEligibility';
 
 export type BookingRecord = {
   id: string;
@@ -91,24 +96,20 @@ async function findById(id: string): Promise<BookingRecord | undefined> {
 
 async function findEligibleForUser(userId: string, nowDateISO: string): Promise<BookingRecord | undefined> {
   try {
-    const today = new Date(nowDateISO);
-    const accessWindowEnd = new Date(today);
-    accessWindowEnd.setUTCDate(accessWindowEnd.getUTCDate() + 7);
-    const booking = await prisma.booking.findFirst({
+    const eligibilityWindow = createPortalBookingEligibilityWindow(new Date(nowDateISO));
+    const bookingCandidates = await prisma.booking.findMany({
       where: {
         userId,
         accessStatus: 'VERIFIED',
-        startDate: {
-          lte: accessWindowEnd,
-        },
-        endDate: {
-          gte: today,
-        },
+        ...portalBookingTemporalWhere(eligibilityWindow),
       },
       orderBy: {
         startDate: 'asc',
       },
     });
+    const booking = bookingCandidates.find((candidate) => (
+      isPortalBookingTemporallyEligible(candidate, eligibilityWindow)
+    ));
 
     return booking ? mapBookingFromDb(booking) : undefined;
   } catch (error) {

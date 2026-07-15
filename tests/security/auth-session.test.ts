@@ -17,8 +17,14 @@ const prismaMock = vi.hoisted(() => ({
     findUnique: vi.fn(),
   },
 }));
+const refreshTokenRepositoryMock = vi.hoisted(() => ({
+  revokeAuthorizationForSession: vi.fn(),
+}));
 
 vi.mock('@/lib/prisma', () => ({ prisma: prismaMock }));
+vi.mock('@/lib/prisma-repositories/refreshTokenRepository', () => ({
+  refreshTokenRepository: refreshTokenRepositoryMock,
+}));
 
 import {
   createAdminSession,
@@ -35,6 +41,7 @@ import {
   createSessionCookie,
   issueGuestSession,
   parseGuestSession,
+  parseGuestSessionBinding,
   revokeGuestSession,
   verifyGuestSessionAccess,
 } from '@/lib/guestSession';
@@ -147,6 +154,22 @@ describe('guest authentication', () => {
     expect(parseGuestSession(jwt.sign({ type: 'guest' }, GUEST_SECRET, { algorithm: 'HS384' }))).toBeNull();
   });
 
+  it('parses an expired signed session only as a refresh binding', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const expired = jwt.sign({
+      type: 'guest', sid: 'session-1', user: { id: 'user-1' }, booking: { id: 'booking-1' },
+    }, GUEST_SECRET, { algorithm: 'HS256', expiresIn: -1 });
+    expect(parseGuestSession(expired)).toBeNull();
+    expect(parseGuestSessionBinding(expired)).toEqual({
+      status: 'present',
+      sessionId: 'session-1',
+      userId: 'user-1',
+      bookingId: 'booking-1',
+    });
+    expect(parseGuestSessionBinding(null)).toEqual({ status: 'missing' });
+    expect(parseGuestSessionBinding('malformed')).toEqual({ status: 'invalid' });
+  });
+
   it('issues a database-backed guest session and matching JWT', async () => {
     prismaMock.session.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => data);
     const token = await issueGuestSession('user-1', 'booking-1');
@@ -180,15 +203,13 @@ describe('guest authentication', () => {
     await expect(verifyGuestSessionAccess(null)).resolves.toBeNull();
   });
 
-  it('revokes a live session and ignores payloads without a session id', async () => {
-    prismaMock.session.updateMany.mockResolvedValue({ count: 1 });
+  it('revokes the session authorization chain and ignores payloads without a session id', async () => {
+    refreshTokenRepositoryMock.revokeAuthorizationForSession.mockResolvedValue(true);
     await revokeGuestSession({ type: 'guest' });
-    expect(prismaMock.session.updateMany).not.toHaveBeenCalled();
+    expect(refreshTokenRepositoryMock.revokeAuthorizationForSession).not.toHaveBeenCalled();
     await revokeGuestSession({ type: 'guest', sid: 'session-1' });
-    expect(prismaMock.session.updateMany).toHaveBeenCalledWith({
-      where: { id: 'session-1', revokedAt: null },
-      data: { revokedAt: expect.any(Date) },
-    });
+    expect(refreshTokenRepositoryMock.revokeAuthorizationForSession)
+      .toHaveBeenCalledWith('session-1');
   });
 
   it('uses secure, HTTP-only, same-site cookie policies', () => {
