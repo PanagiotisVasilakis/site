@@ -64,7 +64,7 @@ try {
     // ignore chmod failures on platforms that don't support it
   }
   toAppend.forEach((line) => console.log(`Generated ${line.split('=')[0]} and appended to .env.local (local only).`));
-  console.log('Do NOT commit .env.local. Use your platform secret store for CI/production.');
+  console.log('Do NOT commit .env.local. Use your deployment platform secret store in production.');
 } catch (err) {
   console.error('Failed to write .env.local:', err.message || err);
   process.exit(2);

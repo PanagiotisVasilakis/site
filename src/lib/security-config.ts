@@ -245,23 +245,6 @@ const productionConfig: SecurityConfig = {
 // Get configuration based on environment
 export function getSecurityConfig(): SecurityConfig {
   const env = process.env.NODE_ENV || 'development';
-  
-  // Test environment config: enable stricter checks expected by tests
-  if (env === 'test') {
-    const testConfig: SecurityConfig = {
-      ...developmentConfig,
-      rateLimit: {
-        ...developmentConfig.rateLimit,
-        enabled: true,
-        maxRequests: 50,
-      },
-    };
-    const res = SecurityConfigSchema.safeParse(testConfig);
-    if (!res.success) {
-      throw new Error('Test security configuration validation failed');
-    }
-    return res.data;
-  }
 
   const config = env === 'production' ? productionConfig : developmentConfig;
   
@@ -377,17 +360,5 @@ export async function logSecurityEvent(event: SecurityEvent): Promise<void> {
       console.error('Failed to record security event:', error);
       console.warn('Security event recording unavailable', { type: event.type, severity: event.severity });
     }
-  }
-}
-
-// Validate security configuration at runtime
-export function validateSecurityConfig(): void {
-  try {
-    getSecurityConfig();
-  } catch (error) {
-    console.error('❌ Security configuration validation failed:', error);
-    
-    // Edge Runtime compatible error handling - avoid process.exit
-    throw new Error('Security configuration validation failed - critical error');
   }
 }

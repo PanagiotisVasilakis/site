@@ -111,48 +111,6 @@ function addPrismaInstrumentation(client: PrismaClient): void {
   });
 }
 
-function createTestPrismaClient(): PrismaClient {
-  // NOTE: pg-mem is incompatible with @prisma/adapter-pg v6+
-  // Use a real PostgreSQL test database instead
-  const testDbUrl = process.env.TEST_DATABASE_URL;
-  
-  if (!testDbUrl) {
-    throw new Error('TEST_DATABASE_URL is required for database-backed tests');
-  }
-
-  const databaseName = new URL(testDbUrl).pathname.replace(/^\//, '');
-  if (!databaseName.endsWith('_test')) {
-    throw new Error('Refusing to run tests: TEST_DATABASE_URL database name must end with _test');
-  }
-
-  logger.info('Initialized Prisma client for tests', { 
-    usingDedicatedTestDb: true,
-    database: databaseName,
-  });
-
-  const client = new PrismaClient({
-    adapter: createPrismaPgAdapter(testDbUrl),
-    log: [
-      { emit: 'event', level: 'query' },
-      { emit: 'event', level: 'error' },
-    ],
-  });
-
-  // Add query logging for debugging
-  (client as PrismaClientWithEvents).$on('query', (e: Prisma.QueryEvent) => {
-    logger.debug('Prisma query', { query: e.query, params: e.params, duration: e.duration });
-  });
-
-  (client as PrismaClientWithEvents).$on('error', (e: Prisma.LogEvent) => {
-    logger.error('Prisma error', { message: e.message });
-  });
-
-  // Add instrumentation for tracing and metrics
-  addPrismaInstrumentation(client);
-
-  return client;
-}
-
 /**
  * Get recommended connection pool size based on environment
  * PostgreSQL connection pooling is configured via DATABASE_URL query params:
@@ -174,15 +132,11 @@ function getRecommendedPoolConfig(): { connectionLimit: number; poolTimeout: num
     return { connectionLimit: 10, poolTimeout: 20 };
   }
   
-  // Development/test: smaller pool is fine
+  // Development: a smaller pool is sufficient.
   return { connectionLimit: 5, poolTimeout: 10 };
 }
 
 function createPrismaClient(): PrismaClient {
-  if (process.env.NODE_ENV === 'test') {
-    return createTestPrismaClient();
-  }
-
   const databaseUrl = assertDatabaseUrl();
   
   // Log recommended pool config (actual config is in DATABASE_URL)
@@ -211,10 +165,10 @@ function createPrismaClient(): PrismaClient {
   return client;
 }
 
-// Only initialize the Prisma client if a DATABASE_URL is present or we're running tests.
+// Only initialize the Prisma client if a DATABASE_URL is present.
 // This avoids throwing during Next.js build-time data collection when env vars are not available.
 if (!globalThisWithPrisma.__prisma__) {
-  if (process.env.NODE_ENV === 'test' || process.env.DATABASE_URL) {
+  if (process.env.DATABASE_URL) {
     globalThisWithPrisma.__prisma__ = createPrismaClient();
   } else {
     // Leave undefined during build/time when no DATABASE_URL is configured.
@@ -256,15 +210,11 @@ function registerPrismaShutdownHooks(client: PrismaClient): void {
 
   const longRunningHints =
     Boolean(process.env.NEXT_RUNTIME) ||
-    Boolean(process.env.VITEST) ||
-    Boolean(process.env.VITEST_WORKER_ID) ||
-    Boolean(process.env.JEST_WORKER_ID) ||
-    Boolean(process.env.PLAYWRIGHT_TEST) ||
-    process.argv.some((arg) => /next|vitest|jest|turbo|node-dev|tsx-dev|--watch/.test(arg));
+    process.argv.some((arg) => /next|turbo|node-dev|tsx-dev|--watch/.test(arg));
 
   // Added check for command line execution to avoid hanging processes
   const isCommandLineExecution = process.argv.some((arg) => 
-    /tsx|-e|--eval/.test(arg) || process.env.NODE_ENV === 'test'
+    /tsx|-e|--eval/.test(arg)
   ) && !longRunningHints;
 
   const autoDisconnectEnv = process.env.PRISMA_AUTO_DISCONNECT;

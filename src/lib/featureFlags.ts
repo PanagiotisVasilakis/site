@@ -27,14 +27,6 @@ function parseFlags(value: unknown): FeatureFlags {
   };
 }
 
-/**
- * Synchronous snapshot for non-request compatibility only. Runtime authorization
- * paths must use getFeatureFlagsAsync so every process observes the shared DB value.
- */
-export function getFeatureFlags(): FeatureFlags {
-  return { ...(cache ?? defaults()) };
-}
-
 export async function getFeatureFlagsAsync(): Promise<FeatureFlags> {
   try {
     const { prisma } = await import('@/lib/prisma');
@@ -65,8 +57,4 @@ export async function setFeatureFlags(partial: Partial<FeatureFlags>): Promise<F
   `;
   cache = parseFlags(rows[0]?.value);
   return { ...cache };
-}
-
-export function resetFeatureFlags(): void {
-  cache = null;
 }

@@ -2,9 +2,7 @@
 
 import {
   APARTMENT_LOCATION,
-  createMapLocationFromItem,
   getKalamataMapLocations,
-  type CategoryMapItem,
   type MapContentItem,
   type MapLocation,
   type MapMarkerType,
@@ -53,15 +51,6 @@ export function markerFromMapLocation(location: MapLocation): MarkerData {
 
 function markersFromMapLocations(locations: readonly MapLocation[]): MarkerData[] {
   return locations.map(markerFromMapLocation);
-}
-
-export function createMarkerFromItem(
-  item: CategoryMapItem,
-  categorySlug: string,
-  locale: string
-): MarkerData | null {
-  const location = createMapLocationFromItem(item, categorySlug, locale);
-  return location ? markerFromMapLocation(location) : null;
 }
 
 export function getKalamataMarkers(

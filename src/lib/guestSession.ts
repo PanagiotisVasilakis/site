@@ -6,9 +6,6 @@ import { logger } from '@/lib/logger-enterprise';
 
 const { sign, verify } = jwt;
 
-export type BookingSource = 'ONSITE' | 'EXTERNAL';
-export type BookingStatus = 'PENDING' | 'VERIFIED' | 'NONE';
-
 // Minimal JWT payload: only identifiers and exp (from JWT). No PII.
 export interface GuestSessionPayload extends JwtPayload {
   type: 'guest';
@@ -28,7 +25,7 @@ function getGuestJwtSecret(): string {
   return secret || 'dev-guest-secret-change-me';
 }
 
-export function signGuestSession(
+function signGuestSession(
   payload: Omit<GuestSessionPayload, 'type'> & { type?: 'guest' },
   expiresIn: NonNullable<SignOptions['expiresIn']> = '2h',
 ): string {
@@ -129,10 +126,6 @@ export async function revokeGuestSession(session: GuestSessionPayload | null | u
     where: { id: session.sid, revokedAt: null },
     data: { revokedAt: new Date() },
   });
-}
-
-export function hasVerifiedBookingSession(session: GuestSessionPayload | null | undefined): boolean {
-  return !!(session?.sid && session.user?.id && session.booking?.id);
 }
 
 export function createSessionCookie(token: string): { name: string; value: string; options: { httpOnly: boolean; sameSite: 'lax'; secure: boolean; path: string; maxAge: number } } {

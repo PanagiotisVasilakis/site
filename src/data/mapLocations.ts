@@ -258,7 +258,7 @@ export function getApartmentMapLocation(locale: Locale = 'en'): MapLocation {
   };
 }
 
-export function createMapLocationFromItem(
+function createMapLocationFromItem(
   item: CategoryMapItem,
   categorySlug: string,
   locale: Locale | string

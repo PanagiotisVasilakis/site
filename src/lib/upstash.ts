@@ -1,6 +1,6 @@
 /* Lightweight Upstash Redis wrapper (REST) that works on Edge and Node runtimes.
    Uses fetch against UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN env vars.
-   Exports: incrWithExpire(key, windowMs), get(key), del(key), ping().
+   Exports: incrWithExpire(key, windowMs), ping().
 */
 
 const BASE = process.env.UPSTASH_REDIS_REST_URL || '';
@@ -87,17 +87,6 @@ export async function incrWithExpire(key: string, windowMs: number): Promise<Rat
     throw new Error('Upstash returned an invalid rate-limit TTL');
   }
   return { count, resetAfterMs };
-}
-
-export async function get(key: string): Promise<number | null> {
-  const resp = await fetchJson(`get/${encodeURIComponent(key)}`);
-  // Upstash may return { result: <value> } or a primitive. Handle both.
-  const result = unwrapResult(resp);
-  return result === null ? null : Number(String(result));
-}
-
-export async function del(key: string): Promise<void> {
-  await fetchJson(`del/${encodeURIComponent(key)}`, { method: 'POST' });
 }
 
 export async function ping(): Promise<boolean> {

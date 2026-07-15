@@ -126,7 +126,7 @@ class GuestDataCache {
   }
 }
 
-export function createGuestDataCache(config?: GuestDataCacheConfig): GuestDataCache {
+function createGuestDataCache(config?: GuestDataCacheConfig): GuestDataCache {
   const resolvers: Record<GuestDatasetKey, SnapshotResolver> = Object.fromEntries(
     GUEST_DATASET_KEYS.map((key) => [key, config?.[key] ?? (() => getGuestDatasetSnapshot(key))])
   ) as Record<GuestDatasetKey, SnapshotResolver>;

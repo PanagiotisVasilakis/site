@@ -22,16 +22,8 @@ export function formatDateRange(range: DateRange, locale: DateLocale = 'en'): st
   return formatter.formatRange(range.from, range.to);
 }
 
-// Format for compact display (mobile)
-export function formatDateRangeCompact(range: DateRange, locale: DateLocale = 'en'): string {
-  if (!range?.from) return '';
-  const formatter = new Intl.DateTimeFormat(localeCode(locale), { day: 'numeric', month: 'numeric' });
-  if (!range?.to) return formatter.format(range.from);
-  return formatter.formatRange(range.from, range.to);
-}
-
 // Parse date string safely
-export function parseDate(dateString: string, formatString: string = 'yyyy-MM-dd'): Date | undefined {
+function parseDate(dateString: string, formatString: string = 'yyyy-MM-dd'): Date | undefined {
   try {
     const parsed = parse(dateString, formatString, new Date());
     return isValid(parsed) ? parsed : undefined;
@@ -54,7 +46,7 @@ export function getNights(range: DateRange): number {
 }
 
 // Check if date is in the past
-export function isPastDate(date: Date): boolean {
+function isPastDate(date: Date): boolean {
   return isBefore(startOfDay(date), startOfDay(new Date()));
 }
 

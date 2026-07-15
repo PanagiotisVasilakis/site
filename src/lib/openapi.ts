@@ -371,15 +371,3 @@ export const openApiSpec = {
     { name: 'Guest' }, { name: 'Privacy' }, { name: 'Analytics' }, { name: 'Admin' }, { name: 'Operations' },
   ],
 } as const;
-
-export function validateOpenAPISpec(): boolean {
-  if (!/^3\.\d+\.\d+$/.test(openApiSpec.openapi)) return false;
-  const methods = new Set(['get', 'post', 'put', 'patch', 'delete', 'head', 'options']);
-  for (const [path, operations] of Object.entries(openApiSpec.paths)) {
-    if (!path.startsWith('/')) return false;
-    for (const [method, operation] of Object.entries(operations)) {
-      if (!methods.has(method) || !('responses' in operation) || Object.keys(operation.responses).length === 0) return false;
-    }
-  }
-  return true;
-}

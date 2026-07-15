@@ -47,7 +47,7 @@ function average(values: number[]): number {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-export function buildTopPaths(hits: AnalyticsHit[]): TopPath[] {
+function buildTopPaths(hits: AnalyticsHit[]): TopPath[] {
   const counts = new Map<string, number>();
   for (const hit of hits) {
     counts.set(hit.path, (counts.get(hit.path) ?? 0) + 1);

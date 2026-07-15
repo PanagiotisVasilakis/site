@@ -1,7 +1,7 @@
 # Database migration rehearsal
 
 Use this runbook before deploying a release that contains Prisma migrations. A
-successful local test database is useful, but it does not replace a rehearsal
+successful local disposable database is useful, but it does not replace a rehearsal
 against a recent staging clone with production-like data volume and shape.
 
 ## 1. Obtain platform access

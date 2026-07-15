@@ -4,7 +4,7 @@ import security from 'eslint-plugin-security';
 
 const config = [
   {
-    ignores: ['**/node_modules/**', '**/.next/**', '**/coverage/**', 'out/**', 'build/**', 'next-env.d.ts', '**/reports/**'],
+    ignores: ['**/node_modules/**', '**/.next/**', 'out/**', 'build/**', 'next-env.d.ts', '**/reports/**'],
   },
   ...nextCoreWebVitals,
   ...nextTypescript,
@@ -58,16 +58,6 @@ const config = [
       'react-hooks/purity': 'off',
       'react-hooks/set-state-in-effect': 'off',
       'react-hooks/static-components': 'off'
-    }
-  },
-  {
-    files: ['**/*.test.ts', '**/*.test.tsx'],
-    rules: {
-      // Relax security rules for test files
-      'security/detect-non-literal-fs-filename': 'off',
-      'security/detect-non-literal-regexp': 'off',
-      '@next/next/no-img-element': 'off',
-      'no-console': 'off'
     }
   },
   {

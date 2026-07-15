@@ -36,7 +36,7 @@ export function normalizePhone(input: string, origin?: Origin): { e164: string }
   return null;
 }
 
-export function isE164(v: string): boolean {
+function isE164(v: string): boolean {
   // E.164: + followed by 8 to 15 digits total
   return /^\+[1-9]\d{7,14}$/.test(v);
 }

@@ -189,7 +189,7 @@ class MetricsCollector implements MetricSink {
     this.addMetric(metric);
   }
 
-  // Alert config controls (dev/testing support)
+  // Runtime controls used by the development verification endpoint.
   public setVerificationFailedAlertConfig(config: { windowMs?: number; threshold?: number }): void {
     if (typeof config.windowMs === 'number' && config.windowMs > 0) {
       this.alerts.verificationFailed.windowMs = config.windowMs;
@@ -204,11 +204,6 @@ class MetricsCollector implements MetricSink {
       windowMs: this.alerts.verificationFailed.windowMs,
       threshold: this.alerts.verificationFailed.threshold,
     };
-  }
-
-  public resetVerificationFailedAlertConfig(): void {
-    this.alerts.verificationFailed.windowMs = 60_000;
-    this.alerts.verificationFailed.threshold = 20;
   }
 
   // Simple alerting for verification failures per minute

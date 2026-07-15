@@ -49,8 +49,8 @@ Commands:
   check       Validate prerequisites and environment contract without starting services
 
 Options:
-  --profile <production|development|test>  Runtime profile (default: production)
-  --strict                                 Add lint + typecheck + tests before build/start
+  --profile <production|development>       Runtime profile (default: production)
+  --strict                                 Add lint + typecheck before build/start
   --db-only                                Validate only DB-related environment and skip app build/start requirements
   --no-docker-fallback                     Fail instead of starting local DB when DATABASE_URL is unreachable
   --skip-build                             Skip build step where applicable
@@ -113,8 +113,8 @@ require_cmd() {
 
 validate_profile() {
   case "$PROFILE" in
-    production|development|test) ;;
-    *) die "Invalid profile '$PROFILE'. Use production, development, or test." 11 ;;
+    production|development) ;;
+    *) die "Invalid profile '$PROFILE'. Use production or development." 11 ;;
   esac
 }
 
@@ -324,9 +324,6 @@ env_candidates() {
     development)
       printf '%s\n' ".env.development.local" ".env.local" ".env.development" ".env"
       ;;
-    test)
-      printf '%s\n' ".env.test.local" ".env.test" ".env"
-      ;;
   esac
 }
 
@@ -494,10 +491,8 @@ validate_environment_contract() {
     error "NEXT_PUBLIC_SITE_URL is not a valid URL"
     failed=1
   elif [[ "$PROFILE" == "production" && -n "${NEXT_PUBLIC_SITE_URL:-}" && "$NEXT_PUBLIC_SITE_URL" != https://* ]]; then
-    if [[ "${CI:-false}" != "true" || ! "$NEXT_PUBLIC_SITE_URL" =~ ^http://(localhost|127\.0\.0\.1)(:[0-9]+)?$ ]]; then
-      error "NEXT_PUBLIC_SITE_URL must use HTTPS in production"
-      failed=1
-    fi
+    error "NEXT_PUBLIC_SITE_URL must use HTTPS in production"
+    failed=1
   fi
   if [[ -n "${BUILD_SITE_URL:-}" && "${NEXT_PUBLIC_SITE_URL:-}" != "$BUILD_SITE_URL" ]]; then
     error "NEXT_PUBLIC_SITE_URL does not match the URL compiled into this image"
@@ -514,10 +509,8 @@ validate_environment_contract() {
       error "ALLOWED_ORIGINS contains an invalid origin"
       failed=1
     elif [[ "$PROFILE" == "production" && "$configured_origin" != https://* ]]; then
-      if [[ "${CI:-false}" != "true" || ! "$configured_origin" =~ ^http://(localhost|127\.0\.0\.1)(:[0-9]+)?$ ]]; then
-        error "ALLOWED_ORIGINS must use HTTPS in production"
-        failed=1
-      fi
+      error "ALLOWED_ORIGINS must use HTTPS in production"
+      failed=1
     fi
   done
 
@@ -675,14 +668,6 @@ NODE
 }
 
 choose_fallback_database() {
-  if [[ "$PROFILE" == "test" ]]; then
-    DB_COMPOSE_FILE="docker/docker-compose.test-db.yml"
-    DB_SERVICE="postgres-test"
-    DB_CONTAINER=""
-    DB_LOCAL_URL="postgresql://testuser:testpass@localhost:5434/site_test"
-    return
-  fi
-
   DB_COMPOSE_FILE="docker-compose.yml"
   DB_SERVICE="db"
   DB_CONTAINER="site-dev-db"
@@ -881,12 +866,11 @@ run_strict_quality_gate_if_requested() {
     return
   fi
 
-  log "Running strict quality gate: lint + typecheck + tests"
+  log "Running strict quality gate: lint + typecheck"
   (
     cd "$REPO_ROOT"
     npm run lint
     npm run typecheck
-    npm test
   )
 }
 
@@ -913,7 +897,6 @@ app_command_for_profile() {
     # inside a read-only systemd sandbox.
     production) printf '%s' "node scripts/start-standalone.mjs .next/standalone/server.js" ;;
     development) printf '%s' "npm run dev" ;;
-    test) printf '%s' "npm run dev" ;;
   esac
 }
 
@@ -936,7 +919,6 @@ set_node_env_for_profile() {
   case "$PROFILE" in
     production) export NODE_ENV="production" ;;
     development) export NODE_ENV="development" ;;
-    test) export NODE_ENV="test" ;;
   esac
 }
 

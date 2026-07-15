@@ -17,8 +17,6 @@ interface RateLimitOptions {
   windowMs: number;
 }
 
-const testStore = new Map<string, { count: number; resetAt: Date }>();
-
 function normalizeIdentifier(value: string): string {
   const normalized = value.trim().toLowerCase();
   if (!/^\+?[0-9 ()-]+$/.test(normalized)) return normalized;
@@ -37,36 +35,11 @@ function buildKeys(request: NextRequest, options: RateLimitOptions): string[] {
   });
 }
 
-function inMemoryDecision(key: string, options: RateLimitOptions): RateLimitDecision {
-  const now = Date.now();
-  const current = testStore.get(key);
-  const record = !current || current.resetAt.getTime() <= now
-    ? { count: 1, resetAt: new Date(now + options.windowMs) }
-    : { count: current.count + 1, resetAt: current.resetAt };
-  testStore.set(key, record);
-  return {
-    allowed: record.count <= options.limit,
-    limit: options.limit,
-    remaining: Math.max(0, options.limit - record.count),
-    resetAt: record.resetAt,
-  };
-}
-
 export async function checkSensitiveRateLimit(
   request: NextRequest,
   options: RateLimitOptions,
 ): Promise<RateLimitDecision> {
   const keys = buildKeys(request, options);
-  if (process.env.NODE_ENV === 'test') {
-    const decisions = keys.map((key) => inMemoryDecision(key, options));
-    return {
-      allowed: decisions.every((decision) => decision.allowed),
-      limit: options.limit,
-      remaining: Math.min(...decisions.map((decision) => decision.remaining)),
-      resetAt: new Date(Math.max(...decisions.map((decision) => decision.resetAt.getTime()))),
-    };
-  }
-
   const { prisma } = await import('@/lib/prisma');
   const resetAt = new Date(Date.now() + options.windowMs);
   const records = await Promise.all(keys.map(async (key) => {
@@ -94,8 +67,4 @@ export async function checkSensitiveRateLimit(
     remaining: Math.min(...records.map((record) => Math.max(0, options.limit - record.count))),
     resetAt: new Date(Math.max(...records.map((record) => new Date(record.reset_time).getTime()))),
   };
-}
-
-export function clearSensitiveRateLimitTestStore(): void {
-  testStore.clear();
 }

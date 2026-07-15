@@ -16,10 +16,6 @@ interface BookingFormProps {
   locale: string;
   labels: BookingFormDictionary;
   propertyName: string;
-  /**
-   * Optional delay after successful delivery. Tests can use this to exercise loading state.
-   */
-  submissionDelayMs?: number;
 }
 
 interface BookingFormData {
@@ -31,7 +27,7 @@ interface BookingFormData {
   specialRequests?: string;
 }
 
-export default function BookingForm({ dateRange, locale, labels, propertyName, submissionDelayMs = 0 }: BookingFormProps) {
+export default function BookingForm({ dateRange, locale, labels, propertyName }: BookingFormProps) {
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [idempotencyKey] = useState(() => globalThis.crypto.randomUUID());
@@ -108,9 +104,6 @@ export default function BookingForm({ dateRange, locale, labels, propertyName, s
         return;
       }
 
-      if (submissionDelayMs > 0) {
-        await new Promise(resolve => setTimeout(resolve, submissionDelayMs));
-      }
       setSubmitted(true);
 
     } catch (err) {

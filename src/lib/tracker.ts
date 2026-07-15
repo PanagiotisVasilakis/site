@@ -1,16 +1,6 @@
 "use client";
 import { trackEvent as baseTrack } from '@/lib/analyticsClient';
 
-// Allowed event names
-export type TrackerEventName =
-  | 'portal_opened'
-  | 'origin_selected'
-  | 'form_submitted'
-  | 'auth_mode_changed'
-  | 'no_booking_cta_clicked'
-  | 'checkin_viewed'
-  | 'checkin_completed';
-
 // Event-specific prop shapes (PII-free)
 export type EventProps =
   | { name: 'portal_opened'; props: { source?: string } }
@@ -23,18 +13,6 @@ export type EventProps =
 
 function trimStr(s: string, max = 80): string {
   return s.length > max ? s.slice(0, max) : s;
-}
-
-// Collapse arbitrary reasons into coarse categories to avoid PII
-export function categorizeReason(reason: string): string {
-  const r = reason.toLowerCase();
-  if (r.includes('network') || r.includes('fetch')) return 'network_error';
-  if (r.includes('timeout')) return 'timeout';
-  if (r.includes('invalid') && r.includes('afm')) return 'validation_afm';
-  if (r.includes('validation')) return 'validation';
-  if (r.includes('unauthorized') || r.includes('forbidden')) return 'auth';
-  if (r.includes('not found') || r.includes('404')) return 'not_found';
-  return trimStr('other');
 }
 
 type PropsOf<N extends EventProps['name']> = Extract<EventProps, { name: N }>['props'];
@@ -74,7 +52,7 @@ function sanitize<K extends EventProps['name']>(name: K, props: PropsOf<K> | unk
   }
 }
 
-export function track(e: EventProps) {
+function track(e: EventProps) {
   try {
     let safe: Record<string, unknown> | undefined;
     switch (e.name) {

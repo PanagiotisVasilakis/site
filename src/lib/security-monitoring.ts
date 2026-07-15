@@ -68,7 +68,7 @@ function sanitizeEvent(event: SecurityEvent): { event: SecurityEvent; ipHash: st
 }
 
 async function persistSecurityEvent(event: SecurityEvent, ipHash: string | null): Promise<void> {
-  if (process.env.NODE_ENV === 'test' || !process.env.DATABASE_URL) return;
+  if (!process.env.DATABASE_URL) return;
   const { prisma } = await import('@/lib/prisma');
   await prisma.$transaction(async (tx) => {
     await tx.$executeRawUnsafe("SET LOCAL statement_timeout = '1800ms'");
@@ -222,35 +222,12 @@ class SecurityMonitor {
 
   }
 
-  public getMetrics(): SecurityMetrics {
-    return { ...this.metrics };
-  }
-
-  public getRecentEvents(minutes: number = 60): SecurityEvent[] {
-    const cutoff = Date.now() - (minutes * 60 * 1000);
-    return this.eventBuffer.filter(event => 
-      new Date(event.timestamp).getTime() > cutoff
-    );
-  }
-
-  public clearMetrics(): void {
-    this.metrics = {
-      totalEvents: 0,
-      eventsByType: {},
-      eventsBySeverity: {},
-      topIPs: [],
-      alertsTriggered: 0,
-      lastUpdated: new Date().toISOString(),
-    };
-    this.eventBuffer = [];
-    this.lastAlertAt.clear();
-  }
 }
 
 // Singleton instance
 let securityMonitor: SecurityMonitor | null = null;
 
-export function getSecurityMonitor(): SecurityMonitor {
+function getSecurityMonitor(): SecurityMonitor {
   if (!securityMonitor) {
     securityMonitor = new SecurityMonitor();
   }
@@ -306,117 +283,3 @@ export async function handleCSPViolation(
 
   await recordSecurityEvent(event);
 }
-
-// Security report generator
-export class SecurityReportGenerator {
-  public generateDailyReport(): string {
-    const monitor = getSecurityMonitor();
-    const metrics = monitor.getMetrics();
-    const recentEvents = monitor.getRecentEvents(24 * 60); // Last 24 hours
-
-    const report = `
-# Daily Security Report
-Generated: ${new Date().toISOString()}
-
-## Summary
-- Total Events: ${metrics.totalEvents}
-- Alerts Triggered: ${metrics.alertsTriggered}
-- Unique IPs: ${metrics.topIPs.length}
-
-## Events by Type
-${Object.entries(metrics.eventsByType)
-  .map(([type, count]) => `- ${type}: ${count}`)
-  .join('\n')}
-
-## Events by Severity
-${Object.entries(metrics.eventsBySeverity)
-  .map(([severity, count]) => `- ${severity}: ${count}`)
-  .join('\n')}
-
-## Top Source Hashes
-${metrics.topIPs.slice(0, 5)
-  .map(({ ip, count }) => `- ${ip}: ${count} events`)
-  .join('\n')}
-
-## Recent High-Priority Events
-${recentEvents
-  .filter(e => e.severity === 'high' || e.severity === 'critical')
-  .slice(-10)
-  .map(e => `- ${e.timestamp}: ${e.type} from ${e.ip}`)
-  .join('\n')}
-    `.trim();
-
-    return report;
-  }
-
-  public generateWeeklyTrends(): Record<string, unknown> {
-    // Using unknown values narrowed below where accessed
-    const monitor = getSecurityMonitor();
-    const weekEvents = monitor.getRecentEvents(7 * 24 * 60); // Last 7 days
-    
-    // Group events by day
-    const eventsByDay: Record<string, number> = {};
-    weekEvents.forEach(event => {
-      const day = event.timestamp.split('T')[0];
-      eventsByDay[day] = (eventsByDay[day] || 0) + 1;
-    });
-
-    // Calculate trends
-    const days = Object.keys(eventsByDay).sort();
-    const trends = {
-      totalEvents: weekEvents.length,
-      averagePerDay: weekEvents.length / 7,
-      peakDay: days.length > 0
-        ? days.reduce((peak, day) => eventsByDay[day] > eventsByDay[peak] ? day : peak, days[0])
-        : null,
-      eventsByDay,
-      typeDistribution: weekEvents.reduce((acc, event) => {
-        acc[event.type] = (acc[event.type] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>),
-    };
-
-    return trends;
-  }
-}
-
-// Health check for security monitoring
-export function getSecurityHealthStatus(): {
-  status: 'healthy' | 'warning' | 'critical';
-  checks: Record<string, boolean>;
-  message: string;
-} {
-  const config = getSecurityConfig();
-  const monitor = getSecurityMonitor();
-  const metrics = monitor.getMetrics();
-  
-  const checks = {
-    monitoringEnabled: config.monitoring.enabled,
-    cspEnabled: config.csp.enabled,
-    hstsEnabled: config.headers.hsts.enabled,
-    rateLimitEnabled: config.rateLimit.enabled,
-    corsEnabled: config.cors.enabled,
-    recentAlerts: metrics.alertsTriggered < 10, // Less than 10 alerts is healthy
-  };
-
-  const healthyChecks = Object.values(checks).filter(Boolean).length;
-  const totalChecks = Object.keys(checks).length;
-  
-  let status: 'healthy' | 'warning' | 'critical';
-  let message: string;
-
-  if (healthyChecks === totalChecks) {
-    status = 'healthy';
-    message = 'All security systems operational';
-  } else if (healthyChecks >= totalChecks * 0.8) {
-    status = 'warning';
-    message = 'Some security features need attention';
-  } else {
-    status = 'critical';
-    message = 'Critical security issues detected';
-  }
-
-  return { status, checks, message };
-}
-
-export type { SecurityMetrics };

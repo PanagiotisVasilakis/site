@@ -10,7 +10,7 @@ import crypto from 'node:crypto';
 // Note: This requires Node.js runtime (not Edge). For Edge routes, use fallback.
 const asyncLocalStorage = new AsyncLocalStorage<Partial<LogContext>>();
 
-export interface LogContext {
+interface LogContext {
   correlationId: string;
   userId?: string;
   sessionId?: string;
@@ -21,9 +21,9 @@ export interface LogContext {
   traceId?: string;
 }
 
-export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 
-export interface LogEntry {
+interface LogEntry {
   timestamp: string;
   level: LogLevel;
   message: string;
@@ -77,9 +77,7 @@ class EnterpriseLogger {
   constructor(config?: Partial<LoggerConfig>) {
     this.config = {
       level: (process.env.LOG_LEVEL as LogLevel) || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
-      enableConsole: process.env.NODE_ENV === 'test'
-        ? process.env.LOG_CONSOLE === 'true'
-        : process.env.LOG_CONSOLE !== 'false',
+      enableConsole: process.env.LOG_CONSOLE !== 'false',
       enableStructured: process.env.LOG_STRUCTURED === 'true',
       enablePerformanceMetrics: process.env.LOG_PERFORMANCE === 'true',
       maxMetadataSize: parseInt(process.env.LOG_MAX_METADATA_SIZE || '1000', 10),

@@ -1,4 +1,4 @@
-# QR City Guide
+# Kalamata Guest Guide
 
 Localized Next.js guest guide, booking-request site, and authenticated guest check-in portal backed by PostgreSQL and Prisma.
 
@@ -25,18 +25,17 @@ npm run system:up -- --profile development --skip-build
 
 The development orchestrator validates the environment, provisions a local PostgreSQL fallback when needed, applies migrations, starts the app, and verifies readiness plus a localized page. See [scripts/README.md](scripts/README.md) for the complete runbook.
 
-## Validation
+## Manual validation
 
 ```bash
 npm run typecheck
 npm run lint -- --max-warnings=0
+npm run lint:security
 npm run check:dead-code
-npm run test:unit
-npm run test:db
 npm run validate:security
 ```
 
-Database tests require a dedicated database whose name ends in `_test`; they refuse other database names. Browser, accessibility, responsive, Lighthouse, migration, and production-build gates are defined in `.github/workflows/ci.yml`.
+The repository intentionally has no GitHub Actions workflows or automated test suite. These checks run only when invoked locally. Optional browser audits remain available through `audit:a11y`, `audit:contrast`, `audit:responsive:ux`, and `audit:lighthouse:matrix`.
 
 ## Operations
 
@@ -47,12 +46,11 @@ The systemd installer creates the app service plus two timers:
 
 Production startup never loads `.env.local`, never provisions a Docker fallback database, and requires an explicit trusted-proxy topology. Secrets belong in the deployment secret store or the root-owned systemd environment file.
 
-The production container runs as a non-root user. Its build requires an HTTPS `NEXT_PUBLIC_SITE_URL` because Next.js compiles canonical URLs and the sitemap into the output. Configure the GitHub repository variable `NEXT_PUBLIC_SITE_URL`; for a local image use `NEXT_PUBLIC_SITE_URL=https://your-host.example npm run docker:build`.
+The production container runs as a non-root user. Its build requires an HTTPS `NEXT_PUBLIC_SITE_URL` because Next.js compiles canonical URLs and the sitemap into the output. Build it with `NEXT_PUBLIC_SITE_URL=https://your-host.example npm run docker:build`.
 
 ## Documentation
 
 - [Setup and runtime](scripts/README.md)
-- [Database CI](docs/ci/db-tests.md)
-- [Local database verification](docs/testing/db-lookup.md)
+- [Migration rehearsal](docs/deployment-migration-rehearsal.md)
 - [Secret handling and incident response](SECURITY.md)
 - Runtime OpenAPI UI: `/api/docs`

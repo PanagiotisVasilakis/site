@@ -5,9 +5,6 @@
 .cursor
 .vscode
 node_modules
-coverage
-playwright-report
-test-results
 reports
 artifacts
 analytics-backups

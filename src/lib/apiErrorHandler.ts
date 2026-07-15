@@ -121,7 +121,7 @@ export class ValidationError extends ApiError {
 }
 
 // Rate limiting error
-export class RateLimitError extends ApiError {
+class RateLimitError extends ApiError {
   constructor(
     limit: number,
     windowMs: number,
@@ -144,7 +144,7 @@ export class RateLimitError extends ApiError {
 }
 
 // Request timeout error
-export class TimeoutError extends ApiError {
+class TimeoutError extends ApiError {
   constructor(timeoutMs: number, correlationId?: string) {
     super(
       ErrorCodes.GATEWAY_TIMEOUT,
@@ -156,7 +156,7 @@ export class TimeoutError extends ApiError {
 }
 
 // Standard API response types
-export interface ApiResponse<T = unknown> {
+interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: {
@@ -585,13 +585,3 @@ function sanitizeHeaders(headers: Headers): Record<string, string> {
   
   return sanitized;
 }
-
-// Export utility functions for route handlers
-export {
-  HttpStatusCodes as HttpStatus,
-  createSuccessResponse as success,
-  ApiError as error,
-  ValidationError as validationError,
-  RateLimitError as rateLimitError,
-  TimeoutError as timeoutError,
-};

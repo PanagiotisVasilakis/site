@@ -174,7 +174,7 @@ NEXT_PUBLIC_ENABLE_PERF_TELEMETRY=false
 VALID_API_KEYS=
 METRICS_WRITE_API_KEYS=
 INTERNAL_API_KEYS=
-# Required in production. Process-local rate limiting is development/test only.
+# Required in production. Process-local rate limiting is development-only.
 RATE_LIMIT_BACKEND=redis
 UPSTASH_REDIS_REST_URL=
 UPSTASH_REDIS_REST_TOKEN=

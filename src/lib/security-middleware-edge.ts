@@ -51,7 +51,7 @@ interface SecurityMiddlewareOptions {
   customHeaders?: Record<string, string>;
 }
 
-export class SecurityHeadersMiddleware {
+class SecurityHeadersMiddleware {
   private readonly config = getSecurityConfig();
   private readonly options: SecurityMiddlewareOptions;
 
@@ -172,7 +172,7 @@ export class SecurityHeadersMiddleware {
 
 }
 
-export class RateLimitMiddleware {
+class RateLimitMiddleware {
   private readonly config = getSecurityConfig().rateLimit;
   private readonly memoryStore = new Map<string, { count: number; resetTime: number }>();
 
@@ -215,16 +215,14 @@ export class RateLimitMiddleware {
         metrics.counter('rate_limit.allowed', 1, { backend: 'redis' });
         return null;
       } catch (error) {
-        if (process.env.NODE_ENV !== 'test') {
-          console.error('Upstash rate limit error:', error);
-        }
+        console.error('Upstash rate limit error:', error);
         metrics.counter('rate_limit.backend_unavailable', 1, { backend: 'redis' });
         return this.createBackendUnavailableResponse();
       }
     }
 
-    // A process-local map is only safe for a single, long-lived development or
-    // test process. Production and Edge deployments can have multiple isolates,
+    // A process-local map is only safe for a single, long-lived development
+    // process. Production and Edge deployments can have multiple isolates,
     // so silently falling back would multiply the configured limit by the number
     // of instances. Fail closed even if startup environment validation was
     // bypassed or an Edge function was deployed without the expected secrets.
@@ -312,7 +310,7 @@ export class RateLimitMiddleware {
   }
 }
 
-export class CORSMiddleware {
+class CORSMiddleware {
   private readonly config = getSecurityConfig().cors;
 
   public async handle(request: NextRequest): Promise<NextResponse | null> {

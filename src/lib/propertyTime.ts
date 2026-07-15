@@ -27,7 +27,7 @@ function timeZoneOffsetMs(instant: Date, timeZone: string): number {
   return representedAsUtc - instant.getTime();
 }
 
-export function propertyDateTimeToUtc(date: Date, time: string, timeZone: string): Date {
+function propertyDateTimeToUtc(date: Date, time: string, timeZone: string): Date {
   if (!timePattern.test(time)) throw new Error(`Invalid property time: ${time}`);
   const [hour, minute] = time.split(':').map(Number);
   const wallClockAsUtc = Date.UTC(

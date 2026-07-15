@@ -98,7 +98,6 @@ export async function createAdminSession(): Promise<{ id: string; loginAt: numbe
 export async function verifyAdminSession(token: string): Promise<(JwtPayload & AdminAuthPayload) | null> {
   const payload = verifyAdmin(token);
   if (!payload) return null;
-  if (process.env.NODE_ENV === 'test' && !payload.session_id) return payload;
   if (!payload.session_id) return null;
 
   const { prisma } = await import('@/lib/prisma');

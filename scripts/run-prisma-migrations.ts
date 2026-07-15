@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /*
- * Executes `prisma migrate deploy` for production, staging, and test environments
+ * Executes `prisma migrate deploy` for production and staging environments
  * with resilient retry logic and timestamped logging. This script is intended for
  * deployment pipelines where migrations must succeed even if transient network
  * interruptions occur.
@@ -24,7 +24,7 @@ const MAX_ATTEMPTS = Math.max(1, Number.parseInt(process.env.PRISMA_MIGRATE_MAX_
 const INITIAL_BACKOFF_MS = Math.max(100, Number.parseInt(process.env.PRISMA_MIGRATE_INITIAL_BACKOFF_MS ?? '1000', 10));
 
 interface EnvironmentConfig {
-  readonly name: 'prod' | 'staging' | 'test';
+  readonly name: 'prod' | 'staging';
   readonly description: string;
   readonly connectionStringEnvVars: readonly string[];
   readonly buildRuntimeEnv: (connectionString: string) => Record<string, string>;
@@ -47,16 +47,6 @@ const ENVIRONMENTS: readonly EnvironmentConfig[] = [
     buildRuntimeEnv: (connectionString) => ({
       DATABASE_URL: connectionString,
       NODE_ENV: 'production',
-    }),
-  },
-  {
-    name: 'test',
-    description: 'test',
-    connectionStringEnvVars: ['TEST_DATABASE_URL', 'CI_TEST_DATABASE_URL', 'DATABASE_URL_TEST'],
-    buildRuntimeEnv: (connectionString) => ({
-      DATABASE_URL: connectionString,
-      TEST_DATABASE_URL: connectionString,
-      NODE_ENV: 'test',
     }),
   },
 ];

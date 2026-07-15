@@ -29,8 +29,7 @@ function isTimeZone(value) {
 }
 
 export const runtimeEnvSchema = z.object({
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  CI: z.enum(['true', 'false']).optional(),
+  NODE_ENV: z.enum(['development', 'production']).default('development'),
 
   DATABASE_URL: z.string().url().min(1, 'DATABASE_URL is required').refine(isPostgresUrl, 'DATABASE_URL must use postgres or postgresql'),
 
@@ -85,17 +84,13 @@ export const runtimeEnvSchema = z.object({
   RATE_LIMIT_NAMESPACE: optionalEnv(z.string().regex(/^[A-Za-z0-9:_-]{1,64}$/, 'RATE_LIMIT_NAMESPACE contains invalid characters')),
   UPSTASH_REDIS_REST_URL: optionalEnv(z.string().url()),
   UPSTASH_REDIS_REST_TOKEN: optionalEnv(z.string().min(20)),
-
-  TEST_DATABASE_URL: optionalEnv(z.string().url().refine(isPostgresUrl, 'TEST_DATABASE_URL must use postgres or postgresql')),
 }).superRefine((env, context) => {
-  const ciLoopbackAllowed = env.CI === 'true';
   if (env.NODE_ENV === 'production' && !env.NEXT_PUBLIC_SITE_URL) {
     context.addIssue({ code: 'custom', path: ['NEXT_PUBLIC_SITE_URL'], message: 'NEXT_PUBLIC_SITE_URL is required in production' });
   }
   if (env.NODE_ENV === 'production' && env.NEXT_PUBLIC_SITE_URL) {
     const siteUrl = new URL(env.NEXT_PUBLIC_SITE_URL);
-    const loopback = siteUrl.hostname === 'localhost' || siteUrl.hostname === '127.0.0.1';
-    if (siteUrl.protocol !== 'https:' && !(ciLoopbackAllowed && loopback)) {
+    if (siteUrl.protocol !== 'https:') {
       context.addIssue({ code: 'custom', path: ['NEXT_PUBLIC_SITE_URL'], message: 'NEXT_PUBLIC_SITE_URL must use HTTPS in production' });
     }
   }
@@ -109,9 +104,8 @@ export const runtimeEnvSchema = z.object({
     for (const configuredOrigin of env.ALLOWED_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean)) {
       try {
         const parsed = new URL(configuredOrigin);
-        const loopback = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
         if (parsed.origin !== configuredOrigin
-          || (env.NODE_ENV === 'production' && parsed.protocol !== 'https:' && !(ciLoopbackAllowed && loopback))) {
+          || (env.NODE_ENV === 'production' && parsed.protocol !== 'https:')) {
           throw new Error('invalid origin');
         }
       } catch {
@@ -163,8 +157,7 @@ export const runtimeEnvSchema = z.object({
   }
   if (env.NODE_ENV === 'production' && env.UPSTASH_REDIS_REST_URL) {
     const redisUrl = new URL(env.UPSTASH_REDIS_REST_URL);
-    const loopback = redisUrl.hostname === 'localhost' || redisUrl.hostname === '127.0.0.1';
-    if (redisUrl.protocol !== 'https:' && !(ciLoopbackAllowed && loopback)) {
+    if (redisUrl.protocol !== 'https:') {
       context.addIssue({ code: 'custom', path: ['UPSTASH_REDIS_REST_URL'], message: 'UPSTASH_REDIS_REST_URL must use HTTPS in production' });
     }
   }

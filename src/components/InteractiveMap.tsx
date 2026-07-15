@@ -16,9 +16,6 @@ import type { LeafletMapLabels, LeafletMarkerData } from '@/components/LeafletMa
 
 const LeafletMap = dynamic(() => import('@/components/LeafletMap'), { ssr: false });
 
-// Re-export utilities for backwards compatibility
-export { createMarkerFromItem, type MarkerData } from '@/lib/mapUtils';
-
 interface InteractiveMapProps {
   markers?: MarkerData[];
   center?: [number, number];

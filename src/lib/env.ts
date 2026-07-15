@@ -10,7 +10,7 @@ type Env = z.infer<typeof runtimeEnvSchema>;
 
 let validatedEnv: Env | null = null;
 
-export function parseEnv(input: Record<string, string | undefined>): Env {
+function parseEnv(input: Record<string, string | undefined>): Env {
   return runtimeEnvSchema.parse(input);
 }
 

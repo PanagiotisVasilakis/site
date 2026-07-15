@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getClientIp } from '@/lib/net/getClientIp';
 import { getSecurityConfig, logSecurityEvent, type SecurityEvent } from '@/lib/security-config';
 
-export class APIInputValidationMiddleware {
+class APIInputValidationMiddleware {
   private readonly config = getSecurityConfig().apiSecurity.inputValidation;
 
   public async validateRequest(request: NextRequest): Promise<NextResponse | null> {
@@ -58,7 +58,7 @@ export class APIInputValidationMiddleware {
   }
 }
 
-export class APIKeyAuthMiddleware {
+class APIKeyAuthMiddleware {
   public async validateRequest(request: NextRequest, requiredScopes?: string[]): Promise<NextResponse | null> {
     const apiKey = this.extractAPIKey(request);
     if (!apiKey) {

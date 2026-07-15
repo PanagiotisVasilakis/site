@@ -3,20 +3,12 @@
 import { useEffect, useRef } from 'react';
 import { toSafeLocalPath } from '@/lib/safeLocalPath';
 
-type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
-type Sleep = (milliseconds: number, signal?: AbortSignal) => Promise<void>;
-
 type PortalRefreshRedirectProps = {
   refreshHref: string;
   failureHref: string;
-  /** Test seams; production callers should use the browser defaults. */
-  fetcher?: Fetcher;
-  sleep?: Sleep;
-  navigate?: (href: string) => void;
-  maxAttempts?: number;
 };
 
-export type PortalRefreshResult =
+type PortalRefreshResult =
   | { status: 'refreshed'; href: string }
   | { status: 'failed' }
   | { status: 'aborted' };
@@ -25,7 +17,7 @@ const DEFAULT_MAX_ATTEMPTS = 3;
 const DEFAULT_RETRY_DELAY_MS = 1_000;
 const MAX_RETRY_DELAY_MS = 5_000;
 
-export function toSafeLocalHref(value: string, baseHref: string): string | null {
+function toSafeLocalHref(value: string, baseHref: string): string | null {
   return toSafeLocalPath(value, baseHref);
 }
 
@@ -65,7 +57,7 @@ async function isConcurrentRefresh(response: Response): Promise<boolean> {
   }
 }
 
-const defaultSleep: Sleep = (milliseconds, signal) => new Promise((resolve, reject) => {
+const sleep = (milliseconds: number, signal?: AbortSignal) => new Promise<void>((resolve, reject) => {
   if (signal?.aborted) {
     reject(new DOMException('Portal refresh aborted', 'AbortError'));
     return;
@@ -87,20 +79,14 @@ function isAbort(error: unknown, signal?: AbortSignal): boolean {
     || (error instanceof DOMException && error.name === 'AbortError');
 }
 
-export async function refreshPortalSession({
+async function refreshPortalSession({
   refreshHref,
   baseHref,
-  fetcher = fetch,
-  sleep = defaultSleep,
   signal,
-  maxAttempts = DEFAULT_MAX_ATTEMPTS,
 }: {
   refreshHref: string;
   baseHref: string;
-  fetcher?: Fetcher;
-  sleep?: Sleep;
   signal?: AbortSignal;
-  maxAttempts?: number;
 }): Promise<PortalRefreshResult> {
   const safeRefreshHref = toSafeLocalHref(refreshHref, baseHref);
   if (!safeRefreshHref) return { status: 'failed' };
@@ -108,14 +94,13 @@ export async function refreshPortalSession({
   const refreshUrl = new URL(safeRefreshHref, baseHref);
   if (refreshUrl.pathname !== '/api/portal/refresh') return { status: 'failed' };
   const safeNextHref = toSafeRefreshDestination(refreshUrl.searchParams.get('next') || '', baseHref);
-  const requestedAttempts = Number.isFinite(maxAttempts) ? Math.floor(maxAttempts) : DEFAULT_MAX_ATTEMPTS;
-  const attemptLimit = Math.min(DEFAULT_MAX_ATTEMPTS, Math.max(1, requestedAttempts));
+  const attemptLimit = DEFAULT_MAX_ATTEMPTS;
 
   for (let attempt = 1; attempt <= attemptLimit; attempt += 1) {
     if (signal?.aborted) return { status: 'aborted' };
 
     try {
-      const response = await fetcher(safeRefreshHref, {
+      const response = await fetch(safeRefreshHref, {
         method: 'POST',
         credentials: 'same-origin',
         redirect: 'follow',
@@ -153,10 +138,6 @@ export async function refreshPortalSession({
 export default function PortalRefreshRedirect({
   refreshHref,
   failureHref,
-  fetcher,
-  sleep,
-  navigate,
-  maxAttempts,
 }: PortalRefreshRedirectProps) {
   const navigationStarted = useRef(false);
   const safeFailureLink = toSafeLocalPath(failureHref) ?? '/';
@@ -169,28 +150,21 @@ export default function PortalRefreshRedirect({
     void refreshPortalSession({
       refreshHref,
       baseHref,
-      fetcher,
-      sleep,
       signal: controller.signal,
-      maxAttempts,
     }).then((result) => {
       if (!active || result.status === 'aborted' || navigationStarted.current) return;
 
       const safeFailureHref = toSafeLocalHref(failureHref, baseHref) || '/';
       const destination = result.status === 'refreshed' ? result.href : safeFailureHref;
       navigationStarted.current = true;
-      if (navigate) {
-        navigate(destination);
-      } else {
-        window.location.replace(destination);
-      }
+      window.location.replace(destination);
     });
 
     return () => {
       active = false;
       controller.abort();
     };
-  }, [failureHref, fetcher, maxAttempts, navigate, refreshHref, sleep]);
+  }, [failureHref, refreshHref]);
 
   return (
     <div className="page-bg min-h-[50vh] px-4 py-10">
