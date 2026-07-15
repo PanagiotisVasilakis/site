@@ -49,7 +49,7 @@ const METRIC_DESCRIPTIONS = {
   TTFB: 'Time to First Byte - Server response time',
 };
 
-// Send metrics to analytics endpoint
+// Send one metric snapshot to the analytics endpoint when telemetry is enabled.
 function sendMetric(metric: { name: string; value: number; id: string; rating: string }) {
   try {
     let shouldSend = false;
@@ -64,7 +64,7 @@ function sendMetric(metric: { name: string; value: number; id: string; rating: s
         shouldSend = true;
       }
     }
-    if (!shouldSend) return;
+    if (!shouldSend || typeof window === 'undefined' || typeof navigator === 'undefined') return;
     const payload = JSON.stringify({
       name: metric.name,
       value: metric.value,
@@ -73,12 +73,12 @@ function sendMetric(metric: { name: string; value: number; id: string; rating: s
     });
     // Only metric data and a query-free path are collected. User agent and full URLs are excluded.
     if (navigator.sendBeacon) {
-      navigator.sendBeacon('/api/vitals', new Blob([payload], { type: 'application/json' }));
-    } else {
-      internalPost('/api/vitals', JSON.parse(payload)).catch(err => {
-        console.warn('Failed to send web vital metric', { metric, error: err });
-      });
+      const queued = navigator.sendBeacon('/api/vitals', new Blob([payload], { type: 'application/json' }));
+      if (queued) return;
     }
+    internalPost('/api/vitals', JSON.parse(payload)).catch(err => {
+      console.warn('Failed to send web vital metric', { metric, error: err });
+    });
   } catch (err) {
     console.warn('sendBeacon vitals failed', { metric, error: err });
   }
@@ -87,8 +87,7 @@ function sendMetric(metric: { name: string; value: number; id: string; rating: s
 function WebVitalsReporterInternal({
   showWidget = process.env.NODE_ENV === 'development',
   position = 'bottom-right',
-  // Default to false to avoid duplicate reporting; performanceMonitor handles sending
-  enableRealTimeReporting = false,
+  enableRealTimeReporting = true,
   onMetricUpdate,
   className,
 }: WebVitalsReporterProps) {
@@ -134,7 +133,6 @@ function WebVitalsReporterInternal({
       };
     });
 
-    // Optionally send directly; by default rely on performanceMonitor batching
     if (enableRealTimeReporting) {
       sendMetric({
         name: metric.name,
@@ -143,8 +141,6 @@ function WebVitalsReporterInternal({
         rating,
       });
     }
-
-    // Collection handled by performanceMonitor; avoid duplicating here
 
     // Call custom handler
     onMetricUpdate?.(webVitalMetric);
@@ -180,17 +176,17 @@ function WebVitalsReporterInternal({
   };
 
   const getScoreColor = (score: number): string => {
-    if (score >= 90) return 'text-green-600';
-    if (score >= 50) return 'text-yellow-600';
-    return 'text-red-600';
+    if (score >= 90) return 'text-green-800';
+    if (score >= 50) return 'text-amber-900';
+    return 'text-red-800';
   };
 
   const getRatingColor = (rating: string): string => {
     switch (rating) {
-      case 'good': return 'text-green-600 bg-green-100';
-      case 'needs-improvement': return 'text-yellow-600 bg-yellow-100';
-      case 'poor': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'good': return 'text-green-900 bg-green-100';
+      case 'needs-improvement': return 'text-amber-900 bg-amber-100';
+      case 'poor': return 'text-red-900 bg-red-100';
+      default: return 'text-gray-900 bg-gray-100';
     }
   };
 
@@ -220,8 +216,6 @@ function WebVitalsReporterInternal({
     onINP(handleMetricUpdate);
     onTTFB(handleMetricUpdate);
   }, [handleMetricUpdate]);
-
-  // Removed duplicate always-on sender to avoid posting vitals twice
 
   if (!showWidget) {
     return null;

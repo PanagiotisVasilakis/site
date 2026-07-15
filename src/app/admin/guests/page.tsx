@@ -197,7 +197,7 @@ export default function GuestDataViewer() {
   const pendingArrivalRequests = arrivalRequests.filter((request) => request.status === 'pending')
 
   return (
-    <div className="admin-page-shell min-h-screen p-6">
+    <main className="admin-page-shell min-h-screen p-6">
       <div className="max-w-7xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -464,6 +464,6 @@ export default function GuestDataViewer() {
           )}
         </motion.div>
       </div>
-    </div>
+    </main>
   )
 }

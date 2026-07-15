@@ -7,18 +7,18 @@ import { getSecurityConfig, logSecurityEvent, type SecurityEvent } from '@/lib/s
 export class APIInputValidationMiddleware {
   private readonly config = getSecurityConfig().apiSecurity.inputValidation;
 
-  public validateRequest(request: NextRequest): NextResponse | null {
+  public async validateRequest(request: NextRequest): Promise<NextResponse | null> {
     if (!this.config.enabled) return null;
 
     const contentLengthHeader = request.headers.get('content-length');
     if (contentLengthHeader) {
       const contentLength = Number(contentLengthHeader);
       if (!Number.isSafeInteger(contentLength) || contentLength < 0) {
-        this.logViolation(request, 'invalid_content_length');
+        await this.logViolation(request, 'invalid_content_length');
         return new NextResponse('Invalid content length', { status: 400 });
       }
       if (contentLength > this.config.maxPayloadSize) {
-        this.logViolation(request, 'payload_too_large', {
+        await this.logViolation(request, 'payload_too_large', {
           contentLength,
           maxAllowed: this.config.maxPayloadSize,
         });
@@ -33,7 +33,7 @@ export class APIInputValidationMiddleware {
         .toLowerCase();
       const allowed = this.config.allowedContentTypes.some((type) => type.toLowerCase() === mediaType);
       if (!allowed) {
-        this.logViolation(request, 'invalid_content_type', { mediaType: mediaType || 'missing' });
+        await this.logViolation(request, 'invalid_content_type', { mediaType: mediaType || 'missing' });
         return new NextResponse('Invalid content type', { status: 415 });
       }
     }
@@ -41,11 +41,11 @@ export class APIInputValidationMiddleware {
     return null;
   }
 
-  private logViolation(
+  private async logViolation(
     request: NextRequest,
     violationType: string,
     details: Record<string, unknown> = {},
-  ): void {
+  ): Promise<void> {
     const event: SecurityEvent = {
       type: 'api_security_violation',
       severity: 'medium',
@@ -54,15 +54,15 @@ export class APIInputValidationMiddleware {
       url: request.nextUrl.pathname,
       details: { violationType, method: request.method, ...details },
     };
-    logSecurityEvent(event);
+    await logSecurityEvent(event);
   }
 }
 
 export class APIKeyAuthMiddleware {
-  public validateRequest(request: NextRequest, requiredScopes?: string[]): NextResponse | null {
+  public async validateRequest(request: NextRequest, requiredScopes?: string[]): Promise<NextResponse | null> {
     const apiKey = this.extractAPIKey(request);
     if (!apiKey) {
-      this.logAuthFailure(request, 'missing_api_key');
+      await this.logAuthFailure(request, 'missing_api_key');
       return new NextResponse('API key required', {
         status: 401,
         headers: { 'WWW-Authenticate': 'ApiKey' },
@@ -70,19 +70,19 @@ export class APIKeyAuthMiddleware {
     }
 
     if (!/^[a-zA-Z0-9]{32,64}$/.test(apiKey)) {
-      this.logAuthFailure(request, 'invalid_api_key_format');
+      await this.logAuthFailure(request, 'invalid_api_key_format');
       return new NextResponse('Invalid API key', { status: 401 });
     }
 
     const keyType = this.configuredKeyType(apiKey);
     if (!keyType) {
-      this.logAuthFailure(request, 'invalid_api_key');
+      await this.logAuthFailure(request, 'invalid_api_key');
       return new NextResponse('Invalid API key', { status: 401 });
     }
 
     const scopes = keyType === 'internal' ? ['internal'] : ['read', 'write'];
     if (requiredScopes?.some((scope) => !scopes.includes(scope))) {
-      this.logAuthFailure(request, 'insufficient_scope', { required: requiredScopes });
+      await this.logAuthFailure(request, 'insufficient_scope', { required: requiredScopes });
       return new NextResponse('Insufficient scope', { status: 403 });
     }
     return null;
@@ -112,11 +112,11 @@ export class APIKeyAuthMiddleware {
       });
   }
 
-  private logAuthFailure(
+  private async logAuthFailure(
     request: NextRequest,
     reason: string,
     details: Record<string, unknown> = {},
-  ): void {
+  ): Promise<void> {
     const event: SecurityEvent = {
       type: 'api_auth_failure',
       severity: 'medium',
@@ -125,7 +125,7 @@ export class APIKeyAuthMiddleware {
       url: request.nextUrl.pathname,
       details: { reason, method: request.method, ...details },
     };
-    logSecurityEvent(event);
+    await logSecurityEvent(event);
   }
 }
 
@@ -136,12 +136,12 @@ export function createAPISecurityMiddleware(options?: {
   const inputValidation = new APIInputValidationMiddleware();
   const apiKeyAuth = new APIKeyAuthMiddleware();
 
-  return (request: NextRequest): NextResponse | null => {
-    const inputValidationResult = inputValidation.validateRequest(request);
+  return async (request: NextRequest): Promise<NextResponse | null> => {
+    const inputValidationResult = await inputValidation.validateRequest(request);
     if (inputValidationResult) return inputValidationResult;
 
     if (options?.requireAPIKey) {
-      return apiKeyAuth.validateRequest(request, options.requiredScopes);
+      return await apiKeyAuth.validateRequest(request, options.requiredScopes);
     }
     return null;
   };

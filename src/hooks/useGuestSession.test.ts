@@ -31,7 +31,7 @@ describe('useGuestSession', () => {
     const { result } = renderHook(() => useGuestSession());
 
     await waitFor(() => expect(result.current.isSignedIn).toBe(true));
-    expect(mocks.internalFetch).toHaveBeenCalledWith('/api/check-in', expect.objectContaining({
+    expect(mocks.internalFetch).toHaveBeenCalledWith('/api/portal/sessions', expect.objectContaining({
       method: 'GET',
     }));
   });
@@ -67,5 +67,35 @@ describe('useGuestSession', () => {
       mocks.sessionListener?.({ reason: 'signout' });
     });
     expect(result.current.isSignedIn).toBe(false);
+  });
+
+  it('keeps the signed-in state when logout fails', async () => {
+    mocks.internalFetch
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: false, status: 503 });
+    const { result } = renderHook(() => useGuestSession());
+    await waitFor(() => expect(result.current.isSignedIn).toBe(true));
+
+    await expect(result.current.signOut()).resolves.toBe(false);
+    expect(result.current.isSignedIn).toBe(true);
+    expect(mocks.emitGuestSessionChanged).not.toHaveBeenCalled();
+  });
+
+  it('does not let an older session check overwrite a cross-tab signout', async () => {
+    let resolveCheck: ((value: { ok: boolean }) => void) | undefined;
+    mocks.internalFetch.mockReturnValue(new Promise((resolve) => { resolveCheck = resolve; }));
+    const { result } = renderHook(() => useGuestSession({ initialIsSignedIn: true }));
+    await waitFor(() => expect(mocks.internalFetch).toHaveBeenCalled());
+
+    act(() => mocks.sessionListener?.({ reason: 'signout' }));
+    expect(result.current.isSignedIn).toBe(false);
+    await act(async () => { resolveCheck?.({ ok: true }); });
+    expect(result.current.isSignedIn).toBe(false);
+  });
+
+  it('clears a seeded state when session checks are disabled', async () => {
+    const { result } = renderHook(() => useGuestSession({ initialIsSignedIn: true, enabled: false }));
+    await waitFor(() => expect(result.current.isSignedIn).toBe(false));
+    expect(mocks.internalFetch).not.toHaveBeenCalled();
   });
 });

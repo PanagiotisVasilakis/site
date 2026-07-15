@@ -9,6 +9,7 @@ import {
   vitalsSummary,
 } from '@/lib/analyticsRepository';
 import { evaluateOperationalAlerts } from '@/lib/operationalMonitor';
+import { deliverOutboxEvent } from '@/lib/bookingOutbox';
 import { completeErasureRequest, createVerifiedErasureRequest } from '@/lib/privacyService';
 import { prisma } from '@/lib/prisma';
 import { checkInRequestRepository } from '@/lib/prisma-repositories/checkInRequestRepository';
@@ -33,8 +34,18 @@ describe('database-backed operations', () => {
       status: 'PENDING',
     });
 
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(deliverOutboxEvent(event.id)).resolves.toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith('https://example.test/check-in', expect.objectContaining({
+      headers: expect.objectContaining({ 'Idempotency-Key': event.id }),
+    }));
+    expect(await prisma.outboxEvent.findUniqueOrThrow({ where: { id: event.id } }))
+      .toMatchObject({ status: 'DELIVERED' });
+
     await prisma.outboxEvent.delete({ where: { id: event.id } });
     await prisma.checkInRequest.delete({ where: { id: created.request.id } });
+    vi.unstubAllGlobals();
     delete process.env.CHECKIN_REQUEST_WEBHOOK_URL;
   });
 
@@ -58,13 +69,79 @@ describe('database-backed operations', () => {
     delete process.env.CHECKIN_REQUEST_WEBHOOK_URL;
   });
 
+  it('reuses a pending arrival request and keeps lookup scoped to the active booking', async () => {
+    const userId = crypto.randomUUID();
+    const firstBookingId = crypto.randomUUID();
+    const secondBookingId = crypto.randomUUID();
+    const phone = `+3067${String(Date.now()).slice(-8)}`;
+    const startDate = new Date();
+    const endDate = new Date(Date.now() + 2 * 86_400_000);
+
+    await prisma.user.create({
+      data: { id: userId, phoneE164: phone, countryOrigin: 'GR' },
+    });
+    await prisma.booking.createMany({
+      data: [
+        {
+          id: firstBookingId,
+          source: 'EXTERNAL',
+          provider: 'integration',
+          externalReference: firstBookingId,
+          startDate,
+          endDate,
+          userId,
+          accessStatus: 'VERIFIED',
+        },
+        {
+          id: secondBookingId,
+          source: 'EXTERNAL',
+          provider: 'integration',
+          externalReference: secondBookingId,
+          startDate,
+          endDate,
+          userId,
+          accessStatus: 'VERIFIED',
+        },
+      ],
+    });
+
+    const first = await checkInRequestRepository.create({
+      bookingId: firstBookingId,
+      userId,
+      requestedTime: '13:00',
+    });
+    const second = await checkInRequestRepository.create({
+      bookingId: secondBookingId,
+      userId,
+      requestedTime: '14:00',
+    });
+    const duplicate = await checkInRequestRepository.create({
+      bookingId: firstBookingId,
+      userId,
+      requestedTime: '15:00',
+    });
+
+    expect(duplicate).toMatchObject({ created: false, request: { id: first.request.id } });
+    expect(await checkInRequestRepository.findLatestForGuest({ bookingId: firstBookingId, userId }))
+      .toMatchObject({ id: first.request.id });
+    expect(await checkInRequestRepository.findLatestForGuest({ bookingId: secondBookingId, userId }))
+      .toMatchObject({ id: second.request.id });
+
+    await prisma.checkInRequest.deleteMany({ where: { userId } });
+    await prisma.booking.deleteMany({ where: { id: { in: [firstBookingId, secondBookingId] } } });
+    await prisma.user.delete({ where: { id: userId } });
+  });
+
   it('persists privacy-safe analytics and returns database aggregates', async () => {
     const marker = crypto.randomUUID();
     const path = `/integration/${marker}`;
-    await recordAnalyticsHits([
-      { path, locale: 'en' },
-      { path, locale: 'en', eventName: 'checkin_viewed', properties: {} },
-    ]);
+    const eventId = crypto.randomUUID();
+    const occurredAt = new Date(Date.now() - 60_000);
+    await expect(recordAnalyticsHits([
+      { path, locale: 'en', eventId, occurredAt },
+      { path, locale: 'en', eventName: 'checkin_viewed', properties: {}, eventId: crypto.randomUUID() },
+    ])).resolves.toBe(2);
+    await expect(recordAnalyticsHits([{ path, locale: 'en', eventId, occurredAt }])).resolves.toBe(0);
     await recordVital({ name: 'LCP', value: 1_234, id: marker, path });
 
     const [top, stats, days, vitals] = await Promise.all([
@@ -73,9 +150,9 @@ describe('database-backed operations', () => {
       dayBuckets(2),
       vitalsSummary(),
     ]);
-    expect(top).toContainEqual({ path, count: 2 });
+    expect(top).toContainEqual({ path, count: 1 });
     expect(stats.uniquePaths).toBeGreaterThanOrEqual(1);
-    expect(days.reduce((sum, day) => sum + day.count, 0)).toBeGreaterThanOrEqual(2);
+    expect(days.reduce((sum, day) => sum + day.count, 0)).toBeGreaterThanOrEqual(1);
     expect(vitals.find((vital) => vital.name === 'LCP')).toMatchObject({ count: expect.any(Number) });
 
     await prisma.analyticsVital.deleteMany({ where: { metricId: marker } });
@@ -84,6 +161,7 @@ describe('database-backed operations', () => {
 
   it('retries durable alert notifications and preserves administrator thresholds', async () => {
     const eventId = crypto.randomUUID();
+    const securityEventId = crypto.randomUUID();
     await prisma.securityAuditEvent.deleteMany({ where: { severity: { in: ['high', 'critical'] } } });
     await prisma.outboxEvent.deleteMany({ where: { status: 'DEAD' } });
     await prisma.alert.deleteMany();
@@ -100,11 +178,19 @@ describe('database-backed operations', () => {
         status: 'DEAD',
       },
     });
+    await prisma.securityAuditEvent.create({
+      data: {
+        id: securityEventId,
+        eventType: 'integration.high_severity',
+        severity: 'high',
+        details: { test: true },
+      },
+    });
 
     process.env.ALERT_WEBHOOK_URL = 'https://alerts.invalid/hook';
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 503 }))
-      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+      .mockResolvedValue(new Response(null, { status: 204 }));
     vi.stubGlobal('fetch', fetchMock);
     await expect(evaluateOperationalAlerts()).rejects.toThrow('503');
 
@@ -113,6 +199,11 @@ describe('database-backed operations', () => {
     });
     expect(failed).toMatchObject({ notificationAttempts: 1, notificationDeliveredAt: null });
     expect(failed.notificationLastError).toContain('503');
+    const laterRule = await prisma.alert.findFirstOrThrow({
+      where: { rule: { name: 'Recent high-severity security events' } },
+    });
+    expect(laterRule.notificationDeliveredAt).toBeInstanceOf(Date);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
 
     await expect(evaluateOperationalAlerts()).resolves.toMatchObject({ evaluated: 3 });
     const delivered = await prisma.alert.findUniqueOrThrow({ where: { id: failed.id } });
@@ -129,6 +220,7 @@ describe('database-backed operations', () => {
     delete process.env.ALERT_WEBHOOK_URL;
     vi.unstubAllGlobals();
     await prisma.outboxEvent.deleteMany({ where: { id: eventId } });
+    await prisma.securityAuditEvent.deleteMany({ where: { id: securityEventId } });
   });
 
   it('completes a verified erasure atomically and removes queued PII', async () => {
@@ -208,7 +300,13 @@ describe('database-backed operations', () => {
       },
     });
 
-    const created = await createVerifiedErasureRequest(userId, bookingId);
+    const racedRequests = await Promise.all([
+      createVerifiedErasureRequest(userId, bookingId),
+      createVerifiedErasureRequest(userId, bookingId),
+    ]);
+    expect(new Set(racedRequests.map((entry) => entry.request.id)).size).toBe(1);
+    expect(racedRequests.filter((entry) => entry.created)).toHaveLength(1);
+    const created = racedRequests[0];
     const completed = await completeErasureRequest(created.request.id, 'Approved after operator review.');
     expect(completed.status).toBe('COMPLETED');
     expect(completed.userId).toBeNull();

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { getDictionary, type Dictionary } from '@/i18n/dictionaries';
+import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
 
 /**
@@ -31,8 +31,3 @@ export function useTranslation(locale: string) {
         isEnglish: safeLocale === 'en',
     };
 }
-
-/**
- * Type helper for extracting specific sections from Dictionary
- */
-export type TranslationSection<K extends keyof Dictionary> = NonNullable<Dictionary[K]>;

@@ -93,6 +93,11 @@ describe('portal booking claims (database)', () => {
 
     await expect(authenticatePortalUser({ phone, password: 'a-strong-test-password' }))
       .resolves.toEqual({ userId: claimed.userId, bookingId: ids.booking });
+
+    await expect(authenticatePortalUser({
+      phone: phone.slice(3),
+      password: 'a-strong-test-password',
+    })).resolves.toEqual({ userId: claimed.userId, bookingId: ids.booking });
   });
 
   it('withholds Wi-Fi credentials until 24 hours before the stay', async () => {
@@ -109,9 +114,8 @@ describe('portal booking claims (database)', () => {
     const earlyResponse = await GET(request(), { params: Promise.resolve({}) });
     expect((await earlyResponse.json()).data).toMatchObject({ wifi: null });
 
-    const tomorrow = new Date();
-    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-    await prisma.booking.update({ where: { id: ids.booking }, data: { startDate: tomorrow } });
+    const today = new Date(new Date().toISOString().slice(0, 10));
+    await prisma.booking.update({ where: { id: ids.booking }, data: { startDate: today } });
     const eligibleResponse = await GET(request(), { params: Promise.resolve({}) });
     expect((await eligibleResponse.json()).data.wifi).toEqual({
       network: 'IntegrationNetwork',

@@ -214,7 +214,7 @@ function calculateSummary(values: MetricRecord[]) {
   };
 }
 
-export const GET = withErrorHandler(async (request: NextRequest) => {
+export const GET = withErrorHandler(async (request: NextRequest, { signal }) => {
   const span = tracer.startSpan('metrics_query', undefined, {
     component: 'metrics',
     'http.method': request.method,
@@ -226,6 +226,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
 
   try {
     await assertMetricsAccess(request, 'read', correlationId);
+    signal.throwIfAborted();
 
     const url = new URL(request.url);
     const timeRangeRaw = url.searchParams.get('timeRange');
@@ -411,7 +412,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
 });
 
 // POST endpoint for custom metric submission
-export const POST = withErrorHandler(async (request: NextRequest) => {
+export const POST = withErrorHandler(async (request: NextRequest, { signal }) => {
   const span = tracer.startSpan('metrics_submit', undefined, {
     component: 'metrics',
     'http.method': request.method,
@@ -421,8 +422,10 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   try {
     await assertMetricsAccess(request, 'write', correlationId);
+    signal.throwIfAborted();
 
     const { metric, value, tags, type } = await validateRequestBody(metricSubmissionSchema, 64 * 1_024)(request);
+    signal.throwIfAborted();
 
     tracer.addTags(span, {
       'metrics.submit.metric': metric,

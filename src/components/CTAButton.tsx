@@ -1,9 +1,16 @@
 import React from 'react';
+import clsx from 'clsx';
 
-type Common = { variant?: 'primary' | 'secondary' | 'outline' | 'tint' | 'danger' | 'ghost'; asChild?: boolean; className?: string };
-type ButtonProps = Common & React.ButtonHTMLAttributes<HTMLButtonElement>;
+type Variant = 'primary' | 'secondary' | 'outline' | 'tint' | 'danger' | 'ghost';
+type Common = { variant?: Variant; className?: string };
+type NativeButtonProps = Common & React.ButtonHTMLAttributes<HTMLButtonElement> & { asChild?: false };
+type AsChildProps = Common & Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'children'> & {
+  asChild: true;
+  children: React.ReactElement<{ className?: string }>;
+};
+type CTAButtonProps = NativeButtonProps | AsChildProps;
 
-export function CTAButton({ variant='primary', className='', asChild=false, ...rest }: ButtonProps) {
+export function CTAButton({ variant='primary', className='', asChild=false, ...rest }: CTAButtonProps) {
   const base = 'focus:outline-none';
   const styles: Record<string,string> = {
     primary: 'btn-primary',
@@ -14,14 +21,12 @@ export function CTAButton({ variant='primary', className='', asChild=false, ...r
     ghost: 'btn-ghost',
   };
   if (asChild) {
-    // Expect caller to pass an <a> as children; clone to inject className
-    const restWithChildren = rest as { children?: React.ReactElement<{ className?: string }> };
-    const child = restWithChildren.children;
+    const { children: child, ...anchorProps } = rest as Omit<AsChildProps, keyof Common | 'asChild'>;
     if (!child || !React.isValidElement(child)) return null;
-    const childProps = child.props as { className?: string; children?: React.ReactNode };
-    const inner = childProps.children;
-    const combinedClass = `${base} ${styles[variant]} ${childProps.className || ''} ${className}`.trim();
-    return React.cloneElement(child, { ...childProps, className: combinedClass }, inner);
+    return React.cloneElement(child, {
+      ...anchorProps,
+      className: clsx(base, styles[variant], child.props.className, className),
+    });
   }
-  return <button className={`${base} ${styles[variant]} ${className}`} {...rest} />;
+  return <button className={clsx(base, styles[variant], className)} {...(rest as NativeButtonProps)} />;
 }

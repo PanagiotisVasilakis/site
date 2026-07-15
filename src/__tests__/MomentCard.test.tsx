@@ -53,9 +53,16 @@ describe('MomentCard', () => {
 
     await user.click(screen.getByRole('button', { name: /view details/i }));
 
-    expect(screen.getByRole('button', { name: /back/i })).toBeInTheDocument();
+    const back = screen.getByRole('button', { name: /back/i });
+    expect(back).toBeInTheDocument();
+    expect(back).toHaveFocus();
+    expect(screen.getByRole('button', { name: /view details/i, hidden: true })).toHaveAttribute('tabindex', '-1');
     expect(screen.getByRole('link', { name: '+30 27210 91995' })).toHaveAttribute('href', 'tel:+302721091995');
     expect(screen.getByRole('link', { name: /call/i })).toHaveAttribute('href', 'tel:+302721091995');
+
+    await user.click(back);
+    expect(screen.getByRole('button', { name: /view details/i })).toHaveFocus();
+    expect(screen.queryByRole('button', { name: /back/i })).not.toBeInTheDocument();
   });
 
   it('keeps dedicated detail links for non-phone cards', () => {

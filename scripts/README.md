@@ -48,8 +48,9 @@ Production additionally requires:
 
 - `CLAIM_TOKEN_PEPPER`
 - `TRUST_PROXY_MODE=hops` with a positive `TRUST_PROXY_HOPS`, or `TRUST_PROXY_MODE=header` with an explicitly trusted `CLIENT_IP_HEADER`
+- `RATE_LIMIT_BACKEND=redis` with `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`; production fails closed instead of using a per-process counter. `RATE_LIMIT_NAMESPACE` may be set per environment; otherwise a stable environment/site namespace is derived automatically.
 
-If a booking or check-in webhook URL is configured, its token is mandatory; production webhook URLs must use HTTPS. If `RATE_LIMIT_BACKEND=redis`, both Upstash URL and token are mandatory.
+If a booking or check-in webhook URL is configured, its token is mandatory; production webhook URLs must use HTTPS. A blank rate-limit backend is supported only in development/test, where it uses an in-memory counter.
 
 Never place secrets in `NEXT_PUBLIC_*` variables.
 

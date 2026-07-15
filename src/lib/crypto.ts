@@ -163,13 +163,3 @@ export function decryptJSON<T = unknown>(b64: string): T {
     throw primaryError;
   }
 }
-
-export function maskLast4(value: string): string {
-  const last = value.slice(-4);
-  return last.padStart(value.length, '•');
-}
-
-// Deterministic HMAC for lookups (not reversible, keyed by PEPPER)
-export function hmacDeterministic(value: string): string {
-  return crypto.createHmac('sha256', PEPPER).update(value).digest('hex');
-}

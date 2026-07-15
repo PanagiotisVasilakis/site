@@ -1,13 +1,13 @@
 import { GUEST_DATASET_KEYS, type GuestDatasetKey, type GuestDatasetSnapshot, getGuestDatasetSnapshot } from '@/lib/guestDatasetVersion';
 
-export type GuestDataCacheEntry<T> = {
+type GuestDataCacheEntry<T> = {
   snapshot: GuestDatasetSnapshot;
   value: T;
   fetchedAt: number;
   size: number | null;
 };
 
-export type GuestDataCacheMetrics = {
+type GuestDataCacheMetrics = {
   hits: number;
   misses: number;
   invalidations: number;

@@ -10,7 +10,7 @@ type RuleDefinition = {
   threshold: number;
   windowMinutes: number;
   severity: 'low' | 'medium' | 'high' | 'critical';
-  read: () => Promise<number>;
+  read: (windowMinutes: number) => Promise<number>;
 };
 
 const RULES: RuleDefinition[] = [
@@ -49,10 +49,10 @@ const RULES: RuleDefinition[] = [
     threshold: 0,
     windowMinutes: 5,
     severity: 'high',
-    read: () => prisma.securityAuditEvent.count({
+    read: (windowMinutes) => prisma.securityAuditEvent.count({
       where: {
         severity: { in: ['high', 'critical'] },
-        occurredAt: { gte: new Date(Date.now() - 5 * 60_000) },
+        occurredAt: { gte: new Date(Date.now() - windowMinutes * 60_000) },
       },
     }),
   },
@@ -110,6 +110,7 @@ async function notifyAlert(input: {
 export async function evaluateOperationalAlerts(): Promise<{ opened: number; resolved: number; evaluated: number }> {
   let opened = 0;
   let resolved = 0;
+  const notificationFailures: Error[] = [];
 
   for (const definition of RULES) {
     const rule = await prisma.alertRule.upsert({
@@ -131,7 +132,7 @@ export async function evaluateOperationalAlerts(): Promise<{ opened: number; res
     });
     if (!rule.enabled) continue;
 
-    const value = await definition.read();
+    const value = await definition.read(rule.windowMinutes);
     const current = await prisma.alert.findFirst({
       where: { ruleId: rule.id, status: { in: ['OPEN', 'ACKNOWLEDGED'] } },
     });
@@ -163,10 +164,10 @@ export async function evaluateOperationalAlerts(): Promise<{ opened: number; res
               notificationLastError: (error instanceof Error ? error.message : String(error)).slice(0, 1_024),
             },
           });
-          throw error;
+          notificationFailures.push(error instanceof Error ? error : new Error(String(error)));
         }
       } else if (!alert.notificationDeliveredAt && process.env.ALERT_WEBHOOK_REQUIRED === '1') {
-        throw new Error('ALERT_WEBHOOK_URL is required but not configured');
+        notificationFailures.push(new Error('ALERT_WEBHOOK_URL is required but not configured'));
       }
     } else if (current) {
       await prisma.alert.update({
@@ -175,6 +176,13 @@ export async function evaluateOperationalAlerts(): Promise<{ opened: number; res
       });
       resolved += 1;
     }
+  }
+
+  if (notificationFailures.length > 0) {
+    throw new AggregateError(
+      notificationFailures,
+      `${notificationFailures.length} operational alert notification(s) failed: ${notificationFailures.map((error) => error.message).join('; ')}`,
+    );
   }
 
   return { opened, resolved, evaluated: RULES.length };

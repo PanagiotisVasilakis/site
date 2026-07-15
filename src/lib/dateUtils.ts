@@ -1,4 +1,4 @@
-import { format, parse, isValid, isSameDay, isAfter, isBefore, startOfDay } from 'date-fns';
+import { format, parse, isValid, isAfter, isBefore, startOfDay } from 'date-fns';
 import { logger } from './logger-client';
 
 export interface DateRange {
@@ -6,36 +6,28 @@ export interface DateRange {
   to?: Date | undefined;
 }
 
-export interface AvailabilityInfo {
-  available: boolean;
-  minStay?: number;
-  maxStay?: number;
-  reason?: string; // Why unavailable: 'booked', 'blocked', 'maintenance'
-}
+type DateLocale = 'en' | 'el';
+
+const localeCode = (locale: DateLocale) => locale === 'el' ? 'el-GR' : 'en-US';
 
 // Format dates for display
-export function formatDateRange(range: DateRange): string {
+export function formatDateRange(range: DateRange, locale: DateLocale = 'en'): string {
   if (!range?.from) return '';
-  if (!range?.to) return format(range.from, 'MMM d');
-  
-  const sameMonth = format(range.from, 'MMM yyyy') === format(range.to, 'MMM yyyy');
-  const sameYear = format(range.from, 'yyyy') === format(range.to, 'yyyy');
-  
-  if (sameMonth) {
-    return `${format(range.from, 'MMM d')}-${format(range.to, 'd, yyyy')}`;
-  } else if (sameYear) {
-    return `${format(range.from, 'MMM d')} - ${format(range.to, 'MMM d, yyyy')}`;
-  } else {
-    return `${format(range.from, 'MMM d, yyyy')} - ${format(range.to, 'MMM d, yyyy')}`;
-  }
+  const formatter = new Intl.DateTimeFormat(localeCode(locale), {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+  if (!range?.to) return formatter.format(range.from);
+  return formatter.formatRange(range.from, range.to);
 }
 
 // Format for compact display (mobile)
-export function formatDateRangeCompact(range: DateRange): string {
+export function formatDateRangeCompact(range: DateRange, locale: DateLocale = 'en'): string {
   if (!range?.from) return '';
-  if (!range?.to) return format(range.from, 'M/d');
-  
-  return `${format(range.from, 'M/d')}-${format(range.to, 'M/d')}`;
+  const formatter = new Intl.DateTimeFormat(localeCode(locale), { day: 'numeric', month: 'numeric' });
+  if (!range?.to) return formatter.format(range.from);
+  return formatter.formatRange(range.from, range.to);
 }
 
 // Parse date string safely
@@ -56,8 +48,9 @@ export function parseDate(dateString: string, formatString: string = 'yyyy-MM-dd
 // Get number of nights between dates
 export function getNights(range: DateRange): number {
   if (!range?.from || !range?.to) return 0;
-  const diffTime = range.to.getTime() - range.from.getTime();
-  return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+  const fromDay = Date.UTC(range.from.getFullYear(), range.from.getMonth(), range.from.getDate());
+  const toDay = Date.UTC(range.to.getFullYear(), range.to.getMonth(), range.to.getDate());
+  return Math.max(0, Math.round((toDay - fromDay) / (1000 * 60 * 60 * 24)));
 }
 
 // Check if date is in the past
@@ -70,54 +63,46 @@ export function getBlockedDates(): Date[] {
   return [];
 }
 
-// Check date availability using current local rules. External availability can be layered in here.
-export function getDateAvailability(date: Date): AvailabilityInfo {
-  // Check if past date
-  if (isPastDate(date)) {
-    return { available: false, reason: 'Past date' };
-  }
-  
-  // Check blocked dates
-  const blockedDates = getBlockedDates();
-  if (blockedDates.some(blocked => isSameDay(blocked, date))) {
-    return { available: false, reason: 'booked' };
-  }
-  
-  const dayOfWeek = date.getDay();
-  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-  
-  return {
-    available: true,
-    minStay: isWeekend ? 2 : 1,
-    maxStay: 14,
-  };
-}
-
 // Validate date range
-export function validateDateRange(range: DateRange): { valid: boolean; error?: string } {
+export function validateDateRange(range: DateRange, locale: DateLocale = 'en'): { valid: boolean; error?: string } {
+  const errors = locale === 'el' ? {
+    missingCheckIn: 'Παρακαλώ επιλέξτε ημερομηνία άφιξης',
+    pastCheckIn: 'Η ημερομηνία άφιξης δεν μπορεί να είναι στο παρελθόν',
+    missingCheckOut: 'Παρακαλώ επιλέξτε ημερομηνία αναχώρησης',
+    invalidOrder: 'Η αναχώρηση πρέπει να είναι μετά την άφιξη',
+    minimumStay: 'Η ελάχιστη διαμονή είναι 1 νύχτα',
+    maximumStay: 'Η μέγιστη διαμονή είναι 30 νύχτες',
+  } : {
+    missingCheckIn: 'Please select a check-in date',
+    pastCheckIn: 'Check-in date cannot be in the past',
+    missingCheckOut: 'Please select a check-out date',
+    invalidOrder: 'Check-out must be after check-in',
+    minimumStay: 'Minimum stay is 1 night',
+    maximumStay: 'Maximum stay is 30 nights',
+  };
   if (!range?.from) {
-    return { valid: false, error: 'Please select a check-in date' };
+    return { valid: false, error: errors.missingCheckIn };
   }
   
   if (isPastDate(range.from)) {
-    return { valid: false, error: 'Check-in date cannot be in the past' };
+    return { valid: false, error: errors.pastCheckIn };
   }
   
   if (!range?.to) {
-    return { valid: false, error: 'Please select a check-out date' };
+    return { valid: false, error: errors.missingCheckOut };
   }
   
   if (!isAfter(range.to, range.from)) {
-    return { valid: false, error: 'Check-out must be after check-in' };
+    return { valid: false, error: errors.invalidOrder };
   }
   
   const nights = getNights(range);
   if (nights < 1) {
-    return { valid: false, error: 'Minimum stay is 1 night' };
+    return { valid: false, error: errors.minimumStay };
   }
   
   if (nights > 30) {
-    return { valid: false, error: 'Maximum stay is 30 nights' };
+    return { valid: false, error: errors.maximumStay };
   }
   
   return { valid: true };

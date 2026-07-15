@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 import { openApiSpec, validateOpenAPISpec } from './openapi';
 
 const intentionallyInternalOrUiRoutes = new Set([
-  '/coverage',
   '/dev/alerts/verify-spike',
   '/docs',
   '/docs/openapi',

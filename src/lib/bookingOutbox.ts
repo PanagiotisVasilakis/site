@@ -54,56 +54,56 @@ export async function deliverOutboxEvent(eventId: string): Promise<boolean> {
   if (!attempt) return false;
 
   try {
-    const committed = await prisma.$transaction(async (tx) => {
-      // Serialize delivery with privacy erasure. The row lock is held until the
-      // external handoff and local state transition have completed.
-      await tx.$queryRaw`SELECT "id" FROM "outbox_events" WHERE "id" = ${eventId}::uuid FOR UPDATE`;
-      const event = await tx.outboxEvent.findUnique({
-        where: { id: eventId },
-        include: { stayRequest: true, checkInRequest: true },
-      });
-      if (!event || event.status !== 'LEASED' || event.leaseOwner !== leaseOwner) return false;
-      if (!config.url) throw new Error('Webhook destination is not configured');
+    const event = await prisma.outboxEvent.findUnique({
+      where: { id: eventId },
+      include: { stayRequest: true, checkInRequest: true },
+    });
+    if (!event || event.status !== 'LEASED' || event.leaseOwner !== leaseOwner) return false;
+    if (!config.url) throw new Error('Webhook destination is not configured');
 
-      const payload = payloadRecord(event.payload);
-      const body = event.destination === BOOKING_DESTINATION
+    const payload = payloadRecord(event.payload);
+    const body = event.destination === BOOKING_DESTINATION
+      ? {
+          event: event.eventType,
+          eventId: event.id,
+          submittedAt: event.createdAt.toISOString(),
+          request: event.stayRequest,
+        }
+      : event.checkInRequest
         ? {
             event: event.eventType,
             eventId: event.id,
-            submittedAt: event.createdAt.toISOString(),
-            request: event.stayRequest,
+            requestId: event.checkInRequest.id,
+            bookingId: event.checkInRequest.bookingId,
+            userId: event.checkInRequest.userId,
+            guestName: event.checkInRequest.guestName,
+            guestEmail: event.checkInRequest.guestEmail,
+            guestPhone: event.checkInRequest.guestPhone,
+            requestedTime: event.checkInRequest.requestedTime,
+            message: event.checkInRequest.message,
+            previousStatus: payload.previousStatus ?? undefined,
+            status: payload.status ?? event.checkInRequest.status,
+            occurredAt: event.createdAt.toISOString(),
           }
-        : event.checkInRequest
-          ? {
-              event: event.eventType,
-              eventId: event.id,
-              requestId: event.checkInRequest.id,
-              bookingId: event.checkInRequest.bookingId,
-              userId: event.checkInRequest.userId,
-              guestName: event.checkInRequest.guestName,
-              guestEmail: event.checkInRequest.guestEmail,
-              guestPhone: event.checkInRequest.guestPhone,
-              requestedTime: event.checkInRequest.requestedTime,
-              message: event.checkInRequest.message,
-              previousStatus: payload.previousStatus ?? undefined,
-              status: payload.status ?? event.checkInRequest.status,
-              occurredAt: event.createdAt.toISOString(),
-            }
-          : null;
-      if (!body || (event.destination === BOOKING_DESTINATION && !event.stayRequest)) {
-        throw new Error('Outbox aggregate is missing');
-      }
+        : null;
+    if (!body || (event.destination === BOOKING_DESTINATION && !event.stayRequest)) {
+      throw new Error('Outbox aggregate is missing');
+    }
 
-      const headers: HeadersInit = { 'Content-Type': 'application/json' };
-      if (config.token) headers.Authorization = `Bearer ${config.token}`;
-      const response = await fetch(config.url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(5_000),
-      });
-      if (!response.ok) throw new Error(`Webhook responded with ${response.status}`);
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      'Idempotency-Key': event.id,
+    };
+    if (config.token) headers.Authorization = `Bearer ${config.token}`;
+    const response = await fetch(config.url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) throw new Error(`Webhook responded with ${response.status}`);
 
+    return await prisma.$transaction(async (tx) => {
       const updated = await tx.outboxEvent.updateMany({
         where: { id: event.id, status: 'LEASED', leaseOwner },
         data: {
@@ -119,8 +119,7 @@ export async function deliverOutboxEvent(eventId: string): Promise<boolean> {
         await tx.stayRequest.update({ where: { id: event.stayRequestId }, data: { status: 'DELIVERED' } });
       }
       return true;
-    }, { maxWait: 5_000, timeout: 12_000 });
-    return committed;
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message.slice(0, 500) : 'Unknown webhook failure';
     const exhausted = attempt.attemptCount >= MAX_ATTEMPTS;
@@ -190,6 +189,3 @@ export async function drainOutbox(batchSize = 20): Promise<{ attempted: number; 
   const results = await deliverWithConcurrency(events.map(({ id }) => id), 5);
   return { attempted: events.length, delivered: results.filter(Boolean).length };
 }
-
-export const deliverBookingOutboxEvent = deliverOutboxEvent;
-export const drainBookingOutbox = drainOutbox;

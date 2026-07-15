@@ -47,6 +47,8 @@ yarn-error.log*
 /reports/**/screenshots-*/
 /lighthouse.*
 /.lighthouse*/
+/axe-a11y-report*.json
+/axe-contrast-report*.json
 /src/generated/prisma/
 
 # generated local runtime data
@@ -73,8 +75,6 @@ public/version.json
 QWEN.md
 GEMINI.md
 //wsl.localhost/
-
-.github/copilot-instructions.md
 
 .venv
 .runtime/

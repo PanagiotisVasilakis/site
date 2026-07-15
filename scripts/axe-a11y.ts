@@ -12,10 +12,14 @@ import axePkg from 'axe-core';
 const axeSource: string = (axePkg as unknown as { source?: string }).source || fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
 
 const BASE = process.env.AXE_BASE || 'http://localhost:3000';
-const PATHS = (process.env.AXE_PATHS || '/en,/en/apartment,/en/favorites,/en/offline,/en/phones,/en/phones/emergency-112').split(',');
-const STATIC_DIR = process.env.AXE_STATIC_DIR || '.next/server/app';
+const PATHS = (process.env.AXE_PATHS || '/en,/en/apartment,/en/favorites,/en/offline,/en/phones,/en/phones/emergency-112')
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean);
+const SETTLE_MS = Math.max(0, Number.parseInt(process.env.AXE_SETTLE_MS || '4000', 10) || 0);
 
 interface ViolationSummary { id: string; impact: string | null; help: string; nodes: number; url: string; }
+interface AuditError { url: string; error: string; }
 
 process.on('unhandledRejection', (err) => {
   console.error('[axe-a11y] UnhandledRejection:', err);
@@ -31,72 +35,108 @@ process.on('uncaughtException', (err) => {
   const browser = await puppeteer.launch({ headless: true });
   const page = await browser.newPage();
   const allViolations: ViolationSummary[] = [];
-  const errors: { url: string; error: string }[] = [];
-  for (const p of PATHS) {
-    const target = BASE + p;
-    console.log(`Auditing (full) ${target}`);
-    let navigated = false;
+  const errors: AuditError[] = [];
+  const errorKeys = new Set<string>();
+  const baseOrigin = new URL(BASE).origin;
+
+  const recordError = (url: string, error: string) => {
+    const key = `${url}\n${error}`;
+    if (errorKeys.has(key)) return;
+    errorKeys.add(key);
+    errors.push({ url, error });
+    console.error(`[axe-a11y] ${error}: ${url}`);
+  };
+
+  const isAuditedAsset = (url: string, resourceType: string) => {
+    if (resourceType !== 'script' && resourceType !== 'stylesheet') return false;
     try {
-      const resp = await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 45000 });
-      console.log(`[axe-a11y] navigated ${target} status=${resp?.status?.()}`);
-      await page.waitForNetworkIdle({ idleTime: 750, timeout: 12000 }).catch(()=>{});
-      navigated = true;
-    } catch (err) {
-      console.error(`[axe-a11y] navigation failed for ${target}:`, (err as Error).message);
-      errors.push({ url: target, error: (err as Error).message });
+      return new URL(url).origin === baseOrigin;
+    } catch {
+      return false;
+    }
+  };
+
+  page.on('requestfailed', (request) => {
+    if (!isAuditedAsset(request.url(), request.resourceType())) return;
+    recordError(
+      request.url(),
+      `Same-origin ${request.resourceType()} request failed (${request.failure()?.errorText ?? 'unknown error'})`,
+    );
+  });
+
+  page.on('response', (response) => {
+    const request = response.request();
+    if (response.status() < 400 || !isAuditedAsset(response.url(), request.resourceType())) return;
+    recordError(response.url(), `Same-origin ${request.resourceType()} returned HTTP ${response.status()}`);
+  });
+
+  page.on('pageerror', (error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    recordError(page.url() || BASE, `Uncaught page error (${message})`);
+  });
+
+  try {
+    for (const p of PATHS) {
+      const target = new URL(p, BASE).toString();
+      console.log(`Auditing (full) ${target}`);
+
+      let response: Awaited<ReturnType<typeof page.goto>>;
       try {
-        const pathModule = await import('node:path');
-        const safe = p.replace(/\/$/, '') || '/';
-        const guessFiles: string[] = [];
-        if (safe === '/') {
-          guessFiles.push(pathModule.join(STATIC_DIR, 'index.html'));
-        } else {
-          const rel = safe.slice(1);
-            if (!rel.includes('/')) guessFiles.push(pathModule.join(STATIC_DIR, rel + '.html'));
-            guessFiles.push(pathModule.join(STATIC_DIR, rel + '.html'));
-        }
-        let found: string | null = null;
-        for (const f of guessFiles) { if (fs.existsSync(f)) { found = f; break; } }
-        if (found) {
-          console.log(`[axe-a11y] static fallback using ${found}`);
-          const html = await fs.promises.readFile(found, 'utf8');
-          await page.setContent(html, { waitUntil: 'domcontentloaded' });
-          navigated = true;
-        } else {
-          console.log('[axe-a11y] no static fallback file found');
-        }
-      } catch (fe) {
-        console.error('[axe-a11y] static fallback failed:', (fe as Error).message);
+        response = await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 45000 });
+      } catch (error) {
+        recordError(target, `Navigation failed (${error instanceof Error ? error.message : String(error)})`);
+        continue;
       }
-      if (!navigated) continue;
-    }
-    // Runtime.evaluate is intentionally used here: a script tag is blocked by the
-    // application's production CSP, while Puppeteer's isolated execution context
-    // is the trusted audit harness.
-    await page.evaluate(axeSource);
-    const axeAvailable = await page.evaluate(() => 'axe' in globalThis);
-    if (!axeAvailable) throw new Error('axe-core injection failed');
-    console.log('[axe-a11y] axe injected, running...');
-    const result = await page.evaluate(async () => {
-      // @ts-expect-error axe injected globally at runtime
-      return await axe.run();
-    });
-    console.log(`[axe-a11y] violations found: ${result.violations.length}`);
-    if (result.violations.length) {
-      for (const v of result.violations) {
-        allViolations.push({ id: v.id, impact: v.impact, help: v.help, nodes: v.nodes.length, url: target });
-        console.log(`  Rule: ${v.id} (${v.impact}) - ${v.help} (nodes=${v.nodes.length})`);
-        for (const n of v.nodes.slice(0,10)) {
-          const preview = n.html.replace(/\s+/g,' ').slice(0,140);
-          console.log(`    Node: ${preview}`);
-        }
-        if (v.nodes.length > 10) console.log(`    ...and ${v.nodes.length - 10} more nodes`);
+
+      if (!response) {
+        recordError(target, 'Navigation returned no HTTP response');
+        continue;
       }
-    } else {
-      console.log('  No violations');
+
+      const status = response.status();
+      console.log(`[axe-a11y] navigated ${target} status=${status}`);
+      if (status < 200 || status >= 300) {
+        recordError(target, `Navigation returned HTTP ${status}`);
+        continue;
+      }
+
+      await page.waitForNetworkIdle({ idleTime: 750, timeout: 12000 }).catch(()=>{});
+      if (SETTLE_MS > 0) await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
+
+      try {
+        // Runtime.evaluate is intentionally used here: a script tag is blocked by the
+        // application's production CSP, while Puppeteer's isolated execution context
+        // is the trusted audit harness.
+        await page.evaluate(axeSource);
+        const axeAvailable = await page.evaluate(() => 'axe' in globalThis);
+        if (!axeAvailable) throw new Error('axe-core injection failed');
+        console.log('[axe-a11y] axe injected, running...');
+        const result = await page.evaluate(async () => {
+          // @ts-expect-error axe injected globally at runtime
+          return await axe.run();
+        });
+        console.log(`[axe-a11y] violations found: ${result.violations.length}`);
+        if (result.violations.length) {
+          for (const v of result.violations) {
+            allViolations.push({ id: v.id, impact: v.impact, help: v.help, nodes: v.nodes.length, url: target });
+            console.log(`  Rule: ${v.id} (${v.impact}) - ${v.help} (nodes=${v.nodes.length})`);
+            for (const n of v.nodes.slice(0,10)) {
+              const preview = n.html.replace(/\s+/g,' ').slice(0,140);
+              console.log(`    Node: ${preview}`);
+            }
+            if (v.nodes.length > 10) console.log(`    ...and ${v.nodes.length - 10} more nodes`);
+          }
+        } else {
+          console.log('  No violations');
+        }
+      } catch (error) {
+        recordError(target, `Accessibility audit failed (${error instanceof Error ? error.message : String(error)})`);
+      }
     }
+  } finally {
+    await browser.close();
   }
-  await browser.close();
+
   if (process.env.AXE_JSON) {
     const out = { generatedAt: new Date().toISOString(), base: BASE, paths: PATHS, violations: allViolations, errors };
     let file = process.env.AXE_JSON === '1' ? 'axe-a11y-report.json' : process.env.AXE_JSON;
@@ -105,11 +145,14 @@ process.on('uncaughtException', (err) => {
       file = `axe-a11y-report-${ts}.json`;
     }
     try {
-  try { await fs.promises.unlink(file); console.log(`[axe-a11y] removed existing ${file}`); } catch {}
+      try {
+        await fs.promises.unlink(file);
+        console.log(`[axe-a11y] removed existing ${file}`);
+      } catch {}
       await fs.promises.writeFile(file, JSON.stringify(out, null, 2), 'utf8');
       console.log(`Wrote JSON report to ${file} (violations=${allViolations.length} errors=${errors.length})`);
     } catch (e) {
-      console.error('[axe-a11y] failed to write JSON report:', (e as Error).message);
+      recordError(file, `Failed to write JSON report (${e instanceof Error ? e.message : String(e)})`);
     }
   }
   if (allViolations.length) {
@@ -117,6 +160,12 @@ process.on('uncaughtException', (err) => {
     allViolations.forEach(v => { grouped[v.id] = (grouped[v.id]||0)+v.nodes; });
     console.log('\nSummary:');
     Object.entries(grouped).forEach(([k,count]) => console.log(`- ${k}: ${count} nodes`));
+  }
+  if (errors.length) {
+    console.error('\nAudit errors:');
+    errors.forEach(({ url, error }) => console.error(`- ${url}: ${error}`));
+  }
+  if (allViolations.length || errors.length) {
     process.exitCode = 1;
   } else {
     console.log('No accessibility violations detected across scanned pages.');

@@ -57,10 +57,10 @@ function integer(value: unknown, min: number, max: number): number | undefined {
     : undefined;
 }
 
-function sanitizeEvent(value: unknown): Pick<AnalyticsInput, 'eventName' | 'properties'> {
-  if (!value || typeof value !== 'object') return {};
+function sanitizeEvent(value: unknown): Pick<AnalyticsInput, 'eventName' | 'properties'> | null {
+  if (!value || typeof value !== 'object') return null;
   const event = value as { name?: unknown; props?: unknown };
-  if (typeof event.name !== 'string' || !ALLOWED_EVENTS.has(event.name)) return {};
+  if (typeof event.name !== 'string' || !ALLOWED_EVENTS.has(event.name)) return null;
   const raw = event.props && typeof event.props === 'object' && !Array.isArray(event.props)
     ? event.props as Record<string, unknown>
     : {};
@@ -104,13 +104,28 @@ function sanitizeEvent(value: unknown): Pick<AnalyticsInput, 'eventName' | 'prop
 
 function normalizeHit(value: unknown): AnalyticsInput | null {
   if (!value || typeof value !== 'object') return null;
-  const record = value as { path?: unknown; locale?: unknown; event?: unknown };
+  const record = value as { path?: unknown; locale?: unknown; event?: unknown; ts?: unknown; eventId?: unknown };
   const path = normalizePath(record.path);
   if (!path) return null;
+  const now = Date.now();
+  const oldestAllowed = now - 90 * 24 * 60 * 60 * 1_000;
+  const occurredAt = typeof record.ts === 'number'
+    && Number.isInteger(record.ts)
+    && record.ts >= oldestAllowed
+    && record.ts <= now + 5 * 60_000
+    ? new Date(Math.min(record.ts, now))
+    : undefined;
+  const eventId = typeof record.eventId === 'string' && /^[A-Za-z0-9._:-]{8,128}$/.test(record.eventId)
+    ? record.eventId
+    : undefined;
+  const event = record.event === undefined ? {} : sanitizeEvent(record.event);
+  if (event === null) return null;
   return {
     path,
     locale: safeLocale(record.locale),
-    ...sanitizeEvent(record.event),
+    occurredAt,
+    eventId,
+    ...event,
   };
 }
 
@@ -159,7 +174,12 @@ export async function GET(request: NextRequest) {
   const [hits, groupedVitals] = await Promise.all([recentAnalytics(), vitalsRecent()]);
   const vitals = Object.values(groupedVitals).flat().sort((a, b) => a.ts - b.ts).slice(-500);
   return Response.json({
-    hits: hits.reverse().map((hit) => ({ path: hit.path, locale: hit.locale ?? undefined })),
+    hits: hits.reverse().map((hit) => ({
+      path: hit.path,
+      locale: hit.locale ?? undefined,
+      eventName: hit.eventName ?? undefined,
+      ts: hit.occurredAt.getTime(),
+    })),
     vitals,
   }, { headers: { 'cache-control': 'no-store, private' } });
 }

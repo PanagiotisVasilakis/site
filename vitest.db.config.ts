@@ -16,6 +16,7 @@ export default defineConfig({
       'src/__tests__/public-exports.test.ts',
       'src/__tests__/portalClaims.db.test.ts',
       'src/__tests__/operations.db.test.ts',
+      'src/__tests__/migrationGuards.db.test.ts',
     ],
     setupFiles: [
       './src/__tests__/setup/vitest.setup.ts',

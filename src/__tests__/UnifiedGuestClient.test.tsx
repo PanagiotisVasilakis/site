@@ -6,10 +6,11 @@ import userEvent from '@testing-library/user-event';
 const replaceMock = vi.fn();
 const pushMock = vi.fn();
 const internalFetchMock = vi.hoisted(() => vi.fn());
+let searchValue = 'mode=signin';
 vi.mock('next/navigation', () => ({
   useParams: () => ({ locale: 'en' }),
   useRouter: () => ({ replace: replaceMock, push: pushMock }),
-  useSearchParams: () => new URLSearchParams('mode=signin'),
+  useSearchParams: () => new URLSearchParams(searchValue),
 }));
 
 vi.mock('@/lib/internalFetchClient', () => ({
@@ -61,14 +62,35 @@ import UnifiedGuestClient from '../app/[locale]/guest/UnifiedGuestClient';
 
 describe('UnifiedGuestClient', () => {
   beforeEach(() => {
+    searchValue = 'mode=signin';
     replaceMock.mockClear();
     pushMock.mockClear();
     internalFetchMock.mockReset();
   });
 
+  it('shows refresh feedback and follows a new claim URL without discarding query state', async () => {
+    searchValue = 'mode=signin&flash=Please+sign+in&next=%2Fen%2Fcheck-in';
+    const view = render(<UnifiedGuestClient />);
+    expect(screen.getByText('Please sign in')).toBeInTheDocument();
+
+    searchValue = `mode=signup&claim=${'a'.repeat(40)}&next=%2Fen%2Fcheck-in`;
+    view.rerender(<UnifiedGuestClient />);
+    await waitFor(() => expect(document.getElementById('tab-signup')).toHaveAttribute('aria-selected', 'true'));
+    expect(screen.getByLabelText(/booking claim token/i)).toHaveValue('a'.repeat(40));
+
+    const user = userEvent.setup();
+    await user.click(document.getElementById('tab-signin') as HTMLButtonElement);
+    expect(replaceMock).toHaveBeenLastCalledWith(
+      '/en/guest?mode=signin&next=%2Fen%2Fcheck-in',
+      { scroll: false },
+    );
+  });
+
   it('syncs tab mode with URL and updates when toggled', async () => {
     const user = userEvent.setup();
-    render(<UnifiedGuestClient />);
+    const { container } = render(<UnifiedGuestClient />);
+
+    expect(container.querySelector('main')).toBeNull();
 
     // Auth form is now shown directly (no intro gate), initial mode is signin per mocked search params
     const signinTab = document.getElementById('tab-signin') as HTMLButtonElement;

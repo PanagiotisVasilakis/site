@@ -13,9 +13,7 @@ import {
 import { logger as elogger } from '@/lib/logger-enterprise';
 import { metrics } from '@/lib/metrics-collector';
 import { requestAuthContext } from '@/lib/portalAuthHttp';
-
-const isSafePath = (p?: string | null): p is string =>
-  typeof p === 'string' && p.startsWith('/') && !p.startsWith('//');
+import { toSafeLocalPath } from '@/lib/safeLocalPath';
 
 function applyAuthCookies(response: NextResponse, sessionJwt: string, refreshToken?: string): void {
   const sessionCookie = createSessionCookie(sessionJwt);
@@ -46,22 +44,55 @@ function unauthorizedResponse(request: NextRequest, failurePath?: string): NextR
   return response;
 }
 
-async function issueRefreshedSession(request: NextRequest, refreshToken: string): Promise<{ jwt: string; refreshToken: string } | null> {
+function concurrentRefreshResponse(): NextResponse {
+  return NextResponse.json({
+    success: false,
+    error: {
+      code: 'REFRESH_IN_PROGRESS',
+      message: 'A session refresh is already in progress. Retry shortly.',
+      details: { retryable: true },
+    },
+  }, {
+    status: 409,
+    headers: {
+      'cache-control': 'no-store',
+      'retry-after': '1',
+    },
+  });
+}
+
+type RefreshSessionResult =
+  | { status: 'refreshed'; jwt: string; refreshToken: string }
+  | { status: 'concurrent' }
+  | { status: 'failed' };
+
+async function issueRefreshedSession(
+  request: NextRequest,
+  refreshToken: string,
+): Promise<RefreshSessionResult> {
   const context = requestAuthContext(request);
   const rotated = await guestStore.rotateRefreshToken(refreshToken, 7, {
     device_hint: context.deviceHint,
     ip_hint: context.ipHint,
   });
+  if (rotated.status === 'concurrent') {
+    elogger.info('refresh_token.concurrent', {
+      correlationId: elogger.getContext()?.correlationId,
+    });
+    metrics.counter('refresh_token.concurrent', 1);
+    return { status: 'concurrent' };
+  }
+
   if (rotated.status === 'replayed') {
     elogger.warn('refresh_token.replay_detected', {
       correlationId: elogger.getContext()?.correlationId,
     });
     metrics.counter('refresh_token.replay_detected', 1);
-    return null;
+    return { status: 'failed' };
   }
 
   if (rotated.status !== 'rotated' || !rotated.old || !rotated.rec || !rotated.token) {
-    return null;
+    return { status: 'failed' };
   }
 
   elogger.info('refresh_token.rotated', {
@@ -77,10 +108,11 @@ async function issueRefreshedSession(request: NextRequest, refreshToken: string)
   const booking = user ? await guestStore.findEligibleBookingForUser(user.id) : undefined;
   if (!user || !booking) {
     await guestStore.revokeRefreshToken(rotated.rec.id);
-    return null;
+    return { status: 'failed' };
   }
 
   return {
+    status: 'refreshed',
     jwt: await issueGuestSession(user.id, booking.id),
     refreshToken: rotated.token,
   };
@@ -94,14 +126,17 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   // Support GET-style redirect flow too by allowing query params in POST.
   const nextUrl = req.nextUrl;
   const nextRaw = nextUrl.searchParams.get('next');
-  const nextParam = isSafePath(nextRaw) ? nextRaw : undefined;
+  const nextParam = toSafeLocalPath(nextRaw, req.url) ?? undefined;
   const refresh = req.cookies.get('guest_rt')?.value;
   if (!refresh) {
     return unauthorizedResponse(req);
   }
 
   const refreshed = await issueRefreshedSession(req, refresh);
-  if (!refreshed) {
+  if (refreshed.status === 'concurrent') {
+    return concurrentRefreshResponse();
+  }
+  if (refreshed.status === 'failed') {
     return unauthorizedResponse(req);
   }
   await revokeCurrentSession(req);

@@ -1,5 +1,6 @@
 "use client";
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo, useId } from 'react';
+import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { ApartmentPhotoWithAlt } from '@/types/apartment';
@@ -8,20 +9,39 @@ import type { ApartmentPhotoWithAlt } from '@/types/apartment';
 
 type AltMap = Partial<Record<ApartmentPhotoWithAlt['altKey'], string>> | undefined;
 type LightboxLabels = {
+  title?: string;
   instructions?: string;
   counter?: string;
   prev?: string;
   next?: string;
   close?: string;
   resetZoom?: string;
+  thumbnail?: string;
 };
 const DEFAULT_LIGHTBOX_LABELS: Required<LightboxLabels> = {
+  title: 'Photo viewer',
   instructions: 'Photo viewer controls: Use arrow keys to navigate between images, Home/End keys to jump to first/last image, Escape to close viewer.',
   counter: 'Currently viewing image {current} of {total}.',
   prev: 'Previous image',
   next: 'Next image',
   close: 'Close viewer',
   resetZoom: 'Reset Zoom',
+  thumbnail: 'View image {current} of {total}',
+};
+
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
+
+type SiblingState = {
+  element: HTMLElement;
+  ariaHidden: string | null;
+  inert: boolean;
 };
 
 interface Props {
@@ -69,13 +89,15 @@ export default function ApartmentGalleryLightbox({ photos, alts, enableHaptics =
 
   // Derived state
   const activePhotos = useMemo(() => activeSequence.map(idx => photos[idx]).filter(Boolean), [activeSequence, photos]);
-  const index = ((page % activePhotos.length) + activePhotos.length) % activePhotos.length;
-  const currentPhoto = activePhotos[index];
   const total = activePhotos.length;
+  const index = total > 0 ? ((page % total) + total) % total : 0;
+  const currentPhoto = activePhotos[index];
 
   const lastPersistedIndex = useRef(0);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const prevFocused = useRef<HTMLElement | null>(null);
+  const instructionsId = useId();
 
   // Formatting utils
   const numberFormatter = useMemo(() => {
@@ -85,12 +107,14 @@ export default function ApartmentGalleryLightbox({ photos, alts, enableHaptics =
 
 
   const resolvedLabels = useMemo(() => ({
+    title: labels?.title ?? (locale === 'el' ? 'Προβολή φωτογραφιών' : DEFAULT_LIGHTBOX_LABELS.title),
     instructions: labels?.instructions ?? DEFAULT_LIGHTBOX_LABELS.instructions,
     counter: labels?.counter ?? DEFAULT_LIGHTBOX_LABELS.counter,
     prev: labels?.prev ?? DEFAULT_LIGHTBOX_LABELS.prev,
     next: labels?.next ?? DEFAULT_LIGHTBOX_LABELS.next,
     close: labels?.close ?? DEFAULT_LIGHTBOX_LABELS.close,
     resetZoom: labels?.resetZoom ?? (locale === 'el' ? 'Επαναφορά ζουμ' : DEFAULT_LIGHTBOX_LABELS.resetZoom),
+    thumbnail: labels?.thumbnail ?? (locale === 'el' ? 'Προβολή εικόνας {current} από {total}' : DEFAULT_LIGHTBOX_LABELS.thumbnail),
   }), [labels, locale]);
 
   const counterDisplay = `${numberFormatter.format(index + 1)}/${numberFormatter.format(total)}`;
@@ -178,24 +202,87 @@ export default function ApartmentGalleryLightbox({ photos, alts, enableHaptics =
     return () => window.removeEventListener('keydown', onKey);
   }, [open, close, paginate, total]);
 
-  // Focus trap & Scroll lock
+  // Keep the modal isolated from the page, trap keyboard focus, and restore the
+  // exact scroll/focus state when it closes.
   useEffect(() => {
-    if (open) {
-      prevFocused.current = document.activeElement as HTMLElement;
-      document.body.style.overflow = 'hidden';
-      setTimeout(() => dialogRef.current?.focus(), 50);
-    } else {
-      document.body.style.overflow = '';
-      prevFocused.current?.focus();
+    if (!open) return;
+
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    prevFocused.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+
+    const siblingStates: SiblingState[] = Array.from(document.body.children)
+      .filter((element): element is HTMLElement => element instanceof HTMLElement && element !== dialog)
+      .map((element) => ({
+        element,
+        ariaHidden: element.getAttribute('aria-hidden'),
+        inert: element.hasAttribute('inert'),
+      }));
+    for (const { element } of siblingStates) {
+      element.setAttribute('aria-hidden', 'true');
+      element.setAttribute('inert', '');
     }
-    return () => { document.body.style.overflow = ''; };
+
+    const originalDocumentOverflow = document.documentElement.style.overflow;
+    const originalBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+
+    const getFocusable = () => Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+    const focusFirst = () => (closeButtonRef.current ?? getFocusable()[0] ?? dialog).focus();
+    const focusTimer = window.setTimeout(focusFirst, 0);
+
+    const handleTab = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const focusable = getFocusable();
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || !dialog.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    const handleFocusIn = (event: FocusEvent) => {
+      if (!dialog.contains(event.target as Node)) focusFirst();
+    };
+    document.addEventListener('keydown', handleTab);
+    document.addEventListener('focusin', handleFocusIn);
+
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.removeEventListener('keydown', handleTab);
+      document.removeEventListener('focusin', handleFocusIn);
+      document.documentElement.style.overflow = originalDocumentOverflow;
+      document.body.style.overflow = originalBodyOverflow;
+      for (const { element, ariaHidden, inert } of siblingStates) {
+        if (ariaHidden === null) element.removeAttribute('aria-hidden');
+        else element.setAttribute('aria-hidden', ariaHidden);
+        if (inert) element.setAttribute('inert', '');
+        else element.removeAttribute('inert');
+      }
+      prevFocused.current?.focus();
+    };
   }, [open]);
 
   // Zoom state
   const [scale, setScale] = useState(1);
   const resetZoom = () => setScale(1);
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -205,22 +292,24 @@ export default function ApartmentGalleryLightbox({ photos, alts, enableHaptics =
           transition={{ duration: 0.2 }}
           role="dialog"
           aria-modal="true"
-          aria-label={resolvedLabels.instructions}
+          aria-label={resolvedLabels.title}
+          aria-describedby={instructionsId}
           className="fixed inset-0 z-50 flex flex-col bg-black/95 backdrop-blur-sm"
           ref={dialogRef}
           tabIndex={-1}
         >
+          <p id={instructionsId} className="sr-only">{resolvedLabels.instructions}</p>
           {/* Controls Header */}
           <div className="flex items-center justify-between p-4 z-20 text-white bg-gradient-to-b from-black/60 to-transparent">
             <span className="font-mono text-sm opacity-80">{counterDisplay}</span>
             <div className="flex gap-2">
               {/* Reset zoom if zoomed in, otherwise standard controls can stay */}
               {scale > 1 && (
-                <button onClick={resetZoom} className="px-3 py-1 bg-white/10 rounded-full text-xs hover:bg-white/20 transition">
+                <button type="button" onClick={resetZoom} className="px-3 py-1 bg-white/10 rounded-full text-xs hover:bg-white/20 transition">
                   {resolvedLabels.resetZoom}
                 </button>
               )}
-              <button onClick={close} className="p-2 hover:bg-white/20 rounded-full transition" aria-label={resolvedLabels.close}>
+              <button ref={closeButtonRef} type="button" onClick={close} className="p-2 hover:bg-white/20 rounded-full transition" aria-label={resolvedLabels.close}>
                 <span className="text-xl leading-none">✕</span>
               </button>
             </div>
@@ -231,6 +320,7 @@ export default function ApartmentGalleryLightbox({ photos, alts, enableHaptics =
 
             {/* Nav Buttons (Desktop) */}
             <button
+              type="button"
               className="absolute left-4 z-20 p-4 text-white/70 hover:text-white hover:bg-black/20 rounded-full transition hidden md:block"
               onClick={() => paginate(-1)}
               aria-label={resolvedLabels.prev}
@@ -238,6 +328,7 @@ export default function ApartmentGalleryLightbox({ photos, alts, enableHaptics =
               ◀
             </button>
             <button
+              type="button"
               className="absolute right-4 z-20 p-4 text-white/70 hover:text-white hover:bg-black/20 rounded-full transition hidden md:block"
               onClick={() => paginate(1)}
               aria-label={resolvedLabels.next}
@@ -305,9 +396,14 @@ export default function ApartmentGalleryLightbox({ photos, alts, enableHaptics =
             {activePhotos.map((p, i) => (
               <button
                 key={i}
+                type="button"
                 onClick={() => setPage([i, i > index ? 1 : -1])}
                 className={`relative w-12 h-12 flex-shrink-0 rounded-md overflow-hidden transition-all ${i === index ? 'ring-2 ring-white scale-110 opacity-100' : 'opacity-50 hover:opacity-80'
                   }`}
+                aria-label={resolvedLabels.thumbnail
+                  .replace('{current}', numberFormatter.format(i + 1))
+                  .replace('{total}', numberFormatter.format(total))}
+                aria-current={i === index ? 'true' : undefined}
               >
                 <Image
                   src={p.src}
@@ -322,6 +418,7 @@ export default function ApartmentGalleryLightbox({ photos, alts, enableHaptics =
 
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }

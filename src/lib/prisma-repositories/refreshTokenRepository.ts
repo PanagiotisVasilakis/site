@@ -19,7 +19,7 @@ export type GuestRefreshTokenRec = {
   ip_hint?: string;
 };
 
-export type RefreshTokenRotationResult =
+type RefreshTokenRotationResult =
   | { status: 'rotated'; old: GuestRefreshTokenRec; rec: GuestRefreshTokenRec }
   | { status: 'invalid' }
   | { status: 'concurrent'; familyId: string }
@@ -251,11 +251,12 @@ async function rotate(
         return { status: 'invalid' } as const;
       }
 
+      const sameRefreshContext = !!replacement.deviceHash
+        && replacement.deviceHash === candidate.family.deviceHash
+        && (!candidate.family.ipHash || replacement.ipHash === candidate.family.ipHash);
+
       if (candidate.revokedAt) {
-        const sameDevice = !!replacement.deviceHash
-          && replacement.deviceHash === candidate.family.deviceHash
-          && (!candidate.family.ipHash || replacement.ipHash === candidate.family.ipHash);
-        if (sameDevice && now.getTime() - candidate.revokedAt.getTime() <= CONCURRENT_ROTATION_GRACE_MS) {
+        if (sameRefreshContext && now.getTime() - candidate.revokedAt.getTime() <= CONCURRENT_ROTATION_GRACE_MS) {
           logger.info('Concurrent refresh within same-device grace window', {
             tokenId: candidate.id,
             familyId: candidate.familyId,
@@ -291,15 +292,23 @@ async function rotate(
       });
 
       if (revoked.count !== 1) {
+        if (sameRefreshContext) {
+          logger.info('Concurrent refresh lost the conditional revoke race', {
+            tokenId: candidate.id,
+            familyId: candidate.familyId,
+          });
+          return { status: 'concurrent', familyId: candidate.familyId } as const;
+        }
+
         await tx.refreshTokenFamily.update({
           where: { id: candidate.familyId },
-          data: { revokedAt: now, revocationReason: 'concurrent_rotation_conflict' },
+          data: { revokedAt: now, revocationReason: 'refresh_token_replay' },
         });
         await tx.refreshToken.updateMany({
           where: { familyId: candidate.familyId, revokedAt: null },
           data: { revokedAt: now },
         });
-        logger.warn('Concurrent refresh token replay detected; family revoked', {
+        logger.warn('Cross-context refresh race detected; family revoked', {
           tokenId: candidate.id,
           familyId: candidate.familyId,
         });

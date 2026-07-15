@@ -10,7 +10,6 @@ import { formatTraceContextHeaders, parseTraceContextHeaders, SpanStatus } from 
 import type { Span, SpanLogLevel, TraceContext } from '@/lib/observability-contracts';
 
 export { SpanStatus } from '@/lib/observability-contracts';
-export type { Span, TraceContext } from '@/lib/observability-contracts';
 
 // Tracer class for distributed tracing
 class DistributedTracer {

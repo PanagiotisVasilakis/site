@@ -18,7 +18,7 @@ interface QueryParams {
 const guard = createAPISecurityMiddleware();
 
 const handler = async (request: NextRequest) => {
-  const earlyResponse = guard(request);
+  const earlyResponse = await guard(request);
   if (earlyResponse) return earlyResponse;
 
   if (!(await isAdminRequest(request))) {

@@ -111,13 +111,15 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
   };
 
   return (
-    <html>
-      <body>
-        <div className="page-bg min-h-screen flex items-center justify-center p-6">
+    <main
+      className="page-bg min-h-screen flex items-center justify-center p-6"
+      role="alert"
+      aria-labelledby="global-error-title"
+    >
           <div className="max-w-md w-full text-center space-y-6 surface-card rounded-lg shadow-lg p-8">
             {/* Error Icon */}
             <div className="text-red-500 mb-4">
-              <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -129,7 +131,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
 
             {/* Error Message */}
             <div className="space-y-2">
-              <h1 className="text-2xl font-serif italic font-bold page-title">{t.title}</h1>
+              <h1 id="global-error-title" className="text-2xl font-serif italic font-bold page-title">{t.title}</h1>
               <p className="text-body">
                 {t.body}
               </p>
@@ -205,8 +207,6 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
               </p>
             </div>
           </div>
-        </div>
-      </body>
-    </html>
+    </main>
   );
 }

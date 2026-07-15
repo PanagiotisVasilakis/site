@@ -50,6 +50,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     } catch (error) {
       const code = error instanceof Error ? error.message : '';
       if (code === 'ERASURE_BLOCKED_BY_ACTIVE_HOLD') throw new ApiError(ApiErrorCode.CONFLICT, 'Erasure is blocked by an active privacy hold');
+      if (code === 'ERASURE_BLOCKED_BY_ACTIVE_DELIVERY') throw new ApiError(ApiErrorCode.CONFLICT, 'Erasure is blocked while a related webhook delivery is active; retry after delivery completes');
       if (code === 'ERASURE_REQUEST_NOT_FOUND' || code === 'ERASURE_SUBJECT_NOT_FOUND') throw new ApiError(ApiErrorCode.NOT_FOUND, 'Erasure request or subject not found');
       if (code === 'ERASURE_REQUEST_NOT_VERIFIED') throw new ApiError(ApiErrorCode.CONFLICT, 'Erasure request is not verified');
       throw error;

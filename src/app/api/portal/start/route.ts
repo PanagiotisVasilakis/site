@@ -17,7 +17,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
   // Enforce the shared request content-type and payload-size contract.
   const guard = createAPISecurityMiddleware();
-  const early = guard(req);
+  const early = await guard(req);
   if (early) return early;
 
   const schema = {

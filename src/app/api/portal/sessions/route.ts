@@ -8,6 +8,7 @@ import { locales, defaultLocale } from '@/i18n/config';
 import { PortalAuthError, authenticatePortalUser } from '@/lib/portalAuthService';
 import { attachPortalAuthCookies } from '@/lib/portalAuthHttp';
 import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
+import { parseGuestSession, verifyGuestSessionAccess } from '@/lib/guestSession';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,11 +18,22 @@ const schema = z.object({
   remember: z.boolean().optional().default(false),
 });
 
+export const GET = withErrorHandler(async (request: NextRequest) => {
+  if (!(await getFeatureFlagsAsync()).portalEnabled) {
+    throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
+  }
+  const session = parseGuestSession(request.cookies.get('guest_session')?.value);
+  if (!session || !(await verifyGuestSessionAccess(session))) {
+    throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Guest session required');
+  }
+  return createSuccessResponse({ authenticated: true, bookingId: session.booking_id });
+});
+
 export const POST = withErrorHandler(async (request: NextRequest) => {
   if (!(await getFeatureFlagsAsync()).portalEnabled) {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }
-  const early = createAPISecurityMiddleware()(request);
+  const early = await createAPISecurityMiddleware()(request);
   if (early) return early;
   const parsed = schema.safeParse(await readJsonBody(request, 16 * 1_024));
   if (!parsed.success) throw new ValidationError(parsed.error.issues);

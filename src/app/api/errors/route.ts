@@ -30,15 +30,17 @@ function redact(value: string): string {
   return redactSensitiveText(value, 2_000);
 }
 
-export const POST = withErrorHandler(async (request: NextRequest) => {
+export const POST = withErrorHandler(async (request: NextRequest, { signal }) => {
   const decision = await checkSensitiveRateLimit(request, {
     scope: 'client-error-report',
     limit: 10,
     windowMs: 60_000,
   });
+  signal.throwIfAborted();
   if (!decision.allowed) throw new ApiError(ApiErrorCode.RATE_LIMITED, 'Too many error reports');
 
   const report = await validateRequestBody(errorReportSchema, 16 * 1_024)(request);
+  signal.throwIfAborted();
   const clientIp = getClientIp(request);
   const reportUrl = new URL(report.context.url);
   const path = reportUrl.pathname.slice(0, 512);
@@ -48,6 +50,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     : undefined;
 
   const { prisma } = await import('@/lib/prisma');
+  signal.throwIfAborted();
   await prisma.securityAuditEvent.create({
     data: {
       id: crypto.randomUUID(),

@@ -48,7 +48,7 @@ export interface BookingFormDictionary {
     submitFailed: string;
 }
 
-export interface BookingDetailsPageDictionary {
+interface BookingDetailsPageDictionary {
     howToBookTitle: string;
     howToBook: string[];
     availabilityTitle: string;

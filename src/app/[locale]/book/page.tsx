@@ -9,7 +9,6 @@ import { dateRangeFromParams, formatDateRange, validateDateRange, getNights } fr
 import { BookingFormSkeleton } from '@/components/LoadingSkeleton';
 import BookingForm from '@/components/BookingForm';
 import StaticLocationMap from '@/components/StaticLocationMap';
-import { ClientBoundary } from '@/components/ClientBoundary';
 import AmenitiesList from '@/components/AmenitiesList';
 import { getApartmentContent } from '@/data/apartmentData';
 import MapLoadingSkeleton from '@/components/MapLoadingSkeleton';
@@ -63,7 +62,7 @@ export default async function BookingPage({
 
   // Validate booking parameters
   const hasValidDates = dateRange.from && dateRange.to;
-  const dateValidation = hasValidDates ? validateDateRange(dateRange) : { valid: false, error: t.booking?.selectDatesError };
+  const dateValidation = hasValidDates ? validateDateRange(dateRange, eff) : { valid: false, error: t.booking?.selectDatesError };
   const nights = hasValidDates ? getNights(dateRange) : 0;
   const nightsLabel = nights === 1 ? t.booking?.night : t.booking?.nights;
 
@@ -99,7 +98,7 @@ export default async function BookingPage({
             </div>
             {hasValidDates && (
               <div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] px-4 py-2 text-sm shadow-sm">
-                <span className="font-medium">{formatDateRange(dateRange)}</span>
+                <span className="font-medium">{formatDateRange(dateRange, eff)}</span>
                 <span className="opacity-40" aria-hidden>•</span>
                 <span className="opacity-80">{nights} {nightsLabel}</span>
               </div>
@@ -115,7 +114,7 @@ export default async function BookingPage({
               <div className="rounded-2xl border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] p-4 shadow-sm transition-colors">
                 <div className="text-[11px] font-semibold uppercase tracking-wider opacity-60">{t.booking?.datesLabel}</div>
                 <div className="mt-1.5 text-sm font-medium leading-snug">
-                  {hasValidDates ? formatDateRange(dateRange) : t.booking?.notSelected}
+                  {hasValidDates ? formatDateRange(dateRange, eff) : t.booking?.notSelected}
                 </div>
               </div>
               <div className="rounded-2xl border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] p-4 shadow-sm transition-colors">
@@ -214,15 +213,13 @@ export default async function BookingPage({
         {/* Full-width: Explore the Neighborhood */}
         <div className="mt-6 lg:mt-8 rounded-2xl shadow-sm border border-[color:var(--border-soft)] transition-colors bg-[color:var(--layer-surface)] p-5 md:p-6">
           <h4 className="font-serif italic font-bold mb-3">{t.locationPanel?.title}</h4>
-          <ClientBoundary>
-            <ApartmentLocationMap
-              locale={eff}
-              height="360px"
-              zoom={15}
-              activation="intent"
-              className="rounded-xl overflow-hidden"
-            />
-          </ClientBoundary>
+          <ApartmentLocationMap
+            locale={eff}
+            height="360px"
+            zoom={15}
+            activation="intent"
+            className="rounded-xl overflow-hidden"
+          />
           <div className="mt-4">
             <StaticLocationMap
               locale={eff}

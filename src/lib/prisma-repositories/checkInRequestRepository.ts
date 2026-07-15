@@ -39,7 +39,7 @@ type ListCheckInRequestParams = {
   limit?: number;
 };
 
-export type CheckInRequestStatusCounts = {
+type CheckInRequestStatusCounts = {
   pending: number;
   approved: number;
   rejected: number;
@@ -65,7 +65,7 @@ function mapRequest(request: CheckInRequest): CheckInRequestRecord {
 async function create(
   input: CreateCheckInRequestInput,
   notification?: NotificationEvent,
-): Promise<{ request: CheckInRequestRecord; notificationEventId?: string }> {
+): Promise<{ request: CheckInRequestRecord; notificationEventId?: string; created: boolean }> {
   try {
     const requestId = crypto.randomUUID();
     const notificationEventId = notification && process.env.CHECKIN_REQUEST_WEBHOOK_URL
@@ -105,8 +105,25 @@ async function create(
       bookingId: input.bookingId,
       userId: input.userId,
     });
-    return { request: mapRequest(request), notificationEventId };
+    return { request: mapRequest(request), notificationEventId, created: true };
   } catch (error) {
+    if (
+      input.bookingId
+      && error instanceof Prisma.PrismaClientKnownRequestError
+      && error.code === 'P2002'
+    ) {
+      const existing = await prisma.checkInRequest.findFirst({
+        where: { bookingId: input.bookingId, status: CheckInRequestStatus.PENDING },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (existing) {
+        logger.info('Reused existing pending check-in request', {
+          requestId: existing.id,
+          bookingId: input.bookingId,
+        });
+        return { request: mapRequest(existing), created: false };
+      }
+    }
     logger.error('checkInRequestRepository(prisma): create failed', error);
     throw error;
   }
@@ -130,12 +147,14 @@ async function findLatestForGuest(params: { bookingId?: string; userId?: string 
     if (!params.bookingId && !params.userId) return undefined;
 
     const request = await prisma.checkInRequest.findFirst({
-      where: {
-        OR: [
-          ...(params.bookingId ? [{ bookingId: params.bookingId }] : []),
-          ...(params.userId ? [{ userId: params.userId }] : []),
-        ],
-      },
+      where: params.bookingId
+        ? {
+            OR: [
+              { bookingId: params.bookingId },
+              ...(params.userId ? [{ bookingId: null, userId: params.userId }] : []),
+            ],
+          }
+        : { userId: params.userId },
       orderBy: { createdAt: 'desc' },
     });
 

@@ -36,7 +36,7 @@ function serializeRequest(request: CheckInRequestRecord) {
 }
 
 export const GET = withErrorHandler(async (request: NextRequest) => {
-  const earlyResponse = guard(request);
+  const earlyResponse = await guard(request);
   if (earlyResponse) return earlyResponse;
 
   if (!(await isAdminRequest(request))) {

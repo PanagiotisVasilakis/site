@@ -47,6 +47,8 @@ export default function DateRangePicker({
   const [isMobile, setIsMobile] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
   const popoverRef = useRef<HTMLDivElement | null>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+  const restoreFocusRef = useRef(false);
 
   // Check if mobile on mount
   useEffect(() => {
@@ -107,6 +109,7 @@ export default function DateRangePicker({
     // Auto-close when both dates are selected (after a brief delay for visual feedback)
     if (range.from && range.to) {
       setTimeout(() => {
+        restoreFocusRef.current = true;
         onClose?.();
       }, 500);
     }
@@ -114,15 +117,16 @@ export default function DateRangePicker({
 
   // Apply selection
   const handleApply = useCallback(() => {
-    const validation = validateDateRange(selectedRange);
+    const validation = validateDateRange(selectedRange, locale === 'el' ? 'el' : 'en');
     if (!validation.valid) {
       logger.warn('Invalid date range selected', { range: selectedRange, error: validation.error });
       return;
     }
 
     onChange?.(selectedRange);
+    restoreFocusRef.current = true;
     onClose?.();
-  }, [selectedRange, onChange, onClose]);
+  }, [selectedRange, locale, onChange, onClose]);
 
   // Clear selection
   const handleClear = useCallback(() => {
@@ -166,20 +170,42 @@ export default function DateRangePicker({
   useEffect(() => {
     if (!isOpen) return;
 
+    previouslyFocusedRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const focusTimer = window.setTimeout(() => {
+      popoverRef.current?.querySelector<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )?.focus();
+    }, 0);
+
     const handlePointerDown = (event: MouseEvent | TouchEvent) => {
       if (!popoverRef.current) return;
       if (popoverRef.current.contains(event.target as Node)) {
         return;
       }
+      restoreFocusRef.current = false;
+      onClose?.();
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      restoreFocusRef.current = true;
       onClose?.();
     };
 
     document.addEventListener('mousedown', handlePointerDown);
     document.addEventListener('touchstart', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
 
     return () => {
+      window.clearTimeout(focusTimer);
       document.removeEventListener('mousedown', handlePointerDown);
       document.removeEventListener('touchstart', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+      if (restoreFocusRef.current) previouslyFocusedRef.current?.focus();
+      restoreFocusRef.current = false;
     };
   }, [isOpen, onClose]);
 
@@ -190,6 +216,7 @@ export default function DateRangePicker({
         {/* Clear button positioned top-right, only show when dates selected */}
         {(selectedRange?.from || selectedRange?.to) && (
           <button
+            type="button"
             onClick={handleClear}
             className={`absolute top-0 right-0 z-10 p-1.5 text-subtle hover:text-body hover:bg-[var(--layer-surface-alt)] rounded-full transition-colors ${isCompact ? 'p-1' : 'p-1.5'}`}
             aria-label={dp?.clearSelected ?? 'Clear selected dates'}
@@ -203,6 +230,7 @@ export default function DateRangePicker({
 
         {/* Custom navigation buttons for all screen sizes */}
         <button
+          type="button"
           onClick={handlePreviousMonth}
           className={`absolute left-4 top-0 z-20 w-7 h-7 flex items-center justify-center text-subtle hover:text-body hover:bg-[var(--layer-surface-alt)] rounded-md transition-colors border border-soft ${isCompact ? 'w-6 h-6 left-2' : 'w-7 h-7 left-4'}`}
           aria-label={dp?.prevMonth ?? 'Previous month'}
@@ -213,6 +241,7 @@ export default function DateRangePicker({
           </svg>
         </button>
         <button
+          type="button"
           onClick={handleNextMonth}
           className={`absolute right-4 top-0 z-20 w-7 h-7 flex items-center justify-center text-subtle hover:text-body hover:bg-[var(--layer-surface-alt)] rounded-md transition-colors border border-soft ${isCompact ? 'w-6 h-6 right-2' : 'w-7 h-7 right-4'}`}
           aria-label={dp?.nextMonth ?? 'Next month'}
@@ -242,6 +271,7 @@ export default function DateRangePicker({
       {
         selectedRange?.from && selectedRange?.to && (
           <button
+            type="button"
             onClick={handleApply}
             className={`w-full px-4 py-2 text-sm font-medium text-white bg-brand-600 rounded-md hover:bg-brand-700 focus:outline-none focus:ring-1 focus:ring-brand-500 focus:ring-offset-1 transition-colors ${isCompact ? 'px-3 py-1.5 text-sm' : 'px-4 py-2 text-sm'}`}
             aria-label={dp?.applyRange ?? 'Apply selected date range'}
@@ -259,7 +289,6 @@ export default function DateRangePicker({
       ref={popoverRef}
       className={`absolute top-full left-0 mt-2 surface-card rounded-xl shadow-xl border border-soft p-3 z-50 date-picker-popover ${isCompact ? 'compact-datepicker' : ''}`}
       role="dialog"
-      aria-modal="true"
       aria-label={dp?.rangePicker ?? 'Date range picker'}
       style={{
         width: isCompact ? 'min(90vw, 320px)' : 'min(92vw, 360px)',

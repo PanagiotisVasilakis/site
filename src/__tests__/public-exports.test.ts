@@ -1,10 +1,8 @@
 import { type MarkerData as InteractiveMarkerData } from '@/components/InteractiveMap';
 import { type BookingSource as SessionBookingSource, type BookingStatus } from '@/lib/guestSession';
-import { type PerformanceBudget } from '@/lib/performanceBudget';
 import { type SecurityConfig } from '@/lib/security-config';
 import { type SecurityMetrics } from '@/lib/security-monitoring';
 import { type ApiResponse, type ApiRouteHandler, type ErrorHandlerConfig } from '@/lib/apiErrorHandler';
-import { type AvailabilityInfo } from '@/lib/dateUtils';
 import { type Dictionary as IndexDictionary } from '@/i18n';
 import { type Dictionary as I18nDictionary } from '@/i18n/dictionaries';
 import { type TrackerEventName, type EventProps } from '@/lib/tracker';
@@ -33,7 +31,6 @@ describe.skipIf(!hasDbUrl)('public API surface remains reachable', () => {
     const { validateOpenAPISpec } = await import('@/lib/openapi');
     const { createMarkerFromItem } = await import('@/components/InteractiveMap');
     const { clearSessionCookie, clearRefreshCookie } = await import('@/lib/guestSession');
-    const { PerformanceBudgetValidator, performanceBudgetSchema } = await import('@/lib/performanceBudget');
     const { getSecurityConfig, validateSecurityConfig } = await import('@/lib/security-config');
     const { SecurityReportGenerator } = await import('@/lib/security-monitoring');
     const { resetFeatureFlags } = await import('@/lib/featureFlags');
@@ -72,12 +69,6 @@ describe.skipIf(!hasDbUrl)('public API surface remains reachable', () => {
 
     expect(clearSessionCookie().name).toBeDefined();
     expect(clearRefreshCookie().name).toBeDefined();
-
-    const parsedBudget = performanceBudgetSchema.parse(defaultBudgetSample);
-    expect(parsedBudget).toBeDefined();
-
-    const validator = new PerformanceBudgetValidator();
-    expect(typeof validator.validateBuildTime).toBe('function');
 
     expect(getSecurityConfig().csp.enabled).toBe(true);
     validateSecurityConfig();
@@ -124,7 +115,6 @@ describe.skipIf(!hasDbUrl)('public API surface remains reachable', () => {
     expectTypeOf<InteractiveMarkerData>().toMatchTypeOf<{ id: string }>();
     expectTypeOf<SessionBookingSource>().toMatchTypeOf<'ONSITE' | 'EXTERNAL'>();
     expectTypeOf<BookingStatus>().toMatchTypeOf<string>();
-    expectTypeOf<PerformanceBudget>().toMatchTypeOf<Record<string, any>>();
     expectTypeOf<Origin>().toMatchTypeOf<string>();
     expectTypeOf<SecurityConfig>().toMatchTypeOf<Record<string, any>>();
     expectTypeOf<SecurityMetrics>().toMatchTypeOf<Record<string, any>>();
@@ -133,7 +123,6 @@ describe.skipIf(!hasDbUrl)('public API surface remains reachable', () => {
     expectTypeOf<ApiRouteHandler>().toMatchTypeOf<(...args: any[]) => any>();
     expectTypeOf<ErrorHandlerConfig>().toMatchTypeOf<Record<string, any>>();
     expectTypeOf<AppConfig>().toMatchTypeOf<Record<string, any>>();
-    expectTypeOf<AvailabilityInfo>().toMatchTypeOf<Record<string, any>>();
     expectTypeOf<IndexDictionary>().toMatchTypeOf<Record<string, any>>();
     expectTypeOf<VillaPhoto>().toMatchTypeOf<{ src: string }>();
     expectTypeOf<Role>().toMatchTypeOf<string>();
@@ -144,20 +133,3 @@ describe.skipIf(!hasDbUrl)('public API surface remains reachable', () => {
     expectTypeOf<TravelMode>().toMatchTypeOf<'driving' | 'foot' | 'cycling'>();
   });
 });
-
-const defaultBudgetSample = {
-  buildTime: { max: 180000, warning: 120000 },
-  bundleSize: {
-    total: { max: 2097152, warning: 1048576 },
-    individual: { max: 524288, warning: 262144 }
-  },
-  coreWebVitals: {
-    lcp: { good: 2500, poor: 4000 },
-    fid: { good: 100, poor: 300 },
-    cls: { good: 0.1, poor: 0.25 },
-    inp: { good: 200, poor: 500 },
-    ttfb: { good: 800, poor: 1800 }
-  },
-  assets: { maxImageSize: 1048576, maxFontSize: 131072, totalAssetSize: 10485760 },
-  dependencies: { maxTotal: 150, maxProduction: 50 }
-} satisfies PerformanceBudget;

@@ -31,7 +31,6 @@ try {
     port: chrome.port,
     output: outputMode.split(',') as Array<'json' | 'html'>,
     logLevel: 'info',
-    screenEmulation: { mobile: true, disabled: false },
   }, {
     extends: 'lighthouse:default',
     settings: {
@@ -40,9 +39,10 @@ try {
         mobile: true,
         width: 360,
         height: 640,
-        deviceScaleRatio: 2.625,
+        deviceScaleFactor: 2.625,
         disabled: false,
       },
+      emulatedUserAgent: true,
       throttling: {
         rttMs: 150,
         throughputKbps: 1638.4,

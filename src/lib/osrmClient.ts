@@ -20,7 +20,7 @@ export interface OSRMTableResponse {
     durations: number[][];
 }
 
-export interface OSRMRouteResponse {
+interface OSRMRouteResponse {
     code: string;
     routes?: Array<{
         geometry?: {

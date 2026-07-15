@@ -19,7 +19,7 @@ export type Booking = BookingRecord;
 export type CheckinCompletionRec = CheckinRecord;
 export type GuestRefreshTokenRec = PrismaGuestRefreshTokenRec;
 
-export class BookingAlreadyLinkedError extends Error {
+class BookingAlreadyLinkedError extends Error {
   readonly code = 'BOOKING_ALREADY_LINKED';
 
   constructor(
@@ -29,15 +29,6 @@ export class BookingAlreadyLinkedError extends Error {
   ) {
     super('Booking is already linked to another user');
     this.name = 'BookingAlreadyLinkedError';
-  }
-}
-
-export class BookingNotFoundError extends Error {
-  readonly code = 'BOOKING_NOT_FOUND';
-
-  constructor() {
-    super('No matching booking was found');
-    this.name = 'BookingNotFoundError';
   }
 }
 

@@ -51,15 +51,20 @@ export async function getFeatureFlagsAsync(): Promise<FeatureFlags> {
 
 export async function setFeatureFlags(partial: Partial<FeatureFlags>): Promise<FeatureFlags> {
   const { prisma } = await import('@/lib/prisma');
-  const current = await getFeatureFlagsAsync();
-  const merged = parseFlags({ ...current, ...partial });
-  await prisma.operationalSetting.upsert({
-    where: { key: SETTING_KEY },
-    create: { key: SETTING_KEY, value: merged },
-    update: { value: merged },
-  });
-  cache = merged;
-  return { ...merged };
+  const patch = Object.fromEntries(Object.entries(partial).filter(([, value]) => typeof value === 'boolean'));
+  if (Object.keys(patch).length === 0) return getFeatureFlagsAsync();
+
+  const serialized = JSON.stringify(patch);
+  const rows = await prisma.$queryRaw<Array<{ value: unknown }>>`
+    INSERT INTO "operational_settings" ("key", "value", "updated_at")
+    VALUES (${SETTING_KEY}, ${serialized}::jsonb, CURRENT_TIMESTAMP)
+    ON CONFLICT ("key") DO UPDATE SET
+      "value" = "operational_settings"."value" || EXCLUDED."value",
+      "updated_at" = CURRENT_TIMESTAMP
+    RETURNING "value"
+  `;
+  cache = parseFlags(rows[0]?.value);
+  return { ...cache };
 }
 
 export function resetFeatureFlags(): void {

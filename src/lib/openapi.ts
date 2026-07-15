@@ -209,6 +209,10 @@ export const openApiSpec = {
       },
     },
     '/portal/sessions': {
+      get: {
+        summary: 'Probe the current guest portal session', tags: ['Portal'], security: [{ GuestCookie: [] }],
+        responses: { '200': { description: 'Guest session is valid' }, '401': { $ref: '#/components/responses/Unauthorized' }, '404': { $ref: '#/components/responses/NotFound' } },
+      },
       post: {
         summary: 'Sign in to an eligible claimed booking', tags: ['Portal'],
         requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/PortalSession' } } } },
@@ -219,7 +223,7 @@ export const openApiSpec = {
       post: { summary: 'Rotate the refresh token family', tags: ['Portal'], security: [{ GuestCookie: [] }], responses: { '200': { description: 'Session refreshed' }, '401': { $ref: '#/components/responses/Unauthorized' }, '409': { $ref: '#/components/responses/Conflict' } } },
     },
     '/portal/logout': {
-      post: { summary: 'Revoke the refresh family and clear guest cookies', tags: ['Portal'], security: [{ GuestCookie: [] }], responses: { '200': { description: 'Signed out' } } },
+      post: { summary: 'Revoke the refresh family and clear guest cookies', tags: ['Portal'], security: [{ GuestCookie: [] }], responses: { '204': { description: 'Signed out' } } },
     },
     '/portal/start': {
       post: { summary: 'Read the current host-issued claim form schema', tags: ['Portal'], responses: { '200': { description: 'Claim flow schema' }, '404': { $ref: '#/components/responses/NotFound' } } },

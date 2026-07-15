@@ -3,8 +3,13 @@ import AdminSessionManager from '@/components/AdminSessionManager';
 import { verifyAdminSession } from '@/lib/auth/admin';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = {
+  title: 'Admin Analytics',
+  robots: 'noindex, nofollow',
+};
 
 export default async function AnalyticsAdminPage() {
   // Server-side JWT verification (Node.js runtime compatible)
@@ -33,7 +38,7 @@ export default async function AnalyticsAdminPage() {
   const p90 = percentile(hourCounts, 0.9);
   const p99 = percentile(hourCounts, 0.99);
   return (
-    <div className="admin-page-shell mx-auto max-w-4xl p-6 space-y-8 min-h-screen">
+    <main className="admin-page-shell mx-auto max-w-4xl p-6 space-y-8 min-h-screen">
       <AdminSessionManager />
       <h1 className="text-2xl font-semibold page-title">Analytics Overview</h1>
       <section className="grid gap-4 md:grid-cols-2">
@@ -114,6 +119,6 @@ export default async function AnalyticsAdminPage() {
         </div>
       </section>
       <p className="text-xs text-subtle">Paths may be hashed & UA omitted if anonymization enabled. Vitals are client-reported (CLS, INP, LCP, FID, TTFB).</p>
-    </div>
+    </main>
   );
 }

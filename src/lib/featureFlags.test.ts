@@ -1,5 +1,8 @@
-const operationalSetting = vi.hoisted(() => ({ findUnique: vi.fn(), upsert: vi.fn() }));
-vi.mock('@/lib/prisma', () => ({ prisma: { operationalSetting } }));
+const mocks = vi.hoisted(() => ({
+  operationalSetting: { findUnique: vi.fn() },
+  queryRaw: vi.fn(),
+}));
+vi.mock('@/lib/prisma', () => ({ prisma: { operationalSetting: mocks.operationalSetting, $queryRaw: mocks.queryRaw } }));
 vi.mock('@/lib/logger-enterprise', () => ({ logger: { error: vi.fn() } }));
 
 import {
@@ -20,7 +23,7 @@ describe('shared feature flags', () => {
   });
 
   it('reads and normalizes the shared database value', async () => {
-    operationalSetting.findUnique.mockResolvedValue({
+    mocks.operationalSetting.findUnique.mockResolvedValue({
       value: { portalEnabled: false, checkinEnabled: true },
     });
     await expect(getFeatureFlagsAsync()).resolves.toEqual({ portalEnabled: false, checkinEnabled: true });
@@ -28,22 +31,18 @@ describe('shared feature flags', () => {
   });
 
   it('persists a partial update without discarding the other flag', async () => {
-    operationalSetting.findUnique.mockResolvedValue({
-      value: { portalEnabled: true, checkinEnabled: true },
-    });
-    operationalSetting.upsert.mockResolvedValue({});
+    mocks.queryRaw.mockResolvedValue([{ value: { portalEnabled: true, checkinEnabled: false } }]);
     await expect(setFeatureFlags({ checkinEnabled: false })).resolves.toEqual({
       portalEnabled: true,
       checkinEnabled: false,
     });
-    expect(operationalSetting.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      update: { value: { portalEnabled: true, checkinEnabled: false } },
-    }));
+    expect(mocks.queryRaw).toHaveBeenCalledOnce();
+    expect(mocks.queryRaw.mock.calls[0][0].join(' ')).toContain('|| EXCLUDED.');
   });
 
   it('fails closed in production if the shared store is unavailable', async () => {
     vi.stubEnv('NODE_ENV', 'production');
-    operationalSetting.findUnique.mockRejectedValue(new Error('database unavailable'));
+    mocks.operationalSetting.findUnique.mockRejectedValue(new Error('database unavailable'));
     resetFeatureFlags();
     await expect(getFeatureFlagsAsync()).resolves.toEqual({ portalEnabled: false, checkinEnabled: false });
   });

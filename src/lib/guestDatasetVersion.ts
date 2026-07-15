@@ -29,9 +29,9 @@ function formatSnapshot(
 async function computeBookingSnapshot(): Promise<GuestDatasetSnapshot> {
   const aggregate = await prisma.booking.aggregate({
     _count: { _all: true },
-    _max: { createdAt: true },
+    _max: { updatedAt: true },
   });
-  return formatSnapshot('bookings', aggregate._count?._all ?? 0, aggregate._max?.createdAt);
+  return formatSnapshot('bookings', aggregate._count?._all ?? 0, aggregate._max?.updatedAt);
 }
 
 async function computeUserSnapshot(): Promise<GuestDatasetSnapshot> {

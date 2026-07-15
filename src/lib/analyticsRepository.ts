@@ -8,6 +8,8 @@ export type AnalyticsInput = {
   locale?: string;
   eventName?: string;
   properties?: Record<string, unknown>;
+  eventId?: string;
+  occurredAt?: Date;
 };
 
 export type Vital = { name: string; value: number; id: string; ts: number };
@@ -21,7 +23,10 @@ export async function recordAnalyticsHits(hits: AnalyticsInput[]): Promise<numbe
       locale: hit.locale ?? null,
       eventName: hit.eventName ?? null,
       properties: hit.properties as Prisma.InputJsonObject | undefined,
+      eventId: hit.eventId ?? null,
+      occurredAt: hit.occurredAt,
     })),
+    skipDuplicates: true,
   });
   return result.count;
 }
@@ -41,7 +46,10 @@ export async function recordVital(input: Omit<Vital, 'ts'> & { path: string }): 
 export async function topPaths(limit = 10, since?: number) {
   const rows = await prisma.analyticsHit.groupBy({
     by: ['path'],
-    where: since ? { occurredAt: { gte: new Date(since) } } : undefined,
+    where: {
+      eventName: null,
+      ...(since ? { occurredAt: { gte: new Date(since) } } : {}),
+    },
     _count: { _all: true },
     orderBy: { _count: { path: 'desc' } },
     take: Math.min(Math.max(limit, 1), 100),
@@ -55,15 +63,17 @@ async function timeBuckets(unit: 'hour' | 'day', count: number) {
   const start = currentStart - (count - 1) * unitMs;
   const rows = unit === 'hour'
     ? await prisma.$queryRaw<Array<{ bucket: Date; count: bigint }>>`
-        SELECT date_trunc('hour', "occurred_at") AS bucket, count(*)::bigint AS count
+        SELECT date_trunc('hour', "occurred_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AS bucket,
+          count(*)::bigint AS count
         FROM "analytics_hits"
-        WHERE "occurred_at" >= ${new Date(start)}
+        WHERE "occurred_at" >= ${new Date(start)} AND "event_name" IS NULL
         GROUP BY 1 ORDER BY 1
       `
     : await prisma.$queryRaw<Array<{ bucket: Date; count: bigint }>>`
-        SELECT date_trunc('day', "occurred_at") AS bucket, count(*)::bigint AS count
+        SELECT date_trunc('day', "occurred_at" AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AS bucket,
+          count(*)::bigint AS count
         FROM "analytics_hits"
-        WHERE "occurred_at" >= ${new Date(start)}
+        WHERE "occurred_at" >= ${new Date(start)} AND "event_name" IS NULL
         GROUP BY 1 ORDER BY 1
       `;
   const values = new Map(rows.map((row) => [new Date(row.bucket).getTime(), Number(row.count)]));
@@ -82,10 +92,12 @@ export async function dailyNewPaths(lastDays = 30) {
   const currentStart = Math.floor(Date.now() / dayMs) * dayMs;
   const start = currentStart - (count - 1) * dayMs;
   const rows = await prisma.$queryRaw<Array<{ bucket: Date; count: bigint }>>`
-    SELECT date_trunc('day', first_seen) AS bucket, count(*)::bigint AS count
+    SELECT date_trunc('day', first_seen AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AS bucket,
+      count(*)::bigint AS count
     FROM (
       SELECT "path", min("occurred_at") AS first_seen
       FROM "analytics_hits"
+      WHERE "event_name" IS NULL
       GROUP BY "path"
     ) first_paths
     WHERE first_seen >= ${new Date(start)}
@@ -100,7 +112,9 @@ export async function dailyNewPaths(lastDays = 30) {
 
 export async function analyticsStats() {
   const rows = await prisma.$queryRaw<Array<{ count: bigint }>>`
-    SELECT count(DISTINCT "path")::bigint AS count FROM "analytics_hits"
+    SELECT count(DISTINCT "path")::bigint AS count
+    FROM "analytics_hits"
+    WHERE "event_name" IS NULL
   `;
   return { uniquePaths: Number(rows[0]?.count ?? 0) };
 }

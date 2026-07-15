@@ -50,7 +50,7 @@ export function parseGuestSession(token: string | undefined | null): GuestSessio
   }
 }
 
-export async function getGuestSessionFromCookies(): Promise<GuestSessionPayload | null> {
+async function getGuestSessionFromCookies(): Promise<GuestSessionPayload | null> {
   try {
     const jar = await cookies();
     const token = jar.get(COOKIE_NAME)?.value;

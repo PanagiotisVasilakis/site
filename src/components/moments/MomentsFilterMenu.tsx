@@ -1,7 +1,7 @@
 "use client";
 
 /** Filter categories for Moments page */
-const MOMENTS_FILTER_KEYS = [
+export const MOMENTS_FILTER_KEYS = [
     'all', 'beaches', 'museums', 'restaurants', 'bars', 'brunchs', 'taygetos', 'sites', 'nearby'
 ] as const;
 
@@ -24,6 +24,7 @@ interface MomentsFilterMenuProps {
     active: MomentsFilterKey;
     onChange: (filter: MomentsFilterKey) => void;
     filterByCategoryLabel?: string;
+    availableFilters?: readonly MomentsFilterKey[];
     ui?: {
         all?: string;
         beaches?: string;
@@ -52,13 +53,19 @@ const labelsFor = (ui: MomentsFilterMenuProps['ui']): Record<MomentsFilterKey, s
 /**
  * Horizontal scrollable category chips for Moments page.
  */
-export function CategoryChips({ active, onChange, ui, filterByCategoryLabel = 'Filter moments by category' }: MomentsFilterMenuProps) {
+export function CategoryChips({
+    active,
+    onChange,
+    ui,
+    filterByCategoryLabel = 'Filter moments by category',
+    availableFilters = MOMENTS_FILTER_KEYS,
+}: MomentsFilterMenuProps) {
     const labels = labelsFor(ui);
 
     return (
         <nav className="moments-chip-nav" aria-label={filterByCategoryLabel}>
             <div className="moments-chip-scroll">
-                {MOMENTS_FILTER_KEYS.map(key => (
+                {MOMENTS_FILTER_KEYS.filter(key => availableFilters.includes(key)).map(key => (
                     <button
                         key={key}
                         type="button"
@@ -76,7 +83,7 @@ export function CategoryChips({ active, onChange, ui, filterByCategoryLabel = 'F
 
 /**
  * Filters items based on the selected moments filter.
- * Returns all items if 'all' is selected or if no matching tags are found.
+ * Returns all items only when 'all' is selected.
  */
 export function filterMomentsByCategory<T extends { tags?: string[] }>(
     items: T[],

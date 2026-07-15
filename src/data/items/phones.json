@@ -11,7 +11,7 @@
     "description_el": "Δωρεάν γραμμή έκτακτης ανάγκης 24/7 σε Ελλάδα και ΕΕ. Καλέστε το 112 για άμεση βοήθεια από αστυνομία, πυροσβεστική ή ασθενοφόρο.",
     "icon": "🆘",
     "image": "/phones/sos-icon.svg",
-    "heroImage": "/phones/sos-hero.png",
+    "heroImage": "/phones/sos-hero.webp",
     "heroImagePosition": "center center",
     "tags": ["emergency", "safety"],
     "featured": true
@@ -34,7 +34,7 @@
     "website": "https://www.astynomia.gr/",
     "directionsUrl": "https://maps.app.goo.gl/DFsTwLdL2AxLgZMb7",
     "image": "/phones/police-icon.svg",
-    "heroImage": "/phones/police-hero.png",
+    "heroImage": "/phones/police-hero.webp",
     "heroImagePosition": "center 45%",
     "tags": ["emergency", "police", "safety"],
     "sourceUrls": [
@@ -65,7 +65,7 @@
     "website": "https://www.fireservice.gr/",
     "directionsUrl": "https://www.google.com/maps/dir/?api=1&destination=37.0347815%2C22.1087865",
     "image": "/phones/fire-icon.svg",
-    "heroImage": "/phones/fire-department-hero.png",
+    "heroImage": "/phones/fire-department-hero.webp",
     "heroImagePosition": "center center",
     "tags": ["emergency", "safety"],
     "sourceUrls": [
@@ -91,7 +91,7 @@
     "website": "https://www.nosokomeiokalamatas.gr/",
     "directionsUrl": "https://maps.app.goo.gl/NL4bWgGUe4GqUAww6",
     "image": "/phones/hospital-icon.svg",
-    "heroImage": "/phones/hospital-hero.png",
+    "heroImage": "/phones/hospital-hero.webp",
     "heroImagePosition": "center 45%",
     "tags": ["health", "medical", "hospital"],
     "sourceUrls": [
@@ -120,7 +120,7 @@
     "description_el": "Τηλέφωνα επικοινωνίας του Ραδιοταξί Καλαμάτας για διαδρομές μέσα και γύρω από την πόλη.",
     "icon": "🚕",
     "image": "/phones/taxi-icon.svg",
-    "heroImage": "/phones/taxi-hero.png",
+    "heroImage": "/phones/taxi-hero.webp",
     "heroImagePosition": "center center",
     "tags": ["transport"]
   }

@@ -62,8 +62,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
   };
 
   const handleSignOut = async () => {
-    await signOut();
-    window.location.href = `/${locale}`;
+    if (await signOut()) window.location.href = `/${locale}`;
   };
 
   const closeMenu = (restoreFocus = false) => {

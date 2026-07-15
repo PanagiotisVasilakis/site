@@ -19,6 +19,31 @@ import { getClientIp } from '@/lib/net/getClientIp';
 let securityHeadersCache: Record<string, string> | null = null;
 let cacheTimestamp = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const DIRECT_HEALTH_PROBE_PATHS = new Set([
+  '/api/health',
+  '/api/health/live',
+  '/api/health/ready',
+]);
+let rateLimitHmacSecret: string | null = null;
+let rateLimitHmacKey: Promise<CryptoKey> | null = null;
+
+function getRateLimitHmacKey(secret: string): Promise<CryptoKey> {
+  if (rateLimitHmacSecret !== secret || !rateLimitHmacKey) {
+    rateLimitHmacSecret = secret;
+    rateLimitHmacKey = crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign'],
+    );
+  }
+  return rateLimitHmacKey;
+}
+
+function bytesToHex(value: ArrayBuffer): string {
+  return Array.from(new Uint8Array(value), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
 
 interface SecurityMiddlewareOptions {
   skipPaths?: string[];
@@ -154,24 +179,37 @@ export class RateLimitMiddleware {
   public async handle(request: NextRequest): Promise<NextResponse | null> {
     if (!this.config.enabled) return null;
     if (!request.nextUrl.pathname.startsWith('/api/')) return null;
+    // Container/systemd probes call these endpoints directly and therefore do
+    // not traverse the trusted reverse proxy that supplies client identity.
+    if (DIRECT_HEALTH_PROBE_PATHS.has(request.nextUrl.pathname)) return null;
 
-    const key = this.generateKey(request);
-    if (!key) return null;
+    const backend = typeof process !== 'undefined' && process.env ? process.env.RATE_LIMIT_BACKEND || '' : '';
+    const isProduction = typeof process !== 'undefined' && process.env?.NODE_ENV === 'production';
+    const isEdgeRuntime = typeof (globalThis as unknown as { EdgeRuntime?: string }).EdgeRuntime !== 'undefined';
+    const upstashConfigured = Boolean(
+      typeof process !== 'undefined'
+      && process.env?.UPSTASH_REDIS_REST_URL
+      && process.env?.UPSTASH_REDIS_REST_TOKEN,
+    );
+    const key = await this.generateKey(request);
+    if (!key) {
+      if (isProduction || isEdgeRuntime) {
+        metrics.counter('rate_limit.backend_unavailable', 1, { backend: 'client_identity' });
+        return this.createBackendUnavailableResponse();
+      }
+      return null;
+    }
     const now = Date.now();
     const resetTime = now + this.config.windowMs;
 
-    const backend = typeof process !== 'undefined' && process.env ? process.env.RATE_LIMIT_BACKEND || '' : '';
-    const isEdgeRuntime = typeof (globalThis as unknown as { EdgeRuntime?: string }).EdgeRuntime !== 'undefined';
-    const upstashConfigured = typeof process !== 'undefined' && process.env?.UPSTASH_REDIS_REST_URL;
-
-    if ((backend === 'redis' || isEdgeRuntime) && upstashConfigured) {
+    if (backend === 'redis' && upstashConfigured) {
       try {
         const upstash = await import('@/lib/upstash');
-        const count = await upstash.incrWithExpire(key, this.config.windowMs);
+        const { count, resetAfterMs } = await upstash.incrWithExpire(key, this.config.windowMs);
 
         if (count > this.config.maxRequests) {
           metrics.counter('rate_limit.blocked', 1, { backend: 'redis' });
-          return this.createLimitResponse(now);
+          return this.createLimitResponse(now, undefined, resetAfterMs);
         }
 
         metrics.counter('rate_limit.allowed', 1, { backend: 'redis' });
@@ -181,14 +219,33 @@ export class RateLimitMiddleware {
           console.error('Upstash rate limit error:', error);
         }
         metrics.counter('rate_limit.backend_unavailable', 1, { backend: 'redis' });
-        return new NextResponse('Rate limit service unavailable', {
-          status: 503,
-          headers: { 'Retry-After': '5' },
-        });
+        return this.createBackendUnavailableResponse();
       }
     }
 
+    // A process-local map is only safe for a single, long-lived development or
+    // test process. Production and Edge deployments can have multiple isolates,
+    // so silently falling back would multiply the configured limit by the number
+    // of instances. Fail closed even if startup environment validation was
+    // bypassed or an Edge function was deployed without the expected secrets.
+    if (isProduction || isEdgeRuntime || backend !== '') {
+      metrics.counter('rate_limit.backend_unavailable', 1, {
+        backend: backend || 'missing',
+      });
+      return this.createBackendUnavailableResponse();
+    }
+
     return this.handleInMemory(key, now, resetTime);
+  }
+
+  private createBackendUnavailableResponse(): NextResponse {
+    return new NextResponse('Rate limit service unavailable', {
+      status: 503,
+      headers: {
+        'Cache-Control': 'no-store',
+        'Retry-After': '5',
+      },
+    });
   }
 
   private handleInMemory(key: string, now: number, resetTime: number): NextResponse | null {
@@ -213,37 +270,57 @@ export class RateLimitMiddleware {
     return null;
   }
 
-  private createLimitResponse(now: number, resetTime?: number): NextResponse {
+  private createLimitResponse(now: number, resetTime?: number, resetAfterMs?: number): NextResponse {
     const response = new NextResponse('Too Many Requests', { status: 429 });
+    const remainingMs = resetAfterMs ?? Math.max(1, (resetTime ?? now + this.config.windowMs) - now);
+    const retryAfterSeconds = Math.max(1, Math.ceil(remainingMs / 1000));
+    response.headers.set('Retry-After', retryAfterSeconds.toString());
 
     if (this.config.standardHeaders) {
       response.headers.set('RateLimit-Limit', this.config.maxRequests.toString());
       response.headers.set('RateLimit-Remaining', '0');
-      const resetSeconds = Math.ceil((resetTime ?? now + this.config.windowMs) / 1000);
-      response.headers.set('RateLimit-Reset', resetSeconds.toString());
+      response.headers.set('RateLimit-Reset', retryAfterSeconds.toString());
     }
 
     if (this.config.legacyHeaders) {
       response.headers.set('X-RateLimit-Limit', this.config.maxRequests.toString());
       response.headers.set('X-RateLimit-Remaining', '0');
-      const resetSeconds = Math.ceil((resetTime ?? now + this.config.windowMs) / 1000);
-      response.headers.set('X-RateLimit-Reset', resetSeconds.toString());
+      const resetEpochSeconds = Math.ceil((now + remainingMs) / 1000);
+      response.headers.set('X-RateLimit-Reset', resetEpochSeconds.toString());
     }
 
     return response;
   }
 
-  private generateKey(request: NextRequest): string | null {
+  private async generateKey(request: NextRequest): Promise<string | null> {
     const ip = getClientIp(request, { trustProxy: true });
-    return ip === 'unknown' ? null : `${ip}:${request.nextUrl.pathname}`;
+    if (ip === 'unknown') return null;
+
+    const secret = process.env.SECURITY_PEPPER;
+    if (!secret) return process.env.NODE_ENV === 'production' ? null : `rl:dev:${ip}`;
+    const namespace = process.env.RATE_LIMIT_NAMESPACE
+      || `${process.env.NODE_ENV || 'development'}:${process.env.NEXT_PUBLIC_SITE_URL || 'local'}`;
+    const key = await getRateLimitHmacKey(secret);
+    const signature = await crypto.subtle.sign(
+      'HMAC',
+      key,
+      new TextEncoder().encode(`${namespace}\0${ip}`),
+    );
+    // The third-party Redis service receives only a namespaced digest. Raw IPs
+    // and dynamic route identifiers never leave the application boundary.
+    return `rl:v1:${bytesToHex(signature)}`;
   }
 }
 
 export class CORSMiddleware {
   private readonly config = getSecurityConfig().cors;
 
-  public handle(request: NextRequest): NextResponse | null {
+  public async handle(request: NextRequest): Promise<NextResponse | null> {
     if (!this.config.enabled) return null;
+    if (!request.nextUrl.pathname.startsWith('/api/')) return null;
+    // Health probes intentionally have no CORS surface. Skipping avoids an
+    // attacker-controlled Origin turning a direct probe into an audit DB write.
+    if (DIRECT_HEALTH_PROBE_PATHS.has(request.nextUrl.pathname)) return null;
 
     const origin = request.headers.get('origin');
     const method = request.method;
@@ -265,7 +342,7 @@ export class CORSMiddleware {
         },
       };
 
-      logSecurityEvent(event);
+      await logSecurityEvent(event);
       return new NextResponse('CORS violation', { status: 403 });
     }
 
@@ -274,7 +351,8 @@ export class CORSMiddleware {
 
   public applyActualRequestHeaders(request: NextRequest, response: NextResponse): void {
     const origin = request.headers.get('origin');
-    if (!this.config.enabled || !origin || !this.isOriginAllowed(origin, request)) return;
+    if (!this.config.enabled || !request.nextUrl.pathname.startsWith('/api/')
+      || !origin || !this.isOriginAllowed(origin, request)) return;
     response.headers.set('Access-Control-Allow-Origin', origin);
     response.headers.append('Vary', 'Origin');
     if (this.config.credentials) response.headers.set('Access-Control-Allow-Credentials', 'true');
@@ -329,15 +407,15 @@ export function createSecurityMiddleware(options?: SecurityMiddlewareOptions) {
   const cors = new CORSMiddleware();
 
   return async (request: NextRequest): Promise<NextResponse> => {
-    const corsResponse = cors.handle(request);
-    if (corsResponse) {
-      return corsResponse;
-    }
-
     const rateLimitResponse = await rateLimit.handle(request);
     if (rateLimitResponse) {
       cors.applyActualRequestHeaders(request, rateLimitResponse);
       return rateLimitResponse;
+    }
+
+    const corsResponse = await cors.handle(request);
+    if (corsResponse) {
+      return corsResponse;
     }
 
     const response = securityHeaders.handle(request);

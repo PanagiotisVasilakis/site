@@ -2,7 +2,6 @@ import { formatTraceContextHeaders, parseTraceContextHeaders, SpanStatus } from 
 import type { Span, SpanLogLevel, TraceApi, TraceContext } from '@/lib/observability-contracts';
 
 export { SpanStatus } from '@/lib/observability-contracts';
-export type { Span, TraceContext } from '@/lib/observability-contracts';
 
 const HEX_CHARS = '0123456789abcdef';
 

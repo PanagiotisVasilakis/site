@@ -212,9 +212,18 @@ export async function authenticatePortalUser(input: {
   phone: string;
   password: string;
 }): Promise<{ userId: string; bookingId: string }> {
-  const normalized = normalizePhone(input.phone);
-  if (!normalized) throw new PortalAuthError('INVALID_CREDENTIALS');
-  const user = await prisma.user.findUnique({ where: { phoneE164: normalized.e164 } });
+  const primaryPhone = normalizePhone(input.phone);
+  if (!primaryPhone) throw new PortalAuthError('INVALID_CREDENTIALS');
+
+  // Preserve the existing international-without-plus interpretation first,
+  // then support the local 10-digit format used by Greek guests at claim time.
+  // The fallback only runs when the primary identifier has no account, keeping
+  // account selection deterministic if both canonical numbers exist.
+  const greekLocalPhone = normalizePhone(input.phone, 'GR');
+  let user = await prisma.user.findUnique({ where: { phoneE164: primaryPhone.e164 } });
+  if (!user && greekLocalPhone && greekLocalPhone.e164 !== primaryPhone.e164) {
+    user = await prisma.user.findUnique({ where: { phoneE164: greekLocalPhone.e164 } });
+  }
   if (!user?.passwordHash || !(await bcrypt.compare(input.password, user.passwordHash))) {
     throw new PortalAuthError('INVALID_CREDENTIALS');
   }

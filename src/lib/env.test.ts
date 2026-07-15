@@ -22,6 +22,9 @@ const productionBase = {
   TRUST_PROXY_MODE: 'hops',
   TRUST_PROXY_HOPS: '1',
   NEXT_PUBLIC_SITE_URL: 'https://example.test',
+  RATE_LIMIT_BACKEND: 'redis',
+  UPSTASH_REDIS_REST_URL: 'https://redis.example.test',
+  UPSTASH_REDIS_REST_TOKEN: 'a'.repeat(20),
 };
 
 describe('environment contract', () => {
@@ -52,6 +55,35 @@ describe('environment contract', () => {
       NODE_ENV: 'production',
       CLAIM_TOKEN_PEPPER: 'a'.repeat(32),
       TRUST_PROXY_MODE: 'none',
+    })).toThrow();
+  });
+
+  it('requires a distributed rate limiter in production', () => {
+    expect(() => parseEnv({
+      ...productionBase,
+      RATE_LIMIT_BACKEND: '',
+      UPSTASH_REDIS_REST_URL: '',
+      UPSTASH_REDIS_REST_TOKEN: '',
+    })).toThrow();
+    expect(parseEnv(productionBase).RATE_LIMIT_BACKEND).toBe('redis');
+  });
+
+  it('allows an HTTP Redis mock only on loopback in explicit CI', () => {
+    expect(parseEnv({
+      ...productionBase,
+      CI: 'true',
+      UPSTASH_REDIS_REST_URL: 'http://127.0.0.1:8079',
+    }).UPSTASH_REDIS_REST_URL).toBe('http://127.0.0.1:8079');
+
+    expect(() => parseEnv({
+      ...productionBase,
+      CI: 'true',
+      UPSTASH_REDIS_REST_URL: 'http://redis.example.test',
+    })).toThrow();
+    expect(() => parseEnv({
+      ...productionBase,
+      CI: 'false',
+      UPSTASH_REDIS_REST_URL: 'http://127.0.0.1:8079',
     })).toThrow();
   });
 

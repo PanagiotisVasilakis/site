@@ -1,22 +1,23 @@
-import crypto from 'node:crypto';
 import type { NextRequest, NextResponse } from 'next/server';
 
 import { guestStore } from '@/lib/guestDataStore';
-import { createRefreshCookie, createSessionCookie, issueGuestSession } from '@/lib/guestSession';
+import {
+  clearRefreshCookie,
+  createRefreshCookie,
+  createSessionCookie,
+  issueGuestSession,
+} from '@/lib/guestSession';
 import { getClientIp } from '@/lib/net/getClientIp';
-
-function privacyHash(value: string): string {
-  const pepper = process.env.SECURITY_PEPPER || 'development-only-network-hash-pepper';
-  return crypto.createHmac('sha256', pepper).update(value).digest('hex');
-}
+import { privacyHmac } from '@/lib/privacyHash';
 
 export function requestAuthContext(request: NextRequest): { deviceHint: string; ipHint: string; ipHash: string } {
   const userAgent = request.headers.get('user-agent') || 'unknown';
   const ip = getClientIp(request);
+  const ipHint = privacyHmac(ip, 'portal-auth:ip-hint:v1');
   return {
-    deviceHint: privacyHash(userAgent),
-    ipHint: privacyHash(ip),
-    ipHash: privacyHash(ip),
+    deviceHint: privacyHmac(userAgent, 'portal-auth:device-hint:v1'),
+    ipHint,
+    ipHash: ipHint,
   };
 }
 
@@ -25,6 +26,15 @@ export async function attachPortalAuthCookies(
   response: NextResponse,
   input: { userId: string; bookingId: string; remember: boolean },
 ): Promise<void> {
+  if (!input.remember) {
+    const presentedRefreshToken = request.cookies.get('guest_rt')?.value;
+    if (presentedRefreshToken) {
+      await guestStore.revokeRefreshFamily(presentedRefreshToken);
+    }
+    const refreshCookie = clearRefreshCookie();
+    response.cookies.set(refreshCookie.name, refreshCookie.value, refreshCookie.options);
+  }
+
   const sessionToken = await issueGuestSession(input.userId, input.bookingId);
   const sessionCookie = createSessionCookie(sessionToken);
   response.cookies.set(sessionCookie.name, sessionCookie.value, sessionCookie.options);

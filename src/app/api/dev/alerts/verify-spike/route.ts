@@ -20,6 +20,21 @@ function requireDevAndSecret(req: NextRequest) {
   }
 }
 
+function abortableDelay(delayMs: number, signal: AbortSignal): Promise<void> {
+  signal.throwIfAborted();
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, delayMs);
+    const onAbort = () => {
+      clearTimeout(timeout);
+      reject(signal.reason);
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
 export const GET = withErrorHandler(async (req: NextRequest) => {
   requireDevAndSecret(req);
 
@@ -32,7 +47,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   });
 });
 
-export const POST = withErrorHandler(async (req: NextRequest) => {
+export const POST = withErrorHandler(async (req: NextRequest, { signal }) => {
   requireDevAndSecret(req);
 
   const body = await readJsonBody(req, 8 * 1_024) as Record<string, unknown>;
@@ -54,8 +69,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   // Emit the requested number of failure metrics
   for (let i = 0; i < count; i++) {
+    signal.throwIfAborted();
     metrics.counter('verification_failed', 1, { reason: 'synthetic_spike' });
-    if (delayMs > 0) await new Promise((res) => setTimeout(res, delayMs));
+    if (delayMs > 0) await abortableDelay(delayMs, signal);
   }
 
   const cfg = metrics.getVerificationFailedAlertConfig();

@@ -12,7 +12,7 @@ const prismaMock = vi.hoisted(() => ({
 vi.mock('@/lib/prisma', () => ({ prisma: prismaMock }));
 vi.mock('@/lib/logger-enterprise', () => ({ logger: { warn: vi.fn() } }));
 
-import { deliverBookingOutboxEvent, drainBookingOutbox } from './bookingOutbox';
+import { deliverOutboxEvent, drainOutbox } from './bookingOutbox';
 
 type EventFixture = {
   id: string;
@@ -77,7 +77,7 @@ describe('booking outbox delivery', () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(deliverBookingOutboxEvent(event.id)).resolves.toBe(true);
+    await expect(deliverOutboxEvent(event.id)).resolves.toBe(true);
     expect(fetchMock).toHaveBeenCalledWith(
       process.env.BOOKING_REQUEST_WEBHOOK_URL,
       expect.objectContaining({
@@ -96,7 +96,7 @@ describe('booking outbox delivery', () => {
 
   it('backs off durably when delivery is not configured', async () => {
     delete process.env.BOOKING_REQUEST_WEBHOOK_URL;
-    await expect(deliverBookingOutboxEvent(event.id)).resolves.toBe(false);
+    await expect(deliverOutboxEvent(event.id)).resolves.toBe(false);
     expect(prismaMock.outboxEvent.updateMany).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ status: 'PENDING', lastError: 'Webhook destination is not configured' }),
     }));
@@ -105,7 +105,7 @@ describe('booking outbox delivery', () => {
   it('schedules a bounded retry after a webhook failure', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }));
 
-    await expect(deliverBookingOutboxEvent(event.id)).resolves.toBe(false);
+    await expect(deliverOutboxEvent(event.id)).resolves.toBe(false);
     expect(prismaMock.outboxEvent.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: 'PENDING', lastError: 'Webhook responded with 503' }),
@@ -118,7 +118,7 @@ describe('booking outbox delivery', () => {
 
   it('recovers abandoned leases and caps the requested batch size', async () => {
     prismaMock.outboxEvent.findMany.mockResolvedValue([]);
-    await expect(drainBookingOutbox(500)).resolves.toEqual({ attempted: 0, delivered: 0 });
+    await expect(drainOutbox(500)).resolves.toEqual({ attempted: 0, delivered: 0 });
     expect(prismaMock.outboxEvent.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ status: 'LEASED' }) }),
     );
@@ -138,7 +138,7 @@ describe('booking outbox delivery', () => {
       .mockResolvedValueOnce({ count: 0 });
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
 
-    await expect(deliverBookingOutboxEvent(event.id)).resolves.toBe(false);
+    await expect(deliverOutboxEvent(event.id)).resolves.toBe(false);
     expect(prismaMock.stayRequest.update).not.toHaveBeenCalled();
   });
 
@@ -167,7 +167,7 @@ describe('booking outbox delivery', () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(deliverBookingOutboxEvent(checkInEvent.id)).resolves.toBe(true);
+    await expect(deliverOutboxEvent(checkInEvent.id)).resolves.toBe(true);
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({
       event: 'check_in_time_request.updated',
       previousStatus: 'PENDING',

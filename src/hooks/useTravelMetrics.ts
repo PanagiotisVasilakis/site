@@ -7,12 +7,12 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { OSRMClient, TravelMode, TravelMetrics, getOSRMClient } from '@/lib/osrmClient';
 
-export interface MarkerWithCoords {
+interface MarkerWithCoords {
     id: string;
     coordinates: [number, number]; // [lng, lat]
 }
 
-export interface TravelData {
+interface TravelData {
     [markerId: string]: {
         driving?: TravelMetrics;
         foot?: TravelMetrics;
@@ -36,7 +36,7 @@ export interface UseTravelMetricsResult {
     data: TravelData;
     loading: boolean;
     error: string | null;
-    refetch: () => void;
+    refetch: () => Promise<void>;
     getMetrics: (markerId: string, mode: TravelMode) => TravelMetrics | undefined;
 }
 
@@ -56,7 +56,7 @@ export function useTravelMetrics({
     const [error, setError] = useState<string | null>(null);
 
     const clientRef = useRef<OSRMClient | null>(null);
-    const cancelledRef = useRef(false);
+    const requestVersionRef = useRef(0);
 
     // Initialize client
     useEffect(() => {
@@ -64,7 +64,12 @@ export function useTravelMetrics({
     }, [osrmBaseUrl]);
 
     const fetchMetrics = useCallback(async () => {
+        const requestVersion = requestVersionRef.current + 1;
+        requestVersionRef.current = requestVersion;
         if (!origin || markers.length === 0 || !enabled || modes.length === 0) {
+            setData({});
+            setLoading(false);
+            setError(null);
             return;
         }
 
@@ -73,7 +78,6 @@ export function useTravelMetrics({
 
         setLoading(true);
         setError(null);
-        cancelledRef.current = false;
 
         try {
             const newData: TravelData = {};
@@ -89,10 +93,10 @@ export function useTravelMetrics({
             }
 
             for (const mode of modes) {
-                if (cancelledRef.current) break;
+                if (requestVersion !== requestVersionRef.current) return;
 
                 for (const chunk of chunks) {
-                    if (cancelledRef.current) break;
+                    if (requestVersion !== requestVersionRef.current) return;
 
                     const destinations = chunk.map(m => m.coordinates);
                     const metrics = await client.getTableMetrics(mode, origin, destinations);
@@ -108,7 +112,7 @@ export function useTravelMetrics({
                 }
             }
 
-            if (!cancelledRef.current) {
+            if (requestVersion === requestVersionRef.current) {
                 setData(newData);
 
                 const failed = client.getFailedProfiles();
@@ -117,11 +121,11 @@ export function useTravelMetrics({
                 }
             }
         } catch (err) {
-            if (!cancelledRef.current) {
+            if (requestVersion === requestVersionRef.current) {
                 setError(err instanceof Error ? err.message : 'Failed to fetch travel metrics');
             }
         } finally {
-            if (!cancelledRef.current) {
+            if (requestVersion === requestVersionRef.current) {
                 setLoading(false);
             }
         }
@@ -129,7 +133,10 @@ export function useTravelMetrics({
 
     // Debounced fetch on changes
     useEffect(() => {
-        if (!enabled || !origin) return;
+        if (!enabled || !origin || markers.length === 0 || modes.length === 0) {
+            void fetchMetrics();
+            return;
+        }
 
         const timeout = setTimeout(() => {
             fetchMetrics();
@@ -137,7 +144,7 @@ export function useTravelMetrics({
 
         return () => {
             clearTimeout(timeout);
-            cancelledRef.current = true;
+            requestVersionRef.current += 1;
         };
     }, [origin, markers, modes, enabled, debounceMs, fetchMetrics]);
 

@@ -102,16 +102,3 @@ const dictionaries: Record<Locale, Dictionary> = deepFreeze({
 export function getDictionary(locale: Locale): Dictionary {
   return dictionaries[locale] ?? dictionaries.en;
 }
-
-// Re-export domain types for convenience
-export type {
-  CommonDictionary,
-  HouseDictionary,
-  LocationPanelDictionary,
-  BookingDictionary,
-  CheckinDictionary,
-  CheckinInfoDictionary,
-  PortalDictionary,
-  ContactDictionary,
-  AboutDictionary,
-};

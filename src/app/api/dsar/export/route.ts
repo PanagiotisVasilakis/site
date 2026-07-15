@@ -79,12 +79,6 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
           requestedTime: true, message: true, status: true, createdAt: true, updatedAt: true,
         },
       },
-      mfaFactors: {
-        select: { id: true, type: true, status: true, createdAt: true, activatedAt: true, lastUsedAt: true },
-      },
-      mfaChallenges: {
-        select: { id: true, factorId: true, expiresAt: true, completedAt: true, createdAt: true },
-      },
       termsAcceptances: {
         select: { bookingId: true, termsVersion: true, contentHash: true, acceptedAt: true },
       },
@@ -116,7 +110,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     generated_at: new Date().toISOString(),
     excluded_secret_material: [
       'password hashes', 'claim token digests', 'refresh token and device hashes',
-      'MFA secrets and challenge codes', 'JWT values',
+      'JWT values',
     ],
   };
 

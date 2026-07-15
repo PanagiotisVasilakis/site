@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useForm, FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -35,6 +35,11 @@ export default function BookingForm({ dateRange, locale, labels, propertyName, s
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [idempotencyKey] = useState(() => globalThis.crypto.randomUUID());
+  const successRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (submitted) successRef.current?.focus();
+  }, [submitted]);
 
   // Build the validation schema with localized messages
   const bookingSchema = useMemo(
@@ -121,7 +126,15 @@ export default function BookingForm({ dateRange, locale, labels, propertyName, s
 
   if (submitted) {
     return (
-      <div className="text-center py-12 space-y-4">
+      <div
+        ref={successRef}
+        className="text-center py-12 space-y-4 outline-none"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        tabIndex={-1}
+      >
+        <span className="sr-only">{labels.submittedAnnounce}</span>
         <div className="text-6xl" aria-hidden>🎉</div>
         <div>
           <h2 className="text-2xl font-serif italic font-bold text-green-600 mb-2">{labels.confirmedTitle}</h2>
@@ -130,7 +143,7 @@ export default function BookingForm({ dateRange, locale, labels, propertyName, s
           </p>
           <div className="bg-green-50 rounded-lg p-4 text-sm space-y-1">
             <div><strong>{labels.propertyLabel}</strong> {propertyName}</div>
-            <div><strong>{labels.datesLabel}</strong> {formatDateRange(dateRange)}</div>
+            <div><strong>{labels.datesLabel}</strong> {formatDateRange(dateRange, locale === 'el' ? 'el' : 'en')}</div>
           </div>
         </div>
         <div className="flex gap-3 justify-center">
@@ -159,7 +172,6 @@ export default function BookingForm({ dateRange, locale, labels, propertyName, s
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {Object.keys(errors).length > 0 && labels.formErrorsAnnounce}
         {submitError && labels.submitFailed}
-        {submitted && labels.submittedAnnounce}
         {isSubmitting && labels.submittingAnnounce}
       </div>
 

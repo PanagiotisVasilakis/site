@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 const guard = createAPISecurityMiddleware({ requireAPIKey: true, requiredScopes: ['internal'] });
 
 export async function GET(request: NextRequest) {
-  const early = guard(request);
+  const early = await guard(request);
   if (early) return early;
 
   const [metrics, snapshots] = await Promise.all([

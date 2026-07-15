@@ -30,4 +30,11 @@ describe('sensitive rate limiting dimensions', () => {
     await expect(checkSensitiveRateLimit(request('203.0.113.11'), options)).resolves.toMatchObject({ allowed: true });
     await expect(checkSensitiveRateLimit(request('203.0.113.12'), options)).resolves.toMatchObject({ allowed: false });
   });
+
+  it('shares one identifier bucket across equivalent Greek phone formats', async () => {
+    const options = { scope: 'signin-test', identifier: '691 234 5678', limit: 1, windowMs: 60_000 };
+    await expect(checkSensitiveRateLimit(request('203.0.113.11'), options)).resolves.toMatchObject({ allowed: true });
+    await expect(checkSensitiveRateLimit(request('203.0.113.12'), { ...options, identifier: '+30 691-234-5678' }))
+      .resolves.toMatchObject({ allowed: false });
+  });
 });

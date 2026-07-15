@@ -65,7 +65,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   }
 
   const guard = createAPISecurityMiddleware();
-  const early = guard(request);
+  const early = await guard(request);
   if (early) return early;
 
   const session = await getVerifiedSession(request);
@@ -88,7 +88,9 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   const delivered = created.notificationEventId
     ? await (await import('@/lib/bookingOutbox')).deliverOutboxEvent(created.notificationEventId)
     : false;
-  const notification = !created.notificationEventId
+  const notification = !created.created
+    ? { status: 'skipped' as const, reason: 'request_already_pending' }
+    : !created.notificationEventId
     ? { status: 'skipped' as const, reason: 'webhook_not_configured' }
     : { status: delivered ? 'sent' as const : 'queued' as const };
 

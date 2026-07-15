@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useFavorites } from '@/lib/favorites';
 import { useToast } from '@/components/Toast';
 import { momentsLayoutConfig } from '@/config/momentsLayoutConfig';
@@ -189,6 +189,9 @@ export function MomentCard({
     labels,
 }: MomentCardProps) {
     const [isFlipped, setIsFlipped] = useState(false);
+    const viewDetailsRef = useRef<HTMLButtonElement | null>(null);
+    const backRef = useRef<HTMLButtonElement | null>(null);
+    const previousFlipRef = useRef(false);
     const { isFavorite, toggle } = useFavorites();
     const { push } = useToast();
     const t = getDictionary(locale as Locale);
@@ -223,6 +226,12 @@ export function MomentCard({
         toggle(favoriteId);
         push(wasFavorite ? (t.labels?.removedFavorite ?? 'Removed from favorites') : (t.labels?.addedFavorite ?? 'Added to favorites'));
     };
+
+    useEffect(() => {
+        if (previousFlipRef.current === isFlipped) return;
+        previousFlipRef.current = isFlipped;
+        (isFlipped ? backRef.current : viewDetailsRef.current)?.focus();
+    }, [isFlipped]);
 
     const frontContent = (
         <>
@@ -292,10 +301,12 @@ export function MomentCard({
                         </div>
                         <div className="moment-card-actions moment-card-actions-single">
                             <button
+                                ref={viewDetailsRef}
                                 type="button"
                                 className="moment-card-action moment-card-action-primary"
                                 aria-expanded={isFlipped}
                                 aria-controls={detailsId}
+                                tabIndex={isFlipped ? -1 : 0}
                                 onClick={() => setIsFlipped(true)}
                             >
                                 {cardLabels.viewDetails}
@@ -355,6 +366,7 @@ export function MomentCard({
                                     </a>
                                 )}
                                 <button
+                                    ref={backRef}
                                     type="button"
                                     className="moment-card-action"
                                     tabIndex={isFlipped ? 0 : -1}

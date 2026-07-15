@@ -6,6 +6,7 @@ import { getClientIp } from '@/lib/net/getClientIp';
 import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
 import { deliverOutboxEvent } from '@/lib/bookingOutbox';
 import { ApiError, readJsonBody } from '@/lib/apiErrorHandler';
+import { normalizeStayRequestPhone } from '@/lib/stayRequestPhone';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,6 +67,8 @@ export async function POST(request: NextRequest) {
   }
   const parsed = bookingRequestSchema.safeParse(raw);
   if (!parsed.success) return errorResponse('Invalid booking request payload', 422);
+  const phone = normalizeStayRequestPhone(parsed.data.guest.phone);
+  if (!phone) return errorResponse('Invalid phone number', 422);
 
   const clientIp = getClientIp(request);
   const limit = await checkSensitiveRateLimit(request, {
@@ -94,7 +97,7 @@ export async function POST(request: NextRequest) {
         firstName: parsed.data.guest.firstName,
         lastName: parsed.data.guest.lastName,
         email: parsed.data.guest.email,
-        phone: parsed.data.guest.phone.replace(/[ ()-]/g, ''),
+        phone,
         arrivalTime: parsed.data.guest.arrivalTime || null,
         specialRequests: parsed.data.guest.specialRequests || null,
         idempotencyKey: key,

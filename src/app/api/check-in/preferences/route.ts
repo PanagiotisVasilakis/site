@@ -5,6 +5,7 @@ import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import { parseGuestSession, verifyGuestSessionAccess } from '@/lib/guestSession';
 import { isAdminRequest } from '@/lib/rbac';
 import { getFeatureFlagsAsync } from '@/lib/featureFlags';
+import { wifiDisclosureWindow } from '@/lib/propertyTime';
 
 const preferencesSchema = z.object({
   checkInTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Check-in time must be in HH:MM format'),
@@ -80,11 +81,16 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
       select: { startDate: true, endDate: true },
     });
     if (booking) {
-      const revealAt = new Date(booking.startDate);
-      revealAt.setUTCHours(revealAt.getUTCHours() - 24);
+      const { revealAt, expiresAt } = wifiDisclosureWindow({
+        startDate: booking.startDate,
+        endDate: booking.endDate,
+        checkInTime: prefs.checkInTime,
+        checkOutTime: prefs.checkOutTime,
+        timeZone: process.env.PROPERTY_TIME_ZONE || 'Europe/Athens',
+      });
       wifiAvailableAt = revealAt.toISOString();
       const now = new Date();
-      if (now >= revealAt && now <= booking.endDate) {
+      if (now >= revealAt && now <= expiresAt) {
         wifi = {
           network: process.env.GUEST_WIFI_NETWORK || '',
           password: process.env.GUEST_WIFI_PASSWORD || '',
@@ -110,7 +116,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   // Basic security checks only (content type, XSS/SQLi)
   const guard = createAPISecurityMiddleware();
-  const early = guard(request);
+  const early = await guard(request);
   if (early) return early;
 
   if (!(await isAdminRequest(request))) {

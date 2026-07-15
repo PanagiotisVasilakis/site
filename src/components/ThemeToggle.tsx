@@ -22,6 +22,7 @@ export default function ThemeToggle({
 }: ThemeToggleProps = {}) {
   const [theme, setTheme] = useState<"light" | "dark">('light');
   const [mounted, setMounted] = useState(false);
+  const [followsSystem, setFollowsSystem] = useState(true);
   const pathname = usePathname();
   const locale: Locale = pathname?.startsWith('/el') ? 'el' : 'en';
   const a11y = getDictionary(locale).a11y;
@@ -32,8 +33,12 @@ export default function ThemeToggle({
       const stored = localStorage.getItem('theme');
       if (stored === 'light' || stored === 'dark') {
         setTheme(stored);
+        setFollowsSystem(false);
       } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
         setTheme('dark');
+        setFollowsSystem(true);
+      } else {
+        setFollowsSystem(true);
       }
     } catch (err) { logger.warn('ThemeToggle read localStorage failed', err instanceof Error ? err : { error: String(err) }); }
   }, []);
@@ -48,18 +53,41 @@ export default function ThemeToggle({
       root.setAttribute('data-theme', 'light');
       root.classList.remove('dark');
     }
-    try { localStorage.setItem('theme', theme); } catch (err) { logger.warn('ThemeToggle write localStorage failed', err instanceof Error ? err : { error: String(err) }); }
   }, [theme, mounted]);
   // Listen to system changes only if user hasn't chosen explicitly
   useEffect(() => {
     if (!mounted) return;
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const stored = localStorage.getItem('theme');
-    if (stored === 'light' || stored === 'dark') return; // user preference locks
+    if (!followsSystem) return;
     const listener = () => setTheme(mq.matches ? 'dark' : 'light');
     mq.addEventListener('change', listener);
     return () => mq.removeEventListener('change', listener);
+  }, [followsSystem, mounted]);
+  useEffect(() => {
+    if (!mounted) return;
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== 'theme') return;
+      if (event.newValue === 'light' || event.newValue === 'dark') {
+        setFollowsSystem(false);
+        setTheme(event.newValue);
+      } else {
+        setFollowsSystem(true);
+        setTheme(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, [mounted]);
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setFollowsSystem(false);
+    setTheme(next);
+    try {
+      localStorage.setItem('theme', next);
+    } catch (err) {
+      logger.warn('ThemeToggle write localStorage failed', err instanceof Error ? err : { error: String(err) });
+    }
+  };
   const icon = mounted ? (theme === 'dark' ? '🌞' : '🌙') : '🌙';
   const visibleText = mounted && theme === 'dark' ? darkText : lightText;
   const label = mounted
@@ -70,7 +98,7 @@ export default function ThemeToggle({
       type="button"
       aria-label={label}
       suppressHydrationWarning
-      onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+      onClick={toggleTheme}
       className={className || DEFAULT_CLASS}
     >
       <span aria-hidden suppressHydrationWarning className="select-none text-sm">{icon}</span>

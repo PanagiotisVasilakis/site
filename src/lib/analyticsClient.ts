@@ -36,15 +36,27 @@ async function post(body: unknown) {
   }
 }
 
+function analyticsEnvelope(body: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...body,
+    ts: Date.now(),
+    eventId: globalThis.crypto.randomUUID(),
+  };
+}
+
 export function trackPageview(pathname: string, locale?: string) {
   if (typeof window === 'undefined') return;
   if (dntEnabled()) return;
   const loc = locale || pathname.split('/')[1];
-  post({ path: pathname, ts: Date.now(), locale: loc });
+  post(analyticsEnvelope({ path: pathname, locale: loc }));
 }
 
 export function trackEvent(name: string, props?: Record<string, unknown>) {
   if (typeof window === 'undefined') return;
   if (dntEnabled()) return;
-  post({ path: location.pathname, locale: location.pathname.split('/')[1], event: { name, props } });
+  post(analyticsEnvelope({
+    path: location.pathname,
+    locale: location.pathname.split('/')[1],
+    event: { name, props },
+  }));
 }

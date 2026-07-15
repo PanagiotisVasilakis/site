@@ -6,7 +6,11 @@ import FilterDrawer from '@/components/FilterDrawer';
 import { ListingCardSkeleton } from '@/components/ListingCardSkeleton';
 import dynamic from 'next/dynamic';
 import { EmptyState, MomentCard, MomentsToolbar } from '@/components/moments';
-import { filterMomentsByCategory, type MomentsFilterKey } from '@/components/moments/MomentsFilterMenu';
+import {
+  filterMomentsByCategory,
+  MOMENTS_FILTER_KEYS,
+  type MomentsFilterKey,
+} from '@/components/moments/MomentsFilterMenu';
 import { momentsLayoutConfig } from '@/config/momentsLayoutConfig';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
@@ -99,6 +103,15 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
     () => filterMomentsByCategory(items, momentsFilter),
     [items, momentsFilter]
   );
+  const availableMomentsFilters = useMemo(
+    () => MOMENTS_FILTER_KEYS.filter((filter) => (
+      filter === 'all' || filterMomentsByCategory(items, filter).length > 0
+    )),
+    [items],
+  );
+  useEffect(() => {
+    if (!availableMomentsFilters.includes(momentsFilter)) setMomentsFilter('all');
+  }, [availableMomentsFilters, momentsFilter]);
   const momentsFiltered = useMemo(() => {
     const query = momentsSearch.trim().toLowerCase();
     if (!query) return momentsCategoryFiltered;
@@ -173,6 +186,7 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
       searchMomentsLabel={t.moments?.searchMoments}
       searchPlaceholder={t.moments?.searchPlaceholder}
       filterByCategoryLabel={t.moments?.filterByCategory}
+      availableFilters={availableMomentsFilters}
       filters={momentsFilters}
     />
   );
@@ -242,8 +256,11 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
           {momentsFiltered.length === 0 && (
             <EmptyState
               message={t.moments?.noPlaces}
-              clearLabel={t.moments?.clearSearch}
-              onClear={momentsSearch ? () => setMomentsSearch('') : undefined}
+              clearLabel={momentsFilter !== 'all' ? (ui?.resetAll || 'Reset all') : t.moments?.clearSearch}
+              onClear={(momentsSearch || momentsFilter !== 'all') ? () => {
+                setMomentsSearch('');
+                setMomentsFilter('all');
+              } : undefined}
             />
           )}
         </div>
@@ -266,8 +283,11 @@ function CategoryGridClientComponent({ items, locale, emptyLabel, categorySlug, 
           {momentsFiltered.length === 0 && (
             <EmptyState
               message={t.moments?.noPlaces}
-              clearLabel={t.moments?.clearSearch}
-              onClear={momentsSearch ? () => setMomentsSearch('') : undefined}
+              clearLabel={momentsFilter !== 'all' ? (ui?.resetAll || 'Reset all') : t.moments?.clearSearch}
+              onClear={(momentsSearch || momentsFilter !== 'all') ? () => {
+                setMomentsSearch('');
+                setMomentsFilter('all');
+              } : undefined}
             />
           )}
         </div>

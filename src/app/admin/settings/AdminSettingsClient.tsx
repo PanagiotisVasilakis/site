@@ -22,7 +22,7 @@ export default function AdminSettingsClient() {
 
   useEffect(() => { load().catch((loadError) => setError(loadError.message)); }, [load]);
 
-  async function save(next: Flags) {
+  async function save(next: Partial<Flags>) {
     setSaving(true);
     setError('');
     try {
@@ -64,7 +64,7 @@ export default function AdminSettingsClient() {
                 <input
                   type="checkbox"
                   checked={flags[key]}
-                  onChange={(event) => void save({ ...flags, [key]: event.target.checked })}
+                  onChange={(event) => void save({ [key]: event.target.checked })}
                   className="h-5 w-5"
                 />
               </label>

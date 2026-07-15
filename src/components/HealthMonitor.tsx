@@ -86,10 +86,10 @@ export default function HealthMonitor({
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'healthy': return 'text-green-600 bg-green-100';
-      case 'degraded': return 'text-yellow-600 bg-yellow-100';
-      case 'unhealthy': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'healthy': return 'text-green-900 bg-green-100';
+      case 'degraded': return 'text-amber-900 bg-amber-100';
+      case 'unhealthy': return 'text-red-900 bg-red-100';
+      default: return 'text-gray-900 bg-gray-100';
     }
   };
 

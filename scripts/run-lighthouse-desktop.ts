@@ -6,6 +6,7 @@
 
 import { launch } from 'chrome-launcher';
 import { writeFile } from 'node:fs/promises';
+import { screenEmulationMetrics, throttling } from 'lighthouse/core/config/constants.js';
 
 const { default: lighthouse } = await import('lighthouse');
 
@@ -42,19 +43,14 @@ try {
       port: chrome.port,
       output: outputMode.split(',') as Array<'json' | 'html'>,
       logLevel: 'info',
-      screenEmulation: { mobile: false, disabled: false },
     },
     {
       extends: 'lighthouse:default',
       settings: {
         formFactor: 'desktop',
-        screenEmulation: {
-          mobile: false,
-          width: 1366,
-          height: 768,
-          deviceScaleRatio: 1,
-          disabled: false,
-        },
+        screenEmulation: { ...screenEmulationMetrics.desktop },
+        emulatedUserAgent: true,
+        throttling: { ...throttling.desktopDense4G },
         throttlingMethod: 'simulate',
         onlyCategories: ['performance'],
       },

@@ -11,6 +11,7 @@ import {
   type SecurityEvent 
 } from '@/lib/security-config';
 import { isSensitiveFieldName, redactSensitiveText } from '@/lib/redaction';
+import { privacyHmac } from '@/lib/privacyHash';
 
 // Security metrics collection
 interface SecurityMetrics {
@@ -51,7 +52,7 @@ function pathnameOnly(rawUrl: string): string {
 
 function sanitizeEvent(event: SecurityEvent): { event: SecurityEvent; ipHash: string | null } {
   const ipHash = event.ip && event.ip !== 'unknown'
-    ? crypto.createHash('sha256').update(event.ip).digest('hex')
+    ? privacyHmac(event.ip, 'security-event-ip:v1')
     : null;
   return {
     ipHash,
@@ -69,17 +70,21 @@ function sanitizeEvent(event: SecurityEvent): { event: SecurityEvent; ipHash: st
 async function persistSecurityEvent(event: SecurityEvent, ipHash: string | null): Promise<void> {
   if (process.env.NODE_ENV === 'test' || !process.env.DATABASE_URL) return;
   const { prisma } = await import('@/lib/prisma');
-  await prisma.securityAuditEvent.create({
-    data: {
-      id: crypto.randomUUID(),
-      eventType: event.type,
-      severity: event.severity,
-      ipHash,
-      path: event.url === 'unknown' ? null : event.url,
-      details: event.details as Prisma.InputJsonValue,
-      occurredAt: new Date(event.timestamp),
-    },
-  });
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe("SET LOCAL statement_timeout = '1800ms'");
+    await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '500ms'");
+    await tx.securityAuditEvent.create({
+      data: {
+        id: crypto.randomUUID(),
+        eventType: event.type,
+        severity: event.severity,
+        ipHash,
+        path: event.url === 'unknown' ? null : event.url,
+        details: event.details as Prisma.InputJsonValue,
+        occurredAt: new Date(event.timestamp),
+      },
+    });
+  }, { maxWait: 1_000, timeout: 2_500 });
 }
 
 class SecurityMonitor {
@@ -374,9 +379,6 @@ ${recentEvents
     return trends;
   }
 }
-
-// Export report generator instance
-export const securityReportGenerator = new SecurityReportGenerator();
 
 // Health check for security monitoring
 export function getSecurityHealthStatus(): {

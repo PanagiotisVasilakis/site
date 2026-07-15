@@ -25,7 +25,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   if (!(await getFeatureFlagsAsync()).portalEnabled) {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }
-  const early = createAPISecurityMiddleware()(request);
+  const early = await createAPISecurityMiddleware()(request);
   if (early) return early;
 
   const parsed = schema.safeParse(await readJsonBody(request, 16 * 1_024));

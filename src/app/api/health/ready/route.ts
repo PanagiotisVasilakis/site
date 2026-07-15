@@ -5,7 +5,10 @@ export const dynamic = 'force-dynamic';
 
 // This must be updated whenever a schema migration is added. Readiness is not
 // merely a TCP/SELECT probe: the running binary and database schema must agree.
-export const EXPECTED_MIGRATION = '20260714150000_trustworthy_portal_and_operations';
+const EXPECTED_MIGRATION = '20260715110000_remove_unused_legacy_models';
+const READINESS_CACHE_MS = 2_000;
+let cachedReadiness: { ready: boolean; expiresAt: number } | null = null;
+let readinessInFlight: Promise<boolean> | null = null;
 
 async function databaseReady(): Promise<boolean> {
   try {
@@ -28,8 +31,47 @@ async function databaseReady(): Promise<boolean> {
   }
 }
 
+async function rateLimitBackendReady(): Promise<boolean> {
+  const backend = process.env.RATE_LIMIT_BACKEND || '';
+  const requiresDistributedBackend = process.env.NODE_ENV === 'production' || backend === 'redis';
+  if (!requiresDistributedBackend) return true;
+  if (backend !== 'redis') return false;
+
+  try {
+    const upstash = await import('@/lib/upstash');
+    return upstash.ping();
+  } catch {
+    return false;
+  }
+}
+
+async function checkReadiness(): Promise<boolean> {
+  const [database, rateLimitBackend] = await Promise.all([
+    databaseReady(),
+    rateLimitBackendReady(),
+  ]);
+  return database && rateLimitBackend;
+}
+
+async function getReadiness(): Promise<boolean> {
+  const now = Date.now();
+  if (cachedReadiness && cachedReadiness.expiresAt > now) return cachedReadiness.ready;
+  if (readinessInFlight) return readinessInFlight;
+
+  readinessInFlight = checkReadiness().then((ready) => {
+    cachedReadiness = { ready, expiresAt: Date.now() + READINESS_CACHE_MS };
+    return ready;
+  }).finally(() => {
+    readinessInFlight = null;
+  });
+  return readinessInFlight;
+}
+
 async function readinessResponse(head = false) {
-  const ready = await databaseReady();
+  // Coalesce concurrent probes and briefly cache the dependency result. This
+  // bounds public request amplification while retaining a much shorter window
+  // than the container's 30-second probe interval.
+  const ready = await getReadiness();
   const init = {
     status: ready ? 200 : 503,
     headers: { 'cache-control': 'no-store' },

@@ -607,7 +607,10 @@ validate_environment_contract() {
     failed=1
   fi
 
-  if [[ -n "${RATE_LIMIT_BACKEND:-}" && "${RATE_LIMIT_BACKEND}" != "redis" ]]; then
+  if [[ "$PROFILE" == "production" && "${RATE_LIMIT_BACKEND:-}" != "redis" ]]; then
+    error "RATE_LIMIT_BACKEND=redis is required in production; process-local rate limiting is not distributed"
+    failed=1
+  elif [[ -n "${RATE_LIMIT_BACKEND:-}" && "${RATE_LIMIT_BACKEND}" != "redis" ]]; then
     error "RATE_LIMIT_BACKEND must be redis when configured"
     failed=1
   elif [[ "${RATE_LIMIT_BACKEND:-}" == "redis" ]]; then
@@ -767,16 +770,59 @@ prepare_database() {
 }
 
 ensure_dependencies() {
-  if (( FORCE_INSTALL )) || [[ ! -d "$REPO_ROOT/node_modules" ]]; then
-    log "Installing dependencies via npm ci"
+  local missing_build_dependencies=0
+  if [[ -d "$REPO_ROOT/node_modules" ]] \
+    && { [[ ! -x "$REPO_ROOT/node_modules/.bin/tsx" ]] \
+      || [[ ! -x "$REPO_ROOT/node_modules/.bin/prisma" ]] \
+      || [[ ! -d "$REPO_ROOT/node_modules/@tailwindcss/postcss" ]]; }; then
+    missing_build_dependencies=1
+  fi
+
+  if (( FORCE_INSTALL )) || [[ ! -d "$REPO_ROOT/node_modules" ]] || (( missing_build_dependencies )); then
+    if (( missing_build_dependencies )); then
+      warn "node_modules exists but required build dependencies are missing"
+    fi
+    log "Installing dependencies via npm ci --include=dev"
     (
       cd "$REPO_ROOT"
-      npm ci
+      # NODE_ENV=production makes npm omit devDependencies by default. Production
+      # bootstrap still needs the checked-in build toolchain before standalone output
+      # can be produced, so make the install mode explicit.
+      npm ci --include=dev
     )
     return
   fi
 
   log "Dependencies already present (node_modules exists)"
+}
+
+validate_runtime_environment_contract() {
+  if (( DB_ONLY_MODE )); then
+    return
+  fi
+
+  log "Validating authoritative runtime environment schema"
+  (
+    cd "$REPO_ROOT"
+    node --input-type=module <<'NODE'
+import { z } from 'zod';
+import { runtimeEnvSchema } from './src/lib/runtime-env-schema.js';
+
+try {
+  runtimeEnvSchema.parse(process.env);
+} catch (error) {
+  if (error instanceof z.ZodError) {
+    console.error('[orchestrator] Authoritative runtime environment validation failed:');
+    for (const issue of error.issues) {
+      console.error(`  - ${issue.path.join('.')}: ${issue.message}`);
+    }
+    process.exit(14);
+  }
+  throw error;
+}
+NODE
+  )
+  log "Authoritative runtime environment validation passed"
 }
 
 run_prisma_generate() {
@@ -854,15 +900,36 @@ run_build_pipeline() {
   (
     cd "$REPO_ROOT"
     npm run build
+    # Materialize the standalone public/static tree and its writable cache before
+    # a hardened systemd service mounts only the cache path read-write.
+    node scripts/prepare-standalone.mjs
   )
 }
 
 app_command_for_profile() {
   case "$PROFILE" in
-    production) printf '%s' "npm start" ;;
+    # The production build pipeline already materializes public/static assets.
+    # Starting the server directly avoids rerunning the mutating npm prestart hook
+    # inside a read-only systemd sandbox.
+    production) printf '%s' "node scripts/start-standalone.mjs .next/standalone/server.js" ;;
     development) printf '%s' "npm run dev" ;;
     test) printf '%s' "npm run dev" ;;
   esac
+}
+
+validate_standalone_runtime_tree() {
+  [[ "$PROFILE" == "production" ]] || return
+
+  local required_path
+  for required_path in \
+    ".next/standalone/server.js" \
+    ".next/standalone/.next/static" \
+    ".next/standalone/.next/cache/images" \
+    ".next/standalone/public"; do
+    if [[ ! -e "$REPO_ROOT/$required_path" ]]; then
+      die "Prepared standalone runtime is missing $required_path; run the production build first" 19
+    fi
+  done
 }
 
 set_node_env_for_profile() {
@@ -915,6 +982,7 @@ start_app() {
 
   set_node_env_for_profile
   ensure_runtime_dir
+  validate_standalone_runtime_tree
 
   if app_is_running; then
     die "Application already running with PID $(cat "$APP_PID_FILE")" 19
@@ -1136,6 +1204,7 @@ run_bootstrap_sequence() {
   fi
 
   ensure_dependencies
+  validate_runtime_environment_contract
   prepare_database
   run_prisma_generate
   run_migrations_with_retry
@@ -1233,12 +1302,15 @@ cmd_logs() {
 
 cmd_verify() {
   run_preflight
+  ensure_dependencies
+  validate_runtime_environment_contract
   verify_runtime
 }
 
 cmd_build() {
   run_preflight
   ensure_dependencies
+  validate_runtime_environment_contract
   prepare_database
   run_prisma_generate
   run_build_pipeline
@@ -1248,6 +1320,7 @@ cmd_build() {
 cmd_migrate() {
   run_preflight
   ensure_dependencies
+  validate_runtime_environment_contract
   prepare_database
   run_prisma_generate
   run_migrations_with_retry
@@ -1255,6 +1328,10 @@ cmd_migrate() {
 
 cmd_check() {
   run_preflight
+  if (( DB_ONLY_MODE == 0 )); then
+    ensure_dependencies
+    validate_runtime_environment_contract
+  fi
   if database_reachable "$DATABASE_URL"; then
     log "Check passed: DATABASE_URL accepted a SQL query"
   else

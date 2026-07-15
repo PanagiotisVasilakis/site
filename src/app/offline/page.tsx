@@ -1,11 +1,14 @@
 import OfflineActions from "@/components/OfflineActions";
 import type { Metadata } from 'next';
 
-export const metadata: Metadata = { robots: { index: false, follow: false } };
+export const metadata: Metadata = {
+  title: 'Offline',
+  robots: { index: false, follow: false },
+};
 
 export default function OfflinePage() {
   return (
-    <div className="page-bg min-h-screen flex items-center justify-center p-6 safe-bottom">
+    <main className="page-bg min-h-screen flex items-center justify-center p-6 safe-bottom">
       <div className="max-w-md w-full surface-card rounded-xl shadow-sm p-8 relative overflow-hidden">
         <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full opacity-40" style={{ background: 'var(--brand-100)' }} aria-hidden></div>
         <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-amber-100 rounded-full opacity-30" aria-hidden></div>
@@ -24,6 +27,6 @@ export default function OfflinePage() {
           <OfflineActions homeHref="/" />
         </div>
       </div>
-    </div>
+    </main>
   );
 }

@@ -319,7 +319,6 @@ self.addEventListener('install', (event) => {
     } catch {
       await Promise.allSettled(CORE_ASSETS.map(u => cache.add(u).catch(() => {})));
     }
-    await self.skipWaiting();
   })());
 });
 
@@ -442,16 +441,6 @@ self.addEventListener('message', (event) => {
   if (event.data.type === 'REQUEST_VERSION') {
     // Respond directly to requesting client only
     event.source?.postMessage({ type: 'RUNTIME_VERSION', meta: RUNTIME_META, cache: ACTIVE_CACHE_NAME });
-  }
-  if (event.data.type === 'BG_SYNC_TRIGGER') {
-    // Placeholder: attempt to refetch precache manifest
-  // NOTE: Previously used undefined CACHE_NAME; intentionally using ACTIVE_CACHE_NAME.
-  fetchInternal('/precache.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : []).then(async (urls) => {
-  const cache = await caches.open(ACTIVE_CACHE_NAME);
-      if (Array.isArray(urls)) {
-        for (const u of urls) cache.add(u).catch(()=>{});
-      }
-    }).catch(()=>{});
   }
   if (event.data.type === 'QUEUE_ANALYTICS' && event.data.body) {
     enqueue(event.data.body).then((queued) => {

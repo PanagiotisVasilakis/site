@@ -26,18 +26,22 @@ export default function PwaManager() {
           const showBanner = () => {
             const b = document.getElementById('update-banner');
             if (!b) return;
-            const dismissedVer = localStorage.getItem('update-dismissed-version');
-            const newVer = b.getAttribute('data-new-version');
-            if (dismissedVer && newVer && dismissedVer === newVer) return; // don't re-show for dismissed version
+            const dismissedUpdate = localStorage.getItem('update-dismissed-version');
+            const updateKey = b.getAttribute('data-update-key');
+            if (dismissedUpdate && updateKey && dismissedUpdate === updateKey) return;
             b.style.display = 'flex';
           };
             if (reg.waiting) {
+              reg.waiting.postMessage({ type: 'REQUEST_VERSION' });
               showBanner();
             }
             reg.addEventListener('updatefound', () => {
               const nw = reg.installing; if (!nw) return;
               nw.addEventListener('statechange', () => {
-                if (nw.state === 'installed' && navigator.serviceWorker.controller) showBanner();
+                if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                  nw.postMessage({ type: 'REQUEST_VERSION' });
+                  showBanner();
+                }
               }, { signal });
             }, { signal });
   } catch (err) { logger.error('Service worker registration failed', err instanceof Error ? err : { error: String(err) }); }
@@ -51,7 +55,6 @@ export default function PwaManager() {
     // iOS A2HS tip
   const hasTouch = 'maxTouchPoints' in navigator ? navigator.maxTouchPoints > 1 : false;
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && hasTouch);
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || hasTouch;
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
     ('standalone' in window.navigator ? (window.navigator as { standalone?: boolean }).standalone === true : false);
     const dismissed = localStorage.getItem('ios-a2hs-dismissed') === '1';
@@ -67,46 +70,38 @@ export default function PwaManager() {
         const banner = document.getElementById('update-banner');
         const newV = banner?.getAttribute('data-new-version');
         const newHash = banner?.getAttribute('data-new-hash-full');
-        if (reg?.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        if (reg?.waiting) {
+          const activated = await new Promise<boolean>((resolve) => {
+            let settled = false;
+            const finish = (value: boolean) => {
+              if (settled) return;
+              settled = true;
+              window.clearTimeout(timeout);
+              navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+              resolve(value);
+            };
+            const onControllerChange = () => finish(true);
+            const timeout = window.setTimeout(() => finish(false), 8_000);
+            navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+            reg.waiting?.postMessage({ type: 'SKIP_WAITING' });
+          });
+          if (!activated) throw new Error('Timed out waiting for the updated service worker to activate');
+        }
         if (newV) localStorage.setItem('app-version', newV);
         if (newHash) localStorage.setItem('app-precache-hash', newHash);
+        window.location.reload();
   } catch (err) { logger.error('Update reload handler failed', err instanceof Error ? err : { error: String(err) }); }
-      window.location.reload();
     }, { signal });
     const dismiss = document.getElementById('update-dismiss-btn');
     dismiss?.addEventListener('click', () => {
       const banner = document.getElementById('update-banner');
       if (banner) {
-        const ver = banner.getAttribute('data-new-version') || banner.getAttribute('data-old-version');
-        if (ver) localStorage.setItem('update-dismissed-version', ver);
+        const updateKey = banner.getAttribute('data-update-key')
+          || banner.getAttribute('data-new-version')
+          || banner.getAttribute('data-old-version');
+        if (updateKey) localStorage.setItem('update-dismissed-version', updateKey);
         banner.style.display = 'none';
       }
-    }, { signal });
-    // Install prompt button
-  // Track deferred install prompt event
-  interface BeforeInstallPromptEvent extends Event {
-    prompt: () => void;
-    userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
-  }
-  
-  let deferred: BeforeInstallPromptEvent | null = null;
-    const btn = document.getElementById('install-btn');
-  if (btn) btn.style.display = 'none';
-    
-    window.addEventListener('beforeinstallprompt', (e: Event) => {
-      e.preventDefault();
-      // Validate that the event has the expected install prompt interface
-      if (e && typeof (e as BeforeInstallPromptEvent).prompt === 'function' && (e as BeforeInstallPromptEvent).userChoice) {
-        deferred = e as BeforeInstallPromptEvent;
-  if (btn && !isIOS && isMobile) btn.style.display = 'inline-flex';
-      }
-    }, { signal });
-    btn?.addEventListener('click', async () => {
-      if (!deferred) return;
-      deferred.prompt();
-      await deferred.userChoice;
-  deferred = null;
-      if (btn) btn.style.display = 'none';
     }, { signal });
     // Listen for version messages from SW
     navigator.serviceWorker?.addEventListener('message', (e: MessageEvent) => {
@@ -115,19 +110,13 @@ export default function PwaManager() {
         const newVersion = meta.version || meta.pkgVersion;
         const newHash: string | undefined = meta.precacheHash;
         if (!newVersion) return;
-        const currentEl = document.getElementById('current-version');
         const storedVersion = localStorage.getItem('app-version');
         const storedHash = localStorage.getItem('app-precache-hash');
         const shortNewHash = newHash ? newHash.slice(0,8) : '';
         if (!storedVersion) {
           localStorage.setItem('app-version', newVersion);
           if (newHash) localStorage.setItem('app-precache-hash', newHash);
-          if (currentEl) currentEl.textContent = shortNewHash ? `${newVersion} (${shortNewHash})` : newVersion;
           return;
-        }
-        if (currentEl && !document.getElementById('update-banner')?.style.display) {
-          const storedShort = storedHash ? storedHash.slice(0,8) : '';
-          currentEl.textContent = storedShort ? `${storedVersion} (${storedShort})` : storedVersion;
         }
         const banner = document.getElementById('update-banner');
         const versionChanged = storedVersion !== newVersion;
@@ -146,27 +135,21 @@ export default function PwaManager() {
           }
           banner.setAttribute('data-old-version', storedVersion);
           banner.setAttribute('data-new-version', newVersion);
+          const updateKey = newHash ? `${newVersion}:${newHash}` : newVersion;
+          banner.setAttribute('data-update-key', updateKey);
           if (hashChanged && newHash) {
             banner.setAttribute('data-new-hash', shortNewHash);
             banner.setAttribute('data-new-hash-full', newHash);
           }
           // If user previously dismissed this same new version, keep hidden.
-          const dismissedVer = localStorage.getItem('update-dismissed-version');
-          if (dismissedVer === newVersion) {
+          const dismissedUpdate = localStorage.getItem('update-dismissed-version');
+          if (dismissedUpdate === updateKey) {
             banner.style.display = 'none';
+          } else {
+            banner.style.display = 'flex';
           }
         }
       }
-    }, { signal });
-    // Manual update check
-    const manual = document.getElementById('manual-update-check');
-    manual?.addEventListener('click', async () => {
-      try {
-        const reg = await navigator.serviceWorker.getRegistration();
-        await reg?.update();
-  // Ask SW to refresh precache opportunistically
-  reg?.active?.postMessage({ type: 'BG_SYNC_TRIGGER' });
-  } catch (err) { logger.error('Manual update check failed', err instanceof Error ? err : { error: String(err) }); }
     }, { signal });
     return () => eventController.abort();
   }, []);

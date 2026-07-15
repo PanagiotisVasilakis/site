@@ -23,33 +23,48 @@ describe('Upstash wrapper', () => {
     vi.resetAllMocks();
   });
 
-  it('incrWithExpire should call incr then expire when count === 1', async () => {
-    // first call: incr -> returns { result: 1 }
-    // second call: expire -> returns {} (ok)
-    fetchMock
-      .mockResolvedValueOnce(new Response(JSON.stringify({ result: 1 }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ result: true }), { status: 200 }));
+  it('increments and assigns the TTL atomically with one Redis script', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ result: [1, 15000] }), { status: 200 }));
 
     const upstash = await import('../upstash');
 
-    const count = await upstash.incrWithExpire('my-key', 15000);
+    const result = await upstash.incrWithExpire('my-key', 15000);
 
-    expect(count).toBe(1);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect((fetchMock.mock.calls[0] as any[])[0]).toBe(`${BASE}/incr/my-key`);
-    expect((fetchMock.mock.calls[1] as any[])[0]).toMatch(new RegExp(`^${BASE}/expire/my-key/`));
+    expect(result).toEqual({ count: 1, resetAfterMs: 15000 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(BASE);
+    expect(options.signal).toBeInstanceOf(AbortSignal);
+    expect(JSON.parse(String(options.body))).toEqual([
+      'EVAL',
+      expect.stringContaining("redis.call('PEXPIRE'"),
+      1,
+      'my-key',
+      15000,
+    ]);
   });
 
-  it('incrWithExpire should not call expire when count > 1', async () => {
-    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ result: 5 }), { status: 200 }));
+  it('returns subsequent atomic increment results', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ result: [5, 42000] }), { status: 200 }));
 
     const upstash = await import('../upstash');
 
-    const count = await upstash.incrWithExpire('another-key', 60000);
+    const result = await upstash.incrWithExpire('another-key', 60000);
 
-    expect(count).toBe(5);
+    expect(result).toEqual({ count: 5, resetAfterMs: 42000 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect((fetchMock.mock.calls[0] as any[])[0]).toBe(`${BASE}/incr/another-key`);
+  });
+
+  it('rejects malformed counter responses instead of failing open', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ result: ['not-a-number', 1000] }), { status: 200 }));
+    const upstash = await import('../upstash');
+    await expect(upstash.incrWithExpire('invalid-key', 60000)).rejects.toThrow('invalid rate-limit count');
+  });
+
+  it('rejects malformed TTL responses instead of inventing reset headers', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ result: [2, -1] }), { status: 200 }));
+    const upstash = await import('../upstash');
+    await expect(upstash.incrWithExpire('invalid-ttl', 60000)).rejects.toThrow('invalid rate-limit TTL');
   });
 
   it('get should return number or null', async () => {

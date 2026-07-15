@@ -1,4 +1,4 @@
-FROM node:22.19-alpine@sha256:d2166de198f26e17e5a442f537754dd616ab069c47cc57b889310a717e0abbf9 AS builder
+FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS builder
 
 ARG NEXT_PUBLIC_SITE_URL
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -15,7 +15,7 @@ RUN npm ci --audit=false --fund=false && npm cache clean --force
 COPY . .
 RUN npm run build
 
-FROM node:22.19-alpine@sha256:d2166de198f26e17e5a442f537754dd616ab069c47cc57b889310a717e0abbf9 AS runner
+FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS runner
 
 ARG NEXT_PUBLIC_SITE_URL
 
@@ -24,7 +24,9 @@ LABEL org.opencontainers.image.title="QR City Guest Guide" \
       org.opencontainers.image.version="0.1.1" \
       org.opencontainers.image.licenses="UNLICENSED"
 
-RUN apk add --no-cache dumb-init \
+RUN apk add --no-cache dumb-init=1.2.5-r4 \
+  && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn-* \
+  && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /usr/local/bin/yarn /usr/local/bin/yarnpkg \
   && addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 --ingroup nodejs nextjs
 
@@ -41,10 +43,15 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/start-standalone.mjs ./scripts/start-standalone.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/src/lib/runtime-env-schema.js ./src/lib/runtime-env-schema.js
+# The two manually copied startup modules import zod outside Next's output trace.
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/zod ./node_modules/zod
 
-RUN find /app -type d -exec chmod 0555 {} + \
+RUN mkdir -p /app/.next/cache/images \
+  && find /app -type d -exec chmod 0555 {} + \
   && find /app -type f -exec chmod 0444 {} + \
-  && chmod 0555 /app/server.js
+  && chmod 0555 /app/server.js \
+  && chown nextjs:nodejs /app/.next/cache/images \
+  && chmod 0750 /app/.next/cache/images
 
 USER 1001:1001
 EXPOSE 3000

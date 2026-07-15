@@ -129,6 +129,8 @@ describe('BookingPage (server component harness)', () => {
     await waitFor(() => expect(submit).toBeEnabled());
     await user.click(submit);
     expect(await screen.findByRole('heading', { name: /Request Sent/i })).toBeInTheDocument();
-    // Submission confirmation renders
+    const confirmation = screen.getByRole('status');
+    expect(confirmation).toHaveTextContent(bookingFormLabels.submittedAnnounce);
+    expect(confirmation).toHaveFocus();
   });
 });

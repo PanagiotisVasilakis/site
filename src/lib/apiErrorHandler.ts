@@ -174,11 +174,30 @@ export interface ApiResponse<T = unknown> {
   };
 }
 
-// API route handler type compatible with Next.js 15
+interface ApiRouteHandlerContext {
+  params: Promise<Record<string, string>>;
+  /**
+   * Aborted when the client disconnects or the configured request deadline is
+   * reached. Long-running handlers must pass this signal to cancellable I/O and
+   * call throwIfAborted() before starting irreversible work. Once an irreversible
+   * mutation has started, return its actual outcome rather than converting an
+   * already-committed operation into a timeout.
+   */
+  signal: AbortSignal;
+}
+
+// API route handler type compatible with Next.js route handlers. The wrapper
+// enriches Next's context with a cooperative cancellation signal.
 export type ApiRouteHandler = (
   request: NextRequest,
-  context: { params: Promise<Record<string, string>> }
+  context: ApiRouteHandlerContext,
 ) => Promise<NextResponse> | NextResponse;
+
+type NextRouteContext = Omit<ApiRouteHandlerContext, 'signal'>;
+type WrappedApiRouteHandler = (
+  request: NextRequest,
+  context: NextRouteContext,
+) => Promise<NextResponse>;
 
 // Error handling middleware configuration
 export interface ErrorHandlerConfig {
@@ -211,10 +230,14 @@ const DEFAULT_CONFIG: Required<ErrorHandlerConfig> = {
 export function withErrorHandler(
   handler: ApiRouteHandler,
   config: ErrorHandlerConfig = {}
-): ApiRouteHandler {
+): WrappedApiRouteHandler {
   const mergedConfig = { ...DEFAULT_CONFIG, ...config };
 
-  return async (request: NextRequest, context: { params: Promise<Record<string, string>> }) => {
+  if (!Number.isSafeInteger(mergedConfig.requestTimeoutMs) || mergedConfig.requestTimeoutMs <= 0) {
+    throw new RangeError('requestTimeoutMs must be a positive integer');
+  }
+
+  return async (request: NextRequest, context: NextRouteContext) => {
     const startTime = performance.now();
     const correlationId = generateCorrelationId();
     const method = request.method;
@@ -248,21 +271,61 @@ export function withErrorHandler(
         );
       }
 
-      // Request timeout
-      let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        timeoutHandle = setTimeout(() => {
-          reject(new TimeoutError(mergedConfig.requestTimeoutMs, correlationId));
-        }, mergedConfig.requestTimeoutMs);
-      });
+      // Request deadline. Safe/read-only methods may return a 504 immediately.
+      // Mutation methods abort cooperatively but await handler settlement, so a
+      // client is never told that a still-running mutation timed out and then
+      // tempted to retry while its first write can still commit.
+      const deadlineController = new AbortController();
+      const canReturnBeforeSettlement = ['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase());
+      const forwardClientAbort = () => {
+        if (!deadlineController.signal.aborted) {
+          deadlineController.abort(request.signal.reason);
+        }
+      };
+      if (request.signal.aborted) {
+        forwardClientAbort();
+      } else {
+        request.signal.addEventListener('abort', forwardClientAbort, { once: true });
+      }
 
-      // Execute handler with timeout
-      const handlerPromise = handler(request, context);
+      let rejectTimeout: ((reason: TimeoutError) => void) | undefined;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        rejectTimeout = reject;
+      });
+      const timeoutHandle = setTimeout(() => {
+        const timeoutError = new TimeoutError(mergedConfig.requestTimeoutMs, correlationId);
+        if (!deadlineController.signal.aborted) {
+          deadlineController.abort(timeoutError);
+        }
+        if (canReturnBeforeSettlement) {
+          rejectTimeout?.(timeoutError);
+        }
+      }, mergedConfig.requestTimeoutMs);
+
+      // Pass the deadline signal through the Request as well as the explicit
+      // context. This makes body readers and any handler code that forwards
+      // request.signal cooperative without every route needing bespoke wiring.
+      const deadlineRequest = new NextRequest(request, {
+        signal: deadlineController.signal,
+      });
+      const handlerPromise = Promise.resolve()
+        .then(() => handler(deadlineRequest, { ...context, signal: deadlineController.signal }))
+        .catch((error: unknown) => {
+          const abortReason = deadlineController.signal.reason;
+          const isAbortError = error instanceof DOMException && error.name === 'AbortError';
+          if (abortReason instanceof TimeoutError && (error === abortReason || isAbortError)) {
+            throw abortReason;
+          }
+          throw error;
+        });
       let response: NextResponse;
       try {
-        response = await Promise.race([handlerPromise, timeoutPromise]);
+        response = canReturnBeforeSettlement
+          ? await Promise.race([handlerPromise, timeoutPromise])
+          : await handlerPromise;
       } finally {
-        if (timeoutHandle) clearTimeout(timeoutHandle);
+        clearTimeout(timeoutHandle);
+        request.signal.removeEventListener('abort', forwardClientAbort);
       }
       const requestDuration = performance.now() - startTime;
       metrics.counter('http.requests', 1, { method, route: request.nextUrl.pathname, status: String(response.status) });
@@ -440,11 +503,18 @@ export async function readJsonBody(
 
   if (!request.body) throw new ApiError(ErrorCodes.BAD_REQUEST, 'Invalid JSON in request body');
   const reader = request.body.getReader();
+  const signal = request.signal;
   const chunks: Uint8Array[] = [];
   let total = 0;
+  const cancelOnAbort = () => {
+    void reader.cancel(signal.reason).catch(() => undefined);
+  };
   try {
+    signal.throwIfAborted();
+    signal.addEventListener('abort', cancelOnAbort, { once: true });
     while (true) {
       const { done, value } = await reader.read();
+      signal.throwIfAborted();
       if (done) break;
       total += value.byteLength;
       if (total > maxBytes) {
@@ -454,6 +524,7 @@ export async function readJsonBody(
       chunks.push(value);
     }
   } finally {
+    signal.removeEventListener('abort', cancelOnAbort);
     reader.releaseLock();
   }
 

@@ -19,8 +19,6 @@ const badgeVariants = cva('status-badge', {
   },
 });
 
-export type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>['variant']>;
-
 type BadgeProps = HTMLAttributes<HTMLSpanElement> & VariantProps<typeof badgeVariants>;
 
 export function Badge({ className, variant, ...props }: BadgeProps) {

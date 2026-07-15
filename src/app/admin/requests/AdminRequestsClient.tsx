@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import internalFetch from '@/lib/internalFetchClient';
 import { Badge, EmptyPanel, MetricCard, Surface } from '@/components/ui';
 
@@ -76,13 +76,24 @@ export default function AdminRequestsClient() {
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
+  const loadVersionRef = useRef(0);
+  const loadAbortRef = useRef<AbortController | null>(null);
+  const filterRef = useRef<RequestFilter>('pending');
 
   const loadRequests = useCallback(async (nextFilter: RequestFilter, clearFeedback = true) => {
+    const version = loadVersionRef.current + 1;
+    loadVersionRef.current = version;
+    loadAbortRef.current?.abort();
+    const controller = new AbortController();
+    loadAbortRef.current = controller;
     setLoading(true);
     if (clearFeedback) setFeedback(null);
     try {
-      const response = await internalFetch(`/api/admin/check-in-requests?status=${nextFilter}`);
+      const response = await internalFetch(`/api/admin/check-in-requests?status=${nextFilter}`, {
+        signal: controller.signal,
+      });
       const data = await response.json().catch(() => null);
+      if (version !== loadVersionRef.current) return;
       if (!response.ok || !data?.success) {
         setRequests([]);
         setSummary(emptySummary);
@@ -96,17 +107,25 @@ export default function AdminRequestsClient() {
       setRequests(data.data?.requests ?? []);
       setSummary(data.data?.summary ?? emptySummary);
     } catch (error) {
+      if (controller.signal.aborted || version !== loadVersionRef.current) return;
       console.error('Failed to load arrival requests', error);
       setRequests([]);
       setSummary(emptySummary);
       setFeedback({ type: 'error', message: 'Unable to load arrival requests' });
     } finally {
-      setLoading(false);
+      if (version === loadVersionRef.current) {
+        loadAbortRef.current = null;
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    loadRequests('pending');
+    void loadRequests('pending');
+    return () => {
+      loadVersionRef.current += 1;
+      loadAbortRef.current?.abort();
+    };
   }, [loadRequests]);
 
   const summaryCards = useMemo(() => ([
@@ -117,8 +136,9 @@ export default function AdminRequestsClient() {
   ]), [summary]);
 
   const changeFilter = (nextFilter: RequestFilter) => {
+    filterRef.current = nextFilter;
     setFilter(nextFilter);
-    loadRequests(nextFilter);
+    void loadRequests(nextFilter);
   };
 
   const updateRequestStatus = async (requestId: string, status: Exclude<RequestStatus, 'pending'>) => {
@@ -140,7 +160,7 @@ export default function AdminRequestsClient() {
         return;
       }
 
-      await loadRequests(filter, false);
+      await loadRequests(filterRef.current, false);
       setFeedback({
         type: 'success',
         message: `Request ${status}. Notification ${data.data?.notification?.status ?? 'skipped'}.`,

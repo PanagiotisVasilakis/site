@@ -1,6 +1,7 @@
-import crypto from 'node:crypto';
 import type { NextRequest } from 'next/server';
 import { getClientIp } from '@/lib/net/getClientIp';
+import { normalizePhone } from '@/lib/phone';
+import { privacyHmac } from '@/lib/privacyHash';
 
 export interface RateLimitDecision {
   allowed: boolean;
@@ -18,13 +19,21 @@ interface RateLimitOptions {
 
 const testStore = new Map<string, { count: number; resetAt: Date }>();
 
+function normalizeIdentifier(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  if (!/^\+?[0-9 ()-]+$/.test(normalized)) return normalized;
+  const compact = normalized.replace(/[ ()-]/g, '');
+  const phone = normalizePhone(normalized, !compact.startsWith('+') && compact.length === 10 ? 'GR' : undefined);
+  return phone?.e164 ?? normalized;
+}
+
 function buildKeys(request: NextRequest, options: RateLimitOptions): string[] {
   const ip = getClientIp(request, { trustProxy: true });
   const dimensions = [`ip:${ip}`];
-  if (options.identifier) dimensions.push(`identifier:${options.identifier.trim().toLowerCase()}`);
+  if (options.identifier) dimensions.push(`identifier:${normalizeIdentifier(options.identifier)}`);
   return dimensions.map((dimension) => {
     const raw = `${options.scope}|${dimension}`;
-    return `sensitive:${crypto.createHash('sha256').update(raw).digest('hex')}`;
+    return `sensitive:${privacyHmac(raw, 'sensitive-rate-limit:v1')}`;
   });
 }
 

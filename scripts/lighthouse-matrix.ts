@@ -9,7 +9,7 @@
  * - LH_BASE_URL=http://localhost:3000
  * - LH_MATRIX_PATHS=/en,/el,/en/guest?mode=signin,/en/book
  * - LH_MATRIX_PROFILES=mobile,desktop
- * - LH_MATRIX_MIN_SCORE=70
+ * - LH_MATRIX_MIN_SCORE=90
  * - LH_MATRIX_FAIL_ON_ISSUES=1
  * - CHROME_PATH=/usr/bin/google-chrome
  */
@@ -17,6 +17,7 @@
 import path from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { launch } from 'chrome-launcher';
+import { screenEmulationMetrics, throttling } from 'lighthouse/core/config/constants.js';
 
 const { default: lighthouse } = await import('lighthouse');
 
@@ -30,13 +31,14 @@ interface Profile {
     mobile: boolean;
     width: number;
     height: number;
-    deviceScaleRatio: number;
+    deviceScaleFactor: number;
     disabled: boolean;
   };
-  throttling?: {
+  throttling: {
     rttMs: number;
     throughputKbps: number;
     cpuSlowdownMultiplier: number;
+    requestLatencyMs?: number;
     downloadThroughputKbps: number;
     uploadThroughputKbps: number;
   };
@@ -88,7 +90,7 @@ const ALL_PROFILES: Profile[] = [
       mobile: true,
       width: 360,
       height: 640,
-      deviceScaleRatio: 2.625,
+      deviceScaleFactor: 2.625,
       disabled: false,
     },
     throttling: {
@@ -101,14 +103,12 @@ const ALL_PROFILES: Profile[] = [
   },
   {
     id: 'desktop',
-    label: 'Desktop Simulated',
-    screenEmulation: {
-      mobile: false,
-      width: 1366,
-      height: 768,
-      deviceScaleRatio: 1,
-      disabled: false,
-    },
+    label: 'Desktop Dense 4G',
+    // Keep the matrix aligned with Lighthouse's official `--preset=desktop`.
+    // Omitting desktop throttling silently inherits the mobile defaults from
+    // `lighthouse:default`, which produces misleading desktop scores.
+    screenEmulation: { ...screenEmulationMetrics.desktop } as Profile['screenEmulation'],
+    throttling: { ...throttling.desktopDense4G },
   },
 ];
 
@@ -385,6 +385,7 @@ async function run() {
           settings: {
             formFactor: profile.id,
             screenEmulation: profile.screenEmulation,
+            emulatedUserAgent: true,
             throttlingMethod: 'simulate',
             throttling: profile.throttling,
             onlyCategories: ['performance'],
@@ -398,10 +399,6 @@ async function run() {
               port: chrome.port,
               output: ['json'],
               logLevel: 'error',
-              screenEmulation: {
-                mobile: profile.id === 'mobile',
-                disabled: false,
-              },
             },
             config,
           );

@@ -16,8 +16,6 @@ model User {
   createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
   bookings         Booking[]
-  mfaChallenges    MfaChallenge[]
-  mfaFactors       MfaFactor[]
   refreshFamilies  RefreshTokenFamily[]
   refreshTokens    RefreshToken[]
   sessions         Session[]
@@ -46,6 +44,7 @@ model Booking {
   accessStatus      AccessStatus        @default(PENDING) @map("access_status")
   claimedAt         DateTime?           @map("claimed_at") @db.Timestamptz(6)
   createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
   user              User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
   checkin           Checkin?
   sessions          Session[]
@@ -61,6 +60,7 @@ model Booking {
   @@index([startDate, endDate], map: "idx_bookings_dates")
   @@index([userId, startDate, endDate], map: "idx_bookings_user_dates")
   @@index([source, createdAt], map: "idx_bookings_source_created")
+  @@index([updatedAt], map: "idx_bookings_updated_at")
   @@index([accessStatus, startDate, endDate], map: "idx_bookings_access_window")
   @@map("bookings")
 }
@@ -323,6 +323,7 @@ model AnalyticsHit {
   path       String   @db.VarChar(512)
   locale     String?  @db.VarChar(8)
   eventName  String?  @map("event_name") @db.VarChar(96)
+  eventId    String?  @unique(map: "analytics_hits_event_id_key") @map("event_id") @db.VarChar(128)
   properties Json?
   occurredAt DateTime @default(now()) @map("occurred_at") @db.Timestamptz(6)
 
@@ -376,62 +377,6 @@ model PrivacyHold {
   @@index([userId, releasedAt], map: "idx_privacy_holds_user")
   @@index([bookingId, releasedAt], map: "idx_privacy_holds_booking")
   @@map("privacy_holds")
-}
-
-model MfaFactor {
-  id              String          @id @db.Uuid
-  userId          String          @map("user_id") @db.Uuid
-  type            MfaFactorType
-  secretHash      String          @map("secret_hash")
-  secretSalt      String          @map("secret_salt")
-  backupCodesHash String?         @map("backup_codes_hash")
-  backupCodesSalt String?         @map("backup_codes_salt")
-  phoneNumberEnc  String?         @map("phone_number_enc")
-  emailEnc        String?         @map("email_enc")
-  status          MfaFactorStatus
-  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
-  activatedAt     DateTime?       @map("activated_at") @db.Timestamptz(6)
-  lastUsedAt      DateTime?       @map("last_used_at") @db.Timestamptz(6)
-  challenges      MfaChallenge[]
-  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId], map: "idx_mfa_factors_user_id")
-  @@index([type], map: "idx_mfa_factors_type")
-  @@index([status], map: "idx_mfa_factors_status")
-  @@index([createdAt], map: "idx_mfa_factors_created_at")
-  @@index([activatedAt], map: "idx_mfa_factors_activated_at")
-  @@index([lastUsedAt], map: "idx_mfa_factors_last_used_at")
-  @@map("mfa_factors")
-}
-
-model MfaChallenge {
-  id                String    @id @db.Uuid
-  userId            String    @map("user_id") @db.Uuid
-  factorId          String    @map("factor_id") @db.Uuid
-  challengeCodeHash String    @map("challenge_code_hash")
-  challengeCodeSalt String    @map("challenge_code_salt")
-  expiresAt         DateTime  @map("expires_at") @db.Timestamptz(6)
-  completedAt       DateTime? @map("completed_at") @db.Timestamptz(6)
-  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  factor            MfaFactor @relation(fields: [factorId], references: [id], onDelete: Cascade)
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId], map: "idx_mfa_challenges_user_id")
-  @@index([factorId], map: "idx_mfa_challenges_factor_id")
-  @@index([expiresAt], map: "idx_mfa_challenges_expires_at")
-  @@index([completedAt], map: "idx_mfa_challenges_completed_at")
-  @@index([createdAt], map: "idx_mfa_challenges_created_at")
-  @@map("mfa_challenges")
-}
-
-model CacheEntry {
-  key       String   @id
-  value     String
-  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
-
-  @@index([expiresAt], map: "idx_cache_expires_at")
-  @@index([key], map: "idx_cache_key")
-  @@map("cache")
 }
 
 model RateLimit {
@@ -524,17 +469,4 @@ enum PrivacyRequestStatus {
   VERIFIED
   COMPLETED
   REJECTED
-}
-
-enum MfaFactorType {
-  TOTP
-  SMS
-  EMAIL
-  BACKUP_CODE
-}
-
-enum MfaFactorStatus {
-  ACTIVE
-  INACTIVE
-  PENDING
 }

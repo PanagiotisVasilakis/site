@@ -19,7 +19,7 @@ export type MapMarkerType =
   | 'city-center'
   | 'church';
 
-export type MapCoordinates = [lng: number, lat: number];
+type MapCoordinates = [lng: number, lat: number];
 
 export interface MapLocation {
   id: string;

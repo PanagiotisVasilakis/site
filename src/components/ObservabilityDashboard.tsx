@@ -11,6 +11,7 @@ import HealthMonitor from './HealthMonitor';
 type AnalyticsHit = {
   path: string;
   locale?: string;
+  eventName?: string;
 };
 
 type AnalyticsVital = {
@@ -46,7 +47,7 @@ function average(values: number[]): number {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-function buildTopPaths(hits: AnalyticsHit[]): TopPath[] {
+export function buildTopPaths(hits: AnalyticsHit[]): TopPath[] {
   const counts = new Map<string, number>();
   for (const hit of hits) {
     counts.set(hit.path, (counts.get(hit.path) ?? 0) + 1);
@@ -93,9 +94,10 @@ export default function ObservabilityDashboard({
   }, [fetchDashboardData, autoRefresh, refreshInterval]);
 
   const hits = useMemo(() => analytics.hits ?? [], [analytics.hits]);
+  const pageviews = useMemo(() => hits.filter((hit) => !hit.eventName), [hits]);
   const vitals = useMemo(() => analytics.vitals ?? [], [analytics.vitals]);
-  const topPaths = useMemo(() => buildTopPaths(hits), [hits]);
-  const uniquePaths = useMemo(() => new Set(hits.map((hit) => hit.path)).size, [hits]);
+  const topPaths = useMemo(() => buildTopPaths(pageviews), [pageviews]);
+  const uniquePaths = useMemo(() => new Set(pageviews.map((hit) => hit.path)).size, [pageviews]);
   const vitalSummary = useMemo(() => {
     const names = ['FCP', 'LCP', 'FID', 'CLS', 'TTFB'];
     return names.map((name) => {

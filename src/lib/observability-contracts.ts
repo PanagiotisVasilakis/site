@@ -54,7 +54,7 @@ export function formatTraceContextHeaders(context: TraceContext): Record<string,
 
 export type SpanLogLevel = 'info' | 'warn' | 'error' | 'debug';
 
-export interface SpanLog {
+interface SpanLog {
   timestamp: number;
   level: SpanLogLevel;
   message: string;
@@ -84,7 +84,7 @@ export interface TraceApi {
   addLog(span: Span, level: SpanLogLevel, message: string, fields?: Record<string, unknown>): void;
 }
 
-export type MetricTags = Record<string, string>;
+type MetricTags = Record<string, string>;
 
 export interface MetricSink {
   counter(name: string, value?: number, tags?: MetricTags): void;

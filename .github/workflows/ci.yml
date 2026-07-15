@@ -12,7 +12,6 @@ permissions:
 env:
   NODE_VERSION_FILE: .nvmrc
   NPM_VERSION: 11.18.0
-  NODE_ENV: production
   GUEST_JWT_SECRET: ci-guest-jwt-secret-should-be-32-chars-0001
   GUEST_WIFI_NETWORK: ci-guest-network
   GUEST_WIFI_PASSWORD: ci-guest-password
@@ -43,6 +42,7 @@ jobs:
       - run: npm install --global "npm@${NPM_VERSION}"
       - run: npm ci --no-audit --no-fund
       - run: npm run check:conflicts
+      - run: npm run check:image-assets
       - run: npm run typecheck
       - run: npm run lint -- --max-warnings=0
       - run: npm run lint:security
@@ -53,6 +53,11 @@ jobs:
       - run: npm run security:license-check
       - run: npx prisma validate
       - run: npm run build
+        env:
+          CI: 'true'
+          RATE_LIMIT_BACKEND: redis
+          UPSTASH_REDIS_REST_URL: https://redis.example.test
+          UPSTASH_REDIS_REST_TOKEN: ci-upstash-token-at-least-20-characters
       - name: Upload coverage
         if: always()
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
@@ -83,6 +88,10 @@ jobs:
       DATABASE_URL: postgresql://ci_user:ci_pass@localhost:5432/site_ci_test
       DIRECT_URL: postgresql://ci_user:ci_pass@localhost:5432/site_ci_test
       TEST_DATABASE_URL: postgresql://ci_user:ci_pass@localhost:5432/site_ci_test
+      CI: 'true'
+      RATE_LIMIT_BACKEND: redis
+      UPSTASH_REDIS_REST_URL: https://redis.example.test
+      UPSTASH_REDIS_REST_TOKEN: ci-upstash-token-at-least-20-characters
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
@@ -125,7 +134,10 @@ jobs:
       LH_BASE_URL: http://localhost:3000
       RESPONSIVE_UX_FAIL_ON_ISSUES: '1'
       LH_MATRIX_FAIL_ON_ISSUES: '1'
-      LH_MATRIX_MIN_SCORE: '70'
+      LH_MATRIX_MIN_SCORE: '90'
+      RATE_LIMIT_BACKEND: redis
+      UPSTASH_REDIS_REST_URL: http://127.0.0.1:8079
+      UPSTASH_REDIS_REST_TOKEN: ci-upstash-token-at-least-20-characters
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
@@ -136,9 +148,22 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run prisma:migrate:deploy
       - run: npm run build
+      - name: Start CI Redis REST mock
+        run: npm exec tsx scripts/upstash-rest-mock.ts > /tmp/upstash-mock.log 2>&1 &
+      - run: npm run wait:http -- http://127.0.0.1:8079/healthz 30000
       - name: Start application
         run: npm start > /tmp/next-server.log 2>&1 &
+        env:
+          NODE_ENV: production
       - run: npm run wait:http -- http://localhost:3000/api/health/ready 120000
+      - name: Verify served PWA assets
+        run: npm run check:offline-assets
+        env:
+          OFFLINE_CHECK_ORIGIN: http://localhost:3000
+      - name: Verify real browser offline navigation
+        run: npm run check:browser-offline
+        env:
+          OFFLINE_BROWSER_ORIGIN: http://localhost:3000
       - run: npm run ci:accessibility
       - run: npm run ci:responsive:ux
       - run: npm run ci:lighthouse:matrix
@@ -152,13 +177,37 @@ jobs:
             axe-contrast-report-*.json
             reports/responsive-ux/**
             reports/lighthouse-matrix/**
+            reports/offline-browser/**
             /tmp/next-server.log
+            /tmp/upstash-mock.log
           if-no-files-found: warn
+
+  container:
+    name: Container build and strict vulnerability gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - name: Build immutable candidate
+        run: docker build --build-arg NEXT_PUBLIC_SITE_URL=https://example.test -f docker/Dockerfile.security -t villa-app:ci .
+      - name: Block every HIGH or CRITICAL vulnerability
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: villa-app:ci
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: false
+          exit-code: '1'
+      - name: Verify hardened runtime metadata
+        run: |
+          test "$(docker image inspect villa-app:ci --format '{{.Config.User}}')" = '1001:1001'
+          docker image inspect villa-app:ci --format '{{json .Config.Healthcheck}}' | grep -q '/api/health/ready'
+          docker run --rm --entrypoint /bin/sh villa-app:ci -c 'test ! -e /usr/local/bin/npm && test ! -e /usr/local/bin/yarn && test ! -w /app && test -w /app/.next/cache/images'
 
   quality-gate:
     name: Required quality gate
     if: always()
-    needs: [build-test, database, browser]
+    needs: [build-test, database, browser, container]
     runs-on: ubuntu-latest
     steps:
       - name: Require every gate
@@ -166,7 +215,9 @@ jobs:
           BUILD_RESULT: ${{ needs.build-test.result }}
           DATABASE_RESULT: ${{ needs.database.result }}
           BROWSER_RESULT: ${{ needs.browser.result }}
+          CONTAINER_RESULT: ${{ needs.container.result }}
         run: |
           test "$BUILD_RESULT" = success
           test "$DATABASE_RESULT" = success
           test "$BROWSER_RESULT" = success
+          test "$CONTAINER_RESULT" = success

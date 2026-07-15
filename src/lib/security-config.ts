@@ -64,7 +64,6 @@ const SecurityConfigSchema = z.object({
     enabled: z.boolean(),
     windowMs: z.number(),
     maxRequests: z.number(),
-    skipSuccessfulRequests: z.boolean(),
     standardHeaders: z.boolean(),
     legacyHeaders: z.boolean(),
   }),
@@ -142,7 +141,6 @@ const developmentConfig: SecurityConfig = {
     enabled: true,
     windowMs: 15 * 60 * 1000, // 15 minutes
     maxRequests: 1000, // More lenient in development
-    skipSuccessfulRequests: false,
     standardHeaders: true,
     legacyHeaders: false,
   },
@@ -219,7 +217,6 @@ const productionConfig: SecurityConfig = {
     enabled: true,
     windowMs: 15 * 60 * 1000, // 15 minutes
     maxRequests: 100, // Stricter in production
-    skipSuccessfulRequests: true,
     standardHeaders: true,
     legacyHeaders: false,
   },
@@ -257,7 +254,6 @@ export function getSecurityConfig(): SecurityConfig {
         ...developmentConfig.rateLimit,
         enabled: true,
         maxRequests: 50,
-        skipSuccessfulRequests: false,
       },
     };
     const res = SecurityConfigSchema.safeParse(testConfig);
@@ -312,10 +308,35 @@ export function generateNonce(): string {
 // Permission Policy builder
 export function buildPermissionsPolicy(permissions: SecurityConfig['headers']['permissionsPolicy']): string {
   const policies: string[] = [];
+
+  const serializeAllowlistItem = (item: string): string | null => {
+    const trimmed = item.trim();
+    const hasMatchingQuotes = trimmed.length >= 2
+      && ((trimmed.startsWith("'") && trimmed.endsWith("'"))
+        || (trimmed.startsWith('"') && trimmed.endsWith('"')));
+    const normalized = hasMatchingQuotes ? trimmed.slice(1, -1) : trimmed;
+
+    // Permissions-Policy keywords are structured-field tokens, not origins.
+    if (normalized === 'self' || normalized === 'src' || normalized === '*') {
+      return normalized;
+    }
+
+    // An empty allowlist is the valid representation of the legacy `none` value.
+    if (!normalized || normalized === 'none') {
+      return null;
+    }
+
+    // Origins are quoted strings in the Permissions-Policy grammar. JSON
+    // stringification supplies the required escaping for quotes/backslashes.
+    return JSON.stringify(normalized);
+  };
   
   Object.entries(permissions).forEach(([feature, allowlist]) => {
-    const policy = allowlist.length > 0 
-      ? `${feature}=(${allowlist.map(origin => `"${origin}"`).join(' ')})`
+    const serializedAllowlist = allowlist
+      .map(serializeAllowlistItem)
+      .filter((item): item is string => item !== null);
+    const policy = serializedAllowlist.length > 0
+      ? `${feature}=(${serializedAllowlist.join(' ')})`
       : `${feature}=()`;
     policies.push(policy);
   });
@@ -335,7 +356,12 @@ export interface SecurityEvent {
 }
 
 // Security monitoring utilities
-export function logSecurityEvent(event: SecurityEvent): void {
+//
+// Keep this API awaitable: request handlers must not finish while the durable
+// audit write is still only queued in the JavaScript microtask queue. The
+// dynamic import still avoids the configuration/monitoring module cycle and
+// keeps the browser bundle free of the server-only persistence code.
+export async function logSecurityEvent(event: SecurityEvent): Promise<void> {
   const config = getSecurityConfig();
   
   if (!config.monitoring.enabled || !config.monitoring.logSecurityEvents) {
@@ -344,12 +370,13 @@ export function logSecurityEvent(event: SecurityEvent): void {
 
   // Use dynamic import to avoid circular dependency
   if (typeof window === 'undefined') { // Server-side only
-    import('./security-monitoring').then(({ recordSecurityEvent }) => {
-      void recordSecurityEvent(event);
-    }).catch(error => {
+    try {
+      const { recordSecurityEvent } = await import('./security-monitoring');
+      await recordSecurityEvent(event);
+    } catch (error) {
       console.error('Failed to record security event:', error);
       console.warn('Security event recording unavailable', { type: event.type, severity: event.severity });
-    });
+    }
   }
 }
 

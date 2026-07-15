@@ -5,7 +5,8 @@ describe('buildPrismaPgAdapterArgs', () => {
     const result = buildPrismaPgAdapterArgs(
       'postgresql://user:pass@localhost:5432/app'
       + '?connection_limit=7&connect_timeout=9&max_idle_connection_lifetime=12'
-      + '&max_connection_lifetime=60&schema=guest&sslmode=require',
+      + '&max_connection_lifetime=60&statement_timeout=11000&query_timeout=12000'
+      + '&lock_timeout=3000&schema=guest&sslmode=require',
     );
 
     expect(result.config).toMatchObject({
@@ -13,6 +14,9 @@ describe('buildPrismaPgAdapterArgs', () => {
       connectionTimeoutMillis: 9_000,
       idleTimeoutMillis: 12_000,
       maxLifetimeSeconds: 60,
+      statement_timeout: 11_000,
+      query_timeout: 12_000,
+      lock_timeout: 3_000,
     });
     expect(typeof result.config).toBe('object');
     if (typeof result.config === 'string' || !('connectionString' in result.config)) {
@@ -20,6 +24,7 @@ describe('buildPrismaPgAdapterArgs', () => {
     }
     expect(result.config.connectionString).toContain('sslmode=require');
     expect(result.config.connectionString).not.toContain('connection_limit');
+    expect(result.config.connectionString).not.toContain('statement_timeout');
     expect(result.options).toEqual({ schema: 'guest' });
   });
 
@@ -28,6 +33,9 @@ describe('buildPrismaPgAdapterArgs', () => {
       connectionString: 'not-a-url',
       connectionTimeoutMillis: 5_000,
       idleTimeoutMillis: 300_000,
+      statement_timeout: 20_000,
+      query_timeout: 25_000,
+      lock_timeout: 5_000,
     });
   });
 });

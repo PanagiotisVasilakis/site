@@ -25,7 +25,7 @@ describe('CheckInInfo map integration', () => {
   });
 
   it('passes moments and services into the shared map component for canonical filtering', async () => {
-    render(
+    const { container } = render(
       <CheckInInfo
         locale="en"
         nearbyRestaurants={[
@@ -51,6 +51,8 @@ describe('CheckInInfo map integration', () => {
         ]}
       />
     );
+
+    expect(container.querySelector('main')).toBeNull();
 
     await waitFor(() => expect(dynamicMapMock).toHaveBeenCalled());
 

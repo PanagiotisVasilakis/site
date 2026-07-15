@@ -1,7 +1,12 @@
 import { headers } from 'next/headers';
+import type { Metadata } from 'next';
 import AdminLoginClient from './AdminLoginClient';
 
 export const dynamic = 'force-dynamic';
+export const metadata: Metadata = {
+  title: 'Admin Login',
+  robots: 'noindex, nofollow',
+};
 
 export default async function AdminLoginPage() {
   // Reading request headers opts the route into dynamic rendering, which is

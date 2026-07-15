@@ -128,8 +128,39 @@ describe('refreshTokenRepository.rotate', () => {
     expect(tx.refreshToken.create).not.toHaveBeenCalled();
   });
 
-  it('treats a lost concurrent revoke race as replay and revokes the family', async () => {
-    tx.refreshToken.findUnique.mockResolvedValue(tokenRecord());
+  it('treats a same-context lost conditional revoke race as concurrent without revoking the family', async () => {
+    tx.refreshToken.findUnique.mockResolvedValue(tokenRecord({
+      family: {
+        ...tokenRecord().family,
+        deviceHash: 'device-hash',
+        ipHash: 'ip-hash',
+      },
+    }));
+    tx.refreshToken.updateMany.mockResolvedValue({ count: 0 });
+    const replacement = hashSensitive('replacement');
+
+    const result = await refreshTokenRepository.rotate(`${OLD_ID}.old-secret`, {
+      tokenHash: replacement.hash,
+      salt: replacement.salt,
+      expiresAt: Date.now() + 120_000,
+      deviceHash: 'device-hash',
+      ipHash: 'ip-hash',
+    });
+
+    expect(result).toEqual({ status: 'concurrent', familyId: 'family-1' });
+    expect(tx.refreshToken.updateMany).toHaveBeenCalledTimes(1);
+    expect(tx.refreshTokenFamily.update).not.toHaveBeenCalled();
+    expect(tx.refreshToken.create).not.toHaveBeenCalled();
+  });
+
+  it('revokes the family when a different context loses the conditional revoke race', async () => {
+    tx.refreshToken.findUnique.mockResolvedValue(tokenRecord({
+      family: {
+        ...tokenRecord().family,
+        deviceHash: 'known-device-hash',
+        ipHash: 'known-ip-hash',
+      },
+    }));
     tx.refreshToken.updateMany
       .mockResolvedValueOnce({ count: 0 })
       .mockResolvedValueOnce({ count: 1 });
@@ -139,13 +170,19 @@ describe('refreshTokenRepository.rotate', () => {
       tokenHash: replacement.hash,
       salt: replacement.salt,
       expiresAt: Date.now() + 120_000,
+      deviceHash: 'different-device-hash',
+      ipHash: 'different-ip-hash',
     });
 
     expect(result).toEqual({ status: 'replayed', familyId: 'family-1' });
-    expect(tx.refreshToken.updateMany).toHaveBeenCalledTimes(2);
     expect(tx.refreshTokenFamily.update).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ revocationReason: 'concurrent_rotation_conflict' }),
+      where: { id: 'family-1' },
+      data: expect.objectContaining({ revocationReason: 'refresh_token_replay' }),
     }));
+    expect(tx.refreshToken.updateMany).toHaveBeenLastCalledWith({
+      where: { familyId: 'family-1', revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
     expect(tx.refreshToken.create).not.toHaveBeenCalled();
   });
 

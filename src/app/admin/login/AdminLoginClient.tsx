@@ -25,7 +25,7 @@ export default function AdminLoginClient() {
   }
 
   return (
-    <div className="mx-auto max-w-sm p-6 space-y-4">
+    <main className="mx-auto max-w-sm p-6 space-y-4">
       <h1 className="text-xl font-serif italic font-bold">Admin Login</h1>
       <form onSubmit={submit} className="space-y-3">
         <div>
@@ -48,6 +48,6 @@ export default function AdminLoginClient() {
           {status === 'error' && <p id="admin-login-error" className="text-sm text-red-600">Authentication failed</p>}
         </div>
       </form>
-    </div>
+    </main>
   );
 }

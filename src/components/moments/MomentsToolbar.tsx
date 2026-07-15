@@ -15,6 +15,7 @@ interface MomentsToolbarProps {
     searchMomentsLabel?: string;
     searchPlaceholder?: string;
     filterByCategoryLabel?: string;
+    availableFilters?: readonly MomentsFilterKey[];
     filters?: {
         all?: string;
         beaches?: string;
@@ -41,6 +42,7 @@ export function MomentsToolbar({
     searchMomentsLabel = 'Search moments',
     searchPlaceholder = 'Search places, beaches, museums...',
     filterByCategoryLabel = 'Filter moments by category',
+    availableFilters,
     filters,
 }: MomentsToolbarProps) {
     return (
@@ -56,7 +58,13 @@ export function MomentsToolbar({
                 />
             </label>
 
-            <CategoryChips active={activeFilter} onChange={onFilterChange} ui={filters} filterByCategoryLabel={filterByCategoryLabel} />
+            <CategoryChips
+                active={activeFilter}
+                onChange={onFilterChange}
+                ui={filters}
+                filterByCategoryLabel={filterByCategoryLabel}
+                availableFilters={availableFilters}
+            />
 
             <button
                 type="button"

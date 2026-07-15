@@ -21,12 +21,12 @@ export default async function AdminDashboardPage() {
   await requireAdminPageSession();
 
   return (
-    <div className="min-h-screen">
+    <main className="min-h-screen">
       <AdminSessionManager />
       <ObservabilityDashboard 
         refreshInterval={30000} // 30 seconds
         autoRefresh={true}
       />
-    </div>
+    </main>
   );
 }

@@ -23,7 +23,7 @@ export const PATCH = withErrorHandler(async (
   request: NextRequest,
   context: { params: Promise<Record<string, string>> }
 ) => {
-  const earlyResponse = guard(request);
+  const earlyResponse = await guard(request);
   if (earlyResponse) return earlyResponse;
 
   if (!(await isAdminRequest(request))) {

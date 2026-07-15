@@ -9,6 +9,7 @@ declare module 'lighthouse' {
   export interface LighthouseSettings {
     formFactor?: 'desktop' | 'mobile';
     screenEmulation?: Record<string, unknown>;
+    emulatedUserAgent?: string | boolean;
     throttling?: Record<string, unknown>;
     throttlingMethod?: string;
     onlyCategories?: string[];

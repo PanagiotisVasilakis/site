@@ -91,10 +91,10 @@ describe('Security Configuration', () => {
 
   test('should build permissions policy', () => {
     const permissions = {
-      geolocation: ['self'],
+      geolocation: ['self', 'https://maps.example.com'],
       microphone: ["'self'"],
       camera: [],
-      payment: [],
+      payment: ['*'],
       accelerometer: [],
       gyroscope: [],
       magnetometer: [],
@@ -102,9 +102,9 @@ describe('Security Configuration', () => {
     };
 
     const policy = buildPermissionsPolicy(permissions);
-    expect(policy).toContain('geolocation=("self")');
-    expect(policy).toContain('microphone=("\'self\'")');
-    expect(policy).toContain('camera=()');
+    expect(policy).toBe(
+      'geolocation=(self "https://maps.example.com"), microphone=(self), camera=(), payment=(*), accelerometer=(), gyroscope=(), magnetometer=(), usb=()',
+    );
   });
 });
 
@@ -168,7 +168,6 @@ describe('Rate Limiting Middleware', () => {
       enabled: true,
       windowMs: 60_000,
       maxRequests: 2,
-      skipSuccessfulRequests: false,
       standardHeaders: true,
       legacyHeaders: false,
     };
@@ -196,7 +195,7 @@ describe('CORS Middleware', () => {
     middleware = new CORSMiddleware();
   });
 
-  test('should handle preflight requests', () => {
+  test('should handle preflight requests', async () => {
     const request = new NextRequest('https://example.com/api/test', {
       method: 'OPTIONS',
       headers: {
@@ -204,12 +203,12 @@ describe('CORS Middleware', () => {
       },
     });
 
-    const response = middleware.handle(request);
+    const response = await middleware.handle(request);
     expect(response?.status).toBe(200);
     expect(response?.headers.get('Access-Control-Allow-Origin')).toBeTruthy();
   });
 
-  test('should block disallowed origins', () => {
+  test('should block disallowed origins', async () => {
     const request = new NextRequest('https://example.com/api/test', {
       method: 'GET',
       headers: {
@@ -217,20 +216,29 @@ describe('CORS Middleware', () => {
       },
     });
 
-    const response = middleware.handle(request);
+    const response = await middleware.handle(request);
     expect(response?.status).toBe(403);
   });
 
-  test('should always allow the request own origin', () => {
+  test('does not perform CORS enforcement or persistence for non-API pages', async () => {
+    const request = new NextRequest('https://example.com/en', {
+      method: 'GET',
+      headers: { origin: 'https://malicious-site.com' },
+    });
+
+    expect(await middleware.handle(request)).toBeNull();
+  });
+
+  test('should always allow the request own origin', async () => {
     const request = new NextRequest('https://same-origin.example/api/test', {
       method: 'POST',
       headers: { origin: 'https://same-origin.example' },
     });
 
-    expect(middleware.handle(request)).toBeNull();
+    expect(await middleware.handle(request)).toBeNull();
   });
 
-  test('uses the contacted Host header when Next normalizes the request URL origin', () => {
+  test('uses the contacted Host header when Next normalizes the request URL origin', async () => {
     const request = new NextRequest('http://localhost:3000/api/test', {
       method: 'POST',
       headers: {
@@ -239,10 +247,10 @@ describe('CORS Middleware', () => {
       },
     });
 
-    expect(middleware.handle(request)).toBeNull();
+    expect(await middleware.handle(request)).toBeNull();
   });
 
-  test('does not treat a Host match with a different protocol as same-origin', () => {
+  test('does not treat a Host match with a different protocol as same-origin', async () => {
     const request = new NextRequest('https://example.com/api/test', {
       method: 'POST',
       headers: {
@@ -251,12 +259,12 @@ describe('CORS Middleware', () => {
       },
     });
 
-    expect(middleware.handle(request)?.status).toBe(403);
+    expect((await middleware.handle(request))?.status).toBe(403);
   });
 });
 
 describe('API Security Middleware', () => {
-  test('should validate input payload size', () => {
+  test('should validate input payload size', async () => {
     const middleware = new APIInputValidationMiddleware();
     const request = new NextRequest('https://example.com/api/test', {
       method: 'POST',
@@ -266,11 +274,11 @@ describe('API Security Middleware', () => {
       },
     });
 
-    const response = middleware.validateRequest(request);
+    const response = await middleware.validateRequest(request);
     expect(response?.status).toBe(413);
   });
 
-  test('should validate content types', () => {
+  test('should validate content types', async () => {
     const middleware = new APIInputValidationMiddleware();
     const request = new NextRequest('https://example.com/api/test', {
       method: 'POST',
@@ -279,18 +287,18 @@ describe('API Security Middleware', () => {
       },
     });
 
-    const response = middleware.validateRequest(request);
+    const response = await middleware.validateRequest(request);
     expect(response?.status).toBe(415);
   });
 
-  test('should require an exact media type match', () => {
+  test('should require an exact media type match', async () => {
     const middleware = new APIInputValidationMiddleware();
     const request = new NextRequest('https://example.com/api/test', {
       method: 'POST',
       headers: { 'content-type': 'application/json-malicious' },
     });
 
-    expect(middleware.validateRequest(request)?.status).toBe(415);
+    expect((await middleware.validateRequest(request))?.status).toBe(415);
   });
 });
 
@@ -307,14 +315,14 @@ describe('API Key Authentication', () => {
     vi.unstubAllEnvs();
   });
 
-  test('should require API key when enabled', () => {
+  test('should require API key when enabled', async () => {
     const request = new NextRequest('https://example.com/api/protected');
 
-    const response = middleware.validateRequest(request);
+    const response = await middleware.validateRequest(request);
     expect(response?.status).toBe(401);
   });
 
-  test('should accept valid API key in header', () => {
+  test('should accept valid API key in header', async () => {
     const validKey = 'testkey123testkey123testkey12345';
     vi.stubEnv('VALID_API_KEYS', validKey);
     const localMiddleware = new APIKeyAuthMiddleware();
@@ -325,25 +333,25 @@ describe('API Key Authentication', () => {
       },
     });
 
-    const response = localMiddleware.validateRequest(request);
+    const response = await localMiddleware.validateRequest(request);
     expect(response).toBeNull();
     // restore handled by afterEach if needed, but here we can just leave it since we're inside a test method
     // actually unstubAllEnvs in afterEach might be too late if others depend on it, 
     // but typically stubEnv is test-scoped
   });
 
-  test('should reject invalid API key format', () => {
+  test('should reject invalid API key format', async () => {
     const request = new NextRequest('https://example.com/api/protected', {
       headers: {
         'authorization': 'Bearer invalid-key',
       },
     });
 
-    const response = middleware.validateRequest(request);
+    const response = await middleware.validateRequest(request);
     expect(response?.status).toBe(401);
   });
 
-  test('should enforce internal scope with a dedicated key', () => {
+  test('should enforce internal scope with a dedicated key', async () => {
     const readKey = '0123456789abcdef0123456789abcdef';
     const internalKey = 'fedcba9876543210fedcba9876543210';
     vi.stubEnv('VALID_API_KEYS', readKey);
@@ -353,21 +361,21 @@ describe('API Key Authentication', () => {
     const readRequest = new NextRequest('https://example.com/api/internal/cache-metrics', {
       headers: { 'x-api-key': readKey },
     });
-    expect(localMiddleware.validateRequest(readRequest, ['internal'])?.status).toBe(403);
+    expect((await localMiddleware.validateRequest(readRequest, ['internal']))?.status).toBe(403);
 
     const internalRequest = new NextRequest('https://example.com/api/internal/cache-metrics', {
       headers: { 'x-api-key': internalKey },
     });
-    expect(localMiddleware.validateRequest(internalRequest, ['internal'])).toBeNull();
+    expect(await localMiddleware.validateRequest(internalRequest, ['internal'])).toBeNull();
   });
 
-  test('should not accept API keys from query parameters', () => {
+  test('should not accept API keys from query parameters', async () => {
     const validKey = '0123456789abcdef0123456789abcdef';
     vi.stubEnv('VALID_API_KEYS', validKey);
     const localMiddleware = new APIKeyAuthMiddleware();
     const request = new NextRequest(`https://example.com/api/protected?api_key=${validKey}`);
 
-    expect(localMiddleware.validateRequest(request)?.status).toBe(401);
+    expect((await localMiddleware.validateRequest(request))?.status).toBe(401);
   });
 });
 
@@ -378,7 +386,7 @@ describe('Security Monitoring', () => {
     monitor.clearMetrics();
   });
 
-  test('should record security events', () => {
+  test('should record security events', async () => {
     const event = {
       type: 'suspicious_activity' as const,
       severity: 'medium' as const,
@@ -388,7 +396,7 @@ describe('Security Monitoring', () => {
       details: { test: true },
     };
 
-    recordSecurityEvent(event);
+    await recordSecurityEvent(event);
 
     const monitor = getSecurityMonitor();
     const metrics = monitor.getMetrics();
@@ -428,12 +436,12 @@ describe('Security Monitoring', () => {
     expect(health.message).toBeDefined();
   });
 
-  test('should track recent events', () => {
+  test('should track recent events', async () => {
     const monitor = getSecurityMonitor();
 
     // Record some events
     for (let i = 0; i < 5; i++) {
-      recordSecurityEvent({
+      await recordSecurityEvent({
         type: 'rate_limit_exceeded',
         severity: 'medium',
         timestamp: new Date().toISOString(),
@@ -494,20 +502,20 @@ describe('Combined Security Middleware', () => {
     expect(typeof middleware).toBe('function');
   });
 
-  test('should not block SQL-like API query strings in logging-only mode', () => {
+  test('should not block SQL-like API query strings in logging-only mode', async () => {
     const middleware = createAPISecurityMiddleware();
     const request = new NextRequest(
       'https://example.com/api/test?query=SELECT * FROM users WHERE id=1 OR 1=1'
     );
 
-    const response = middleware(request);
+    const response = await middleware(request);
     expect(response).toBeNull();
   });
 
-  test('should enforce route-level API keys in every environment', () => {
+  test('should enforce route-level API keys in every environment', async () => {
     vi.stubEnv('NODE_ENV', 'development');
     const middleware = createAPISecurityMiddleware({ requireAPIKey: true });
-    const response = middleware(new NextRequest('https://example.com/api/internal'));
+    const response = await middleware(new NextRequest('https://example.com/api/internal'));
     expect(response?.status).toBe(401);
     vi.unstubAllEnvs();
   });

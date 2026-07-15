@@ -996,7 +996,7 @@ export default function CheckInInfo({
           </section>
         </aside>
 
-        <main className="space-y-6 lg:order-1">
+        <div className="space-y-6 lg:order-1">
           <section id="house-rules" className={`${panelClass} scroll-mt-24 p-5 sm:p-6`} aria-labelledby="house-rules-title">
             <SectionTitle id="house-rules-title" title={t.checkinInfo?.houseRulesTitle || 'House Rules'} icon="shield" />
             <ul className="grid gap-3 sm:grid-cols-2">
@@ -1082,7 +1082,7 @@ export default function CheckInInfo({
               )}
             </div>
           </section>
-        </main>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 
 import ErrorSummary from '@/components/ErrorSummary';
@@ -18,8 +18,11 @@ export default function UnifiedGuestClient() {
   const dictionary = getDictionary(locale).portal;
   const router = useRouter();
   const search = useSearchParams();
+  const searchKey = search.toString();
   const initialClaimToken = search.get('claim')?.trim() || '';
   const initialMode: GuestMode = initialClaimToken || search.get('mode') === 'signup' ? 'signup' : 'signin';
+  const initialFlash = search.get('flash')?.trim().slice(0, 300) || '';
+  const syncingFromUrlRef = useRef(false);
 
   const [mode, setMode] = useState<GuestMode>(initialMode);
   const [origin, setOrigin] = useState<GuestOrigin>('');
@@ -30,7 +33,9 @@ export default function UnifiedGuestClient() {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [submitError, setSubmitError] = useState<{ summary: string; details?: string[] } | null>(null);
+  const [submitError, setSubmitError] = useState<{ summary: string; details?: string[] } | null>(
+    initialFlash ? { summary: initialFlash } : null,
+  );
 
   const valid = useMemo(() => isGuestFormValid(mode, {
     origin,
@@ -45,12 +50,26 @@ export default function UnifiedGuestClient() {
   }, [initialClaimToken]);
 
   useEffect(() => {
-    const claim = mode === 'signup' && claimToken ? `&claim=${encodeURIComponent(claimToken)}` : '';
-    const currentClaim = search.get('claim')?.trim() || '';
-    if (search.get('mode') === mode && currentClaim === (mode === 'signup' ? claimToken : '')) return;
-    router.replace(`/${locale}/guest?mode=${mode}${claim}`, { scroll: false });
+    syncingFromUrlRef.current = true;
+    setMode(initialMode);
+    setClaimToken(initialMode === 'signup' ? initialClaimToken : '');
+    setSubmitError(initialFlash ? { summary: initialFlash } : null);
+  }, [initialClaimToken, initialFlash, initialMode, searchKey]);
+
+  useEffect(() => {
+    if (syncingFromUrlRef.current) {
+      syncingFromUrlRef.current = false;
+      return;
+    }
+    const nextSearch = new URLSearchParams(searchKey);
+    const currentClaim = nextSearch.get('claim')?.trim() || '';
+    if (nextSearch.get('mode') === mode && currentClaim === (mode === 'signup' ? claimToken : '')) return;
+    nextSearch.set('mode', mode);
+    if (mode === 'signup' && claimToken) nextSearch.set('claim', claimToken);
+    else nextSearch.delete('claim');
+    router.replace(`/${locale}/guest?${nextSearch.toString()}`, { scroll: false });
     tracker.authModeChanged(mode);
-  }, [claimToken, locale, mode, router, search]);
+  }, [claimToken, locale, mode, router, searchKey]);
 
   function changeMode(nextMode: GuestMode) {
     setMode(nextMode);
@@ -97,7 +116,7 @@ export default function UnifiedGuestClient() {
   const inputClass = 'w-full rounded-lg border border-soft bg-[var(--layer-surface)] px-3 py-3 text-[color:var(--fg-default)] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)]';
 
   return (
-    <main className="mx-auto max-w-md p-4">
+    <div className="mx-auto max-w-md p-4">
       <section className="main-glass-container surface-card p-5" aria-labelledby="guest-auth-title">
         <header className="mb-5 text-center">
           <h1 id="guest-auth-title" className="text-2xl font-bold">
@@ -243,6 +262,6 @@ export default function UnifiedGuestClient() {
           </form>
         </div>
       </section>
-    </main>
+    </div>
   );
 }
