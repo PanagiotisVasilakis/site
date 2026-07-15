@@ -13,6 +13,7 @@ export default defineConfig({
     root,
     environment: 'node',
     include: ['tests/**/*.test.{ts,tsx}'],
+    exclude: ['tests/integration/**'],
     setupFiles: ['./tests/setup.ts'],
     clearMocks: true,
     mockReset: true,

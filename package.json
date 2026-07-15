@@ -27,6 +27,7 @@
     "start": "node scripts/start-standalone.mjs .next/standalone/server.js",
     "lint": "eslint",
     "test": "vitest run --config vitest.config.ts --reporter=default",
+    "test:integration": "tsx tests/integration/run.ts",
     "test:unit": "vitest run --config vitest.config.ts tests/unit --reporter=default",
     "test:components": "vitest run --config vitest.config.ts tests/components --reporter=default",
     "test:routes": "vitest run --config vitest.config.ts tests/routes --reporter=default",

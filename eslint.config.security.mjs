@@ -87,6 +87,15 @@ const config = [
     rules: { 'security/detect-non-literal-fs-filename': 'off' }
   },
   {
+    // Integration-test filesystem inputs are either the fixed migration root,
+    // the committed manifest, or the explicit dotenv filename allowlist.
+    files: [
+      'tests/integration/support/database-lifecycle.ts',
+      'tests/integration/support/migrations.ts',
+    ],
+    rules: { 'security/detect-non-literal-fs-filename': 'off' }
+  },
+  {
     // Inputs are length-capped before these linear IP-format expressions run.
     files: ['src/lib/net/getClientIp.ts'],
     rules: { 'security/detect-unsafe-regex': 'off' }
