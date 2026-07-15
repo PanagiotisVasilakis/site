@@ -25,9 +25,11 @@ npm run system:up -- --profile development --skip-build
 
 The development orchestrator validates the environment, provisions a local PostgreSQL fallback when needed, applies migrations, starts the app, and verifies readiness plus a localized page. See [scripts/README.md](scripts/README.md) for the complete runbook.
 
-## Manual validation
+## Validation
 
 ```bash
+npm test
+npm run test:coverage
 npm run typecheck
 npm run lint -- --max-warnings=0
 npm run lint:security
@@ -35,7 +37,7 @@ npm run check:dead-code
 npm run validate:security
 ```
 
-The repository intentionally has no GitHub Actions workflows or automated test suite. These checks run only when invoked locally. Optional browser audits remain available through `audit:a11y`, `audit:contrast`, `audit:responsive:ux`, and `audit:lighthouse:matrix`.
+The deterministic Vitest suite covers critical unit, security, component, and public-route contracts without live database or external-service dependencies. `npm run validate:local` runs the enforced local quality gate. There are intentionally no GitHub Actions workflows, so these checks run only when invoked locally. See [Testing strategy](docs/testing.md) for scope and coverage policy. Optional browser audits remain available through `audit:a11y`, `audit:contrast`, `audit:responsive:ux`, and `audit:lighthouse:matrix`.
 
 ## Operations
 
@@ -51,6 +53,7 @@ The production container runs as a non-root user. Its build requires an HTTPS `N
 ## Documentation
 
 - [Setup and runtime](scripts/README.md)
+- [Testing strategy](docs/testing.md)
 - [Migration rehearsal](docs/deployment-migration-rehearsal.md)
 - [Secret handling and incident response](SECURITY.md)
 - Runtime OpenAPI UI: `/api/docs`

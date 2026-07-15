@@ -3,7 +3,7 @@ import nextTypescript from "eslint-config-next/typescript";
 import internalFetchRule from "./scripts/eslint-rules/internal-fetch.js";
 
 const eslintConfig = [
-  { ignores: ["**/node_modules/**", "**/.next/**", "out/**", "build/**", "next-env.d.ts", "**/reports/**"] },
+  { ignores: ["**/node_modules/**", "**/.next/**", "**/coverage/**", "out/**", "build/**", "next-env.d.ts", "**/reports/**"] },
   ...nextCoreWebVitals,
   ...nextTypescript,
   {
@@ -24,6 +24,12 @@ const eslintConfig = [
       }
     },
     rules: { 'internal-fetch/no-internal-fetch': 'warn' }
+  },
+  {
+    files: ['tests/**/*.{ts,tsx}'],
+    rules: {
+      '@next/next/no-img-element': 'off'
+    }
   }
 ];
 

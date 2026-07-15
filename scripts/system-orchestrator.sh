@@ -50,7 +50,7 @@ Commands:
 
 Options:
   --profile <production|development>       Runtime profile (default: production)
-  --strict                                 Add lint + typecheck before build/start
+  --strict                                 Add lint + typecheck + coverage gate before build/start
   --db-only                                Validate only DB-related environment and skip app build/start requirements
   --no-docker-fallback                     Fail instead of starting local DB when DATABASE_URL is unreachable
   --skip-build                             Skip build step where applicable
@@ -866,11 +866,12 @@ run_strict_quality_gate_if_requested() {
     return
   fi
 
-  log "Running strict quality gate: lint + typecheck"
+  log "Running strict quality gate: lint + typecheck + test coverage"
   (
     cd "$REPO_ROOT"
-    npm run lint
+    npm run lint -- --max-warnings=0
     npm run typecheck
+    npm run test:coverage
   )
 }
 

@@ -419,13 +419,8 @@ export function withErrorHandler(
       // Handle unexpected errors
       const internalError = new ApiError(
         ErrorCodes.INTERNAL_ERROR,
-        process.env.NODE_ENV === 'production' 
-          ? 'An internal server error occurred'
-          : error instanceof Error ? error.message : String(error),
-        process.env.NODE_ENV !== 'production' ? {
-          originalError: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        } : undefined,
+        'An internal server error occurred',
+        undefined,
         correlationId
       );
 

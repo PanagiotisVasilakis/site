@@ -68,17 +68,27 @@ npm run system:down -- --profile development
 
 Development may start a disposable Docker database when the configured database is unreachable. Production disables that fallback and fails closed.
 
-## Manual validation
+## Local validation
 
-The repository has no automated test suite or GitHub Actions workflows. Run the retained static, security, and build checks explicitly when needed:
+The repository has a deterministic local Vitest suite but no GitHub Actions workflows. Run the complete local gate with:
 
 ```bash
+npm run validate:local
+```
+
+Individual checks are also available:
+
+```bash
+npm test
+npm run test:coverage
 npm run typecheck
 npm run lint -- --max-warnings=0
 npm run lint:security
 npm run check:dead-code
 npm run validate:security
 ```
+
+The suite does not contact a live PostgreSQL, Redis, webhook, or third-party API. Persistence and network boundaries are mocked deterministically; production connectivity remains covered by `system:check`, `system:verify`, and the production build/security gate. See [Testing strategy](../docs/testing.md).
 
 Optional browser audits are manual commands: `audit:a11y`, `audit:contrast`, `audit:responsive:ux`, and `audit:lighthouse:matrix`.
 
