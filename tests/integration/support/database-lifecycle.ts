@@ -18,6 +18,12 @@ import type {
   DisposableDatabaseTarget,
 } from './database-safety';
 import {
+  POSTGRES_IMAGE_INSPECT_FORMAT,
+  assertApprovedPostgresImageReference,
+  assertApprovedPostgresOciIndex,
+  validatePulledPostgresImageInspection,
+} from './postgres-image-policy';
+import {
   CONTAINER_PREFIX,
   DATABASE_PREFIX,
   DOCKER_LABELS,
@@ -65,23 +71,24 @@ function quoteLiteral(value: string): string {
 
 async function docker(
   args: readonly string[],
-  secrets: readonly string[] = [],
   environment: NodeJS.ProcessEnv = dockerClientEnvironment(),
+  timeout = 30_000,
+  trimOutput = true,
 ): Promise<string> {
   try {
     const { stdout } = await execFileAsync('docker', [...args], {
       cwd: REPOSITORY_ROOT,
       env: environment,
       encoding: 'utf8',
-      maxBuffer: 1024 * 1024,
-      timeout: 30_000,
+      maxBuffer: 2 * 1024 * 1024,
+      timeout,
       killSignal: 'SIGKILL',
     });
-    return stdout.trim();
-  } catch (error) {
-    throw new Error(`Disposable PostgreSQL Docker command failed: ${
-      sanitizeDatabaseDiagnostics(error, secrets)
-    }`);
+    return trimOutput ? stdout.trim() : stdout;
+  } catch {
+    throw new Error(
+      'Disposable PostgreSQL Docker command failed; Docker diagnostics were withheld.',
+    );
   }
 }
 
@@ -186,6 +193,8 @@ async function collectKnownDatabaseTargetFingerprints(): Promise<Set<string>> {
 }
 
 export async function startDisposablePostgres(): Promise<DisposablePostgresRuntime> {
+  const configuredPostgresImage = process.env.INTEGRATION_POSTGRES_IMAGE ?? POSTGRES_IMAGE;
+  assertApprovedPostgresImageReference(configuredPostgresImage);
   const runId = randomBytes(6).toString('hex');
   const runFingerprint = randomBytes(24).toString('hex');
   const repositoryId = repositoryIdentifier(REPOSITORY_ROOT);
@@ -195,7 +204,23 @@ export async function startDisposablePostgres(): Promise<DisposablePostgresRunti
   const containerName = `${CONTAINER_PREFIX}-${runId}`;
   const forbiddenTargetFingerprints = await collectKnownDatabaseTargetFingerprints();
   await assertLocalDockerDaemon();
-  const containerImageId = await docker(['image', 'inspect', POSTGRES_IMAGE, '--format', '{{.Id}}']);
+  const rawOciIndex = await docker([
+    'buildx',
+    'imagetools',
+    'inspect',
+    configuredPostgresImage,
+    '--raw',
+  ], dockerClientEnvironment(), 60_000, false);
+  assertApprovedPostgresOciIndex(rawOciIndex);
+  await docker(['pull', '--quiet', configuredPostgresImage], dockerClientEnvironment(), 120_000);
+  const imageInspection = await docker([
+    'image',
+    'inspect',
+    configuredPostgresImage,
+    '--format',
+    POSTGRES_IMAGE_INSPECT_FORMAT,
+  ]);
+  const { imageId: containerImageId } = validatePulledPostgresImageInspection(imageInspection);
 
   const dockerEnvironment = dockerClientEnvironment({
     POSTGRES_USER: user,
@@ -223,8 +248,8 @@ export async function startDisposablePostgres(): Promise<DisposablePostgresRunti
     '--env', 'POSTGRES_USER',
     '--env', 'POSTGRES_PASSWORD',
     '--env', 'POSTGRES_DB',
-    POSTGRES_IMAGE,
-  ], [password, user], dockerEnvironment);
+    configuredPostgresImage,
+  ], dockerEnvironment);
   const identity: DisposableContainerIdentity = {
     runId,
     runFingerprint,

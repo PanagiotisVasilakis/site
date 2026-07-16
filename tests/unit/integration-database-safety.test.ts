@@ -164,6 +164,31 @@ describe('disposable PostgreSQL safety guard', () => {
     expect(cleanup).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['configured image reference', (inspection: ReturnType<typeof validDockerInspection>) => {
+      inspection.Config.Image = 'postgres:16-alpine';
+    }],
+    ['running image ID', (inspection: ReturnType<typeof validDockerInspection>) => {
+      inspection.Image = `sha256:${'5'.repeat(64)}`;
+    }],
+  ])('rejects a mismatched %s before connection or SQL', async (_scenario, mutate) => {
+    const runtime = safeRuntime();
+    const target = databaseTarget(runtime, database);
+    const inspection = validDockerInspection(runtime);
+    mutate(inspection);
+    const connect = vi.fn();
+    const cleanup = vi.fn();
+
+    await expect(withVerifiedDisposableDatabase(
+      target,
+      'cleanup',
+      cleanup,
+      { dependencies: { inspectContainer: vi.fn().mockResolvedValue(inspection), connect } },
+    )).rejects.toThrow('Docker image identity');
+    expect(connect).not.toHaveBeenCalled();
+    expect(cleanup).not.toHaveBeenCalled();
+  });
+
   it('closes the connection and rejects before SQL when the live fingerprint differs', async () => {
     const runtime = safeRuntime();
     const target = databaseTarget(runtime, database);

@@ -68,13 +68,15 @@ npm run system:down -- --profile development
 
 Development may start a disposable Docker database when the configured database is unreachable. Production disables that fallback and fails closed.
 
-## Local validation
+## Local validation and CI
 
-The repository has a deterministic local Vitest suite but no GitHub Actions workflows. Run the complete local gate with:
+The repository has deterministic local gates and a versioned GitHub Actions baseline. Run the core local gate with:
 
 ```bash
 npm run validate:local
 ```
+
+For the complete mandatory CI matrix and its local equivalents, see [`docs/ci.md`](../docs/ci.md).
 
 Individual checks are also available:
 
@@ -86,9 +88,12 @@ npm run lint -- --max-warnings=0
 npm run lint:security
 npm run check:dead-code
 npm run validate:security
+npm run check:ci-policy
+npm run check:prisma-integrity
+npm run check:postgres-image-policy
 ```
 
-The suite does not contact a live PostgreSQL, Redis, webhook, or third-party API. Persistence and network boundaries are mocked deterministically; production connectivity remains covered by `system:check`, `system:verify`, and the production build/security gate. See [Testing strategy](../docs/testing.md).
+The default suite does not contact a live PostgreSQL, Redis, webhook, or third-party API. `test:integration` is the isolated exception: it owns a digest-pinned disposable PostgreSQL container and synthetic databases. Production connectivity remains covered by separately authorized `system:check` and `system:verify`; CI never targets persistent environments. See [Testing strategy](../docs/testing.md) and [CI baseline](../docs/ci.md).
 
 Optional browser audits are manual commands: `audit:a11y`, `audit:contrast`, `audit:responsive:ux`, and `audit:lighthouse:matrix`.
 

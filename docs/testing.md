@@ -4,7 +4,7 @@ Last verified: 2026-07-16.
 
 ## Purpose
 
-The repository uses Vitest 4 with explicit TypeScript imports, jsdom only for browser-facing components, and Testing Library for user-observable UI behavior. The suite is local-only: no GitHub Actions workflows are installed and running tests cannot create GitHub notifications.
+The repository uses Vitest 4 with explicit TypeScript imports, jsdom only for browser-facing components, and Testing Library for user-observable UI behavior. The same versioned gates run locally and in the GitHub Actions baseline; see [Continuous integration baseline](ci.md).
 
 The design goal is high-signal regression protection, not assertions against implementation details. Tests cover boundary behavior, security invariants, failure modes, accessibility interactions, and public response contracts.
 
@@ -32,24 +32,28 @@ npm run test:watch       # interactive local development
 npm run test:coverage    # suite plus enforced coverage gate
 npm run validate:local   # typecheck, lint, coverage, security/build validation
 npm run hash:prisma-integrity # deterministic Prisma integrity hashes
+npm run check:prisma-integrity # verify the committed static history baseline
+npm run check:ci-policy       # verify the restricted workflow profile
+npm run check:postgres-image-policy # verify/pull the approved OCI index
 ```
 
 The system orchestrator's `--strict` option also runs lint, typecheck, and the coverage gate before build or startup.
 
 ## Disposable PostgreSQL integration lifecycle
 
-`npm run test:integration` requires a running local Docker socket/daemon and the exact image pinned in `tests/integration/support/runtime.ts`. Remote Docker contexts are rejected. If the image is not present locally, pull that digest explicitly before running the suite. The launcher never falls back to `docker-compose.yml`, `site-dev-db`, a persistent volume, or an externally supplied URL.
+`npm run test:integration` requires a running local Docker socket/daemon and the exact image pinned in `tests/integration/support/postgres-image-policy.ts`. Remote Docker contexts are rejected. The launcher verifies the raw multi-platform OCI index, pulls the exact digest, and validates the canonical local repository digest before every run. It never falls back to `docker-compose.yml`, `site-dev-db`, a persistent volume, or an externally supplied URL.
 
 One invocation performs this lifecycle:
 
 1. Generate a random run ID, synthetic database role/password, and opaque fingerprint.
-2. Start one uniquely named and labelled PostgreSQL 16 container on a Docker-assigned `127.0.0.1` port. PostgreSQL data lives on tmpfs and the container has no restart policy or persistent data volume.
-3. Wait on Docker health and a real PostgreSQL fingerprint; there is no fixed startup sleep.
-4. Mark the control database with the run fingerprint.
-5. Give each suite/worker lifecycle a fresh database with its own `public` schema and derived fingerprint. Database isolation is required because historical migrations explicitly reference `public` objects.
-6. Apply the entire committed migration chain through `prisma.integration.config.ts`. This config reads only the generated `TEST_DATABASE_URL`; it does not load dotenv files and cannot prefer an inherited `DIRECT_URL`.
-7. Seed only fixed synthetic fixtures (`example.invalid`, the reserved fictional `202-555-0100` number, fixed UUIDs/dates, and no password/token).
-8. Disconnect clients, guard and drop suite databases, then guard and remove the exact container in the outer runner's `finally` block.
+2. Verify and pull the official digest-pinned PostgreSQL 16 Alpine OCI index, including its `linux/amd64` and `linux/arm64/v8` descriptors.
+3. Start one uniquely named and labelled PostgreSQL 16 container on a Docker-assigned `127.0.0.1` port. PostgreSQL data lives on tmpfs and the container has no restart policy or persistent data volume.
+4. Wait on Docker health and a real PostgreSQL fingerprint; there is no fixed startup sleep.
+5. Mark the control database with the run fingerprint.
+6. Give each suite/worker lifecycle a fresh database with its own `public` schema and derived fingerprint. Database isolation is required because historical migrations explicitly reference `public` objects.
+7. Apply the entire committed migration chain through `prisma.integration.config.ts`. This config reads only the generated `TEST_DATABASE_URL`; it does not load dotenv files and cannot prefer an inherited `DIRECT_URL`.
+8. Seed only fixed synthetic fixtures (`example.invalid`, the reserved fictional `202-555-0100` number, fixed UUIDs/dates, and no password/token).
+9. Disconnect clients, guard and drop suite databases, then guard and remove the exact container in the outer runner's `finally` block.
 
 Two parallel invocations use different container names, ports, roles, databases, tmpfs filesystems, and fingerprints. Vitest workers allocate different databases inside their invocation. A normal assertion failure, migration failure, `SIGINT`, or `SIGTERM` still reaches the outer teardown. `SIGKILL`, Docker daemon failure, or host loss cannot run process cleanup; any leftover container remains uniquely labelled and has tmpfs-only database data. Inspect it without a wildcard operation:
 
@@ -97,7 +101,7 @@ A request that owns the marker and authoritatively re-reads an already-revoked p
 
 ## Prisma integrity hashing
 
-Run `npm run hash:prisma-integrity` from the repository root. The schema hash covers the raw `prisma/schema.prisma` bytes. The migration-tree hash recursively includes every regular file below `prisma/migrations`, including `migration_lock.toml`; it byte-sorts UTF-8 relative paths and hashes a versioned, length-prefixed path/content stream. Ambiguous or duplicate paths, symbolic links, and special files fail closed; filesystem traversal order, timestamps, and metadata are excluded.
+Run `npm run hash:prisma-integrity` from the repository root. The schema hash covers the raw `prisma/schema.prisma` bytes. The migration-tree hash recursively includes every regular file below `prisma/migrations`, including `migration_lock.toml`; it byte-sorts UTF-8 relative paths and hashes a versioned, length-prefixed path/content stream. Ambiguous or duplicate paths, symbolic links, and special files fail closed; filesystem traversal order, timestamps, and metadata are excluded. `npm run check:prisma-integrity` compares those bytes with the canonical committed `prisma/integrity-manifest.json`; only the explicit `npm run update:prisma-integrity` command rewrites that baseline.
 
 Current verified values:
 
@@ -105,6 +109,8 @@ Current verified values:
 - Prisma migration tree SHA-256: `be2f0a33cd4d80f9eb71b7c1f2916b56600fd3cbc325fbf8ad8a7684c83a3d8f` across 15 files.
 
 The earlier `b1763086454bf563257bbba8b092b89cea1bdd962e442da0bec49af9bbd6450c` / `bcb0d280c005f31d08a1c98a46cd3e2301b97256c5b68b88d52907c6c5bc8bd2` discrepancy was file-scope drift, not a migration change: the first command included `migration_lock.toml` among all 15 files, while the second selected only the 14 `*.sql` files. The versioned utility above is the canonical process for subsequent reports.
+
+This manifest is static repository evidence only. It does not read a live `_prisma_migrations` table or prove that staging/production is migrated, drift-free, or compatible.
 
 ## Coverage policy
 

@@ -1,0 +1,220 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  policy:
+    name: CI / policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install repository npm version
+        run: npm install --global npm@11.18.0
+      - name: Verify npm version
+        run: npm --version | grep -Fx 11.18.0
+      - name: Install dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --audit=false --fund=false
+      - name: Check conflict markers
+        run: npm run check:conflicts
+      - name: Test CI workflow policy
+        run: npm run test:ci-policy
+      - name: Enforce CI workflow policy
+        run: npm run check:ci-policy
+      - name: Test Prisma integrity policy
+        run: npm run test:prisma-integrity
+      - name: Enforce Prisma integrity policy
+        run: npm run check:prisma-integrity
+      - name: Test PostgreSQL image policy
+        run: npm run test:postgres-image-policy
+      - name: Enforce PostgreSQL image policy
+        run: npm run check:postgres-image-policy
+
+  quality:
+    name: CI / quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install repository npm version
+        run: npm install --global npm@11.18.0
+      - name: Verify npm version
+        run: npm --version | grep -Fx 11.18.0
+      - name: Install dependencies
+        run: npm ci --audit=false --fund=false
+      - name: Run complete default test suite
+        run: npm test
+      - name: Run unit tests
+        run: npm run test:unit
+      - name: Run security tests
+        run: npm run test:security
+      - name: Enforce coverage thresholds
+        run: npm run test:coverage
+      - name: Type-check
+        run: npm run typecheck
+      - name: Lint with zero warnings
+        run: npm run lint -- --max-warnings=0
+      - name: Run security lint
+        run: npm run lint:security
+      - name: Check dead code
+        run: npm run check:dead-code
+      - name: Check dependency licenses
+        run: npm run security:license-check
+      - name: Validate Prisma schema
+        run: npx --no-install prisma validate
+      - name: Report deterministic Prisma hashes
+        run: npm run hash:prisma-integrity
+
+  integration-postgres:
+    name: CI / integration-postgres
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install repository npm version
+        run: npm install --global npm@11.18.0
+      - name: Verify npm version
+        run: npm --version | grep -Fx 11.18.0
+      - name: Install dependencies
+        run: npm ci --audit=false --fund=false
+      - name: Run disposable PostgreSQL integration suite
+        run: npm run test:integration
+        env:
+          INTEGRATION_POSTGRES_IMAGE: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+          DATABASE_URL: postgresql://hostile:hostile@hostile.invalid:1/hostile
+          DIRECT_URL: postgresql://hostile:hostile@hostile.invalid:1/hostile
+          SHADOW_DATABASE_URL: postgresql://hostile:hostile@hostile.invalid:1/hostile
+          PGHOST: hostile.invalid
+          PGPORT: "1"
+          PGDATABASE: hostile
+          PGUSER: hostile
+          PGPASSWORD: hostile
+          POSTGRES_DB: hostile
+          POSTGRES_USER: hostile
+          POSTGRES_PASSWORD: hostile
+      - name: Reject orphaned integration containers
+        if: ${{ always() }}
+        run: npm run check:integration-orphans
+
+  production-build:
+    name: CI / production-build
+    needs:
+      - policy
+      - quality
+      - integration-postgres
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install repository npm version
+        run: npm install --global npm@11.18.0
+      - name: Verify npm version
+        run: npm --version | grep -Fx 11.18.0
+      - name: Install dependencies
+        run: npm ci --audit=false --fund=false
+      - name: Validate synthetic production environment
+        run: node --input-type=module --eval "import { runtimeEnvSchema } from './src/lib/runtime-env-schema.js'; runtimeEnvSchema.parse(process.env);"
+        env:
+          NODE_ENV: production
+          DATABASE_URL: postgresql://ci:ci-only@127.0.0.1:1/ci_build
+          ADMIN_JWT_SECRET: ci-only-admin-jwt-secret-000000000000
+          ADMIN_DASH_SECRET: ci-only-admin-dashboard-secret
+          GUEST_JWT_SECRET: ci-only-guest-jwt-secret-000000000000
+          SECURITY_ENC_KEY_HEX: "0000000000000000000000000000000000000000000000000000000000000000"
+          SECURITY_PEPPER: ci-only-security-pepper
+          CLAIM_TOKEN_PEPPER: ci-only-claim-token-pepper-00000000
+          SESSION_SECRET: ci-only-session-secret-00000000000000
+          GUEST_WIFI_NETWORK: CI-SYNTHETIC-NETWORK
+          GUEST_WIFI_PASSWORD: ci-only-password
+          PROPERTY_TIME_ZONE: Europe/Athens
+          ALLOWED_ORIGINS: https://ci.example.invalid
+          NEXT_TELEMETRY_DISABLED: "1"
+          NEXT_PUBLIC_SITE_URL: https://ci.example.invalid
+          BUILD_SITE_URL: https://ci.example.invalid
+          TRUST_PROXY_MODE: hops
+          TRUST_PROXY_HOPS: "1"
+          RATE_LIMIT_BACKEND: redis
+          UPSTASH_REDIS_REST_URL: https://redis.ci.invalid
+          UPSTASH_REDIS_REST_TOKEN: ci-only-redis-token-00000000
+      - name: Run production-format security validation
+        run: npm run validate:security
+        env:
+          NODE_ENV: production
+          DATABASE_URL: postgresql://ci:ci-only@127.0.0.1:1/ci_build
+          ADMIN_JWT_SECRET: ci-only-admin-jwt-secret-000000000000
+          ADMIN_DASH_SECRET: ci-only-admin-dashboard-secret
+          GUEST_JWT_SECRET: ci-only-guest-jwt-secret-000000000000
+          SECURITY_ENC_KEY_HEX: "0000000000000000000000000000000000000000000000000000000000000000"
+          SECURITY_PEPPER: ci-only-security-pepper
+          CLAIM_TOKEN_PEPPER: ci-only-claim-token-pepper-00000000
+          SESSION_SECRET: ci-only-session-secret-00000000000000
+          GUEST_WIFI_NETWORK: CI-SYNTHETIC-NETWORK
+          GUEST_WIFI_PASSWORD: ci-only-password
+          PROPERTY_TIME_ZONE: Europe/Athens
+          ALLOWED_ORIGINS: https://ci.example.invalid
+          NEXT_TELEMETRY_DISABLED: "1"
+          NEXT_PUBLIC_SITE_URL: https://ci.example.invalid
+          BUILD_SITE_URL: https://ci.example.invalid
+          TRUST_PROXY_MODE: hops
+          TRUST_PROXY_HOPS: "1"
+          RATE_LIMIT_BACKEND: redis
+          UPSTASH_REDIS_REST_URL: https://redis.ci.invalid
+          UPSTASH_REDIS_REST_TOKEN: ci-only-redis-token-00000000
+
+  required:
+    name: CI / required
+    needs:
+      - policy
+      - quality
+      - integration-postgres
+      - production-build
+    if: ${{ always() }}
+    permissions: {}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every mandatory job to succeed
+        run: test "${{ needs.policy.result }}" = success && test "${{ needs.quality.result }}" = success && test "${{ needs.integration-postgres.result }}" = success && test "${{ needs.production-build.result }}" = success

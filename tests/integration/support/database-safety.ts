@@ -4,6 +4,7 @@ import { promisify } from 'node:util';
 import pg from 'pg';
 import type { Client as PgClient } from 'pg';
 
+import { assertApprovedPostgresImageReference } from './postgres-image-policy';
 import {
   DATABASE_PREFIX,
   DOCKER_LABELS,
@@ -20,6 +21,7 @@ const { Client } = pg;
 const FORBIDDEN_ENVIRONMENT_LABEL = /(production|prod|staging|stage|development|dev)/i;
 const DATABASE_NAME_PATTERN = /^site_integration_test_[a-f0-9]{12}_[a-z0-9_]{1,28}$/;
 const CONTAINER_ID_PATTERN = /^[a-f0-9]{64}$/;
+const IMAGE_ID_PATTERN = /^sha256:[a-f0-9]{64}$/;
 
 export type GuardedDatabaseOperation =
   | 'bootstrap-fingerprint'
@@ -244,6 +246,7 @@ function assertBaseContainerIdentity(
   identity: DisposableContainerIdentity,
   record: DockerInspectRecord,
 ): void {
+  assertApprovedPostgresImageReference(POSTGRES_IMAGE);
   const labels = record.Config?.Labels ?? {};
   const tmpfs = record.HostConfig?.Tmpfs ?? {};
   const dataMount = record.Mounts?.find(
@@ -255,7 +258,9 @@ function assertBaseContainerIdentity(
     || record.Name !== `/${identity.containerName}`) {
     reject('Docker container ID or name differs from the runner context');
   }
-  if (record.Config?.Image !== POSTGRES_IMAGE || record.Image !== identity.containerImageId) {
+  if (!IMAGE_ID_PATTERN.test(identity.containerImageId)
+    || record.Config?.Image !== POSTGRES_IMAGE
+    || record.Image !== identity.containerImageId) {
     reject('Docker image identity differs from the pinned PostgreSQL image');
   }
   if (labels[DOCKER_LABELS.disposable] !== 'true'

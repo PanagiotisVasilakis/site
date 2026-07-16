@@ -1,0 +1,94 @@
+{
+  "format": "prisma-integrity-manifest",
+  "formatVersion": 1,
+  "generatorVersion": "1.0.0",
+  "checkerVersion": "1.0.0",
+  "schema": {
+    "path": "prisma/schema.prisma",
+    "sha256": "55e5f6c9ec3230009b60d2331f0b9d04a4acc143f65e72c376fd1a7c31df044b",
+    "bytes": 19924
+  },
+  "migrations": {
+    "root": "prisma/migrations",
+    "treeHashAlgorithm": "sha256-prisma-migrations-v1",
+    "sha256": "be2f0a33cd4d80f9eb71b7c1f2916b56600fd3cbc325fbf8ad8a7684c83a3d8f",
+    "fileCount": 15,
+    "files": [
+      {
+        "path": "000_init/migration.sql",
+        "sha256": "f25a3d005ffa2ba6573ab36e8c0849b59d1db7983c8925ee64a9983584ea2c25",
+        "bytes": 10339
+      },
+      {
+        "path": "001_add_session_created_at/migration.sql",
+        "sha256": "86d3a2b83e570c6a7b1a9142086ca242e90c78dcdfca712e5f0c754c562502c9",
+        "bytes": 323
+      },
+      {
+        "path": "20251014185403_add_composite_indexes/migration.sql",
+        "sha256": "2340d607ff2b3f8d8d2db244598835e07e23bc94e9c13f1013cbac9699099fac",
+        "bytes": 812
+      },
+      {
+        "path": "20260426201500_add_check_in_requests/migration.sql",
+        "sha256": "8f5593d87e7cb1a8bffa61ffbecfd1ae9ff4663d01efa07e5d11ebe179a79c5f",
+        "bytes": 957
+      },
+      {
+        "path": "20260714090000_comprehensive_remediation/migration.sql",
+        "sha256": "7350e9490019ec84d2431489477c3b395c66a5af2cb59655642ce10c9bf8bb2a",
+        "bytes": 6090
+      },
+      {
+        "path": "20260714145900_preserve_booking_ownership/migration.sql",
+        "sha256": "e2d6c8542bf5570827f99e4146cbf4b7e6b8d5f1abadfbee357ad3fbad899cb8",
+        "bytes": 2112
+      },
+      {
+        "path": "20260714150000_trustworthy_portal_and_operations/migration.sql",
+        "sha256": "34332d763f7ecb1617a3a4758fa9c5168749051411640319bb17ff2061aeae25",
+        "bytes": 14657
+      },
+      {
+        "path": "20260715100000_enforce_booking_ownership_invariant/migration.sql",
+        "sha256": "5250299bd2f3cda62783276a1c76bf1127050f1cb246c9414513cf35b36f4578",
+        "bytes": 848
+      },
+      {
+        "path": "20260715101000_normalize_stay_request_phones/migration.sql",
+        "sha256": "a3f59f9ce766b5b70a20d8fee9ed67fb6b1f4564e11205dbc7140e0a48d73629",
+        "bytes": 1387
+      },
+      {
+        "path": "20260715102000_idempotent_analytics_occurrence/migration.sql",
+        "sha256": "0d7f5441078969be2d5bb7cdf3488f0260f45907baa1d4195a146c4beec3178f",
+        "bytes": 170
+      },
+      {
+        "path": "20260715103000_track_booking_updates/migration.sql",
+        "sha256": "a4407555ccac11e9f99c071c9f37e2b5c7908987b800b285ba4249385ae768eb",
+        "bytes": 186
+      },
+      {
+        "path": "20260715104000_unique_open_erasure_request/migration.sql",
+        "sha256": "9e9fdd4aca6a969f9a57fa5c19c06f89cc7544ab0ebb208b1d8acebf7a89f276",
+        "bytes": 574
+      },
+      {
+        "path": "20260715105000_recover_legacy_outbox_leases/migration.sql",
+        "sha256": "b77537144ae8523db9d9f3b25cb07fd016773ca54aebaee812898a788a035272",
+        "bytes": 656
+      },
+      {
+        "path": "20260715110000_remove_unused_legacy_models/migration.sql",
+        "sha256": "94a00297c507e8c8aed855725fd204cd37797f5f915e801dc8bc510582562967",
+        "bytes": 1326
+      },
+      {
+        "path": "migration_lock.toml",
+        "sha256": "99836963713b4f5b269ad49af0ed3d7b0b2e336115c2f92dc9ac683d139d0900",
+        "bytes": 128
+      }
+    ]
+  }
+}

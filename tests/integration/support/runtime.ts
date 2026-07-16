@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
+import { APPROVED_POSTGRES_IMAGE } from './postgres-image-policy';
+
 export const REPOSITORY_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
-export const POSTGRES_IMAGE =
-  'postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777';
+export const POSTGRES_IMAGE = APPROVED_POSTGRES_IMAGE;
 export const POSTGRES_INTERNAL_PORT = 5432;
 export const DATABASE_PREFIX = 'site_integration_test';
 export const CONTAINER_PREFIX = 'site-integration-test';
