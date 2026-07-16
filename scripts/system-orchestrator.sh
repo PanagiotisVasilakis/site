@@ -10,7 +10,7 @@ APP_PID_FILE="$RUNTIME_DIR/app.pid"
 APP_LOG_FILE="$RUNTIME_DIR/app.log"
 MIGRATION_LOCK_FILE="$RUNTIME_DIR/migrate.lock"
 
-PROFILE="production"
+PROFILE="development"
 STRICT_MODE=0
 DOCKER_FALLBACK=1
 SKIP_BUILD=0
@@ -49,7 +49,7 @@ Commands:
   check       Validate prerequisites and environment contract without starting services
 
 Options:
-  --profile <production|development>       Runtime profile (default: production)
+  --profile <production|development>       Runtime profile (default: development)
   --strict                                 Add lint + typecheck + coverage gate before build/start
   --db-only                                Validate only DB-related environment and skip app build/start requirements
   --no-docker-fallback                     Fail instead of starting local DB when DATABASE_URL is unreachable

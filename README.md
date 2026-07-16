@@ -25,19 +25,13 @@ npm run system:up -- --profile development --skip-build
 
 The development orchestrator validates the environment, provisions a local PostgreSQL fallback when needed, applies migrations, starts the app, and verifies readiness plus a localized page. See [scripts/README.md](scripts/README.md) for the complete runbook.
 
-## Validation
+## Release verification
 
 ```bash
-npm test
-npm run test:coverage
-npm run typecheck
-npm run lint -- --max-warnings=0
-npm run lint:security
-npm run check:dead-code
-npm run validate:security
+npm run verify:release
 ```
 
-The deterministic Vitest suite covers critical unit, security, component, and public-route contracts without live database or external-service dependencies. `npm run validate:local` runs the enforced local quality gate. There are intentionally no GitHub Actions workflows, so these checks run only when invoked locally. See [Testing strategy](docs/testing.md) for scope and coverage policy. Optional browser audits remain available through `audit:a11y`, `audit:contrast`, `audit:responsive:ux`, and `audit:lighthouse:matrix`.
+This repository-owned command is the mandatory local gate for a commit that may later become a production release. It includes static policy, integrity, test, lint, real disposable-PostgreSQL, and production-format build checks. It requires local Docker, performs no deployment or persistent migration, and is not centrally enforced. See [Release verification](docs/release-verification.md) and [Testing strategy](docs/testing.md). Optional browser audits remain available through `audit:a11y`, `audit:contrast`, `audit:responsive:ux`, and `audit:lighthouse:matrix`.
 
 ## Operations
 
@@ -52,6 +46,9 @@ The production container runs as a non-root user. Its build requires an HTTPS `N
 
 ## Documentation
 
+- [Selected deployment target](docs/architecture/deployment-target.md)
+- [Release verification](docs/release-verification.md)
+- [External platform cleanup runbook](docs/deployment/external-platform-cleanup.md)
 - [Setup and runtime](scripts/README.md)
 - [Testing strategy](docs/testing.md)
 - [Migration rehearsal](docs/deployment-migration-rehearsal.md)

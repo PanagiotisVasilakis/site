@@ -6,6 +6,7 @@ import {
   POSTGRES_IMAGE_INSPECT_FORMAT,
   assertApprovedPostgresImageReference,
   assertApprovedPostgresOciIndex,
+  assertLocalDockerEndpoint,
   postgresImagePolicyDiagnostic,
   validatePulledPostgresImageInspection,
 } from '../tests/integration/support/postgres-image-policy';
@@ -56,8 +57,19 @@ async function docker(
   }
 }
 
+async function assertLocalDockerDaemon(): Promise<void> {
+  const rawEndpoint = await docker([
+    'context',
+    'inspect',
+    '--format',
+    '{{json .Endpoints.docker.Host}}',
+  ], 30_000);
+  assertLocalDockerEndpoint(rawEndpoint);
+}
+
 async function main(): Promise<void> {
   assertApprovedPostgresImageReference(APPROVED_POSTGRES_IMAGE);
+  await assertLocalDockerDaemon();
 
   const rawIndex = await docker([
     'buildx',

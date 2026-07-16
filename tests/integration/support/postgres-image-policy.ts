@@ -35,6 +35,19 @@ function reject(reason: string): never {
   throw new PostgresImagePolicyError(reason);
 }
 
+export function assertLocalDockerEndpoint(rawEndpoint: string): void {
+  let endpoint: unknown;
+  try {
+    endpoint = JSON.parse(rawEndpoint);
+  } catch {
+    return reject('an invalid Docker daemon endpoint');
+  }
+  if (typeof endpoint !== 'string'
+    || (!endpoint.startsWith('unix://') && !endpoint.startsWith('npipe://'))) {
+    return reject('a remote Docker daemon endpoint');
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

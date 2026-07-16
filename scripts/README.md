@@ -68,15 +68,15 @@ npm run system:down -- --profile development
 
 Development may start a disposable Docker database when the configured database is unreachable. Production disables that fallback and fails closed.
 
-## Local validation and CI
+## Local release verification
 
-The repository has deterministic local gates and a versioned GitHub Actions baseline. Run the core local gate with:
+The repository intentionally has no GitHub Actions workflow. Run the complete mandatory local release gate with:
 
 ```bash
-npm run validate:local
+npm run verify:release
 ```
 
-For the complete mandatory CI matrix and its local equivalents, see [`docs/ci.md`](../docs/ci.md).
+The command requires a local Docker daemon, fails on the first mandatory gate, and never deploys or migrates a persistent database. It is not centrally enforced and can be bypassed by a human; see [Release verification](../docs/release-verification.md).
 
 Individual checks are also available:
 
@@ -88,28 +88,18 @@ npm run lint -- --max-warnings=0
 npm run lint:security
 npm run check:dead-code
 npm run validate:security
-npm run check:ci-policy
+npm run validate:release-policy
 npm run check:prisma-integrity
 npm run check:postgres-image-policy
 ```
 
-The default suite does not contact a live PostgreSQL, Redis, webhook, or third-party API. `test:integration` is the isolated exception: it owns a digest-pinned disposable PostgreSQL container and synthetic databases. Production connectivity remains covered by separately authorized `system:check` and `system:verify`; CI never targets persistent environments. See [Testing strategy](../docs/testing.md) and [CI baseline](../docs/ci.md).
+The default suite does not contact a live PostgreSQL, Redis, webhook, or third-party API. `test:integration` is the isolated exception: it owns a digest-pinned disposable PostgreSQL container and synthetic databases. `verify:release` never targets a persistent environment. See [Testing strategy](../docs/testing.md) and [Release verification](../docs/release-verification.md).
 
 Optional browser audits are manual commands: `audit:a11y`, `audit:contrast`, `audit:responsive:ux`, and `audit:lighthouse:matrix`.
 
-## Production process
+## Existing production-oriented tooling
 
-Load secrets from the deployment secret store, then run:
-
-```bash
-npm run system:check -- --profile production --no-docker-fallback
-npm run system:migrate -- --profile production --no-docker-fallback
-npm run system:build -- --profile production --no-docker-fallback
-npm run system:up -- --profile production --skip-build --skip-migrate --no-docker-fallback
-npm run system:verify -- --profile production --no-docker-fallback
-```
-
-The production profile fails on missing configuration, database connectivity, pending migrations, build errors, or failed runtime verification.
+The production profile, systemd templates, and standalone runtime helpers remain as generic components, but they do not yet implement the selected Netcup Docker topology end to end. They must not be treated as an approved release procedure. A future, separately authorized phase must align the reverse proxy, application container, workers, PostgreSQL, backups, immutable image identity, migration ordering, and rollback procedure before production use.
 
 ## systemd deployment
 

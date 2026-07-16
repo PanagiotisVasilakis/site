@@ -21,6 +21,7 @@ import {
   POSTGRES_IMAGE_INSPECT_FORMAT,
   assertApprovedPostgresImageReference,
   assertApprovedPostgresOciIndex,
+  assertLocalDockerEndpoint,
   validatePulledPostgresImageInspection,
 } from './postgres-image-policy';
 import {
@@ -99,18 +100,7 @@ async function assertLocalDockerDaemon(): Promise<void> {
     '--format',
     '{{json .Endpoints.docker.Host}}',
   ]);
-  let endpoint: string;
-  try {
-    endpoint = JSON.parse(endpointJson) as string;
-  } catch {
-    throw new Error('Docker returned an invalid daemon endpoint.');
-  }
-  if (typeof endpoint !== 'string') {
-    throw new Error('Docker returned an invalid daemon endpoint.');
-  }
-  if (!endpoint.startsWith('unix://') && !endpoint.startsWith('npipe://')) {
-    throw new Error('Disposable PostgreSQL requires a local Docker socket, not a remote daemon.');
-  }
+  assertLocalDockerEndpoint(endpointJson);
 }
 
 async function readDockerInspect(containerId: string): Promise<Record<string, unknown>> {

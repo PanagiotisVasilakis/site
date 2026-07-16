@@ -1,7 +1,7 @@
 SHELL := /usr/bin/env bash
 
 ORCH := ./scripts/system-orchestrator.sh
-PROFILE ?= production
+PROFILE ?= development
 
 .PHONY: bootstrap up up-dev down restart status logs logs-follow verify build migrate check strict-up systemd-install
 

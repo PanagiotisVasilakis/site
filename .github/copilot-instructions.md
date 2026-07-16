@@ -28,19 +28,13 @@ This is a Next.js 16 App Router application using TypeScript, PostgreSQL, Prisma
 
 ## Validation
 
-Use the active Node 22.19/npm 11.18 runtime. The repository has a local deterministic Vitest suite and intentionally has no GitHub Actions workflows. Validation is invoked manually:
+Use the active Node 22.19/npm 11.18 runtime. The repository intentionally has no GitHub Actions workflows. Before any commit that may later become a production release, run the complete repository-owned local gate:
 
 ```bash
-npm test
-npm run test:coverage
-npm run typecheck
-npm run lint -- --max-warnings=0
-npm run lint:security
-npm run check:dead-code
-npm run validate:security
+npm run verify:release
 ```
 
-Add tests under `tests/unit`, `tests/security`, `tests/components`, or `tests/routes`. Do not add live external-service dependencies, sleeps, order-dependent shared state, or production test bypasses. Coverage thresholds protect the critical authored-code scope defined in `vitest.config.ts`; update tests before widening that scope or raising the gate. See `docs/testing.md`.
+The gate performs no deployment or persistent migration and requires a local Docker daemon for its disposable PostgreSQL suite. It is enforced by operator discipline rather than a protected pre-merge check. Add tests under `tests/unit`, `tests/security`, `tests/components`, or `tests/routes`. Do not add live external-service dependencies, sleeps, order-dependent shared state, or production test bypasses. Coverage thresholds protect the critical authored-code scope defined in `vitest.config.ts`; update tests before widening that scope or raising the gate. See `docs/release-verification.md` and `docs/testing.md`.
 
 Optional accessibility, responsive, and Lighthouse audits are available through the `audit:*` package scripts. Do not weaken production behavior merely to improve an audit score.
 

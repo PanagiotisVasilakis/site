@@ -4,7 +4,7 @@ Last verified: 2026-07-16.
 
 ## Purpose
 
-The repository uses Vitest 4 with explicit TypeScript imports, jsdom only for browser-facing components, and Testing Library for user-observable UI behavior. The same versioned gates run locally and in the GitHub Actions baseline; see [Continuous integration baseline](ci.md).
+The repository uses Vitest 4 with explicit TypeScript imports, jsdom only for browser-facing components, and Testing Library for user-observable UI behavior. Release verification is local and repository-owned; see [Release verification](release-verification.md).
 
 The design goal is high-signal regression protection, not assertions against implementation details. Tests cover boundary behavior, security invariants, failure modes, accessibility interactions, and public response contracts.
 
@@ -31,9 +31,10 @@ npm run test:integration # disposable PostgreSQL migration/integration foundatio
 npm run test:watch       # interactive local development
 npm run test:coverage    # suite plus enforced coverage gate
 npm run validate:local   # typecheck, lint, coverage, security/build validation
+npm run verify:release   # complete mandatory local release gate
 npm run hash:prisma-integrity # deterministic Prisma integrity hashes
 npm run check:prisma-integrity # verify the committed static history baseline
-npm run check:ci-policy       # verify the restricted workflow profile
+npm run validate:release-policy # verify the restricted local release profile
 npm run check:postgres-image-policy # verify/pull the approved OCI index
 ```
 
@@ -136,4 +137,4 @@ Coverage thresholds are regression gates, not a claim that every repository line
 
 ## Known boundaries
 
-The integration foundation proves the existing migration chain from an empty PostgreSQL 16 database, final Prisma access, deterministic fixture isolation, guarded cleanup, and sanitized migration failure. The committed auth integration suites separately cover claim eligibility, refresh revocation, rollback, isolation, and deterministic concurrency regressions. They do not inspect live schema drift, production migration state, historical data shapes, backup/restore behavior, or production topology. Before production deployment, also run the separately authorized migration rehearsal, `system:check`, `system:verify`, and `validate:security` against the intended environment.
+The integration foundation proves the existing migration chain from an empty PostgreSQL 16 database, final Prisma access, deterministic fixture isolation, guarded cleanup, and sanitized migration failure. The committed auth integration suites separately cover claim eligibility, refresh revocation, rollback, isolation, and deterministic concurrency regressions. They do not inspect live schema drift, production migration state, historical data shapes, backup/restore behavior, or production topology. `verify:release` is necessary repository evidence, not production readiness; live migration rehearsal, runtime verification, backup/restore, and topology checks belong to a separately authorized release phase.

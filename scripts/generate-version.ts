@@ -19,7 +19,7 @@ function main() {
       const precacheContent = fs.readFileSync(precachePath);
       precacheHash = crypto.createHash('sha256').update(precacheContent).digest('hex');
     } catch {}
-    const commit = process.env.GIT_COMMIT || process.env.VERCEL_GIT_COMMIT_SHA || '';
+    const commit = process.env.GIT_COMMIT || '';
     const ts = new Date().toISOString();
     const data = { version, commit, timestamp: ts, precacheHash };
     fs.writeFileSync(outFile, JSON.stringify(data, null, 2));

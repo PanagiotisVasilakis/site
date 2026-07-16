@@ -1,0 +1,462 @@
+import { readdir, readFile, stat } from 'node:fs/promises';
+import path from 'node:path';
+
+import {
+  APPROVED_POSTGRES_IMAGE,
+  HOSTILE_INTEGRATION_ENVIRONMENT,
+  RELEASE_GATES,
+  SYNTHETIC_PRODUCTION_ENVIRONMENT,
+} from './release-gates.mjs';
+
+const EXPECTED_POSTGRES_IMAGE =
+  'postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777';
+
+const EXPECTED_HOSTILE_INTEGRATION_ENVIRONMENT = Object.freeze({
+  INTEGRATION_POSTGRES_IMAGE: EXPECTED_POSTGRES_IMAGE,
+  DATABASE_URL: 'postgresql://hostile:hostile@hostile.invalid:1/hostile',
+  DIRECT_URL: 'postgresql://hostile:hostile@hostile.invalid:1/hostile',
+  SHADOW_DATABASE_URL: 'postgresql://hostile:hostile@hostile.invalid:1/hostile',
+  PGHOST: 'hostile.invalid',
+  PGPORT: '1',
+  PGDATABASE: 'hostile',
+  PGUSER: 'hostile',
+  PGPASSWORD: 'hostile',
+  POSTGRES_DB: 'hostile',
+  POSTGRES_USER: 'hostile',
+  POSTGRES_PASSWORD: 'hostile',
+});
+
+const EXPECTED_SYNTHETIC_PRODUCTION_ENVIRONMENT = Object.freeze({
+  NODE_ENV: 'production',
+  DATABASE_URL: 'postgresql://release:synthetic@127.0.0.1:1/release_build',
+  DIRECT_URL: 'postgresql://release:synthetic@127.0.0.1:1/release_build',
+  ADMIN_JWT_SECRET: 'release-only-admin-jwt-secret-00000000',
+  ADMIN_DASH_SECRET: 'release-only-admin-dashboard-secret',
+  GUEST_JWT_SECRET: 'release-only-guest-jwt-secret-00000000',
+  SECURITY_ENC_KEY_HEX:
+    '0000000000000000000000000000000000000000000000000000000000000000',
+  SECURITY_PEPPER: 'release-only-security-pepper',
+  CLAIM_TOKEN_PEPPER: 'release-only-claim-token-pepper-0000',
+  SESSION_SECRET: 'release-only-session-secret-0000000000',
+  GUEST_WIFI_NETWORK: 'RELEASE-SYNTHETIC-NETWORK',
+  GUEST_WIFI_PASSWORD: 'release-only-password',
+  PROPERTY_TIME_ZONE: 'Europe/Athens',
+  ALLOWED_ORIGINS: 'https://release.example.invalid',
+  NEXT_TELEMETRY_DISABLED: '1',
+  NEXT_PUBLIC_SITE_URL: 'https://release.example.invalid',
+  BUILD_SITE_URL: 'https://release.example.invalid',
+  TRUST_PROXY_MODE: 'hops',
+  TRUST_PROXY_HOPS: '1',
+  RATE_LIMIT_BACKEND: 'redis',
+  UPSTASH_REDIS_REST_URL: 'https://redis.release.invalid',
+  UPSTASH_REDIS_REST_TOKEN: 'release-only-redis-token-000000',
+});
+
+const EXPECTED_GATE_PROFILE = Object.freeze([
+  ['release-policy', 'npm', ['--ignore-scripts', 'run', 'validate:release-policy'], 'base'],
+  ['release-policy-tests', 'npm', ['--ignore-scripts', 'run', 'test:release-policy'], 'base'],
+  ['conflicts', 'npm', ['--ignore-scripts', 'run', 'check:conflicts'], 'base'],
+  ['prisma-manifest', 'npm', ['--ignore-scripts', 'run', 'check:prisma-integrity'], 'base'],
+  ['prisma-tests', 'npm', ['--ignore-scripts', 'run', 'test:prisma-integrity'], 'base'],
+  ['postgres-policy-tests', 'npm', ['--ignore-scripts', 'run', 'test:postgres-image-policy'], 'base'],
+  ['default-tests', 'npm', ['--ignore-scripts', 'run', 'test'], 'base'],
+  ['unit-tests', 'npm', ['--ignore-scripts', 'run', 'test:unit'], 'base'],
+  ['security-tests', 'npm', ['--ignore-scripts', 'run', 'test:security'], 'base'],
+  ['coverage', 'npm', ['--ignore-scripts', 'run', 'test:coverage'], 'base'],
+  ['typecheck', 'npm', ['--ignore-scripts', 'run', 'typecheck'], 'base'],
+  ['lint', 'npm', ['--ignore-scripts', 'run', 'lint', '--', '--max-warnings=0'], 'base'],
+  ['security-lint', 'npm', ['--ignore-scripts', 'run', 'lint:security'], 'base'],
+  ['dead-code', 'npm', ['--ignore-scripts', 'run', 'check:dead-code'], 'base'],
+  ['licenses', 'npm', ['--ignore-scripts', 'run', 'security:license-check'], 'base'],
+  ['prisma-validate', 'npm', ['--ignore-scripts', 'run', 'prisma:validate'], 'base'],
+  ['postgres-policy', 'npm', ['--ignore-scripts', 'run', 'check:postgres-image-policy'], 'base'],
+  ['integration', 'npm', ['--ignore-scripts', 'run', 'test:integration'], 'integration'],
+  ['production-build', 'npm', ['--ignore-scripts', 'run', 'validate:security'], 'production'],
+  ['final-prisma-manifest', 'npm', ['--ignore-scripts', 'run', 'check:prisma-integrity'], 'base'],
+  ['final-prisma-hashes', 'npm', ['--ignore-scripts', 'run', 'hash:prisma-integrity'], 'base'],
+  ['diff-check', 'git', ['diff', '--check'], 'base'],
+  ['candidate-diff', 'npm', ['--ignore-scripts', 'run', 'check:candidate-diff'], 'base'],
+  ['integration-orphans', 'npm', ['--ignore-scripts', 'run', 'check:integration-orphans'], 'base'],
+]);
+
+const EXPECTED_PACKAGE_SCRIPTS = Object.freeze({
+  'verify:release': 'node scripts/verify-release.mjs',
+  'validate:release-policy': 'node scripts/validate-release-policy.mjs',
+  'test:release-policy': 'node --test scripts/tests/release-policy.test.mjs',
+  'check:conflicts': 'node scripts/check-conflict-markers.mjs',
+  'check:candidate-diff': 'node scripts/check-candidate-diff.mjs',
+  'check:prisma-integrity': 'node scripts/check-prisma-integrity.mjs',
+  'test:prisma-integrity': 'node --test scripts/tests/prisma-integrity.test.mjs',
+  'test:postgres-image-policy':
+    'vitest run --config vitest.config.ts tests/unit/postgres-image-policy.test.ts --reporter=default',
+  'check:postgres-image-policy': 'tsx scripts/check-postgres-image-policy.ts',
+  test: 'vitest run --config vitest.config.ts --reporter=default',
+  'test:unit': 'vitest run --config vitest.config.ts tests/unit --reporter=default',
+  'test:security': 'vitest run --config vitest.config.ts tests/security --reporter=default',
+  'test:coverage': 'vitest run --config vitest.config.ts --coverage --reporter=default',
+  typecheck: 'tsc --noEmit',
+  lint: 'eslint',
+  'lint:security': 'eslint --config eslint.config.security.mjs . --max-warnings=0',
+  'check:dead-code': 'knip --include files,dependencies,unlisted,binaries',
+  'security:license-check': 'tsx scripts/check-licenses.ts',
+  'prisma:validate': 'prisma validate',
+  'test:integration': 'tsx tests/integration/run.ts',
+  'validate:security': 'tsx scripts/validate-security.ts',
+  build:
+    'tsx scripts/generate-precache.ts && tsx scripts/validate-content.ts && tsx scripts/generate-version.ts && next build',
+  'hash:prisma-integrity': 'node scripts/hash-prisma-integrity.mjs',
+  'check:integration-orphans': 'node scripts/check-integration-orphans.mjs',
+});
+
+const FORBIDDEN_PLATFORM_PATHS = Object.freeze([
+  'CNAME',
+  'vercel.json',
+  '.vercelignore',
+  'wrangler.toml',
+  'wrangler.json',
+  'wrangler.jsonc',
+  'open-next.config.js',
+  'open-next.config.mjs',
+  'open-next.config.ts',
+  '_routes.json',
+  'public/CNAME',
+  '.open-next',
+  '.vercel',
+]);
+
+const FORBIDDEN_DEPLOY_COMMANDS = Object.freeze([
+  ['Vercel deployment command', /\bvercel\s+(?:deploy|--prod)\b/iu],
+  [
+    'version-qualified Vercel deployment command',
+    /\bvercel@[A-Za-z0-9._~^*<>=/-]{1,80}\s+(?:deploy|--prod)\b/iu,
+  ],
+  ['Wrangler deployment command', /\bwrangler\s+deploy\b/iu],
+  ['Wrangler Pages deployment command', /\bwrangler\s+pages\s+deploy\b/iu],
+  [
+    'version-qualified Wrangler deployment command',
+    /\bwrangler@[A-Za-z0-9._~^*<>=/-]{1,80}\s+deploy\b/iu,
+  ],
+  [
+    'version-qualified Wrangler Pages deployment command',
+    /\bwrangler@[A-Za-z0-9._~^*<>=/-]{1,80}\s+pages\s+deploy\b/iu,
+  ],
+  ['Cloudflare Pages deployment command', /\bcloudflare\s+pages\s+deploy\b/iu],
+  ['GitHub Pages deployment command', /\bgh-pages\b/iu],
+  ['Git push', /\bgit\s+push\b/iu],
+  ['Docker registry push', /\bdocker\s+push\b/iu],
+  ['Docker registry push', /\bdocker\s+image\s+push\b/iu],
+  ['package publication', /\bnpm\s+publish\b/iu],
+]);
+
+const POLICY_SELF_FILES = new Set([
+  'scripts/lib/release-policy.mjs',
+  'scripts/tests/release-policy.test.mjs',
+]);
+
+async function readOptional(filePath) {
+  try {
+    return await readFile(filePath, 'utf8');
+  } catch (error) {
+    if (error?.code === 'ENOENT') return undefined;
+    throw error;
+  }
+}
+
+async function exists(filePath) {
+  try {
+    await stat(filePath);
+    return true;
+  } catch (error) {
+    if (error?.code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
+async function filesBelow(directory, root) {
+  let entries;
+  try {
+    entries = await readdir(directory, { withFileTypes: true });
+  } catch (error) {
+    if (error?.code === 'ENOENT') return [];
+    throw error;
+  }
+
+  const files = [];
+  for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+    const absolute = path.join(directory, entry.name);
+    if (entry.isDirectory()) files.push(...await filesBelow(absolute, root));
+    else files.push(path.relative(root, absolute).split(path.sep).join('/'));
+  }
+  return files;
+}
+
+function renderCommand(command, args) {
+  return [command, ...args].join(' ');
+}
+
+function validateGateProfile(gates, errors) {
+  if (!Array.isArray(gates) || gates.length !== EXPECTED_GATE_PROFILE.length) {
+    errors.push(`release gate profile must contain exactly ${EXPECTED_GATE_PROFILE.length} gates`);
+    return;
+  }
+
+  for (const [index, expected] of EXPECTED_GATE_PROFILE.entries()) {
+    const gate = gates[index];
+    const [id, command, args, environment] = expected;
+    if (!gate || gate.id !== id || gate.command !== command
+      || JSON.stringify(gate.args) !== JSON.stringify(args)
+      || gate.environment !== environment) {
+      errors.push(`release gate ${index + 1} must be the restricted ${id} profile`);
+      continue;
+    }
+
+    const rendered = renderCommand(gate.command, gate.args);
+    for (const [label, pattern] of FORBIDDEN_DEPLOY_COMMANDS) {
+      if (pattern.test(rendered)) errors.push(`${label} is forbidden inside verify:release`);
+    }
+    if (/\b(?:prisma\s+migrate|migrate\s+deploy|system:migrate|db:migrate)\b/iu.test(rendered)) {
+      errors.push('persistent migration commands are forbidden inside verify:release');
+    }
+  }
+}
+
+function validateControlledEnvironments(errors) {
+  if (APPROVED_POSTGRES_IMAGE !== EXPECTED_POSTGRES_IMAGE) {
+    errors.push('the release profile must use the exact approved digest-pinned PostgreSQL image');
+  }
+  if (JSON.stringify(HOSTILE_INTEGRATION_ENVIRONMENT)
+    !== JSON.stringify(EXPECTED_HOSTILE_INTEGRATION_ENVIRONMENT)) {
+    errors.push('the integration gate must use only the exact hostile DB/PG environment');
+  }
+  if (JSON.stringify(SYNTHETIC_PRODUCTION_ENVIRONMENT)
+    !== JSON.stringify(EXPECTED_SYNTHETIC_PRODUCTION_ENVIRONMENT)) {
+    errors.push('the production build must use the restricted unreachable synthetic environment');
+  }
+}
+
+function validatePackage(packageJson, errors) {
+  const scripts = packageJson?.scripts;
+  if (!scripts || Array.isArray(scripts) || typeof scripts !== 'object') {
+    errors.push('package.json scripts must be an object');
+    return;
+  }
+
+  for (const [name, expected] of Object.entries(EXPECTED_PACKAGE_SCRIPTS)) {
+    if (scripts[name] !== expected) errors.push(`package script ${name} must be exactly: ${expected}`);
+  }
+  for (const removed of ['check:ci-policy', 'test:ci-policy', 'prisma:migrate:deploy:all', 'migrate']) {
+    if (Object.hasOwn(scripts, removed)) errors.push(`retired or unsafe package script ${removed} is forbidden`);
+  }
+
+  const protectedLifecycleScripts = new Set([
+    'verify:release',
+    'build',
+    ...EXPECTED_GATE_PROFILE
+      .filter(([, command]) => command === 'npm')
+      .map(([, , args]) => args[2]),
+  ]);
+  for (const name of protectedLifecycleScripts) {
+    for (const hook of [`pre${name}`, `post${name}`]) {
+      if (Object.hasOwn(scripts, hook)) {
+        errors.push(`npm lifecycle hook ${hook} is forbidden for the local release path`);
+      }
+    }
+  }
+
+  for (const [name, command] of Object.entries(scripts)) {
+    if (typeof command !== 'string') {
+      errors.push(`package script ${name} must be a string`);
+      continue;
+    }
+    for (const [label, pattern] of FORBIDDEN_DEPLOY_COMMANDS) {
+      if (pattern.test(command)) errors.push(`${label} is forbidden in package script ${name}`);
+    }
+    if (/^(?:deploy|release(?::deploy)?)(?::|$)/iu.test(name)) {
+      errors.push(`automatic deployment-oriented package script ${name} is forbidden`);
+    }
+    if (/\b(?:migrate|db\s+push)\b/iu.test(command)
+      && /(?:--profile\s+production|NODE_ENV\s*=\s*production)/iu.test(command)) {
+      errors.push(`database mutation package script ${name} must not select production by default`);
+    }
+    const hasStaging = /(?:STAGING_DATABASE_URL|DATABASE_URL_STAGING)/u.test(command);
+    const hasProduction = /(?:PROD(?:UCTION)?_DATABASE_URL|DATABASE_URL_PROD(?:UCTION)?)/u.test(command);
+    if (hasStaging && hasProduction) {
+      errors.push(`package script ${name} must not consume staging and production credentials together`);
+    }
+  }
+
+  const directDependencies = {
+    ...(packageJson.dependencies ?? {}),
+    ...(packageJson.devDependencies ?? {}),
+    ...(packageJson.optionalDependencies ?? {}),
+    ...(packageJson.peerDependencies ?? {}),
+  };
+  for (const dependency of [
+    'vercel',
+    'wrangler',
+    'gh-pages',
+    '@cloudflare/next-on-pages',
+    '@opennextjs/cloudflare',
+  ]) {
+    if (Object.hasOwn(directDependencies, dependency)) {
+      errors.push(`retired deployment dependency ${dependency} is forbidden`);
+    }
+  }
+  for (const [name, version] of Object.entries(directDependencies)) {
+    if (typeof version !== 'string') continue;
+    for (const dependency of [
+      'vercel',
+      'wrangler',
+      'gh-pages',
+      '@cloudflare/next-on-pages',
+      '@opennextjs/cloudflare',
+    ]) {
+      if (version.startsWith(`npm:${dependency}@`)) {
+        errors.push(`retired deployment dependency alias ${name} -> ${dependency} is forbidden`);
+      }
+    }
+  }
+}
+
+async function validateActiveScripts(root, errors) {
+  const scriptFiles = [
+    ...await filesBelow(path.join(root, 'scripts'), root),
+    ...await filesBelow(path.join(root, 'deploy'), root),
+    ...await filesBelow(path.join(root, 'docker'), root),
+    'Makefile',
+    'Dockerfile',
+    'docker-compose.yml',
+  ]
+    .filter((relative) => relative !== 'scripts/README.md')
+    .filter((relative) => !POLICY_SELF_FILES.has(relative));
+
+  for (const relative of scriptFiles) {
+    const source = await readOptional(path.join(root, relative));
+    if (source === undefined) continue;
+    for (const [label, pattern] of FORBIDDEN_DEPLOY_COMMANDS) {
+      if (pattern.test(source)) errors.push(`${relative}: ${label} is forbidden in active scripts`);
+    }
+    const hasStaging = /(?:STAGING_DATABASE_URL|DATABASE_URL_STAGING)/u.test(source);
+    const hasProduction = /(?:PROD(?:UCTION)?_DATABASE_URL|DATABASE_URL_PROD(?:UCTION)?)/u.test(source);
+    if (hasStaging && hasProduction) {
+      errors.push(`${relative}: staging and production database credentials must not be consumed together`);
+    }
+  }
+}
+
+async function validatePostgresReferences(root, errors) {
+  for (const relative of ['docker-compose.yml', 'docker/docker-compose.prod.yml']) {
+    const source = await readOptional(path.join(root, relative));
+    if (source === undefined) {
+      errors.push(`${relative} is required`);
+      continue;
+    }
+    const references = source.match(/\bpostgres:[^\s"']+/gu) ?? [];
+    if (references.length !== 1 || references[0] !== EXPECTED_POSTGRES_IMAGE) {
+      errors.push(`${relative} must contain exactly the approved digest-pinned PostgreSQL image`);
+    }
+  }
+
+  const policySource = await readOptional(
+    path.join(root, 'tests/integration/support/postgres-image-policy.ts'),
+  );
+  if (policySource === undefined
+    || !policySource.includes("APPROVED_POSTGRES_REPOSITORY = 'postgres'")
+    || !policySource.includes("APPROVED_POSTGRES_TAG = '16-alpine'")
+    || !policySource.includes(`'${EXPECTED_POSTGRES_IMAGE.slice('postgres:16-alpine@'.length)}'`)) {
+    errors.push('integration PostgreSQL policy constants must retain the approved tag and full digest');
+  }
+}
+
+async function validateLocalDefaults(root, errors) {
+  const makefile = await readOptional(path.join(root, 'Makefile'));
+  if (makefile === undefined || !/^PROFILE \?= development$/mu.test(makefile)
+    || /^PROFILE \?= production$/mu.test(makefile)) {
+    errors.push('Makefile must default to the development profile');
+  }
+
+  const orchestrator = await readOptional(path.join(root, 'scripts/system-orchestrator.sh'));
+  if (orchestrator === undefined || !/^PROFILE="development"$/mu.test(orchestrator)
+    || /^PROFILE="production"$/mu.test(orchestrator)
+    || !/Runtime profile \(default: development\)/u.test(orchestrator)) {
+    errors.push('system orchestrator must default to development in code and usage text');
+  }
+}
+
+async function validateVerifyImplementation(root, errors) {
+  const source = await readOptional(path.join(root, 'scripts/verify-release.mjs'));
+  if (source === undefined) {
+    errors.push('scripts/verify-release.mjs is required');
+    return;
+  }
+  for (const marker of [
+    "from './lib/release-gates.mjs'",
+    'spawn(',
+    'shell: false',
+    'RELEASE_GATES',
+  ]) {
+    if (!source.includes(marker)) errors.push(`verify:release must retain restricted marker: ${marker}`);
+  }
+  if (/\bexec(?:Sync|File|FileSync)?\s*\(/u.test(source)) {
+    errors.push('verify:release must use argument-vector process spawning, not exec APIs');
+  }
+  for (const [label, pattern] of FORBIDDEN_DEPLOY_COMMANDS) {
+    if (pattern.test(source)) errors.push(`${label} is forbidden in verify:release`);
+  }
+  if (/\b(?:prisma\s+migrate|migrate\s+deploy|system:migrate|db:migrate)\b/iu.test(source)) {
+    errors.push('persistent migration commands are forbidden in verify:release');
+  }
+}
+
+export async function validateReleasePolicy(
+  repositoryRoot = process.cwd(),
+  { gates = RELEASE_GATES } = {},
+) {
+  const root = path.resolve(repositoryRoot);
+  const errors = [];
+
+  validateGateProfile(gates, errors);
+  validateControlledEnvironments(errors);
+
+  const packageSource = await readOptional(path.join(root, 'package.json'));
+  if (packageSource === undefined) {
+    errors.push('package.json is required');
+  } else {
+    try {
+      validatePackage(JSON.parse(packageSource), errors);
+    } catch {
+      errors.push('package.json must contain valid JSON');
+    }
+  }
+
+  const workflowFiles = await filesBelow(path.join(root, '.github/workflows'), root);
+  if (workflowFiles.length > 0) {
+    errors.push(`active GitHub Actions workflows are forbidden: ${workflowFiles.join(', ')}`);
+  }
+  const githubFiles = await filesBelow(path.join(root, '.github'), root);
+  for (const relative of githubFiles) {
+    const source = await readFile(path.join(root, relative), 'utf8');
+    if (/\bpull_request_target\b/u.test(source)) {
+      errors.push(`${relative}: pull_request_target is forbidden`);
+    }
+  }
+
+  for (const relative of FORBIDDEN_PLATFORM_PATHS) {
+    if (await exists(path.join(root, relative))) {
+      errors.push(`retired deployment artifact ${relative} is forbidden`);
+    }
+  }
+
+  await validateLocalDefaults(root, errors);
+  await validateActiveScripts(root, errors);
+  await validatePostgresReferences(root, errors);
+  await validateVerifyImplementation(root, errors);
+
+  return [...new Set(errors)].sort();
+}
+
+export const releasePolicyInternals = Object.freeze({
+  expectedPostgresImage: EXPECTED_POSTGRES_IMAGE,
+  expectedGateProfile: EXPECTED_GATE_PROFILE,
+  expectedPackageScripts: EXPECTED_PACKAGE_SCRIPTS,
+});

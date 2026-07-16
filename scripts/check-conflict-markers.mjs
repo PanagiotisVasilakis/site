@@ -3,13 +3,13 @@
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
-const tracked = spawnSync('git', ['ls-files', '-z'], {
+const candidate = spawnSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], {
   encoding: 'utf8',
   maxBuffer: 16 * 1024 * 1024,
 });
 
-if (tracked.status !== 0) {
-  process.stderr.write(tracked.stderr || 'Unable to list tracked files.\n');
+if (candidate.status !== 0) {
+  process.stderr.write(candidate.stderr || 'Unable to list candidate files.\n');
   process.exit(2);
 }
 
@@ -23,7 +23,7 @@ function isConflictMarker(line) {
 }
 const failures = [];
 
-for (const file of tracked.stdout.split('\0').filter(Boolean)) {
+for (const file of candidate.stdout.split('\0').filter(Boolean)) {
   let content;
   try {
     content = readFileSync(file);

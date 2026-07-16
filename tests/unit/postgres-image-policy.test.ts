@@ -7,6 +7,7 @@ import {
   APPROVED_POSTGRES_REPO_DIGEST,
   assertApprovedPostgresImageReference,
   assertApprovedPostgresOciIndex,
+  assertLocalDockerEndpoint,
   postgresImagePolicyDiagnostic,
   validatePostgresOciIndexMetadata,
   validatePulledPostgresImageInspection,
@@ -105,6 +106,32 @@ describe('approved disposable PostgreSQL image reference', () => {
       if (previous === undefined) delete process.env.INTEGRATION_POSTGRES_IMAGE;
       else process.env.INTEGRATION_POSTGRES_IMAGE = previous;
     }
+  });
+});
+
+describe('local Docker daemon boundary', () => {
+  it.each(['unix:///var/run/docker.sock', 'npipe:////./pipe/docker_engine'])(
+    'accepts a local %s endpoint',
+    (endpoint) => {
+      expect(() => assertLocalDockerEndpoint(JSON.stringify(endpoint))).not.toThrow();
+    },
+  );
+
+  it.each([
+    ['remote TCP endpoint', JSON.stringify('tcp://docker.example.invalid:2376')],
+    ['remote SSH endpoint', JSON.stringify('ssh://docker.example.invalid')],
+    ['non-string endpoint', JSON.stringify({ host: 'unix:///var/run/docker.sock' })],
+    ['malformed response', 'not-json'],
+  ])('rejects a %s without echoing it', (_scenario, rawEndpoint) => {
+    let diagnostic = '';
+    try {
+      assertLocalDockerEndpoint(rawEndpoint);
+    } catch (error) {
+      diagnostic = postgresImagePolicyDiagnostic(error);
+    }
+    expect(diagnostic).toContain('image policy rejected');
+    expect(diagnostic).not.toContain(rawEndpoint);
+    expect(diagnostic).not.toContain('docker.example.invalid');
   });
 });
 
