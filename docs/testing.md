@@ -67,6 +67,12 @@ After connection, the guard checks `current_database()`, `current_user`, databas
 
 The dedicated config and guard are defense in depth, not permission to provide a database URL manually. Run the integration suite only through `npm run test:integration`.
 
+## Claim and logout characterization
+
+Booking-claim races run through two independent child application contexts, each with its own Prisma pool and PostgreSQL `application_name`. A synthetic database lock holds the authoritative write boundary until `pg_stat_activity` and `pg_blocking_pids` show both claimants in the same database wait graph; `setImmediate` only yields while polling that state. The suite uses 15 literal fresh migrated databases for different-identity claims and 15 for identical claims. Each race must produce one `200` winner, one generic `401` loser, one owner and consumed grant, and one complete remember-enabled session/family/token graph with `Session.id === RefreshToken.id`; no losing user, terms, audit, session, family, or token may survive.
+
+The non-race matrix covers new and existing users with remember enabled and disabled, sibling-grant revocation, wrong-password and owned-booking denial, generic invalid grant states, and a real claim-to-refresh rotation. Logout coverage exercises session-only, matching, malformed, already-revoked, mismatched, and repeated credentials through the route. Every logout returns `204`, clears both cookies, and preserves authorization graphs that were not explicitly presented.
+
 ## Portal booking eligibility policy
 
 Portal access uses booking calendar dates, not elapsed durations. `Booking.startDate` and `Booking.endDate` are PostgreSQL `DATE` columns surfaced by Prisma as UTC-midnight `Date` values, so the established portal convention is a UTC calendar date. `PROPERTY_TIME_ZONE` applies to property time-of-day behavior and does not redefine this authentication boundary.
@@ -87,7 +93,7 @@ Refresh concurrency uses a transaction-scoped PostgreSQL advisory try-lock deriv
 
 Only a contender whose committed preflight shows an active generation, valid session/booking binding, and approved same context may map observed marker contention to cookie-free `409 REFRESH_IN_PROGRESS`; the owner remains the sole `200` winner. Every different-context, invalid-binding, revoked, or ambiguous contender ends its try-lock transaction and enters a separately bounded cleanup transaction using `User → RefreshTokenFamily`. If the owner locks User first, cleanup revokes every committed descendant; if cleanup locks User first, the owner later observes the revoked family and cannot issue a credential.
 
-A request that owns the marker and authoritatively re-reads an already-revoked predecessor is completed replay: it atomically revokes the family, all family tokens, and paired sessions before returning `401` and clearing both auth cookies. Integration coverage uses PostgreSQL lock barriers rather than ordering sleeps and includes 20 same-context overlaps, 15 different-context overlaps, completed-replay timing boundaries and post-commit contention, invalid bindings, family/generation isolation, and owner rollback/retry.
+A request that owns the marker and authoritatively re-reads an already-revoked predecessor is completed replay: it atomically revokes the family, all family tokens, and paired sessions before returning `401` and clearing both auth cookies. Integration coverage uses PostgreSQL lock barriers rather than ordering sleeps and includes 20 same-context overlaps, 15 different-context overlaps, five fresh-database completed-replay commit witnesses, invalid bindings, family/generation isolation, and owner rollback/retry.
 
 ## Prisma integrity hashing
 

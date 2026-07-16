@@ -80,7 +80,22 @@ interface OverlapResult {
   contender: SafeRotationEvidence;
   ownerLockObserved: boolean;
   contenderWaitObserved: boolean;
+  completedRotationCommit?: CompletedRotationCommitWitness;
   state: AuthorizationState;
+}
+
+interface CompletedRotationCommitWitness {
+  predecessorMarkerAcquired: boolean;
+  witnessMarkerReleased: boolean;
+  familyActive: boolean;
+  predecessorRevoked: boolean;
+  descendantCount: number;
+  activeDescendantCount: number;
+  sessionCount: number;
+  activeSessionCount: number;
+  revokedSessionCount: number;
+  generationSessionPairingValid: boolean;
+  isolatedFamilyActive: boolean;
 }
 
 interface FamilyRotationState {
@@ -658,6 +673,66 @@ async function readFamilyRotationState(
   };
 }
 
+async function observeCompletedRotationCommit(
+  monitorClient: PrismaClient,
+  releaseProbeClient: PrismaClient,
+  predecessorMarkerKey: bigint,
+): Promise<CompletedRotationCommitWitness> {
+  const committedState = await monitorClient.$transaction(async (tx) => {
+    const markerRows = await tx.$queryRaw<Array<{ acquired: boolean }>>`
+      SELECT pg_try_advisory_xact_lock(${predecessorMarkerKey}::bigint) AS "acquired"
+    `;
+    const [family, tokens, sessions, isolatedFamily] = await Promise.all([
+      tx.refreshTokenFamily.findUnique({ where: { id: PRIMARY_FAMILY_ID } }),
+      tx.refreshToken.findMany({
+        where: { familyId: PRIMARY_FAMILY_ID },
+        orderBy: { createdAt: 'asc' },
+      }),
+      tx.session.findMany({
+        where: { id: { in: [ROOT_GENERATION_ID, WINNER_GENERATION_ID] } },
+        orderBy: { createdAt: 'asc' },
+      }),
+      tx.refreshTokenFamily.findUnique({ where: { id: ISOLATED_FAMILY_ID } }),
+    ]);
+    const sessionsById = new Map(sessions.map((session) => [session.id, session]));
+    const predecessor = tokens.find((token) => token.id === ROOT_GENERATION_ID);
+
+    return {
+      predecessorMarkerAcquired: markerRows.length === 1 && markerRows[0].acquired,
+      familyActive: Boolean(family && !family.revokedAt),
+      predecessorRevoked: Boolean(predecessor?.revokedAt),
+      descendantCount: tokens.filter((token) => token.rotatedFromId === ROOT_GENERATION_ID).length,
+      activeDescendantCount: tokens.filter(
+        (token) => token.rotatedFromId === ROOT_GENERATION_ID && !token.revokedAt,
+      ).length,
+      sessionCount: sessions.length,
+      activeSessionCount: sessions.filter((session) => !session.revokedAt).length,
+      revokedSessionCount: sessions.filter((session) => Boolean(session.revokedAt)).length,
+      generationSessionPairingValid: tokens.every((token) => {
+        const session = sessionsById.get(token.id);
+        return Boolean(session
+          && session.userId === token.userId
+          && session.bookingId === PRIMARY_BOOKING_ID
+          && Boolean(session.revokedAt) === Boolean(token.revokedAt));
+      }),
+      isolatedFamilyActive: Boolean(isolatedFamily && !isolatedFamily.revokedAt),
+    };
+  });
+
+  // The first transaction's successful marker acquisition proves the initial
+  // rotation released its transaction-scoped marker before the witness read.
+  // Reacquisition from another client proves the witness transaction itself
+  // committed and released that same marker before either replay starts.
+  const witnessMarkerReleased = await releaseProbeClient.$transaction(async (tx) => {
+    const markerRows = await tx.$queryRaw<Array<{ acquired: boolean }>>`
+      SELECT pg_try_advisory_xact_lock(${predecessorMarkerKey}::bigint) AS "acquired"
+    `;
+    return markerRows.length === 1 && markerRows[0].acquired;
+  });
+
+  return { ...committedState, witnessMarkerReleased };
+}
+
 async function executeOverlap(
   target: DisposableDatabaseTarget,
   kind: OverlapKind,
@@ -678,6 +753,7 @@ async function executeOverlap(
           const releaseBlocker = createDeferred<void>();
           let ownerPromise: Promise<RotationResult> | undefined;
           let contenderPromise: Promise<RotationResult> | undefined;
+          let completedRotationCommit: CompletedRotationCommitWitness | undefined;
 
           if (kind === 'completed-replay-contention') {
             const committedRotation = await ownerRepository.rotate(
@@ -693,6 +769,14 @@ async function executeOverlap(
             if (committedRotation.status !== 'rotated') {
               throw new Error('Completed-replay fixture did not commit its initial rotation.');
             }
+            const { refreshGenerationAdvisoryLockKey } = await import(
+              '@/lib/refreshRotationLock'
+            );
+            completedRotationCommit = await observeCompletedRotationCommit(
+              monitorClient,
+              contenderClient,
+              refreshGenerationAdvisoryLockKey(ROOT_GENERATION_ID),
+            );
           }
 
           const blockerPromise = blockerClient.$transaction(async (tx) => {
@@ -802,6 +886,7 @@ async function executeOverlap(
               ownerLockObserved: ownerLock.advisoryGranted
                 && ownerLock.blockingPids.includes(blockerPid),
               contenderWaitObserved,
+              ...(completedRotationCommit ? { completedRotationCommit } : {}),
               state: await readAuthorizationState(monitorClient, monitorRepository),
             };
           } finally {
@@ -1365,40 +1450,58 @@ describe.sequential('refresh overlap classification through PostgreSQL contentio
     });
   }, 120_000);
 
-  it('never returns concurrent when two same-context replays start after the winner commit', async () => {
-    const result = await runFreshOverlap('completed-replay-contention', 1);
-    expect([result.owner.status, result.contender.status].sort()).toEqual([
-      'invalid',
-      'replayed',
-    ]);
-    expect({
-      ownerLockObserved: result.ownerLockObserved,
-      contenderWaitObserved: result.contenderWaitObserved,
-      state: result.state,
-    }).toEqual({
-      ownerLockObserved: true,
-      contenderWaitObserved: true,
-      state: {
-        primary: {
-          familyRevoked: true,
-          familyReason: 'refresh_token_replay',
-          tokenCount: 2,
-          activeTokenCount: 0,
-          revokedTokenCount: 2,
+  it('never returns concurrent across 5 fresh-database replays after the winner commit', async () => {
+    for (let repetition = 1; repetition <= 5; repetition += 1) {
+      const result = await runFreshOverlap('completed-replay-contention', repetition);
+      const replayStatuses = [result.owner.status, result.contender.status];
+      expect(replayStatuses, `completed replay repetition ${repetition}`).not.toContain('concurrent');
+      expect(replayStatuses.sort(), `completed replay repetition ${repetition}`).toEqual([
+        'invalid',
+        'replayed',
+      ]);
+      expect({
+        completedRotationCommit: result.completedRotationCommit,
+        ownerLockObserved: result.ownerLockObserved,
+        contenderWaitObserved: result.contenderWaitObserved,
+        state: result.state,
+      }, `completed replay repetition ${repetition}`).toEqual({
+        completedRotationCommit: {
+          predecessorMarkerAcquired: true,
+          witnessMarkerReleased: true,
+          familyActive: true,
+          predecessorRevoked: true,
           descendantCount: 1,
-          activeDescendantCount: 0,
+          activeDescendantCount: 1,
           sessionCount: 2,
-          activeSessionCount: 0,
-          revokedSessionCount: 2,
+          activeSessionCount: 1,
+          revokedSessionCount: 1,
           generationSessionPairingValid: true,
-          rootUsable: false,
-          replacementUsable: false,
-          contenderUsable: false,
+          isolatedFamilyActive: true,
         },
-        isolated: ACTIVE_ISOLATED_FAMILY,
-      },
-    });
-  }, 120_000);
+        ownerLockObserved: true,
+        contenderWaitObserved: true,
+        state: {
+          primary: {
+            familyRevoked: true,
+            familyReason: 'refresh_token_replay',
+            tokenCount: 2,
+            activeTokenCount: 0,
+            revokedTokenCount: 2,
+            descendantCount: 1,
+            activeDescendantCount: 0,
+            sessionCount: 2,
+            activeSessionCount: 0,
+            revokedSessionCount: 2,
+            generationSessionPairingValid: true,
+            rootUsable: false,
+            replacementUsable: false,
+            contenderUsable: false,
+          },
+          isolated: ACTIVE_ISOLATED_FAMILY,
+        },
+      });
+    }
+  }, 600_000);
 
   it('isolates simultaneous rotations by family, booking, and user', async () => {
     const result = await runFreshFamilyIsolation();
