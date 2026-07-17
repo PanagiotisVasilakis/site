@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server';
-import { getClientIp } from '@/lib/net/getClientIp';
+import { requireCanonicalClientIp } from '@/lib/net/clientIdentity';
 import { normalizePhone } from '@/lib/phone';
 import { privacyHmac } from '@/lib/privacyHash';
 
@@ -25,8 +25,7 @@ function normalizeIdentifier(value: string): string {
   return phone?.e164 ?? normalized;
 }
 
-function buildKeys(request: NextRequest, options: RateLimitOptions): string[] {
-  const ip = getClientIp(request, { trustProxy: true });
+function buildKeys(ip: string, options: RateLimitOptions): string[] {
   const dimensions = [`ip:${ip}`];
   if (options.identifier) dimensions.push(`identifier:${normalizeIdentifier(options.identifier)}`);
   return dimensions.map((dimension) => {
@@ -39,7 +38,11 @@ export async function checkSensitiveRateLimit(
   request: NextRequest,
   options: RateLimitOptions,
 ): Promise<RateLimitDecision> {
-  const keys = buildKeys(request, options);
+  // Resolve identity before hashing a limiter dimension or importing Prisma.
+  // Missing identity is an internal availability failure, never a shared
+  // persistent identity bucket.
+  const ip = requireCanonicalClientIp(request, { trustProxy: true });
+  const keys = buildKeys(ip, options);
   const { prisma } = await import('@/lib/prisma');
   const resetAt = new Date(Date.now() + options.windowMs);
   const records = await Promise.all(keys.map(async (key) => {

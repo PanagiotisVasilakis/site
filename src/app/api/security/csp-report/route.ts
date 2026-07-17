@@ -7,6 +7,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { handleCSPViolation } from '@/lib/security-monitoring';
 import { getClientIp } from '@/lib/net/getClientIp';
+import {
+  createClientIdentityUnavailableResponse,
+  isClientIdentityUnavailableError,
+} from '@/lib/net/clientIdentity';
 import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
 import { ApiError, readJsonBody } from '@/lib/apiErrorHandler';
 
@@ -53,6 +57,9 @@ export async function POST(request: NextRequest) {
     // Return success response
     return new NextResponse(null, { status: 204 });
   } catch (error) {
+    if (isClientIdentityUnavailableError(error)) {
+      return createClientIdentityUnavailableResponse();
+    }
     if (error instanceof ApiError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }

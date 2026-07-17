@@ -8,12 +8,14 @@ import {
   issueGuestSession,
   parseGuestSession,
 } from '@/lib/guestSession';
-import { getClientIp } from '@/lib/net/getClientIp';
+import { requireCanonicalClientIp } from '@/lib/net/clientIdentity';
 import { privacyHmac } from '@/lib/privacyHash';
 
 export function requestAuthContext(request: NextRequest): { deviceHint: string; ipHint: string; ipHash: string } {
+  // Identity must be available before any context HMAC is created. In
+  // particular, never turn the sentinel `unknown` into a valid-looking hint.
+  const ip = requireCanonicalClientIp(request);
   const userAgent = request.headers.get('user-agent') || 'unknown';
-  const ip = getClientIp(request);
   const ipHint = privacyHmac(ip, 'portal-auth:ip-hint:v1');
   return {
     deviceHint: privacyHmac(userAgent, 'portal-auth:device-hint:v1'),
@@ -27,6 +29,11 @@ export async function attachPortalAuthCookies(
   response: NextResponse,
   input: { userId: string; bookingId: string; remember: boolean },
 ): Promise<void> {
+  // Resolve before revoking a family or issuing a persistent session. This is
+  // intentionally earlier than the remember-me branch so every mutation path
+  // observes the same fail-closed identity contract.
+  const context = requestAuthContext(request);
+
   if (!input.remember) {
     const presentedRefreshToken = request.cookies.get('guest_rt')?.value;
     if (presentedRefreshToken) {
@@ -45,7 +52,6 @@ export async function attachPortalAuthCookies(
     if (!sessionId) {
       throw new Error('Failed to bind refresh authorization to guest session');
     }
-    const context = requestAuthContext(request);
     const issued = await guestStore.issueRefreshToken(input.userId, 7, {
       session_id: sessionId,
       device_hint: context.deviceHint,

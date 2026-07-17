@@ -7,6 +7,10 @@ import {
   type AnalyticsInput,
 } from '@/lib/analyticsRepository';
 import { logger } from '@/lib/logger-enterprise';
+import {
+  createClientIdentityUnavailableResponse,
+  isClientIdentityUnavailableError,
+} from '@/lib/net/clientIdentity';
 import { isAdminRequest } from '@/lib/rbac';
 import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
 import { ApiError, readJsonBody } from '@/lib/apiErrorHandler';
@@ -138,11 +142,19 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'Payload too large' }, { status: 413 });
   }
 
-  const decision = await checkSensitiveRateLimit(request, {
-    scope: 'analytics-ingest',
-    limit: 120,
-    windowMs: 60_000,
-  });
+  let decision: Awaited<ReturnType<typeof checkSensitiveRateLimit>>;
+  try {
+    decision = await checkSensitiveRateLimit(request, {
+      scope: 'analytics-ingest',
+      limit: 120,
+      windowMs: 60_000,
+    });
+  } catch (error) {
+    if (isClientIdentityUnavailableError(error)) {
+      return createClientIdentityUnavailableResponse();
+    }
+    throw error;
+  }
   if (!decision.allowed) {
     return Response.json(
       { error: 'Rate limited' },

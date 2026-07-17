@@ -10,6 +10,10 @@ import { z } from 'zod';
 import type { ApiErrorCode } from './apiErrorTypes';
 import { ApiErrorCode as ErrorCodes } from './apiErrorTypes';
 import { metrics } from './metrics-collector';
+import {
+  createClientIdentityUnavailableResponse,
+  isClientIdentityUnavailableError,
+} from './net/clientIdentity';
 
 // Re-export for backward compatibility
 export { ErrorCodes as ApiErrorCode };
@@ -351,7 +355,10 @@ export function withErrorHandler(
 
     } catch (error) {
       const duration = performance.now() - startTime;
-      const errorStatus = error instanceof ApiError ? error.statusCode : 500;
+      const identityUnavailable = isClientIdentityUnavailableError(error);
+      const errorStatus = identityUnavailable
+        ? HttpStatusCodes.SERVICE_UNAVAILABLE
+        : error instanceof ApiError ? error.statusCode : 500;
       metrics.counter('http.requests', 1, { method, route: request.nextUrl.pathname, status: String(errorStatus) });
       if (errorStatus >= 500) {
         metrics.counter('http.errors', 1, { method, route: request.nextUrl.pathname, status: String(errorStatus) });
@@ -359,6 +366,18 @@ export function withErrorHandler(
         metrics.counter('http.client_errors', 1, { method, route: request.nextUrl.pathname, status: String(errorStatus) });
       }
       metrics.timer('http.response_time', duration, { method, route: request.nextUrl.pathname });
+
+      if (identityUnavailable) {
+        if (mergedConfig.enableErrorLogging) {
+          logger.debug('API dependency unavailable', {
+            method,
+            url,
+            status: HttpStatusCodes.SERVICE_UNAVAILABLE,
+            duration: Math.round(duration * 100) / 100,
+          });
+        }
+        return createClientIdentityUnavailableResponse();
+      }
       
       // Handle known API errors
       if (error instanceof ApiError) {

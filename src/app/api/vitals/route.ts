@@ -3,6 +3,10 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
 import { recordVital, vitalsSummary } from '@/lib/analyticsRepository';
+import {
+  createClientIdentityUnavailableResponse,
+  isClientIdentityUnavailableError,
+} from '@/lib/net/clientIdentity';
 import { isAdminRequest } from '@/lib/rbac';
 import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
 import { ApiError, readJsonBody } from '@/lib/apiErrorHandler';
@@ -25,11 +29,19 @@ function safePath(value: string | null | undefined): string {
 }
 
 export async function POST(request: NextRequest) {
-  const decision = await checkSensitiveRateLimit(request, {
-    scope: 'vitals-ingest',
-    limit: 60,
-    windowMs: 60_000,
-  });
+  let decision: Awaited<ReturnType<typeof checkSensitiveRateLimit>>;
+  try {
+    decision = await checkSensitiveRateLimit(request, {
+      scope: 'vitals-ingest',
+      limit: 60,
+      windowMs: 60_000,
+    });
+  } catch (error) {
+    if (isClientIdentityUnavailableError(error)) {
+      return createClientIdentityUnavailableResponse();
+    }
+    throw error;
+  }
   if (!decision.allowed) {
     return Response.json({ error: 'Rate limited' }, { status: 429 });
   }

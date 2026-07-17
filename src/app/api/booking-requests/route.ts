@@ -2,7 +2,11 @@ import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
-import { getClientIp } from '@/lib/net/getClientIp';
+import {
+  createClientIdentityUnavailableResponse,
+  isClientIdentityUnavailableError,
+  requireCanonicalClientIp,
+} from '@/lib/net/clientIdentity';
 import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
 import { deliverOutboxEvent } from '@/lib/bookingOutbox';
 import { ApiError, readJsonBody } from '@/lib/apiErrorHandler';
@@ -70,13 +74,21 @@ export async function POST(request: NextRequest) {
   const phone = normalizeStayRequestPhone(parsed.data.guest.phone);
   if (!phone) return errorResponse('Invalid phone number', 422);
 
-  const clientIp = getClientIp(request);
-  const limit = await checkSensitiveRateLimit(request, {
-    scope: 'booking-request',
-    identifier: `${clientIp}:${parsed.data.guest.email}`,
-    limit: 5,
-    windowMs: 60 * 60 * 1000,
-  });
+  let limit: Awaited<ReturnType<typeof checkSensitiveRateLimit>>;
+  try {
+    const clientIp = requireCanonicalClientIp(request);
+    limit = await checkSensitiveRateLimit(request, {
+      scope: 'booking-request',
+      identifier: `${clientIp}:${parsed.data.guest.email}`,
+      limit: 5,
+      windowMs: 60 * 60 * 1000,
+    });
+  } catch (error) {
+    if (isClientIdentityUnavailableError(error)) {
+      return createClientIdentityUnavailableResponse();
+    }
+    throw error;
+  }
   if (!limit.allowed) return errorResponse('Too many booking requests. Please try again later.', 429);
 
   const existing = await prisma.stayRequest.findUnique({ where: { idempotencyKey: key } });

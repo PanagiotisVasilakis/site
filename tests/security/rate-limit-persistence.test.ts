@@ -2,18 +2,34 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const queryRaw = vi.hoisted(() => vi.fn());
+const privacyHmac = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/prisma', () => ({ prisma: { $queryRaw: queryRaw } }));
+vi.mock('@/lib/privacyHash', () => ({ privacyHmac }));
 
 import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
+import { CLIENT_IDENTITY_UNAVAILABLE } from '@/lib/net/clientIdentity';
 
 function request(ip: string) {
   return new NextRequest('https://guest.test/api/auth', { headers: { 'x-forwarded-for': ip } });
+}
+
+function rawHeaderRequest(ip: string): NextRequest {
+  return {
+    headers: { get: (name: string) => name.toLowerCase() === 'x-forwarded-for' ? ip : null },
+  } as unknown as NextRequest;
 }
 
 describe('durable sensitive-operation rate limiting', () => {
   beforeEach(() => {
     vi.stubEnv('TRUST_PROXY_MODE', 'hops');
     vi.stubEnv('TRUST_PROXY_HOPS', '1');
+    privacyHmac.mockImplementation((value: string, context: string) => {
+      let hash = 2_166_136_261;
+      for (const character of `${context}\0${value}`) {
+        hash = Math.imul(hash ^ character.charCodeAt(0), 16_777_619);
+      }
+      return (hash >>> 0).toString(16).padStart(8, '0').repeat(8);
+    });
     queryRaw.mockResolvedValue([{ count: 1, reset_time: new Date(Date.now() + 60_000) }]);
   });
 
@@ -68,5 +84,55 @@ describe('durable sensitive-operation rate limiting', () => {
     await expect(checkSensitiveRateLimit(request('203.0.113.10'), {
       scope: 'portal-signin', limit: 3, windowMs: 60_000,
     })).rejects.toThrow('Rate limiter did not return a decision');
+  });
+
+  it('fails before persistence instead of merging unknown callers into a universal IP bucket', async () => {
+    vi.stubEnv('TRUST_PROXY_MODE', 'none');
+    vi.stubEnv('TRUST_PROXY_HOPS', '0');
+
+    await expect(checkSensitiveRateLimit(request('203.0.113.10'), {
+      scope: 'portal-signin',
+      identifier: 'missing-identity@example.test',
+      limit: 3,
+      windowMs: 60_000,
+    })).rejects.toMatchObject({ code: CLIENT_IDENTITY_UNAVAILABLE, reason: 'sentinel' });
+
+    expect(queryRaw).not.toHaveBeenCalled();
+    expect(privacyHmac).not.toHaveBeenCalled();
+  });
+
+  it('canonicalizes IPv6 before generating the limiter HMAC and persists normally', async () => {
+    const decision = await checkSensitiveRateLimit(rawHeaderRequest(
+      '2001:0DB8:0000:0000:0000:0000:0000:0001',
+    ), {
+      scope: 'portal-signin', limit: 3, windowMs: 60_000,
+    });
+
+    expect(privacyHmac).toHaveBeenCalledOnce();
+    expect(privacyHmac).toHaveBeenCalledWith(
+      'portal-signin|ip:2001:db8::1',
+      'sensitive-rate-limit:v1',
+    );
+    expect(queryRaw).toHaveBeenCalledOnce();
+    expect(decision.allowed).toBe(true);
+  });
+
+  it.each([
+    ['', 'missing'],
+    ['   ', 'malformed'],
+    ['unknown', 'sentinel'],
+    [' 203.0.113.10', 'malformed'],
+    ['203.0.113.10 ', 'malformed'],
+    ['::::', 'unsupported_format'],
+    ['203.0.113.10,198.51.100.20', 'multi_value'],
+    ['203.0.113.10:443', 'unsupported_format'],
+    ['guest.example.test', 'unsupported_format'],
+    ['fe80::1%eth0', 'unsupported_format'],
+  ] as const)('rejects non-canonical source %j before persistence', async (ip, reason) => {
+    await expect(checkSensitiveRateLimit(rawHeaderRequest(ip), {
+      scope: 'portal-signin', limit: 3, windowMs: 60_000,
+    })).rejects.toMatchObject({ code: CLIENT_IDENTITY_UNAVAILABLE, reason });
+    expect(queryRaw).not.toHaveBeenCalled();
+    expect(privacyHmac).not.toHaveBeenCalled();
   });
 });

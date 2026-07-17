@@ -32,10 +32,21 @@ This append-only record preserves findings discovered after the original product
 - **Verification:** Completed-replay timing matrix, 20 fresh-database same-context overlaps, 15 fresh-database different-context overlaps, post-commit replay contention, invalid-binding contention, family/generation isolation, owner rollback/retry, and existing PR-02A/PR-02C regressions.
 - **Schema/migration impact:** None.
 
+## HIGH-ABUSE-03 — Missing client identity shared one durable sensitive-limit bucket
+
+- **Status:** Fixed by `PR-P0-D1A`; clean checkpoint verification is recorded in the task evidence.
+- **Original behavior:** When client-IP resolution returned the `unknown` sentinel, the durable sensitive-operation limiter treated it as an ordinary identity, derived the same privacy-HMAC key for every unidentified caller, and wrote that shared key to `rate_limits`.
+- **Security and availability impact:** A request without client identity could pass the first limiter decisions and reach a sensitive route, while repeated unidentified requests could exhaust the shared bucket and deny unrelated callers. This made the planned fail-closed ingress boundary capable of both pre-limit domain mutation and a cross-caller denial-of-service condition.
+- **Root cause:** The sensitive limiter constructed `ip:${ip}` unconditionally and did not distinguish a canonical client IP from the `unknown` failure sentinel before hashing, importing Prisma, or writing persistence state.
+- **Zero-write resolution:** Missing or invalid client identity raises the bounded internal `CLIENT_IDENTITY_UNAVAILABLE` condition before privacy-HMAC derivation, Prisma import, rate-limit persistence, session/refresh work, or other protected domain mutation. Route handling maps the condition to a generic, non-diagnostic `503` response.
+- **Representative route/database verification:** Disposable PostgreSQL run `1f26a35a5093` created and migrated three independent clean databases. In each database, the missing-identity booking route returned a generic `503` while `rate_limits`, `stay_requests`, sessions, refresh tokens/families, outbox, privacy, and security-audit tables remained at zero rows; the canonical IPv4 control succeeded and created exactly one `rate_limits` row. The complete integration suite passed 10 files and 70 tests, and its exact disposable container was removed.
+- **Related active finding:** `HIGH-ABUSE-02` remains open; this focused resolution does not establish the trusted Cloudflare-to-origin boundary.
+- **Schema/migration impact:** None.
+
 ## Findings count
 
 - **Original audit High findings:** 10.
-- **Newly discovered High findings during production-faithful testing:** 3.
-- **Total High findings discovered historically:** 13.
-- **New findings closed by remediation:** 3.
-- **Original active High findings remaining:** 10, subject to later remediation and manual evidence.
+- **Newly discovered High findings during production-faithful testing:** 5.
+- **Total High findings discovered historically:** 15.
+- **New findings closed by remediation:** 4.
+- **Active High findings remaining:** 11 — the 10 original High findings plus `HIGH-ABUSE-02`, subject to later remediation and manual evidence.
