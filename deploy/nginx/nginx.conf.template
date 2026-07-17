@@ -1,0 +1,76 @@
+user nginx;
+worker_processes auto;
+pid /tmp/nginx.pid;
+
+events {
+  worker_connections 1024;
+}
+
+http {
+  include /etc/nginx/mime.types;
+  default_type application/octet-stream;
+
+  # Deliberately excludes peer/client IPs, forwarding headers, request bodies,
+  # query strings, and the private attestation value.
+  log_format origin_safe '$request_id $request_method $uri $status $body_bytes_sent '
+                         '$request_time cf_ray=$http_cf_ray';
+  access_log /var/log/nginx/access.log origin_safe;
+  error_log /var/log/nginx/error.log warn;
+
+  include /etc/nginx/trusted-ingress/cloudflare-realip.conf;
+  real_ip_header CF-Connecting-IP;
+  real_ip_recursive off;
+
+  geo $realip_remote_addr $cloudflare_source {
+    default 0;
+    include /etc/nginx/trusted-ingress/cloudflare-geo.conf;
+  }
+
+  map $cloudflare_source $verified_client_ip {
+    default "";
+    1 $remote_addr;
+  }
+
+  map $cloudflare_source $origin_proxy_attestation {
+    default "";
+    1 "${ORIGIN_PROXY_SHARED_SECRET}";
+  }
+
+  upstream next_app {
+    server 127.0.0.1:3000;
+    keepalive 32;
+  }
+
+  server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name __PRODUCTION_HOSTNAME__;
+
+    ssl_certificate /etc/nginx/tls/origin.crt;
+    ssl_certificate_key /etc/nginx/tls/origin.key;
+    ssl_client_certificate /etc/nginx/tls/cloudflare-origin-pull-ca.pem;
+    ssl_verify_client on;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    client_max_body_size 1m;
+
+    location / {
+      if ($cloudflare_source = 0) { return 403; }
+
+      proxy_http_version 1.1;
+      proxy_set_header Connection "";
+      proxy_set_header Host $server_name;
+      proxy_set_header X-Forwarded-Proto https;
+
+      # Complete overwrite: never append any client-supplied forwarding value.
+      proxy_set_header CF-Connecting-IP $verified_client_ip;
+      proxy_set_header X-Real-IP $verified_client_ip;
+      proxy_set_header X-Forwarded-For $verified_client_ip;
+      proxy_set_header Forwarded "";
+      proxy_set_header X-Origin-Verified-Client-IP $verified_client_ip;
+      proxy_set_header X-Origin-Proxy-Attestation $origin_proxy_attestation;
+
+      proxy_pass http://next_app;
+    }
+  }
+}

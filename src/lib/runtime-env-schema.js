@@ -28,6 +28,20 @@ function isTimeZone(value) {
   }
 }
 
+function hasRepeatedSecretPattern(value) {
+  for (let size = 1; size <= 16; size += 1) {
+    if (value.length % size === 0
+      && value === value.slice(0, size).repeat(value.length / size)) return true;
+  }
+  return false;
+}
+
+function isOriginProxySecret(value) {
+  return /^[0-9a-fA-F]{64}$/u.test(value)
+    && !hasRepeatedSecretPattern(value)
+    && !/^(?:deadbeef|changeme|placeholder)/iu.test(value);
+}
+
 export const runtimeEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'production']).default('development'),
 
@@ -54,9 +68,10 @@ export const runtimeEnvSchema = z.object({
   NEXT_PUBLIC_OSRM_BASE_URL: optionalEnv(z.string().url()),
   NEXT_PUBLIC_ENABLE_PERF_TELEMETRY: optionalEnv(z.enum(['true', 'false'])),
   BUILD_SITE_URL: optionalEnv(z.string().url()),
-  TRUST_PROXY_MODE: z.enum(['none', 'hops', 'header']).optional().default('none'),
-  TRUST_PROXY_HOPS: z.string().regex(/^\d+$/).optional().default('0'),
-  CLIENT_IP_HEADER: optionalEnv(z.enum(['cf-connecting-ip', 'x-real-ip'])),
+  ORIGIN_PROXY_SHARED_SECRET: optionalEnv(z.string().refine(
+    isOriginProxySecret,
+    'ORIGIN_PROXY_SHARED_SECRET must be a non-placeholder 64-character hexadecimal secret',
+  )),
 
   BOOKING_REQUEST_WEBHOOK_URL: optionalEnv(z.string().url()),
   BOOKING_REQUEST_WEBHOOK_TOKEN: optionalEnv(z.string().min(20)),
@@ -116,14 +131,8 @@ export const runtimeEnvSchema = z.object({
       }
     }
   }
-  if (env.TRUST_PROXY_MODE !== 'none' && Number.parseInt(env.TRUST_PROXY_HOPS, 10) < 1) {
-    context.addIssue({ code: 'custom', path: ['TRUST_PROXY_HOPS'], message: 'TRUST_PROXY_HOPS must be at least 1 when proxy trust is enabled' });
-  }
-  if (env.NODE_ENV === 'production' && env.TRUST_PROXY_MODE === 'none') {
-    context.addIssue({ code: 'custom', path: ['TRUST_PROXY_MODE'], message: 'TRUST_PROXY_MODE must explicitly describe the trusted production reverse proxy' });
-  }
-  if (env.TRUST_PROXY_MODE === 'header' && !env.CLIENT_IP_HEADER) {
-    context.addIssue({ code: 'custom', path: ['CLIENT_IP_HEADER'], message: 'CLIENT_IP_HEADER is required in header proxy mode' });
+  if (env.NODE_ENV === 'production' && !env.ORIGIN_PROXY_SHARED_SECRET) {
+    context.addIssue({ code: 'custom', path: ['ORIGIN_PROXY_SHARED_SECRET'], message: 'ORIGIN_PROXY_SHARED_SECRET is required in production' });
   }
   if (env.NODE_ENV === 'production' && !env.CLAIM_TOKEN_PEPPER) {
     context.addIssue({ code: 'custom', path: ['CLAIM_TOKEN_PEPPER'], message: 'CLAIM_TOKEN_PEPPER is required in production' });

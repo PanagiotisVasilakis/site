@@ -265,7 +265,8 @@ async function performClaimRequest(options: {
     headers: {
       'content-type': 'application/json',
       'user-agent': 'pr02b-synthetic-claim-client',
-      'x-forwarded-for': '198.51.100.51',
+      'x-origin-verified-client-ip': '198.51.100.51',
+      'x-origin-proxy-attestation': process.env.ORIGIN_PROXY_SHARED_SECRET ?? '',
     },
     body: JSON.stringify({
       claimToken: options.token ?? CLAIM_TOKEN,

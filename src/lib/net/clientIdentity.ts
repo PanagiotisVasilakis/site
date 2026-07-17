@@ -1,8 +1,11 @@
-import { isIP } from 'node:net';
-
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { getClientIp, type GetClientIpOptions } from '@/lib/net/getClientIp';
+import {
+  canonicalizeClientIp,
+  getClientIp,
+  ORIGIN_PROXY_ATTESTATION_HEADER,
+  VERIFIED_CLIENT_IP_HEADER,
+} from '@/lib/net/getClientIp';
 
 export const CLIENT_IDENTITY_UNAVAILABLE = 'CLIENT_IDENTITY_UNAVAILABLE' as const;
 export type ClientIdentityUnavailableReason =
@@ -54,57 +57,12 @@ export function createClientIdentityUnavailableResponse(): NextResponse {
   });
 }
 
-function canonicalizeIpv4(value: string): string {
-  return value.split('.').map((octet) => String(Number(octet))).join('.');
-}
-
-function mappedIpv4FromCanonicalIpv6(value: string): string | null {
-  const match = value.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/u);
-  if (!match) return null;
-
-  const high = Number.parseInt(match[1], 16);
-  const low = Number.parseInt(match[2], 16);
-  return [high >>> 8, high & 0xff, low >>> 8, low & 0xff].join('.');
-}
-
-/**
- * Validate and normalize one IP literal. Chains, ports, hostnames, zone IDs,
- * brackets, and values with whitespace are never client identities.
- */
-export function canonicalizeClientIp(value: string): string | null {
-  if (!value || value.length > 45 || value !== value.trim()) return null;
-  if (value.includes(',') || value.includes('%') || value.includes('[') || value.includes(']')) {
-    return null;
-  }
-  if (/\s/u.test(value)) return null;
-
-  const version = isIP(value);
-  if (version === 4) return canonicalizeIpv4(value);
-  if (version !== 6) return null;
-
-  try {
-    const hostname = new URL(`http://[${value}]/`).hostname;
-    if (!hostname.startsWith('[') || !hostname.endsWith(']')) return null;
-    const canonical = hostname.slice(1, -1).toLowerCase();
-    return mappedIpv4FromCanonicalIpv6(canonical) ?? canonical;
-  } catch {
-    return null;
-  }
-}
+export { canonicalizeClientIp } from '@/lib/net/getClientIp';
 
 function configuredRawSource(
   request: NextRequest,
-  options?: GetClientIpOptions,
 ): string | null {
-  const proxyMode = process.env.TRUST_PROXY_MODE || 'none';
-  const configuredHeader = options?.clientIpHeader || process.env.CLIENT_IP_HEADER;
-  if ((proxyMode === 'header' || options?.clientIpHeader !== undefined) && configuredHeader) {
-    return request.headers.get(configuredHeader);
-  }
-  if (proxyMode === 'hops' || options?.trustedHops !== undefined) {
-    return request.headers.get('x-forwarded-for');
-  }
-  return null;
+  return request.headers.get(VERIFIED_CLIENT_IP_HEADER);
 }
 
 function unavailableReason(value: string | null): ClientIdentityUnavailableReason {
@@ -118,14 +76,20 @@ function unavailableReason(value: string | null): ClientIdentityUnavailableReaso
 /** Resolve the source selected by getClientIp to one canonical literal. */
 export function requireCanonicalClientIp(
   request: NextRequest,
-  options?: GetClientIpOptions,
 ): string {
-  const rawSource = configuredRawSource(request, options);
+  const rawSource = configuredRawSource(request);
+  const attestation = request.headers.get(ORIGIN_PROXY_ATTESTATION_HEADER);
+  if (attestation === null || attestation === '') {
+    throw new ClientIdentityUnavailableError('missing');
+  }
+  if (attestation.includes(',')) {
+    throw new ClientIdentityUnavailableError('multi_value');
+  }
   if (rawSource !== null && canonicalizeClientIp(rawSource) === null) {
     throw new ClientIdentityUnavailableError(unavailableReason(rawSource));
   }
 
-  const selected = getClientIp(request, options);
+  const selected = getClientIp(request);
   const canonical = canonicalizeClientIp(selected);
   if (!canonical) {
     throw new ClientIdentityUnavailableError(

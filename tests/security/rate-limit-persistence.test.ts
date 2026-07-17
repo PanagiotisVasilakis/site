@@ -9,20 +9,32 @@ vi.mock('@/lib/privacyHash', () => ({ privacyHmac }));
 import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
 import { CLIENT_IDENTITY_UNAVAILABLE } from '@/lib/net/clientIdentity';
 
+const attestation = '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2';
+
 function request(ip: string) {
-  return new NextRequest('https://guest.test/api/auth', { headers: { 'x-forwarded-for': ip } });
+  return new NextRequest('https://guest.test/api/auth', {
+    headers: {
+      'x-origin-verified-client-ip': ip,
+      'x-origin-proxy-attestation': attestation,
+    },
+  });
 }
 
 function rawHeaderRequest(ip: string): NextRequest {
   return {
-    headers: { get: (name: string) => name.toLowerCase() === 'x-forwarded-for' ? ip : null },
+    headers: {
+      get: (name: string) => {
+        if (name.toLowerCase() === 'x-origin-verified-client-ip') return ip;
+        if (name.toLowerCase() === 'x-origin-proxy-attestation') return attestation;
+        return null;
+      },
+    },
   } as unknown as NextRequest;
 }
 
 describe('durable sensitive-operation rate limiting', () => {
   beforeEach(() => {
-    vi.stubEnv('TRUST_PROXY_MODE', 'hops');
-    vi.stubEnv('TRUST_PROXY_HOPS', '1');
+    vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', attestation);
     privacyHmac.mockImplementation((value: string, context: string) => {
       let hash = 2_166_136_261;
       for (const character of `${context}\0${value}`) {
@@ -87,15 +99,16 @@ describe('durable sensitive-operation rate limiting', () => {
   });
 
   it('fails before persistence instead of merging unknown callers into a universal IP bucket', async () => {
-    vi.stubEnv('TRUST_PROXY_MODE', 'none');
-    vi.stubEnv('TRUST_PROXY_HOPS', '0');
+    const publicOnlyRequest = new NextRequest('https://guest.test/api/auth', {
+      headers: { 'x-forwarded-for': '203.0.113.10' },
+    });
 
-    await expect(checkSensitiveRateLimit(request('203.0.113.10'), {
+    await expect(checkSensitiveRateLimit(publicOnlyRequest, {
       scope: 'portal-signin',
       identifier: 'missing-identity@example.test',
       limit: 3,
       windowMs: 60_000,
-    })).rejects.toMatchObject({ code: CLIENT_IDENTITY_UNAVAILABLE, reason: 'sentinel' });
+    })).rejects.toMatchObject({ code: CLIENT_IDENTITY_UNAVAILABLE, reason: 'missing' });
 
     expect(queryRaw).not.toHaveBeenCalled();
     expect(privacyHmac).not.toHaveBeenCalled();

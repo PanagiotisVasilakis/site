@@ -24,8 +24,7 @@ REQUIRED_ENV_VARS=(
   SECURITY_PEPPER
   CLAIM_TOKEN_PEPPER
   NEXT_PUBLIC_SITE_URL
-  TRUST_PROXY_MODE
-  TRUST_PROXY_HOPS
+  ORIGIN_PROXY_SHARED_SECRET
 )
 
 usage() {
@@ -181,10 +180,9 @@ UPSTASH_REDIS_REST_TOKEN=
 ALERT_WEBHOOK_URL=
 ALERT_WEBHOOK_TOKEN=
 ALERT_WEBHOOK_REQUIRED=0
-# Required in production. For one trusted reverse proxy use hops/1.
-TRUST_PROXY_MODE=
-TRUST_PROXY_HOPS=
-CLIENT_IP_HEADER=
+# Required in production. Generate with: openssl rand -hex 32
+# Render the same root-owned value into the local Nginx configuration.
+ORIGIN_PROXY_SHARED_SECRET=
 BOOKING_REQUEST_WEBHOOK_URL=
 BOOKING_REQUEST_WEBHOOK_TOKEN=
 CHECKIN_REQUEST_WEBHOOK_URL=
@@ -266,13 +264,10 @@ run_bootstrap() {
     fi
   done
 
-  local proxy_mode proxy_hops
-  proxy_mode="$(grep -E '^TRUST_PROXY_MODE=' "$ENV_FILE" | tail -n 1 | cut -d= -f2-)"
-  proxy_hops="$(grep -E '^TRUST_PROXY_HOPS=' "$ENV_FILE" | tail -n 1 | cut -d= -f2-)"
-  [[ "$proxy_mode" == "hops" || "$proxy_mode" == "header" ]] \
-    || die "TRUST_PROXY_MODE must be hops or header in production"
-  [[ "$proxy_hops" =~ ^[1-9][0-9]*$ ]] \
-    || die "TRUST_PROXY_HOPS must be a positive integer in production"
+  local proxy_secret
+  proxy_secret="$(grep -E '^ORIGIN_PROXY_SHARED_SECRET=' "$ENV_FILE" | tail -n 1 | cut -d= -f2-)"
+  [[ "$proxy_secret" =~ ^[0-9A-Fa-f]{64}$ ]] \
+    || die "ORIGIN_PROXY_SHARED_SECRET must be a 64-character hexadecimal secret"
 
   log "Running one-time bootstrap: ${SERVICE_NAME}-bootstrap.service"
   systemctl start "${SERVICE_NAME}-bootstrap.service"

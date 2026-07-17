@@ -15,10 +15,9 @@ const managedEnvironment = [
   'BOOKING_REQUEST_WEBHOOK_URL',
   'DATABASE_URL',
   'LOG_CONSOLE',
+  'ORIGIN_PROXY_SHARED_SECRET',
   'PRISMA_AUTO_DISCONNECT',
   'SECURITY_PEPPER',
-  'TRUST_PROXY_HOPS',
-  'TRUST_PROXY_MODE',
 ] as const;
 const originalEnvironment = new Map<string, string | undefined>();
 type PrismaGlobal = typeof globalThis & { __prisma__?: PrismaClient };
@@ -54,8 +53,8 @@ function setApplicationEnvironment(databaseUrl: string): void {
   process.env.LOG_CONSOLE = 'false';
   process.env.PRISMA_AUTO_DISCONNECT = 'false';
   process.env.SECURITY_PEPPER = 'd1a-integration-security-pepper-only';
-  process.env.TRUST_PROXY_MODE = 'hops';
-  process.env.TRUST_PROXY_HOPS = '1';
+  process.env.ORIGIN_PROXY_SHARED_SECRET =
+    '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2';
 }
 
 function restoreApplicationEnvironment(): void {
@@ -167,7 +166,10 @@ describe.sequential('D1A missing client identity with live PostgreSQL', () => {
         const { checkSensitiveRateLimit } = await import('@/lib/sensitiveRateLimit');
         const canonicalDecision = await checkSensitiveRateLimit(new NextRequest(
           'http://integration.invalid/api/canonical-control',
-          { headers: { 'x-forwarded-for': '198.51.100.240' } },
+          { headers: {
+            'x-origin-verified-client-ip': '198.51.100.240',
+            'x-origin-proxy-attestation': process.env.ORIGIN_PROXY_SHARED_SECRET ?? '',
+          } },
         ), {
           scope: `d1a-canonical-control-${sequence}`,
           limit: 3,

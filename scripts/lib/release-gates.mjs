@@ -35,8 +35,8 @@ export const SYNTHETIC_PRODUCTION_ENVIRONMENT = Object.freeze({
   NEXT_TELEMETRY_DISABLED: '1',
   NEXT_PUBLIC_SITE_URL: 'https://release.example.invalid',
   BUILD_SITE_URL: 'https://release.example.invalid',
-  TRUST_PROXY_MODE: 'hops',
-  TRUST_PROXY_HOPS: '1',
+  ORIGIN_PROXY_SHARED_SECRET:
+    '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2',
   RATE_LIMIT_BACKEND: 'redis',
   UPSTASH_REDIS_REST_URL: 'https://redis.release.invalid',
   UPSTASH_REDIS_REST_TOKEN: 'release-only-redis-token-000000',
@@ -55,6 +55,8 @@ function npmGate(id, label, script, extraArgs = [], environment = 'base') {
 export const RELEASE_GATES = Object.freeze([
   npmGate('release-policy', 'Local release-policy validation', 'validate:release-policy'),
   npmGate('release-policy-tests', 'Local release-policy tests', 'test:release-policy'),
+  npmGate('cloudflare-ingress', 'Offline Cloudflare ingress manifest check', 'check:cloudflare-ips'),
+  npmGate('nginx-ingress', 'Disposable Nginx trusted-ingress integration', 'test:nginx-ingress'),
   npmGate('conflicts', 'Conflict-marker check', 'check:conflicts'),
   npmGate('prisma-manifest', 'Prisma integrity manifest check', 'check:prisma-integrity'),
   npmGate('prisma-tests', 'Prisma integrity policy tests', 'test:prisma-integrity'),

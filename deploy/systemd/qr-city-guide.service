@@ -10,6 +10,8 @@ User=__APP_USER__
 Group=__APP_GROUP__
 WorkingDirectory=__REPO_ROOT__
 Environment=NODE_ENV=production
+Environment=HOSTNAME=127.0.0.1
+Environment=PORT=3000
 EnvironmentFile=__ENV_FILE__
 ExecStartPre=/usr/bin/env bash __REPO_ROOT__/scripts/system-orchestrator.sh check --profile production --no-docker-fallback
 ExecStart=/usr/bin/env bash __REPO_ROOT__/scripts/system-orchestrator.sh up --profile production --skip-build --skip-migrate --skip-verify --foreground --no-docker-fallback

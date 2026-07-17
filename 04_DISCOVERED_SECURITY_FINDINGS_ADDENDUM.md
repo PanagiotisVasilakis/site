@@ -40,7 +40,17 @@ This append-only record preserves findings discovered after the original product
 - **Root cause:** The sensitive limiter constructed `ip:${ip}` unconditionally and did not distinguish a canonical client IP from the `unknown` failure sentinel before hashing, importing Prisma, or writing persistence state.
 - **Zero-write resolution:** Missing or invalid client identity raises the bounded internal `CLIENT_IDENTITY_UNAVAILABLE` condition before privacy-HMAC derivation, Prisma import, rate-limit persistence, session/refresh work, or other protected domain mutation. Route handling maps the condition to a generic, non-diagnostic `503` response.
 - **Representative route/database verification:** Disposable PostgreSQL run `1f26a35a5093` created and migrated three independent clean databases. In each database, the missing-identity booking route returned a generic `503` while `rate_limits`, `stay_requests`, sessions, refresh tokens/families, outbox, privacy, and security-audit tables remained at zero rows; the canonical IPv4 control succeeded and created exactly one `rate_limits` row. The complete integration suite passed 10 files and 70 tests, and its exact disposable container was removed.
-- **Related active finding:** `HIGH-ABUSE-02` remains open; this focused resolution does not establish the trusted Cloudflare-to-origin boundary.
+- **Related finding:** `HIGH-ABUSE-02` is closed by the subsequent trusted-ingress checkpoint described below.
+- **Schema/migration impact:** None.
+
+## HIGH-ABUSE-02 — Public forwarding headers could self-assert client identity
+
+- **Status:** Fixed by the A2 trusted-ingress checkpoint.
+- **Original behavior:** `TRUST_PROXY_MODE` and request-local resolver options allowed `CF-Connecting-IP`, `X-Real-IP`, or `X-Forwarded-For` to become the canonical limiter/session context without cryptographic proof that the request traversed the trusted local proxy. A direct caller could therefore bypass the intended D1A missing-identity denial by supplying a public header.
+- **Root cause:** The application encoded hop/header selection but had no independently authenticated Nginx-to-application identity channel, while no versioned reverse-proxy, Cloudflare source allowlist, app-port isolation, or origin restriction specification existed.
+- **Resolution:** Nginx accepts only checked-in Cloudflare IPv4/IPv6 source ranges, overwrites every public forwarding header, and injects one canonical private IP plus a private attestation. The application accepts identity only when the IP is a bounded canonical literal and the attestation matches a root-owned 32-byte secret in constant time. Missing, malformed, duplicate, or mismatched values enter the existing `CLIENT_IDENTITY_UNAVAILABLE` zero-write contract.
+- **Defense in depth:** The host Node service binds `127.0.0.1:3000`; the release policy rejects public app-port publication, wildcard proxy trust, append-style canonical forwarding, missing header overwrite/AOP/runbook material, missing Nginx syntax tests, and certificate/key files. Live firewall, Cloudflare Full (strict), AOP, and dashboard state still require operator evidence.
+- **Verification:** Public/private-header matrix, IPv4/IPv6 canonicalization, duplicate and port rejection, production secret validation, explicit diagnostic redaction, invalid-attestation zero-write regressions, a disposable digest-pinned Nginx overwrite/source-isolation test, release-policy mutation tests, and the real PostgreSQL integration suite.
 - **Schema/migration impact:** None.
 
 ## Findings count
@@ -48,5 +58,5 @@ This append-only record preserves findings discovered after the original product
 - **Original audit High findings:** 10.
 - **Newly discovered High findings during production-faithful testing:** 5.
 - **Total High findings discovered historically:** 15.
-- **New findings closed by remediation:** 4.
-- **Active High findings remaining:** 11 — the 10 original High findings plus `HIGH-ABUSE-02`, subject to later remediation and manual evidence.
+- **New findings closed by remediation:** 5.
+- **Active High findings remaining:** 10 — the original High findings, subject to their later remediation and manual evidence.

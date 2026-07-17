@@ -385,7 +385,7 @@ class CORSMiddleware {
       const requestHost = request.headers.get('host')?.toLowerCase();
       if (!requestHost || parsedOrigin.host.toLowerCase() !== requestHost) return false;
 
-      const trustsProxy = (process.env.TRUST_PROXY_MODE || 'none') !== 'none';
+      const trustsProxy = getClientIp(request) !== 'unknown';
       const forwardedProtocol = trustsProxy
         ? request.headers.get('x-forwarded-proto')?.split(',', 1)[0]?.trim().toLowerCase()
         : undefined;

@@ -25,8 +25,7 @@ function productionEnv(overrides: Record<string, string | undefined> = {}) {
     NODE_ENV: 'production',
     NEXT_PUBLIC_SITE_URL: 'https://guest.example',
     CLAIM_TOKEN_PEPPER: 'c'.repeat(32),
-    TRUST_PROXY_MODE: 'hops',
-    TRUST_PROXY_HOPS: '1',
+    ORIGIN_PROXY_SHARED_SECRET: '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2',
     RATE_LIMIT_BACKEND: 'redis',
     UPSTASH_REDIS_REST_URL: 'https://redis.example',
     UPSTASH_REDIS_REST_TOKEN: 'r'.repeat(20),
@@ -40,8 +39,6 @@ describe('runtime environment fail-closed policy', () => {
     expect(result).toEqual(expect.objectContaining({
       NODE_ENV: 'development',
       PROPERTY_TIME_ZONE: 'Europe/Athens',
-      TRUST_PROXY_MODE: 'none',
-      TRUST_PROXY_HOPS: '0',
     }));
   });
 
@@ -65,7 +62,8 @@ describe('runtime environment fail-closed policy', () => {
     ['missing public URL', { NEXT_PUBLIC_SITE_URL: undefined }, 'NEXT_PUBLIC_SITE_URL'],
     ['HTTP public URL', { NEXT_PUBLIC_SITE_URL: 'http://guest.example' }, 'NEXT_PUBLIC_SITE_URL'],
     ['missing claim pepper', { CLAIM_TOKEN_PEPPER: undefined }, 'CLAIM_TOKEN_PEPPER'],
-    ['untrusted proxy topology', { TRUST_PROXY_MODE: 'none', TRUST_PROXY_HOPS: '0' }, 'TRUST_PROXY_MODE'],
+    ['missing origin attestation secret', { ORIGIN_PROXY_SHARED_SECRET: undefined }, 'ORIGIN_PROXY_SHARED_SECRET'],
+    ['weak origin attestation secret', { ORIGIN_PROXY_SHARED_SECRET: 'a'.repeat(64) }, 'ORIGIN_PROXY_SHARED_SECRET'],
     ['process-local rate limiting', { RATE_LIMIT_BACKEND: undefined }, 'RATE_LIMIT_BACKEND'],
     ['insecure Redis endpoint', { UPSTASH_REDIS_REST_URL: 'http://redis.example' }, 'UPSTASH_REDIS_REST_URL'],
   ])('rejects production configuration with %s', (_label, overrides, expectedPath) => {
@@ -74,18 +72,13 @@ describe('runtime environment fail-closed policy', () => {
     if (!result.success) expect(result.error.issues.some(({ path }) => path[0] === expectedPath)).toBe(true);
   });
 
-  it('requires header selection and positive hops for header proxy mode', () => {
-    const missingHeader = runtimeEnvSchema.safeParse({
+  it('rejects malformed origin attestation secrets even outside production', () => {
+    const result = runtimeEnvSchema.safeParse({
       ...requiredEnv,
-      TRUST_PROXY_MODE: 'header',
-      TRUST_PROXY_HOPS: '0',
+      ORIGIN_PROXY_SHARED_SECRET: 'not-a-32-byte-hex-secret',
     });
-    expect(missingHeader.success).toBe(false);
-    if (!missingHeader.success) {
-      expect(missingHeader.error.issues.map(({ path }) => path[0])).toEqual(
-        expect.arrayContaining(['TRUST_PROXY_HOPS', 'CLIENT_IP_HEADER']),
-      );
-    }
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues[0].path[0]).toBe('ORIGIN_PROXY_SHARED_SECRET');
   });
 
   it('requires webhook tokens and HTTPS endpoints in production', () => {
@@ -163,6 +156,8 @@ describe('credential hashing and privacy-safe logging', () => {
 });
 
 describe('trusted proxy IP extraction', () => {
+  const secret = '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2';
+
   afterEach(() => vi.unstubAllEnvs());
 
   function request(headers: Record<string, string>): NextRequest {
@@ -171,39 +166,80 @@ describe('trusted proxy IP extraction', () => {
     } as unknown as NextRequest;
   }
 
-  it('ignores all forwarding data when proxy trust is disabled', () => {
+  it('ignores public forwarding data even when legacy options ask for trust', () => {
+    vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);
     expect(getClientIp(request({ 'x-forwarded-for': '203.0.113.10' }), { trustProxy: false })).toBe('unknown');
-  });
-
-  it('selects the client address using the configured trusted-hop count', () => {
     expect(getClientIp(request({
       'x-forwarded-for': '203.0.113.10, 198.51.100.20, 192.0.2.30',
-    }), { trustProxy: true, trustedHops: 2 })).toBe('198.51.100.20');
+    }), { trustProxy: true, trustedHops: 2 })).toBe('unknown');
   });
 
-  it('accepts only allowlisted direct client-IP headers', () => {
-    expect(getClientIp(request({ 'cf-connecting-ip': '203.0.113.195' }), {
-      trustProxy: true,
-      trustedHops: 1,
-      clientIpHeader: 'cf-connecting-ip',
-    })).toBe('203.0.113.195');
-    expect(getClientIp(request({ 'x-client-ip': '203.0.113.195' }), {
-      trustProxy: true,
-      trustedHops: 1,
-      clientIpHeader: 'x-client-ip',
-    })).toBe('unknown');
+  it('accepts a canonical IPv4 only with both private headers', () => {
+    vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);
+    expect(getClientIp(request({
+      'x-origin-verified-client-ip': '203.0.113.195',
+      'x-origin-proxy-attestation': secret,
+    }))).toBe('203.0.113.195');
   });
 
-  it('normalizes IPv4-mapped IPv6 and rejects malformed addresses', () => {
-    expect(getClientIp(request({ 'x-real-ip': '::ffff:203.0.113.10' }), {
-      trustProxy: true,
-      trustedHops: 1,
-      clientIpHeader: 'x-real-ip',
-    })).toBe('203.0.113.10');
-    expect(getClientIp(request({ 'x-real-ip': 'attacker-controlled-value' }), {
-      trustProxy: true,
-      trustedHops: 1,
-      clientIpHeader: 'x-real-ip',
-    })).toBe('unknown');
+  it('canonicalizes attested IPv6 and IPv4-mapped IPv6 identities', () => {
+    vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);
+    expect(getClientIp(request({
+      'x-origin-verified-client-ip': '2001:0DB8:0000:0000:0000:0000:0000:0001',
+      'x-origin-proxy-attestation': secret,
+    }))).toBe('2001:db8::1');
+    expect(getClientIp(request({
+      'x-origin-verified-client-ip': '::ffff:203.0.113.10',
+      'x-origin-proxy-attestation': secret,
+    }))).toBe('203.0.113.10');
   });
+
+  it.each([
+    ['missing attestation', { 'x-origin-verified-client-ip': '203.0.113.10' }],
+    ['missing private IP', { 'x-origin-proxy-attestation': secret }],
+    ['wrong attestation', {
+      'x-origin-verified-client-ip': '203.0.113.10',
+      'x-origin-proxy-attestation': 'fedcba9876543210'.repeat(4),
+    }],
+    ['duplicated attestation', {
+      'x-origin-verified-client-ip': '203.0.113.10',
+      'x-origin-proxy-attestation': `${secret}, ${secret}`,
+    }],
+    ['duplicated private IP', {
+      'x-origin-verified-client-ip': '203.0.113.10, 198.51.100.1',
+      'x-origin-proxy-attestation': secret,
+    }],
+    ['IP with port', {
+      'x-origin-verified-client-ip': '203.0.113.10:443',
+      'x-origin-proxy-attestation': secret,
+    }],
+  ] as const)('rejects %s', (_label, headers) => {
+    vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);
+    expect(getClientIp(request(headers))).toBe('unknown');
+  });
+
+  it('ignores spoofed public candidates when the private pair is valid', () => {
+    vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);
+    expect(getClientIp(request({
+      'cf-connecting-ip': '198.51.100.1',
+      'x-forwarded-for': '198.51.100.2',
+      'x-real-ip': '198.51.100.3',
+      forwarded: 'for=198.51.100.4',
+      'x-origin-verified-client-ip': '203.0.113.10',
+      'x-origin-proxy-attestation': secret,
+    }))).toBe('203.0.113.10');
+  });
+
+  it.each([
+    ['CF-Connecting-IP', 'header', 'cf-connecting-ip', 'cf-connecting-ip'],
+    ['X-Real-IP', 'header', 'x-real-ip', 'x-real-ip'],
+    ['X-Forwarded-For', 'hops', undefined, 'x-forwarded-for'],
+  ] as const)(
+    'does not trust an unverified direct request merely because it supplies %s',
+    (_label, _mode, _configuredHeader, suppliedHeader) => {
+      vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);
+
+      expect(getClientIp(request({ [suppliedHeader]: '203.0.113.195' }))).toBe('unknown');
+    },
+  );
 });

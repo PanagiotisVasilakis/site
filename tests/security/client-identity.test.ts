@@ -9,6 +9,8 @@ import {
 } from '@/lib/net/clientIdentity';
 
 describe('canonical client identity', () => {
+  const secret = '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2';
+
   afterEach(() => vi.unstubAllEnvs());
 
   it.each([
@@ -39,14 +41,29 @@ describe('canonical client identity', () => {
   });
 
   it('preserves a valid configured single-address source and canonicalizes IPv6', () => {
-    vi.stubEnv('TRUST_PROXY_MODE', 'header');
-    vi.stubEnv('TRUST_PROXY_HOPS', '1');
-    vi.stubEnv('CLIENT_IP_HEADER', 'x-real-ip');
+    vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);
     const request = new NextRequest('https://guest.test/api/auth', {
-      headers: { 'x-real-ip': '2001:0DB8:0000:0000:0000:0000:0000:0001' },
+      headers: {
+        'x-origin-verified-client-ip': '2001:0DB8:0000:0000:0000:0000:0000:0001',
+        'x-origin-proxy-attestation': secret,
+      },
     });
 
     expect(requireCanonicalClientIp(request)).toBe('2001:db8::1');
+  });
+
+  it('rejects a valid private IP paired with the wrong attestation', () => {
+    vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);
+    const request = new NextRequest('https://guest.test/api/auth', {
+      headers: {
+        'x-origin-verified-client-ip': '203.0.113.10',
+        'x-origin-proxy-attestation': 'fedcba9876543210'.repeat(4),
+      },
+    });
+
+    expect(() => requireCanonicalClientIp(request)).toThrow(expect.objectContaining({
+      code: CLIENT_IDENTITY_UNAVAILABLE,
+    }));
   });
 
   it('keeps internal classification out of the shared public response', async () => {

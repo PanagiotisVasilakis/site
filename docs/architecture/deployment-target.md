@@ -47,12 +47,12 @@ the Cloudflare proxy must be enabled for the public origin, and the Netcup
 firewall must prevent public access to PostgreSQL and direct, spoofable access
 to the application origin.
 
-The reverse proxy is the only local ingress to the application container. It
-must overwrite untrusted forwarding headers and provide the exact client-IP
-contract expected by the application. For the Cloudflare path, the application
-may trust `cf-connecting-ip` only when the origin accepts traffic from verified
-Cloudflare networks and the local proxy prevents clients from supplying a
-trusted value directly.
+The reverse proxy is the only local ingress to the application runtime. It
+overwrites untrusted forwarding headers and supplies a private canonical IP plus
+constant-time application attestation. The application never treats
+`cf-connecting-ip`, `x-forwarded-for`, `x-real-ip`, or `Forwarded` as identity.
+The checked-in Nginx configuration accepts only official Cloudflare source
+networks and the host application binds only to loopback.
 
 The application is released manually from one verified Git commit and one
 immutable image identity. A Git push must never deploy. A release operator must:
@@ -149,7 +149,9 @@ decision commit, the repository still has these blockers:
 - `scripts/system-orchestrator.sh` can install development dependencies, build,
   migrate, and start production from the host checkout;
 - the current image build and scan commands default to `villa-app:latest`;
-- no versioned reverse-proxy configuration exists;
+- the versioned reverse-proxy and trusted-ingress contract exist, but live
+  Netcup firewall, Cloudflare Full (strict), AOP, and certificate evidence is
+  still required;
 - no automated encrypted off-site backup or restore-verification artifact
   exists;
 - H0 removed the Vercel-specific commit fallback from build metadata, but the

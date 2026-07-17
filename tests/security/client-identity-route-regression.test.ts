@@ -138,9 +138,7 @@ async function expectGenericIdentityUnavailable(
 describe('missing client identity route boundary', () => {
   beforeEach(() => {
     vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('TRUST_PROXY_MODE', 'none');
-    vi.stubEnv('TRUST_PROXY_HOPS', '0');
-    vi.stubEnv('CLIENT_IP_HEADER', '');
+    vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2');
     vi.stubEnv('ADMIN_DASH_SECRET', 'admin-dashboard-secret-marker');
     vi.stubEnv('BOOKING_REQUEST_WEBHOOK_URL', 'https://hooks.example/booking');
     mocks.rateLimitQuery.mockResolvedValue([{
@@ -159,6 +157,24 @@ describe('missing client identity route boundary', () => {
     const response = await adminLogin(request('/api/admin/login', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ token: accountToken }),
+    }), { params: Promise.resolve({}) });
+
+    await expectGenericIdentityUnavailable(response, ['admin-login', accountToken]);
+    expect(mocks.rateLimitQuery).not.toHaveBeenCalled();
+    expect(mocks.createAdminSession).not.toHaveBeenCalled();
+    expect(mocks.signAdmin).not.toHaveBeenCalled();
+  });
+
+  it('keeps D1A zero-write behavior when private identity has an invalid attestation', async () => {
+    const accountToken = 'admin-dashboard-secret-marker';
+    const response = await adminLogin(request('/api/admin/login', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-origin-verified-client-ip': '203.0.113.10',
+        'x-origin-proxy-attestation': 'fedcba9876543210'.repeat(4),
+      },
       body: JSON.stringify({ token: accountToken }),
     }), { params: Promise.resolve({}) });
 

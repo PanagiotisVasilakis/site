@@ -221,9 +221,9 @@ function spawnClaimWorker(
       PRISMA_AUTO_DISCONNECT: 'false',
       SECURITY_PEPPER: CLAIM_RACE_SECURITY_PEPPER,
       // safeChildEnvironment deliberately strips application configuration.
-      // Re-declare the synthetic one-hop topology for these route workers.
-      TRUST_PROXY_MODE: 'hops',
-      TRUST_PROXY_HOPS: '1',
+      // Re-declare the private ingress attestation for these route workers.
+      ORIGIN_PROXY_SHARED_SECRET:
+        '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2',
     },
     execArgv: ['--import', 'tsx'],
     serialization: 'json',

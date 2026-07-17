@@ -32,7 +32,7 @@ async function createBaselineFixture() {
   await writeRelative(
     root,
     'scripts/system-orchestrator.sh',
-    '#!/usr/bin/env bash\nPROFILE="development"\n# Runtime profile (default: development)\n',
+    '#!/usr/bin/env bash\nPROFILE="development"\n# Runtime profile (default: development)\nexport HOSTNAME="127.0.0.1"\n',
   );
   await writeRelative(
     root,
@@ -59,6 +59,56 @@ async function createBaselineFixture() {
       '',
     ].join('\n'),
   );
+  await writeRelative(root, 'deploy/nginx/cloudflare-ips.json', JSON.stringify({
+    version: 1,
+    ipv4: ['203.0.113.0/24'],
+    ipv6: ['2001:db8::/32'],
+  }));
+  await writeRelative(root, 'deploy/nginx/includes/cloudflare-realip.conf', 'set_real_ip_from 203.0.113.0/24;\n');
+  await writeRelative(root, 'deploy/nginx/includes/cloudflare-geo.conf', '203.0.113.0/24 1;\n');
+  await writeRelative(root, 'deploy/nginx/image.lock.json', JSON.stringify({
+    repository: 'docker.io/library/nginx',
+    digest: 'sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236',
+    mediaType: 'application/vnd.oci.image.index.v1+json',
+  }));
+  await writeRelative(root, 'deploy/nginx/nginx.conf.template', [
+    'include /etc/nginx/trusted-ingress/cloudflare-realip.conf;',
+    'real_ip_header CF-Connecting-IP;',
+    'geo $realip_remote_addr $cloudflare_source {',
+    '  include /etc/nginx/trusted-ingress/cloudflare-geo.conf;',
+    '}',
+    'upstream next_app { server 127.0.0.1:3000; }',
+    'proxy_set_header CF-Connecting-IP $verified_client_ip;',
+    'proxy_set_header X-Real-IP $verified_client_ip;',
+    'proxy_set_header X-Forwarded-For $verified_client_ip;',
+    'proxy_set_header Forwarded "";',
+    'proxy_set_header X-Origin-Verified-Client-IP $verified_client_ip;',
+    'proxy_set_header X-Origin-Proxy-Attestation $origin_proxy_attestation;',
+    'ssl_client_certificate /etc/nginx/tls/cloudflare-origin-pull-ca.pem;',
+    'ssl_verify_client on;',
+    '',
+  ].join('\n'));
+  await writeRelative(root, 'deploy/systemd/qr-city-guide.service', [
+    'Environment=HOSTNAME=127.0.0.1',
+    'Environment=PORT=3000',
+    '',
+  ].join('\n'));
+  await writeRelative(root, 'src/lib/runtime-env-schema.js', [
+    'ORIGIN_PROXY_SHARED_SECRET',
+    '64-character hexadecimal secret non-placeholder',
+    '',
+  ].join('\n'));
+  await writeRelative(root, 'src/lib/net/getClientIp.ts', [
+    "import { timingSafeEqual } from 'node:crypto';",
+    "const ip = 'x-origin-verified-client-ip';",
+    "const attestation = 'x-origin-proxy-attestation';",
+    'void timingSafeEqual; void ip; void attestation;',
+    '',
+  ].join('\n'));
+  await writeRelative(root, 'docs/deployment/origin-ingress-runbook.md', [
+    'firewall IPv4 IPv6 Authenticated Origin Pull Full (strict) rollback rotation',
+    '',
+  ].join('\n'));
   return root;
 }
 
@@ -187,6 +237,90 @@ test('rejects a tag-only PostgreSQL image', async () => {
       'services:\n  db:\n    image: postgres:16-alpine\n',
     );
     assertRejected(await validateReleasePolicy(root), /digest-pinned PostgreSQL image/u);
+  });
+});
+
+test('rejects missing private attestation overwrite', async () => {
+  await withFixture(async (root) => {
+    const configPath = path.join(root, 'deploy/nginx/nginx.conf.template');
+    const config = await readFile(configPath, 'utf8');
+    await writeFile(configPath, config.replace(
+      'proxy_set_header X-Origin-Proxy-Attestation $origin_proxy_attestation;\n',
+      '',
+    ));
+    assertRejected(await validateReleasePolicy(root), /X-Origin-Proxy-Attestation/u);
+  });
+});
+
+test('rejects wildcard Nginx proxy trust', async () => {
+  await withFixture(async (root) => {
+    await writeRelative(root, 'deploy/nginx/includes/cloudflare-realip.conf', 'set_real_ip_from 0.0.0.0/0;\n');
+    assertRejected(await validateReleasePolicy(root), /wildcard trusted proxy/u);
+  });
+});
+
+test('rejects canonical X-Forwarded-For append behavior', async () => {
+  await withFixture(async (root) => {
+    const configPath = path.join(root, 'deploy/nginx/nginx.conf.template');
+    const config = await readFile(configPath, 'utf8');
+    await writeFile(configPath, `${config}proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n`);
+    assertRejected(await validateReleasePolicy(root), /proxy_add_x_forwarded_for/u);
+  });
+});
+
+test('rejects a Cloudflare manifest without IPv6', async () => {
+  await withFixture(async (root) => {
+    await writeRelative(root, 'deploy/nginx/cloudflare-ips.json', JSON.stringify({
+      version: 1,
+      ipv4: ['203.0.113.0/24'],
+      ipv6: [],
+    }));
+    assertRejected(await validateReleasePolicy(root), /must contain IPv6/u);
+  });
+});
+
+test('rejects public publication of the application port', async () => {
+  await withFixture(async (root) => {
+    await writeRelative(root, 'docker/docker-compose.prod.yml', [
+      'services:',
+      '  db:',
+      `    image: ${APPROVED_IMAGE}`,
+      '  app:',
+      '    ports:',
+      '      - "3000:3000"',
+      '',
+    ].join('\n'));
+    assertRejected(await validateReleasePolicy(root), /application port must not be publicly published/u);
+  });
+});
+
+test('rejects certificate or private-key material under deploy/nginx', async () => {
+  await withFixture(async (root) => {
+    await writeRelative(root, 'deploy/nginx/origin.key', 'synthetic forbidden key material\n');
+    assertRejected(await validateReleasePolicy(root), /secret or certificate material is forbidden/u);
+  });
+});
+
+test('rejects application identity reads from public forwarding headers', async () => {
+  await withFixture(async (root) => {
+    await writeRelative(root, 'src/lib/net/getClientIp.ts', [
+      "import { timingSafeEqual } from 'node:crypto';",
+      "const ip = 'x-origin-verified-client-ip';",
+      "const attestation = 'x-origin-proxy-attestation';",
+      "request.headers.get('x-forwarded-for');",
+      'void timingSafeEqual; void ip; void attestation;',
+      '',
+    ].join('\n'));
+    assertRejected(await validateReleasePolicy(root), /must not read public forwarding headers/u);
+  });
+});
+
+test('rejects removal of the Nginx syntax integration gate', async () => {
+  await withFixture(async (root) => {
+    await mutatePackage(root, (packageJson) => {
+      packageJson.scripts['test:nginx-ingress'] = 'node --version';
+    });
+    assertRejected(await validateReleasePolicy(root), /package script test:nginx-ingress must be exactly/u);
   });
 });
 

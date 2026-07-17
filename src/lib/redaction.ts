@@ -77,6 +77,20 @@ export function isSensitiveFieldName(key: string): boolean {
   const normalized = key.toLowerCase().split('').filter((character) => (
     (character >= 'a' && character <= 'z') || (character >= '0' && character <= '9')
   )).join('');
-  return ['authorization', 'cookie', 'password', 'secret', 'token', 'email', 'phone', 'useragent']
+  return [
+    'authorization',
+    'cookie',
+    'password',
+    'secret',
+    'token',
+    'email',
+    'phone',
+    'useragent',
+    'forwardedfor',
+    'connectingip',
+    'realip',
+    'verifiedclientip',
+    'originproxyattestation',
+  ]
     .some((sensitive) => normalized.includes(sensitive));
 }

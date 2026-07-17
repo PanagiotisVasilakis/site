@@ -260,7 +260,7 @@ export function withErrorHandler(
         logger.info('API request started', {
           method,
           url,
-          headers: sanitizeHeaders(request.headers),
+          headers: sanitizeRequestHeaders(request.headers),
         });
       }
 
@@ -585,9 +585,19 @@ function generateCorrelationId(): string {
   return crypto.randomUUID();
 }
 
-function sanitizeHeaders(headers: Headers): Record<string, string> {
+export function sanitizeRequestHeaders(headers: Headers): Record<string, string> {
   const sanitized: Record<string, string> = {};
-  const sensitiveHeaders = ['authorization', 'cookie', 'x-api-key'];
+  const sensitiveHeaders = [
+    'authorization',
+    'cookie',
+    'x-api-key',
+    'cf-connecting-ip',
+    'x-forwarded-for',
+    'x-real-ip',
+    'forwarded',
+    'x-origin-verified-client-ip',
+    'x-origin-proxy-attestation',
+  ];
   
   headers.forEach((value, key) => {
     if (sensitiveHeaders.includes(key.toLowerCase())) {

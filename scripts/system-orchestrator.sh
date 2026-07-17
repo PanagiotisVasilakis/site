@@ -532,26 +532,12 @@ validate_environment_contract() {
     failed=1
   fi
 
-  local proxy_mode="${TRUST_PROXY_MODE:-none}"
-  local proxy_hops="${TRUST_PROXY_HOPS:-0}"
-  if [[ ! "$proxy_mode" =~ ^(none|hops|header)$ ]]; then
-    error "TRUST_PROXY_MODE must be one of: none, hops, header"
+  if [[ -n "${ORIGIN_PROXY_SHARED_SECRET:-}" \
+    && ! "${ORIGIN_PROXY_SHARED_SECRET}" =~ ^[0-9A-Fa-f]{64}$ ]]; then
+    error "ORIGIN_PROXY_SHARED_SECRET must be a 64-character hexadecimal secret"
     failed=1
-  elif [[ "$PROFILE" == "production" && "$proxy_mode" == "none" ]]; then
-    error "TRUST_PROXY_MODE must explicitly describe the trusted production reverse proxy"
-    failed=1
-  fi
-
-  if [[ ! "$proxy_hops" =~ ^[0-9]+$ ]]; then
-    error "TRUST_PROXY_HOPS must be a non-negative integer"
-    failed=1
-  elif [[ "$proxy_mode" != "none" && "$proxy_hops" -lt 1 ]]; then
-    error "TRUST_PROXY_HOPS must be at least 1 when proxy trust is enabled"
-    failed=1
-  fi
-
-  if [[ "$proxy_mode" == "header" && ! "${CLIENT_IP_HEADER:-}" =~ ^(cf-connecting-ip|x-real-ip)$ ]]; then
-    error "CLIENT_IP_HEADER must be cf-connecting-ip or x-real-ip in header proxy mode"
+  elif [[ "$PROFILE" == "production" && -z "${ORIGIN_PROXY_SHARED_SECRET:-}" ]]; then
+    error "ORIGIN_PROXY_SHARED_SECRET is required in production"
     failed=1
   fi
 
@@ -918,7 +904,11 @@ validate_standalone_runtime_tree() {
 
 set_node_env_for_profile() {
   case "$PROFILE" in
-    production) export NODE_ENV="production" ;;
+    production)
+      export NODE_ENV="production"
+      export HOSTNAME="127.0.0.1"
+      export PORT="${PORT:-3000}"
+      ;;
     development) export NODE_ENV="development" ;;
   esac
 }

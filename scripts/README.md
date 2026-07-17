@@ -46,7 +46,7 @@ The authoritative schema is `src/lib/runtime-env-schema.js`; `src/lib/env.ts` is
 Production additionally requires:
 
 - `CLAIM_TOKEN_PEPPER`
-- `TRUST_PROXY_MODE=hops` with a positive `TRUST_PROXY_HOPS`, or `TRUST_PROXY_MODE=header` with an explicitly trusted `CLIENT_IP_HEADER`
+- `ORIGIN_PROXY_SHARED_SECRET`, generated with `openssl rand -hex 32` and injected into both Nginx and the application
 - `RATE_LIMIT_BACKEND=redis` with `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`; production fails closed instead of using a per-process counter. `RATE_LIMIT_NAMESPACE` may be set per environment; otherwise a stable environment/site namespace is derived automatically.
 
 If a booking or check-in webhook URL is configured, its token is mandatory; production webhook URLs must use HTTPS. A blank rate-limit backend is supported only in development, where it uses an in-memory counter.

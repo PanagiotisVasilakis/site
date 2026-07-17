@@ -1,110 +1,77 @@
-/**
- * IP Extraction Utility
- * 
- * Extract client IP from request headers with support for various proxy configurations.
- * Handles multiple header formats and provides options for trusted proxy scenarios.
- */
+import { timingSafeEqual } from 'node:crypto';
+import { isIP } from 'node:net';
 
 import type { NextRequest } from 'next/server';
 
-// Every candidate is capped at 45 bytes before the linear IP-format checks below.
+export const VERIFIED_CLIENT_IP_HEADER = 'x-origin-verified-client-ip' as const;
+export const ORIGIN_PROXY_ATTESTATION_HEADER = 'x-origin-proxy-attestation' as const;
 
 /**
- * Options for IP extraction
+ * Retained only as a source-compatibility type for callers and historical tests.
+ * Request-local options can never opt into trusting a public forwarding header.
  */
 export interface GetClientIpOptions {
-  /**
-   * Trust proxy headers (x-forwarded-for, etc.)
-   * When true, headers from proxies/load balancers are trusted
-   * Should be true in production with known proxies, false otherwise
-   * @default true in production, false in development
-   */
   trustProxy?: boolean;
-  
-  /**
-   * Custom header name for pre-extracted client IP
-   * Useful when middleware has already parsed the IP
-   * No default. Only explicitly configured cf-connecting-ip or x-real-ip is accepted.
-   */
   clientIpHeader?: string;
-
-  /** Number of trusted reverse-proxy hops. Zero means proxy headers are ignored. */
   trustedHops?: number;
 }
 
+function canonicalizeIpv4(value: string): string {
+  return value.split('.').map((octet) => String(Number(octet))).join('.');
+}
+
+function mappedIpv4FromCanonicalIpv6(value: string): string | null {
+  const match = value.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/u);
+  if (!match) return null;
+  const high = Number.parseInt(match[1], 16);
+  const low = Number.parseInt(match[2], 16);
+  return [high >>> 8, high & 0xff, low >>> 8, low & 0xff].join('.');
+}
+
+/** One IP literal only: no chains, ports, brackets, zones, or whitespace. */
+export function canonicalizeClientIp(value: string): string | null {
+  if (!value || value.length > 45 || value !== value.trim()) return null;
+  if (value.includes(',') || value.includes('%') || value.includes('[') || value.includes(']')) {
+    return null;
+  }
+  if (/\s/u.test(value)) return null;
+
+  const version = isIP(value);
+  if (version === 4) return canonicalizeIpv4(value);
+  if (version !== 6) return null;
+
+  try {
+    const hostname = new URL(`http://[${value}]/`).hostname;
+    if (!hostname.startsWith('[') || !hostname.endsWith(']')) return null;
+    const canonical = hostname.slice(1, -1).toLowerCase();
+    return mappedIpv4FromCanonicalIpv6(canonical) ?? canonical;
+  } catch {
+    return null;
+  }
+}
+
+function validAttestation(presented: string | null): boolean {
+  const expected = process.env.ORIGIN_PROXY_SHARED_SECRET;
+  if (!presented || !expected || presented.length > 128 || presented.includes(',')) return false;
+
+  const suppliedBytes = Buffer.from(presented, 'utf8');
+  const expectedBytes = Buffer.from(expected, 'utf8');
+  return suppliedBytes.length === expectedBytes.length
+    && timingSafeEqual(suppliedBytes, expectedBytes);
+}
+
 /**
- * Extract client IP from request headers
- * 
- * Priority order:
- * 1. Explicitly configured single-value proxy header
- * 2. X-Forwarded-For using the configured trusted-hop count
- * 
- * @param request - Next.js NextRequest object
- * @param options - Configuration options
- * @returns Client IP address or 'unknown' if not determinable
+ * Resolve the canonical identity asserted by the local trusted reverse proxy.
+ *
+ * Public forwarding headers are deliberately ignored. Both private headers are
+ * overwritten by Nginx, and the attestation is compared in constant time. A
+ * duplicate Fetch header is comma-coalesced and therefore rejected.
  */
-export function getClientIp(request: NextRequest, options?: GetClientIpOptions): string {
-  const proxyMode = process.env.TRUST_PROXY_MODE || 'none';
-  const hasExplicitTestOverride = options?.trustedHops !== undefined || options?.clientIpHeader !== undefined;
-  const trustProxy = options?.trustProxy ?? proxyMode !== 'none';
-  const configuredHops = Number.parseInt(process.env.TRUST_PROXY_HOPS || '0', 10);
-  const trustedHops = options?.trustedHops ?? (
-    proxyMode === 'none' ? 0 : (Number.isFinite(configuredHops) ? configuredHops : 0)
-  );
-  const clientIpHeader = options?.clientIpHeader || process.env.CLIENT_IP_HEADER;
-  
-  // Don't trust proxy headers unless explicitly configured to do so
-  if (!trustProxy || trustedHops < 1) {
-    return 'unknown';
-  }
+export function getClientIp(request: NextRequest, _options?: GetClientIpOptions): string {
+  void _options;
+  const attestation = request.headers.get(ORIGIN_PROXY_ATTESTATION_HEADER);
+  if (!validAttestation(attestation)) return 'unknown';
 
-  // A single-value header is trusted only when the operator explicitly names it.
-  // x-client-ip is intentionally rejected because clients can set it directly.
-  if ((proxyMode === 'header' || hasExplicitTestOverride)
-    && clientIpHeader
-    && ['cf-connecting-ip', 'x-real-ip'].includes(clientIpHeader.toLowerCase())) {
-    const candidate = request.headers.get(clientIpHeader)?.trim();
-    if (candidate && isValidIpAddress(candidate)) {
-      return normalizeIpAddress(candidate);
-    }
-  }
-
-  if (proxyMode !== 'hops' && !hasExplicitTestOverride) return 'unknown';
-
-  const forwarded = request.headers.get('x-forwarded-for')
-    ?.split(',')
-    .map((value) => value.trim())
-    .filter(Boolean) ?? [];
-  const candidateIndex = Math.max(0, forwarded.length - trustedHops);
-  const candidate = forwarded[candidateIndex];
-  if (candidate && isValidIpAddress(candidate)) {
-    return normalizeIpAddress(candidate);
-  }
-  
-  // Fallback: Return unknown if no IP can be determined
-  return 'unknown';
-}
-
-function isValidIpAddress(ip: string): boolean {
-  if (!ip || ip.length > 45) return false;
-
-  const ipv4Pattern = /^(?:\d{1,3}\.){3}\d{1,3}$/;
-  if (ipv4Pattern.test(ip)) {
-    return ip.split('.').every((octet) => {
-      const value = Number.parseInt(octet, 10);
-      return value >= 0 && value <= 255;
-    });
-  }
-
-  const ipv6Pattern = /^(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}$/i;
-  return ipv6Pattern.test(ip) || (
-    ip.includes('::')
-    && /^[0-9a-f:.]+$/i.test(ip)
-  );
-}
-
-function normalizeIpAddress(ip: string): string {
-  const normalized = ip.toLowerCase();
-  const mappedIpv4 = normalized.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/)?.[1];
-  return mappedIpv4 && isValidIpAddress(mappedIpv4) ? mappedIpv4 : normalized;
+  const candidate = request.headers.get(VERIFIED_CLIENT_IP_HEADER);
+  return candidate ? canonicalizeClientIp(candidate) ?? 'unknown' : 'unknown';
 }

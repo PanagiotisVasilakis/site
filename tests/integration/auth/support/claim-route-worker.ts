@@ -161,7 +161,8 @@ async function executeClaimWorker(): Promise<void> {
       headers: {
         'content-type': 'application/json',
         'user-agent': `pr02b-${scenario}-claim-${actor}`,
-        'x-forwarded-for': '198.51.100.73',
+        'x-origin-verified-client-ip': '198.51.100.73',
+        'x-origin-proxy-attestation': requiredWorkerValue('ORIGIN_PROXY_SHARED_SECRET'),
       },
       body: JSON.stringify({
         claimToken: CLAIM_RACE_TOKEN,

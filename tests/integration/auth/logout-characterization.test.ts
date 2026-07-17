@@ -25,7 +25,8 @@ const SYNTHETIC_SECURITY_PEPPER = 'pr02b-logout-security-pepper-only';
 const SYNTHETIC_JWT_SECRET = 'pr02b-logout-jwt-secret-only';
 const REQUEST_HEADERS = {
   'user-agent': 'pr02b-synthetic-logout-client',
-  'x-forwarded-for': '198.51.100.73',
+  'x-origin-verified-client-ip': '198.51.100.73',
+  'x-origin-proxy-attestation': '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2',
 } as const;
 const THIRD_CONTROL_FIXTURE: AuthPrincipalFixture = {
   userId: '11000000-0000-4000-8000-000000000004',

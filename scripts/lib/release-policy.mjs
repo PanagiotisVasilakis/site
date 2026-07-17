@@ -10,6 +10,8 @@ import {
 
 const EXPECTED_POSTGRES_IMAGE =
   'postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777';
+const EXPECTED_NGINX_IMAGE =
+  'docker.io/library/nginx@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236';
 
 const EXPECTED_HOSTILE_INTEGRATION_ENVIRONMENT = Object.freeze({
   INTEGRATION_POSTGRES_IMAGE: EXPECTED_POSTGRES_IMAGE,
@@ -45,8 +47,8 @@ const EXPECTED_SYNTHETIC_PRODUCTION_ENVIRONMENT = Object.freeze({
   NEXT_TELEMETRY_DISABLED: '1',
   NEXT_PUBLIC_SITE_URL: 'https://release.example.invalid',
   BUILD_SITE_URL: 'https://release.example.invalid',
-  TRUST_PROXY_MODE: 'hops',
-  TRUST_PROXY_HOPS: '1',
+  ORIGIN_PROXY_SHARED_SECRET:
+    '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2',
   RATE_LIMIT_BACKEND: 'redis',
   UPSTASH_REDIS_REST_URL: 'https://redis.release.invalid',
   UPSTASH_REDIS_REST_TOKEN: 'release-only-redis-token-000000',
@@ -55,6 +57,8 @@ const EXPECTED_SYNTHETIC_PRODUCTION_ENVIRONMENT = Object.freeze({
 const EXPECTED_GATE_PROFILE = Object.freeze([
   ['release-policy', 'npm', ['--ignore-scripts', 'run', 'validate:release-policy'], 'base'],
   ['release-policy-tests', 'npm', ['--ignore-scripts', 'run', 'test:release-policy'], 'base'],
+  ['cloudflare-ingress', 'npm', ['--ignore-scripts', 'run', 'check:cloudflare-ips'], 'base'],
+  ['nginx-ingress', 'npm', ['--ignore-scripts', 'run', 'test:nginx-ingress'], 'base'],
   ['conflicts', 'npm', ['--ignore-scripts', 'run', 'check:conflicts'], 'base'],
   ['prisma-manifest', 'npm', ['--ignore-scripts', 'run', 'check:prisma-integrity'], 'base'],
   ['prisma-tests', 'npm', ['--ignore-scripts', 'run', 'test:prisma-integrity'], 'base'],
@@ -83,6 +87,9 @@ const EXPECTED_PACKAGE_SCRIPTS = Object.freeze({
   'verify:release': 'node scripts/verify-release.mjs',
   'validate:release-policy': 'node scripts/validate-release-policy.mjs',
   'test:release-policy': 'node --test scripts/tests/release-policy.test.mjs',
+  'check:cloudflare-ips': 'node scripts/check-cloudflare-ips.mjs',
+  'check:cloudflare-ips:current': 'node scripts/check-cloudflare-ips.mjs --current',
+  'test:nginx-ingress': 'bash scripts/test-nginx-ingress.sh',
   'check:conflicts': 'node scripts/check-conflict-markers.mjs',
   'check:candidate-diff': 'node scripts/check-candidate-diff.mjs',
   'check:prisma-integrity': 'node scripts/check-prisma-integrity.mjs',
@@ -368,6 +375,120 @@ async function validatePostgresReferences(root, errors) {
   }
 }
 
+async function validateTrustedIngress(root, errors) {
+  const config = await readOptional(path.join(root, 'deploy/nginx/nginx.conf.template'));
+  const manifestSource = await readOptional(path.join(root, 'deploy/nginx/cloudflare-ips.json'));
+  const realIp = await readOptional(path.join(root, 'deploy/nginx/includes/cloudflare-realip.conf'));
+  const geo = await readOptional(path.join(root, 'deploy/nginx/includes/cloudflare-geo.conf'));
+  const imageSource = await readOptional(path.join(root, 'deploy/nginx/image.lock.json'));
+  const runbook = await readOptional(path.join(root, 'docs/deployment/origin-ingress-runbook.md'));
+  const systemd = await readOptional(path.join(root, 'deploy/systemd/qr-city-guide.service'));
+  const orchestrator = await readOptional(path.join(root, 'scripts/system-orchestrator.sh'));
+  const runtimeSchema = await readOptional(path.join(root, 'src/lib/runtime-env-schema.js'));
+  const identitySource = await readOptional(path.join(root, 'src/lib/net/getClientIp.ts'));
+
+  if (!config) {
+    errors.push('versioned production Nginx trusted-ingress configuration is required');
+  } else {
+    const requiredMarkers = [
+      'real_ip_header CF-Connecting-IP;',
+      'cloudflare-realip.conf',
+      'cloudflare-geo.conf',
+      'X-Origin-Verified-Client-IP $verified_client_ip;',
+      'X-Origin-Proxy-Attestation $origin_proxy_attestation;',
+      'CF-Connecting-IP $verified_client_ip;',
+      'X-Real-IP $verified_client_ip;',
+      'X-Forwarded-For $verified_client_ip;',
+      'Forwarded "";',
+      'ssl_verify_client on;',
+      'cloudflare-origin-pull-ca.pem',
+      'server 127.0.0.1:3000;',
+    ];
+    for (const marker of requiredMarkers) {
+      if (!config.includes(marker)) errors.push(`production Nginx configuration lacks: ${marker}`);
+    }
+    if (/set_real_ip_from\s+(?:0\.0\.0\.0\/0|::\/0)/u.test(config + realIp)) {
+      errors.push('wildcard trusted proxy networks are forbidden');
+    }
+    if (/\$proxy_add_x_forwarded_for/u.test(config)) {
+      errors.push('$proxy_add_x_forwarded_for is forbidden for canonical identity');
+    }
+    if (/proxy_set_header\s+X-Origin-(?:Verified-Client-IP|Proxy-Attestation)\s+\$http_/iu.test(config)) {
+      errors.push('private identity headers must be overwritten, not copied from the request');
+    }
+  }
+
+  let manifest;
+  try {
+    manifest = JSON.parse(manifestSource ?? '');
+  } catch {
+    errors.push('Cloudflare CIDR manifest must be valid JSON');
+  }
+  if (!Array.isArray(manifest?.ipv4) || manifest.ipv4.length === 0) {
+    errors.push('Cloudflare CIDR manifest must contain IPv4 ranges');
+  }
+  if (!Array.isArray(manifest?.ipv6) || manifest.ipv6.length === 0) {
+    errors.push('Cloudflare CIDR manifest must contain IPv6 ranges');
+  }
+  if (!realIp || !geo) errors.push('both generated Cloudflare Nginx includes are required');
+
+  try {
+    const lock = JSON.parse(imageSource ?? '');
+    if (`${lock.repository ?? ''}@${lock.digest ?? ''}` !== EXPECTED_NGINX_IMAGE
+      || lock.mediaType !== 'application/vnd.oci.image.index.v1+json') {
+      errors.push('Nginx must use the approved multi-platform digest-pinned official image');
+    }
+  } catch {
+    errors.push('Nginx image lock must be valid JSON');
+  }
+
+  if (!systemd?.includes('Environment=HOSTNAME=127.0.0.1')
+    || !systemd.includes('Environment=PORT=3000')) {
+    errors.push('the host application upstream must bind only to 127.0.0.1:3000');
+  }
+  if (!orchestrator?.includes('export HOSTNAME="127.0.0.1"')) {
+    errors.push('the production orchestrator must enforce loopback application binding');
+  }
+  if (!runtimeSchema?.includes('ORIGIN_PROXY_SHARED_SECRET')
+    || !runtimeSchema.includes('64-character hexadecimal secret')
+    || !runtimeSchema.includes('non-placeholder')) {
+    errors.push('production startup must validate the origin-proxy shared secret');
+  }
+  if (runtimeSchema && /TRUST_PROXY_MODE|CLIENT_IP_HEADER/u.test(runtimeSchema)) {
+    errors.push('direct public forwarding-header trust configuration is forbidden');
+  }
+  if (!identitySource?.includes("timingSafeEqual")
+    || !identitySource.includes("x-origin-verified-client-ip")
+    || !identitySource.includes("x-origin-proxy-attestation")) {
+    errors.push('application identity must validate the private IP and attestation in constant time');
+  }
+  if (identitySource && /headers\.get\(['"](?:cf-connecting-ip|x-forwarded-for|x-real-ip|forwarded)['"]\)/iu.test(identitySource)) {
+    errors.push('application identity must not read public forwarding headers as candidates');
+  }
+
+  for (const marker of ['firewall', 'IPv4', 'IPv6', 'Authenticated Origin Pull', 'Full (strict)', 'rollback', 'rotation']) {
+    if (!runbook?.includes(marker)) errors.push(`origin ingress runbook lacks: ${marker}`);
+  }
+
+  for (const relative of await filesBelow(path.join(root, 'deploy/nginx'), root)) {
+    if (/\.(?:key|pem|p12|pfx|crt)$/iu.test(relative)) {
+      errors.push(`secret or certificate material is forbidden in the repository: ${relative}`);
+    }
+  }
+
+  const productionCompose = await readOptional(path.join(root, 'docker/docker-compose.prod.yml'));
+  const publiclyPublishesApplication = productionCompose?.split('\n').some((line) => {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('-')) return false;
+    const mapping = trimmed.slice(1).trim().replaceAll('"', '').replaceAll("'", '');
+    if (!mapping.endsWith('3000:3000')) return false;
+    return !mapping.startsWith('127.0.0.1:') && !mapping.startsWith('[::1]:');
+  });
+  if (publiclyPublishesApplication) {
+    errors.push('the application port must not be publicly published');
+  }
+}
+
 async function validateLocalDefaults(root, errors) {
   const makefile = await readOptional(path.join(root, 'Makefile'));
   if (makefile === undefined || !/^PROFILE \?= development$/mu.test(makefile)
@@ -450,6 +571,7 @@ export async function validateReleasePolicy(
   await validateLocalDefaults(root, errors);
   await validateActiveScripts(root, errors);
   await validatePostgresReferences(root, errors);
+  await validateTrustedIngress(root, errors);
   await validateVerifyImplementation(root, errors);
 
   return [...new Set(errors)].sort();

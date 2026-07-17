@@ -34,11 +34,13 @@ const LEGACY_FAMILY_ID = 'pr02a-unbound-legacy-family';
 const LEGACY_REFRESH_SECRET = 'pr02a-synthetic-unbound-refresh-secret';
 const REQUEST_HEADERS = {
   'user-agent': 'pr02-synthetic-refresh-client',
-  'x-forwarded-for': '198.51.100.42',
+  'x-origin-verified-client-ip': '198.51.100.42',
+  'x-origin-proxy-attestation': '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2',
 } as const;
 const DIFFERENT_CONTEXT_HEADERS = {
   'user-agent': 'pr02d-suspicious-refresh-client',
-  'x-forwarded-for': '203.0.113.99',
+  'x-origin-verified-client-ip': '203.0.113.99',
+  'x-origin-proxy-attestation': '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2',
 } as const;
 const CONTROLLED_REPLAY_NOW = new Date('2030-06-15T12:34:56.789Z');
 const DATABASE_WAIT_TIMEOUT_MS = 4_000;

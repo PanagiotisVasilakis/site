@@ -41,7 +41,7 @@ export async function checkSensitiveRateLimit(
   // Resolve identity before hashing a limiter dimension or importing Prisma.
   // Missing identity is an internal availability failure, never a shared
   // persistent identity bucket.
-  const ip = requireCanonicalClientIp(request, { trustProxy: true });
+  const ip = requireCanonicalClientIp(request);
   const keys = buildKeys(ip, options);
   const { prisma } = await import('@/lib/prisma');
   const resetAt = new Date(Date.now() + options.windowMs);

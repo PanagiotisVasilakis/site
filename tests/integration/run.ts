@@ -60,11 +60,11 @@ function runIntegrationTests(runtime: DisposablePostgresRuntime): Promise<number
           ...disposableRuntimeChildEnvironment(runtime),
           NODE_ENV: 'test',
           NO_COLOR: '1',
-          // Integration requests provide an explicit synthetic X-Forwarded-For
-          // value. This test-only topology keeps successful sensitive-operation
-          // fixtures independent from the unavailable-identity sentinel.
-          TRUST_PROXY_MODE: 'hops',
-          TRUST_PROXY_HOPS: '1',
+          LOG_CONSOLE: 'false',
+          // Integration requests provide the same private pair that the local
+          // Nginx contract supplies in production.
+          ORIGIN_PROXY_SHARED_SECRET:
+            '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2',
         },
         detached: process.platform !== 'win32',
         shell: false,

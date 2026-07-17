@@ -365,7 +365,8 @@ async function performClaim(input: {
   const headers: Record<string, string> = {
     'content-type': 'application/json',
     'user-agent': 'pr02b-claim-lifecycle-client',
-    'x-forwarded-for': '198.51.100.81',
+    'x-origin-verified-client-ip': '198.51.100.81',
+    'x-origin-proxy-attestation': process.env.ORIGIN_PROXY_SHARED_SECRET ?? '',
   };
   if (input.sessionCookie) headers.cookie = `guest_session=${input.sessionCookie}`;
   const request = new NextRequest(CLAIM_URL, {
@@ -419,7 +420,8 @@ async function performRefresh(credentials: {
     headers: {
       cookie: `guest_session=${credentials.sessionToken}; guest_rt=${credentials.refreshToken}`,
       'user-agent': 'pr02b-claim-lifecycle-client',
-      'x-forwarded-for': '198.51.100.81',
+      'x-origin-verified-client-ip': '198.51.100.81',
+      'x-origin-proxy-attestation': process.env.ORIGIN_PROXY_SHARED_SECRET ?? '',
     },
   });
   const response = await refreshRoute.POST(request, { params: Promise.resolve({}) });

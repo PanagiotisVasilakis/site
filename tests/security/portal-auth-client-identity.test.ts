@@ -29,8 +29,7 @@ import { attachPortalAuthCookies, requestAuthContext } from '@/lib/portalAuthHtt
 
 describe('portal auth client identity', () => {
   beforeEach(() => {
-    vi.stubEnv('TRUST_PROXY_MODE', 'none');
-    vi.stubEnv('TRUST_PROXY_HOPS', '0');
+    vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2');
   });
 
   function request(): NextRequest {
@@ -46,7 +45,7 @@ describe('portal auth client identity', () => {
   it('does not HMAC the unknown sentinel', () => {
     expect(() => requestAuthContext(request())).toThrow(expect.objectContaining({
       code: CLIENT_IDENTITY_UNAVAILABLE,
-      reason: 'sentinel',
+      reason: 'missing',
     }));
     expect(authMocks.privacyHmac).not.toHaveBeenCalled();
   });
