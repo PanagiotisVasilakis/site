@@ -48,6 +48,14 @@ const testConfig = rendered
   .replace('server 127.0.0.1:3000;', 'server ingress-upstream:8080;')
   .replace('listen 443 ssl;', 'listen 8080;')
   .replace('listen [::]:443 ssl;', 'listen [::]:8080;')
+  .replace('rate=5r/s;', 'rate=1r/s;')
+  .replace('rate=10r/s;', 'rate=1r/s;')
+  .replace('rate=30r/s;', 'rate=1r/s;')
+  .replace('burst=20 nodelay;', 'burst=1 nodelay;')
+  .replace('burst=40 nodelay;', 'burst=1 nodelay;')
+  .replace('burst=60 nodelay;', 'burst=1 nodelay;')
+  .replace('limit_req_dry_run on;', 'limit_req_dry_run off;')
+  .replace('limit_conn_dry_run on;', 'limit_conn_dry_run off;')
   .replace(/^\s*ssl_(?:certificate|certificate_key|client_certificate|verify_client|protocols).*;\n/gmu, '');
 fs.writeFileSync(path.join(temporary, 'nginx.test.conf'), testConfig);
 
@@ -111,9 +119,16 @@ if docker run --rm --network "$UNTRUSTED_NET" "$IMAGE" /bin/sh -eu -c \
   exit 1
 fi
 
+rate_output="$(docker run --rm --network "$TRUSTED_NET" "$IMAGE" /bin/sh -c \
+  "for i in \$(seq 1 20); do wget -q -S -O /dev/null --header='CF-Connecting-IP: 203.0.113.99' --post-data='{}' http://172.30.240.10:8080/api/admin/login 2>&1 || true; done")"
+if ! grep -Fq 'HTTP/1.1 429 Too Many Requests' <<<"$rate_output"; then
+  echo 'Enforced Nginx rate limit did not return 429.' >&2
+  exit 1
+fi
+
 if rg -n '172\.30\.(?:240|241)\.' "$REPO_ROOT/deploy/nginx/includes" "$REPO_ROOT/deploy/nginx/nginx.conf.template"; then
   echo 'Production Nginx artifacts contain a test network.' >&2
   exit 1
 fi
 
-echo 'Nginx trusted-ingress integration passed.'
+echo 'Nginx trusted-ingress and layered-rate integration passed.'

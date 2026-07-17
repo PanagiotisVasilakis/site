@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   createAdminSession: vi.fn(),
   signAdmin: vi.fn(),
   rateLimitQuery: vi.fn(),
+  rateLimitTransaction: vi.fn(),
   stayRequestFindUnique: vi.fn(),
   stayRequestCreate: vi.fn(),
   privacyRequestFindMany: vi.fn(),
@@ -32,7 +33,7 @@ vi.mock('@/lib/auth/admin', () => ({
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    $queryRaw: mocks.rateLimitQuery,
+    $transaction: mocks.rateLimitTransaction,
     stayRequest: {
       findUnique: mocks.stayRequestFindUnique,
       create: mocks.stayRequestCreate,
@@ -139,12 +140,16 @@ describe('missing client identity route boundary', () => {
   beforeEach(() => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2');
+    vi.stubEnv('SECURITY_PEPPER', 'a3-route-test-security-pepper-only');
     vi.stubEnv('ADMIN_DASH_SECRET', 'admin-dashboard-secret-marker');
     vi.stubEnv('BOOKING_REQUEST_WEBHOOK_URL', 'https://hooks.example/booking');
     mocks.rateLimitQuery.mockResolvedValue([{
       count: 1,
       reset_time: new Date(Date.now() + 60_000),
     }]);
+    mocks.rateLimitTransaction.mockImplementation(async (callback) => callback({
+      $queryRaw: mocks.rateLimitQuery,
+    }));
     mocks.getVerifiedGuestSessionFromCookies.mockResolvedValue({
       user: { id: 'privacy-user-sensitive-marker' },
       booking: { id: 'privacy-booking-sensitive-marker' },
@@ -215,6 +220,41 @@ describe('missing client identity route boundary', () => {
       email,
     ]);
     expect(mocks.rateLimitQuery).not.toHaveBeenCalled();
+    expect(mocks.stayRequestFindUnique).not.toHaveBeenCalled();
+    expect(mocks.stayRequestCreate).not.toHaveBeenCalled();
+    expect(mocks.deliverOutboxEvent).not.toHaveBeenCalled();
+  });
+
+  it('returns generic 503 and leaves domain state untouched when PostgreSQL limiter fails', async () => {
+    mocks.rateLimitQuery.mockRejectedValue(new Error('synthetic database diagnostics'));
+    const response = await createBookingRequest(request('/api/booking-requests', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'idempotency-key': 'a3-booking-key-000001',
+        'x-origin-verified-client-ip': '198.51.100.73',
+        'x-origin-proxy-attestation': process.env.ORIGIN_PROXY_SHARED_SECRET ?? '',
+      },
+      body: JSON.stringify({
+        propertyName: 'A3 Test Property',
+        locale: 'en',
+        dateRange: {
+          from: '2030-06-01T12:00:00.000Z',
+          to: '2030-06-08T12:00:00.000Z',
+        },
+        guest: {
+          firstName: 'A3',
+          lastName: 'Failure',
+          email: 'a3-limiter-failure@example.test',
+          phone: '+12025550124',
+        },
+      }),
+    }));
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('retry-after')).toBeNull();
+    expect(await response.text()).toMatch(/temporarily unavailable/i);
+    expect(mocks.rateLimitTransaction).toHaveBeenCalledOnce();
     expect(mocks.stayRequestFindUnique).not.toHaveBeenCalled();
     expect(mocks.stayRequestCreate).not.toHaveBeenCalled();
     expect(mocks.deliverOutboxEvent).not.toHaveBeenCalled();

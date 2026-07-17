@@ -87,6 +87,9 @@ export async function POST(request: NextRequest) {
     if (isClientIdentityUnavailableError(error)) {
       return createClientIdentityUnavailableResponse();
     }
+    if (error instanceof ApiError) {
+      return errorResponse(error.message, error.statusCode);
+    }
     throw error;
   }
   if (!limit.allowed) return errorResponse('Too many booking requests. Please try again later.', 429);

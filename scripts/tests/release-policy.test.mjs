@@ -86,6 +86,19 @@ async function createBaselineFixture() {
     'proxy_set_header X-Origin-Proxy-Attestation $origin_proxy_attestation;',
     'ssl_client_certificate /etc/nginx/tls/cloudflare-origin-pull-ca.pem;',
     'ssl_verify_client on;',
+    'limit_req_zone $auth_rate_key zone=auth_operations:10m rate=5r/s;',
+    'limit_req_zone $public_write_rate_key zone=public_writes:10m rate=10r/s;',
+    'limit_req_zone $broad_api_rate_key zone=broad_api:10m rate=30r/s;',
+    'limit_conn_zone $binary_remote_addr zone=per_client_connections:10m;',
+    'limit_req zone=auth_operations burst=20 nodelay;',
+    'limit_req zone=public_writes burst=40 nodelay;',
+    'limit_req zone=broad_api burst=60 nodelay;',
+    'limit_req_dry_run on;',
+    'limit_conn_dry_run on;',
+    'limit_req_status 429;',
+    'limit_conn per_client_connections 20;',
+    'limit_conn_status 429;',
+    'log_format safe "limit_req=$limit_req_status limit_conn=$limit_conn_status";',
     '',
   ].join('\n'));
   await writeRelative(root, 'deploy/systemd/qr-city-guide.service', [
@@ -103,6 +116,27 @@ async function createBaselineFixture() {
     "const ip = 'x-origin-verified-client-ip';",
     "const attestation = 'x-origin-proxy-attestation';",
     'void timingSafeEqual; void ip; void attestation;',
+    '',
+  ].join('\n'));
+  await writeRelative(
+    root,
+    'src/app/api/health/ready/route.ts',
+    'async function databaseReady() { return true; }\nfunction checkReadiness() { return databaseReady(); }\n',
+  );
+  await writeRelative(root, 'src/lib/sensitiveRateLimit.ts', [
+    'const prisma = { $transaction: async (callback) => callback({}) };',
+    'const ApiErrorCode = { SERVICE_UNAVAILABLE: 503 };',
+    'void prisma.$transaction; void ApiErrorCode.SERVICE_UNAVAILABLE;',
+    '',
+  ].join('\n'));
+  await writeRelative(
+    root,
+    'src/lib/operationalMonitor.ts',
+    'const prisma = { rateLimit: { deleteMany() {} } }; void prisma.rateLimit.deleteMany;\n',
+  );
+  await writeRelative(root, 'docs/security/layered-rate-limiting.md', [
+    'Cloudflare Free public reads PostgreSQL dry-run 429 503 key cardinality',
+    'false positives new reviewed ADR',
     '',
   ].join('\n'));
   await writeRelative(root, 'docs/deployment/origin-ingress-runbook.md', [
@@ -321,6 +355,44 @@ test('rejects removal of the Nginx syntax integration gate', async () => {
       packageJson.scripts['test:nginx-ingress'] = 'node --version';
     });
     assertRejected(await validateReleasePolicy(root), /package script test:nginx-ingress must be exactly/u);
+  });
+});
+
+test('rejects reintroduction of mandatory Upstash configuration', async () => {
+  await withFixture(async (root) => {
+    await writeRelative(root, 'src/lib/external-limiter.ts', 'const value = process.env.UPSTASH_REDIS_REST_URL;\n');
+    assertRejected(await validateReleasePolicy(root), /mandatory external rate-limiter configuration/u);
+  });
+});
+
+test('rejects removal of Nginx rate-limit enforcement semantics', async () => {
+  await withFixture(async (root) => {
+    const configPath = path.join(root, 'deploy/nginx/nginx.conf.template');
+    const config = await readFile(configPath, 'utf8');
+    await writeFile(configPath, config.replace('limit_req_status 429;\n', ''));
+    assertRejected(await validateReleasePolicy(root), /limit_req_status 429/u);
+  });
+});
+
+test('rejects a non-atomic sensitive PostgreSQL limiter', async () => {
+  await withFixture(async (root) => {
+    await writeRelative(root, 'src/lib/sensitiveRateLimit.ts', [
+      'const ApiErrorCode = { SERVICE_UNAVAILABLE: 503 };',
+      'void ApiErrorCode.SERVICE_UNAVAILABLE;',
+      '',
+    ].join('\n'));
+    assertRejected(await validateReleasePolicy(root), /atomic and fail closed/u);
+  });
+});
+
+test('rejects an external limiter readiness dependency', async () => {
+  await withFixture(async (root) => {
+    await writeRelative(root, 'src/app/api/health/ready/route.ts', [
+      'async function databaseReady() { return true; }',
+      'async function checkReadiness() { await pingUpstash(); return databaseReady(); }',
+      '',
+    ].join('\n'));
+    assertRejected(await validateReleasePolicy(root), /external rate-limiting service/u);
   });
 });
 

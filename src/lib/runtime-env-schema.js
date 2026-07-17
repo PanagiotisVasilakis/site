@@ -95,10 +95,6 @@ export const runtimeEnvSchema = z.object({
   LOG_PERFORMANCE: optionalEnv(z.enum(['true', 'false'])),
   LOG_MAX_METADATA_SIZE: optionalEnv(z.string().regex(/^\d+$/)),
 
-  RATE_LIMIT_BACKEND: optionalEnv(z.enum(['redis'])),
-  RATE_LIMIT_NAMESPACE: optionalEnv(z.string().regex(/^[A-Za-z0-9:_-]{1,64}$/, 'RATE_LIMIT_NAMESPACE contains invalid characters')),
-  UPSTASH_REDIS_REST_URL: optionalEnv(z.string().url()),
-  UPSTASH_REDIS_REST_TOKEN: optionalEnv(z.string().min(20)),
 }).superRefine((env, context) => {
   if (env.NODE_ENV === 'production' && !env.NEXT_PUBLIC_SITE_URL) {
     context.addIssue({ code: 'custom', path: ['NEXT_PUBLIC_SITE_URL'], message: 'NEXT_PUBLIC_SITE_URL is required in production' });
@@ -157,17 +153,5 @@ export const runtimeEnvSchema = z.object({
   }
   if (env.NODE_ENV === 'production' && env.ALERT_WEBHOOK_URL && new URL(env.ALERT_WEBHOOK_URL).protocol !== 'https:') {
     context.addIssue({ code: 'custom', path: ['ALERT_WEBHOOK_URL'], message: 'ALERT_WEBHOOK_URL must use HTTPS in production' });
-  }
-  if (env.RATE_LIMIT_BACKEND === 'redis' && (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN)) {
-    context.addIssue({ code: 'custom', path: ['RATE_LIMIT_BACKEND'], message: 'Redis rate limiting requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN' });
-  }
-  if (env.NODE_ENV === 'production' && env.RATE_LIMIT_BACKEND !== 'redis') {
-    context.addIssue({ code: 'custom', path: ['RATE_LIMIT_BACKEND'], message: 'RATE_LIMIT_BACKEND=redis is required in production; process-local rate limiting is not distributed' });
-  }
-  if (env.NODE_ENV === 'production' && env.UPSTASH_REDIS_REST_URL) {
-    const redisUrl = new URL(env.UPSTASH_REDIS_REST_URL);
-    if (redisUrl.protocol !== 'https:') {
-      context.addIssue({ code: 'custom', path: ['UPSTASH_REDIS_REST_URL'], message: 'UPSTASH_REDIS_REST_URL must use HTTPS in production' });
-    }
   }
 });

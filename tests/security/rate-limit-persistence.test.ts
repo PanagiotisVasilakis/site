@@ -2,8 +2,9 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const queryRaw = vi.hoisted(() => vi.fn());
+const transaction = vi.hoisted(() => vi.fn());
 const privacyHmac = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/prisma', () => ({ prisma: { $queryRaw: queryRaw } }));
+vi.mock('@/lib/prisma', () => ({ prisma: { $transaction: transaction } }));
 vi.mock('@/lib/privacyHash', () => ({ privacyHmac }));
 
 import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
@@ -43,6 +44,7 @@ describe('durable sensitive-operation rate limiting', () => {
       return (hash >>> 0).toString(16).padStart(8, '0').repeat(8);
     });
     queryRaw.mockResolvedValue([{ count: 1, reset_time: new Date(Date.now() + 60_000) }]);
+    transaction.mockImplementation(async (callback) => callback({ $queryRaw: queryRaw }));
   });
 
   it('uses both source-IP and normalized identifier dimensions', async () => {
@@ -53,6 +55,7 @@ describe('durable sensitive-operation rate limiting', () => {
       windowMs: 60_000,
     });
     expect(queryRaw).toHaveBeenCalledTimes(2);
+    expect(transaction).toHaveBeenCalledOnce();
     const keys = queryRaw.mock.calls.map((call) => call[1]);
     expect(keys).toHaveLength(2);
     expect(keys[0]).toMatch(/^sensitive:[a-f0-9]{64}$/);
@@ -95,7 +98,19 @@ describe('durable sensitive-operation rate limiting', () => {
     queryRaw.mockResolvedValue([]);
     await expect(checkSensitiveRateLimit(request('203.0.113.10'), {
       scope: 'portal-signin', limit: 3, windowMs: 60_000,
-    })).rejects.toThrow('Rate limiter did not return a decision');
+    })).rejects.toMatchObject({ statusCode: 503, message: 'Service temporarily unavailable' });
+  });
+
+  it('keeps all dimensions inside one transaction and fails closed on storage error', async () => {
+    queryRaw
+      .mockResolvedValueOnce([{ count: 1, reset_time: new Date(Date.now() + 60_000) }])
+      .mockRejectedValueOnce(new Error('synthetic storage failure'));
+
+    await expect(checkSensitiveRateLimit(request('203.0.113.10'), {
+      scope: 'portal-signin', identifier: 'account@example.test', limit: 3, windowMs: 60_000,
+    })).rejects.toMatchObject({ statusCode: 503, message: 'Service temporarily unavailable' });
+    expect(transaction).toHaveBeenCalledOnce();
+    expect(queryRaw).toHaveBeenCalledTimes(2);
   });
 
   it('fails before persistence instead of merging unknown callers into a universal IP bucket', async () => {

@@ -49,9 +49,6 @@ const EXPECTED_SYNTHETIC_PRODUCTION_ENVIRONMENT = Object.freeze({
   BUILD_SITE_URL: 'https://release.example.invalid',
   ORIGIN_PROXY_SHARED_SECRET:
     '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2',
-  RATE_LIMIT_BACKEND: 'redis',
-  UPSTASH_REDIS_REST_URL: 'https://redis.release.invalid',
-  UPSTASH_REDIS_REST_TOKEN: 'release-only-redis-token-000000',
 });
 
 const EXPECTED_GATE_PROFILE = Object.freeze([
@@ -489,6 +486,71 @@ async function validateTrustedIngress(root, errors) {
   }
 }
 
+async function validateLayeredRateLimiting(root, errors) {
+  const config = await readOptional(path.join(root, 'deploy/nginx/nginx.conf.template'));
+  const readiness = await readOptional(path.join(root, 'src/app/api/health/ready/route.ts'));
+  const limiter = await readOptional(path.join(root, 'src/lib/sensitiveRateLimit.ts'));
+  const retention = await readOptional(path.join(root, 'src/lib/operationalMonitor.ts'));
+  const contract = await readOptional(path.join(root, 'docs/security/layered-rate-limiting.md'));
+
+  for (const marker of [
+    'zone=auth_operations:',
+    'zone=public_writes:',
+    'zone=broad_api:',
+    'limit_conn_zone',
+    'limit_req_dry_run on;',
+    'limit_conn_dry_run on;',
+    'limit_req_status 429;',
+    'limit_conn_status 429;',
+    'limit_req=$limit_req_status',
+  ]) {
+    if (!config?.includes(marker)) errors.push(`layered Nginx rate limiting lacks: ${marker}`);
+  }
+
+  if (!readiness?.includes('return databaseReady();')) {
+    errors.push('readiness must depend on the critical PostgreSQL/schema check');
+  }
+  if (readiness && /(?:upstash|redis|cloudflare\s+api)/iu.test(readiness)) {
+    errors.push('readiness must not depend on an external rate-limiting service');
+  }
+  if (!limiter?.includes('prisma.$transaction')
+    || !limiter.includes('ApiErrorCode.SERVICE_UNAVAILABLE')) {
+    errors.push('sensitive PostgreSQL limiter must be atomic and fail closed with generic 503');
+  }
+  if (!retention?.includes('prisma.rateLimit.deleteMany')) {
+    errors.push('persistent limiter retention cleanup is required');
+  }
+  for (const marker of [
+    'Cloudflare Free',
+    'public reads',
+    'PostgreSQL',
+    'dry-run',
+    '429',
+    '503',
+    'key cardinality',
+    'false positives',
+    'new reviewed ADR',
+  ]) {
+    if (!contract?.includes(marker)) errors.push(`layered rate-limiting contract lacks: ${marker}`);
+  }
+
+  const activeFiles = [
+    ...await filesBelow(path.join(root, 'src'), root),
+    ...await filesBelow(path.join(root, 'scripts'), root),
+    ...await filesBelow(path.join(root, 'deploy'), root),
+    ...await filesBelow(path.join(root, 'docker'), root),
+    '.env.example',
+    'package.json',
+  ].filter((relative) => !POLICY_SELF_FILES.has(relative));
+  const forbiddenExternalLimiter = /(?:UPSTASH_REDIS_REST_|RATE_LIMIT_BACKEND|RATE_LIMIT_NAMESPACE|@upstash\/|lib\/upstash|upstash\.com)/iu;
+  for (const relative of activeFiles) {
+    const source = await readOptional(path.join(root, relative));
+    if (source && forbiddenExternalLimiter.test(source)) {
+      errors.push(`${relative}: mandatory external rate-limiter configuration is forbidden`);
+    }
+  }
+}
+
 async function validateLocalDefaults(root, errors) {
   const makefile = await readOptional(path.join(root, 'Makefile'));
   if (makefile === undefined || !/^PROFILE \?= development$/mu.test(makefile)
@@ -572,6 +634,7 @@ export async function validateReleasePolicy(
   await validateActiveScripts(root, errors);
   await validatePostgresReferences(root, errors);
   await validateTrustedIngress(root, errors);
+  await validateLayeredRateLimiting(root, errors);
   await validateVerifyImplementation(root, errors);
 
   return [...new Set(errors)].sort();

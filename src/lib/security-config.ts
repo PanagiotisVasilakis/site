@@ -60,13 +60,6 @@ const SecurityConfigSchema = z.object({
     crossOriginOpenerPolicy: z.enum(['unsafe-none', 'same-origin-allow-popups', 'same-origin']),
     crossOriginResourcePolicy: z.enum(['same-site', 'same-origin', 'cross-origin']),
   }),
-  rateLimit: z.object({
-    enabled: z.boolean(),
-    windowMs: z.number(),
-    maxRequests: z.number(),
-    standardHeaders: z.boolean(),
-    legacyHeaders: z.boolean(),
-  }),
   cors: z.object({
     enabled: z.boolean(),
     origins: z.array(z.string()),
@@ -137,13 +130,6 @@ const developmentConfig: SecurityConfig = {
     crossOriginOpenerPolicy: 'same-origin-allow-popups',
     crossOriginResourcePolicy: 'cross-origin',
   },
-  rateLimit: {
-    enabled: true,
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    maxRequests: 1000, // More lenient in development
-    standardHeaders: true,
-    legacyHeaders: false,
-  },
   cors: {
     enabled: true,
     origins: ['http://localhost:3000', 'http://127.0.0.1:3000'],
@@ -212,13 +198,6 @@ const productionConfig: SecurityConfig = {
     crossOriginEmbedderPolicy: 'require-corp',
     crossOriginOpenerPolicy: 'same-origin',
     crossOriginResourcePolicy: 'same-origin',
-  },
-  rateLimit: {
-    enabled: true,
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    maxRequests: 100, // Stricter in production
-    standardHeaders: true,
-    legacyHeaders: false,
   },
   cors: {
     enabled: true,

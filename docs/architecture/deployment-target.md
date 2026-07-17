@@ -157,11 +157,10 @@ decision commit, the repository still has these blockers:
 - H0 removed the Vercel-specific commit fallback from build metadata, but the
   generated version file still embeds a wall-clock timestamp, so the repository
   must not claim reproducible images;
-- the current production environment contract requires Upstash Redis REST for
-  rate limiting, but that dependency is not established by this deployment
-  decision. The mismatch is an explicit release blocker that requires separate
-  authorization and remediation; H0 does not silently add it to the selected
-  architecture; and
+- the layered abuse-control contract is Cloudflare Free, Nginx, and
+  PostgreSQL-backed authoritative limits for sensitive operations; the
+  checked-in Nginx thresholds remain dry-run observation defaults until
+  staging/load qualification;
 - the canonical production hostname, backup target, RPO/RTO, origin firewall
   policy, and exact reverse-proxy configuration still require recorded evidence.
 

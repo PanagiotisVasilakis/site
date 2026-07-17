@@ -26,9 +26,6 @@ function productionEnv(overrides: Record<string, string | undefined> = {}) {
     NEXT_PUBLIC_SITE_URL: 'https://guest.example',
     CLAIM_TOKEN_PEPPER: 'c'.repeat(32),
     ORIGIN_PROXY_SHARED_SECRET: '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2',
-    RATE_LIMIT_BACKEND: 'redis',
-    UPSTASH_REDIS_REST_URL: 'https://redis.example',
-    UPSTASH_REDIS_REST_TOKEN: 'r'.repeat(20),
     ...overrides,
   };
 }
@@ -42,7 +39,7 @@ describe('runtime environment fail-closed policy', () => {
     }));
   });
 
-  it('accepts a complete HTTPS production environment', () => {
+  it('accepts a complete HTTPS production environment without external limiter variables', () => {
     expect(runtimeEnvSchema.safeParse(productionEnv()).success).toBe(true);
   });
 
@@ -64,8 +61,6 @@ describe('runtime environment fail-closed policy', () => {
     ['missing claim pepper', { CLAIM_TOKEN_PEPPER: undefined }, 'CLAIM_TOKEN_PEPPER'],
     ['missing origin attestation secret', { ORIGIN_PROXY_SHARED_SECRET: undefined }, 'ORIGIN_PROXY_SHARED_SECRET'],
     ['weak origin attestation secret', { ORIGIN_PROXY_SHARED_SECRET: 'a'.repeat(64) }, 'ORIGIN_PROXY_SHARED_SECRET'],
-    ['process-local rate limiting', { RATE_LIMIT_BACKEND: undefined }, 'RATE_LIMIT_BACKEND'],
-    ['insecure Redis endpoint', { UPSTASH_REDIS_REST_URL: 'http://redis.example' }, 'UPSTASH_REDIS_REST_URL'],
   ])('rejects production configuration with %s', (_label, overrides, expectedPath) => {
     const result = runtimeEnvSchema.safeParse(productionEnv(overrides));
     expect(result.success).toBe(false);
@@ -92,6 +87,30 @@ describe('runtime environment fail-closed policy', () => {
       BOOKING_REQUEST_WEBHOOK_TOKEN: 't'.repeat(20),
     }));
     expect(insecure.success).toBe(false);
+  });
+
+  it.each([
+    [
+      'development session minting without its secret',
+      { DEV_SESSION_MINT_ENABLED: '1', DEV_SESSION_MINT_SECRET: undefined },
+      'DEV_SESSION_MINT_SECRET',
+    ],
+    [
+      'required alert delivery without an endpoint',
+      { ALERT_WEBHOOK_REQUIRED: '1', ALERT_WEBHOOK_URL: undefined },
+      'ALERT_WEBHOOK_URL',
+    ],
+    [
+      'an insecure production alert endpoint',
+      { ALERT_WEBHOOK_URL: 'http://alerts.example', ALERT_WEBHOOK_TOKEN: 'a'.repeat(20) },
+      'ALERT_WEBHOOK_URL',
+    ],
+  ] as const)('rejects %s', (_label, overrides, expectedPath) => {
+    const result = runtimeEnvSchema.safeParse(productionEnv(overrides));
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some(({ path }) => path[0] === expectedPath)).toBe(true);
+    }
   });
 
   it('rejects duplicate encryption rotation keys and compiled URL drift', () => {

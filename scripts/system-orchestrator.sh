@@ -586,27 +586,6 @@ validate_environment_contract() {
     failed=1
   fi
 
-  if [[ "$PROFILE" == "production" && "${RATE_LIMIT_BACKEND:-}" != "redis" ]]; then
-    error "RATE_LIMIT_BACKEND=redis is required in production; process-local rate limiting is not distributed"
-    failed=1
-  elif [[ -n "${RATE_LIMIT_BACKEND:-}" && "${RATE_LIMIT_BACKEND}" != "redis" ]]; then
-    error "RATE_LIMIT_BACKEND must be redis when configured"
-    failed=1
-  elif [[ "${RATE_LIMIT_BACKEND:-}" == "redis" ]]; then
-    if [[ -z "${UPSTASH_REDIS_REST_URL:-}" ]] || ! is_valid_url "$UPSTASH_REDIS_REST_URL"; then
-      error "UPSTASH_REDIS_REST_URL must be a valid URL for Redis rate limiting"
-      failed=1
-    fi
-    if [[ "$PROFILE" == "production" && -n "${UPSTASH_REDIS_REST_URL:-}" && "$UPSTASH_REDIS_REST_URL" != https://* ]]; then
-      error "UPSTASH_REDIS_REST_URL must use HTTPS in production"
-      failed=1
-    fi
-    if [[ -z "${UPSTASH_REDIS_REST_TOKEN:-}" || ${#UPSTASH_REDIS_REST_TOKEN} -lt 20 ]]; then
-      error "UPSTASH_REDIS_REST_TOKEN must be at least 20 characters for Redis rate limiting"
-      failed=1
-    fi
-  fi
-
   if [[ "${DEV_SESSION_MINT_ENABLED:-0}" == "1" && ( -z "${DEV_SESSION_MINT_SECRET:-}" || ${#DEV_SESSION_MINT_SECRET} -lt 32 ) ]]; then
     error "DEV_SESSION_MINT_SECRET must be at least 32 characters when development session minting is enabled"
     failed=1

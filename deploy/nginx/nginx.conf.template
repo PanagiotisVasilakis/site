@@ -13,7 +13,8 @@ http {
   # Deliberately excludes peer/client IPs, forwarding headers, request bodies,
   # query strings, and the private attestation value.
   log_format origin_safe '$request_id $request_method $uri $status $body_bytes_sent '
-                         '$request_time cf_ray=$http_cf_ray';
+                         '$request_time cf_ray=$http_cf_ray '
+                         'limit_req=$limit_req_status limit_conn=$limit_conn_status';
   access_log /var/log/nginx/access.log origin_safe;
   error_log /var/log/nginx/error.log warn;
 
@@ -36,6 +37,27 @@ http {
     1 "${ORIGIN_PROXY_SHARED_SECRET}";
   }
 
+  # Empty keys are not accounted. The checked-in values are deliberately
+  # conservative observation defaults and remain dry-run until staging/load
+  # evidence approves an explicit enforcement change.
+  map "$request_method:$uri" $auth_rate_key {
+    default "";
+    ~^POST:/api/(?:admin/(?:login|refresh)|portal/(?:claims|sessions|refresh))$ $binary_remote_addr;
+  }
+  map "$request_method:$uri" $public_write_rate_key {
+    default "";
+    ~^(?:POST|PUT|PATCH|DELETE):/api/(?:booking-requests|analytics|vitals|errors|security/csp-report|alerts/webhook|dsar/requests|check-in(?:/|$)) $binary_remote_addr;
+  }
+  map $uri $broad_api_rate_key {
+    default "";
+    ~^/api/ $binary_remote_addr;
+  }
+
+  limit_req_zone $auth_rate_key zone=auth_operations:10m rate=5r/s;
+  limit_req_zone $public_write_rate_key zone=public_writes:10m rate=10r/s;
+  limit_req_zone $broad_api_rate_key zone=broad_api:10m rate=30r/s;
+  limit_conn_zone $binary_remote_addr zone=per_client_connections:10m;
+
   upstream next_app {
     server 127.0.0.1:3000;
     keepalive 32;
@@ -56,6 +78,15 @@ http {
 
     location / {
       if ($cloudflare_source = 0) { return 403; }
+
+      limit_req zone=auth_operations burst=20 nodelay;
+      limit_req zone=public_writes burst=40 nodelay;
+      limit_req zone=broad_api burst=60 nodelay;
+      limit_req_dry_run on;
+      limit_req_status 429;
+      limit_conn per_client_connections 20;
+      limit_conn_dry_run on;
+      limit_conn_status 429;
 
       proxy_http_version 1.1;
       proxy_set_header Connection "";

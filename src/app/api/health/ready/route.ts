@@ -31,26 +31,8 @@ async function databaseReady(): Promise<boolean> {
   }
 }
 
-async function rateLimitBackendReady(): Promise<boolean> {
-  const backend = process.env.RATE_LIMIT_BACKEND || '';
-  const requiresDistributedBackend = process.env.NODE_ENV === 'production' || backend === 'redis';
-  if (!requiresDistributedBackend) return true;
-  if (backend !== 'redis') return false;
-
-  try {
-    const upstash = await import('@/lib/upstash');
-    return upstash.ping();
-  } catch {
-    return false;
-  }
-}
-
 async function checkReadiness(): Promise<boolean> {
-  const [database, rateLimitBackend] = await Promise.all([
-    databaseReady(),
-    rateLimitBackendReady(),
-  ]);
-  return database && rateLimitBackend;
+  return databaseReady();
 }
 
 async function getReadiness(): Promise<boolean> {

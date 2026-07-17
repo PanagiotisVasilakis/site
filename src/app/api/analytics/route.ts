@@ -153,6 +153,9 @@ export async function POST(request: NextRequest) {
     if (isClientIdentityUnavailableError(error)) {
       return createClientIdentityUnavailableResponse();
     }
+    if (error instanceof ApiError) {
+      return Response.json({ error: error.message }, { status: error.statusCode });
+    }
     throw error;
   }
   if (!decision.allowed) {

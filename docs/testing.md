@@ -15,7 +15,10 @@ The design goal is high-signal regression protection, not assertions against imp
 - `tests/components`: jsdom interaction tests for theme state, locale synchronization, modal focus management, safe fallbacks, and request cancellation.
 - `tests/routes`: public health, OpenAPI, and category response contracts.
 
-The default suite deliberately does not connect to PostgreSQL, Upstash, webhooks, OSRM, or another live service. Persistence and network boundaries are mocked at their adapters. This keeps `npm test` fast, repeatable, and independent of subscriptions or infrastructure availability.
+The default suite deliberately does not connect to PostgreSQL, webhooks, OSRM,
+or another live service. Persistence and network boundaries are mocked at
+their adapters. This keeps `npm test` fast, repeatable, and independent of
+subscriptions or infrastructure availability.
 
 The separate `tests/integration` profile uses a real, disposable PostgreSQL 16 container. It is opt-in, excluded from the default Vitest profile, and owns its complete container/database lifecycle. It does not use the development Compose service or any caller-supplied database URL.
 

@@ -37,9 +37,6 @@ export const SYNTHETIC_PRODUCTION_ENVIRONMENT = Object.freeze({
   BUILD_SITE_URL: 'https://release.example.invalid',
   ORIGIN_PROXY_SHARED_SECRET:
     '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2',
-  RATE_LIMIT_BACKEND: 'redis',
-  UPSTASH_REDIS_REST_URL: 'https://redis.release.invalid',
-  UPSTASH_REDIS_REST_TOKEN: 'release-only-redis-token-000000',
 });
 
 function npmGate(id, label, script, extraArgs = [], environment = 'base') {

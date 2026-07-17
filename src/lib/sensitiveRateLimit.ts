@@ -1,4 +1,5 @@
 import type { NextRequest } from 'next/server';
+import { ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 import { requireCanonicalClientIp } from '@/lib/net/clientIdentity';
 import { normalizePhone } from '@/lib/phone';
 import { privacyHmac } from '@/lib/privacyHash';
@@ -43,27 +44,34 @@ export async function checkSensitiveRateLimit(
   // persistent identity bucket.
   const ip = requireCanonicalClientIp(request);
   const keys = buildKeys(ip, options);
-  const { prisma } = await import('@/lib/prisma');
   const resetAt = new Date(Date.now() + options.windowMs);
-  const records = await Promise.all(keys.map(async (key) => {
-    const rows = await prisma.$queryRaw<Array<{ count: number; reset_time: Date }>>`
-      INSERT INTO "rate_limits" ("key", "count", "reset_time")
-      VALUES (${key}, 1, ${resetAt})
-      ON CONFLICT ("key") DO UPDATE SET
-        "count" = CASE
-          WHEN "rate_limits"."reset_time" <= CURRENT_TIMESTAMP THEN 1
-          ELSE "rate_limits"."count" + 1
-        END,
-        "reset_time" = CASE
-          WHEN "rate_limits"."reset_time" <= CURRENT_TIMESTAMP THEN EXCLUDED."reset_time"
-          ELSE "rate_limits"."reset_time"
-        END
-      RETURNING "count", "reset_time"
-    `;
-    const record = rows[0];
-    if (!record) throw new Error('Rate limiter did not return a decision');
-    return record;
-  }));
+  let records: Array<{ count: number; reset_time: Date }>;
+  try {
+    const { prisma } = await import('@/lib/prisma');
+    records = await prisma.$transaction(async (tx) => Promise.all(keys.map(async (key) => {
+      const rows = await tx.$queryRaw<Array<{ count: number; reset_time: Date }>>`
+        INSERT INTO "rate_limits" ("key", "count", "reset_time")
+        VALUES (${key}, 1, ${resetAt})
+        ON CONFLICT ("key") DO UPDATE SET
+          "count" = CASE
+            WHEN "rate_limits"."reset_time" <= CURRENT_TIMESTAMP THEN 1
+            ELSE "rate_limits"."count" + 1
+          END,
+          "reset_time" = CASE
+            WHEN "rate_limits"."reset_time" <= CURRENT_TIMESTAMP THEN EXCLUDED."reset_time"
+            ELSE "rate_limits"."reset_time"
+          END
+        RETURNING "count", "reset_time"
+      `;
+      const record = rows[0];
+      if (!record) throw new Error('missing limiter decision');
+      return record;
+    })), { timeout: 5_000 });
+  } catch {
+    // The transaction rolls back every limiter dimension before callers see a
+    // generic fail-closed response. Never expose database diagnostics here.
+    throw new ApiError(ApiErrorCode.SERVICE_UNAVAILABLE, 'Service temporarily unavailable');
+  }
   return {
     allowed: records.every((record) => record.count <= options.limit),
     limit: options.limit,

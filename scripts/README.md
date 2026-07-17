@@ -47,9 +47,12 @@ Production additionally requires:
 
 - `CLAIM_TOKEN_PEPPER`
 - `ORIGIN_PROXY_SHARED_SECRET`, generated with `openssl rand -hex 32` and injected into both Nginx and the application
-- `RATE_LIMIT_BACKEND=redis` with `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`; production fails closed instead of using a per-process counter. `RATE_LIMIT_NAMESPACE` may be set per environment; otherwise a stable environment/site namespace is derived automatically.
+- no external limiter variables: authoritative sensitive-operation limits use
+  PostgreSQL and verified ingress identity. Cloudflare and Nginx provide coarse
+  protection; see `docs/security/layered-rate-limiting.md`.
 
-If a booking or check-in webhook URL is configured, its token is mandatory; production webhook URLs must use HTTPS. A blank rate-limit backend is supported only in development, where it uses an in-memory counter.
+If a booking or check-in webhook URL is configured, its token is mandatory;
+production webhook URLs must use HTTPS.
 
 Never place secrets in `NEXT_PUBLIC_*` variables.
 
@@ -93,7 +96,11 @@ npm run check:prisma-integrity
 npm run check:postgres-image-policy
 ```
 
-The default suite does not contact a live PostgreSQL, Redis, webhook, or third-party API. `test:integration` is the isolated exception: it owns a digest-pinned disposable PostgreSQL container and synthetic databases. `verify:release` never targets a persistent environment. See [Testing strategy](../docs/testing.md) and [Release verification](../docs/release-verification.md).
+The default suite does not contact a live PostgreSQL, webhook, or third-party
+API. `test:integration` is the isolated exception: it owns a digest-pinned
+disposable PostgreSQL container and synthetic databases. `verify:release`
+never targets a persistent environment. See [Testing strategy](../docs/testing.md)
+and [Release verification](../docs/release-verification.md).
 
 Optional browser audits are manual commands: `audit:a11y`, `audit:contrast`, `audit:responsive:ux`, and `audit:lighthouse:matrix`.
 
@@ -127,5 +134,7 @@ The outbox worker uses bounded attempts, exponential backoff, leases, abandoned-
 
 - Version error: switch the active shell to Node 22.19/npm 11.18 and reinstall with `npm ci`.
 - Readiness fails: inspect the SQL error and migration state; liveness alone does not prove the app is ready.
-- Production proxy validation fails: configure the real reverse-proxy hop count or trusted single-value header; do not guess.
+- Production proxy validation fails: verify the Cloudflare source allowlist,
+  Nginx header overwrite, and private attestation contract; do not trust a
+  public forwarding header directly.
 - Outbox backlog: inspect `outbox_events.last_error`, the destination URL/token, and the outbox service journal.

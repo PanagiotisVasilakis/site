@@ -74,7 +74,6 @@ export async function GET(request: NextRequest) {
       monitoringEnabled: config.monitoring.enabled,
       cspEnabled: config.csp.enabled,
       hstsEnabled: config.headers.hsts.enabled,
-      rateLimitEnabled: config.rateLimit.enabled,
       recentCriticalEvents: critical === 0,
     };
     return Response.json({

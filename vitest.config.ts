@@ -62,7 +62,6 @@ export default defineConfig({
         'src/lib/site.ts',
         'src/lib/stayRequestPhone.ts',
         'src/lib/travelFormat.ts',
-        'src/lib/upstash.ts',
         'src/lib/userFacingErrors.ts',
       ],
       exclude: ['src/generated/**', '**/*.d.ts'],
