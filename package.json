@@ -131,7 +131,7 @@
     "vitest": "4.1.10"
   },
   "optionalDependencies": {
-    "sharp": "^0.34.5"
+    "sharp": "^0.35.3"
   },
   "overrides": {
     "@prisma/dev": "0.24.14",
