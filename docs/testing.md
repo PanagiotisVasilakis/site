@@ -11,7 +11,7 @@ The design goal is high-signal regression protection, not assertions against imp
 ## Test layers
 
 - `tests/unit`: pure formatting, validation, date/time, data, map, navigation, and adapter configuration.
-- `tests/security`: environment fail-closed rules, JWT and database-session contracts, request-body limits, error sanitization, privacy hashing/redaction, trusted proxies, durable rate limiting, Redis responses, and portal refresh behavior.
+- `tests/security`: environment fail-closed rules, JWT and database-session contracts, request-body limits, error sanitization, privacy hashing/redaction, trusted proxies, durable rate limiting, limiter failure responses, and portal refresh behavior.
 - `tests/components`: jsdom interaction tests for theme state, locale synchronization, modal focus management, safe fallbacks, and request cancellation.
 - `tests/routes`: public health, OpenAPI, and category response contracts.
 

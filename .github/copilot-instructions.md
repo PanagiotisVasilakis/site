@@ -8,7 +8,7 @@ This is a Next.js 16 App Router application using TypeScript, PostgreSQL, Prisma
 - Guest activation requires an administrator-issued, short-lived, one-time booking claim token. Do not restore document, surname, or untrusted booking-reference authentication.
 - Guest/admin JWT cookies are backed by database sessions. Guest refresh tokens belong to rotating families with absolute expiry and replay revocation.
 - Booking and check-in webhook notifications use `OutboxEvent`; writes and events must be transactional. Do not replace the worker with best-effort inline fetches.
-- Sensitive rate limits are PostgreSQL-backed and independently limit IP and normalized identifiers. The proxy-wide limiter uses Upstash in production and may fall back in-process only during development.
+- Sensitive rate limits are PostgreSQL-backed and independently limit verified client identity and normalized identifiers. Cloudflare and Nginx provide coarse upstream protection; do not add a mandatory external limiter without a new architecture decision.
 - Analytics, Web Vitals, security audit events, alerts, and privacy workflows are database-backed. Do not add filesystem or module-memory persistence as a production source of truth.
 
 ## API conventions

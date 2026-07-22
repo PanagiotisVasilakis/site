@@ -165,6 +165,8 @@ describe('security header builders', () => {
   it('selects production and development policy intentionally', () => {
     vi.stubEnv('NODE_ENV', 'development');
     expect(getSecurityConfig().csp.reportOnly).toBe(true);
+    expect(getSecurityConfig().csp.directives.scriptSrc).not.toContain('https://vercel.live');
+    expect(getSecurityConfig().csp.directives.connectSrc).not.toContain('https://vercel.live');
     vi.stubEnv('NODE_ENV', 'production');
     expect(getSecurityConfig().csp.reportOnly).toBe(false);
     expect(getSecurityConfig().headers.hsts.enabled).toBe(true);

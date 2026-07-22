@@ -128,7 +128,7 @@ function getRecommendedPoolConfig(): { connectionLimit: number; poolTimeout: num
   const env = process.env.NODE_ENV;
   
   if (env === 'production') {
-    // For serverless (Vercel), keep pool small per instance
+    // Keep the production pool bounded per application instance.
     return { connectionLimit: 10, poolTimeout: 20 };
   }
   

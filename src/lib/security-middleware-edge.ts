@@ -1,7 +1,7 @@
 /**
  * Security middleware tailored for the Edge runtime.
  * Mirrors the critical behaviour of the Node implementation while
- * avoiding Node-specific dependencies that are unsupported in Vercel Edge.
+ * avoiding Node-specific dependencies that are unavailable in this runtime.
  */
 
 import { NextRequest, NextResponse } from 'next/server';

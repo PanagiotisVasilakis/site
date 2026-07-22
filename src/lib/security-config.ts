@@ -91,11 +91,11 @@ const developmentConfig: SecurityConfig = {
     reportOnly: true, // Report-only mode in development
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://vercel.live"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
-  connectSrc: ["'self'", "https://vercel.live", "https://router.project-osrm.org", "wss:", "ws:"],
+      connectSrc: ["'self'", "https://router.project-osrm.org", "wss:", "ws:"],
       frameSrc: ["'self'"],
       manifestSrc: ["'self'"],
       workerSrc: ["'self'", "blob:"],
