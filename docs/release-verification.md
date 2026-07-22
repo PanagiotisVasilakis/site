@@ -77,6 +77,16 @@ and coverage thresholds; the default suite also covers component and route
 surfaces. No mandatory suite is inferred away merely because another command
 currently includes some of its files.
 
+The production/security gate invokes
+`npm --ignore-scripts run validate:security`. Its single dependency audit is
+`npm audit --audit-level=high --omit=dev --json`: the production-only scope and
+High threshold are unchanged. The validator writes the exact JSON stdout and
+complete stderr to permission-restricted files in a unique operating-system
+temporary directory outside the repository, reports the absolute JSON artifact
+path and SHA-256, and fails closed for invalid evidence or process failures.
+High or Critical findings remain release-blocking; lower severities are reported
+without being filtered or suppressed.
+
 The live image check is placed immediately before integration because it can
 perform registry I/O and an immutable image pull. The integration lifecycle
 repeats the exact reference, OCI-index, pulled-image, running-container,

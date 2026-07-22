@@ -8,6 +8,8 @@ import { readFileSync, existsSync, statSync } from 'fs';
 import { execFileSync, execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
+import { runNpmAuditEvidenceCheck } from './lib/npm-audit-evidence';
+
 interface SecurityCheck {
   name: string;
   description: string;
@@ -78,15 +80,7 @@ const checks: SecurityCheck[] = [
     name: 'Package Vulnerabilities',
     description: 'Check for known vulnerabilities in dependencies',
     severity: 'error',
-    check: async () => {
-      try {
-        execSync('npm audit --audit-level=high --omit=dev', { stdio: 'pipe' });
-        return true;
-      } catch {
-        console.error('⚠️ High/Critical vulnerabilities found in dependencies');
-        return false;
-      }
-    }
+    check: runNpmAuditEvidenceCheck
   },
   {
     name: 'CSP Configuration',
