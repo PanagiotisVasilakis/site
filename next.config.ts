@@ -2,6 +2,13 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  outputFileTracingIncludes: {
+    '/*': [
+      './node_modules/sharp/**/*',
+      './node_modules/@img/colour/**/*',
+      './node_modules/@img/sharp-*/**/*',
+    ],
+  },
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'www.vgkareliascollection.com' },

@@ -103,7 +103,7 @@
     "jsonwebtoken": "9.0.3",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",
-    "next": "^16.2.4",
+    "next": "16.2.11",
     "pg": "8.22.0",
     "react": "19.2.7",
     "react-day-picker": "^9.14.0",
@@ -136,6 +136,7 @@
     "lighthouse": "^13.4.0",
     "postcss": "8.5.19",
     "prisma": "^7.0.0",
+    "proxy-agent": "8.0.2",
     "puppeteer": "24.43.1",
     "spdx-expression-parse": "^4.0.0",
     "tailwindcss": "4.3.2",
@@ -145,19 +146,22 @@
     "vitest": "4.1.10"
   },
   "optionalDependencies": {
-    "sharp": "^0.34.5"
+    "sharp": "0.35.3"
   },
   "overrides": {
     "@prisma/dev": "0.24.14",
     "@sentry/node": "^10.64.0",
-    "postcss": "$postcss"
+    "next@16.2.11": {
+      "postcss": "8.5.10",
+      "sharp": "$sharp"
+    }
   },
   "allowScripts": {
     "@prisma/engines@7.8.0": true,
     "bcrypt@6.0.0": true,
     "esbuild@0.28.1": true,
     "fsevents@2.3.3": true,
-    "sharp@0.34.5": true,
+    "sharp@0.35.3": true,
     "prisma@7.8.0": true,
     "puppeteer@24.43.1": true,
     "unrs-resolver@1.11.1": true
