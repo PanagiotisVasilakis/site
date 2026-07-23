@@ -40,6 +40,30 @@ flowchart LR
     Backup[Encrypted backup process] --> Offsite[Off-site backup storage]
 ```
 
+### Production platform contract
+
+The selected production plan is the Netcup VPS 500 G12 in the provider's x86
+class with 64-bit capability; the separate VPS ARM64 product family is not
+selected. The production operating-system family is Linux, the Docker/OCI
+platform is `linux/amd64`, the expected in-container machine architecture is
+`x86_64`, and the expected Node.js architecture is `x64`. The production
+container libc is musl because the repository's production Dockerfile uses an
+Alpine-based image.
+
+This versioned contract defines the deployment target; it is not evidence that
+a live VPS has already been provisioned or observed. Before the first
+production deployment, the provisioned host must be checked read-only against
+this contract in a separate checkpoint. Changing the provider plan,
+architecture, or base-image libc requires an ADR update, new native-dependency
+qualification, and new production-image smoke proof.
+
+Authoritative sources (accessed 2026-07-23):
+
+- [Netcup VPS overview and FAQ](https://www.netcup.com/en/server/vps)
+- [Netcup VPS 500 G12 product](https://www.netcup.com/en/server/vps/vps-500-g12-iv-12m)
+- [Docker multi-platform build documentation](https://docs.docker.com/build/building/multi-platform/)
+- [Alpine Linux](https://www.alpinelinux.org/)
+
 Cloudflare Free is retained only as the authoritative DNS and edge security/reverse-
 proxy front door. Cloudflare Workers and Cloudflare Pages are not application
 runtime or deployment targets. Edge-to-origin traffic must remain encrypted,

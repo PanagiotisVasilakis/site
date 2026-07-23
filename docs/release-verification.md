@@ -48,28 +48,35 @@ be diagnosed without the orchestrator printing environment values.
 | ---: | --- | --- |
 | 1 | Local release policy | `npm --ignore-scripts run validate:release-policy` |
 | 2 | Release-policy negative/positive fixtures | `npm --ignore-scripts run test:release-policy` |
-| 3 | Conflict markers | `npm --ignore-scripts run check:conflicts` |
-| 4 | Prisma integrity manifest | `npm --ignore-scripts run check:prisma-integrity` |
-| 5 | Prisma integrity policy tests | `npm --ignore-scripts run test:prisma-integrity` |
-| 6 | PostgreSQL image-policy tests | `npm --ignore-scripts run test:postgres-image-policy` |
-| 7 | Complete default tests | `npm --ignore-scripts run test` |
-| 8 | Explicit unit tests | `npm --ignore-scripts run test:unit` |
-| 9 | Explicit security tests | `npm --ignore-scripts run test:security` |
-| 10 | Coverage thresholds | `npm --ignore-scripts run test:coverage` |
-| 11 | TypeScript | `npm --ignore-scripts run typecheck` |
-| 12 | Primary lint, zero warnings | `npm --ignore-scripts run lint -- --max-warnings=0` |
-| 13 | Security lint | `npm --ignore-scripts run lint:security` |
-| 14 | Dead code/dependency surface | `npm --ignore-scripts run check:dead-code` |
-| 15 | Dependency licenses | `npm --ignore-scripts run security:license-check` |
-| 16 | Prisma schema validation | `npm --ignore-scripts run prisma:validate` |
-| 17 | Live PostgreSQL OCI-index/provenance check | `npm --ignore-scripts run check:postgres-image-policy` |
-| 18 | Real disposable-PostgreSQL integration suite | `npm --ignore-scripts run test:integration` |
-| 19 | Synthetic production/security build | `npm --ignore-scripts run validate:security` |
-| 20 | Final Prisma integrity manifest | `npm --ignore-scripts run check:prisma-integrity` |
-| 21 | Final deterministic Prisma hash evidence | `npm --ignore-scripts run hash:prisma-integrity` |
-| 22 | Git whitespace/error check | `git diff --check` |
-| 23 | Staged and untracked candidate whitespace | `npm --ignore-scripts run check:candidate-diff` |
-| 24 | Disposable-container orphan check | `npm --ignore-scripts run check:integration-orphans` |
+| 3 | Offline Cloudflare ingress manifest | `npm --ignore-scripts run check:cloudflare-ips` |
+| 4 | Disposable Nginx trusted-ingress integration | `npm --ignore-scripts run test:nginx-ingress` |
+| 5 | Conflict markers | `npm --ignore-scripts run check:conflicts` |
+| 6 | Prisma integrity manifest | `npm --ignore-scripts run check:prisma-integrity` |
+| 7 | Prisma integrity policy tests | `npm --ignore-scripts run test:prisma-integrity` |
+| 8 | PostgreSQL image-policy tests | `npm --ignore-scripts run test:postgres-image-policy` |
+| 9 | Complete default tests | `npm --ignore-scripts run test` |
+| 10 | Explicit unit tests | `npm --ignore-scripts run test:unit` |
+| 11 | Explicit security tests | `npm --ignore-scripts run test:security` |
+| 12 | Coverage thresholds | `npm --ignore-scripts run test:coverage` |
+| 13 | TypeScript | `npm --ignore-scripts run typecheck` |
+| 14 | Primary lint, zero warnings | `npm --ignore-scripts run lint -- --max-warnings=0` |
+| 15 | Security lint | `npm --ignore-scripts run lint:security` |
+| 16 | Dead code/dependency surface | `npm --ignore-scripts run check:dead-code` |
+| 17 | Dependency licenses | `npm --ignore-scripts run security:license-check` |
+| 18 | Prisma schema validation | `npm --ignore-scripts run prisma:validate` |
+| 19 | Live PostgreSQL OCI-index/provenance check | `npm --ignore-scripts run check:postgres-image-policy` |
+| 20 | Real disposable-PostgreSQL integration suite | `npm --ignore-scripts run test:integration` |
+| 21 | Synthetic production/security build | `npm --ignore-scripts run validate:security` |
+| 22 | Final Prisma integrity manifest | `npm --ignore-scripts run check:prisma-integrity` |
+| 23 | Final deterministic Prisma hash evidence | `npm --ignore-scripts run hash:prisma-integrity` |
+| 24 | Git whitespace/error check | `git diff --check` |
+| 25 | Staged and untracked candidate whitespace | `npm --ignore-scripts run check:candidate-diff` |
+| 26 | Disposable-container orphan check | `npm --ignore-scripts run check:integration-orphans` |
+
+`proxy-agent@8.0.2` is a dev-only peer-resolution anchor and is intentionally
+not imported by application code. Knip ignores exactly that dependency, while
+full `npm ls` and explicit dependency-tree evidence remain mandatory; nested
+`proxy-agent@6.5.0` remains required for the legacy Puppeteer chain.
 
 The default Vitest suite and the explicit unit/security/coverage invocations
 overlap intentionally. The explicit gates preserve the agreed release contract
