@@ -35,11 +35,14 @@ export const POST = withErrorHandler(async (
       ttlMinutes: parsed.data.ttlMinutes,
       adminSessionId: admin.session_id,
     });
-    return createSuccessResponse({
+    const response = createSuccessResponse({
       claimToken: grant.token,
       expiresAt: grant.expiresAt.toISOString(),
       channel: parsed.data.channel,
     }, 201);
+    response.headers.set('cache-control', 'no-store');
+    response.headers.set('referrer-policy', 'no-referrer');
+    return response;
   } catch (error) {
     if (error instanceof PortalAuthError) {
       if (error.code === 'BOOKING_ALREADY_CLAIMED') {

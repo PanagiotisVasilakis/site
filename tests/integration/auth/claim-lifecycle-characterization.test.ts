@@ -358,8 +358,9 @@ async function performClaim(input: {
   body: string;
   credentials: { sessionToken: string; refreshToken: string } | null;
 }> {
-  const [{ NextRequest }, claimRoute] = await Promise.all([
+  const [{ NextRequest }, exchangeRoute, claimRoute] = await Promise.all([
     import('next/server'),
+    import('@/app/api/portal/claim-exchange/route'),
     import('@/app/api/portal/claims/route'),
   ]);
   const headers: Record<string, string> = {
@@ -369,11 +370,44 @@ async function performClaim(input: {
     'x-origin-proxy-attestation': process.env.ORIGIN_PROXY_SHARED_SECRET ?? '',
   };
   if (input.sessionCookie) headers.cookie = `guest_session=${input.sessionCookie}`;
+  const exchangeRequest = new NextRequest(
+    'http://integration.invalid/api/portal/claim-exchange',
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ claimToken: input.token ?? PRIMARY_TOKEN }),
+    },
+  );
+  const exchangeResponse = await exchangeRoute.POST(
+    exchangeRequest,
+    { params: Promise.resolve({}) },
+  );
+  if (!exchangeResponse.ok) {
+    const body = await exchangeResponse.text();
+    const parsed = JSON.parse(body) as { success?: boolean; error?: { code?: string } };
+    return {
+      body,
+      credentials: null,
+      http: {
+        status: exchangeResponse.status,
+        success: parsed.success === true,
+        errorCode: parsed.error?.code ?? null,
+        sessionCookie: false,
+        refreshCookie: false,
+        refreshCookieCleared: false,
+      },
+    };
+  }
+  const exchangeCookie = exchangeResponse.cookies.get('booking_claim_exchange')?.value;
+  if (!exchangeCookie) throw new Error('Claim exchange did not issue its short-lived cookie');
+  headers.cookie = [
+    `booking_claim_exchange=${exchangeCookie}`,
+    input.sessionCookie ? `guest_session=${input.sessionCookie}` : '',
+  ].filter(Boolean).join('; ');
   const request = new NextRequest(CLAIM_URL, {
     method: 'POST',
     headers,
     body: JSON.stringify({
-      claimToken: input.token ?? PRIMARY_TOKEN,
       origin: 'ABROAD',
       phone: input.phone ?? CLAIMANT_PHONE,
       password: input.password ?? CLAIMANT_PASSWORD,

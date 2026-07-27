@@ -72,6 +72,9 @@ export async function proxy(req: NextRequest) {
     if (/^\/(?:en|el)\/(?:check-in)\/?$/.test(pathname)) {
       response.headers.set('X-Robots-Tag', 'noindex, nofollow');
     }
+    if (/^\/(?:en|el)\/guest\/?$/.test(pathname)) {
+      response.headers.set('Referrer-Policy', 'no-referrer');
+    }
 
     // Skip locale routing for Next.js internals, API routes, and root-level operational pages.
     if (pathname.startsWith("/_next") || pathname.startsWith("/api") || isNonLocalizedRoute(pathname)) {

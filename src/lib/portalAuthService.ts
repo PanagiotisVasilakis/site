@@ -90,8 +90,29 @@ export async function issueBookingClaimGrant(input: {
   return { token, expiresAt };
 }
 
+export async function prepareBookingClaimExchange(
+  rawToken: string,
+): Promise<{ tokenDigest: string; expiresAt: Date }> {
+  const tokenDigest = digestClaimToken(rawToken.trim());
+  const now = new Date();
+  const eligibilityWindow = createPortalBookingEligibilityWindow(now);
+  const grant = await prisma.bookingClaimGrant.findUnique({
+    where: { tokenDigest },
+    include: { booking: true },
+  });
+  if (!grant
+    || grant.consumedAt
+    || grant.revokedAt
+    || grant.expiresAt <= now
+    || !isPortalBookingTemporallyEligible(grant.booking, eligibilityWindow)) {
+    throw new PortalAuthError('INVALID_CLAIM');
+  }
+  return { tokenDigest, expiresAt: grant.expiresAt };
+}
+
 export async function consumeBookingClaimGrant(input: {
-  token: string;
+  token?: string;
+  tokenDigest?: string;
   phone: string;
   origin: Origin;
   password: string;
@@ -101,7 +122,13 @@ export async function consumeBookingClaimGrant(input: {
   const normalized = normalizePhone(input.phone, input.origin);
   if (!normalized) throw new PortalAuthError('INVALID_CLAIM');
 
-  const tokenDigest = digestClaimToken(input.token.trim());
+  const hasRawToken = typeof input.token === 'string';
+  const hasTokenDigest = typeof input.tokenDigest === 'string';
+  if (hasRawToken === hasTokenDigest) throw new PortalAuthError('INVALID_CLAIM');
+  const tokenDigest = hasTokenDigest
+    ? input.tokenDigest!
+    : digestClaimToken(input.token!.trim());
+  if (!/^[a-f0-9]{64}$/u.test(tokenDigest)) throw new PortalAuthError('INVALID_CLAIM');
   const newPasswordHash = await bcrypt.hash(input.password, BCRYPT_ROUNDS);
   const now = new Date();
   const eligibilityWindow = createPortalBookingEligibilityWindow(now);

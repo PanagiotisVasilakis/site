@@ -105,6 +105,7 @@ async function createBaselineFixture() {
     'docs/security/secret-scanning.md',
     'Sanitized IR-01 secret-scanning contract.\n',
   );
+  await writeRelative(root, 'docs/security/claim-token-transport.md', 'Claim transport contract.\n');
   const compose = `services:\n  db:\n    image: ${APPROVED_IMAGE}\n`;
   await writeRelative(root, 'docker-compose.yml', compose);
   await writeRelative(root, 'docker/docker-compose.prod.yml', compose);
@@ -159,6 +160,7 @@ async function createBaselineFixture() {
     'limit_conn per_client_connections 20;',
     'limit_conn_status 429;',
     'log_format safe "limit_req=$limit_req_status limit_conn=$limit_conn_status";',
+    'log_format claim_safe "$uri";',
     '',
   ].join('\n'));
   await writeRelative(root, 'deploy/systemd/qr-city-guide.service', [
@@ -176,6 +178,45 @@ async function createBaselineFixture() {
     "const ip = 'x-origin-verified-client-ip';",
     "const attestation = 'x-origin-proxy-attestation';",
     'void timingSafeEqual; void ip; void attestation;',
+    '',
+  ].join('\n'));
+  await writeRelative(root, 'src/lib/portalClaimExchange.ts', [
+    "const options = { httpOnly: true, secure: process.env.NODE_ENV === 'production',",
+    "sameSite: 'strict', path: '/api/portal', maxAge: 0 };",
+    'const PORTAL_CLAIM_EXCHANGE_MAX_AGE_SECONDS = 300;',
+    'const grantLifetimeSeconds = 60;',
+    "const headers = ['cache-control', 'no-referrer'];",
+    'void options; void PORTAL_CLAIM_EXCHANGE_MAX_AGE_SECONDS;',
+    'void grantLifetimeSeconds; void headers;',
+    '',
+  ].join('\n'));
+  await writeRelative(root, 'src/app/[locale]/guest/UnifiedGuestClient.tsx', [
+    "current.searchParams.delete('claim');",
+    "current.searchParams.delete('claimToken');",
+    'window.history.replaceState(null, "", "/en/guest");',
+    "const endpoint = '/api/portal/claim-exchange';",
+    'void endpoint;',
+    '',
+  ].join('\n'));
+  await writeRelative(root, 'src/app/api/portal/claim-exchange/route.ts', [
+    'prepareBookingClaimExchange();',
+    'createPortalClaimExchangeCookie();',
+    'checkSensitiveRateLimit();',
+    'readJsonBody();',
+    '',
+  ].join('\n'));
+  await writeRelative(root, 'src/app/api/portal/claims/route.ts', [
+    'readPortalClaimExchange();',
+    'clearPresentedPortalClaimExchange();',
+    '',
+  ].join('\n'));
+  await writeRelative(root, 'src/app/api/admin/bookings/[id]/claim-grants/route.ts', [
+    "response.headers.set('cache-control', 'no-store');",
+    "response.headers.set('referrer-policy', 'no-referrer');",
+    '',
+  ].join('\n'));
+  await writeRelative(root, 'src/proxy.ts', [
+    "if (/\\/guest/u.test(pathname)) response.headers.set('Referrer-Policy', 'no-referrer');",
     '',
   ].join('\n'));
   await writeRelative(
@@ -294,6 +335,31 @@ test('rejects a global Gitleaks ignore file', async () => {
   await withFixture(async (root) => {
     await writeRelative(root, '.gitleaksignore', 'unreviewed-global-suppression\n');
     assertRejected(await validateReleasePolicy(root), /global .gitleaksignore suppression/u);
+  });
+});
+
+test('rejects claim capability parsing from a URL', async () => {
+  await withFixture(async (root) => {
+    const guestPath = path.join(root, 'src/app/[locale]/guest/UnifiedGuestClient.tsx');
+    const source = await readFile(guestPath, 'utf8');
+    await writeFile(guestPath, `${source}\nconst leaked = search.get('claim');\n`, 'utf8');
+    assertRejected(await validateReleasePolicy(root), /must not be created or consumed through URLs/u);
+  });
+});
+
+test('rejects claim consumption directly from a JSON token field', async () => {
+  await withFixture(async (root) => {
+    await writeRelative(root, 'src/app/api/portal/claims/route.ts', [
+      'readPortalClaimExchange();',
+      'clearPresentedPortalClaimExchange();',
+      'const input = { claimToken: "forbidden-direct-transport" };',
+      'void input;',
+      '',
+    ].join('\n'));
+    assertRejected(
+      await validateReleasePolicy(root),
+      /must use and clear only the server-controlled exchange cookie/u,
+    );
   });
 });
 

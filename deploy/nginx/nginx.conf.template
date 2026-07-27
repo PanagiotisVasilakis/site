@@ -42,7 +42,7 @@ http {
   # evidence approves an explicit enforcement change.
   map "$request_method:$uri" $auth_rate_key {
     default "";
-    ~^POST:/api/(?:admin/(?:login|refresh)|portal/(?:claims|sessions|refresh))$ $binary_remote_addr;
+    ~^POST:/api/(?:admin/(?:login|refresh)|portal/(?:claim-exchange|claims|sessions|refresh))$ $binary_remote_addr;
   }
   map "$request_method:$uri" $public_write_rate_key {
     default "";

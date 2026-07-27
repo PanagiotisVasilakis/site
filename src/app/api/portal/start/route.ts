@@ -51,7 +51,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
             name: 'claimToken',
             type: 'text',
             required: true,
-            help: 'One-time token issued by the host for this booking.',
+            help: 'One-time token pasted from the host; it is exchanged by POST and never placed in a URL.',
           },
           {
             name: 'password',

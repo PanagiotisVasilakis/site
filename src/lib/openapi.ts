@@ -103,14 +103,20 @@ export const openApiSpec = {
       },
       PortalClaim: {
         type: 'object',
-        required: ['claimToken', 'origin', 'phone', 'password', 'acceptTerms'],
+        required: ['origin', 'phone', 'password', 'acceptTerms'],
         properties: {
-          claimToken: { type: 'string', minLength: 32, maxLength: 256 },
           origin: { type: 'string', enum: ['GR', 'ABROAD'] },
           phone: { type: 'string', minLength: 8, maxLength: 32 },
           password: { type: 'string', minLength: 8, maxLength: 128, format: 'password' },
           remember: { type: 'boolean', default: false },
           acceptTerms: { type: 'boolean', enum: [true] },
+        },
+      },
+      PortalClaimExchange: {
+        type: 'object',
+        required: ['claimToken'],
+        properties: {
+          claimToken: { type: 'string', minLength: 32, maxLength: 256 },
         },
       },
       PortalSession: {
@@ -203,9 +209,16 @@ export const openApiSpec = {
     },
     '/portal/claims': {
       post: {
-        summary: 'Consume a one-time host-issued booking claim', tags: ['Portal'],
+        summary: 'Consume the short-lived server-controlled claim exchange', tags: ['Portal'],
         requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/PortalClaim' } } } },
         responses: { '200': { description: 'Guest and refresh cookies issued' }, '401': { $ref: '#/components/responses/Unauthorized' }, '409': { $ref: '#/components/responses/Conflict' }, '429': { $ref: '#/components/responses/RateLimited' } },
+      },
+    },
+    '/portal/claim-exchange': {
+      post: {
+        summary: 'Exchange a host-issued token for a short-lived HttpOnly claim cookie', tags: ['Portal'],
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/PortalClaimExchange' } } } },
+        responses: { '200': { description: 'Short-lived claim exchange cookie issued' }, '401': { $ref: '#/components/responses/Unauthorized' }, '429': { $ref: '#/components/responses/RateLimited' } },
       },
     },
     '/portal/sessions': {

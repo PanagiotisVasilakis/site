@@ -151,21 +151,41 @@ async function executeClaimWorker(): Promise<void> {
     const databaseUrl = requiredWorkerValue('DATABASE_URL');
     phase = 'request';
 
-    const [{ NextRequest }, claimRoute, guestSession] = await Promise.all([
+    const [{ NextRequest }, exchangeRoute, claimRoute, guestSession] = await Promise.all([
       import('next/server'),
+      import('@/app/api/portal/claim-exchange/route'),
       import('@/app/api/portal/claims/route'),
       import('@/lib/guestSession'),
     ]);
+    const headers = {
+      'content-type': 'application/json',
+      'user-agent': `pr02b-${scenario}-claim-${actor}`,
+      'x-origin-verified-client-ip': '198.51.100.73',
+      'x-origin-proxy-attestation': requiredWorkerValue('ORIGIN_PROXY_SHARED_SECRET'),
+    };
+    const exchangeRequest = new NextRequest(
+      'http://integration.invalid/api/portal/claim-exchange',
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ claimToken: CLAIM_RACE_TOKEN }),
+      },
+    );
+    const exchangeResponse = await exchangeRoute.POST(
+      exchangeRequest,
+      { params: Promise.resolve({}) },
+    );
+    const exchangeCookie = exchangeResponse.cookies.get('booking_claim_exchange')?.value;
+    if (!exchangeResponse.ok || !exchangeCookie) {
+      throw new Error('Claim race exchange failed');
+    }
     const request = new NextRequest(CLAIM_URL, {
       method: 'POST',
       headers: {
-        'content-type': 'application/json',
-        'user-agent': `pr02b-${scenario}-claim-${actor}`,
-        'x-origin-verified-client-ip': '198.51.100.73',
-        'x-origin-proxy-attestation': requiredWorkerValue('ORIGIN_PROXY_SHARED_SECRET'),
+        ...headers,
+        cookie: `booking_claim_exchange=${exchangeCookie}`,
       },
       body: JSON.stringify({
-        claimToken: CLAIM_RACE_TOKEN,
         origin: 'ABROAD',
         phone: claimant.phone,
         password: claimant.password,

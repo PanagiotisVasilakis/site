@@ -6,6 +6,11 @@ import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 import { locales, defaultLocale } from '@/i18n/config';
 import { PortalAuthError, consumeBookingClaimGrant } from '@/lib/portalAuthService';
+import {
+  clearPresentedPortalClaimExchange,
+  readPortalClaimExchange,
+  setClaimTransportResponseHeaders,
+} from '@/lib/portalClaimExchange';
 import { attachPortalAuthCookies, requestAuthContext } from '@/lib/portalAuthHttp';
 import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
 import { logger } from '@/lib/logger-enterprise';
@@ -13,7 +18,6 @@ import { logger } from '@/lib/logger-enterprise';
 export const dynamic = 'force-dynamic';
 
 const schema = z.object({
-  claimToken: z.string().trim().min(32).max(256),
   origin: z.enum(['GR', 'ABROAD']),
   phone: z.string().trim().min(8).max(32),
   password: z.string().min(8).max(128),
@@ -21,7 +25,7 @@ const schema = z.object({
   acceptTerms: z.literal(true),
 });
 
-export const POST = withErrorHandler(async (request: NextRequest) => {
+const claim = withErrorHandler(async (request: NextRequest) => {
   if (!(await getFeatureFlagsAsync()).portalEnabled) {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }
@@ -38,11 +42,15 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   });
   if (!rateLimit.allowed) throw new ApiError(ApiErrorCode.RATE_LIMITED, 'Too many claim attempts');
 
+  const tokenDigest = readPortalClaimExchange(request);
+  if (!tokenDigest) {
+    throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'The claim token or account credentials are invalid');
+  }
   const authContext = requestAuthContext(request);
   let result: { userId: string; bookingId: string };
   try {
     result = await consumeBookingClaimGrant({
-      token: parsed.data.claimToken,
+      tokenDigest,
       phone: parsed.data.phone,
       origin: parsed.data.origin,
       password: parsed.data.password,
@@ -68,3 +76,13 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   await attachPortalAuthCookies(request, response, { ...result, remember: parsed.data.remember });
   return response;
 });
+
+export const POST = async (
+  request: NextRequest,
+  context: { params: Promise<Record<string, string>> },
+) => {
+  const response = await claim(request, context);
+  clearPresentedPortalClaimExchange(request, response);
+  setClaimTransportResponseHeaders(response);
+  return response;
+};

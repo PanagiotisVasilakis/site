@@ -719,8 +719,8 @@ describe.sequential('booking claim concurrency characterization', () => {
         responseRedacted: true,
       });
       expect(result.state.ownerPhone).not.toBe(loserClaimant.phone);
-      expect(result.state.rateLimitRecords).toBe(3);
-      expect(result.state.rateLimitCounts).toEqual([1, 1, 2]);
+      expect(result.state.rateLimitRecords).toBe(4);
+      expect(result.state.rateLimitCounts).toEqual([1, 1, 2, 2]);
     }
   });
 
@@ -757,8 +757,8 @@ describe.sequential('booking claim concurrency characterization', () => {
         refreshGenerationId: null,
         responseRedacted: true,
       });
-      expect(result.state.rateLimitRecords).toBe(2);
-      expect(result.state.rateLimitCounts).toEqual([2, 2]);
+      expect(result.state.rateLimitRecords).toBe(3);
+      expect(result.state.rateLimitCounts).toEqual([2, 2, 2]);
     }
   });
 });

@@ -745,6 +745,97 @@ async function validateSecretScanning(root, errors) {
   }
 }
 
+async function validateClaimTokenTransport(root, errors) {
+  const activeFiles = await filesBelow(path.join(root, 'src'), root);
+  for (const relative of activeFiles) {
+    const source = await readFile(path.join(root, relative), 'utf8');
+    if (/[?&#]claim(?:Token)?=/iu.test(source)
+      || /(?:search|searchParams?)\.get\(\s*['"]claim(?:Token)?['"]\s*\)/u.test(source)
+      || /(?:search|searchParams?)\.set\(\s*['"]claim(?:Token)?['"]/u.test(source)
+      || /claim-link/u.test(source)) {
+      errors.push(`${relative}: claim capabilities must not be created or consumed through URLs`);
+    }
+  }
+
+  const guestClient = await readOptional(
+    path.join(root, 'src/app/[locale]/guest/UnifiedGuestClient.tsx'),
+  );
+  for (const marker of [
+    "current.searchParams.delete('claim')",
+    "current.searchParams.delete('claimToken')",
+    'window.history.replaceState',
+    "'/api/portal/claim-exchange'",
+  ]) {
+    if (guestClient === undefined || !guestClient.includes(marker)) {
+      errors.push(`guest claim transport must retain sanitization marker: ${marker}`);
+    }
+  }
+
+  const exchangeRoute = await readOptional(
+    path.join(root, 'src/app/api/portal/claim-exchange/route.ts'),
+  );
+  for (const marker of [
+    'prepareBookingClaimExchange',
+    'createPortalClaimExchangeCookie',
+    'checkSensitiveRateLimit',
+    'readJsonBody',
+  ]) {
+    if (exchangeRoute === undefined || !exchangeRoute.includes(marker)) {
+      errors.push(`server-controlled claim exchange must retain marker: ${marker}`);
+    }
+  }
+
+  const claimRoute = await readOptional(path.join(root, 'src/app/api/portal/claims/route.ts'));
+  if (claimRoute === undefined
+    || !claimRoute.includes('readPortalClaimExchange')
+    || !claimRoute.includes('clearPresentedPortalClaimExchange')
+    || /\bclaimToken\s*:/u.test(claimRoute)) {
+    errors.push('claim consumption must use and clear only the server-controlled exchange cookie');
+  }
+
+  const cookieContract = await readOptional(path.join(root, 'src/lib/portalClaimExchange.ts'));
+  for (const marker of [
+    'httpOnly: true',
+    "secure: process.env.NODE_ENV === 'production'",
+    "sameSite: 'strict'",
+    "path: '/api/portal'",
+    'PORTAL_CLAIM_EXCHANGE_MAX_AGE_SECONDS',
+    'grantLifetimeSeconds',
+    'maxAge: 0',
+    'cache-control',
+    'no-referrer',
+  ]) {
+    if (cookieContract === undefined || !cookieContract.includes(marker)) {
+      errors.push(`claim exchange cookie must retain security marker: ${marker}`);
+    }
+  }
+
+  const proxy = await readOptional(path.join(root, 'src/proxy.ts'));
+  if (proxy === undefined
+    || !/\/guest/u.test(proxy)
+    || !/Referrer-Policy['"],\s*['"]no-referrer/u.test(proxy)) {
+    errors.push('guest claim UI must enforce Referrer-Policy: no-referrer');
+  }
+
+  const nginx = await readOptional(path.join(root, 'deploy/nginx/nginx.conf.template'));
+  if (nginx === undefined || !nginx.includes('$uri') || nginx.includes('$request_uri')) {
+    errors.push('Nginx logging must exclude query strings from the claim transport');
+  }
+
+  const adminGrant = await readOptional(
+    path.join(root, 'src/app/api/admin/bookings/[id]/claim-grants/route.ts'),
+  );
+  if (adminGrant === undefined
+    || !adminGrant.includes("'cache-control', 'no-store'")
+    || !adminGrant.includes("'referrer-policy', 'no-referrer'")) {
+    errors.push('admin claim issuance must return no-store and no-referrer headers');
+  }
+
+  if (!await exists(path.join(root, 'docs/security/claim-token-transport.md'))) {
+    errors.push('claim capability transport documentation is required');
+  }
+}
+
 export async function validateReleasePolicy(
   repositoryRoot = process.cwd(),
   { gates = RELEASE_GATES } = {},
@@ -790,6 +881,7 @@ export async function validateReleasePolicy(
   await validateTrustedIngress(root, errors);
   await validateLayeredRateLimiting(root, errors);
   await validateSecretScanning(root, errors);
+  await validateClaimTokenTransport(root, errors);
   await validateVerifyImplementation(root, errors);
 
   return [...new Set(errors)].sort();

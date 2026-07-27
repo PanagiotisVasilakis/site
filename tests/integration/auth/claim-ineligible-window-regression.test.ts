@@ -256,20 +256,56 @@ async function performClaimRequest(options: {
   responseText: string;
   http: SafeHttpEvidence;
 }> {
-  const [{ NextRequest }, claimRoute] = await Promise.all([
+  const [{ NextRequest }, exchangeRoute, claimRoute] = await Promise.all([
     import('next/server'),
+    import('@/app/api/portal/claim-exchange/route'),
     import('@/app/api/portal/claims/route'),
   ]);
+  const headers = {
+    'content-type': 'application/json',
+    'user-agent': 'pr02b-synthetic-claim-client',
+    'x-origin-verified-client-ip': '198.51.100.51',
+    'x-origin-proxy-attestation': process.env.ORIGIN_PROXY_SHARED_SECRET ?? '',
+  };
+  const exchangeRequest = new NextRequest(
+    'http://integration.invalid/api/portal/claim-exchange',
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ claimToken: options.token ?? CLAIM_TOKEN }),
+    },
+  );
+  const exchangeResponse = await exchangeRoute.POST(
+    exchangeRequest,
+    { params: Promise.resolve({}) },
+  );
+  if (!exchangeResponse.ok) {
+    const responseText = await exchangeResponse.text();
+    const responseBody = JSON.parse(responseText) as {
+      success?: boolean;
+      error?: { code?: string };
+    };
+    return {
+      response: exchangeResponse,
+      responseText,
+      http: {
+        status: exchangeResponse.status,
+        success: responseBody.success === true,
+        errorCode: responseBody.error?.code ?? null,
+        sessionCookieSet: false,
+        refreshCookieSet: false,
+      },
+    };
+  }
+  const exchangeCookie = exchangeResponse.cookies.get('booking_claim_exchange')?.value;
+  if (!exchangeCookie) throw new Error('Claim exchange did not issue its short-lived cookie');
   const request = new NextRequest(CLAIM_URL, {
     method: 'POST',
     headers: {
-      'content-type': 'application/json',
-      'user-agent': 'pr02b-synthetic-claim-client',
-      'x-origin-verified-client-ip': '198.51.100.51',
-      'x-origin-proxy-attestation': process.env.ORIGIN_PROXY_SHARED_SECRET ?? '',
+      ...headers,
+      cookie: `booking_claim_exchange=${exchangeCookie}`,
     },
     body: JSON.stringify({
-      claimToken: options.token ?? CLAIM_TOKEN,
       origin: 'ABROAD',
       phone: SYNTHETIC_PHONE,
       password: SYNTHETIC_PASSWORD,
@@ -430,7 +466,7 @@ describe.sequential('booking claim eligibility-window defect gate', () => {
         sessions: 0,
         refreshFamilies: 0,
         refreshTokens: 0,
-        rateLimitRecords: 2,
+        rateLimitRecords: 1,
       },
     });
   });
@@ -469,10 +505,10 @@ describe.sequential('booking claim eligibility-window defect gate', () => {
   });
 
   it.each([
-    ['expired', 'expired', CLAIM_TOKEN, 401, 'UNAUTHORIZED', 2],
-    ['revoked', 'revoked', CLAIM_TOKEN, 401, 'UNAUTHORIZED', 2],
-    ['consumed', 'consumed', CLAIM_TOKEN, 401, 'UNAUTHORIZED', 2],
-    ['unknown', 'active', `claim_${'U'.repeat(43)}`, 401, 'UNAUTHORIZED', 2],
+    ['expired', 'expired', CLAIM_TOKEN, 401, 'UNAUTHORIZED', 1],
+    ['revoked', 'revoked', CLAIM_TOKEN, 401, 'UNAUTHORIZED', 1],
+    ['consumed', 'consumed', CLAIM_TOKEN, 401, 'UNAUTHORIZED', 1],
+    ['unknown', 'active', `claim_${'U'.repeat(43)}`, 401, 'UNAUTHORIZED', 1],
     ['malformed', 'active', 'short', 422, 'VALIDATION_ERROR', 0],
   ] as const)(
     'preserves the existing generic failure contract for a %s grant token',

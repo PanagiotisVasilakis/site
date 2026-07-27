@@ -19,14 +19,13 @@ export default function UnifiedGuestClient() {
   const router = useRouter();
   const search = useSearchParams();
   const searchKey = search.toString();
-  const initialClaimToken = search.get('claim')?.trim() || '';
-  const initialMode: GuestMode = initialClaimToken || search.get('mode') === 'signup' ? 'signup' : 'signin';
+  const initialMode: GuestMode = search.get('mode') === 'signup' ? 'signup' : 'signin';
   const initialFlash = search.get('flash')?.trim().slice(0, 300) || '';
   const syncingFromUrlRef = useRef(false);
 
   const [mode, setMode] = useState<GuestMode>(initialMode);
   const [origin, setOrigin] = useState<GuestOrigin>('');
-  const [claimToken, setClaimToken] = useState(initialClaimToken);
+  const [claimToken, setClaimToken] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
@@ -46,15 +45,29 @@ export default function UnifiedGuestClient() {
   }), [acceptTerms, claimToken, mode, origin, password, phone]);
 
   useEffect(() => {
-    tracker.portalOpened(initialClaimToken ? 'claim-link' : 'unified');
-  }, [initialClaimToken]);
+    tracker.portalOpened('unified');
+  }, []);
+
+  useEffect(() => {
+    const current = new URL(window.location.href);
+    const before = current.toString();
+    current.searchParams.delete('claim');
+    current.searchParams.delete('claimToken');
+    if (/^#.*claim(?:Token)?=/iu.test(current.hash)) current.hash = '';
+    if (current.toString() !== before) {
+      window.history.replaceState(
+        window.history.state,
+        '',
+        `${current.pathname}${current.search}${current.hash}`,
+      );
+    }
+  }, []);
 
   useEffect(() => {
     syncingFromUrlRef.current = true;
     setMode(initialMode);
-    setClaimToken(initialMode === 'signup' ? initialClaimToken : '');
     setSubmitError(initialFlash ? { summary: initialFlash } : null);
-  }, [initialClaimToken, initialFlash, initialMode, searchKey]);
+  }, [initialFlash, initialMode, searchKey]);
 
   useEffect(() => {
     if (syncingFromUrlRef.current) {
@@ -62,14 +75,13 @@ export default function UnifiedGuestClient() {
       return;
     }
     const nextSearch = new URLSearchParams(searchKey);
-    const currentClaim = nextSearch.get('claim')?.trim() || '';
-    if (nextSearch.get('mode') === mode && currentClaim === (mode === 'signup' ? claimToken : '')) return;
+    nextSearch.delete('claim');
+    nextSearch.delete('claimToken');
+    if (nextSearch.get('mode') === mode) return;
     nextSearch.set('mode', mode);
-    if (mode === 'signup' && claimToken) nextSearch.set('claim', claimToken);
-    else nextSearch.delete('claim');
     router.replace(`/${locale}/guest?${nextSearch.toString()}`, { scroll: false });
     tracker.authModeChanged(mode);
-  }, [claimToken, locale, mode, router, searchKey]);
+  }, [locale, mode, router, searchKey]);
 
   function changeMode(nextMode: GuestMode) {
     setMode(nextMode);
@@ -84,10 +96,23 @@ export default function UnifiedGuestClient() {
 
     const endpoint = mode === 'signup' ? '/api/portal/claims' : '/api/portal/sessions';
     const body = mode === 'signup'
-      ? { claimToken: claimToken.trim(), origin, phone: phone.trim(), password, remember, acceptTerms }
+      ? { origin, phone: phone.trim(), password, remember, acceptTerms }
       : { phone: phone.trim(), password, remember };
 
     try {
+      if (mode === 'signup') {
+        const exchangeResponse = await internalFetch('/api/portal/claim-exchange', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ claimToken: claimToken.trim() }),
+        });
+        const exchangeJson = await exchangeResponse.json().catch(() => null);
+        if (!exchangeResponse.ok) {
+          const mapped = mapApiErrorToUI(exchangeJson, locale);
+          setSubmitError({ summary: mapped.summary, details: mapped.details });
+          return;
+        }
+      }
       const response = await internalFetch(endpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -102,6 +127,7 @@ export default function UnifiedGuestClient() {
 
       tracker.formSubmitted(mode === 'signup' ? 'sign-up' : 'sign-in');
       emitGuestSessionChanged(mode === 'signup' ? 'claim' : 'signin');
+      if (mode === 'signup') setClaimToken('');
       router.push(json?.data?.redirect || `/${locale}/check-in`);
     } catch {
       setSubmitError({
