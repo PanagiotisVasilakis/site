@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -25,6 +26,10 @@ const mocks = vi.hoisted(() => ({
     error: vi.fn(),
   },
 }));
+
+const SYNTHETIC_ADMIN_DASH_CREDENTIAL = createHash('sha256')
+  .update('client-identity-route-isolated-fixture', 'utf8')
+  .digest('base64url');
 
 vi.mock('@/lib/auth/admin', () => ({
   createAdminSession: mocks.createAdminSession,
@@ -141,7 +146,7 @@ describe('missing client identity route boundary', () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2');
     vi.stubEnv('SECURITY_PEPPER', 'a3-route-test-security-pepper-only');
-    vi.stubEnv('ADMIN_DASH_SECRET', 'admin-dashboard-secret-marker');
+    vi.stubEnv('ADMIN_DASH_SECRET', SYNTHETIC_ADMIN_DASH_CREDENTIAL);
     vi.stubEnv('BOOKING_REQUEST_WEBHOOK_URL', 'https://hooks.example/booking');
     mocks.rateLimitQuery.mockResolvedValue([{
       count: 1,

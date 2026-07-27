@@ -5,13 +5,19 @@ import { logger } from '@/lib/logger-enterprise';
 import { withErrorHandler, validateRequestBody } from '@/lib/apiErrorHandler';
 import crypto from 'node:crypto';
 import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
+import { readRuntimeCredential } from '@/lib/runtime-credentials.js';
 
 const loginSchema = z.object({
   token: z.string().min(1, 'Token is required'),
 });
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const secret = process.env.ADMIN_DASH_SECRET;
+  let secret: string | undefined;
+  try {
+    secret = readRuntimeCredential('ADMIN_DASH_SECRET');
+  } catch {
+    return NextResponse.json({ error: 'Admin login disabled' }, { status: 503 });
+  }
   if (!secret) {
     return NextResponse.json({ error: 'Admin login disabled' }, { status: 400 });
   }

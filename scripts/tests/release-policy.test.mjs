@@ -34,6 +34,26 @@ async function createBaselineFixture() {
     'scripts/system-orchestrator.sh',
     '#!/usr/bin/env bash\nPROFILE="development"\n# Runtime profile (default: development)\nexport HOSTNAME="127.0.0.1"\n',
   );
+  await writeRelative(root, 'scripts/ensure-pepper.js', 'const SECURITY_PEPPER = true;\n');
+  await writeRelative(root, 'scripts/install-systemd-services.sh', [
+    'ADMIN_JWT_SECRET=',
+    'ADMIN_DASH_SECRET=',
+    'GUEST_JWT_SECRET=',
+    '',
+  ].join('\n'));
+  await writeRelative(root, 'scripts/README.md', [
+    'Active production credentials:',
+    'ADMIN_JWT_SECRET ADMIN_DASH_SECRET GUEST_JWT_SECRET',
+    '',
+  ].join('\n'));
+  await writeRelative(root, 'SECURITY.md', 'Runtime credentials follow the maintained contract.\n');
+  await writeRelative(root, '.env.example', [
+    'DATABASE_URL=',
+    'ADMIN_JWT_SECRET=',
+    'ADMIN_DASH_SECRET=',
+    'GUEST_JWT_SECRET=',
+    '',
+  ].join('\n'));
   await writeRelative(
     root,
     'scripts/verify-release.mjs',
@@ -169,10 +189,63 @@ async function createBaselineFixture() {
     '',
   ].join('\n'));
   await writeRelative(root, 'src/lib/runtime-env-schema.js', [
+    'ACTIVE_RUNTIME_CREDENTIAL_NAMES',
+    'runtimeCredentialIssue',
+    'const credentialOwners = new Map();',
+    'const message = "must differ from";',
     'ORIGIN_PROXY_SHARED_SECRET',
     '64-character hexadecimal secret non-placeholder',
     '',
   ].join('\n'));
+  await writeRelative(root, 'src/lib/runtime-credentials.js', [
+    'const ACTIVE_RUNTIME_CREDENTIAL_NAMES = [',
+    "  'ADMIN_JWT_SECRET',",
+    "  'GUEST_JWT_SECRET',",
+    "  'ADMIN_DASH_SECRET',",
+    '];',
+    'const MINIMUM_ESTIMATED_ENTROPY_BITS = 160;',
+    'const MINIMUM_DISTINCT_CHARACTERS = 12;',
+    "const PLACEHOLDER_TERMS = new Set(['placeholder']);",
+    'function isPlaceholderLike() {}',
+    'function hasRepeatedPattern() {}',
+    'function runtimeCredentialIssue() {}',
+    'function readRuntimeCredential() {}',
+    '',
+  ].join('\n'));
+  await writeRelative(root, 'src/lib/auth/admin.ts', [
+    "readRuntimeCredential('ADMIN_JWT_SECRET');",
+    '',
+  ].join('\n'));
+  await writeRelative(root, 'src/lib/guestSession.ts', [
+    "readRuntimeCredential('GUEST_JWT_SECRET');",
+    '',
+  ].join('\n'));
+  await writeRelative(root, 'src/app/api/admin/login/route.ts', [
+    "readRuntimeCredential('ADMIN_DASH_SECRET');",
+    '',
+  ].join('\n'));
+  await writeRelative(root, 'src/app/api/dev/alerts/verify-spike/route.ts', [
+    "readRuntimeCredential('ADMIN_DASH_SECRET');",
+    '',
+  ].join('\n'));
+  await writeRelative(root, 'scripts/start-standalone.mjs', [
+    'runtimeEnvSchema.parse(process.env);',
+    '',
+  ].join('\n'));
+  await writeRelative(root, 'scripts/test-runtime-credential-contract.mjs', [
+    'SYNTHETIC_PRODUCTION_ENVIRONMENT',
+    "['missing'",
+    "['invalid'",
+    "['identical'",
+    "['valid'",
+    'output must not expose credentials',
+    '',
+  ].join('\n'));
+  await writeRelative(
+    root,
+    'docs/security/runtime-credential-contract.md',
+    'Maintained runtime credential contract.\n',
+  );
   await writeRelative(root, 'src/lib/net/getClientIp.ts', [
     "import { timingSafeEqual } from 'node:crypto';",
     "const ip = 'x-origin-verified-client-ip';",
@@ -293,6 +366,44 @@ function fixtureGate(id, environment = 'base') {
 test('accepts the restricted local-only release fixture', async () => {
   await withFixture(async (root) => {
     assert.deepEqual(await validateReleasePolicy(root), []);
+  });
+});
+
+test('rejects reintroducing an obsolete runtime credential requirement', async () => {
+  await withFixture(async (root) => {
+    const examplePath = path.join(root, '.env.example');
+    const current = await readFile(examplePath, 'utf8');
+    await writeFile(
+      examplePath,
+      `${current}SESSION_SECRET=\n`,
+      'utf8',
+    );
+    assertRejected(await validateReleasePolicy(root), /obsolete runtime credential SESSION_SECRET/u);
+  });
+});
+
+test('rejects bypassing the centralized guest signing credential reader', async () => {
+  await withFixture(async (root) => {
+    await writeFile(
+      path.join(root, 'src/lib/guestSession.ts'),
+      "const secret = process.env.GUEST_JWT_SECRET || 'dev-guest-secret-change-me';\n",
+      'utf8',
+    );
+    assertRejected(
+      await validateReleasePolicy(root),
+      /centralized runtime credential reader|fixed development guest signing credentials/u,
+    );
+  });
+});
+
+test('rejects removing the standalone credential startup matrix', async () => {
+  await withFixture(async (root) => {
+    await writeFile(
+      path.join(root, 'scripts/test-runtime-credential-contract.mjs'),
+      'SYNTHETIC_PRODUCTION_ENVIRONMENT\n',
+      'utf8',
+    );
+    assertRejected(await validateReleasePolicy(root), /standalone credential contract test lacks/u);
   });
 });
 

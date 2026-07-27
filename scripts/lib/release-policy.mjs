@@ -1,4 +1,5 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 
 import {
@@ -28,18 +29,21 @@ const EXPECTED_HOSTILE_INTEGRATION_ENVIRONMENT = Object.freeze({
   POSTGRES_PASSWORD: 'hostile',
 });
 
+function deriveExpectedNonProductionCredential(purpose) {
+  return createHash('sha256')
+    .update(`macro-c-r1-isolated-release-fixture:${purpose}`, 'utf8')
+    .digest('base64url');
+}
+
 const EXPECTED_SYNTHETIC_PRODUCTION_ENVIRONMENT = Object.freeze({
   NODE_ENV: 'production',
   DATABASE_URL: 'postgresql://release:synthetic@127.0.0.1:1/release_build',
   DIRECT_URL: 'postgresql://release:synthetic@127.0.0.1:1/release_build',
-  ADMIN_JWT_SECRET: 'release-only-admin-jwt-secret-00000000',
-  ADMIN_DASH_SECRET: 'release-only-admin-dashboard-secret',
-  GUEST_JWT_SECRET: 'release-only-guest-jwt-secret-00000000',
-  SECURITY_ENC_KEY_HEX:
-    '0000000000000000000000000000000000000000000000000000000000000000',
+  ADMIN_JWT_SECRET: deriveExpectedNonProductionCredential('admin-jwt'),
+  ADMIN_DASH_SECRET: deriveExpectedNonProductionCredential('admin-dashboard'),
+  GUEST_JWT_SECRET: deriveExpectedNonProductionCredential('guest-jwt'),
   SECURITY_PEPPER: 'release-only-security-pepper',
   CLAIM_TOKEN_PEPPER: 'release-only-claim-token-pepper-0000',
-  SESSION_SECRET: 'release-only-session-secret-0000000000',
   GUEST_WIFI_NETWORK: 'RELEASE-SYNTHETIC-NETWORK',
   GUEST_WIFI_PASSWORD: 'release-only-password',
   PROPERTY_TIME_ZONE: 'Europe/Athens',
@@ -56,6 +60,7 @@ const EXPECTED_GATE_PROFILE = Object.freeze([
   ['secret-tests', 'npm', ['--ignore-scripts', 'run', 'test:secret-scanning'], 'base'],
   ['release-policy', 'npm', ['--ignore-scripts', 'run', 'validate:release-policy'], 'base'],
   ['release-policy-tests', 'npm', ['--ignore-scripts', 'run', 'test:release-policy'], 'base'],
+  ['runtime-credentials', 'npm', ['--ignore-scripts', 'run', 'test:runtime-credentials'], 'base'],
   ['cloudflare-ingress', 'npm', ['--ignore-scripts', 'run', 'check:cloudflare-ips'], 'base'],
   ['nginx-ingress', 'npm', ['--ignore-scripts', 'run', 'test:nginx-ingress'], 'base'],
   ['conflicts', 'npm', ['--ignore-scripts', 'run', 'check:conflicts'], 'base'],
@@ -90,6 +95,7 @@ const EXPECTED_PACKAGE_SCRIPTS = Object.freeze({
   'check:secrets:sources': 'node scripts/check-secrets.mjs sources',
   'check:secrets:artifacts': 'node scripts/check-secrets.mjs artifacts',
   'test:secret-scanning': 'node --test scripts/tests/secret-scanning.test.mjs',
+  'test:runtime-credentials': 'node scripts/test-runtime-credential-contract.mjs',
   'check:cloudflare-ips': 'node scripts/check-cloudflare-ips.mjs',
   'check:cloudflare-ips:current': 'node scripts/check-cloudflare-ips.mjs --current',
   'test:nginx-ingress': 'bash scripts/test-nginx-ingress.sh',
@@ -146,17 +152,16 @@ const EXPECTED_HISTORICAL_SECRET_BASELINE = Object.freeze([
 
 const EXPECTED_CURRENT_SECRET_FIXTURES = Object.freeze([
   ['synthetic-release-fixture', '.env.example', 'credential-bearing-database-url', 5, 15],
-  ['documented-placeholder', '.env.example', 'generic-api-key', 14, 2],
   ['synthetic-test-fixture', 'tests/integration/auth/portal-eligibility-consistency.test.ts', 'generic-api-key', 29, 8],
-  ['synthetic-test-fixture', 'tests/security/client-identity-route-regression.test.ts', 'generic-api-key', 142, 18],
+  ['synthetic-test-fixture', 'tests/security/client-identity-route-regression.test.ts', 'generic-api-key', 147, 18],
   ['synthetic-test-fixture', 'tests/security/client-identity.test.ts', 'generic-api-key', 12, 10],
   ['synthetic-test-fixture', 'tests/security/portal-auth-client-identity.test.ts', 'generic-api-key', 32, 18],
-  ['synthetic-test-fixture', 'tests/security/security-boundaries.test.ts', 'generic-api-key', 28, 6],
-  ['synthetic-test-fixture', 'tests/security/security-boundaries.test.ts', 'generic-api-key', 178, 10],
-  ['synthetic-release-fixture', 'scripts/lib/release-gates.mjs', 'credential-bearing-database-url', 21, 19],
-  ['synthetic-release-fixture', 'scripts/lib/release-gates.mjs', 'credential-bearing-database-url', 22, 17],
-  ['synthetic-release-fixture', 'scripts/lib/release-policy.mjs', 'credential-bearing-database-url', 33, 19],
-  ['synthetic-release-fixture', 'scripts/lib/release-policy.mjs', 'credential-bearing-database-url', 34, 17],
+  ['synthetic-test-fixture', 'tests/security/security-boundaries.test.ts', 'generic-api-key', 33, 6],
+  ['synthetic-test-fixture', 'tests/security/security-boundaries.test.ts', 'generic-api-key', 222, 10],
+  ['synthetic-release-fixture', 'scripts/lib/release-gates.mjs', 'credential-bearing-database-url', 29, 19],
+  ['synthetic-release-fixture', 'scripts/lib/release-gates.mjs', 'credential-bearing-database-url', 30, 17],
+  ['synthetic-release-fixture', 'scripts/lib/release-policy.mjs', 'credential-bearing-database-url', 40, 19],
+  ['synthetic-release-fixture', 'scripts/lib/release-policy.mjs', 'credential-bearing-database-url', 41, 17],
   ['synthetic-test-fixture', 'tests/unit/integration-database-safety.test.ts', 'credential-bearing-database-url', 228, 28],
 ]);
 
@@ -836,6 +841,128 @@ async function validateClaimTokenTransport(root, errors) {
   }
 }
 
+async function validateRuntimeCredentialContract(root, errors) {
+  const activeNames = [
+    'ADMIN_JWT_SECRET',
+    'GUEST_JWT_SECRET',
+    'ADMIN_DASH_SECRET',
+  ];
+  const obsoleteNames = [
+    'JWT_SECRET',
+    'SESSION_SECRET',
+    'SECURITY_ENC_KEY_HEX',
+    'SECURITY_ENC_KEY_HEX_PREVIOUS',
+  ];
+  const credentialSource = await readOptional(
+    path.join(root, 'src/lib/runtime-credentials.js'),
+  );
+  const runtimeSchema = await readOptional(
+    path.join(root, 'src/lib/runtime-env-schema.js'),
+  );
+  const standalone = await readOptional(path.join(root, 'scripts/start-standalone.mjs'));
+  const standaloneTest = await readOptional(
+    path.join(root, 'scripts/test-runtime-credential-contract.mjs'),
+  );
+
+  for (const marker of [
+    'ACTIVE_RUNTIME_CREDENTIAL_NAMES',
+    'MINIMUM_ESTIMATED_ENTROPY_BITS',
+    'MINIMUM_DISTINCT_CHARACTERS',
+    'PLACEHOLDER_TERMS',
+    'isPlaceholderLike',
+    'hasRepeatedPattern',
+    'runtimeCredentialIssue',
+    'readRuntimeCredential',
+  ]) {
+    if (!credentialSource?.includes(marker)) {
+      errors.push(`runtime credential validator lacks: ${marker}`);
+    }
+  }
+  for (const name of activeNames) {
+    if (!credentialSource?.includes(`'${name}'`)) {
+      errors.push(`runtime credential validator must include ${name}`);
+    }
+  }
+  for (const marker of [
+    'ACTIVE_RUNTIME_CREDENTIAL_NAMES',
+    'runtimeCredentialIssue',
+    'credentialOwners',
+    'must differ from',
+  ]) {
+    if (!runtimeSchema?.includes(marker)) {
+      errors.push(`runtime environment schema lacks credential control: ${marker}`);
+    }
+  }
+  if (!standalone?.includes('runtimeEnvSchema.parse(process.env)')) {
+    errors.push('standalone startup must validate the authoritative runtime environment schema');
+  }
+  for (const marker of [
+    'SYNTHETIC_PRODUCTION_ENVIRONMENT',
+    "['missing'",
+    "['invalid'",
+    "['identical'",
+    "['valid'",
+    'output must not expose credentials',
+  ]) {
+    if (!standaloneTest?.includes(marker)) {
+      errors.push(`standalone credential contract test lacks: ${marker}`);
+    }
+  }
+
+  const activeConfigurationFiles = [
+    '.env.example',
+    'src/lib/runtime-env-schema.js',
+    'scripts/ensure-pepper.js',
+    'scripts/system-orchestrator.sh',
+    'scripts/install-systemd-services.sh',
+    'scripts/README.md',
+    'SECURITY.md',
+  ];
+  for (const relative of activeConfigurationFiles) {
+    const source = await readOptional(path.join(root, relative));
+    if (source === undefined) {
+      errors.push(`runtime credential configuration surface is required: ${relative}`);
+      continue;
+    }
+    const configuredNames = new Set(source.split(/[^A-Z0-9_]+/u));
+    for (const obsolete of obsoleteNames) {
+      if (configuredNames.has(obsolete)) {
+        errors.push(`${relative}: obsolete runtime credential ${obsolete} is forbidden`);
+      }
+    }
+  }
+
+  const adminAuth = await readOptional(path.join(root, 'src/lib/auth/admin.ts'));
+  const guestAuth = await readOptional(path.join(root, 'src/lib/guestSession.ts'));
+  const adminLogin = await readOptional(path.join(root, 'src/app/api/admin/login/route.ts'));
+  const devAlertVerification = await readOptional(
+    path.join(root, 'src/app/api/dev/alerts/verify-spike/route.ts'),
+  );
+  if (!adminAuth?.includes("readRuntimeCredential('ADMIN_JWT_SECRET')")) {
+    errors.push('admin JWT signing must use the centralized runtime credential reader');
+  }
+  if (!guestAuth?.includes("readRuntimeCredential('GUEST_JWT_SECRET')")) {
+    errors.push('guest JWT signing must use the centralized runtime credential reader');
+  }
+  if (!adminLogin?.includes("readRuntimeCredential('ADMIN_DASH_SECRET')")) {
+    errors.push('admin login must use the centralized runtime credential reader');
+  }
+  if (!devAlertVerification?.includes("readRuntimeCredential('ADMIN_DASH_SECRET')")) {
+    errors.push('development alert verification must use the centralized runtime credential reader');
+  }
+  if (guestAuth?.includes('dev-guest-secret-change-me')) {
+    errors.push('fixed development guest signing credentials are forbidden');
+  }
+  if ([adminAuth, guestAuth, adminLogin, devAlertVerification].some((source) => (
+    source && /NEXT_PUBLIC_[A-Z0-9_]*(?:SECRET|TOKEN|KEY)/u.test(source)
+  ))) {
+    errors.push('server credentials must not be exposed through NEXT_PUBLIC variables');
+  }
+  if (!await exists(path.join(root, 'docs/security/runtime-credential-contract.md'))) {
+    errors.push('runtime credential contract documentation is required');
+  }
+}
+
 export async function validateReleasePolicy(
   repositoryRoot = process.cwd(),
   { gates = RELEASE_GATES } = {},
@@ -882,6 +1009,7 @@ export async function validateReleasePolicy(
   await validateLayeredRateLimiting(root, errors);
   await validateSecretScanning(root, errors);
   await validateClaimTokenTransport(root, errors);
+  await validateRuntimeCredentialContract(root, errors);
   await validateVerifyImplementation(root, errors);
 
   return [...new Set(errors)].sort();

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -9,20 +10,24 @@ import { runtimeEnvSchema } from '@/lib/runtime-env-schema.js';
 
 const requiredEnv = {
   DATABASE_URL: 'postgresql://user:pass@localhost:5432/guest_guide',
-  ADMIN_JWT_SECRET: 'a'.repeat(32),
-  ADMIN_DASH_SECRET: 'd'.repeat(20),
-  GUEST_JWT_SECRET: 'g'.repeat(32),
-  SECURITY_ENC_KEY_HEX: '1'.repeat(64),
   SECURITY_PEPPER: 'p'.repeat(16),
-  SESSION_SECRET: 's'.repeat(32),
   GUEST_WIFI_NETWORK: 'Guest WiFi',
   GUEST_WIFI_PASSWORD: 'wifi-password',
 };
+
+function syntheticCredential(purpose: string) {
+  return createHash('sha256')
+    .update(`security-boundary-isolated-fixture:${purpose}`, 'utf8')
+    .digest('base64url');
+}
 
 function productionEnv(overrides: Record<string, string | undefined> = {}) {
   return {
     ...requiredEnv,
     NODE_ENV: 'production',
+    ADMIN_JWT_SECRET: syntheticCredential('admin-jwt'),
+    ADMIN_DASH_SECRET: syntheticCredential('admin-dashboard'),
+    GUEST_JWT_SECRET: syntheticCredential('guest-jwt'),
     NEXT_PUBLIC_SITE_URL: 'https://guest.example',
     CLAIM_TOKEN_PEPPER: 'c'.repeat(32),
     ORIGIN_PROXY_SHARED_SECRET: '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2',
@@ -37,6 +42,9 @@ describe('runtime environment fail-closed policy', () => {
       NODE_ENV: 'development',
       PROPERTY_TIME_ZONE: 'Europe/Athens',
     }));
+    expect(result).not.toHaveProperty('ADMIN_JWT_SECRET');
+    expect(result).not.toHaveProperty('GUEST_JWT_SECRET');
+    expect(result).not.toHaveProperty('ADMIN_DASH_SECRET');
   });
 
   it('accepts a complete HTTPS production environment without external limiter variables', () => {
@@ -45,8 +53,6 @@ describe('runtime environment fail-closed policy', () => {
 
   it.each([
     ['non-Postgres database URL', { DATABASE_URL: 'https://database.example/db' }, 'DATABASE_URL'],
-    ['short JWT secret', { ADMIN_JWT_SECRET: 'short' }, 'ADMIN_JWT_SECRET'],
-    ['invalid encryption key', { SECURITY_ENC_KEY_HEX: 'not-hex' }, 'SECURITY_ENC_KEY_HEX'],
     ['invalid time zone', { PROPERTY_TIME_ZONE: 'Mars/Olympus' }, 'PROPERTY_TIME_ZONE'],
     ['test runtime mode', { NODE_ENV: 'test' }, 'NODE_ENV'],
   ])('rejects %s', (_label, overrides, expectedPath) => {
@@ -56,6 +62,21 @@ describe('runtime environment fail-closed policy', () => {
   });
 
   it.each([
+    ['missing admin JWT credential', { ADMIN_JWT_SECRET: undefined }, 'ADMIN_JWT_SECRET'],
+    ['missing guest JWT credential', { GUEST_JWT_SECRET: undefined }, 'GUEST_JWT_SECRET'],
+    ['missing dashboard credential', { ADMIN_DASH_SECRET: undefined }, 'ADMIN_DASH_SECRET'],
+    ['short credential', { ADMIN_JWT_SECRET: 'short' }, 'ADMIN_JWT_SECRET'],
+    [
+      'placeholder credential',
+      { ADMIN_DASH_SECRET: 'replace-me-with-a-production-dashboard-credential' },
+      'ADMIN_DASH_SECRET',
+    ],
+    [
+      'malformed credential',
+      { GUEST_JWT_SECRET: `${syntheticCredential('malformed')} ` },
+      'GUEST_JWT_SECRET',
+    ],
+    ['patterned credential', { ADMIN_JWT_SECRET: 'a1'.repeat(32) }, 'ADMIN_JWT_SECRET'],
     ['missing public URL', { NEXT_PUBLIC_SITE_URL: undefined }, 'NEXT_PUBLIC_SITE_URL'],
     ['HTTP public URL', { NEXT_PUBLIC_SITE_URL: 'http://guest.example' }, 'NEXT_PUBLIC_SITE_URL'],
     ['missing claim pepper', { CLAIM_TOKEN_PEPPER: undefined }, 'CLAIM_TOKEN_PEPPER'],
@@ -113,21 +134,44 @@ describe('runtime environment fail-closed policy', () => {
     }
   });
 
-  it('rejects duplicate encryption rotation keys and compiled URL drift', () => {
-    const currentKey = 'f'.repeat(64);
+  it.each([
+    ['admin and guest', 'GUEST_JWT_SECRET', 'ADMIN_JWT_SECRET'],
+    ['admin and dashboard', 'ADMIN_DASH_SECRET', 'ADMIN_JWT_SECRET'],
+    ['guest and dashboard', 'ADMIN_DASH_SECRET', 'GUEST_JWT_SECRET'],
+  ] as const)('rejects identical %s credentials', (_label, target, source) => {
+    const baseline = productionEnv();
     const result = runtimeEnvSchema.safeParse({
-      ...productionEnv({
-        SECURITY_ENC_KEY_HEX: currentKey,
-        SECURITY_ENC_KEY_HEX_PREVIOUS: currentKey,
-        BUILD_SITE_URL: 'https://compiled.example',
-      }),
+      ...baseline,
+      [target]: baseline[source],
     });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues.map(({ path }) => path[0])).toEqual(
-        expect.arrayContaining(['SECURITY_ENC_KEY_HEX_PREVIOUS', 'NEXT_PUBLIC_SITE_URL']),
-      );
+      expect(result.error.issues.some(({ path }) => path[0] === target)).toBe(true);
     }
+  });
+
+  it('rejects compiled URL drift', () => {
+    const result = runtimeEnvSchema.safeParse(productionEnv({
+      BUILD_SITE_URL: 'https://compiled.example',
+    }));
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some(({ path }) => path[0] === 'NEXT_PUBLIC_SITE_URL')).toBe(true);
+    }
+  });
+
+  it('strips retired credential names instead of restoring them to the contract', () => {
+    const result = runtimeEnvSchema.parse({
+      ...requiredEnv,
+      JWT_SECRET: 'retired',
+      SESSION_SECRET: 'retired',
+      SECURITY_ENC_KEY_HEX: 'retired',
+      SECURITY_ENC_KEY_HEX_PREVIOUS: 'retired',
+    });
+    expect(result).not.toHaveProperty('JWT_SECRET');
+    expect(result).not.toHaveProperty('SESSION_SECRET');
+    expect(result).not.toHaveProperty('SECURITY_ENC_KEY_HEX');
+    expect(result).not.toHaveProperty('SECURITY_ENC_KEY_HEX_PREVIOUS');
   });
 
   it('validates API key lists and production CORS origins', () => {

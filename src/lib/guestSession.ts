@@ -11,6 +11,7 @@ import {
   createPortalBookingEligibilityWindow,
   isPortalBookingTemporallyEligible,
 } from '@/lib/portalBookingEligibility';
+import { readRuntimeCredential } from '@/lib/runtime-credentials.js';
 
 const { sign, verify } = jwt;
 
@@ -24,13 +25,15 @@ export interface GuestSessionPayload extends JwtPayload {
 
 const COOKIE_NAME = 'guest_session';
 const REFRESH_COOKIE = 'guest_rt';
+let generatedDevSecret: string | null = null;
 
 function getGuestJwtSecret(): string {
-  const secret = process.env.GUEST_JWT_SECRET;
-  if (process.env.NODE_ENV === 'production' && !secret) {
-    throw new Error('GUEST_JWT_SECRET is required in production');
+  const secret = readRuntimeCredential('GUEST_JWT_SECRET');
+  if (secret) return secret;
+  if (!generatedDevSecret) {
+    generatedDevSecret = crypto.randomBytes(32).toString('base64url');
   }
-  return secret || 'dev-guest-secret-change-me';
+  return generatedDevSecret;
 }
 
 function signGuestSession(
@@ -111,6 +114,9 @@ export function createGuestSessionToken(session: RefreshSessionRecord): string {
 }
 
 export async function issueGuestSession(userId: string, bookingId: string): Promise<string> {
+  // Validate the signer before any database mutation. Startup validation is the
+  // primary guard; this keeps direct invocation fail-closed as well.
+  getGuestJwtSecret();
   const { prisma } = await import('@/lib/prisma');
   const now = new Date();
   const expiresAt = new Date(now.getTime() + GUEST_SESSION_TTL_SECONDS * 1000);

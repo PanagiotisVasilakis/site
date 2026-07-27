@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 export const APPROVED_POSTGRES_IMAGE =
   'postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777';
 
@@ -16,18 +18,21 @@ export const HOSTILE_INTEGRATION_ENVIRONMENT = Object.freeze({
   POSTGRES_PASSWORD: 'hostile',
 });
 
+function deriveNonProductionCredential(purpose) {
+  return createHash('sha256')
+    .update(`macro-c-r1-isolated-release-fixture:${purpose}`, 'utf8')
+    .digest('base64url');
+}
+
 export const SYNTHETIC_PRODUCTION_ENVIRONMENT = Object.freeze({
   NODE_ENV: 'production',
   DATABASE_URL: 'postgresql://release:synthetic@127.0.0.1:1/release_build',
   DIRECT_URL: 'postgresql://release:synthetic@127.0.0.1:1/release_build',
-  ADMIN_JWT_SECRET: 'release-only-admin-jwt-secret-00000000',
-  ADMIN_DASH_SECRET: 'release-only-admin-dashboard-secret',
-  GUEST_JWT_SECRET: 'release-only-guest-jwt-secret-00000000',
-  SECURITY_ENC_KEY_HEX:
-    '0000000000000000000000000000000000000000000000000000000000000000',
+  ADMIN_JWT_SECRET: deriveNonProductionCredential('admin-jwt'),
+  ADMIN_DASH_SECRET: deriveNonProductionCredential('admin-dashboard'),
+  GUEST_JWT_SECRET: deriveNonProductionCredential('guest-jwt'),
   SECURITY_PEPPER: 'release-only-security-pepper',
   CLAIM_TOKEN_PEPPER: 'release-only-claim-token-pepper-0000',
-  SESSION_SECRET: 'release-only-session-secret-0000000000',
   GUEST_WIFI_NETWORK: 'RELEASE-SYNTHETIC-NETWORK',
   GUEST_WIFI_PASSWORD: 'release-only-password',
   PROPERTY_TIME_ZONE: 'Europe/Athens',
@@ -54,6 +59,11 @@ export const RELEASE_GATES = Object.freeze([
   npmGate('secret-tests', 'Secret-scanning policy tests', 'test:secret-scanning'),
   npmGate('release-policy', 'Local release-policy validation', 'validate:release-policy'),
   npmGate('release-policy-tests', 'Local release-policy tests', 'test:release-policy'),
+  npmGate(
+    'runtime-credentials',
+    'Standalone production runtime credential contract',
+    'test:runtime-credentials',
+  ),
   npmGate('cloudflare-ingress', 'Offline Cloudflare ingress manifest check', 'check:cloudflare-ips'),
   npmGate('nginx-ingress', 'Disposable Nginx trusted-ingress integration', 'test:nginx-ingress'),
   npmGate('conflicts', 'Conflict-marker check', 'check:conflicts'),

@@ -3,6 +3,7 @@ import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode, readJs
 import { metrics } from '@/lib/metrics-collector';
 import { logger } from '@/lib/logger-enterprise';
 import { timingSafeEqual } from 'node:crypto';
+import { readRuntimeCredential } from '@/lib/runtime-credentials.js';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +11,7 @@ function requireDevAndSecret(req: NextRequest) {
   if (process.env.NODE_ENV === 'production') {
     throw new ApiError(ApiErrorCode.FORBIDDEN, 'This endpoint is only available in non-production environments');
   }
-  const secret = process.env.ADMIN_DASH_SECRET;
+  const secret = readRuntimeCredential('ADMIN_DASH_SECRET');
   const provided = req.headers.get('x-admin-secret') || '';
   if (!secret) throw new ApiError(ApiErrorCode.SERVICE_UNAVAILABLE, 'Development endpoint secret is not configured');
   const providedBuffer = Buffer.from(provided);

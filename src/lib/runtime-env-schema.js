@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  ACTIVE_RUNTIME_CREDENTIAL_NAMES,
+  runtimeCredentialIssue,
+} from './runtime-credentials.js';
 
 const optionalEnv = (schema) => z.preprocess(
   (value) => value === '' ? undefined : value,
@@ -47,14 +51,11 @@ export const runtimeEnvSchema = z.object({
 
   DATABASE_URL: z.string().url().min(1, 'DATABASE_URL is required').refine(isPostgresUrl, 'DATABASE_URL must use postgres or postgresql'),
 
-  ADMIN_JWT_SECRET: z.string().min(32, 'ADMIN_JWT_SECRET must be at least 32 characters'),
-  ADMIN_DASH_SECRET: z.string().min(20, 'ADMIN_DASH_SECRET must be at least 20 characters'),
-  GUEST_JWT_SECRET: z.string().min(32, 'GUEST_JWT_SECRET must be at least 32 characters'),
-  SECURITY_ENC_KEY_HEX: z.string().regex(/^[0-9a-fA-F]{64}$/, 'SECURITY_ENC_KEY_HEX must be exactly 64 hex characters'),
-  SECURITY_ENC_KEY_HEX_PREVIOUS: optionalEnv(z.string().regex(/^[0-9a-fA-F]{64}$/, 'SECURITY_ENC_KEY_HEX_PREVIOUS must be exactly 64 hex characters')),
+  ADMIN_JWT_SECRET: optionalEnv(z.string()),
+  ADMIN_DASH_SECRET: optionalEnv(z.string()),
+  GUEST_JWT_SECRET: optionalEnv(z.string()),
   SECURITY_PEPPER: z.string().min(16, 'SECURITY_PEPPER must be at least 16 characters'),
   CLAIM_TOKEN_PEPPER: optionalEnv(z.string().min(32, 'CLAIM_TOKEN_PEPPER must be at least 32 characters')),
-  SESSION_SECRET: z.string().min(32, 'SESSION_SECRET must be at least 32 characters'),
   GUEST_WIFI_NETWORK: z.string().min(1, 'GUEST_WIFI_NETWORK is required'),
   GUEST_WIFI_PASSWORD: z.string().min(8, 'GUEST_WIFI_PASSWORD must be at least 8 characters'),
   PROPERTY_TIME_ZONE: z.string().refine(isTimeZone, 'PROPERTY_TIME_ZONE must be a valid IANA time zone').default('Europe/Athens'),
@@ -96,6 +97,29 @@ export const runtimeEnvSchema = z.object({
   LOG_MAX_METADATA_SIZE: optionalEnv(z.string().regex(/^\d+$/)),
 
 }).superRefine((env, context) => {
+  if (env.NODE_ENV === 'production') {
+    for (const name of ACTIVE_RUNTIME_CREDENTIAL_NAMES) {
+      const issue = runtimeCredentialIssue(name, env[name]);
+      if (issue) {
+        context.addIssue({ code: 'custom', path: [name], message: `${name} ${issue}` });
+      }
+    }
+    const credentialOwners = new Map();
+    for (const name of ACTIVE_RUNTIME_CREDENTIAL_NAMES) {
+      const value = env[name];
+      if (!value) continue;
+      const previous = credentialOwners.get(value);
+      if (previous) {
+        context.addIssue({
+          code: 'custom',
+          path: [name],
+          message: `${name} must differ from ${previous}`,
+        });
+      } else {
+        credentialOwners.set(value, name);
+      }
+    }
+  }
   if (env.NODE_ENV === 'production' && !env.NEXT_PUBLIC_SITE_URL) {
     context.addIssue({ code: 'custom', path: ['NEXT_PUBLIC_SITE_URL'], message: 'NEXT_PUBLIC_SITE_URL is required in production' });
   }
@@ -107,9 +131,6 @@ export const runtimeEnvSchema = z.object({
   }
   if (env.BUILD_SITE_URL && env.NEXT_PUBLIC_SITE_URL !== env.BUILD_SITE_URL) {
     context.addIssue({ code: 'custom', path: ['NEXT_PUBLIC_SITE_URL'], message: 'Runtime site URL does not match the URL compiled into this image' });
-  }
-  if (env.SECURITY_ENC_KEY_HEX_PREVIOUS && env.SECURITY_ENC_KEY_HEX_PREVIOUS === env.SECURITY_ENC_KEY_HEX) {
-    context.addIssue({ code: 'custom', path: ['SECURITY_ENC_KEY_HEX_PREVIOUS'], message: 'Previous encryption key must differ from the current key' });
   }
   if (env.ALLOWED_ORIGINS) {
     for (const configuredOrigin of env.ALLOWED_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean)) {

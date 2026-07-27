@@ -38,9 +38,9 @@ Production deliberately excludes `.env.local`.
 The authoritative schema is `src/lib/runtime-env-schema.js`; `src/lib/env.ts` is its TypeScript validation wrapper. Required for the application:
 
 - `DATABASE_URL`
-- `ADMIN_JWT_SECRET`, `ADMIN_DASH_SECRET`
-- `GUEST_JWT_SECRET`, `SESSION_SECRET`
-- `SECURITY_PEPPER`, `SECURITY_ENC_KEY_HEX`
+- independently generated `ADMIN_JWT_SECRET`, `ADMIN_DASH_SECRET`, and
+  `GUEST_JWT_SECRET`
+- `SECURITY_PEPPER`
 - `GUEST_WIFI_NETWORK`, `GUEST_WIFI_PASSWORD`
 
 Production additionally requires:
@@ -55,6 +55,8 @@ If a booking or check-in webhook URL is configured, its token is mandatory;
 production webhook URLs must use HTTPS.
 
 Never place secrets in `NEXT_PUBLIC_*` variables.
+See `docs/security/runtime-credential-contract.md` for the production strength,
+isolation, startup, and rotation requirements.
 
 ## Orchestrator commands
 

@@ -79,6 +79,12 @@ describe('admin authentication', () => {
     expect(() => signAdmin({})).toThrow('ADMIN_JWT_SECRET');
   });
 
+  it('fails closed when the production JWT secret is weak', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('ADMIN_JWT_SECRET', 'replace-me-with-a-production-admin-jwt-credential');
+    expect(() => signAdmin({})).toThrow('ADMIN_JWT_SECRET');
+  });
+
   it('creates a bounded server-side admin session', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2030-01-01T00:00:00Z'));
@@ -183,6 +189,13 @@ describe('guest authentication', () => {
       user: { id: 'user-1' },
       booking: { id: 'booking-1' },
     }));
+  });
+
+  it('rejects a missing production guest signer before database mutation', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('GUEST_JWT_SECRET', '');
+    await expect(issueGuestSession('user-1', 'booking-1')).rejects.toThrow('GUEST_JWT_SECRET');
+    expect(prismaMock.session.create).not.toHaveBeenCalled();
   });
 
   it('grants access only when session and verified booking constraints all match', async () => {

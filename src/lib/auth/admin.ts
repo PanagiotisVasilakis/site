@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import type { JwtPayload, SignOptions } from 'jsonwebtoken';
 import { BaseAuthPayload } from './common';
+import { readRuntimeCredential } from '../runtime-credentials.js';
 
 const { sign, verify } = jwt;
 
@@ -27,12 +28,7 @@ let generatedDevSecret: string | null = null;
  * In development, generates a cryptographically strong random secret
  */
 function getJwtSecret(): string {
-  const secret = process.env.ADMIN_JWT_SECRET;
-  
-  // In production, we must have a secure secret
-  if (process.env.NODE_ENV === 'production' && !secret) {
-    throw new Error('ADMIN_JWT_SECRET environment variable is required in production');
-  }
+  const secret = readRuntimeCredential('ADMIN_JWT_SECRET');
   
   // In development, generate a cryptographically strong random secret
   if (!secret && process.env.NODE_ENV !== 'production') {

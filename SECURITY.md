@@ -4,12 +4,16 @@ The sanitized IR-01 disposition and the maintained local release scanner are
 documented in [`docs/security/secret-scanning.md`](docs/security/secret-scanning.md).
 The historical credential values remain permanently retired and must never be
 recovered or reused.
+The maintained production credential map and rotation boundaries are documented
+in [`docs/security/runtime-credential-contract.md`](docs/security/runtime-credential-contract.md).
 
 This project uses a server-side secret named `SECURITY_PEPPER` for additional cryptographic salting/peppering in development and production. Treat it like any other secret.
 
 ## Local development
 
-- Use `.env.local` to store local development secrets such as `SECURITY_PEPPER`, `SECURITY_ENC_KEY_HEX`, and guest auth/Wi-Fi placeholders. This repository ignores `.env*` files by default — do not commit `.env.local`.
+- Use `.env.local` to store local development secrets such as
+  `SECURITY_PEPPER` and guest auth/Wi-Fi values. This repository ignores
+  `.env*` files by default — do not commit `.env.local`.
 
 - To generate secure values locally run:
 
@@ -21,7 +25,9 @@ This project uses a server-side secret named `SECURITY_PEPPER` for additional cr
 
 ## Production
 
-- Use the deployment platform's secrets manager, Vault, Kubernetes secrets, or a root-owned systemd environment file to store `SECURITY_PEPPER`.
+- Use a root-owned systemd environment file or an equivalent local secret
+  injection mechanism for the three active runtime credentials and
+  `SECURITY_PEPPER`.
 
 - Do not copy `.env.local` into deployment artifacts or commit it to the repository.
 

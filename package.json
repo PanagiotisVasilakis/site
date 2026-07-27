@@ -49,6 +49,7 @@
     "check:secrets:sources": "node scripts/check-secrets.mjs sources",
     "check:secrets:artifacts": "node scripts/check-secrets.mjs artifacts",
     "test:secret-scanning": "node --test scripts/tests/secret-scanning.test.mjs",
+    "test:runtime-credentials": "node scripts/test-runtime-credential-contract.mjs",
     "check:candidate-diff": "node scripts/check-candidate-diff.mjs",
     "check:dead-code": "knip --include files,dependencies,unlisted,binaries",
     "check:image-assets": "tsx scripts/check-image-assets.ts",

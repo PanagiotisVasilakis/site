@@ -9,13 +9,6 @@
       "column": 15
     },
     {
-      "classification": "documented-placeholder",
-      "path": ".env.example",
-      "rule": "generic-api-key",
-      "line": 14,
-      "column": 2
-    },
-    {
       "classification": "synthetic-test-fixture",
       "path": "tests/integration/auth/portal-eligibility-consistency.test.ts",
       "rule": "generic-api-key",
@@ -26,7 +19,7 @@
       "classification": "synthetic-test-fixture",
       "path": "tests/security/client-identity-route-regression.test.ts",
       "rule": "generic-api-key",
-      "line": 142,
+      "line": 147,
       "column": 18
     },
     {
@@ -47,42 +40,42 @@
       "classification": "synthetic-test-fixture",
       "path": "tests/security/security-boundaries.test.ts",
       "rule": "generic-api-key",
-      "line": 28,
+      "line": 33,
       "column": 6
     },
     {
       "classification": "synthetic-test-fixture",
       "path": "tests/security/security-boundaries.test.ts",
       "rule": "generic-api-key",
-      "line": 178,
+      "line": 222,
       "column": 10
     },
     {
       "classification": "synthetic-release-fixture",
       "path": "scripts/lib/release-gates.mjs",
       "rule": "credential-bearing-database-url",
-      "line": 21,
+      "line": 29,
       "column": 19
     },
     {
       "classification": "synthetic-release-fixture",
       "path": "scripts/lib/release-gates.mjs",
       "rule": "credential-bearing-database-url",
-      "line": 22,
+      "line": 30,
       "column": 17
     },
     {
       "classification": "synthetic-release-fixture",
       "path": "scripts/lib/release-policy.mjs",
       "rule": "credential-bearing-database-url",
-      "line": 33,
+      "line": 40,
       "column": 19
     },
     {
       "classification": "synthetic-release-fixture",
       "path": "scripts/lib/release-policy.mjs",
       "rule": "credential-bearing-database-url",
-      "line": 34,
+      "line": 41,
       "column": 17
     },
     {

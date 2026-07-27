@@ -1,5 +1,4 @@
 import { readFileSync } from 'node:fs';
-import path from 'node:path';
 
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -190,20 +189,17 @@ describe('claim capability transport', () => {
   });
 
   it('never creates or parses a claim capability in application URLs', () => {
-    const files = [
-      'src/app/[locale]/guest/UnifiedGuestClient.tsx',
-      'src/app/[locale]/guest/sign-up/page.tsx',
-      'src/app/admin/guests/page.tsx',
-      'src/app/api/admin/bookings/[id]/claim-grants/route.ts',
-      'src/app/api/portal/claim-exchange/route.ts',
-      'src/app/api/portal/claims/route.ts',
-      'src/lib/portalClaimExchange.ts',
-      'src/proxy.ts',
-      'deploy/nginx/nginx.conf.template',
-    ];
-    const source = files.map((relative) => (
-      readFileSync(path.join(process.cwd(), relative), 'utf8')
-    )).join('\n');
+    const source = [
+      readFileSync('src/app/[locale]/guest/UnifiedGuestClient.tsx', 'utf8'),
+      readFileSync('src/app/[locale]/guest/sign-up/page.tsx', 'utf8'),
+      readFileSync('src/app/admin/guests/page.tsx', 'utf8'),
+      readFileSync('src/app/api/admin/bookings/[id]/claim-grants/route.ts', 'utf8'),
+      readFileSync('src/app/api/portal/claim-exchange/route.ts', 'utf8'),
+      readFileSync('src/app/api/portal/claims/route.ts', 'utf8'),
+      readFileSync('src/lib/portalClaimExchange.ts', 'utf8'),
+      readFileSync('src/proxy.ts', 'utf8'),
+      readFileSync('deploy/nginx/nginx.conf.template', 'utf8'),
+    ].join('\n');
     for (const forbidden of [
       /[?&#]claim(?:Token)?=/iu,
       /searchParams?\.get\(['"]claim(?:Token)?['"]\)/u,

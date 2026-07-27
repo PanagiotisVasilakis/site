@@ -29,12 +29,6 @@ if (!/^\s*SECURITY_PEPPER\s*=\s*/m.test(existing)) {
   toAppend.push(`SECURITY_PEPPER=${pepper}`);
 }
 
-if (!/^\s*SECURITY_ENC_KEY_HEX\s*=\s*/m.test(existing)) {
-  // 32 bytes (256 bits) recommended for symmetric keys
-  const encKey = crypto.randomBytes(32).toString('hex');
-  toAppend.push(`SECURITY_ENC_KEY_HEX=${encKey}`);
-}
-
 if (!/^\s*GUEST_JWT_SECRET\s*=\s*/m.test(existing)) {
   const guestJwtSecret = crypto.randomBytes(32).toString('hex');
   toAppend.push(`GUEST_JWT_SECRET=${guestJwtSecret}`);

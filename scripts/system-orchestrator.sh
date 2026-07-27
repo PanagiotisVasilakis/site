@@ -385,21 +385,20 @@ load_environment() {
 }
 
 maybe_ensure_pepper() {
-  if [[ -n "${SECURITY_ENC_KEY_HEX:-}" && "${SECURITY_ENC_KEY_HEX}" =~ ^[0-9a-fA-F]{64}$ ]]; then
+  if [[ -n "${SECURITY_PEPPER:-}" && ${#SECURITY_PEPPER} -ge 16 ]]; then
     return
   fi
 
   if [[ "$PROFILE" == "production" ]]; then
-    die "SECURITY_ENC_KEY_HEX missing or invalid; production configuration is never auto-repaired" 14
+    die "SECURITY_PEPPER missing or invalid; production configuration is never auto-repaired" 14
   fi
 
-  warn "SECURITY_ENC_KEY_HEX missing or invalid; running npm run ensure-pepper"
+  warn "SECURITY_PEPPER missing or invalid; running npm run ensure-pepper"
   (
     cd "$REPO_ROOT"
     npm run ensure-pepper
   )
 
-  unset SECURITY_ENC_KEY_HEX || true
   unset SECURITY_PEPPER || true
   load_environment
 }
@@ -444,33 +443,8 @@ validate_environment_contract() {
     failed=1
   fi
 
-  if [[ -z "${ADMIN_JWT_SECRET:-}" || ${#ADMIN_JWT_SECRET} -lt 32 ]]; then
-    error "ADMIN_JWT_SECRET must be at least 32 characters"
-    failed=1
-  fi
-
-  if [[ -z "${ADMIN_DASH_SECRET:-}" || ${#ADMIN_DASH_SECRET} -lt 20 ]]; then
-    error "ADMIN_DASH_SECRET must be at least 20 characters"
-    failed=1
-  fi
-
-  if [[ -z "${GUEST_JWT_SECRET:-}" || ${#GUEST_JWT_SECRET} -lt 32 ]]; then
-    error "GUEST_JWT_SECRET must be at least 32 characters"
-    failed=1
-  fi
-
-  if [[ -z "${SECURITY_ENC_KEY_HEX:-}" || ! "${SECURITY_ENC_KEY_HEX}" =~ ^[0-9a-fA-F]{64}$ ]]; then
-    error "SECURITY_ENC_KEY_HEX must be exactly 64 hex characters"
-    failed=1
-  fi
-
   if [[ -z "${SECURITY_PEPPER:-}" || ${#SECURITY_PEPPER} -lt 16 ]]; then
     error "SECURITY_PEPPER must be at least 16 characters"
-    failed=1
-  fi
-
-  if [[ -z "${SESSION_SECRET:-}" || ${#SESSION_SECRET} -lt 32 ]]; then
-    error "SESSION_SECRET must be at least 32 characters"
     failed=1
   fi
 
