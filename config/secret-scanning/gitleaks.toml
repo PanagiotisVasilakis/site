@@ -1,0 +1,25 @@
+[extend]
+useDefault = true
+
+[[rules]]
+id = "credential-bearing-database-url"
+description = "Database URL containing embedded credentials"
+regex = '''(?i)\b(?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|redis|rediss):\/\/[^:\s\/]+:([^@\s\/]{8,})@[^\s]+'''
+secretGroup = 1
+keywords = [
+  "postgres://",
+  "postgresql://",
+  "mysql://",
+  "mariadb://",
+  "mongodb://",
+  "mongodb+srv://",
+  "redis://",
+  "rediss://",
+]
+
+[[rules]]
+id = "private-key-material"
+description = "PEM private-key material"
+regex = '''-----BEGIN(?: [A-Z0-9]+)? PRIVATE KEY-----'''
+secretGroup = 0
+keywords = ["PRIVATE KEY"]

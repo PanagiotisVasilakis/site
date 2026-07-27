@@ -46,6 +46,7 @@ const PASSTHROUGH_ENVIRONMENT = Object.freeze([
   'DOCKER_HOST',
   'DOCKER_CONFIG',
   'npm_config_cache',
+  'GITLEAKS_BIN',
 ]);
 
 let activeChild;

@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "incident": "IR-01",
+  "status": "COMPLETE_CONTAINED",
+  "findings": [
+    {
+      "classification": "retired-admin-signing-credential",
+      "fingerprint": "70034c89f223bf572c23197f842077ab9c5b2764:docs/DEPLOYMENT_SUCCESS.md:generic-api-key:65"
+    },
+    {
+      "classification": "retired-session-credential",
+      "fingerprint": "70034c89f223bf572c23197f842077ab9c5b2764:docs/DEPLOYMENT_SUCCESS.md:generic-api-key:66"
+    },
+    {
+      "classification": "retired-admin-dashboard-credential",
+      "fingerprint": "70034c89f223bf572c23197f842077ab9c5b2764:docs/DEPLOYMENT_SUCCESS.md:generic-api-key:67"
+    },
+    {
+      "classification": "retired-legacy-signing-credential",
+      "fingerprint": "70034c89f223bf572c23197f842077ab9c5b2764:docs/DEPLOYMENT_SUCCESS.md:generic-api-key:68"
+    },
+    {
+      "classification": "retired-guest-signing-credential",
+      "fingerprint": "70034c89f223bf572c23197f842077ab9c5b2764:docs/DEPLOYMENT_SUCCESS.md:generic-api-key:69"
+    },
+    {
+      "classification": "retired-unused-encryption-credential",
+      "fingerprint": "70034c89f223bf572c23197f842077ab9c5b2764:docs/DEPLOYMENT_SUCCESS.md:generic-api-key:71"
+    }
+  ]
+}

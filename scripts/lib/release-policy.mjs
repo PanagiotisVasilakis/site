@@ -52,6 +52,8 @@ const EXPECTED_SYNTHETIC_PRODUCTION_ENVIRONMENT = Object.freeze({
 });
 
 const EXPECTED_GATE_PROFILE = Object.freeze([
+  ['secret-sources', 'npm', ['--ignore-scripts', 'run', 'check:secrets:sources'], 'base'],
+  ['secret-tests', 'npm', ['--ignore-scripts', 'run', 'test:secret-scanning'], 'base'],
   ['release-policy', 'npm', ['--ignore-scripts', 'run', 'validate:release-policy'], 'base'],
   ['release-policy-tests', 'npm', ['--ignore-scripts', 'run', 'test:release-policy'], 'base'],
   ['cloudflare-ingress', 'npm', ['--ignore-scripts', 'run', 'check:cloudflare-ips'], 'base'],
@@ -73,6 +75,7 @@ const EXPECTED_GATE_PROFILE = Object.freeze([
   ['postgres-policy', 'npm', ['--ignore-scripts', 'run', 'check:postgres-image-policy'], 'base'],
   ['integration', 'npm', ['--ignore-scripts', 'run', 'test:integration'], 'integration'],
   ['production-build', 'npm', ['--ignore-scripts', 'run', 'validate:security'], 'production'],
+  ['secret-artifacts', 'npm', ['--ignore-scripts', 'run', 'check:secrets:artifacts'], 'base'],
   ['final-prisma-manifest', 'npm', ['--ignore-scripts', 'run', 'check:prisma-integrity'], 'base'],
   ['final-prisma-hashes', 'npm', ['--ignore-scripts', 'run', 'hash:prisma-integrity'], 'base'],
   ['diff-check', 'git', ['diff', '--check'], 'base'],
@@ -84,6 +87,9 @@ const EXPECTED_PACKAGE_SCRIPTS = Object.freeze({
   'verify:release': 'node scripts/verify-release.mjs',
   'validate:release-policy': 'node scripts/validate-release-policy.mjs',
   'test:release-policy': 'node --test scripts/tests/release-policy.test.mjs',
+  'check:secrets:sources': 'node scripts/check-secrets.mjs sources',
+  'check:secrets:artifacts': 'node scripts/check-secrets.mjs artifacts',
+  'test:secret-scanning': 'node --test scripts/tests/secret-scanning.test.mjs',
   'check:cloudflare-ips': 'node scripts/check-cloudflare-ips.mjs',
   'check:cloudflare-ips:current': 'node scripts/check-cloudflare-ips.mjs --current',
   'test:nginx-ingress': 'bash scripts/test-nginx-ingress.sh',
@@ -111,6 +117,48 @@ const EXPECTED_PACKAGE_SCRIPTS = Object.freeze({
   'hash:prisma-integrity': 'node scripts/hash-prisma-integrity.mjs',
   'check:integration-orphans': 'node scripts/check-integration-orphans.mjs',
 });
+
+const EXPECTED_SECRET_TOOL_LOCK = Object.freeze({
+  schemaVersion: 1,
+  name: 'gitleaks',
+  version: '8.30.1',
+  releaseUrl: 'https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1',
+  checksumsUrl:
+    'https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_checksums.txt',
+  checksumsFileSha256: '061476c21adaf5441516f96f185c1a4706a83cd6329b9b38762271b3d4a52fae',
+  artifacts: {
+    'darwin-arm64': {
+      archive: 'gitleaks_8.30.1_darwin_arm64.tar.gz',
+      archiveSha256: 'b40ab0ae55c505963e365f271a8d3846efbc170aa17f2607f13df610a9aeb6a5',
+      binarySha256: 'ba52fb1bfabbcde42f032afad3d6e0b19dff8ed105229a16e7caa338bbc0e84f',
+    },
+  },
+});
+
+const EXPECTED_HISTORICAL_SECRET_BASELINE = Object.freeze([
+  ['retired-admin-signing-credential', '70034c89f223bf572c23197f842077ab9c5b2764:docs/DEPLOYMENT_SUCCESS.md:generic-api-key:65'],
+  ['retired-session-credential', '70034c89f223bf572c23197f842077ab9c5b2764:docs/DEPLOYMENT_SUCCESS.md:generic-api-key:66'],
+  ['retired-admin-dashboard-credential', '70034c89f223bf572c23197f842077ab9c5b2764:docs/DEPLOYMENT_SUCCESS.md:generic-api-key:67'],
+  ['retired-legacy-signing-credential', '70034c89f223bf572c23197f842077ab9c5b2764:docs/DEPLOYMENT_SUCCESS.md:generic-api-key:68'],
+  ['retired-guest-signing-credential', '70034c89f223bf572c23197f842077ab9c5b2764:docs/DEPLOYMENT_SUCCESS.md:generic-api-key:69'],
+  ['retired-unused-encryption-credential', '70034c89f223bf572c23197f842077ab9c5b2764:docs/DEPLOYMENT_SUCCESS.md:generic-api-key:71'],
+]);
+
+const EXPECTED_CURRENT_SECRET_FIXTURES = Object.freeze([
+  ['synthetic-release-fixture', '.env.example', 'credential-bearing-database-url', 5, 15],
+  ['documented-placeholder', '.env.example', 'generic-api-key', 14, 2],
+  ['synthetic-test-fixture', 'tests/integration/auth/portal-eligibility-consistency.test.ts', 'generic-api-key', 29, 8],
+  ['synthetic-test-fixture', 'tests/security/client-identity-route-regression.test.ts', 'generic-api-key', 142, 18],
+  ['synthetic-test-fixture', 'tests/security/client-identity.test.ts', 'generic-api-key', 12, 10],
+  ['synthetic-test-fixture', 'tests/security/portal-auth-client-identity.test.ts', 'generic-api-key', 32, 18],
+  ['synthetic-test-fixture', 'tests/security/security-boundaries.test.ts', 'generic-api-key', 28, 6],
+  ['synthetic-test-fixture', 'tests/security/security-boundaries.test.ts', 'generic-api-key', 178, 10],
+  ['synthetic-release-fixture', 'scripts/lib/release-gates.mjs', 'credential-bearing-database-url', 21, 19],
+  ['synthetic-release-fixture', 'scripts/lib/release-gates.mjs', 'credential-bearing-database-url', 22, 17],
+  ['synthetic-release-fixture', 'scripts/lib/release-policy.mjs', 'credential-bearing-database-url', 33, 19],
+  ['synthetic-release-fixture', 'scripts/lib/release-policy.mjs', 'credential-bearing-database-url', 34, 17],
+  ['synthetic-test-fixture', 'tests/unit/integration-database-safety.test.ts', 'credential-bearing-database-url', 228, 28],
+]);
 
 const FORBIDDEN_PLATFORM_PATHS = Object.freeze([
   'CNAME',
@@ -577,6 +625,7 @@ async function validateVerifyImplementation(root, errors) {
     'spawn(',
     'shell: false',
     'RELEASE_GATES',
+    "'GITLEAKS_BIN'",
   ]) {
     if (!source.includes(marker)) errors.push(`verify:release must retain restricted marker: ${marker}`);
   }
@@ -588,6 +637,111 @@ async function validateVerifyImplementation(root, errors) {
   }
   if (/\b(?:prisma\s+migrate|migrate\s+deploy|system:migrate|db:migrate)\b/iu.test(source)) {
     errors.push('persistent migration commands are forbidden in verify:release');
+  }
+}
+
+async function validateSecretScanning(root, errors) {
+  const toolLockSource = await readOptional(
+    path.join(root, 'config/secret-scanning/tool.lock.json'),
+  );
+  if (toolLockSource === undefined) {
+    errors.push('checksum-locked secret scanner metadata is required');
+  } else {
+    try {
+      if (JSON.stringify(JSON.parse(toolLockSource)) !== JSON.stringify(EXPECTED_SECRET_TOOL_LOCK)) {
+        errors.push('secret scanner tool lock must match the reviewed Gitleaks 8.30.1 artifact');
+      }
+    } catch {
+      errors.push('secret scanner tool lock must contain valid JSON');
+    }
+  }
+
+  const historicalSource = await readOptional(
+    path.join(root, 'config/secret-scanning/historical-incident-baseline.json'),
+  );
+  if (historicalSource === undefined) {
+    errors.push('the redacted IR-01 historical baseline is required');
+  } else {
+    try {
+      const historical = JSON.parse(historicalSource);
+      const actual = historical.findings?.map((finding) => [
+        finding.classification,
+        finding.fingerprint,
+      ]);
+      if (historical.schemaVersion !== 1
+        || historical.incident !== 'IR-01'
+        || historical.status !== 'COMPLETE_CONTAINED'
+        || JSON.stringify(actual) !== JSON.stringify(EXPECTED_HISTORICAL_SECRET_BASELINE)) {
+        errors.push('IR-01 baseline must contain exactly the six reviewed redacted fingerprints');
+      }
+    } catch {
+      errors.push('IR-01 historical baseline must contain valid JSON');
+    }
+  }
+
+  const fixtureSource = await readOptional(
+    path.join(root, 'config/secret-scanning/current-fixture-allowlist.json'),
+  );
+  if (fixtureSource === undefined) {
+    errors.push('the location-exact current secret-fixture allowlist is required');
+  } else {
+    try {
+      const fixture = JSON.parse(fixtureSource);
+      const actual = fixture.findings?.map((finding) => [
+        finding.classification,
+        finding.path,
+        finding.rule,
+        finding.line,
+        finding.column,
+      ]);
+      if (fixture.schemaVersion !== 1
+        || JSON.stringify(actual) !== JSON.stringify(EXPECTED_CURRENT_SECRET_FIXTURES)) {
+        errors.push('current secret-fixture allowlist must match the reviewed exact locations');
+      }
+    } catch {
+      errors.push('current secret-fixture allowlist must contain valid JSON');
+    }
+  }
+
+  const config = await readOptional(path.join(root, 'config/secret-scanning/gitleaks.toml'));
+  if (config === undefined
+    || !/useDefault\s*=\s*true/u.test(config)
+    || !/credential-bearing-database-url/u.test(config)
+    || !/private-key-material/u.test(config)) {
+    errors.push('secret scanner must extend maintained defaults with database URL and private-key rules');
+  }
+
+  const scanner = await readOptional(path.join(root, 'scripts/check-secrets.mjs'));
+  for (const marker of [
+    '--redact=100',
+    'git',
+    'ls-files',
+    'current-fixture-allowlist.json',
+    'historical-incident-baseline.json',
+    "'.next/standalone'",
+    'ENV_FILE_PATTERN',
+    'GITLEAKS_BIN',
+    'binarySha256',
+    'formatFinding',
+  ]) {
+    if (scanner === undefined || !scanner.includes(marker)) {
+      errors.push(`secret-scanning gate must retain restricted marker: ${marker}`);
+    }
+  }
+  if (await exists(path.join(root, '.gitleaksignore'))) {
+    errors.push('global .gitleaksignore suppression is forbidden');
+  }
+
+  const dockerIgnore = await readOptional(path.join(root, '.dockerignore'));
+  if (dockerIgnore === undefined
+    || !/(?:^|\n)\.env(?:\n|$)/u.test(dockerIgnore)
+    || !/(?:^|\n)\.env\.\*(?:\n|$)/u.test(dockerIgnore)
+    || !/(?:^|\n)!\.env\.example(?:\n|$)/u.test(dockerIgnore)) {
+    errors.push('Docker inputs must exclude ignored .env files while retaining .env.example');
+  }
+
+  if (!await exists(path.join(root, 'docs/security/secret-scanning.md'))) {
+    errors.push('secret-scanning and sanitized IR-01 documentation is required');
   }
 }
 
@@ -635,6 +789,7 @@ export async function validateReleasePolicy(
   await validatePostgresReferences(root, errors);
   await validateTrustedIngress(root, errors);
   await validateLayeredRateLimiting(root, errors);
+  await validateSecretScanning(root, errors);
   await validateVerifyImplementation(root, errors);
 
   return [...new Set(errors)].sort();
@@ -644,4 +799,7 @@ export const releasePolicyInternals = Object.freeze({
   expectedPostgresImage: EXPECTED_POSTGRES_IMAGE,
   expectedGateProfile: EXPECTED_GATE_PROFILE,
   expectedPackageScripts: EXPECTED_PACKAGE_SCRIPTS,
+  expectedSecretToolLock: EXPECTED_SECRET_TOOL_LOCK,
+  expectedHistoricalSecretBaseline: EXPECTED_HISTORICAL_SECRET_BASELINE,
+  expectedCurrentSecretFixtures: EXPECTED_CURRENT_SECRET_FIXTURES,
 });

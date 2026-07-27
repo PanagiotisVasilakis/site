@@ -1,5 +1,10 @@
 # Security notes for local development and secrets
 
+The sanitized IR-01 disposition and the maintained local release scanner are
+documented in [`docs/security/secret-scanning.md`](docs/security/secret-scanning.md).
+The historical credential values remain permanently retired and must never be
+recovered or reused.
+
 This project uses a server-side secret named `SECURITY_PEPPER` for additional cryptographic salting/peppering in development and production. Treat it like any other secret.
 
 ## Local development

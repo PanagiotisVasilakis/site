@@ -40,10 +40,70 @@ async function createBaselineFixture() {
     [
       "import { spawn } from 'node:child_process';",
       "import { RELEASE_GATES } from './lib/release-gates.mjs';",
+      "const passthrough = ['GITLEAKS_BIN'];",
       "spawn('node', ['--version'], { shell: false });",
-      'void RELEASE_GATES;',
+      'void RELEASE_GATES; void passthrough;',
       '',
     ].join('\n'),
+  );
+  await writeRelative(root, '.dockerignore', '.env\n.env.*\n!.env.example\n');
+  await writeRelative(
+    root,
+    'config/secret-scanning/tool.lock.json',
+    `${JSON.stringify(releasePolicyInternals.expectedSecretToolLock, null, 2)}\n`,
+  );
+  await writeRelative(
+    root,
+    'config/secret-scanning/historical-incident-baseline.json',
+    `${JSON.stringify({
+      schemaVersion: 1,
+      incident: 'IR-01',
+      status: 'COMPLETE_CONTAINED',
+      findings: releasePolicyInternals.expectedHistoricalSecretBaseline.map(
+        ([classification, fingerprint]) => ({ classification, fingerprint }),
+      ),
+    }, null, 2)}\n`,
+  );
+  await writeRelative(
+    root,
+    'config/secret-scanning/current-fixture-allowlist.json',
+    `${JSON.stringify({
+      schemaVersion: 1,
+      findings: releasePolicyInternals.expectedCurrentSecretFixtures.map(
+        ([classification, filePath, rule, line, column]) => ({
+          classification,
+          path: filePath,
+          rule,
+          line,
+          column,
+        }),
+      ),
+    }, null, 2)}\n`,
+  );
+  await writeRelative(root, 'config/secret-scanning/gitleaks.toml', [
+    '[extend]',
+    'useDefault = true',
+    'credential-bearing-database-url',
+    'private-key-material',
+    '',
+  ].join('\n'));
+  await writeRelative(root, 'scripts/check-secrets.mjs', [
+    "const args = ['--redact=100'];",
+    "const git = 'git'; const command = 'ls-files';",
+    "const files = ['current-fixture-allowlist.json', 'historical-incident-baseline.json'];",
+    "const artifacts = ['.next/standalone'];",
+    'const ENV_FILE_PATTERN = /env/u;',
+    "const GITLEAKS_BIN = 'GITLEAKS_BIN';",
+    "const binarySha256 = 'binarySha256';",
+    'function formatFinding() {}',
+    'void args; void git; void command; void files; void artifacts;',
+    'void ENV_FILE_PATTERN; void GITLEAKS_BIN; void binarySha256; void formatFinding;',
+    '',
+  ].join('\n'));
+  await writeRelative(
+    root,
+    'docs/security/secret-scanning.md',
+    'Sanitized IR-01 secret-scanning contract.\n',
   );
   const compose = `services:\n  db:\n    image: ${APPROVED_IMAGE}\n`;
   await writeRelative(root, 'docker-compose.yml', compose);
@@ -192,6 +252,48 @@ function fixtureGate(id, environment = 'base') {
 test('accepts the restricted local-only release fixture', async () => {
   await withFixture(async (root) => {
     assert.deepEqual(await validateReleasePolicy(root), []);
+  });
+});
+
+test('rejects expansion of the six-finding IR-01 baseline', async () => {
+  await withFixture(async (root) => {
+    const baselinePath = path.join(
+      root,
+      'config/secret-scanning/historical-incident-baseline.json',
+    );
+    const baseline = JSON.parse(await readFile(baselinePath, 'utf8'));
+    baseline.findings.push({
+      classification: 'unreviewed',
+      fingerprint: 'new:historical:finding',
+    });
+    await writeFile(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`, 'utf8');
+    assertRejected(await validateReleasePolicy(root), /exactly the six reviewed/u);
+  });
+});
+
+test('rejects expansion of the current secret-fixture allowlist', async () => {
+  await withFixture(async (root) => {
+    const allowlistPath = path.join(
+      root,
+      'config/secret-scanning/current-fixture-allowlist.json',
+    );
+    const allowlist = JSON.parse(await readFile(allowlistPath, 'utf8'));
+    allowlist.findings.push({
+      classification: 'synthetic-test-fixture',
+      path: 'tests/unreviewed.ts',
+      rule: 'generic-api-key',
+      line: 1,
+      column: 1,
+    });
+    await writeFile(allowlistPath, `${JSON.stringify(allowlist, null, 2)}\n`, 'utf8');
+    assertRejected(await validateReleasePolicy(root), /reviewed exact locations/u);
+  });
+});
+
+test('rejects a global Gitleaks ignore file', async () => {
+  await withFixture(async (root) => {
+    await writeRelative(root, '.gitleaksignore', 'unreviewed-global-suppression\n');
+    assertRejected(await validateReleasePolicy(root), /global .gitleaksignore suppression/u);
   });
 });
 
@@ -426,7 +528,7 @@ test('rejects a deployment command inserted into verify:release', async () => {
     };
     assertRejected(
       await validateReleasePolicy(root, { gates }),
-      /forbidden inside verify:release|restricted release-policy profile/u,
+      /forbidden inside verify:release|restricted secret-sources profile/u,
     );
   });
 });
@@ -441,7 +543,7 @@ test('rejects a persistent migration inserted into verify:release', async () => 
     };
     assertRejected(
       await validateReleasePolicy(root, { gates }),
-      /persistent migration commands|restricted release-policy profile/u,
+      /persistent migration commands|restricted secret-sources profile/u,
     );
   });
 });

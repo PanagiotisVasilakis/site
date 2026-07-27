@@ -50,6 +50,8 @@ function npmGate(id, label, script, extraArgs = [], environment = 'base') {
 }
 
 export const RELEASE_GATES = Object.freeze([
+  npmGate('secret-sources', 'Tracked source and build-input secret scan', 'check:secrets:sources'),
+  npmGate('secret-tests', 'Secret-scanning policy tests', 'test:secret-scanning'),
   npmGate('release-policy', 'Local release-policy validation', 'validate:release-policy'),
   npmGate('release-policy-tests', 'Local release-policy tests', 'test:release-policy'),
   npmGate('cloudflare-ingress', 'Offline Cloudflare ingress manifest check', 'check:cloudflare-ips'),
@@ -83,6 +85,7 @@ export const RELEASE_GATES = Object.freeze([
     [],
     'production',
   ),
+  npmGate('secret-artifacts', 'Generated release-artifact secret scan', 'check:secrets:artifacts'),
   npmGate('final-prisma-manifest', 'Final Prisma integrity verification', 'check:prisma-integrity'),
   npmGate('final-prisma-hashes', 'Final deterministic Prisma hashes', 'hash:prisma-integrity'),
   Object.freeze({
