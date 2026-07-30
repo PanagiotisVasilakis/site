@@ -1,4 +1,4 @@
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { lstat, readdir, readFile, realpath, stat } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 
@@ -54,6 +54,58 @@ const EXPECTED_SYNTHETIC_PRODUCTION_ENVIRONMENT = Object.freeze({
   ORIGIN_PROXY_SHARED_SECRET:
     '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2',
 });
+
+import { createRequire, isBuiltin } from 'node:module';
+import ts from 'typescript';
+
+const RUNTIME_MODULE_EXTENSIONS = new Set(['.cjs', '.js', '.mjs']);
+const RUNTIME_LOADER_MODULE_SPECIFIERS = new Set([
+  'module',
+  'node:module',
+  'node:process',
+  'process',
+]);
+const RUNTIME_DATA_MODULE_SPECIFIERS = new Set([
+  'fs',
+  'fs/promises',
+  'node:fs',
+  'node:fs/promises',
+]);
+const EXPECTED_RUNTIME_SETUP_RUN = [
+  'RUN apk add --no-cache dumb-init=1.2.5-r4',
+  '&& rm -rf /usr/local/lib/node_modules/npm',
+  '/usr/local/lib/node_modules/corepack /opt/yarn-*',
+  '&& rm -f /usr/local/bin/npm /usr/local/bin/npx',
+  '/usr/local/bin/corepack /usr/local/bin/yarn /usr/local/bin/yarnpkg',
+  '&& addgroup --system --gid 1001 nodejs',
+  '&& adduser --system --uid 1001 --ingroup nodejs nextjs',
+].join(' ');
+const EXPECTED_POST_COPY_RUNTIME_HARDENING_RUN = [
+  'RUN mkdir -p /app/.next/cache/images',
+  '&& find /app -type d -exec chmod 0555 {} +',
+  '&& find /app -type f -exec chmod 0444 {} +',
+  '&& chmod 0555 /app/server.js',
+  '&& chown nextjs:nodejs /app/.next/cache/images',
+  '&& chmod 0750 /app/.next/cache/images',
+].join(' ');
+const EXPECTED_RUNTIME_USER = 'USER 1001:1001';
+const EXPECTED_RUNTIME_ENTRYPOINT = 'ENTRYPOINT ["/usr/bin/dumb-init", "--"]';
+const EXPECTED_RUNTIME_COMMAND =
+  'CMD ["node", "scripts/start-standalone.mjs", "server.js"]';
+const EXPECTED_RUNTIME_HEALTHCHECK = [
+  'HEALTHCHECK --interval=30s --timeout=4s',
+  '--start-period=15s --retries=3',
+  'CMD wget --quiet --spider',
+  'http://127.0.0.1:3000/api/health/ready || exit 1',
+].join(' ');
+const EXPECTED_RUNTIME_ENV = [
+  'ENV NODE_ENV=production',
+  'NEXT_TELEMETRY_DISABLED=1',
+  'NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}',
+  'BUILD_SITE_URL=${NEXT_PUBLIC_SITE_URL}',
+  'HOSTNAME=0.0.0.0',
+  'PORT=3000',
+].join(' ');
 
 const EXPECTED_GATE_PROFILE = Object.freeze([
   ['secret-sources', 'npm', ['--ignore-scripts', 'run', 'check:secrets:sources'], 'base'],
@@ -718,7 +770,10 @@ async function validateSecretScanning(root, errors) {
 
   const scanner = await readOptional(path.join(root, 'scripts/check-secrets.mjs'));
   for (const marker of [
-    '--redact=100',
+    '--report-path',
+    'mode: 0o600',
+    'await rm(reportPath, { force: true })',
+    'classifyGeneratedArtifactFinding',
     'git',
     'ls-files',
     'current-fixture-allowlist.json',
@@ -838,6 +893,1339 @@ async function validateClaimTokenTransport(root, errors) {
 
   if (!await exists(path.join(root, 'docs/security/claim-token-transport.md'))) {
     errors.push('claim capability transport documentation is required');
+  }
+}
+
+function dockerLogicalLines(source) {
+  const logicalLines = [];
+  let pending = '';
+
+  for (const rawLine of source.split(/\r?\n/u)) {
+    const trimmed = rawLine.trim();
+    if (pending === '' && (trimmed === '' || trimmed.startsWith('#'))) continue;
+
+    const continued = /\\\s*$/u.test(rawLine);
+    const fragment = trimmed.replace(/\\\s*$/u, '').trim();
+    pending = pending === '' ? fragment : `${pending} ${fragment}`;
+    if (!continued) {
+      logicalLines.push(pending);
+      pending = '';
+    }
+  }
+
+  if (pending !== '') logicalLines.push(pending);
+  return logicalLines;
+}
+
+function resolveImagePath(workdir, value, source, sourceIsDirectory) {
+  const resolved = value.startsWith('/')
+    ? path.posix.normalize(value)
+    : path.posix.resolve(workdir, value);
+  if (value.endsWith('/') && !sourceIsDirectory) {
+    return path.posix.join(resolved, path.posix.basename(source));
+  }
+  return resolved;
+}
+
+function safeDockerStageName(value) {
+  return typeof value === 'string'
+    && value.length > 0
+    && value.length <= 128
+    && [...value].every((character) => (
+      /[A-Za-z0-9_.-]/u.test(character)
+    ));
+}
+
+function parseFinalDockerCopies(source, errors) {
+  const stages = [];
+  let currentStage;
+
+  for (const instruction of dockerLogicalLines(source)) {
+    const fromTokens = instruction.split(/\s+/u);
+    if (fromTokens[0]?.toUpperCase() === 'FROM') {
+      const validShape = fromTokens.length === 2
+        || (fromTokens.length === 4 && fromTokens[2]?.toUpperCase() === 'AS'
+          && safeDockerStageName(fromTokens[3]));
+      if (!validShape) {
+        errors.push('docker/Dockerfile.security FROM instructions must use a static stage form');
+        continue;
+      }
+      currentStage = {
+        name: fromTokens[3]?.toLowerCase(),
+        instructions: [],
+      };
+      stages.push(currentStage);
+      continue;
+    }
+    if (currentStage) currentStage.instructions.push(instruction);
+  }
+
+  const finalStage = stages.at(-1);
+  if (!finalStage) {
+    errors.push('docker/Dockerfile.security must contain a final runtime stage');
+    return {
+      commandModule: undefined,
+      commandTarget: undefined,
+      copies: [],
+      finalInstructions: [],
+      finalRuns: [],
+      postCopyRuns: [],
+      workdir: undefined,
+    };
+  }
+  const builderStages = stages
+    .slice(0, -1)
+    .filter((stage) => stage.name === 'builder');
+  if (builderStages.length !== 1 || finalStage.name === 'builder') {
+    errors.push('docker/Dockerfile.security must contain one distinct prior builder stage');
+  }
+
+  let workdir = '/';
+  let commandModule;
+  let commandTarget;
+  const copies = [];
+  const finalRuns = [];
+  const postCopyRuns = [];
+  let sawCopy = false;
+  for (const instruction of finalStage.instructions) {
+    const workdirMatch = instruction.match(/^WORKDIR\s+(\S+)$/iu);
+    if (workdirMatch) {
+      if (/[${}\\[\]*?]/u.test(workdirMatch[1])) {
+        errors.push('docker/Dockerfile.security final WORKDIR must be a static path');
+      } else {
+        workdir = workdirMatch[1].startsWith('/')
+          ? path.posix.normalize(workdirMatch[1])
+          : path.posix.resolve(workdir, workdirMatch[1]);
+      }
+      continue;
+    }
+    const commandMatch = instruction.match(/^CMD\s+(.+)$/iu);
+    if (commandMatch) {
+      try {
+        const command = JSON.parse(commandMatch[1]);
+        const candidate = Array.isArray(command) ? command[1] : undefined;
+        const normalized = typeof candidate === 'string'
+          ? path.posix.normalize(candidate)
+          : undefined;
+        const target = Array.isArray(command) ? command[2] : undefined;
+        const normalizedTarget = typeof target === 'string'
+          ? path.posix.normalize(target)
+          : undefined;
+        if (command[0] !== 'node' || !normalized
+          || normalized === '..' || normalized.startsWith('../')
+          || path.posix.isAbsolute(normalized)
+          || !RUNTIME_MODULE_EXTENSIONS.has(path.posix.extname(normalized))
+          || !normalizedTarget
+          || normalizedTarget === '..' || normalizedTarget.startsWith('../')
+          || path.posix.isAbsolute(normalizedTarget)
+          || !RUNTIME_MODULE_EXTENSIONS.has(path.posix.extname(normalizedTarget))) {
+          throw new Error('unsupported runtime command');
+        }
+        commandModule = normalized;
+        commandTarget = normalizedTarget;
+      } catch {
+        errors.push('docker/Dockerfile.security final CMD must name a static Node runtime module');
+      }
+      continue;
+    }
+    if (/^RUN(?:\s|$)/iu.test(instruction)) {
+      finalRuns.push(instruction);
+      if (sawCopy) postCopyRuns.push(instruction);
+      continue;
+    }
+    if (/^ADD(?:\s|$)/iu.test(instruction)) {
+      errors.push('docker/Dockerfile.security final ADD instructions are forbidden');
+      continue;
+    }
+    if (!/^COPY(?:\s|$)/iu.test(instruction)) continue;
+    sawCopy = true;
+
+    const body = instruction.replace(/^COPY\s+/iu, '').trim();
+    if (body.startsWith('[')) {
+      errors.push('docker/Dockerfile.security final COPY must use an unambiguous static form');
+      continue;
+    }
+
+    const tokens = body.split(/\s+/u);
+    let from;
+    let supported = true;
+    while (tokens[0]?.startsWith('--')) {
+      const option = tokens.shift();
+      if (option.startsWith('--from=')) from = option.slice('--from='.length);
+      else if (!option.startsWith('--chown=')) supported = false;
+    }
+    if (!supported || tokens.length !== 2
+      || tokens.some((token) => /["'${}\\[\]*?]/u.test(token))) {
+      errors.push('docker/Dockerfile.security final COPY must use an unambiguous static form');
+      continue;
+    }
+
+    const [rawSource, rawDestination] = tokens;
+    const normalizedSource = path.posix.normalize(
+      rawSource.startsWith('/') ? rawSource : `/${rawSource}`,
+    );
+    copies.push({
+      order: copies.length,
+      source: normalizedSource,
+      destination: rawDestination,
+      from: from?.toLowerCase(),
+      isBuildContext: from === undefined,
+      workdir,
+    });
+  }
+
+  if (!commandModule) {
+    errors.push('docker/Dockerfile.security final CMD must name a static Node runtime module');
+  }
+  return {
+    commandModule,
+    commandTarget,
+    copies,
+    finalInstructions: finalStage.instructions,
+    finalRuns,
+    postCopyRuns,
+    workdir,
+  };
+}
+
+function validPackageNamePart(value) {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 214) return false;
+  const first = value.codePointAt(0);
+  const isAsciiLetterOrDigit = (code) => (
+    (code >= 48 && code <= 57)
+    || (code >= 65 && code <= 90)
+    || (code >= 97 && code <= 122)
+  );
+  if (!isAsciiLetterOrDigit(first)) return false;
+  return [...value].every((character) => {
+    const code = character.codePointAt(0);
+    return isAsciiLetterOrDigit(code) || character === '.' || character === '_'
+      || character === '-';
+  });
+}
+
+function packageNameFromSpecifier(specifier) {
+  const parts = specifier.split('/');
+  if (specifier.startsWith('@')) {
+    const scope = parts[0]?.slice(1);
+    const name = parts[1];
+    return validPackageNamePart(scope) && validPackageNamePart(name)
+      ? `@${scope}/${name}`
+      : undefined;
+  }
+  return validPackageNamePart(parts[0]) ? parts[0] : undefined;
+}
+
+function analyzeRuntimeModule(relative, source, errors) {
+  const sourceFile = ts.createSourceFile(
+    relative,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.JS,
+  );
+  if (sourceFile.parseDiagnostics.length > 0) {
+    errors.push(`runtime module must contain valid JavaScript syntax: ${relative}`);
+    return {
+      nonLiteralDynamicImports: [],
+      nonLiteralRequires: 0,
+      sourceFile,
+      specifiers: [],
+      unsupportedRuntimeDataAccesses: 0,
+      unsupportedRuntimeLoaders: 0,
+    };
+  }
+
+  const specifiers = new Set();
+  const nonLiteralDynamicImports = [];
+  let nonLiteralRequires = 0;
+  let unsupportedRuntimeDataAccesses = 0;
+  let unsupportedRuntimeLoaders = 0;
+  function addLiteral(node) {
+    if (node && (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))) {
+      specifiers.add(node.text);
+      return true;
+    }
+    return false;
+  }
+  function visit(node) {
+    const isProcessGetBuiltinModule = (ts.isPropertyAccessExpression(node)
+      && ts.isIdentifier(node.expression)
+      && node.expression.text === 'process'
+      && node.name.text === 'getBuiltinModule')
+      || (ts.isElementAccessExpression(node)
+        && ts.isIdentifier(node.expression)
+        && node.expression.text === 'process'
+        && node.argumentExpression
+        && ts.isStringLiteral(node.argumentExpression)
+        && node.argumentExpression.text === 'getBuiltinModule');
+    if (isProcessGetBuiltinModule) {
+      unsupportedRuntimeLoaders += 1;
+    }
+    const isProcessLoadEnvFile = (ts.isPropertyAccessExpression(node)
+      && ts.isIdentifier(node.expression)
+      && node.expression.text === 'process'
+      && node.name.text === 'loadEnvFile')
+      || (ts.isElementAccessExpression(node)
+        && ts.isIdentifier(node.expression)
+        && node.expression.text === 'process'
+        && node.argumentExpression
+        && ts.isStringLiteral(node.argumentExpression)
+        && node.argumentExpression.text === 'loadEnvFile');
+    if (isProcessLoadEnvFile) {
+      unsupportedRuntimeDataAccesses += 1;
+    }
+    if (ts.isIdentifier(node) && node.text === 'getBuiltinModule') {
+      unsupportedRuntimeLoaders += 1;
+    }
+    if (ts.isIdentifier(node) && node.text === 'loadEnvFile') {
+      unsupportedRuntimeDataAccesses += 1;
+    }
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+      addLiteral(node.moduleSpecifier);
+      if (ts.isStringLiteral(node.moduleSpecifier)
+        && RUNTIME_LOADER_MODULE_SPECIFIERS.has(node.moduleSpecifier.text)) {
+        unsupportedRuntimeLoaders += 1;
+      }
+      if (ts.isStringLiteral(node.moduleSpecifier)
+        && RUNTIME_DATA_MODULE_SPECIFIERS.has(node.moduleSpecifier.text)) {
+        unsupportedRuntimeDataAccesses += 1;
+      }
+    } else if (ts.isImportEqualsDeclaration(node)
+      && ts.isExternalModuleReference(node.moduleReference)) {
+      addLiteral(node.moduleReference.expression);
+      if (node.moduleReference.expression
+        && ts.isStringLiteral(node.moduleReference.expression)
+        && RUNTIME_LOADER_MODULE_SPECIFIERS.has(node.moduleReference.expression.text)) {
+        unsupportedRuntimeLoaders += 1;
+      }
+      if (node.moduleReference.expression
+        && ts.isStringLiteral(node.moduleReference.expression)
+        && RUNTIME_DATA_MODULE_SPECIFIERS.has(node.moduleReference.expression.text)) {
+        unsupportedRuntimeDataAccesses += 1;
+      }
+    } else if (ts.isCallExpression(node)) {
+      const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
+      const isRequire = ts.isIdentifier(node.expression) && node.expression.text === 'require';
+      const isModuleRequire = (ts.isPropertyAccessExpression(node.expression)
+        && ts.isIdentifier(node.expression.expression)
+        && node.expression.expression.text === 'module'
+        && node.expression.name.text === 'require')
+        || (ts.isElementAccessExpression(node.expression)
+          && ts.isIdentifier(node.expression.expression)
+          && node.expression.expression.text === 'module'
+          && node.expression.argumentExpression
+          && ts.isStringLiteral(node.expression.argumentExpression)
+          && node.expression.argumentExpression.text === 'require');
+      const isRequireResolve = ts.isPropertyAccessExpression(node.expression)
+        && ts.isIdentifier(node.expression.expression)
+        && node.expression.expression.text === 'require'
+        && node.expression.name.text === 'resolve';
+      if (isDynamicImport || isRequire) {
+        const firstArgument = node.arguments[0];
+        const isLiteral = firstArgument ? addLiteral(firstArgument) : false;
+        const hasSupportedArity = node.arguments.length === 1;
+        if ((!isLiteral || !hasSupportedArity) && isDynamicImport) {
+          nonLiteralDynamicImports.push(firstArgument ?? node);
+        }
+        if ((!isLiteral || !hasSupportedArity) && isRequire) nonLiteralRequires += 1;
+      }
+      if (isModuleRequire || isRequireResolve) {
+        if (node.arguments[0]) addLiteral(node.arguments[0]);
+        unsupportedRuntimeLoaders += 1;
+      }
+      if ((isRequire || isDynamicImport)
+        && node.arguments[0]
+        && (ts.isStringLiteral(node.arguments[0])
+          || ts.isNoSubstitutionTemplateLiteral(node.arguments[0]))
+        && RUNTIME_LOADER_MODULE_SPECIFIERS.has(node.arguments[0].text)) {
+        unsupportedRuntimeLoaders += 1;
+      }
+      if ((isRequire || isDynamicImport)
+        && node.arguments[0]
+        && (ts.isStringLiteral(node.arguments[0])
+          || ts.isNoSubstitutionTemplateLiteral(node.arguments[0]))
+        && RUNTIME_DATA_MODULE_SPECIFIERS.has(node.arguments[0].text)) {
+        unsupportedRuntimeDataAccesses += 1;
+      }
+    } else if ((ts.isPropertyAccessExpression(node)
+      && ts.isIdentifier(node.expression)
+      && ((node.expression.text === 'module' && node.name.text === 'require')
+        || (node.expression.text === 'require' && node.name.text === 'resolve')))
+      || (ts.isElementAccessExpression(node)
+        && ts.isIdentifier(node.expression)
+        && node.expression.text === 'module'
+        && node.argumentExpression
+        && ts.isStringLiteral(node.argumentExpression)
+        && node.argumentExpression.text === 'require')) {
+      unsupportedRuntimeLoaders += 1;
+    } else if (ts.isIdentifier(node)
+      && node.text === 'require'
+      && !(ts.isCallExpression(node.parent) && node.parent.expression === node)) {
+      unsupportedRuntimeLoaders += 1;
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(sourceFile);
+  return {
+    nonLiteralDynamicImports,
+    nonLiteralRequires,
+    sourceFile,
+    specifiers: [...specifiers].sort(),
+    unsupportedRuntimeDataAccesses,
+    unsupportedRuntimeLoaders,
+  };
+}
+
+function importedBinding(sourceFile, moduleSpecifier, importedName) {
+  const matches = [];
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement)
+      || !ts.isStringLiteral(statement.moduleSpecifier)
+      || statement.moduleSpecifier.text !== moduleSpecifier
+      || !statement.importClause?.namedBindings
+      || !ts.isNamedImports(statement.importClause.namedBindings)) {
+      continue;
+    }
+    for (const element of statement.importClause.namedBindings.elements) {
+      if ((element.propertyName?.text ?? element.name.text) === importedName) {
+        matches.push({
+          declaration: element.name,
+          localName: element.name.text,
+        });
+      }
+    }
+  }
+  return matches.length === 1 ? matches[0] : undefined;
+}
+
+function isBindingDeclarationIdentifier(identifier) {
+  const parent = identifier.parent;
+  return (ts.isVariableDeclaration(parent) && parent.name === identifier)
+    || (ts.isParameter(parent) && parent.name === identifier)
+    || (ts.isBindingElement(parent) && parent.name === identifier)
+    || (ts.isImportClause(parent) && parent.name === identifier)
+    || (ts.isImportSpecifier(parent) && parent.name === identifier)
+    || (ts.isNamespaceImport(parent) && parent.name === identifier)
+    || (ts.isImportEqualsDeclaration(parent) && parent.name === identifier)
+    || ((ts.isFunctionDeclaration(parent)
+      || ts.isFunctionExpression(parent)
+      || ts.isClassDeclaration(parent)
+      || ts.isClassExpression(parent)
+      || ts.isEnumDeclaration(parent)
+      || ts.isModuleDeclaration(parent)
+      || ts.isTypeAliasDeclaration(parent)
+      || ts.isInterfaceDeclaration(parent))
+      && parent.name === identifier);
+}
+
+function expressionContainsIdentifier(node, names) {
+  let found = false;
+  function visit(current) {
+    if (found) return;
+    if (ts.isIdentifier(current) && names.has(current.text)) {
+      found = true;
+      return;
+    }
+    ts.forEachChild(current, visit);
+  }
+  visit(node);
+  return found;
+}
+
+function processAccessPath(node) {
+  if (ts.isIdentifier(node)) {
+    return node.text === 'process' ? [] : undefined;
+  }
+  if (ts.isPropertyAccessExpression(node)) {
+    const parentPath = processAccessPath(node.expression);
+    return parentPath ? [...parentPath, node.name.text] : undefined;
+  }
+  if (ts.isElementAccessExpression(node)) {
+    const parentPath = processAccessPath(node.expression);
+    if (!parentPath) return undefined;
+    const argument = node.argumentExpression;
+    const segment = argument
+      && (ts.isStringLiteral(argument) || ts.isNumericLiteral(argument))
+      ? argument.text
+      : '*';
+    return [...parentPath, segment];
+  }
+  return undefined;
+}
+
+function expressionWritesProcessOrArgv(node) {
+  let unsafe = false;
+  function visit(current) {
+    if (unsafe) return;
+    const accessPath = processAccessPath(current);
+    if (accessPath) {
+      unsafe = accessPath.length === 0
+        || accessPath[0] === 'argv'
+        || accessPath[0] === '*';
+      return;
+    }
+    ts.forEachChild(current, visit);
+  }
+  visit(node);
+  return unsafe;
+}
+
+function hasUnexpectedProcessArgvAccess(sourceFile, expectedAccess) {
+  let unsafe = false;
+  function visit(node) {
+    if (unsafe) return;
+    if (ts.isIdentifier(node)
+      && (node.text === 'globalThis' || node.text === 'global')) {
+      unsafe = true;
+      return;
+    }
+    const accessPath = processAccessPath(node);
+    if (accessPath) {
+      const isExpectedArgvAccess = node === expectedAccess;
+      const isAllowedNonArgvAccess = accessPath.length > 0
+        && (accessPath[0] === 'env' || accessPath[0] === 'exitCode');
+      if (!isExpectedArgvAccess && !isAllowedNonArgvAccess) unsafe = true;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(sourceFile);
+  return unsafe;
+}
+
+function hasCompetingBindingOrWrite(
+  sourceFile,
+  expectedBindings,
+  forbiddenBindingNames = new Set(),
+) {
+  const expectedByName = new Map(
+    [...expectedBindings].map((declaration) => [declaration.text, declaration]),
+  );
+  const protectedNames = new Set([
+    ...expectedByName.keys(),
+    ...forbiddenBindingNames,
+  ]);
+  const protectedWriteNames = new Set(expectedByName.keys());
+  let unsafe = false;
+
+  function visit(node) {
+    if (unsafe) return;
+    if (ts.isIdentifier(node)
+      && protectedNames.has(node.text)
+      && isBindingDeclarationIdentifier(node)
+      && expectedByName.get(node.text) !== node) {
+      unsafe = true;
+      return;
+    }
+    if (ts.isBinaryExpression(node)
+      && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+      && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+      && (expressionContainsIdentifier(node.left, protectedWriteNames)
+        || expressionWritesProcessOrArgv(node.left))) {
+      unsafe = true;
+      return;
+    }
+    if ((ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node))
+      && (node.operator === ts.SyntaxKind.PlusPlusToken
+        || node.operator === ts.SyntaxKind.MinusMinusToken)
+      && (expressionContainsIdentifier(node.operand, protectedWriteNames)
+        || expressionWritesProcessOrArgv(node.operand))) {
+      unsafe = true;
+      return;
+    }
+    if ((ts.isForInStatement(node) || ts.isForOfStatement(node))
+      && !ts.isVariableDeclarationList(node.initializer)
+      && (expressionContainsIdentifier(node.initializer, protectedWriteNames)
+        || expressionWritesProcessOrArgv(node.initializer))) {
+      unsafe = true;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(sourceFile);
+  return unsafe;
+}
+
+function commandTargetArgumentIndex(sourceFile, dynamicArgument) {
+  if (!ts.isPropertyAccessExpression(dynamicArgument)
+    || dynamicArgument.name.text !== 'href'
+    || !ts.isCallExpression(dynamicArgument.expression)) {
+    return undefined;
+  }
+  const urlCall = dynamicArgument.expression;
+  const urlBinding = importedBinding(sourceFile, 'node:url', 'pathToFileURL');
+  if (!urlBinding || !ts.isIdentifier(urlCall.expression)
+    || urlCall.expression.text !== urlBinding.localName || urlCall.arguments.length !== 1
+    || !ts.isCallExpression(urlCall.arguments[0])) {
+    return undefined;
+  }
+  const resolveCall = urlCall.arguments[0];
+  const resolveBinding = importedBinding(sourceFile, 'node:path', 'resolve');
+  if (!resolveBinding || !ts.isIdentifier(resolveCall.expression)
+    || resolveCall.expression.text !== resolveBinding.localName || resolveCall.arguments.length !== 1
+    || !ts.isIdentifier(resolveCall.arguments[0])) {
+    return undefined;
+  }
+  const targetVariable = resolveCall.arguments[0].text;
+
+  let current = dynamicArgument;
+  while (current.parent && !ts.isSourceFile(current.parent)) {
+    if (ts.isFunctionLike(current.parent)) return undefined;
+    current = current.parent;
+  }
+  if (!ts.isSourceFile(current.parent)) return undefined;
+
+  const candidates = [];
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)
+      || (statement.declarationList.flags & ts.NodeFlags.Const) === 0) {
+      continue;
+    }
+    for (const declaration of statement.declarationList.declarations) {
+      if (ts.isIdentifier(declaration.name) && declaration.name.text === targetVariable) {
+        candidates.push(declaration);
+      }
+    }
+  }
+  if (candidates.length !== 1) return undefined;
+  const [targetDeclaration] = candidates;
+  const initializer = targetDeclaration.initializer;
+  if (!initializer
+    || !ts.isElementAccessExpression(initializer)
+    || !ts.isPropertyAccessExpression(initializer.expression)
+    || !ts.isIdentifier(initializer.expression.expression)
+    || initializer.expression.expression.text !== 'process'
+    || initializer.expression.name.text !== 'argv'
+    || !initializer.argumentExpression
+    || !ts.isNumericLiteral(initializer.argumentExpression)) {
+    return undefined;
+  }
+  if (hasUnexpectedProcessArgvAccess(sourceFile, initializer)) return undefined;
+  if (hasCompetingBindingOrWrite(sourceFile, new Set([
+    targetDeclaration.name,
+    urlBinding.declaration,
+    resolveBinding.declaration,
+  ]), new Set(['process']))) {
+    return undefined;
+  }
+  return Number.parseInt(initializer.argumentExpression.text, 10);
+}
+
+function isWithinDirectory(candidate, directory) {
+  const relative = path.relative(directory, candidate);
+  return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..'
+    && !path.isAbsolute(relative));
+}
+
+function isWithinImageDirectory(candidate, directory) {
+  const relative = path.posix.relative(directory, candidate);
+  return relative !== ''
+    && !relative.startsWith('../')
+    && relative !== '..'
+    && !path.posix.isAbsolute(relative);
+}
+
+function imagePathsOverlap(left, right) {
+  return left === right
+    || isWithinImageDirectory(left, right)
+    || isWithinImageDirectory(right, left);
+}
+
+async function validateSecurityImageRuntimeClosure(root, errors) {
+  const dockerRelative = 'docker/Dockerfile.security';
+  const dockerSource = await readOptional(path.join(root, dockerRelative));
+  if (dockerSource === undefined) {
+    errors.push(`${dockerRelative} is required`);
+    return;
+  }
+
+  const {
+    commandModule,
+    commandTarget,
+    copies,
+    finalInstructions,
+    finalRuns,
+    postCopyRuns,
+    workdir,
+  } = parseFinalDockerCopies(
+    dockerSource,
+    errors,
+  );
+  const allowedFinalRuns = new Set([
+    EXPECTED_RUNTIME_SETUP_RUN,
+    EXPECTED_POST_COPY_RUNTIME_HARDENING_RUN,
+  ]);
+  for (const instruction of finalRuns) {
+    if (!allowedFinalRuns.has(instruction)) {
+      errors.push(`${dockerRelative}: unmodeled final-stage RUN instruction`);
+    }
+  }
+  for (const instruction of postCopyRuns) {
+    if (instruction !== EXPECTED_POST_COPY_RUNTIME_HARDENING_RUN) {
+      errors.push(`${dockerRelative}: unmodeled RUN after runtime files were copied`);
+    }
+  }
+  const copyIndexes = [];
+  const setupRunIndexes = [];
+  const hardeningRunIndexes = [];
+  const runtimeUserIndexes = [];
+  const runtimeEntrypointIndexes = [];
+  const runtimeCommandIndexes = [];
+  const runtimeEnvironmentIndexes = [];
+  const runtimeHealthcheckIndexes = [];
+  const allowedFinalInstructions = new Set([
+    'ARG',
+    'CMD',
+    'COPY',
+    'ENTRYPOINT',
+    'ENV',
+    'EXPOSE',
+    'HEALTHCHECK',
+    'LABEL',
+    'RUN',
+    'STOPSIGNAL',
+    'USER',
+    'WORKDIR',
+  ]);
+  for (const [index, instruction] of finalInstructions.entries()) {
+    const instructionName = instruction.split(/\s+/u, 1)[0]?.toUpperCase();
+    if (!allowedFinalInstructions.has(instructionName)) {
+      errors.push(`${dockerRelative}: unmodeled final-stage instruction`);
+    }
+    if (/^COPY(?:\s|$)/iu.test(instruction)) copyIndexes.push(index);
+    if (instruction === EXPECTED_RUNTIME_SETUP_RUN) setupRunIndexes.push(index);
+    if (instruction === EXPECTED_POST_COPY_RUNTIME_HARDENING_RUN) {
+      hardeningRunIndexes.push(index);
+    }
+    if (/^USER(?:\s|$)/iu.test(instruction)) {
+      if (instruction === EXPECTED_RUNTIME_USER) runtimeUserIndexes.push(index);
+      else errors.push(`${dockerRelative}: final runtime USER contract is invalid`);
+    }
+    if (/^ENTRYPOINT(?:\s|$)/iu.test(instruction)) {
+      if (instruction === EXPECTED_RUNTIME_ENTRYPOINT) runtimeEntrypointIndexes.push(index);
+      else errors.push(`${dockerRelative}: final runtime ENTRYPOINT contract is invalid`);
+    }
+    if (/^CMD(?:\s|$)/iu.test(instruction)) {
+      if (instruction === EXPECTED_RUNTIME_COMMAND) runtimeCommandIndexes.push(index);
+      else errors.push(`${dockerRelative}: final runtime CMD contract is invalid`);
+    }
+    if (/^ENV(?:\s|$)/iu.test(instruction)) {
+      if (instruction === EXPECTED_RUNTIME_ENV) runtimeEnvironmentIndexes.push(index);
+      else errors.push(`${dockerRelative}: final runtime ENV contract is invalid`);
+    }
+    if (/^HEALTHCHECK(?:\s|$)/iu.test(instruction)) {
+      if (instruction === EXPECTED_RUNTIME_HEALTHCHECK) {
+        runtimeHealthcheckIndexes.push(index);
+      } else {
+        errors.push(`${dockerRelative}: final runtime HEALTHCHECK contract is invalid`);
+      }
+    }
+    if (/^SHELL(?:\s|$)/iu.test(instruction)) {
+      errors.push(`${dockerRelative}: final-stage SHELL instructions are forbidden`);
+    }
+  }
+  const [firstCopyIndex] = copyIndexes;
+  const lastCopyIndex = copyIndexes.at(-1);
+  const [setupRunIndex] = setupRunIndexes;
+  const [hardeningRunIndex] = hardeningRunIndexes;
+  const validRunContract = copyIndexes.length > 0
+    && setupRunIndexes.length === 1
+    && hardeningRunIndexes.length === 1
+    && setupRunIndex < firstCopyIndex
+    && hardeningRunIndex > lastCopyIndex;
+  if (!validRunContract) {
+    errors.push(`${dockerRelative}: final-stage runtime RUN contract is invalid`);
+  }
+  const [runtimeEnvironmentIndex] = runtimeEnvironmentIndexes;
+  if (runtimeEnvironmentIndexes.length !== 1
+    || !(runtimeEnvironmentIndex > setupRunIndex)
+    || !(runtimeEnvironmentIndex < firstCopyIndex)) {
+    errors.push(`${dockerRelative}: final runtime ENV contract is invalid`);
+  }
+  const [runtimeUserIndex] = runtimeUserIndexes;
+  const [runtimeEntrypointIndex] = runtimeEntrypointIndexes;
+  const [runtimeCommandIndex] = runtimeCommandIndexes;
+  if (runtimeUserIndexes.length !== 1
+    || !(runtimeUserIndex > hardeningRunIndex)) {
+    errors.push(`${dockerRelative}: final runtime USER contract is invalid`);
+  }
+  const [runtimeHealthcheckIndex] = runtimeHealthcheckIndexes;
+  if (runtimeHealthcheckIndexes.length !== 1
+    || !(runtimeHealthcheckIndex > runtimeUserIndex)) {
+    errors.push(`${dockerRelative}: final runtime HEALTHCHECK contract is invalid`);
+  }
+  if (runtimeEntrypointIndexes.length !== 1
+    || !(runtimeEntrypointIndex > runtimeHealthcheckIndex)) {
+    errors.push(`${dockerRelative}: final runtime ENTRYPOINT contract is invalid`);
+  }
+  if (runtimeCommandIndexes.length !== 1
+    || !(runtimeCommandIndex > runtimeEntrypointIndex)
+    || runtimeCommandIndex !== finalInstructions.length - 1) {
+    errors.push(`${dockerRelative}: final runtime CMD contract is invalid`);
+  }
+  const forbiddenBuilderSources = new Set(['/app', '/app/src', '/app/src/lib']);
+  const forbiddenContextSources = new Set([
+    '/',
+    '/app',
+    '/app/src',
+    '/app/src/lib',
+    '/src',
+    '/src/lib',
+  ]);
+  const moduleCopies = new Map();
+  const moduleCopyRecords = new Map();
+  const packageCopies = new Map();
+  const packageDestinations = new Map();
+  const standaloneRuntimeCopies = copies.filter((copy) => (
+    copy.from === 'builder'
+    && copy.source === '/app/.next/standalone'
+  )).map((copy) => ({
+    copy,
+    destination: resolveImagePath(
+      copy.workdir,
+      copy.destination,
+      copy.source,
+      true,
+    ),
+  }));
+  const standaloneRuntimeRoots = standaloneRuntimeCopies.map((record) => record.destination);
+  const modeledFinalCopies = new Set(
+    standaloneRuntimeCopies.map((record) => record.copy),
+  );
+
+  for (const copy of copies) {
+    const broadStageCopy = !copy.isBuildContext
+      && forbiddenBuilderSources.has(copy.source);
+    const broadContextCopy = copy.isBuildContext
+      && forbiddenContextSources.has(copy.source);
+    if (broadStageCopy || broadContextCopy) {
+      errors.push(`${dockerRelative}: broad repository-source COPY is forbidden`);
+      continue;
+    }
+
+    const packagePrefix = '/app/node_modules/';
+    if (copy.source.startsWith(packagePrefix)) {
+      const packageRelative = copy.source.slice(packagePrefix.length);
+      const packageName = packageNameFromSpecifier(packageRelative);
+      if (packageName === packageRelative) {
+        const destination = resolveImagePath(
+          copy.workdir,
+          copy.destination,
+          copy.source,
+          true,
+        );
+        const expectedDestination = `/app/node_modules/${packageName}`;
+        if (copy.from !== 'builder' || destination !== expectedDestination) {
+          errors.push(`runtime package must preserve its final-image location: ${packageName}`);
+          continue;
+        }
+        if (packageCopies.has(packageName)
+          || (packageDestinations.has(destination)
+            && packageDestinations.get(destination) !== packageName)) {
+          errors.push(`runtime package has an ambiguous final-image copy: ${packageName}`);
+          continue;
+        }
+        packageCopies.set(packageName, {
+          copy,
+          destination,
+          sourceRoot: path.join(root, 'node_modules', ...packageName.split('/')),
+        });
+        packageDestinations.set(destination, packageName);
+        modeledFinalCopies.add(copy);
+      }
+      continue;
+    }
+
+    if (!copy.source.startsWith('/app/')) continue;
+    const relative = copy.source.slice('/app/'.length);
+    if (relative === 'public'
+      && copy.from === 'builder'
+      && resolveImagePath(copy.workdir, copy.destination, copy.source, true) === '/app/public') {
+      modeledFinalCopies.add(copy);
+      continue;
+    }
+    if (relative === '.next/static'
+      && copy.from === 'builder'
+      && resolveImagePath(
+        copy.workdir,
+        copy.destination,
+        copy.source,
+        true,
+      ) === '/app/.next/static') {
+      modeledFinalCopies.add(copy);
+      continue;
+    }
+    if (relative.startsWith('.next/') || relative.startsWith('public/')) continue;
+    if (!RUNTIME_MODULE_EXTENSIONS.has(path.posix.extname(relative))) continue;
+
+    let sourceStat;
+    try {
+      sourceStat = await lstat(path.join(root, ...relative.split('/')));
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+    if (!sourceStat?.isFile() || sourceStat.isSymbolicLink()) {
+      errors.push(`manually copied runtime module must be a regular file: ${relative}`);
+      continue;
+    }
+    if (copy.from !== 'builder') {
+      errors.push(`runtime module must be copied from the authoritative builder: ${relative}`);
+      continue;
+    }
+
+    const destination = resolveImagePath(
+      copy.workdir,
+      copy.destination,
+      copy.source,
+      false,
+    );
+    const expectedDestination = `/app/${relative}`;
+    if (destination !== expectedDestination) {
+      errors.push(`runtime module must preserve its repository layout: ${relative}`);
+      continue;
+    }
+    const previous = moduleCopies.get(relative);
+    if (previous && previous !== destination) {
+      errors.push(`runtime module has ambiguous final-image destinations: ${relative}`);
+      continue;
+    }
+    moduleCopies.set(relative, destination);
+    moduleCopyRecords.set(relative, {
+      copy,
+      destination,
+    });
+    modeledFinalCopies.add(copy);
+  }
+
+  for (const copy of copies) {
+    if (!modeledFinalCopies.has(copy)) {
+      errors.push(`${dockerRelative}: unmodeled final-image COPY`);
+    }
+  }
+
+  const modeledSourceCopies = new Set(
+    [...moduleCopyRecords.values()].map((record) => record.copy),
+  );
+  for (const copy of copies) {
+    const destination = resolveImagePath(
+      copy.workdir,
+      copy.destination,
+      copy.source,
+      true,
+    );
+    const targetsRepositorySourceTree = destination === '/app/src'
+      || destination === '/app/scripts'
+      || isWithinImageDirectory(destination, '/app/src')
+      || isWithinImageDirectory(destination, '/app/scripts');
+    if (targetsRepositorySourceTree && !modeledSourceCopies.has(copy)) {
+      errors.push(`${dockerRelative}: unmodeled repository-source destination COPY`);
+    }
+  }
+
+  for (const [relative, moduleCopy] of moduleCopyRecords) {
+    for (const copy of copies) {
+      if (copy === moduleCopy.copy) continue;
+      const destination = resolveImagePath(
+        copy.workdir,
+        copy.destination,
+        copy.source,
+        true,
+      );
+      const isPriorStandaloneTree = copy.from === 'builder'
+        && copy.source === '/app/.next/standalone'
+        && destination === '/app'
+        && copy.order < moduleCopy.copy.order;
+      if (!isPriorStandaloneTree
+        && imagePathsOverlap(destination, moduleCopy.destination)) {
+        errors.push(`runtime module final-image path has a foreign COPY collision: ${relative}`);
+        break;
+      }
+    }
+  }
+
+  for (const [packageName, packageCopy] of packageCopies) {
+    for (const copy of copies) {
+      if (copy === packageCopy.copy) continue;
+      const destination = resolveImagePath(
+        copy.workdir,
+        copy.destination,
+        copy.source,
+        true,
+      );
+      const isPriorStandaloneTree = copy.from === 'builder'
+        && copy.source === '/app/.next/standalone'
+        && destination === '/app'
+        && copy.order < packageCopy.copy.order;
+      if (!isPriorStandaloneTree
+        && imagePathsOverlap(destination, packageCopy.destination)) {
+        errors.push(`runtime package final-image tree has a foreign COPY collision: ${packageName}`);
+        break;
+      }
+    }
+  }
+
+  const commandTargetDestination = commandTarget && workdir
+    ? path.posix.resolve(workdir, commandTarget)
+    : undefined;
+  if (commandTargetDestination && standaloneRuntimeCopies.length === 1) {
+    const [standaloneCopy] = standaloneRuntimeCopies;
+    for (const copy of copies) {
+      if (copy === standaloneCopy.copy) continue;
+      const destination = resolveImagePath(
+        copy.workdir,
+        copy.destination,
+        copy.source,
+        true,
+      );
+      if (imagePathsOverlap(destination, commandTargetDestination)) {
+        errors.push('standalone runtime target has a foreign COPY collision');
+        break;
+      }
+    }
+  }
+
+  const commandModuleDestination = commandModule && workdir
+    ? path.posix.resolve(workdir, commandModule)
+    : undefined;
+  if (commandModule
+    && moduleCopies.get(commandModule) !== commandModuleDestination) {
+    errors.push(`final Node runtime module must be explicitly copied: ${commandModule}`);
+  }
+
+  const packageSource = await readOptional(path.join(root, 'package.json'));
+  let packageJson;
+  try {
+    packageJson = packageSource === undefined ? undefined : JSON.parse(packageSource);
+  } catch {
+    return;
+  }
+  if (!packageJson) return;
+
+  const productionDependencies = {
+    ...(packageJson.dependencies ?? {}),
+    ...(packageJson.optionalDependencies ?? {}),
+  };
+  const resolver = createRequire(path.join(root, 'package.json'));
+  const checkedPackageSpecifiers = new Set();
+  const visitedPackageRoots = new Set();
+  const packageRootsInProgress = new Set();
+  const visitedModules = new Set();
+  const lexicalNodeModulesRoot = path.join(root, 'node_modules');
+  let canonicalNodeModulesRoot;
+  try {
+    canonicalNodeModulesRoot = await realpath(lexicalNodeModulesRoot);
+  } catch {
+    errors.push('runtime package dependency tree is unavailable');
+    return;
+  }
+
+  function finalImagePackageDestination(lexicalPackageRoot) {
+    for (const packageCopy of packageCopies.values()) {
+      if (!isWithinDirectory(lexicalPackageRoot, packageCopy.sourceRoot)) continue;
+      const relative = path.relative(packageCopy.sourceRoot, lexicalPackageRoot);
+      const translated = path.posix.join(
+        packageCopy.destination,
+        ...relative.split(path.sep).filter(Boolean),
+      );
+      const repositoryRelative = path.relative(root, lexicalPackageRoot);
+      const expected = path.posix.join(
+        '/app',
+        ...repositoryRelative.split(path.sep).filter(Boolean),
+      );
+      if (translated === expected) return translated;
+    }
+    return undefined;
+  }
+
+  async function installedDependencySlot(importerRoot, dependencyName) {
+    const dependencyResolver = createRequire(path.join(importerRoot, 'package.json'));
+    const searchRoots = dependencyResolver.resolve.paths(dependencyName) ?? [];
+    for (const searchRoot of searchRoots) {
+      const candidate = path.join(searchRoot, ...dependencyName.split('/'));
+      if (!isWithinDirectory(candidate, lexicalNodeModulesRoot)) continue;
+      try {
+        const metadata = await lstat(candidate);
+        if (metadata.isSymbolicLink()) {
+          throw new Error('runtime package dependency slots cannot be symbolic links');
+        }
+        if (metadata.isDirectory()) return candidate;
+      } catch (error) {
+        if (error?.code !== 'ENOENT') throw error;
+      }
+    }
+    return undefined;
+  }
+
+  function validDependencyMap(value) {
+    return value === undefined
+      || (value !== null && typeof value === 'object' && !Array.isArray(value));
+  }
+
+  async function validatePackageDependencyClosure(
+    packageName,
+    lexicalPackageRoot,
+    finalImageDestination,
+  ) {
+    let canonicalPackageRoot;
+    try {
+      const packageRootStat = await lstat(lexicalPackageRoot);
+      if (!packageRootStat.isDirectory() || packageRootStat.isSymbolicLink()) {
+        throw new Error('runtime package roots must be real directories');
+      }
+      canonicalPackageRoot = await realpath(lexicalPackageRoot);
+    } catch {
+      errors.push(`runtime package metadata is invalid: ${packageName}`);
+      return;
+    }
+    if (!isWithinDirectory(canonicalPackageRoot, canonicalNodeModulesRoot)
+      || !finalImageDestination) {
+      errors.push(`runtime package metadata is invalid: ${packageName}`);
+      return;
+    }
+    if (visitedPackageRoots.has(lexicalPackageRoot)
+      || packageRootsInProgress.has(lexicalPackageRoot)) {
+      return;
+    }
+    if (visitedPackageRoots.size + packageRootsInProgress.size >= 4096) {
+      errors.push('runtime package dependency closure exceeds its bounded size');
+      return;
+    }
+    packageRootsInProgress.add(lexicalPackageRoot);
+
+    let manifest;
+    try {
+      const manifestPath = path.join(lexicalPackageRoot, 'package.json');
+      const manifestStat = await stat(manifestPath);
+      if (!manifestStat.isFile() || manifestStat.size > 1024 * 1024) {
+        throw new Error('invalid package manifest');
+      }
+      const canonicalManifestPath = await realpath(manifestPath);
+      if (!isWithinDirectory(canonicalManifestPath, canonicalPackageRoot)) {
+        throw new Error('package manifest escapes its package root');
+      }
+      manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+    } catch {
+      errors.push(`runtime package metadata is invalid: ${packageName}`);
+      packageRootsInProgress.delete(lexicalPackageRoot);
+      return;
+    }
+    const dependencies = manifest?.dependencies;
+    const optionalDependencies = manifest?.optionalDependencies;
+    const peerDependencies = manifest?.peerDependencies;
+    const peerDependenciesMeta = manifest?.peerDependenciesMeta;
+    if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)
+      || !validDependencyMap(dependencies)
+      || !validDependencyMap(optionalDependencies)
+      || !validDependencyMap(peerDependencies)
+      || !validDependencyMap(peerDependenciesMeta)) {
+      errors.push(`runtime package metadata is invalid: ${packageName}`);
+      packageRootsInProgress.delete(lexicalPackageRoot);
+      return;
+    }
+
+    const edges = new Map();
+    for (const dependencyName of Object.keys(dependencies ?? {})) {
+      if (!Object.hasOwn(optionalDependencies ?? {}, dependencyName)) {
+        edges.set(dependencyName, true);
+      }
+    }
+    for (const dependencyName of Object.keys(optionalDependencies ?? {})) {
+      edges.set(dependencyName, false);
+    }
+    for (const dependencyName of Object.keys(peerDependencies ?? {})) {
+      const metadata = peerDependenciesMeta?.[dependencyName];
+      if (metadata !== undefined
+        && (metadata === null || typeof metadata !== 'object' || Array.isArray(metadata))) {
+        errors.push(`runtime package metadata is invalid: ${packageName}`);
+        packageRootsInProgress.delete(lexicalPackageRoot);
+        return;
+      }
+      const requiredPeer = metadata?.optional !== true;
+      edges.set(dependencyName, (edges.get(dependencyName) ?? false) || requiredPeer);
+    }
+    if (edges.size > 2048) {
+      errors.push(`runtime package metadata is invalid: ${packageName}`);
+      packageRootsInProgress.delete(lexicalPackageRoot);
+      return;
+    }
+
+    for (const [dependencyName, required] of [...edges].sort(([left], [right]) => (
+      left < right ? -1 : left > right ? 1 : 0
+    ))) {
+      if (isBuiltin(dependencyName)) continue;
+      if (packageNameFromSpecifier(dependencyName) !== dependencyName) {
+        errors.push(`runtime package metadata is invalid: ${packageName}`);
+        continue;
+      }
+      let dependencyRoot;
+      try {
+        dependencyRoot = await installedDependencySlot(lexicalPackageRoot, dependencyName);
+      } catch {
+        errors.push(`runtime package metadata is invalid: ${packageName}`);
+        continue;
+      }
+      if (!dependencyRoot) {
+        if (required) {
+          errors.push(
+            `runtime package dependency is absent from the installed dependency tree: ${packageName} -> ${dependencyName}`,
+          );
+        }
+        continue;
+      }
+      const dependencyDestination = finalImagePackageDestination(dependencyRoot);
+      if (!dependencyDestination) {
+        errors.push(
+          `runtime package dependency is absent from the final-image dependency tree: ${packageName} -> ${dependencyName}`,
+        );
+        continue;
+      }
+      await validatePackageDependencyClosure(
+        dependencyName,
+        dependencyRoot,
+        dependencyDestination,
+      );
+    }
+
+    packageRootsInProgress.delete(lexicalPackageRoot);
+    visitedPackageRoots.add(lexicalPackageRoot);
+  }
+
+  async function validatePackageImport(specifier, importer) {
+    const packageName = packageNameFromSpecifier(specifier);
+    if (!packageName) {
+      errors.push(`runtime module uses an unsupported package specifier: ${importer}`);
+      return;
+    }
+    if (!Object.hasOwn(productionDependencies, packageName)) {
+      errors.push(`runtime package must be a production dependency: ${packageName}`);
+      return;
+    }
+    if (checkedPackageSpecifiers.has(specifier)) return;
+    checkedPackageSpecifiers.add(specifier);
+
+    let resolved;
+    try {
+      resolved = resolver.resolve(specifier);
+    } catch {
+      errors.push(`runtime package must resolve from the installed dependency tree: ${packageName}`);
+      return;
+    }
+    const installedRoot = path.join(root, 'node_modules', ...packageName.split('/'));
+    let canonicalResolved;
+    let canonicalInstalledRoot;
+    try {
+      [canonicalResolved, canonicalInstalledRoot] = await Promise.all([
+        realpath(resolved),
+        realpath(installedRoot),
+      ]);
+    } catch {
+      errors.push(`runtime package must resolve from the installed dependency tree: ${packageName}`);
+      return;
+    }
+    if (!isWithinDirectory(canonicalResolved, canonicalInstalledRoot)) {
+      errors.push(`runtime package resolved outside its installed package root: ${packageName}`);
+      return;
+    }
+
+    const expectedDestination = `/app/node_modules/${packageName}`;
+    if (packageCopies.get(packageName)?.destination !== expectedDestination) {
+      errors.push(`runtime package is absent from the final-image dependency tree: ${packageName}`);
+      return;
+    }
+    await validatePackageDependencyClosure(
+      packageName,
+      path.join(root, 'node_modules', ...packageName.split('/')),
+      expectedDestination,
+    );
+  }
+
+  async function visitModule(relative) {
+    if (visitedModules.has(relative)) return;
+    visitedModules.add(relative);
+    const source = await readOptional(path.join(root, ...relative.split('/')));
+    if (source === undefined) {
+      errors.push(`runtime module dependency is absent from the repository: ${relative}`);
+      return;
+    }
+
+    const importerDestination = moduleCopies.get(relative);
+    const analysis = analyzeRuntimeModule(relative, source, errors);
+    if (analysis.nonLiteralRequires > 0) {
+      errors.push(`runtime module contains a non-literal require: ${relative}`);
+    }
+    if (analysis.unsupportedRuntimeLoaders > 0) {
+      errors.push(`runtime module contains an unsupported loader: ${relative}`);
+    }
+    if (analysis.unsupportedRuntimeDataAccesses > 0) {
+      errors.push(`runtime module contains unmodeled runtime data access: ${relative}`);
+    }
+    if (analysis.nonLiteralDynamicImports.length > 0) {
+      const commandTargetIndex = analysis.nonLiteralDynamicImports.length === 1
+        ? commandTargetArgumentIndex(
+          analysis.sourceFile,
+          analysis.nonLiteralDynamicImports[0],
+        )
+        : undefined;
+      const standaloneRuntimeRoot = standaloneRuntimeRoots.length === 1
+        ? standaloneRuntimeRoots[0]
+        : undefined;
+      const expectedStandaloneTarget = standaloneRuntimeRoot
+        ? path.posix.join(standaloneRuntimeRoot, 'server.js')
+        : undefined;
+      const isSupportedCommandTarget = relative === commandModule
+        && commandTargetIndex === 2
+        && typeof commandTargetDestination === 'string'
+        && commandTargetDestination === expectedStandaloneTarget;
+      if (!isSupportedCommandTarget) {
+        errors.push(`runtime module contains an unresolved dynamic import: ${relative}`);
+      }
+    }
+
+    for (const specifier of analysis.specifiers) {
+      if (isBuiltin(specifier)) continue;
+      if (!specifier.startsWith('.')) {
+        if (specifier.startsWith('/') || specifier.startsWith('file:')) {
+          errors.push(`runtime module uses an unsupported absolute import: ${relative}`);
+        } else {
+          await validatePackageImport(specifier, relative);
+        }
+        continue;
+      }
+
+      const dependency = path.posix.normalize(
+        path.posix.join(path.posix.dirname(relative), specifier),
+      );
+      if (dependency === '..' || dependency.startsWith('../') || path.posix.isAbsolute(dependency)) {
+        errors.push(`runtime module import escapes the repository: ${relative}`);
+        continue;
+      }
+
+      const expectedDestination = path.posix.normalize(
+        path.posix.join(path.posix.dirname(importerDestination), specifier),
+      );
+      if (moduleCopies.get(dependency) !== expectedDestination) {
+        errors.push(`runtime module dependency is absent from the final image: ${dependency}`);
+        continue;
+      }
+      await visitModule(dependency);
+    }
+  }
+
+  if (commandModule && moduleCopies.has(commandModule)) {
+    await visitModule(commandModule);
+  }
+  for (const relative of [...moduleCopies.keys()].sort()) {
+    if (!visitedModules.has(relative)) {
+      errors.push(`unreferenced manually copied runtime module: ${relative}`);
+    }
+  }
+  for (const [packageName, packageCopy] of [...packageCopies].sort(([left], [right]) => (
+    left < right ? -1 : left > right ? 1 : 0
+  ))) {
+    if (!visitedPackageRoots.has(packageCopy.sourceRoot)) {
+      errors.push(`unreferenced runtime package copy: ${packageName}`);
+    }
   }
 }
 
@@ -1010,6 +2398,7 @@ export async function validateReleasePolicy(
   await validateSecretScanning(root, errors);
   await validateClaimTokenTransport(root, errors);
   await validateRuntimeCredentialContract(root, errors);
+  await validateSecurityImageRuntimeClosure(root, errors);
   await validateVerifyImplementation(root, errors);
 
   return [...new Set(errors)].sort();

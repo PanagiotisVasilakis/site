@@ -2,13 +2,13 @@
 
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import {
   chmod,
   copyFile,
   lstat,
   mkdir,
   mkdtemp,
-  opendir,
   readFile,
   rm,
   writeFile,
@@ -16,6 +16,16 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+
+import {
+  enumerateArtifactFiles,
+  safeArtifactDiagnosticPath,
+} from './lib/artifact-file-walker.mjs';
+import {
+  buildGeneratedArtifactDispositionContext,
+  classifyGeneratedArtifactFinding,
+  GENERATED_ARTIFACT_CLASSIFICATIONS,
+} from './lib/generated-artifact-secret-disposition.mjs';
 
 const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG_ROOT = path.join(REPOSITORY_ROOT, 'config/secret-scanning');
@@ -28,6 +38,7 @@ const ARTIFACT_ROOTS = Object.freeze([
   '.next/standalone',
   '.next/server',
   '.next/static',
+  'public',
 ]);
 
 function sha256(value) {
@@ -90,24 +101,6 @@ async function trackedCandidateFiles() {
   return result.stdout.split('\0').filter(Boolean).sort();
 }
 
-async function walkFiles(root, relative = '') {
-  const output = [];
-  let directory;
-  try {
-    directory = await opendir(path.join(root, relative));
-  } catch (error) {
-    if (error?.code === 'ENOENT') return output;
-    throw error;
-  }
-  for await (const entry of directory) {
-    const child = relative ? `${relative}/${entry.name}` : entry.name;
-    if (entry.isDirectory()) output.push(...await walkFiles(root, child));
-    else if (entry.isFile()) output.push(child);
-    else throw new Error(`Unsupported release input type: ${child}`);
-  }
-  return output;
-}
-
 async function copyCandidateFiles(files, destination) {
   for (const relative of files) {
     if (path.isAbsolute(relative) || relative.split('/').includes('..')) {
@@ -131,25 +124,72 @@ async function copyCandidateFiles(files, destination) {
   }
 }
 
-function normalizeFinding(scanRoot, finding) {
+async function copyResolvedCandidateFiles(files, destination) {
+  for (const file of files) {
+    const { relative, source, canonicalRoot } = file;
+    if (path.isAbsolute(relative) || relative.split('/').includes('..')) {
+      throw new Error('Release input enumeration produced an unsafe path.');
+    }
+    const sourceRelative = path.relative(canonicalRoot, source);
+    if (
+      sourceRelative === '..'
+      || sourceRelative.startsWith(`..${path.sep}`)
+      || path.isAbsolute(sourceRelative)
+    ) {
+      throw new Error('Release input enumeration escaped its artifact root.');
+    }
+    let metadata;
+    try {
+      metadata = await lstat(source);
+    } catch (error) {
+      if (error?.code === 'ENOENT') {
+        throw new Error(
+          `Artifact traversal rejected path=${safeArtifactDiagnosticPath(relative)} `
+            + 'reason=ARTIFACT_ENTRY_CHANGED '
+            + 'classification=unsafe-artifact-entry fingerprint=copy-source-missing',
+        );
+      }
+      throw error;
+    }
+    if (!metadata.isFile()) {
+      throw new Error(
+        `Artifact traversal rejected path=${safeArtifactDiagnosticPath(relative)} `
+          + 'reason=ARTIFACT_ENTRY_CHANGED '
+          + 'classification=unsafe-artifact-entry fingerprint=copy-source-type',
+      );
+    }
+    const target = path.join(destination, relative);
+    await mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
+    await copyFile(source, target);
+    await chmod(target, 0o600);
+  }
+}
+
+function findingRelativePath(scanRoot, finding) {
   const absolute = path.resolve(finding.File);
   const relative = path.relative(scanRoot, absolute).split(path.sep).join('/');
   if (!relative || relative.startsWith('../') || path.isAbsolute(relative)) {
     throw new Error('Secret scanner returned a finding outside the isolated candidate.');
   }
+  return relative;
+}
+
+function normalizeFinding(scanRoot, finding) {
+  const relative = findingRelativePath(scanRoot, finding);
   const rule = String(finding.RuleID ?? 'unknown');
   const line = Number(finding.StartLine);
   const column = Number(finding.StartColumn);
   if (!Number.isSafeInteger(line) || line < 1 || !Number.isSafeInteger(column) || column < 1) {
     throw new Error('Secret scanner returned invalid location metadata.');
   }
+  const diagnosticPath = safeArtifactDiagnosticPath(relative);
   return {
-    path: relative,
+    path: diagnosticPath,
     rule,
     line,
     column,
     classification: classifyRule(rule),
-    fingerprint: sha256(`${relative}\0${rule}\0${line}\0${column}`).slice(0, 16),
+    fingerprint: sha256(`${diagnosticPath}\0${rule}\0${line}\0${column}`).slice(0, 16),
   };
 }
 
@@ -178,6 +218,13 @@ export function evaluateCurrentFindings(findings, allowlistEntries = []) {
   const accepted = [];
   const unexpected = [];
   for (const finding of findings) {
+    if (finding.disposition) {
+      accepted.push({
+        ...finding,
+        classification: finding.disposition.classification,
+      });
+      continue;
+    }
     const known = allowlist.get(allowlistKey(finding));
     if (known) {
       accepted.push({ ...finding, classification: known.classification });
@@ -213,7 +260,7 @@ export function formatFinding(finding) {
   ].join(' ');
 }
 
-async function runGitleaks(binaryPath, scanRoot, reportPath) {
+async function runGitleaks(binaryPath, scanRoot, reportPath, dispositionContext) {
   const result = run(binaryPath, [
     'dir',
     scanRoot,
@@ -223,7 +270,6 @@ async function runGitleaks(binaryPath, scanRoot, reportPath) {
     '--no-color',
     '--log-level',
     'error',
-    '--redact=100',
     '--report-format',
     'json',
     '--report-path',
@@ -237,31 +283,70 @@ async function runGitleaks(binaryPath, scanRoot, reportPath) {
     report = JSON.parse(await readFile(reportPath, 'utf8'));
   } catch {
     throw new Error('The maintained secret scanner did not produce valid JSON evidence.');
+  } finally {
+    await rm(reportPath, { force: true });
   }
   if (!Array.isArray(report)) {
     throw new Error('The maintained secret scanner produced an invalid evidence shape.');
   }
-  return report.map((finding) => normalizeFinding(scanRoot, finding));
+  return report.map((finding) => {
+    const normalized = normalizeFinding(scanRoot, finding);
+    if (!dispositionContext) return normalized;
+    const relativePath = findingRelativePath(scanRoot, finding);
+    const disposition = classifyGeneratedArtifactFinding(dispositionContext, {
+      rule: String(finding.RuleID ?? 'unknown'),
+      secret: String(finding.Secret ?? ''),
+      relativePath,
+      rawFingerprint: String(finding.Fingerprint ?? ''),
+      source: readFileSyncForDisposition(path.join(scanRoot, relativePath)),
+    });
+    return disposition ? { ...normalized, disposition } : normalized;
+  });
 }
 
-async function isolatedScan(files, { allowlist = [], rejectEnvironmentFiles = false } = {}) {
+function readFileSyncForDisposition(filePath) {
+  try {
+    return readFileSync(filePath, 'utf8');
+  } catch {
+    throw new Error('Generated-artifact finding content could not be verified.');
+  }
+}
+
+async function isolatedScan(
+  files,
+  {
+    allowlist = [],
+    rejectEnvironmentFiles = false,
+    resolvedSources = false,
+    dispositionContext,
+  } = {},
+) {
   const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), 'secret-gate-'));
   await chmod(temporaryRoot, 0o700);
   const scanRoot = path.join(temporaryRoot, 'candidate');
   const reportPath = path.join(temporaryRoot, 'report.json');
+  const relativeFiles = resolvedSources
+    ? files.map((file) => file.relative)
+    : files;
   try {
     await mkdir(scanRoot, { mode: 0o700 });
     if (rejectEnvironmentFiles) {
-      const environmentFile = findForbiddenEnvironmentArtifact(files);
+      const environmentFile = findForbiddenEnvironmentArtifact(relativeFiles);
       if (environmentFile) {
         throw new Error(`Environment file is forbidden in release artifacts: ${environmentFile}`);
       }
     }
-    await copyCandidateFiles(files, scanRoot);
+    if (resolvedSources) await copyResolvedCandidateFiles(files, scanRoot);
+    else await copyCandidateFiles(files, scanRoot);
     await writeFile(reportPath, '[]\n', { encoding: 'utf8', mode: 0o600 });
     const binaryPath = scannerBinary();
     await verifyScanner(binaryPath);
-    const findings = await runGitleaks(binaryPath, scanRoot, reportPath);
+    const findings = await runGitleaks(
+      binaryPath,
+      scanRoot,
+      reportPath,
+      dispositionContext,
+    );
     return evaluateCurrentFindings(findings, allowlist);
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
@@ -269,27 +354,15 @@ async function isolatedScan(files, { allowlist = [], rejectEnvironmentFiles = fa
 }
 
 export async function scanPathForTest(sourceRoot, { allowlist = [] } = {}) {
-  const files = await walkFiles(sourceRoot);
-  const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), 'secret-gate-test-'));
-  await chmod(temporaryRoot, 0o700);
-  const scanRoot = path.join(temporaryRoot, 'candidate');
-  const reportPath = path.join(temporaryRoot, 'report.json');
-  try {
-    await mkdir(scanRoot, { mode: 0o700 });
-    for (const relative of files) {
-      const target = path.join(scanRoot, relative);
-      await mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
-      await copyFile(path.join(sourceRoot, relative), target);
-      await chmod(target, 0o600);
-    }
-    await writeFile(reportPath, '[]\n', { encoding: 'utf8', mode: 0o600 });
-    const binaryPath = scannerBinary();
-    await verifyScanner(binaryPath);
-    const findings = await runGitleaks(binaryPath, scanRoot, reportPath);
-    return evaluateCurrentFindings(findings, allowlist);
-  } finally {
-    await rm(temporaryRoot, { recursive: true, force: true });
-  }
+  const artifact = await enumerateArtifactFiles(sourceRoot);
+  return isolatedScan(artifact.files, {
+    allowlist,
+    resolvedSources: true,
+  });
+}
+
+export async function enumerateArtifactPathForTest(sourceRoot) {
+  return enumerateArtifactFiles(sourceRoot);
 }
 
 async function sourceScan() {
@@ -304,13 +377,35 @@ async function sourceScan() {
 async function artifactScan() {
   const files = [];
   for (const artifactRoot of ARTIFACT_ROOTS) {
-    const artifactFiles = await walkFiles(REPOSITORY_ROOT, artifactRoot);
-    files.push(...artifactFiles.map((relative) => `${artifactRoot}/${relative}`));
+    const artifact = await enumerateArtifactFiles(
+      path.join(REPOSITORY_ROOT, artifactRoot),
+    );
+    files.push(...artifact.files.map((file) => ({
+      ...file,
+      relative: `${artifactRoot}/${file.relative}`,
+    })));
   }
   if (files.length === 0) {
     throw new Error('No production build artifacts were available for secret scanning.');
   }
-  return isolatedScan([...new Set(files)].sort(), { rejectEnvironmentFiles: true });
+  files.sort((left, right) => (
+    left.relative < right.relative ? -1 : left.relative > right.relative ? 1 : 0
+  ));
+  const historical = await readJson(HISTORICAL_BASELINE_PATH);
+  if (historical.findings.length !== 6) {
+    throw new Error('IR-01 historical baseline must contain exactly six redacted findings.');
+  }
+  const dispositionContext = buildGeneratedArtifactDispositionContext({
+    repositoryRoot: REPOSITORY_ROOT,
+    artifactFiles: files,
+    environment: process.env,
+    incidentBaseline: historical,
+  });
+  return isolatedScan(files, {
+    rejectEnvironmentFiles: true,
+    resolvedSources: true,
+    dispositionContext,
+  });
 }
 
 async function main() {
@@ -332,6 +427,26 @@ async function main() {
       );
     }
     process.exitCode = 1;
+    return;
+  }
+  if (scope === 'artifacts') {
+    const frameworkInternal = result.accepted.filter(
+      (finding) => (
+        finding.classification
+        === GENERATED_ARTIFACT_CLASSIFICATIONS.INTERNAL_CLASSIFICATION
+      ),
+    ).length;
+    const buildIdentifiers = result.accepted.filter(
+      (finding) => (
+        finding.classification
+        === GENERATED_ARTIFACT_CLASSIFICATIONS.IDENTIFIER_CLASSIFICATION
+      ),
+    ).length;
+    process.stdout.write(
+      `SECRET SCAN PASSED scope=${scope} rawFindings=${result.accepted.length} `
+        + `intentionalFrameworkInternalKeys=${frameworkInternal} `
+        + `knownNonSecretBuildIdentifiers=${buildIdentifiers} actionableFindings=0\n`,
+    );
     return;
   }
   process.stdout.write(
