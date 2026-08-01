@@ -421,7 +421,7 @@ export default function CheckInInfo({
     { text: t.checkinInfo?.tip1 || 'The nearest beach is just 5 minutes walk away', icon: 'waves' },
     { text: t.checkinInfo?.tip2 || 'Supermarket "AB Vassilopoulos" is 300m away, open 8:00-21:00', icon: 'basket' },
     { text: t.checkinInfo?.tip3 || 'Check our restaurant recommendations in the main menu', icon: 'utensils' },
-    { text: t.checkinInfo?.tip4 || 'Need a taxi? Call +30 2721 023456 or use the Taxi app', icon: 'car' },
+    { text: t.checkinInfo?.tip4 || 'Need a taxi? Call +30 27210 21112 or use the Taxi app', icon: 'car' },
   ];
 
   const goodToKnowItems: Array<{ label: string; detail: string; icon: IconName }> = [

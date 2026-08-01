@@ -165,8 +165,8 @@ export const bookingTranslations: Record<Locale, BookingDictionary> = {
             contactTitle: "Contact Us",
             contactIntro: "Ready to book your stay? Get in touch with us for personalized assistance.",
             contact: [
-                "📧 Email: info@dolcefariente.com",
-                "📱 Phone: +30 2721 023456",
+                "📧 Email: dolcefarnienteapartments@gmail.com",
+                "📱 Phone: +30 695 581 0051",
                 "💬 WhatsApp: Available for instant booking"
             ],
             metaDescription: "Learn about our booking process, availability, and policies for your stay at our luxury apartment."
@@ -251,8 +251,8 @@ export const bookingTranslations: Record<Locale, BookingDictionary> = {
             contactTitle: "Επικοινωνήστε μαζί μας",
             contactIntro: "Έτοιμοι να κλείσετε τη διαμονή σας; Επικοινωνήστε μαζί μας για εξατομικευμένη βοήθεια.",
             contact: [
-                "📧 Email: info@dolcefariente.com",
-                "📱 Τηλέφωνο: +30 2721 023456",
+                "📧 Email: dolcefarnienteapartments@gmail.com",
+                "📱 Τηλέφωνο: +30 695 581 0051",
                 "💬 WhatsApp: Διαθέσιμο για άμεση κράτηση"
             ],
             metaDescription: "Μάθετε για τη διαδικασία κράτησης, τη διαθεσιμότητα και τις πολιτικές για τη διαμονή σας στο πολυτελές διαμέρισμά μας."
