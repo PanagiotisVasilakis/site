@@ -24,7 +24,7 @@ interface HouseText {
   };
   [k: string]: unknown;
 }
-interface Props { locale: string; t: unknown; houseText: HouseText | undefined; photos: ApartmentPhotoWithAlt[]; }
+interface Props { locale: string; houseText: HouseText | undefined; photos: ApartmentPhotoWithAlt[]; }
 
 export default function ApartmentCinematic({ locale, houseText, photos }: Props) {
   const ht = React.useMemo(() => houseText || {}, [houseText]);

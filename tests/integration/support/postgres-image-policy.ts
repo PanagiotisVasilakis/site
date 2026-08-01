@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
-export const APPROVED_POSTGRES_REPOSITORY = 'postgres';
-export const APPROVED_POSTGRES_TAG = '16-alpine';
+const APPROVED_POSTGRES_REPOSITORY = 'postgres';
+const APPROVED_POSTGRES_TAG = '16-alpine';
 export const APPROVED_POSTGRES_INDEX_DIGEST =
   'sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777';
 export const APPROVED_POSTGRES_IMAGE =

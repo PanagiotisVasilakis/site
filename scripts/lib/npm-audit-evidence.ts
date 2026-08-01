@@ -20,7 +20,7 @@ export const NPM_AUDIT_ARGUMENTS = Object.freeze([
   '--json',
 ] as const);
 
-export interface NpmAuditCounts {
+interface NpmAuditCounts {
   informational: number;
   low: number;
   moderate: number;
@@ -29,7 +29,7 @@ export interface NpmAuditCounts {
   total: number;
 }
 
-export type NpmAuditFailureReason =
+type NpmAuditFailureReason =
   | 'EMPTY_OUTPUT'
   | 'INVALID_UTF8'
   | 'MALFORMED_JSON'
@@ -183,7 +183,7 @@ function createEvidencePaths(repositoryRoot: string, temporaryRoot: string) {
   return { artifactPath, stderrArtifactPath };
 }
 
-export const runNpmAuditProcess: NpmAuditRunner = async (command, args, options) => {
+const runNpmAuditProcess: NpmAuditRunner = async (command, args, options) => {
   let stdoutDescriptor: number | undefined;
   let stderrDescriptor: number | undefined;
 

@@ -1,4 +1,4 @@
-export const PORTAL_BOOKING_ACCESS_WINDOW_DAYS = 7;
+const PORTAL_BOOKING_ACCESS_WINDOW_DAYS = 7;
 
 export type PortalBookingEligibilityWindow = Readonly<{
   businessToday: Date;

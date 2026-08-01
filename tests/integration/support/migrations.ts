@@ -14,7 +14,7 @@ import {
   safeChildEnvironment,
 } from './runtime';
 
-export const MIGRATION_FILE_MANIFEST = {
+const MIGRATION_FILE_MANIFEST = {
   'prisma/migrations/migration_lock.toml': '99836963713b4f5b269ad49af0ed3d7b0b2e336115c2f92dc9ac683d139d0900',
   'prisma/migrations/000_init/migration.sql': 'f25a3d005ffa2ba6573ab36e8c0849b59d1db7983c8925ee64a9983584ea2c25',
   'prisma/migrations/001_add_session_created_at/migration.sql': '86d3a2b83e570c6a7b1a9142086ca242e90c78dcdfca712e5f0c754c562502c9',
@@ -210,7 +210,7 @@ export async function applyMigrationsFromEmpty(
   await assertCommittedMigrationManifest();
 }
 
-export async function readAppliedMigrationHistory(
+async function readAppliedMigrationHistory(
   target: DisposableDatabaseTarget,
 ): Promise<MigrationRecord[]> {
   return withVerifiedDisposableDatabase(target, 'verification', async (client) => {

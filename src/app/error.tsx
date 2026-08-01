@@ -198,7 +198,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
             <div className="pt-4 border-t border-gray-200">
               <p className="text-sm text-subtle">
                 {t.needHelp}{' '}
-                <a href="mailto:support@villa-app.com" className="text-blue-600 hover:underline">
+                <a href="mailto:dolcefarnienteapartments@gmail.com" className="text-blue-600 hover:underline">
                   {t.supportTeam}
                 </a>
                 {error.digest && (

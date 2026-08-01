@@ -89,7 +89,7 @@ export type DisposableContainerIdentity = Pick<DisposablePostgresRuntime,
   | 'containerImageId'
 >;
 
-export class DatabaseSafetyError extends Error {
+class DatabaseSafetyError extends Error {
   constructor(reason: string) {
     super(`Disposable database safety guard rejected the operation: ${reason}.`);
     this.name = 'DatabaseSafetyError';
@@ -135,7 +135,7 @@ export function canonicalDatabaseTargetFingerprint(databaseUrl: string): string 
     .digest('hex');
 }
 
-export function databaseUrlFor(runtime: DisposablePostgresRuntime, database: string): string {
+function databaseUrlFor(runtime: DisposablePostgresRuntime, database: string): string {
   const url = new URL('postgresql://127.0.0.1');
   url.username = runtime.user;
   url.password = runtime.password;

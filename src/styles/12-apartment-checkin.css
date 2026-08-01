@@ -1,11 +1,9 @@
-.villa-spec-badge,
 .apartment-spec-badge {
   border: 1px solid var(--page-border);
   background: #ffffff;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-[data-theme="dark"] .villa-spec-badge,
 [data-theme="dark"] .apartment-spec-badge {
   border: 1px solid var(--border-soft);
   background: var(--layer-surface);
@@ -14,7 +12,6 @@
 }
 
 /* Primary buttons - applies to all pages */
-.villa-btn-primary,
 .apartment-btn-primary {
   background: #000000;
   color: #ffffff;
@@ -24,38 +21,32 @@
   transition: all 0.3s ease;
 }
 
-.villa-btn-primary--depth,
 .apartment-btn-primary--depth {
   box-shadow: 0 20px 36px -22px rgba(12, 20, 28, 0.6);
   transition: box-shadow 0.25s ease, transform 0.2s ease;
 }
 
-.villa-btn-primary--depth:hover,
 .apartment-btn-primary--depth:hover {
   box-shadow: 0 24px 44px -22px rgba(12, 20, 28, 0.64);
   transform: translateY(-2px);
 }
 
-.villa-btn-primary--depth:active,
 .apartment-btn-primary--depth:active {
   box-shadow: 0 16px 32px -24px rgba(12, 20, 28, 0.68);
   transform: translateY(0);
 }
 
-[data-theme="dark"] .villa-btn-primary,
 [data-theme="dark"] .apartment-btn-primary {
   background: var(--brand-500);
   color: #042c28;
   font-weight: 700;
 }
 
-[data-theme="dark"] .villa-btn-primary--depth,
 [data-theme="dark"] .apartment-btn-primary--depth {
   box-shadow: 0 18px 36px -22px rgba(18, 179, 164, 0.65),
     0 4px 12px -2px rgba(0, 0, 0, 0.3);
 }
 
-[data-theme="dark"] .villa-btn-primary--depth:hover,
 [data-theme="dark"] .apartment-btn-primary--depth:hover {
   box-shadow: 0 24px 48px -24px rgba(18, 179, 164, 0.75),
     0 6px 16px -2px rgba(0, 0, 0, 0.4);
@@ -63,7 +54,6 @@
 }
 
 /* Secondary buttons - applies to all pages */
-.villa-btn-secondary,
 .apartment-btn-secondary {
   background: #ffffff;
   border: 1px solid var(--page-border);
@@ -74,25 +64,21 @@
   transition: all 0.3s ease;
 }
 
-.villa-btn-secondary--depth,
 .apartment-btn-secondary--depth {
   box-shadow: 0 12px 28px -20px rgba(12, 20, 28, 0.45);
   transition: box-shadow 0.25s ease, transform 0.2s ease;
 }
 
-.villa-btn-secondary--depth:hover,
 .apartment-btn-secondary--depth:hover {
   box-shadow: 0 16px 34px -22px rgba(12, 20, 28, 0.5);
   transform: translateY(-2px);
 }
 
-.villa-btn-secondary--depth:active,
 .apartment-btn-secondary--depth:active {
   box-shadow: 0 10px 24px -24px rgba(12, 20, 28, 0.55);
   transform: translateY(0);
 }
 
-[data-theme="dark"] .villa-btn-secondary,
 [data-theme="dark"] .apartment-btn-secondary {
   background: var(--layer-surface);
   border: 1px solid var(--border-soft);
@@ -100,13 +86,11 @@
   font-weight: 600;
 }
 
-[data-theme="dark"] .villa-btn-secondary--depth,
 [data-theme="dark"] .apartment-btn-secondary--depth {
   box-shadow: 0 14px 36px -24px rgba(18, 179, 164, 0.35),
     0 4px 12px -2px rgba(0, 0, 0, 0.3);
 }
 
-[data-theme="dark"] .villa-btn-secondary--depth:hover,
 [data-theme="dark"] .apartment-btn-secondary--depth:hover {
   background: var(--layer-surface-alt);
   box-shadow: 0 18px 42px -24px rgba(18, 179, 164, 0.45),
@@ -114,27 +98,12 @@
 }
 
 /* Footer text - applies to all pages */
-.villa-footer-text,
 .apartment-footer-text {
   color: var(--page-muted);
 }
 
-[data-theme="dark"] .villa-footer-text,
 [data-theme="dark"] .apartment-footer-text {
   color: var(--fg-muted);
-}
-
-/* Photo cards - applies to all pages */
-.villa-photo-card,
-.apartment-photo-card {
-  border: 1px solid var(--page-border);
-  background: #ffffff;
-}
-
-[data-theme="dark"] .villa-photo-card,
-[data-theme="dark"] .apartment-photo-card {
-  border: 1px solid var(--border-soft);
-  background: var(--layer-surface);
 }
 
 /* Responsive booking bar for narrow containers and portrait tablets. */
@@ -599,7 +568,6 @@
 .moments-hero-title,
 .moment-card-title,
 .contact-panel-title,
-.villa-section-title,
 .apartment-hero-title,
 .apartment-section-title {
   font-family: var(--font-title-stack);

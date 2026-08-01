@@ -1,48 +1,8 @@
 /* Utility classes for line clamping */
-.line-clamp-1 {
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.line-clamp-3 {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.line-clamp-4 {
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.line-clamp-5 {
-  display: -webkit-box;
-  -webkit-line-clamp: 5;
-  line-clamp: 5;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.line-clamp-6 {
-  display: -webkit-box;
-  -webkit-line-clamp: 6;
-  line-clamp: 6;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -152,7 +112,6 @@ button[role="tab"] {
 
 /* Universal page dark mode styles - applies apartment color scheme to ALL pages */
 .page-container,
-.villa-cinematic-container,
 .apartment-cinematic-container {
   --page-ink: #1c1c20;
   --page-muted: #4b5563;
@@ -160,7 +119,6 @@ button[role="tab"] {
 }
 
 [data-theme="dark"] .page-container,
-[data-theme="dark"] .villa-cinematic-container,
 [data-theme="dark"] .apartment-cinematic-container {
   --page-ink: var(--fg-default);
   --page-muted: var(--fg-muted);
@@ -169,7 +127,6 @@ button[role="tab"] {
 
 /* Content sections - applies to all pages */
 .page-container,
-.villa-content-section,
 .apartment-content-section {
   /* Use the pale site background so pages appear as a single light color */
   background: var(--sand-50);
@@ -177,7 +134,6 @@ button[role="tab"] {
 }
 
 [data-theme="dark"] .page-container,
-[data-theme="dark"] .villa-content-section,
 [data-theme="dark"] .apartment-content-section {
   background: var(--layer-bg-subtle);
   color: var(--fg-default);
@@ -196,13 +152,11 @@ button[role="tab"] {
 
 /* Section titles inside content containers */
 .page-container :is(h1, h2, h3, h4, h5, h6),
-.villa-section-title,
 .apartment-section-title {
   color: var(--page-ink);
 }
 
 [data-theme="dark"] .page-container :is(h1, h2, h3, h4, h5, h6),
-[data-theme="dark"] .villa-section-title,
 [data-theme="dark"] .apartment-section-title {
   color: var(--fg-default);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
@@ -210,13 +164,11 @@ button[role="tab"] {
 
 /* Description text inside content containers */
 .page-container p,
-.villa-description-text,
 .apartment-description-text {
   color: var(--page-muted);
 }
 
 [data-theme="dark"] .page-container p,
-[data-theme="dark"] .villa-description-text,
 [data-theme="dark"] .apartment-description-text {
   color: var(--fg-muted);
 }
@@ -225,15 +177,15 @@ button[role="tab"] {
 [data-theme="dark"] span,
 [data-theme="dark"] div,
 [data-theme="dark"] label,
-[data-theme="dark"] a:not(.btn-primary):not(.btn-accent):not(.btn-outline):not(.btn-tint):not(.btn-secondary):not(.villa-btn-primary):not(.apartment-btn-primary):not(.home-feature-card):not(.guide-option-card):not(.contact-link):not(.contact-social-link):not(.guest-menu-link):not(.guest-menu-brand):not(.guest-menu-account):not(.guest-menu-utility) {
+[data-theme="dark"] a:not(.btn-primary):not(.btn-accent):not(.btn-outline):not(.btn-tint):not(.btn-secondary):not(.apartment-btn-primary):not(.home-feature-card):not(.guide-option-card):not(.contact-link):not(.contact-social-link):not(.guest-menu-link):not(.guest-menu-brand):not(.guest-menu-account):not(.guest-menu-utility) {
   color: inherit;
 }
 
 /* Links should be visible in dark mode, but don't override buttons */
-[data-theme="dark"] a:not(.btn-primary):not(.btn-accent):not(.btn-outline):not(.btn-tint):not(.btn-secondary):not(.villa-btn-primary):not(.apartment-btn-primary):not(.home-feature-card):not(.guide-option-card):not(.contact-link):not(.contact-social-link):not(.guest-menu-link):not(.guest-menu-brand):not(.guest-menu-account):not(.guest-menu-utility) {
+[data-theme="dark"] a:not(.btn-primary):not(.btn-accent):not(.btn-outline):not(.btn-tint):not(.btn-secondary):not(.apartment-btn-primary):not(.home-feature-card):not(.guide-option-card):not(.contact-link):not(.contact-social-link):not(.guest-menu-link):not(.guest-menu-brand):not(.guest-menu-account):not(.guest-menu-utility) {
   color: var(--brand-400);
 }
 
-[data-theme="dark"] a:not(.btn-primary):not(.btn-accent):not(.btn-outline):not(.btn-tint):not(.btn-secondary):not(.villa-btn-primary):not(.apartment-btn-primary):not(.home-feature-card):not(.guide-option-card):not(.contact-link):not(.contact-social-link):not(.guest-menu-link):not(.guest-menu-brand):not(.guest-menu-account):not(.guest-menu-utility):hover {
+[data-theme="dark"] a:not(.btn-primary):not(.btn-accent):not(.btn-outline):not(.btn-tint):not(.btn-secondary):not(.apartment-btn-primary):not(.home-feature-card):not(.guide-option-card):not(.contact-link):not(.contact-social-link):not(.guest-menu-link):not(.guest-menu-brand):not(.guest-menu-account):not(.guest-menu-utility):hover {
   color: var(--brand-300);
 }

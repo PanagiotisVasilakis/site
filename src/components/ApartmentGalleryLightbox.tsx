@@ -50,7 +50,6 @@ interface Props {
   enableHaptics?: boolean;
   locale?: string;
   labels?: LightboxLabels;
-  springPreset?: string; // Kept for compat, unused
 }
 
 const variants = {
@@ -93,7 +92,6 @@ export default function ApartmentGalleryLightbox({ photos, alts, enableHaptics =
   const index = total > 0 ? ((page % total) + total) % total : 0;
   const currentPhoto = activePhotos[index];
 
-  const lastPersistedIndex = useRef(0);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const prevFocused = useRef<HTMLElement | null>(null);
@@ -146,7 +144,6 @@ export default function ApartmentGalleryLightbox({ photos, alts, enableHaptics =
 
     setPage([startPage, 0]);
     setOpen(true);
-    lastPersistedIndex.current = globalIndex;
   }, [photos]);
 
   // Event Listeners

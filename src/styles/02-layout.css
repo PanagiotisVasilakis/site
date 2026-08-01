@@ -40,7 +40,7 @@ p {
 
 /* Ensure touch targets are at least 44x44px on mobile */
 @media (max-width: 640px) {
-  :where(button, a, [role="button"], [tabindex="0"]):not(.top-controls-compact *):not(.mobile-menu-panel *):not(.mobile-2col-grid *) {
+  :where(button, a, [role="button"], [tabindex="0"]):not(.top-controls-compact *):not(.mobile-menu-panel *) {
     min-height: 44px;
     min-width: 44px;
   }
@@ -58,13 +58,6 @@ p {
     padding: 0.75rem;
     border-radius: 8px;
   }
-
-  /* Use this only on intentional compact two-column mobile layouts. */
-  .mobile-2col-grid {
-    display: grid !important;
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 0.5rem !important;
-  }
 }
 
 /* Coarse pointers include tablet boundary viewports such as 768x1024. */
@@ -80,7 +73,7 @@ p {
     justify-content: center;
   }
 
-  :where(.btn-primary, .btn-outline, .btn-secondary, .btn-tint, .btn-sm, .booking-button, .search-go, .search-trigger, .guest-input, .input) {
+  :where(.btn-primary, .btn-outline, .btn-secondary, .btn-tint, .btn-sm, .booking-button, .search-trigger, .input) {
     min-height: 44px !important;
   }
 

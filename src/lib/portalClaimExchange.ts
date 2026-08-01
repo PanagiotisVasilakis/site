@@ -1,7 +1,7 @@
 import type { NextRequest, NextResponse } from 'next/server';
 
 export const PORTAL_CLAIM_EXCHANGE_COOKIE = 'booking_claim_exchange';
-export const PORTAL_CLAIM_EXCHANGE_MAX_AGE_SECONDS = 5 * 60;
+const PORTAL_CLAIM_EXCHANGE_MAX_AGE_SECONDS = 5 * 60;
 
 const TOKEN_DIGEST_PATTERN = /^[a-f0-9]{64}$/u;
 
@@ -36,7 +36,7 @@ export function createPortalClaimExchangeCookie(
   };
 }
 
-export function clearPortalClaimExchangeCookie() {
+function clearPortalClaimExchangeCookie() {
   return {
     name: PORTAL_CLAIM_EXCHANGE_COOKIE,
     value: '',

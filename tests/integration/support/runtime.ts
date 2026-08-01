@@ -9,10 +9,10 @@ export const POSTGRES_IMAGE = APPROVED_POSTGRES_IMAGE;
 export const POSTGRES_INTERNAL_PORT = 5432;
 export const DATABASE_PREFIX = 'site_integration_test';
 export const CONTAINER_PREFIX = 'site-integration-test';
-export const OPT_IN_ENV = 'SITE_DISPOSABLE_TEST_DB_OPT_IN';
+const OPT_IN_ENV = 'SITE_DISPOSABLE_TEST_DB_OPT_IN';
 export const OPT_IN_VALUE = 'ALLOW_ONLY_THIS_GENERATED_DISPOSABLE_POSTGRES_RUN';
 
-export const CONTEXT_ENV = {
+const CONTEXT_ENV = {
   runId: 'SITE_TEST_RUN_ID',
   runFingerprint: 'SITE_TEST_RUN_FINGERPRINT',
   repositoryId: 'SITE_TEST_REPOSITORY_ID',

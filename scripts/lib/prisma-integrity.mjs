@@ -10,13 +10,13 @@ import {
 import path from 'node:path';
 import { TextDecoder } from 'node:util';
 
-export const MANIFEST_FORMAT = 'prisma-integrity-manifest';
-export const MANIFEST_FORMAT_VERSION = 1;
-export const GENERATOR_VERSION = '1.0.0';
-export const CHECKER_VERSION = '1.0.0';
-export const SCHEMA_RELATIVE_PATH = 'prisma/schema.prisma';
-export const MIGRATIONS_RELATIVE_ROOT = 'prisma/migrations';
-export const MANIFEST_RELATIVE_PATH = 'prisma/integrity-manifest.json';
+const MANIFEST_FORMAT = 'prisma-integrity-manifest';
+const MANIFEST_FORMAT_VERSION = 1;
+const GENERATOR_VERSION = '1.0.0';
+const CHECKER_VERSION = '1.0.0';
+const SCHEMA_RELATIVE_PATH = 'prisma/schema.prisma';
+const MIGRATIONS_RELATIVE_ROOT = 'prisma/migrations';
+const MANIFEST_RELATIVE_PATH = 'prisma/integrity-manifest.json';
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
 const MIGRATIONS_DOMAIN = Buffer.from('prisma-migrations-v1\0', 'utf8');
@@ -102,7 +102,7 @@ function validateManifestRelativePath(relativePath) {
   return Buffer.from(relativePath, 'utf8');
 }
 
-export function collectMigrationFiles(migrationsRoot) {
+function collectMigrationFiles(migrationsRoot) {
   assertDirectory(migrationsRoot, 'migration root');
   const files = [];
 
@@ -151,7 +151,7 @@ export function collectMigrationFiles(migrationsRoot) {
   return files;
 }
 
-export function hashMigrationFiles(files) {
+function hashMigrationFiles(files) {
   const hash = createHash('sha256');
   hash.update(MIGRATIONS_DOMAIN);
   for (const file of files) {
@@ -248,7 +248,7 @@ function assertByteCount(value, label) {
   }
 }
 
-export function validatePrismaIntegrityManifestShape(manifest) {
+function validatePrismaIntegrityManifestShape(manifest) {
   assertExactKeys(
     manifest,
     ['format', 'formatVersion', 'generatorVersion', 'checkerVersion', 'schema', 'migrations'],

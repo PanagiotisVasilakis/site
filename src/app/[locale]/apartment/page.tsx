@@ -53,7 +53,7 @@ export default async function ApartmentPage({ params }: { params: Promise<{ loca
 
   return (
     <div className="cancel-top-gap">
-      <ApartmentCinematic locale={eff} t={t} houseText={ht} photos={photosWithHero} />
+      <ApartmentCinematic locale={eff} houseText={ht} photos={photosWithHero} />
     </div>
   );
 }
