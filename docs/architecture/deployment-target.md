@@ -2,6 +2,7 @@
 
 - **Status:** Accepted architecture; implementation incomplete
 - **Decision date:** 2026-07-16
+- **Last reaffirmed:** 2026-08-01
 - **Scope:** Production hosting, release path, data placement, background workers, and edge services
 
 ## Context
@@ -131,6 +132,11 @@ deployment metadata, and the record of why the integration was retired.
 - Remediation proceeds as one small, reviewable commit at a time.
 - A production deployment requires a separate, explicit release instruction
   that names the verified Git SHA and immutable image identity.
+
+The later `REM-02-I0` proposal for a verification-only GitHub Actions gate is
+superseded by this reaffirmed local-only workflow. Reintroducing hosted CI would
+require a new architecture decision; it is not part of the current remediation
+sequence.
 
 ## Capacity and cost targets
 

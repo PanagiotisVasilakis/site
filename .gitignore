@@ -72,10 +72,12 @@ public/critical-precache.json
 public/version.json
 QWEN.md
 GEMINI.md
-//wsl.localhost/
 
 .venv
 .runtime/
 
 # agent knowledge
 /agent-knowledge/
+/.codex/
+/AGENTS.md
+/graphify-out/

@@ -20,7 +20,7 @@ may be retained as a bounded correlation value, but it is not identity.
 | --- | --- | --- | --- |
 | `sensitiveRateLimit` and admin login, portal claims/sessions, booking requests, DSAR requests, analytics, vitals, client-error, CSP-report and alert-webhook writes | `requireCanonicalClientIp` | Durable limiter key and mutation admission | Require both private headers; generic `503` and zero write otherwise |
 | `portalAuthHttp` claim/login/refresh/session issuance | `requireCanonicalClientIp` | Session/refresh context binding | Fail before any session, refresh-family or cookie mutation |
-| `security-middleware-edge` broad API limiter | `getClientIp` | A2 transitional distributed limiter identity | Use only attested private identity; never public forwarding headers |
+| `security-middleware-edge` CORS diagnostics and forwarded-protocol eligibility | `getClientIp` | Security-event correlation and permission to consider Nginx-overwritten protocol data | Verified identity or `unknown`; never use public forwarding headers as identity |
 | `api-security-middleware` violation/auth diagnostics | `getClientIp` | Security event correlation only | Verified identity or `unknown`; never authorization |
 | client error and CSP persistence diagnostics | `getClientIp` after the sensitive limiter | Privacy HMAC/hash input | Verified identity only; never store a raw public candidate |
 | CORS violation diagnostics | `getClientIp` | Security event correlation only | Verified identity or `unknown`; Cloudflare Ray ID remains non-identity |

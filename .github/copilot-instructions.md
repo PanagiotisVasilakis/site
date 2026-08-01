@@ -41,6 +41,8 @@ Optional accessibility, responsive, and Lighthouse audits are available through 
 ## Runtime and deployment
 
 - Development may use the disposable Docker fallback database. Production must use a configured reachable database and `--no-docker-fallback`.
-- Production does not load `.env.local` and requires an explicit trusted-proxy mode/hop count.
+- Production does not load `.env.local`. It accepts client identity only from the
+  loopback-bound Nginx upstream when both private identity headers and the
+  `ORIGIN_PROXY_SHARED_SECRET` attestation validate.
 - `/api/health/live` is process liveness. `/api/health/ready` checks SQL connectivity and migration state. Do not treat liveness as readiness.
 - The systemd timers drain the outbox every minute and run alert/retention maintenance every five minutes.

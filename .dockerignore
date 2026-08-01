@@ -2,8 +2,15 @@
 .github
 .next
 .runtime
+.codex
 .cursor
 .vscode
+.venv
+AGENTS.md
+QWEN.md
+GEMINI.md
+agent-knowledge
+graphify-out
 node_modules
 reports
 coverage
@@ -16,6 +23,7 @@ analytics-ratelimit.json.tmp
 axe-a11y-report*.json
 axe-contrast-report*.json
 *.tsbuildinfo
+next-env.d.ts
 *.log
 .DS_Store
 .env
@@ -27,4 +35,7 @@ data/*.db-*
 data/*.sqlite
 data/.*.sqlite
 src/generated/prisma
+public/precache.json
+public/critical-precache.json
+public/version.json
 tmp
