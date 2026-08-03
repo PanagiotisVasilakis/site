@@ -27,7 +27,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const rateLimit = await checkSensitiveRateLimit(req, {
     scope: 'admin-login',
-    identifier: 'admin',
     limit: 5,
     windowMs: 15 * 60_000,
   });

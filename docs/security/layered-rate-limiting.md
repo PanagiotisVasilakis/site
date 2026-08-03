@@ -40,6 +40,29 @@ operations worker. Operators must verify the timer runs and alert on cleanup
 age/table growth; the application must not create persistent limiter rows for
 public reads.
 
+## Administrator login source isolation
+
+`REM-04` removes the anonymous, globally enforcing `identifier:admin` bucket
+from administrator login. Before named administrator identities exist, the
+authoritative application budget is the existing privacy-HMAC key for the
+verified source: five attempts in the fixed fifteen-minute window. Saturating
+source A therefore does not consume source B's budget, while A's sixth attempt
+is still denied. The threshold, window, atomic PostgreSQL update, reset,
+retention, and fail-closed storage behavior are unchanged.
+
+Public forwarding headers cannot select that source; the limiter continues to
+require the private canonical IP and valid proxy attestation. Credentials and
+attacker-supplied administrator hints are never key material. Existing bounded
+route/status counters retain a non-enforcing aggregate failure signal; named-
+identity progressive budgets and durable off-host alerting remain later
+`REM-03` and `REM-10` work.
+
+Repository code and deterministic route/PostgreSQL regressions establish the
+implementation contract, but do not close the manual evidence requirement.
+`REM-04` remains `CODE_COMPLETE_EVIDENCE_PENDING` until the exact A/B sequence
+is run through the intended staging proxy topology, forwarding-header spoofing
+is rejected there, and the 401/429/success distributions are observed.
+
 ## Operational signals
 
 Monitor bounded categories, never request bodies, credentials, raw header
