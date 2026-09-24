@@ -1,8 +1,7 @@
 # Booking claim capability transport
 
-The booking claim grant remains the existing short-lived, booking-bound,
-one-time database record. REM-05 changes only how its capability travels
-through the browser:
+The booking claim grant is a short-lived, booking-bound, one-time database
+record. Its capability travels through the browser as follows:
 
 1. An authenticated administrator issues a grant. The raw token is returned
    once in a `no-store` response and shown for manual copy; the application does
@@ -31,5 +30,4 @@ the token or its exchange digest.
 
 The digest cookie is not a session and grants no access by itself. It is
 bounded by the underlying grant and the claim transaction remains the only
-domain mutation path. No new long-lived secret, schema, or migration is
-introduced.
+domain mutation path.

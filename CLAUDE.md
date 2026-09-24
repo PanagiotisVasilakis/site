@@ -70,7 +70,7 @@ npm run verify:release     # mandatory local release gate (30 ordered gates, nee
 ## Database changes
 
 - Edit `prisma/schema.prisma` and add a forward migration under `prisma/migrations/`. Migrations must fail on ambiguous legacy data, not silently drop data or guess ownership.
-- Any schema or migration change breaks `npm run check:prisma-integrity`. Regenerate the committed baseline (`prisma/integrity-manifest.json`) only with `npm run update:prisma-integrity`. `docs/testing.md` also records the current hash values.
+- Any schema or migration change breaks `npm run check:prisma-integrity`. Regenerate the committed baseline (`prisma/integrity-manifest.json`) only with `npm run update:prisma-integrity`; the integration suite reads the same manifest.
 
 ## Testing rules
 
@@ -83,6 +83,6 @@ npm run verify:release     # mandatory local release gate (30 ordered gates, nee
 
 ## Reference docs
 
-- `docs/` holds the deployment target, trusted ingress, rate limiting, claim-token transport, runtime credential contract and migration rehearsal docs.
+- `docs/` holds the deployment target (ADR), release verification, testing strategy, and the security contracts (trusted ingress, rate limiting, claim-token transport, runtime credentials, secret scanning).
 - `scripts/README.md` is the setup and runtime runbook.
 - The 2026-07-15 audit and remediation records (`01_`–`04_*.md`) were removed from the tree; they are in git history (commit `7a955ea`) and describe code that has since changed.

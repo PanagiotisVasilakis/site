@@ -9,24 +9,15 @@
 
 The repository has accumulated artifacts and external status evidence for several
 deployment systems. GitHub commit metadata shows deployments or build attempts
-from Vercel, Cloudflare Workers, and GitHub Pages, and PR-03 added a GitHub
-Actions workflow. Those systems are not the selected production architecture.
+from Vercel, Cloudflare Workers, and GitHub Pages, and an earlier remediation
+added a GitHub Actions workflow. Those systems are not the selected production architecture.
 Multiple connected deployment paths make a source push capable of changing an
 external environment without a single, reviewed release decision.
 
-The original architecture map, production audit, remediation plan, and findings
-addendum are point-in-time evidence. They are no longer in the working tree; they
-remain unchanged and authoritative in git history (added in commit `7a955ea`)
-for what was observed at their review commits:
-
-- `01_SYSTEM_ARCHITECTURE_AND_REPOSITORY_MAP.md`
-- `02_PRODUCTION_SECURITY_AND_PERFORMANCE_AUDIT.md`
-- `03_PRODUCTION_REMEDIATION_AND_PR_PLAN.md`
-- `04_DISCOVERED_SECURITY_FINDINGS_ADDENDUM.md`
-
-This decision supersedes their unresolved hosting assumptions and the active
-GitHub Actions design in PR-03. It does not rewrite their findings, evidence, or
-historical verdicts.
+The original audit and remediation reports (`01_`–`04_*.md`) are point-in-time
+evidence kept in git history (commit `7a955ea`). This decision supersedes their
+unresolved hosting assumptions and the GitHub Actions workflow they proposed,
+without rewriting their findings.
 
 ## Decision
 
@@ -134,10 +125,8 @@ deployment metadata, and the record of why the integration was retired.
 - A production deployment requires a separate, explicit release instruction
   that names the verified Git SHA and immutable image identity.
 
-The later `REM-02-I0` proposal for a verification-only GitHub Actions gate is
-superseded by this reaffirmed local-only workflow. Reintroducing hosted CI would
-require a new architecture decision; it is not part of the current remediation
-sequence.
+Reintroducing hosted CI, including a verification-only GitHub Actions gate,
+requires a new architecture decision.
 
 ## Capacity and cost targets
 
@@ -149,8 +138,7 @@ operated PostgreSQL service only when measured needs justify separating it.
 
 The hosting budget target is near or below EUR 100 per year, excluding the
 domain when necessary. These figures are engineering and economic targets, not
-benchmarked capacity guarantees. H0 neither performs load testing nor provisions
-Netcup infrastructure.
+benchmarked capacity guarantees.
 
 ## Control disposition
 
@@ -167,8 +155,8 @@ centrally enforced pre-merge protection.
 
 ## Current implementation gaps
 
-Acceptance of this ADR is not evidence that the target is deployable. At the
-decision commit, the repository still has these blockers:
+Acceptance of this ADR is not evidence that the target is deployable. These
+blockers were re-checked against the repository on 2026-09-24 and remain open:
 
 - `docker/docker-compose.prod.yml` defines only PostgreSQL; it does not define
   the application, worker execution, or an immutable image reference.
@@ -185,9 +173,9 @@ decision commit, the repository still has these blockers:
   still required;
 - no automated encrypted off-site backup or restore-verification artifact
   exists;
-- H0 removed the Vercel-specific commit fallback from build metadata, but the
-  generated version file still embeds a wall-clock timestamp, so the repository
-  must not claim reproducible images;
+- the generated version file embeds a wall-clock timestamp
+  (`scripts/generate-version.ts`), so the repository must not claim
+  reproducible images;
 - the layered abuse-control contract is Cloudflare Free, Nginx, and
   PostgreSQL-backed authoritative limits for sensitive operations; the
   checked-in Nginx thresholds remain dry-run observation defaults until
@@ -203,8 +191,6 @@ Until every relevant gap is closed and verified, the selected architecture is
 - There is one deliberate production path and no automatic deployment on push.
 - Local verification is human-enforced. It is not continuous integration,
   pre-merge protection, or an independent release approval.
-- Removing GitHub Actions means PR-03 remains historical repository evidence;
-  it does not satisfy `REM-02` as an active mandatory CI control.
 - The single VPS is a shared failure domain for the application, PostgreSQL,
   and workers. Encrypted off-site backups mitigate data recovery, not service
   availability.

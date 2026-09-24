@@ -1,7 +1,5 @@
 # Setup and runtime runbook
 
-Last verified: 2026-07-15.
-
 ## Requirements
 
 - Node.js 22.19.x (`.nvmrc`)

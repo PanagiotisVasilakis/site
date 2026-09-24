@@ -48,13 +48,11 @@ The production container runs as a non-root user. Its build requires an HTTPS `N
 
 - [Selected deployment target](docs/architecture/deployment-target.md)
 - [Release verification](docs/release-verification.md)
-- [External platform cleanup runbook](docs/deployment/external-platform-cleanup.md)
 - [Trusted ingress contract](docs/security/trusted-ingress.md) and [origin runbook](docs/deployment/origin-ingress-runbook.md)
 - [Layered rate-limiting contract](docs/security/layered-rate-limiting.md)
 - [Booking claim-token transport](docs/security/claim-token-transport.md)
 - [Runtime credential contract](docs/security/runtime-credential-contract.md)
 - [Setup and runtime](scripts/README.md)
 - [Testing strategy](docs/testing.md)
-- [Migration rehearsal](docs/deployment-migration-rehearsal.md)
 - [Secret handling and incident response](SECURITY.md)
 - Runtime OpenAPI UI: `/api/docs`

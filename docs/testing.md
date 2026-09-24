@@ -1,7 +1,5 @@
 # Testing strategy
 
-Last verified: 2026-07-16.
-
 ## Purpose
 
 The repository uses Vitest 4 with explicit TypeScript imports, jsdom only for browser-facing components, and Testing Library for user-observable UI behavior. Release verification is local and repository-owned; see [Release verification](release-verification.md).
@@ -13,7 +11,7 @@ The design goal is high-signal regression protection, not assertions against imp
 - `tests/unit`: pure formatting, validation, date/time, data, map, navigation, and adapter configuration.
 - `tests/security`: environment fail-closed rules, JWT and database-session contracts, request-body limits, error sanitization, privacy hashing/redaction, trusted proxies, durable rate limiting, limiter failure responses, and portal refresh behavior.
 - `tests/components`: jsdom interaction tests for theme state, locale synchronization, modal focus management, safe fallbacks, and request cancellation.
-- `tests/routes`: public health, OpenAPI, and category response contracts.
+- `tests/routes`: public liveness and OpenAPI contracts, and the client error-report round trip.
 
 The default suite deliberately does not connect to PostgreSQL, webhooks, OSRM,
 or another live service. Persistence and network boundaries are mocked at
@@ -109,20 +107,13 @@ Run `npm run hash:prisma-integrity` from the repository root. The schema hash co
 
 The current values are recorded only in `prisma/integrity-manifest.json`. The integration support (`tests/integration/support/migrations.ts`) reads the same manifest through `checkPrismaIntegrity` and compares its per-migration SHA-256 values with the applied `_prisma_migrations` checksums.
 
-The earlier `b1763086454bf563257bbba8b092b89cea1bdd962e442da0bec49af9bbd6450c` / `bcb0d280c005f31d08a1c98a46cd3e2301b97256c5b68b88d52907c6c5bc8bd2` discrepancy was file-scope drift, not a migration change: the first command included `migration_lock.toml` among all 15 files, while the second selected only the 14 `*.sql` files. The versioned utility above is the canonical process for subsequent reports.
-
 This manifest is static repository evidence only. It does not read a live `_prisma_migrations` table or prove that staging/production is migrated, drift-free, or compatible.
 
 ## Coverage policy
 
 `vitest.config.ts` lists the critical authored-code coverage scope explicitly. Generated Prisma files, declarations, page composition, and infrastructure that requires live services are not counted in this percentage.
 
-The initial verified baseline is:
-
-- statements: 88.40%; enforced minimum 88%;
-- branches: 82.07%; enforced minimum 82%;
-- functions: 91.04%; enforced minimum 91%;
-- lines: 89.75%; enforced minimum 89%.
+The enforced minimums live in `vitest.config.ts` (`coverage.thresholds`).
 
 Coverage thresholds are regression gates, not a claim that every repository line is tested. A new critical module should be added to the coverage scope with meaningful tests. Do not exclude difficult production code merely to preserve the percentage.
 

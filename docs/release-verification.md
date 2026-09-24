@@ -33,8 +33,8 @@ random disposable database, and the build receives a complete synthetic
 production environment under `.invalid` origins. The orchestrator copies only a
 small allowlist of non-secret host variables and never prints the environment.
 
-The complete warm-cache H0 run measured approximately 2.5 minutes on the
-verified workstation. Cold registry access, the intentionally repeated test
+A warm-cache run takes approximately 2.5 minutes on the reference
+workstation. Cold registry access, the intentionally repeated test
 coverage, and the production build can extend that substantially; reserve
 approximately 5–15 minutes. This is an operational estimate, not a timeout or
 performance guarantee.
@@ -162,9 +162,9 @@ current values with `npm run hash:prisma-integrity` and compare them with
 
 The checker hashes the repository schema and deterministic migration tree. It
 does not inspect a live `_prisma_migrations` table, detect live schema drift, or
-prove that a production database can be migrated safely. A separately
-authorized migration change must update the integrity manifest in the same
-reviewed change; H0 does not authorize one.
+prove that a production database can be migrated safely. A migration change
+must regenerate the manifest (`npm run update:prisma-integrity`) in the same
+reviewed change.
 
 ## Controlled PostgreSQL digest update
 
@@ -204,8 +204,7 @@ tag-only PostgreSQL references; production-default database mutation; and
 commands that combine staging and production database credentials.
 
 It intentionally scans active package/scripts/configuration surfaces and known
-deployment artifact locations, not natural-language historical reports or this
-manual cleanup runbook. It is not a general shell, YAML, Docker, or data-flow
+deployment artifact locations, not natural-language documentation. It is not a general shell, YAML, Docker, or data-flow
 parser. A reviewed change could alter both policy and tests, so code review and
 operator discipline remain necessary.
 
@@ -230,5 +229,3 @@ The command does not:
 
 The accepted target and its current blockers are recorded in
 [`architecture/deployment-target.md`](architecture/deployment-target.md).
-External retirement remains a separately authorized procedure in
-[`deployment/external-platform-cleanup.md`](deployment/external-platform-cleanup.md).
