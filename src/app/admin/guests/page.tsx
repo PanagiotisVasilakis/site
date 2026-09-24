@@ -101,7 +101,7 @@ export default function GuestDataViewer() {
 
   const fetchArrivalRequests = async () => {
     try {
-      const response = await internalFetch('/api/admin/guests?action=requests')
+      const response = await internalFetch('/api/admin/check-in-requests?status=all')
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`)
       }

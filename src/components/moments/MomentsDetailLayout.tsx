@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { ResponsiveImage } from '@/components/ResponsiveImage';
-import { CTAButton } from '@/components/CTAButton';
+import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/Skeleton';
 import FavoriteButton from '@/components/FavoriteButton';
 import ShareButton from '@/components/ShareButton';
@@ -118,24 +118,24 @@ export function MomentsDetailLayout({
             {/* CTA Buttons */}
             <div className={config.ctaGridClass}>
                 {urls.tel && (
-                    <CTAButton variant="primary" asChild aria-label={`${t.cta.call} ${item.name}`}>
+                    <Button variant="primary" asChild aria-label={`${t.cta.call} ${item.name}`}>
                         <a href={urls.tel}>{t.cta.call}</a>
-                    </CTAButton>
+                    </Button>
                 )}
                 {urls.maps && (
-                    <CTAButton variant="primary" asChild aria-label={`${t.cta.directions} ${item.name}`}>
+                    <Button variant="primary" asChild aria-label={`${t.cta.directions} ${item.name}`}>
                         <a href={urls.maps} target="_blank">{t.cta.directions}</a>
-                    </CTAButton>
+                    </Button>
                 )}
                 {urls.website && (
-                    <CTAButton variant="primary" asChild aria-label={`${t.cta.website} ${item.name}`}>
+                    <Button variant="primary" asChild aria-label={`${t.cta.website} ${item.name}`}>
                         <a href={urls.website} target="_blank">{t.cta.website}</a>
-                    </CTAButton>
+                    </Button>
                 )}
                 {urls.reservationUrl && (
-                    <CTAButton variant="primary" asChild aria-label={`${t.cta.reserve} ${item.name}`}>
+                    <Button variant="primary" asChild aria-label={`${t.cta.reserve} ${item.name}`}>
                         <a href={urls.reservationUrl} target="_blank">{t.cta.reserve}</a>
-                    </CTAButton>
+                    </Button>
                 )}
                 <ShareButton title={item.name} text={item.summary} className="btn-primary" locale={locale} />
                 <FavoriteButton id={`${categorySlug}:${item.id}`} label={item.name} locale={locale} />

@@ -192,7 +192,7 @@ export async function runRetention(): Promise<Record<string, number>> {
   const now = Date.now();
   const days = (value: number) => new Date(now - value * 86_400_000);
   const analyticsDays = Math.max(1, Number.parseInt(process.env.ANALYTICS_RETENTION_DAYS || '30', 10));
-  const [rateLimits, sessions, tokens, families, grants, analyticsHits, analyticsVitals, securityEvents, metrics, logs, outbox] = await prisma.$transaction([
+  const [rateLimits, sessions, tokens, families, grants, analyticsHits, analyticsVitals, securityEvents, metrics, logs, outbox, adminSessions] = await prisma.$transaction([
     prisma.rateLimit.deleteMany({ where: { resetTime: { lt: new Date() } } }),
     prisma.session.deleteMany({ where: { expiresAt: { lt: days(7) } } }),
     prisma.refreshToken.deleteMany({ where: { expiresAt: { lt: days(30) } } }),
@@ -209,6 +209,8 @@ export async function runRetention(): Promise<Record<string, number>> {
     prisma.metric.deleteMany({ where: { recordedAt: { lt: days(30) } } }),
     prisma.log.deleteMany({ where: { timestamp: { lt: days(30) } } }),
     prisma.outboxEvent.deleteMany({ where: { status: 'DELIVERED', deliveredAt: { lt: days(30) } } }),
+    // Longer than claim-grant retention, so issued grants keep their admin-session link while they exist.
+    prisma.adminSession.deleteMany({ where: { absoluteExpiresAt: { lt: days(90) } } }),
   ]);
   return {
     rateLimits: rateLimits.count,
@@ -222,5 +224,6 @@ export async function runRetention(): Promise<Record<string, number>> {
     metrics: metrics.count,
     logs: logs.count,
     outbox: outbox.count,
+    adminSessions: adminSessions.count,
   };
 }

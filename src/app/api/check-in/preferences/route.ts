@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { withErrorHandler, validateRequestBody, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
-import { parseGuestSession, verifyGuestSessionAccess } from '@/lib/guestSession';
+import { GUEST_SESSION_COOKIE, parseGuestSession, verifyGuestSessionAccess } from '@/lib/guestSession';
 import { isAdminRequest } from '@/lib/rbac';
 import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 import { wifiDisclosureWindow } from '@/lib/propertyTime';
@@ -60,7 +60,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   }
 
   const adminAccess = await isAdminRequest(request);
-  const guestSession = parseGuestSession(request.cookies.get('guest_session')?.value);
+  const guestSession = parseGuestSession(request.cookies.get(GUEST_SESSION_COOKIE)?.value);
   const guestAccess = await verifyGuestSessionAccess(guestSession);
   if (!adminAccess && !guestAccess) {
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Authentication required to view preferences');
@@ -114,7 +114,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }
 
-  // Basic security checks only (content type, XSS/SQLi)
+  // Request shape checks only (content type and body size)
   const guard = createAPISecurityMiddleware();
   const early = await guard(request);
   if (early) return early;

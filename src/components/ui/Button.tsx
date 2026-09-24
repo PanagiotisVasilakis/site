@@ -8,20 +8,10 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary: 'btn-primary',
-        secondary: 'btn-secondary',
-        outline: 'btn-outline',
-        tint: 'btn-tint',
-        danger: 'btn-danger',
-        ghost: 'btn-ghost',
-      },
-      size: {
-        sm: 'btn-sm',
-        md: '',
       },
     },
     defaultVariants: {
       variant: 'primary',
-      size: 'md',
     },
   }
 );
@@ -41,8 +31,8 @@ type ButtonAsChildProps = ButtonVariantProps &
 
 export type AppButtonProps = ButtonProps | ButtonAsChildProps;
 
-export function Button({ variant, size, className, asChild, ...props }: AppButtonProps) {
-  const classes = buttonVariants({ variant, size, className });
+export function Button({ variant, className, asChild, ...props }: AppButtonProps) {
+  const classes = buttonVariants({ variant, className });
 
   if (asChild) {
     const { children, ...anchorProps } = props as ButtonAsChildProps;

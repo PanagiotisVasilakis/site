@@ -1,4 +1,3 @@
-"use client";
 import React from 'react';
 
 export function SimpleChevronDown({ className }: { className?: string }) {

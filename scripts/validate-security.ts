@@ -14,7 +14,7 @@ interface SecurityCheck {
   name: string;
   description: string;
   check: () => Promise<boolean> | boolean;
-  severity: 'error' | 'warning' | 'info';
+  severity: 'error' | 'warning';
 }
 
 function gitCommandSucceeds(args: string[]): boolean {
@@ -261,11 +261,9 @@ async function runSecurityValidation(): Promise<void> {
         if (check.severity === 'error') {
           console.log(`  ❌ Failed (Error)\n`);
           errorCount++;
-        } else if (check.severity === 'warning') {
+        } else {
           console.log(`  ⚠️ Failed (Warning)\n`);
           warningCount++;
-        } else {
-          console.log(`  ℹ️ Info\n`);
         }
       }
     } catch (error) {
@@ -300,5 +298,3 @@ if (isMain) {
     process.exit(1);
   });
 }
-
-export { runSecurityValidation };

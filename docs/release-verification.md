@@ -85,6 +85,26 @@ not imported by application code. Knip ignores exactly that dependency, while
 full `npm ls` and explicit dependency-tree evidence remain mandatory; nested
 `proxy-agent@6.5.0` remains required for the legacy Puppeteer chain.
 
+`package.json` `overrides` and their reasons:
+
+- `next@16.3.6` → `postcss`, `sharp`: keep Next's nested copies on the patched
+  direct versions (`postcss` GHSA-fxqj-rqcc-2cmp, `sharp` GHSA-rgj7-g3m4-5g8c).
+  Rename the key whenever `next` is bumped.
+- `baseline-browser-mapping`: GHSA-w5vr-8v7q-w6rv (reached through `next`).
+- `deepmerge-ts`, `mysql2`, `fast-uri`: `prisma@7.x` pins vulnerable versions
+  (GHSA-ggr8-5vv4-36mx, GHSA-3f6p-5ww8-9rcr, GHSA-7p8r-x3mc-p8w7 and related).
+  `npm audit --omit=dev` includes them because `prisma` is a peer of
+  `@prisma/client`. `@prisma/config` only calls `deepmerge(a, b)`, and `mysql2`
+  is used only by Prisma Studio's MySQL adapter. Remove these overrides when
+  Prisma ships patched pins.
+- `@prisma/dev`, `@sentry/node`: pre-existing pins for the Prisma CLI and the
+  Lighthouse chain. Re-check both on the next Prisma or Lighthouse upgrade.
+
+`scripts/lib/generated-artifact-secret-disposition.mjs` supports exactly one
+Next version (`SUPPORTED_NEXT_VERSION`). A Next upgrade must update that
+constant and the matching fixture in `scripts/tests/secret-scanning.test.mjs`,
+after confirming that the build's manifest schema still validates.
+
 The default Vitest suite and the explicit unit/security/coverage invocations
 overlap intentionally. The explicit gates preserve the agreed release contract
 and coverage thresholds; the default suite also covers component and route
@@ -136,11 +156,9 @@ copying secret-bearing output into commits or release records.
 
 ## Canonical Prisma integrity baseline
 
-```text
-Schema SHA-256: 55e5f6c9ec3230009b60d2331f0b9d04a4acc143f65e72c376fd1a7c31df044b
-Migration-tree SHA-256: be2f0a33cd4d80f9eb71b7c1f2916b56600fd3cbc325fbf8ad8a7684c83a3d8f
-Migration files: 15
-```
+The baseline is the committed `prisma/integrity-manifest.json`; print the
+current values with `npm run hash:prisma-integrity` and compare them with
+`npm run check:prisma-integrity`.
 
 The checker hashes the repository schema and deterministic migration tree. It
 does not inspect a live `_prisma_migrations` table, detect live schema drift, or

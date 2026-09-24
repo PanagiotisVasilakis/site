@@ -8,8 +8,8 @@ const internalFetchRule = {
           const arg = node.arguments[0];
           if (arg && arg.type === 'Literal' && typeof arg.value === 'string') {
             const v = arg.value;
-            if (v.startsWith('/') && !v.startsWith('/api/og')) {
-              const filename = context.getFilename();
+            if (v.startsWith('/')) {
+              const filename = context.filename;
               if (!filename.includes('/src/lib/')) {
                 context.report({ node, message: 'Use a lib helper instead of direct fetch to internal route' });
               }

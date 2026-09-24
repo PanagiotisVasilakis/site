@@ -5,27 +5,19 @@ const surfaceVariants = cva('', {
   variants: {
     variant: {
       card: 'surface-card',
-      panel: 'surface-panel',
-      subtle: 'surface-subtle',
-      interactive: 'surface-interactive',
     },
     padding: {
-      none: '',
       sm: 'p-4',
       md: 'p-5',
       lg: 'p-6',
       xl: 'p-8',
     },
     radius: {
-      inherit: '',
       md: 'rounded-lg',
       lg: 'rounded-xl',
-      xl: 'rounded-2xl',
     },
     shadow: {
-      none: '',
       sm: 'shadow-sm',
-      md: 'shadow',
       lg: 'shadow-lg',
     },
     border: {

@@ -13,31 +13,20 @@ import {
   runtimeEnvironment,
   safeChildEnvironment,
 } from './runtime';
+import { checkPrismaIntegrity } from '../../../scripts/lib/prisma-integrity.mjs';
 
-const MIGRATION_FILE_MANIFEST = {
-  'prisma/migrations/migration_lock.toml': '99836963713b4f5b269ad49af0ed3d7b0b2e336115c2f92dc9ac683d139d0900',
-  'prisma/migrations/000_init/migration.sql': 'f25a3d005ffa2ba6573ab36e8c0849b59d1db7983c8925ee64a9983584ea2c25',
-  'prisma/migrations/001_add_session_created_at/migration.sql': '86d3a2b83e570c6a7b1a9142086ca242e90c78dcdfca712e5f0c754c562502c9',
-  'prisma/migrations/20251014185403_add_composite_indexes/migration.sql': '2340d607ff2b3f8d8d2db244598835e07e23bc94e9c13f1013cbac9699099fac',
-  'prisma/migrations/20260426201500_add_check_in_requests/migration.sql': '8f5593d87e7cb1a8bffa61ffbecfd1ae9ff4663d01efa07e5d11ebe179a79c5f',
-  'prisma/migrations/20260714090000_comprehensive_remediation/migration.sql': '7350e9490019ec84d2431489477c3b395c66a5af2cb59655642ce10c9bf8bb2a',
-  'prisma/migrations/20260714145900_preserve_booking_ownership/migration.sql': 'e2d6c8542bf5570827f99e4146cbf4b7e6b8d5f1abadfbee357ad3fbad899cb8',
-  'prisma/migrations/20260714150000_trustworthy_portal_and_operations/migration.sql': '34332d763f7ecb1617a3a4758fa9c5168749051411640319bb17ff2061aeae25',
-  'prisma/migrations/20260715100000_enforce_booking_ownership_invariant/migration.sql': '5250299bd2f3cda62783276a1c76bf1127050f1cb246c9414513cf35b36f4578',
-  'prisma/migrations/20260715101000_normalize_stay_request_phones/migration.sql': 'a3f59f9ce766b5b70a20d8fee9ed67fb6b1f4564e11205dbc7140e0a48d73629',
-  'prisma/migrations/20260715102000_idempotent_analytics_occurrence/migration.sql': '0d7f5441078969be2d5bb7cdf3488f0260f45907baa1d4195a146c4beec3178f',
-  'prisma/migrations/20260715103000_track_booking_updates/migration.sql': 'a4407555ccac11e9f99c071c9f37e2b5c7908987b800b285ba4249385ae768eb',
-  'prisma/migrations/20260715104000_unique_open_erasure_request/migration.sql': '9e9fdd4aca6a969f9a57fa5c19c06f89cc7544ab0ebb208b1d8acebf7a89f276',
-  'prisma/migrations/20260715105000_recover_legacy_outbox_leases/migration.sql': 'b77537144ae8523db9d9f3b25cb07fd016773ca54aebaee812898a788a035272',
-  'prisma/migrations/20260715110000_remove_unused_legacy_models/migration.sql': '94a00297c507e8c8aed855725fd204cd37797f5f915e801dc8bc510582562967',
-} as const;
+interface ExpectedMigration {
+  name: string;
+  checksum: string;
+}
 
-const EXPECTED_MIGRATIONS = Object.entries(MIGRATION_FILE_MANIFEST)
-  .filter(([file]) => file.endsWith('/migration.sql'))
-  .map(([file, checksum]) => ({
-    name: file.split('/').at(-2) as string,
-    checksum,
-  }));
+// The canonical committed manifest; checkPrismaIntegrity fails closed on any drift.
+function committedMigrationChain(): ExpectedMigration[] {
+  const { manifest } = checkPrismaIntegrity(REPOSITORY_ROOT);
+  return (manifest.migrations.files as Array<{ path: string; sha256: string }>)
+    .filter((file) => file.path.endsWith('/migration.sql'))
+    .map((file) => ({ name: file.path.split('/')[0], checksum: file.sha256 }));
+}
 
 interface MigrationRecord {
   migration_name: string;
@@ -74,13 +63,7 @@ export async function migrationFileHashes(): Promise<Record<string, string>> {
 }
 
 export async function assertCommittedMigrationManifest(): Promise<void> {
-  const actual = await migrationFileHashes();
-  const expected = Object.fromEntries(
-    Object.entries(MIGRATION_FILE_MANIFEST).sort(([left], [right]) => left.localeCompare(right)),
-  );
-  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-    throw new Error('Migration files differ from the committed integration-test manifest.');
-  }
+  checkPrismaIntegrity(REPOSITORY_ROOT);
 }
 
 interface CommandResult {
@@ -226,12 +209,13 @@ async function readAppliedMigrationHistory(
 export async function assertCompleteMigrationHistory(
   target: DisposableDatabaseTarget,
 ): Promise<void> {
+  const expectedMigrations = committedMigrationChain();
   const history = await readAppliedMigrationHistory(target);
-  if (history.length !== EXPECTED_MIGRATIONS.length) {
+  if (history.length !== expectedMigrations.length) {
     throw new Error('Disposable database has an incomplete migration history.');
   }
   history.forEach((record, index) => {
-    const expected = EXPECTED_MIGRATIONS[index];
+    const expected = expectedMigrations[index];
     if (record.migration_name !== expected.name
       || record.checksum !== expected.checksum
       || !record.finished_at

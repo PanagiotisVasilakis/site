@@ -1266,8 +1266,8 @@ describe.sequential('refresh authorization generation regressions', () => {
     const modules = await loadAuthModules();
     const primaryChain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
     const isolatedChain = await issueBoundAuthorizationChain(modules, ISOLATED_AUTH_FIXTURE);
-    await modules.sessionModule.revokeGuestSession(
-      modules.sessionModule.parseGuestSession(primaryChain.sessionToken),
+    await modules.sessionModule.revokeGuestSessionById(
+      modules.sessionModule.parseGuestSession(primaryChain.sessionToken)?.sid,
     );
 
     const primaryResponse = await performRefresh(

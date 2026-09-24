@@ -15,13 +15,14 @@ Multiple connected deployment paths make a source push capable of changing an
 external environment without a single, reviewed release decision.
 
 The original architecture map, production audit, remediation plan, and findings
-addendum are point-in-time evidence. They remain unchanged and authoritative for
-what was observed at their review commits:
+addendum are point-in-time evidence. They are no longer in the working tree; they
+remain unchanged and authoritative in git history (added in commit `7a955ea`)
+for what was observed at their review commits:
 
-- [`../../01_SYSTEM_ARCHITECTURE_AND_REPOSITORY_MAP.md`](../../01_SYSTEM_ARCHITECTURE_AND_REPOSITORY_MAP.md)
-- [`../../02_PRODUCTION_SECURITY_AND_PERFORMANCE_AUDIT.md`](../../02_PRODUCTION_SECURITY_AND_PERFORMANCE_AUDIT.md)
-- [`../../03_PRODUCTION_REMEDIATION_AND_PR_PLAN.md`](../../03_PRODUCTION_REMEDIATION_AND_PR_PLAN.md)
-- [`../../04_DISCOVERED_SECURITY_FINDINGS_ADDENDUM.md`](../../04_DISCOVERED_SECURITY_FINDINGS_ADDENDUM.md)
+- `01_SYSTEM_ARCHITECTURE_AND_REPOSITORY_MAP.md`
+- `02_PRODUCTION_SECURITY_AND_PERFORMANCE_AUDIT.md`
+- `03_PRODUCTION_REMEDIATION_AND_PR_PLAN.md`
+- `04_DISCOVERED_SECURITY_FINDINGS_ADDENDUM.md`
 
 This decision supersedes their unresolved hosting assumptions and the active
 GitHub Actions design in PR-03. It does not rewrite their findings, evidence, or

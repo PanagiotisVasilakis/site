@@ -1,9 +1,10 @@
 import { Suspense } from "react";
 import { categories } from "@/data/categories";
-import { getItem, mapsHref, telHref, getItemsByCategory, toSlug, pickLocale, isRecentlyUpdated } from "@/lib/data";
-import { absUrl, normalizeExternalUrl } from "@/lib/site";
+import { getItem, getItemsByCategory, toSlug, pickLocale, isRecentlyUpdated } from "@/lib/data";
+import { mapsHref, telHref } from "@/lib/contactLinks";
+import { absUrl } from "@/lib/site";
 import { ResponsiveImage } from "@/components/ResponsiveImage";
-import { CTAButton } from "@/components/CTAButton";
+import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/Skeleton";
 import FavoriteButton from "@/components/FavoriteButton";
 import ShareButton from "@/components/ShareButton";
@@ -68,8 +69,8 @@ export default async function ItemPage({ params }: { params: Promise<{ locale: s
     // Compute URLs server-side to avoid client-side node imports
     const momentsTel = telHref(item.phone);
     const momentsMaps = item.directionsUrl || mapsHref(item.address, item.location?.lat, item.location?.lng);
-    const momentsWebsite = normalizeExternalUrl(item.website);
-    const momentsReservationUrl = normalizeExternalUrl(item.reservationUrl);
+    const momentsWebsite = item.website || undefined;
+    const momentsReservationUrl = item.reservationUrl || undefined;
 
     return (
       <MomentsDetailLayout
@@ -106,8 +107,8 @@ export default async function ItemPage({ params }: { params: Promise<{ locale: s
   // Default layout for other categories
   const tel = telHref(item.phone);
   const maps = item.directionsUrl || mapsHref(item.address, item.location?.lat, item.location?.lng);
-  const website = normalizeExternalUrl(item.website);
-  const reservationUrl = normalizeExternalUrl(item.reservationUrl);
+  const website = item.website || undefined;
+  const reservationUrl = item.reservationUrl || undefined;
 
   return (
     <div className="page-container mx-auto max-w-7xl space-y-6 safe-bottom">
@@ -145,24 +146,24 @@ export default async function ItemPage({ params }: { params: Promise<{ locale: s
 
       <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
         {tel && (
-          <CTAButton variant="primary" asChild aria-label={`${t.cta.call} ${name}`}>
+          <Button variant="primary" asChild aria-label={`${t.cta.call} ${name}`}>
             <a href={tel}>{t.cta.call}</a>
-          </CTAButton>
+          </Button>
         )}
         {maps && (
-          <CTAButton variant="primary" asChild aria-label={`${t.cta.directions} ${name}`}>
+          <Button variant="primary" asChild aria-label={`${t.cta.directions} ${name}`}>
             <a href={maps} target="_blank">{t.cta.directions}</a>
-          </CTAButton>
+          </Button>
         )}
         {website && (
-          <CTAButton variant="primary" asChild aria-label={`${t.cta.website} ${name}`}>
+          <Button variant="primary" asChild aria-label={`${t.cta.website} ${name}`}>
             <a href={website} target="_blank">{t.cta.website}</a>
-          </CTAButton>
+          </Button>
         )}
         {reservationUrl && (
-          <CTAButton variant="primary" asChild aria-label={`${t.cta.reserve} ${name}`}>
+          <Button variant="primary" asChild aria-label={`${t.cta.reserve} ${name}`}>
             <a href={reservationUrl} target="_blank">{t.cta.reserve}</a>
-          </CTAButton>
+          </Button>
         )}
         <ShareButton title={name} text={summary} className="btn-primary" locale={eff} />
         <FavoriteButton id={`${cat.id}:${item.id}`} label={name} locale={eff} />

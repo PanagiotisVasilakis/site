@@ -9,9 +9,11 @@ if (nodeEnv === "production") {
 } else {
   dotenv.config({ path: ".env.development.local" });
   dotenv.config({ path: ".env.local" });
+  dotenv.config({ path: ".env.development" });
 }
 dotenv.config({ path: ".env" });
 
+// Optional DIRECT_URL (e.g. a non-pooled connection) takes precedence for Prisma CLI commands only.
 const datasourceUrl = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
 
 export default defineConfig({

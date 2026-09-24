@@ -1,5 +1,3 @@
-"use client";
-
 export default function DescriptionBox({ title, description }: { title?: string; description?: string }) {
     if (!title && !description) return null;
 

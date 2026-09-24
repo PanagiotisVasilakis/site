@@ -93,7 +93,12 @@ export default function StatusCluster({ className = '', labels, pollMs = 15000 }
     
     async function probe() {
       if (aborted) return;
-      
+      // Skip the network probe while the tab is hidden; online/offline events still apply.
+      if (document.hidden) {
+        timer = setTimeout(probe, pollMs);
+        return;
+      }
+
       try {
         const ctrl = new AbortController();
         const timeoutId = setTimeout(() => ctrl.abort(), 4000);

@@ -4,7 +4,7 @@ import { logger } from '@/lib/logger-client';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
 
-export default function ShareButton({ title, text, className = "fav-btn", locale = 'en' }: { title: string; text?: string; className?: string; locale?: string }) {
+export default function ShareButton({ title, text, className = "", locale = 'en' }: { title: string; text?: string; className?: string; locale?: string }) {
 	const [copied, setCopied] = useState(false);
 	const t = getDictionary(locale as Locale);
 	const copiedLabel = t.checkinInfo?.copied ?? 'Copied';

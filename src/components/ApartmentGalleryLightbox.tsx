@@ -47,7 +47,6 @@ type SiblingState = {
 interface Props {
   photos: ApartmentPhotoWithAlt[];
   alts: AltMap;
-  enableHaptics?: boolean;
   locale?: string;
   labels?: LightboxLabels;
 }
@@ -77,7 +76,7 @@ const swipePower = (offset: number, velocity: number) => {
   return Math.abs(offset) * velocity;
 };
 
-export default function ApartmentGalleryLightbox({ photos, alts, enableHaptics = true, locale = 'en', labels }: Props) {
+export default function ApartmentGalleryLightbox({ photos, alts, locale = 'en', labels }: Props) {
   const [open, setOpen] = useState(false);
   const [[page, direction], setPage] = useState([0, 0]);
   const [activeSequence, setActiveSequence] = useState<number[]>(photos.map((_, i) => i));
@@ -120,10 +119,10 @@ export default function ApartmentGalleryLightbox({ photos, alts, enableHaptics =
   // Actions
   const paginate = useCallback((newDirection: number) => {
     setPage([page + newDirection, newDirection]);
-    if (enableHaptics && typeof navigator !== 'undefined' && navigator.vibrate) {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
       try { navigator.vibrate(10); } catch { /* ignore */ }
     }
-  }, [page, enableHaptics]);
+  }, [page]);
 
   const close = useCallback(() => {
     setOpen(false);

@@ -2,9 +2,9 @@ import type { MetadataRoute } from 'next';
 import { categories } from '@/data/categories';
 import { getItemsByCategory, toSlug } from '@/lib/data';
 import { siteUrl } from '@/lib/site';
+import { locales } from '@/i18n/config';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-	const locales = ['en', 'el'] as const;
 	const urls: MetadataRoute.Sitemap = [];
 	for (const locale of locales) {
 		urls.push({ url: `${siteUrl}/${locale}`, changeFrequency: 'weekly', priority: 0.8 });

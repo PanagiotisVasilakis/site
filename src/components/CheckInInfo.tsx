@@ -10,6 +10,7 @@ import {
 } from '@/data/mapLocations';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
+import { telHref } from '@/lib/contactLinks';
 import internalFetch from '@/lib/internalFetchClient';
 import MapLoadingSkeleton from '@/components/MapLoadingSkeleton';
 import { MAP_DEFAULTS } from '@/lib/mapConstants';
@@ -445,13 +446,13 @@ export default function CheckInInfo({
   const emergencyItems = [
     {
       label: ui.host,
-      value: apartmentLocation.phone || '+30 695 581 0051',
-      href: `tel:${(apartmentLocation.phone || '+30 695 581 0051').replace(/[^+0-9]/g, '')}`,
+      value: apartmentLocation.phone,
+      href: telHref(apartmentLocation.phone),
     },
     ...nearbyServices.slice(0, 2).map((item) => ({
       label: item.name,
       value: item.phone || item.phones?.[0] || item.summary || '',
-      href: item.phone || item.phones?.[0] ? `tel:${(item.phone || item.phones?.[0] || '').replace(/[^+0-9]/g, '')}` : undefined,
+      href: telHref(item.phone || item.phones?.[0]),
     })),
   ].filter((item) => item.value);
 

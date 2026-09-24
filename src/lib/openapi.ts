@@ -11,9 +11,6 @@ export const openApiSpec = {
     securitySchemes: {
       AdminCookie: { type: 'apiKey', in: 'cookie', name: 'admin_jwt' },
       GuestCookie: { type: 'apiKey', in: 'cookie', name: 'guest_session' },
-      ApiKeyAuth: { type: 'apiKey', in: 'header', name: 'X-API-Key' },
-      CronBearer: { type: 'http', scheme: 'bearer', bearerFormat: 'opaque' },
-      WebhookBearer: { type: 'http', scheme: 'bearer', bearerFormat: 'opaque' },
     },
     schemas: {
       Error: {
@@ -38,33 +35,6 @@ export const openApiSpec = {
           },
         },
       },
-      Category: {
-        type: 'object',
-        required: ['id', 'slug'],
-        properties: {
-          id: { type: 'string' },
-          slug: { type: 'string', pattern: '^[a-z0-9_-]+$' },
-          title: { type: 'string' },
-          count: { type: 'integer', minimum: 0 },
-        },
-      },
-      Item: {
-        type: 'object',
-        required: ['id', 'slug', 'name'],
-        properties: {
-          id: { type: 'string' },
-          slug: { type: 'string' },
-          name: { type: 'string' },
-          summary: { type: 'string' },
-          address: { type: 'string' },
-          phone: { type: 'string' },
-          categoryId: { type: 'string' },
-          location: {
-            type: 'object',
-            properties: { lat: { type: 'number' }, lng: { type: 'number' } },
-          },
-        },
-      },
       AnalyticsEvent: {
         type: 'object',
         required: ['path'],
@@ -77,8 +47,7 @@ export const openApiSpec = {
               name: {
                 type: 'string',
                 enum: [
-                  'portal_opened', 'origin_selected', 'form_submitted', 'auth_mode_changed',
-                  'no_booking_cta_clicked', 'checkin_viewed', 'checkin_completed',
+                  'portal_opened', 'form_submitted', 'auth_mode_changed', 'checkin_viewed',
                   'booking_submitted', 'booking_check_availability',
                   'mobile_nav_house', 'mobile_nav_book', 'mobile_nav_booking_details',
                   'mobile_nav_about', 'mobile_nav_favorites', 'mobile_nav_moments',
@@ -163,10 +132,6 @@ export const openApiSpec = {
     },
   },
   paths: {
-    '/health': {
-      get: { summary: 'Process health', tags: ['Health'], responses: { '200': { description: 'Process is alive' } } },
-      head: { summary: 'Process health without a body', tags: ['Health'], responses: { '200': { description: 'Process is alive' } } },
-    },
     '/health/live': {
       get: { summary: 'Liveness probe', tags: ['Health'], responses: { '200': { description: 'Process is alive' } } },
       head: { summary: 'Liveness probe without a body', tags: ['Health'], responses: { '200': { description: 'Process is alive' } } },
@@ -174,26 +139,6 @@ export const openApiSpec = {
     '/health/ready': {
       get: { summary: 'Database and migration readiness probe', tags: ['Health'], responses: { '200': { description: 'Ready' }, '503': { $ref: '#/components/responses/Unavailable' } } },
       head: { summary: 'Readiness probe without a body', tags: ['Health'], responses: { '200': { description: 'Ready' }, '503': { description: 'Not ready' } } },
-    },
-    '/categories': {
-      get: { summary: 'List public categories', tags: ['Content'], responses: { '200': { description: 'Category list', content: { 'application/json': { schema: { type: 'object', properties: { categories: { type: 'array', items: { $ref: '#/components/schemas/Category' } } } } } } } } },
-    },
-    '/categories/{category}/items': {
-      get: {
-        summary: 'List public items in a category', tags: ['Content'],
-        parameters: [{ name: 'category', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { '200': { description: 'Item list' }, '404': { $ref: '#/components/responses/NotFound' } },
-      },
-    },
-    '/categories/{category}/items/{slug}': {
-      get: {
-        summary: 'Read a public item', tags: ['Content'],
-        parameters: [
-          { name: 'category', in: 'path', required: true, schema: { type: 'string' } },
-          { name: 'slug', in: 'path', required: true, schema: { type: 'string' } },
-        ],
-        responses: { '200': { description: 'Item detail' }, '404': { $ref: '#/components/responses/NotFound' } },
-      },
     },
     '/booking-requests': {
       post: {
@@ -238,24 +183,6 @@ export const openApiSpec = {
     '/portal/logout': {
       post: { summary: 'Revoke the refresh family and clear guest cookies', tags: ['Portal'], security: [{ GuestCookie: [] }], responses: { '204': { description: 'Signed out' } } },
     },
-    '/portal/start': {
-      post: { summary: 'Read the current host-issued claim form schema', tags: ['Portal'], responses: { '200': { description: 'Claim flow schema' }, '404': { $ref: '#/components/responses/NotFound' } } },
-    },
-    '/portal/verify': {
-      post: {
-        deprecated: true,
-        summary: 'Compatibility sign-in endpoint; public lookup signup is gone',
-        description: 'Requests with mode=signin are forwarded to /portal/sessions. All former signup modes return 410.',
-        tags: ['Portal'],
-        responses: { '200': { description: 'Sign-in completed' }, '401': { $ref: '#/components/responses/Unauthorized' }, '410': { description: 'Host-issued claim grant required' } },
-      },
-    },
-    '/portal/onsite/confirm': {
-      post: { deprecated: true, summary: 'Removed legacy onsite confirmation endpoint', tags: ['Portal'], responses: { '410': { description: 'Host-issued claim grant required' } } },
-    },
-    '/check-in': {
-      get: { summary: 'Read the verified booking and check-in state', tags: ['Guest'], security: [{ GuestCookie: [] }], responses: { '200': { description: 'Booking state' }, '401': { $ref: '#/components/responses/Unauthorized' } } },
-    },
     '/check-in/preferences': {
       get: { summary: 'Read guest preferences and time-gated Wi-Fi details', tags: ['Guest'], security: [{ GuestCookie: [] }, { AdminCookie: [] }], responses: { '200': { description: 'Preferences' }, '401': { $ref: '#/components/responses/Unauthorized' } } },
       post: { summary: 'Update preferences as an administrator', tags: ['Guest'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Preferences updated' }, '403': { $ref: '#/components/responses/Forbidden' } } },
@@ -263,12 +190,6 @@ export const openApiSpec = {
     '/check-in/arrival-request': {
       get: { summary: 'Read the guest latest requested arrival time', tags: ['Guest'], security: [{ GuestCookie: [] }], responses: { '200': { description: 'Latest request or null' }, '401': { $ref: '#/components/responses/Unauthorized' } } },
       post: { summary: 'Create a durable arrival-time request', tags: ['Guest'], security: [{ GuestCookie: [] }], responses: { '200': { description: 'Request stored; delivery state is sent, queued, or skipped' }, '401': { $ref: '#/components/responses/Unauthorized' }, '422': { $ref: '#/components/responses/BadRequest' } } },
-    },
-    '/check-in/complete': {
-      post: { summary: 'Persist check-in completion details', tags: ['Guest'], security: [{ GuestCookie: [] }], responses: { '200': { description: 'Completion stored' }, '401': { $ref: '#/components/responses/Unauthorized' }, '422': { $ref: '#/components/responses/BadRequest' } } },
-    },
-    '/check-in/complete/get': {
-      get: { summary: 'Read persisted check-in completion details', tags: ['Guest'], security: [{ GuestCookie: [] }], responses: { '200': { description: 'Completion or null' }, '401': { $ref: '#/components/responses/Unauthorized' } } },
     },
     '/dsar/export': {
       get: { summary: 'Export the authenticated subject data', tags: ['Privacy'], security: [{ GuestCookie: [] }, { AdminCookie: [] }], responses: { '200': { description: 'Personal data JSON attachment' }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' } } },
@@ -285,21 +206,8 @@ export const openApiSpec = {
       },
       get: { summary: 'Read recent analytics as an administrator', tags: ['Analytics'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Recent analytics' }, '403': { $ref: '#/components/responses/Forbidden' } } },
     },
-    '/analytics/stats': {
-      get: { summary: 'Read hourly and daily analytics buckets', tags: ['Analytics'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Analytics buckets' }, '403': { $ref: '#/components/responses/Forbidden' } } },
-    },
-    '/analytics/top': {
-      get: { summary: 'Read top query-free paths', tags: ['Analytics'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Top paths' }, '403': { $ref: '#/components/responses/Forbidden' } } },
-    },
-    '/analytics/export.csv': {
-      get: { summary: 'Export privacy-minimized analytics as formula-safe CSV', tags: ['Analytics'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'CSV attachment', content: { 'text/csv': { schema: { type: 'string' } } } }, '401': { $ref: '#/components/responses/Unauthorized' } } },
-    },
     '/vitals': {
       post: { summary: 'Ingest a Core Web Vital', tags: ['Analytics'], requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/WebVital' } } } }, responses: { '201': { description: 'Vital stored' }, '422': { $ref: '#/components/responses/BadRequest' }, '429': { $ref: '#/components/responses/RateLimited' } } },
-      get: { summary: 'Read vital aggregates as an administrator', tags: ['Analytics'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Vital aggregates' }, '403': { $ref: '#/components/responses/Forbidden' } } },
-    },
-    '/vitals/export.csv': {
-      get: { summary: 'Export Core Web Vitals as formula-safe CSV', tags: ['Analytics'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'CSV attachment', content: { 'text/csv': { schema: { type: 'string' } } } }, '401': { $ref: '#/components/responses/Unauthorized' } } },
     },
     '/admin/login': {
       post: { summary: 'Create an administrator session', tags: ['Admin'], responses: { '200': { description: 'Admin cookie issued' }, '401': { $ref: '#/components/responses/Unauthorized' }, '429': { $ref: '#/components/responses/RateLimited' } } },
@@ -348,39 +256,15 @@ export const openApiSpec = {
       get: { summary: 'List privacy requests', tags: ['Admin', 'Privacy'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Privacy requests' }, '403': { $ref: '#/components/responses/Forbidden' } } },
       post: { summary: 'Complete/reject erasure or manage a privacy hold', tags: ['Admin', 'Privacy'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Action completed' }, '201': { description: 'Hold created' }, '409': { $ref: '#/components/responses/Conflict' } } },
     },
-    '/alerts': {
-      get: { summary: 'Read operational alerts or managed rules', tags: ['Operations'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Alerts or rules' }, '403': { $ref: '#/components/responses/Forbidden' } } },
-      post: { summary: 'Acknowledge an operational alert', tags: ['Operations'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Alert acknowledged' }, '404': { $ref: '#/components/responses/NotFound' } } },
-      put: { summary: 'Update a managed alert rule', tags: ['Operations'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Rule updated' }, '404': { $ref: '#/components/responses/NotFound' } } },
-      delete: { summary: 'Reject deletion of built-in rules; disable them instead', tags: ['Operations'], security: [{ AdminCookie: [] }], responses: { '405': { description: 'Built-in rules cannot be deleted' } } },
-    },
-    '/alerts/webhook': {
-      get: { summary: 'Read the external alert receiver capability status', tags: ['Operations'], responses: { '200': { description: 'Receiver capability status' } } },
-      post: { summary: 'Store an authenticated external alert', tags: ['Operations'], security: [{ WebhookBearer: [] }], responses: { '200': { description: 'Alert stored' }, '401': { $ref: '#/components/responses/Unauthorized' }, '429': { $ref: '#/components/responses/RateLimited' }, '503': { $ref: '#/components/responses/Unavailable' } } },
-    },
     '/errors': {
       post: { summary: 'Ingest a bounded and redacted client error report', tags: ['Operations'], responses: { '201': { description: 'Report stored' }, '413': { description: 'Report exceeds 16 KiB' }, '415': { description: 'JSON content type required' }, '422': { $ref: '#/components/responses/BadRequest' }, '429': { $ref: '#/components/responses/RateLimited' } } },
     },
-    '/metrics': {
-      get: { summary: 'Read in-process metrics', tags: ['Operations'], security: [{ AdminCookie: [] }, { ApiKeyAuth: [] }], responses: { '200': { description: 'Metrics snapshot' }, '403': { $ref: '#/components/responses/Forbidden' } } },
-      post: { summary: 'Submit a bounded custom in-process metric', tags: ['Operations'], security: [{ AdminCookie: [] }, { ApiKeyAuth: [] }], responses: { '200': { description: 'Metric accepted' }, '403': { $ref: '#/components/responses/Forbidden' }, '422': { $ref: '#/components/responses/BadRequest' } } },
-    },
     '/security/csp-report': {
       post: { summary: 'Store a bounded browser CSP violation report', tags: ['Operations'], responses: { '204': { description: 'Report accepted' }, '400': { $ref: '#/components/responses/BadRequest' }, '413': { description: 'Report exceeds 16 KiB' }, '429': { $ref: '#/components/responses/RateLimited' } } },
-      options: { summary: 'CSP reporting preflight', tags: ['Operations'], responses: { '204': { description: 'Preflight accepted' } } },
-    },
-    '/security/dashboard': {
-      get: { summary: 'Read persisted security events, alerts, health, or reports', tags: ['Operations'], security: [{ AdminCookie: [] }], responses: { '200': { description: 'Requested security view' }, '400': { $ref: '#/components/responses/BadRequest' }, '401': { $ref: '#/components/responses/Unauthorized' } } },
-    },
-    '/internal/cache-metrics': {
-      get: { summary: 'Read internal cache and dataset-version diagnostics', description: 'Requires an API key from INTERNAL_API_KEYS.', tags: ['Operations'], security: [{ ApiKeyAuth: [] }], responses: { '200': { description: 'Internal cache diagnostics' }, '401': { $ref: '#/components/responses/Unauthorized' }, '403': { $ref: '#/components/responses/Forbidden' } } },
-    },
-    '/internal/booking-outbox': {
-      post: { summary: 'Drain durable booking and check-in webhook deliveries', tags: ['Operations'], security: [{ CronBearer: [] }], responses: { '200': { description: 'Drain result' }, '404': { description: 'Hidden when the bearer secret is invalid' } } },
     },
   },
   tags: [
-    { name: 'Health' }, { name: 'Content' }, { name: 'Booking' }, { name: 'Portal' },
+    { name: 'Health' }, { name: 'Booking' }, { name: 'Portal' },
     { name: 'Guest' }, { name: 'Privacy' }, { name: 'Analytics' }, { name: 'Admin' }, { name: 'Operations' },
   ],
 } as const;

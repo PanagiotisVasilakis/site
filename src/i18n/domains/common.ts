@@ -15,12 +15,9 @@ export interface CommonDictionary {
     homeSubtitle: string;
     backHome: string;
     skipLink?: string;
-    details: string;
     bookingDetails?: string;
     aboutUs?: string;
     emptyState: string;
-    itemSingular: string;
-    itemPlural: string;
     updates?: {
         updateAvailable: string;
         refresh: string;
@@ -29,10 +26,7 @@ export interface CommonDictionary {
         assetsFromTo: string;
     };
     search?: {
-        where: string;
-        addLocation: string;
         addDates: string;
-        search: string;
         arrivalLabel?: string;
         arrivalPlaceholder?: string;
         departureLabel?: string;
@@ -40,12 +34,9 @@ export interface CommonDictionary {
         checkAvailability?: string;
     };
     ui?: {
-        filters: string;
         map: string;
         list: string;
         resetAll: string;
-        activeTags: string;
-        none: string;
         back?: string;
         signIn?: string;
         signOut?: string;
@@ -59,10 +50,6 @@ export interface CommonDictionary {
         yourStay?: string;
         explore?: string;
         account?: string;
-        mainMenu?: string;
-        primaryPages?: string;
-        closeFilters?: string;
-        done?: string;
     };
     cta: {
         call: string;
@@ -88,15 +75,12 @@ export interface CommonDictionary {
         addFavorite?: string;
         removeFavorite?: string;
         share?: string;
-        featured?: string;
-        loadingMore?: string;
         contentUpdating?: string;
     };
     a11y?: {
         placeDetails?: string;
         viewDetailsFor?: string;
         openMapFor?: string;
-        apartmentHero?: string;
         switchToLight?: string;
         switchToDark?: string;
         toggleColorScheme?: string;
@@ -110,7 +94,6 @@ export interface CommonDictionary {
         prevMonth?: string;
         nextMonth?: string;
         selectDates?: string;
-        bookingSummary?: string;
         applyDates?: string;
         applyRange?: string;
         rangePicker?: string;
@@ -124,8 +107,6 @@ export interface CommonDictionary {
         clearSearch?: string;
         filterByCategory?: string;
         mapCaption?: string;
-        mapCaptionShort?: string;
-        removeTag?: string;
         subtitle?: string;
     };
     errors?: {
@@ -158,10 +139,7 @@ export interface CommonDictionary {
     map?: {
         loading: string;
         apartmentMarkerTitle: string;
-        apartmentMarkerDesc: string;
         viewDetails: string;
-        failed: string;
-        tokenMissing: string;
         deferredInteractiveLabel: string;
         travelPrompt: string;
         openMap?: string;
@@ -178,11 +156,6 @@ export interface CommonDictionary {
         approximate: string;
         travelUnavailable: string;
         travelUnavailableWithDirections: string;
-        clearRoute: string;
-        route: string;
-        driving: string;
-        walking: string;
-        cycling: string;
         unavailable: string;
     };
 }
@@ -198,17 +171,11 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
         homeSubtitle: "Experience the sweet art of relaxation in a haven where you feel instantly at home.",
         backHome: "← Back home",
         skipLink: "Skip to content",
-        details: "Details →",
         bookingDetails: "Booking Details",
         aboutUs: "About Us",
         emptyState: "No items yet.",
-        itemSingular: "item",
-        itemPlural: "items",
         search: {
-            where: "Where",
-            addLocation: "Choose a location",
             addDates: "Select your dates",
-            search: "Search",
             arrivalLabel: "Arrival",
             departureLabel: "Departure",
             arrivalPlaceholder: "Select arrival",
@@ -216,12 +183,9 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             checkAvailability: "Check availability"
         },
         ui: {
-            filters: "Filters",
             map: "Map",
             list: "List",
             resetAll: "Reset filters",
-            activeTags: "Applied filters",
-            none: "None",
             back: "Back",
             signIn: "Sign in",
             signOut: "Sign out",
@@ -235,10 +199,6 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             yourStay: "Your stay",
             explore: "Explore Kalamata",
             account: "Guest account",
-            mainMenu: "Main menu",
-            primaryPages: "Primary pages",
-            closeFilters: "Close filters",
-            done: "Done"
         },
         updates: {
             updateAvailable: "An update is available",
@@ -271,15 +231,12 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             addFavorite: "Add to favorites",
             removeFavorite: "Remove from favorites",
             share: "Share",
-            featured: "Featured",
-            loadingMore: "Loading more…",
             contentUpdating: "Content updating – please check again later."
         },
         a11y: {
             placeDetails: "Place details",
             viewDetailsFor: "View details for {name}",
             openMapFor: "Open map for {name}",
-            apartmentHero: "Apartment hero",
             switchToLight: "Switch to light mode",
             switchToDark: "Switch to dark mode",
             toggleColorScheme: "Toggle color scheme",
@@ -293,7 +250,6 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             prevMonth: "Previous month",
             nextMonth: "Next month",
             selectDates: "Select check-in and check-out dates",
-            bookingSummary: "Booking summary",
             applyDates: "Apply dates",
             applyRange: "Apply selected date range",
             rangePicker: "Date range picker"
@@ -336,8 +292,6 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             clearSearch: "Clear search",
             filterByCategory: "Filter moments by category",
             mapCaption: "Apartment location and nearby {category}. Zoom and click markers for details.",
-            mapCaptionShort: "🏡 Apartment location and nearby {category} • Zoom and click markers for details",
-            removeTag: "Remove {tag}",
             subtitle: "Curated local recommendations for your stay"
         },
         errors: {
@@ -370,10 +324,7 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
         map: {
             loading: "Loading map...",
             apartmentMarkerTitle: "Your Apartment",
-            apartmentMarkerDesc: "You are here",
             viewDetails: "View details",
-            failed: "Map failed to load",
-            tokenMissing: "Interactive map temporarily unavailable",
             deferredInteractiveLabel: "The interactive map will load here to keep things speedy.",
             travelPrompt: "Tap a marker to calculate travel time.",
             openMap: "Open map",
@@ -390,11 +341,6 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             approximate: "Approximate – OSRM",
             travelUnavailable: "Travel times unavailable.",
             travelUnavailableWithDirections: "Travel times unavailable. Use Directions for live navigation.",
-            clearRoute: "Clear route",
-            route: "Route",
-            driving: "Driving",
-            walking: "Walking",
-            cycling: "Cycling",
             unavailable: "Unavailable"
         },
     },
@@ -404,17 +350,11 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
         homeSubtitle: "Ζήστε τη γλυκιά τέχνη της χαλάρωσης, σε ένα καταφύγιο που νιώθετε αμέσως σαν το σπίτι σας.",
         backHome: "← Πίσω στην αρχική",
         skipLink: "Μετάβαση στο περιεχόμενο",
-        details: "Λεπτομέρειες →",
         bookingDetails: "Στοιχεία Κράτησης",
         aboutUs: "Σχετικά με Εμάς",
         emptyState: "Δεν υπάρχουν στοιχεία ακόμη.",
-        itemSingular: "στοιχείο",
-        itemPlural: "στοιχεία",
         search: {
-            where: "Προορισμός",
-            addLocation: "Επιλέξτε τοποθεσία",
             addDates: "Επιλέξτε ημερομηνίες",
-            search: "Αναζήτηση",
             arrivalLabel: "Άφιξη",
             departureLabel: "Αναχώρηση",
             arrivalPlaceholder: "Επιλογή άφιξης",
@@ -422,12 +362,9 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             checkAvailability: "Έλεγχος διαθεσιμότητας"
         },
         ui: {
-            filters: "Φίλτρα",
             map: "Χάρτης",
             list: "Λίστα",
             resetAll: "Επαναφορά φίλτρων",
-            activeTags: "Ενεργά φίλτρα",
-            none: "Κανένα",
             back: "Πίσω",
             signIn: "Σύνδεση",
             signOut: "Αποσύνδεση",
@@ -441,10 +378,6 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             yourStay: "Η διαμονή σας",
             explore: "Ανακαλύψτε την Καλαμάτα",
             account: "Λογαριασμός επισκέπτη",
-            mainMenu: "Κύριο μενού",
-            primaryPages: "Κύριες σελίδες",
-            closeFilters: "Κλείσιμο φίλτρων",
-            done: "Τέλος"
         },
         updates: {
             updateAvailable: "Μια ενημέρωση είναι διαθέσιμη",
@@ -477,15 +410,12 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             addFavorite: "Προσθήκη στα αγαπημένα",
             removeFavorite: "Αφαίρεση από τα αγαπημένα",
             share: "Κοινοποίηση",
-            featured: "Προτεινόμενα",
-            loadingMore: "Φόρτωση περισσότερων…",
             contentUpdating: "Το περιεχόμενο ενημερώνεται – δοκιμάστε ξανά αργότερα."
         },
         a11y: {
             placeDetails: "Λεπτομέρειες τοποθεσίας",
             viewDetailsFor: "Δείτε λεπτομέρειες για {name}",
             openMapFor: "Άνοιγμα χάρτη για {name}",
-            apartmentHero: "Εικόνα διαμερίσματος",
             switchToLight: "Εναλλαγή σε φωτεινή λειτουργία",
             switchToDark: "Εναλλαγή σε σκοτεινή λειτουργία",
             toggleColorScheme: "Εναλλαγή χρωματικού θέματος",
@@ -499,7 +429,6 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             prevMonth: "Προηγούμενος μήνας",
             nextMonth: "Επόμενος μήνας",
             selectDates: "Επιλέξτε ημερομηνίες άφιξης και αναχώρησης",
-            bookingSummary: "Σύνοψη κράτησης",
             applyDates: "Εφαρμογή ημερομηνιών",
             applyRange: "Εφαρμογή επιλεγμένου εύρους ημερομηνιών",
             rangePicker: "Επιλογέας εύρους ημερομηνιών"
@@ -542,8 +471,6 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             clearSearch: "Καθαρισμός αναζήτησης",
             filterByCategory: "Φιλτράρισμα στιγμών ανά κατηγορία",
             mapCaption: "Τοποθεσία διαμερίσματος και κοντινά {category}. Κάντε ζουμ και πατήστε τους δείκτες για λεπτομέρειες.",
-            mapCaptionShort: "🏡 Τοποθεσία διαμερίσματος και κοντινά {category} • Κάντε ζουμ και πατήστε τους δείκτες για λεπτομέρειες",
-            removeTag: "Αφαίρεση {tag}",
             subtitle: "Επιλεγμένες τοπικές προτάσεις για τη διαμονή σας"
         },
         errors: {
@@ -576,10 +503,7 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
         map: {
             loading: "Φόρτωση χάρτη...",
             apartmentMarkerTitle: "Το Διαμέρισμά σας",
-            apartmentMarkerDesc: "Βρίσκεστε εδώ",
             viewDetails: "Προβολή λεπτομερειών",
-            failed: "Αποτυχία φόρτωσης χάρτη",
-            tokenMissing: "Ο διαδραστικός χάρτης είναι προσωρινά μη διαθέσιμος",
             deferredInteractiveLabel: "Ο διαδραστικός χάρτης θα φορτώσει εδώ για να διατηρηθεί η ταχύτητα.",
             travelPrompt: "Πατήστε έναν δείκτη για να υπολογίσουμε τον χρόνο διαδρομής.",
             openMap: "Άνοιγμα χάρτη",
@@ -596,11 +520,6 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             approximate: "Κατά προσέγγιση – OSRM",
             travelUnavailable: "Οι χρόνοι διαδρομής δεν είναι διαθέσιμοι.",
             travelUnavailableWithDirections: "Οι χρόνοι διαδρομής δεν είναι διαθέσιμοι. Χρησιμοποιήστε τις Οδηγίες για ζωντανή πλοήγηση.",
-            clearRoute: "Εκκαθάριση διαδρομής",
-            route: "Διαδρομή",
-            driving: "Οδήγηση",
-            walking: "Πεζή",
-            cycling: "Ποδήλατο",
             unavailable: "Μη διαθέσιμο"
         },
     },

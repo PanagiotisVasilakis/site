@@ -8,7 +8,7 @@ import { locales, defaultLocale } from '@/i18n/config';
 import { PortalAuthError, authenticatePortalUser } from '@/lib/portalAuthService';
 import { attachPortalAuthCookies } from '@/lib/portalAuthHttp';
 import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
-import { parseGuestSession, verifyGuestSessionAccess } from '@/lib/guestSession';
+import { GUEST_SESSION_COOKIE, parseGuestSession, verifyGuestSessionAccess } from '@/lib/guestSession';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +22,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   if (!(await getFeatureFlagsAsync()).portalEnabled) {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }
-  const session = parseGuestSession(request.cookies.get('guest_session')?.value);
+  const session = parseGuestSession(request.cookies.get(GUEST_SESSION_COOKIE)?.value);
   if (!session || !(await verifyGuestSessionAccess(session))) {
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Guest session required');
   }

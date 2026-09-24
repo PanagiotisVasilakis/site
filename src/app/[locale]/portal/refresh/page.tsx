@@ -20,7 +20,7 @@ export default async function PortalRefreshPage({ params, searchParams }: Portal
   const failureDefault = `/${eff}/guest?flash=${encodeURIComponent('Please sign in to access check-in information')}`;
   const nextPath = toSafeLocalPath(search.next) ?? `/${eff}/check-in`;
   const failurePath = toSafeLocalPath(search.failure) ?? failureDefault;
-  const refreshHref = `/api/portal/refresh?next=${encodeURIComponent(nextPath)}&failure=${encodeURIComponent(failurePath)}`;
+  const refreshHref = `/api/portal/refresh?next=${encodeURIComponent(nextPath)}`;
 
   return <PortalRefreshRedirect refreshHref={refreshHref} failureHref={failurePath} />;
 }

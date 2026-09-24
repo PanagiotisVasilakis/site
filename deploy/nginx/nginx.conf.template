@@ -46,7 +46,7 @@ http {
   }
   map "$request_method:$uri" $public_write_rate_key {
     default "";
-    ~^(?:POST|PUT|PATCH|DELETE):/api/(?:booking-requests|analytics|vitals|errors|security/csp-report|alerts/webhook|dsar/requests|check-in(?:/|$)) $binary_remote_addr;
+    ~^(?:POST|PUT|PATCH|DELETE):/api/(?:booking-requests|analytics|vitals|errors|security/csp-report|dsar/requests|check-in(?:/|$)) $binary_remote_addr;
   }
   map $uri $broad_api_rate_key {
     default "";

@@ -14,7 +14,7 @@ function replaceDirectory(source, destination) {
   cpSync(source, destination, { recursive: true, force: true });
 }
 
-export function prepareStandalone(root = process.cwd()) {
+function prepareStandalone(root = process.cwd()) {
   const standalone = join(root, '.next', 'standalone');
   if (!existsSync(join(standalone, 'server.js'))) {
     throw new Error('Standalone build not found. Run npm run build before npm start.');

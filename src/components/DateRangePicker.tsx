@@ -3,7 +3,6 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { DayPicker, type DateRange as RDPDateRange } from 'react-day-picker';
 import {
   DateRange,
-  getBlockedDates,
   validateDateRange
 } from '@/lib/dateUtils';
 import { logger } from '@/lib/logger-client';
@@ -78,14 +77,8 @@ export default function DateRangePicker({
     }
   }, [activeField, value]);
 
-  // Get blocked dates
-  const blockedDates = useMemo(() => getBlockedDates(), []);
-
-  // Disable past dates and blocked dates
-  const disabledDays = useMemo(() => [
-    { before: new Date() },
-    ...blockedDates
-  ], [blockedDates]);
+  // Disable past dates
+  const disabledDays = useMemo(() => [{ before: new Date() }], []);
 
   // Handle date selection - convert from RDP type to our type
   const handleDateSelect = useCallback((range: RDPDateRange | undefined) => {
@@ -209,7 +202,7 @@ export default function DateRangePicker({
     };
   }, [isOpen, onClose]);
 
-  const DatePickerContent = () => (
+  const datePickerContent = (
     <div className={isCompact ? "space-y-1" : "space-y-1.5"}>
       {/* Calendar with inline controls */}
       <div className="relative" role="application" aria-label={dp?.calendar ?? 'Date picker calendar'}>
@@ -301,7 +294,7 @@ export default function DateRangePicker({
         className="absolute -top-2 w-4 h-4 surface-card border-l border-t border-soft transform rotate-45 date-picker-arrow"
         style={{ left: arrowLeft }}
       />
-      <DatePickerContent />
+      {datePickerContent}
     </div>
   ) : null;
 }

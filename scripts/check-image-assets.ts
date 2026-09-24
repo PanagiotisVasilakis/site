@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 
-export const DEFAULT_MAX_IMAGE_BYTES = 512 * 1024;
+const DEFAULT_MAX_IMAGE_BYTES = 512 * 1024;
 
 const EXPECTED_FORMATS: Readonly<Record<string, readonly string[]>> = {
   '.avif': ['heif'],
@@ -14,17 +14,17 @@ const EXPECTED_FORMATS: Readonly<Record<string, readonly string[]>> = {
   '.webp': ['webp'],
 };
 
-export interface ImageAssetIssue {
+interface ImageAssetIssue {
   file: string;
   message: string;
 }
 
-export interface ImageAssetValidationResult {
+interface ImageAssetValidationResult {
   checked: number;
   issues: ImageAssetIssue[];
 }
 
-export interface ImageAssetValidationOptions {
+interface ImageAssetValidationOptions {
   rootDir?: string;
   maxBytes?: number;
 }
@@ -48,7 +48,7 @@ async function collectRasterImages(directory: string): Promise<string[]> {
   return files;
 }
 
-export async function validateImageAssets({
+async function validateImageAssets({
   rootDir = path.join(process.cwd(), 'public'),
   maxBytes = DEFAULT_MAX_IMAGE_BYTES,
 }: ImageAssetValidationOptions = {}): Promise<ImageAssetValidationResult> {

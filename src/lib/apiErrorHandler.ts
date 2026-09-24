@@ -6,10 +6,10 @@
 import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from './logger-enterprise';
+import { isSensitiveFieldName } from './redaction';
 import { z } from 'zod';
 import type { ApiErrorCode } from './apiErrorTypes';
 import { ApiErrorCode as ErrorCodes } from './apiErrorTypes';
-import { metrics } from './metrics-collector';
 import {
   createClientIdentityUnavailableResponse,
   isClientIdentityUnavailableError,
@@ -331,14 +331,6 @@ export function withErrorHandler(
         clearTimeout(timeoutHandle);
         request.signal.removeEventListener('abort', forwardClientAbort);
       }
-      const requestDuration = performance.now() - startTime;
-      metrics.counter('http.requests', 1, { method, route: request.nextUrl.pathname, status: String(response.status) });
-      if (response.status >= 500) {
-        metrics.counter('http.errors', 1, { method, route: request.nextUrl.pathname, status: String(response.status) });
-      } else if (response.status >= 400) {
-        metrics.counter('http.client_errors', 1, { method, route: request.nextUrl.pathname, status: String(response.status) });
-      }
-      metrics.timer('http.response_time', requestDuration, { method, route: request.nextUrl.pathname });
 
       // Performance logging
       if (mergedConfig.enablePerformanceLogging) {
@@ -356,16 +348,6 @@ export function withErrorHandler(
     } catch (error) {
       const duration = performance.now() - startTime;
       const identityUnavailable = isClientIdentityUnavailableError(error);
-      const errorStatus = identityUnavailable
-        ? HttpStatusCodes.SERVICE_UNAVAILABLE
-        : error instanceof ApiError ? error.statusCode : 500;
-      metrics.counter('http.requests', 1, { method, route: request.nextUrl.pathname, status: String(errorStatus) });
-      if (errorStatus >= 500) {
-        metrics.counter('http.errors', 1, { method, route: request.nextUrl.pathname, status: String(errorStatus) });
-      } else {
-        metrics.counter('http.client_errors', 1, { method, route: request.nextUrl.pathname, status: String(errorStatus) });
-      }
-      metrics.timer('http.response_time', duration, { method, route: request.nextUrl.pathname });
 
       if (identityUnavailable) {
         if (mergedConfig.enableErrorLogging) {
@@ -585,22 +567,13 @@ function generateCorrelationId(): string {
   return crypto.randomUUID();
 }
 
+// Header names the shared field-name classification does not already cover.
+const SENSITIVE_HEADER_NAMES = new Set(['forwarded', 'x-api-key']);
+
 export function sanitizeRequestHeaders(headers: Headers): Record<string, string> {
   const sanitized: Record<string, string> = {};
-  const sensitiveHeaders = [
-    'authorization',
-    'cookie',
-    'x-api-key',
-    'cf-connecting-ip',
-    'x-forwarded-for',
-    'x-real-ip',
-    'forwarded',
-    'x-origin-verified-client-ip',
-    'x-origin-proxy-attestation',
-  ];
-  
   headers.forEach((value, key) => {
-    if (sensitiveHeaders.includes(key.toLowerCase())) {
+    if (isSensitiveFieldName(key) || SENSITIVE_HEADER_NAMES.has(key.toLowerCase())) {
       sanitized[key] = '[REDACTED]';
     } else {
       sanitized[key] = value;

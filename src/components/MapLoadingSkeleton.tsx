@@ -8,22 +8,18 @@ import type { Locale } from '@/i18n/config';
 
 interface MapLoadingSkeletonProps {
   height?: string;
-  message?: string;
-  className?: string;
 }
 
 export default function MapLoadingSkeleton({ 
   height = MAP_DEFAULTS.HEIGHT.DEFAULT,
-  message,
-  className = ''
 }: MapLoadingSkeletonProps) {
   const params = useParams<{ locale?: string }>();
   const locale: Locale = params?.locale === 'el' ? 'el' : 'en';
-  const localizedMessage = message ?? getDictionary(locale).map?.loading ?? 'Loading map...';
+  const localizedMessage = getDictionary(locale).map?.loading ?? 'Loading map...';
 
   return (
     <div 
-      className={`${MAP_CSS_CLASSES.LOADING_CONTAINER} ${className}`}
+      className={MAP_CSS_CLASSES.LOADING_CONTAINER}
       style={{ height }}
     >
       <div className={MAP_CSS_CLASSES.LOADING_TEXT}>

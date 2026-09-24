@@ -9,31 +9,6 @@ export type CheckinRecord = {
   accepted_at: number;
 };
 
-async function upsert(bookingId: string, arrivalTime: string, specialRequests?: string): Promise<CheckinRecord> {
-  try {
-    const checkin = await prisma.checkin.upsert({
-      where: { bookingId },
-      update: {
-        arrivalTime,
-        specialRequests: specialRequests ?? null,
-        acceptedAt: new Date(),
-      },
-      create: {
-        bookingId,
-        arrivalTime,
-        specialRequests: specialRequests ?? null,
-        acceptedAt: new Date(),
-      },
-    });
-
-    logger.info('Checkin record upserted (prisma)', { bookingId });
-    return mapCheckinFromDb(checkin);
-  } catch (error) {
-    logger.error('checkinRepository(prisma): upsert failed', error);
-    throw error;
-  }
-}
-
 async function getByBookingId(bookingId: string): Promise<CheckinRecord | undefined> {
   try {
     const checkin = await prisma.checkin.findUnique({ where: { bookingId } });
@@ -55,7 +30,6 @@ async function getAll(): Promise<CheckinRecord[]> {
 }
 
 export const checkinRepository = {
-  upsert,
   getByBookingId,
   getAll,
 };

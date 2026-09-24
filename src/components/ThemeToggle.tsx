@@ -7,7 +7,6 @@ import type { Locale } from '@/i18n/config';
 
 interface ThemeToggleProps {
   className?: string;
-  showText?: boolean;
   lightText?: string;
   darkText?: string;
 }
@@ -16,7 +15,6 @@ const DEFAULT_CLASS = "w-12 h-11 md:h-9 inline-flex items-center justify-center 
 
 export default function ThemeToggle({
   className,
-  showText = false,
   lightText = 'Light',
   darkText = 'Dark',
 }: ThemeToggleProps = {}) {
@@ -102,7 +100,7 @@ export default function ThemeToggle({
       className={className || DEFAULT_CLASS}
     >
       <span aria-hidden suppressHydrationWarning className="select-none text-sm">{icon}</span>
-      {showText && <span suppressHydrationWarning>{visibleText}</span>}
+      <span suppressHydrationWarning>{visibleText}</span>
     </button>
   );
 }

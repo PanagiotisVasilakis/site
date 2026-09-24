@@ -236,10 +236,12 @@ function markerTypeForItem(item: CategoryMapItem, categorySlug: string): MapMark
   if (tags.has('church') || tags.has('religion')) return 'church';
   if (tags.has('museum') || tags.has('culture') || tags.has('history')) return 'attraction';
 
-  return categorySlug === 'sightseeing' ? 'sightseeing' : 'attraction';
+  return 'attraction';
 }
 
-export function getApartmentMapLocation(locale: Locale = 'en'): MapLocation {
+export function getApartmentMapLocation(
+  locale: Locale = 'en',
+): MapLocation & { address: string; phone: string; directionsUrl: string } {
   const apartment = getApartmentContent(locale);
   const address = locale === 'el'
     ? 'Αρχιμήδους 21, Καλαμάτα 24100, Ελλάδα'

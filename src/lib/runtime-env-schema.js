@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   ACTIVE_RUNTIME_CREDENTIAL_NAMES,
+  hasRepeatedPattern,
   runtimeCredentialIssue,
 } from './runtime-credentials.js';
 
@@ -14,15 +15,6 @@ function isPostgresUrl(value) {
   return protocol === 'postgresql:' || protocol === 'postgres:';
 }
 
-function isApiKeyList(value) {
-  const keys = value.split(',').map((key) => key.trim()).filter(Boolean);
-  return keys.length > 0 && keys.every((key) => key.length >= 32 && key.length <= 64 && key.split('').every((character) => (
-    (character >= 'a' && character <= 'z')
-    || (character >= 'A' && character <= 'Z')
-    || (character >= '0' && character <= '9')
-  )));
-}
-
 function isTimeZone(value) {
   try {
     new Intl.DateTimeFormat('en', { timeZone: value }).format();
@@ -32,17 +24,9 @@ function isTimeZone(value) {
   }
 }
 
-function hasRepeatedSecretPattern(value) {
-  for (let size = 1; size <= 16; size += 1) {
-    if (value.length % size === 0
-      && value === value.slice(0, size).repeat(value.length / size)) return true;
-  }
-  return false;
-}
-
 function isOriginProxySecret(value) {
   return /^[0-9a-fA-F]{64}$/u.test(value)
-    && !hasRepeatedSecretPattern(value)
+    && !hasRepeatedPattern(value)
     && !/^(?:deadbeef|changeme|placeholder)/iu.test(value);
 }
 
@@ -60,9 +44,6 @@ export const runtimeEnvSchema = z.object({
   GUEST_WIFI_PASSWORD: z.string().min(8, 'GUEST_WIFI_PASSWORD must be at least 8 characters'),
   PROPERTY_TIME_ZONE: z.string().refine(isTimeZone, 'PROPERTY_TIME_ZONE must be a valid IANA time zone').default('Europe/Athens'),
 
-  VALID_API_KEYS: optionalEnv(z.string().refine(isApiKeyList, 'VALID_API_KEYS contains an invalid key')),
-  INTERNAL_API_KEYS: optionalEnv(z.string().refine(isApiKeyList, 'INTERNAL_API_KEYS contains an invalid key')),
-  METRICS_WRITE_API_KEYS: optionalEnv(z.string().refine(isApiKeyList, 'METRICS_WRITE_API_KEYS contains an invalid key')),
 
   ALLOWED_ORIGINS: z.string().optional(),
   NEXT_PUBLIC_SITE_URL: z.string().url().optional(),
@@ -81,12 +62,8 @@ export const runtimeEnvSchema = z.object({
   ALERT_WEBHOOK_URL: optionalEnv(z.string().url()),
   ALERT_WEBHOOK_TOKEN: optionalEnv(z.string().min(20)),
   ALERT_WEBHOOK_REQUIRED: z.enum(['0', '1']).optional().default('0'),
-  CRON_SECRET: optionalEnv(z.string().min(32)),
 
-  DEV_SESSION_MINT_ENABLED: z.enum(['0', '1']).optional().default('0'),
-  DEV_SESSION_MINT_SECRET: optionalEnv(z.string().min(32)),
   ANALYTICS_RETENTION_DAYS: z.string().regex(/^\d+$/).optional().default('30'),
-  GUEST_REFRESH_ALLOW_LEGACY_SECRET_ONLY: optionalEnv(z.enum(['0', '1'])),
   PRISMA_AUTO_DISCONNECT: optionalEnv(z.enum(['true', 'false'])),
   PRISMA_IDLE_DISCONNECT_MS: optionalEnv(z.string().regex(/^\d+$/)),
   PRISMA_LOG_LIFECYCLE: optionalEnv(z.enum(['0', '1'])),
@@ -153,9 +130,6 @@ export const runtimeEnvSchema = z.object({
   }
   if (env.NODE_ENV === 'production' && !env.CLAIM_TOKEN_PEPPER) {
     context.addIssue({ code: 'custom', path: ['CLAIM_TOKEN_PEPPER'], message: 'CLAIM_TOKEN_PEPPER is required in production' });
-  }
-  if (env.DEV_SESSION_MINT_ENABLED === '1' && !env.DEV_SESSION_MINT_SECRET) {
-    context.addIssue({ code: 'custom', path: ['DEV_SESSION_MINT_SECRET'], message: 'DEV_SESSION_MINT_SECRET is required when development session minting is enabled' });
   }
   for (const [urlKey, tokenKey] of [
     ['BOOKING_REQUEST_WEBHOOK_URL', 'BOOKING_REQUEST_WEBHOOK_TOKEN'],

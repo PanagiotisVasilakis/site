@@ -46,7 +46,6 @@ yarn-error.log*
 /lighthouse.*
 /.lighthouse*/
 /axe-a11y-report*.json
-/axe-contrast-report*.json
 /src/generated/prisma/
 
 # generated local runtime data

@@ -16,9 +16,13 @@ function formatDistanceDuration(distMeters: number, durSeconds: number): Distanc
   return { distanceLabel, durationLabel };
 }
 
+export function travelModeIcon(mode: TravelMode): string {
+  return mode === 'driving' ? '🚗' : mode === 'foot' ? '🚶' : '🚲';
+}
+
 export function formatTravelChip(mode: TravelMode, distMeters?: number, durSeconds?: number): string {
   if (!distMeters || !durSeconds) return '';
   const { distanceLabel, durationLabel } = formatDistanceDuration(distMeters, durSeconds);
-  const icon = mode === 'driving' ? '🚗' : mode === 'foot' ? '🚶' : '🚲';
+  const icon = travelModeIcon(mode);
   return `<span class=\"inline-flex items-center gap-1 bg-black/10 dark:bg-white/10 px-2 py-[2px] rounded-full\">${icon}<span>${distanceLabel} • ${durationLabel}</span></span>`;
 }

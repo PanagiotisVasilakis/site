@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -11,7 +11,6 @@ vi.mock('next/navigation', () => ({
 }));
 
 import DocumentLocale from '@/components/DocumentLocale';
-import FilterDrawer from '@/components/FilterDrawer';
 import ThemeToggle from '@/components/ThemeToggle';
 
 type MediaListener = (event: MediaQueryListEvent) => void;
@@ -53,7 +52,7 @@ describe('theme and document locale behavior', () => {
 
   it('applies a persisted dark theme and exposes the correct action label', async () => {
     localStorage.setItem('theme', 'dark');
-    render(<ThemeToggle showText />);
+    render(<ThemeToggle />);
     const button = await screen.findByRole('button', { name: /switch to light mode/i });
     expect(document.documentElement).toHaveClass('dark');
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
@@ -91,66 +90,5 @@ describe('theme and document locale behavior', () => {
     expect(document.documentElement.lang).toBe('en');
     rerender(<DocumentLocale locale="el" />);
     expect(document.documentElement.lang).toBe('el');
-  });
-});
-
-describe('filter drawer accessibility contract', () => {
-  it('renders nothing while closed', () => {
-    render(<FilterDrawer open={false} onClose={vi.fn()}>Filters</FilterDrawer>);
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  });
-
-  it('creates a modal, hides background siblings and locks page scroll', async () => {
-    const onClose = vi.fn();
-    const { container, unmount } = render(
-      <FilterDrawer open onClose={onClose} title="Choose filters">
-        <button type="button">First option</button>
-      </FilterDrawer>,
-    );
-    expect(screen.getByRole('dialog', { name: 'Choose filters' })).toHaveAttribute('aria-modal', 'true');
-    expect(container).toHaveAttribute('aria-hidden', 'true');
-    expect(container).toHaveAttribute('inert');
-    expect(document.documentElement.style.overflow).toBe('hidden');
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Close filters' })).toHaveFocus());
-    unmount();
-    expect(container).not.toHaveAttribute('aria-hidden');
-    expect(container).not.toHaveAttribute('inert');
-    expect(document.documentElement.style.overflow).toBe('');
-  });
-
-  it('closes on Escape, close button, done button and backdrop click', async () => {
-    const user = userEvent.setup();
-    const onClose = vi.fn();
-    const { container } = render(
-      <FilterDrawer open onClose={onClose} closeLabel="Close choices" doneLabel="Apply choices">
-        <span>Contents</span>
-      </FilterDrawer>,
-    );
-    await user.keyboard('{Escape}');
-    await user.click(screen.getByRole('button', { name: 'Close choices' }));
-    await user.click(screen.getByRole('button', { name: 'Apply choices' }));
-    const portal = document.querySelector('[data-filter-drawer-portal]');
-    const backdrop = portal?.firstElementChild;
-    expect(backdrop).toBeInstanceOf(HTMLElement);
-    await user.click(backdrop as HTMLElement);
-    expect(onClose).toHaveBeenCalledTimes(4);
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it('traps forward and reverse tab focus inside the dialog', () => {
-    render(
-      <FilterDrawer open onClose={vi.fn()}>
-        <button type="button">Middle action</button>
-      </FilterDrawer>,
-    );
-    const buttons = screen.getAllByRole('button');
-    const first = buttons[0];
-    const last = buttons[buttons.length - 1];
-    last.focus();
-    fireEvent.keyDown(document, { key: 'Tab' });
-    expect(first).toHaveFocus();
-    first.focus();
-    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
-    expect(last).toHaveFocus();
   });
 });

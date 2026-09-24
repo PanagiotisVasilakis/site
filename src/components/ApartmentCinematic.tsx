@@ -28,6 +28,7 @@ interface Props { locale: string; houseText: HouseText | undefined; photos: Apar
 
 export default function ApartmentCinematic({ locale, houseText, photos }: Props) {
   const ht = React.useMemo(() => houseText || {}, [houseText]);
+  const photoAlts: Partial<Record<ApartmentPhotoWithAlt['altKey'], string>> = ht.photoAlts ?? {};
   // Use locale directly instead of fragile Greek character detection
   const isGreek = locale === 'el';
   // hero scroll hint and skip intro labels were removed from the UI; keep properties available in `ht` for completeness
@@ -190,7 +191,7 @@ export default function ApartmentCinematic({ locale, houseText, photos }: Props)
                         <div className="apartment-photo-stack-frame">
                           <Image
                             src={photo.src}
-                            alt={photo.altKey}
+                            alt={photoAlts[photo.altKey] ?? photo.altKey}
                             fill
                             sizes="(max-width:1024px) 100vw, 420px"
                             loading="lazy"
@@ -229,13 +230,7 @@ export default function ApartmentCinematic({ locale, houseText, photos }: Props)
         </div>
         <ApartmentGalleryLightbox
           photos={photos}
-          alts={ht?.photoAlts ? {
-            living: ht.photoAlts.living || 'living',
-            bedroom: ht.photoAlts.bedroom || 'bedroom',
-            kitchen: ht.photoAlts.kitchen || 'kitchen',
-            balcony: ht.photoAlts.balcony || 'balcony',
-            bathroom: ht.photoAlts.bathroom || 'bathroom',
-          } : undefined}
+          alts={photoAlts}
           locale={locale}
           labels={ht?.photoViewer}
         />

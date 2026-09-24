@@ -6,16 +6,6 @@ import type { NextRequest } from 'next/server';
 export const VERIFIED_CLIENT_IP_HEADER = 'x-origin-verified-client-ip' as const;
 export const ORIGIN_PROXY_ATTESTATION_HEADER = 'x-origin-proxy-attestation' as const;
 
-/**
- * Retained only as a source-compatibility type for callers and historical tests.
- * Request-local options can never opt into trusting a public forwarding header.
- */
-export interface GetClientIpOptions {
-  trustProxy?: boolean;
-  clientIpHeader?: string;
-  trustedHops?: number;
-}
-
 function canonicalizeIpv4(value: string): string {
   return value.split('.').map((octet) => String(Number(octet))).join('.');
 }
@@ -67,8 +57,7 @@ function validAttestation(presented: string | null): boolean {
  * overwritten by Nginx, and the attestation is compared in constant time. A
  * duplicate Fetch header is comma-coalesced and therefore rejected.
  */
-export function getClientIp(request: NextRequest, _options?: GetClientIpOptions): string {
-  void _options;
+export function getClientIp(request: NextRequest): string {
   const attestation = request.headers.get(ORIGIN_PROXY_ATTESTATION_HEADER);
   if (!validAttestation(attestation)) return 'unknown';
 

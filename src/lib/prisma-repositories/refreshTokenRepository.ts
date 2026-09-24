@@ -112,14 +112,12 @@ function mapToken(token: {
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function parseCompositeToken(token: string): { id?: string; secret: string } | null {
+function parseCompositeToken(token: string): { id: string; secret: string } | null {
   const normalized = token.trim();
   if (!normalized) return null;
 
   const separatorIndex = normalized.indexOf('.');
-  if (separatorIndex <= 0) {
-    return { secret: normalized };
-  }
+  if (separatorIndex <= 0) return null;
 
   const id = normalized.slice(0, separatorIndex);
   const secret = normalized.slice(separatorIndex + 1);
@@ -278,91 +276,32 @@ async function verify(
     if (!parsed) return undefined;
     const now = Date.now();
 
-    if (parsed.id) {
-      const candidate = await database.refreshToken.findUnique({
-        where: { id: parsed.id },
-        include: { family: true },
-      });
-      const session = candidate
-        ? await database.session.findUnique({ where: { id: candidate.id } })
-        : null;
-      if (!candidate
-        || !session
-        || session.userId !== candidate.userId
-        || session.revokedAt
-        || candidate.revokedAt
-        || candidate.expiresAt.getTime() <= now
-        || candidate.family.revokedAt
-        || candidate.family.absoluteExpiresAt.getTime() <= now
-        || !verifySensitive(parsed.secret, candidate.salt, candidate.tokenHash)) {
-        return undefined;
-      }
-
-      await database.refreshToken.update({
-        where: { id: candidate.id },
-        data: { lastUsedAt: new Date(now) },
-      });
-      return mapToken({ ...candidate, lastUsedAt: new Date(now) });
-    }
-
-    if (process.env.GUEST_REFRESH_ALLOW_LEGACY_SECRET_ONLY !== '1') {
-      logger.warn('Rejected legacy secret-only refresh token; enable GUEST_REFRESH_ALLOW_LEGACY_SECRET_ONLY=1 only during migration');
+    const candidate = await database.refreshToken.findUnique({
+      where: { id: parsed.id },
+      include: { family: true },
+    });
+    const session = candidate
+      ? await database.session.findUnique({ where: { id: candidate.id } })
+      : null;
+    if (!candidate
+      || !session
+      || session.userId !== candidate.userId
+      || session.revokedAt
+      || candidate.revokedAt
+      || candidate.expiresAt.getTime() <= now
+      || candidate.family.revokedAt
+      || candidate.family.absoluteExpiresAt.getTime() <= now
+      || !verifySensitive(parsed.secret, candidate.salt, candidate.tokenHash)) {
       return undefined;
     }
 
-    const activeTokens = await database.refreshToken.findMany({
-      where: {
-        revokedAt: null,
-        family: { revokedAt: null, absoluteExpiresAt: { gt: new Date() } },
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: { createdAt: 'desc' },
+    await database.refreshToken.update({
+      where: { id: candidate.id },
+      data: { lastUsedAt: new Date(now) },
     });
-
-    for (const candidate of activeTokens) {
-      const session = await database.session.findUnique({ where: { id: candidate.id } });
-      if (session
-        && session.userId === candidate.userId
-        && !session.revokedAt
-        && verifySensitive(parsed.secret, candidate.salt, candidate.tokenHash)) {
-        await database.refreshToken.update({
-          where: { id: candidate.id },
-          data: { lastUsedAt: new Date(now) },
-        });
-        return mapToken({ ...candidate, lastUsedAt: new Date(now) });
-      }
-    }
-    return undefined;
+    return mapToken({ ...candidate, lastUsedAt: new Date(now) });
   } catch (error) {
     logger.error('refreshTokenRepository(prisma): verify failed', error);
-    throw error;
-  }
-}
-
-async function revoke(database: PrismaClient, id: string): Promise<boolean> {
-  try {
-    const initial = await database.refreshToken.findUnique({ where: { id } });
-    if (!initial) return false;
-    const revoked = await database.$transaction(async (tx) => {
-      if (!(await lockUser(tx, initial.userId)) || !(await lockFamily(tx, initial.familyId))) {
-        return false;
-      }
-      const token = await tx.refreshToken.findUnique({ where: { id } });
-      if (!token || token.userId !== initial.userId || token.familyId !== initial.familyId) {
-        return false;
-      }
-      const family = await tx.refreshTokenFamily.findUnique({ where: { id: token.familyId } });
-      if (!family || family.userId !== token.userId) return false;
-      await revokeFamilyGraph(tx, token.familyId, new Date(), 'refresh_token_revoked');
-      return true;
-    });
-    if (revoked) {
-      logger.info('Refresh token revoked (prisma)', { tokenId: id });
-      return true;
-    }
-    return false;
-  } catch (error) {
-    logger.error('refreshTokenRepository(prisma): revoke failed', error);
     throw error;
   }
 }
@@ -701,32 +640,13 @@ async function revokeFamilyForToken(
   });
 }
 
-async function purgeExpired(
-  database: PrismaClient,
-  maxAgeDaysPastExpiry = 30,
-): Promise<number> {
-  try {
-    const cutoff = new Date(Date.now() - maxAgeDaysPastExpiry * 24 * 60 * 60 * 1000);
-    const result = await database.refreshToken.deleteMany({
-      where: { expiresAt: { lt: cutoff } },
-    });
-    if (result.count > 0) logger.info('Expired refresh tokens purged (prisma)', { count: result.count });
-    return result.count;
-  } catch (error) {
-    logger.error('refreshTokenRepository(prisma): purgeExpired failed', error);
-    throw error;
-  }
-}
-
 export function createRefreshTokenRepository(database: PrismaClient) {
   return {
     create: create.bind(undefined, database),
     verify: verify.bind(undefined, database),
-    revoke: revoke.bind(undefined, database),
     rotate: rotate.bind(undefined, database),
     revokeAuthorizationForSession: revokeAuthorizationForSession.bind(undefined, database),
     revokeFamilyForToken: revokeFamilyForToken.bind(undefined, database),
-    purgeExpired: purgeExpired.bind(undefined, database),
   };
 }
 

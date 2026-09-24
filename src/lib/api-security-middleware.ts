@@ -1,4 +1,3 @@
-import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { getClientIp } from '@/lib/net/getClientIp';
@@ -58,91 +57,8 @@ class APIInputValidationMiddleware {
   }
 }
 
-class APIKeyAuthMiddleware {
-  public async validateRequest(request: NextRequest, requiredScopes?: string[]): Promise<NextResponse | null> {
-    const apiKey = this.extractAPIKey(request);
-    if (!apiKey) {
-      await this.logAuthFailure(request, 'missing_api_key');
-      return new NextResponse('API key required', {
-        status: 401,
-        headers: { 'WWW-Authenticate': 'ApiKey' },
-      });
-    }
-
-    if (!/^[a-zA-Z0-9]{32,64}$/.test(apiKey)) {
-      await this.logAuthFailure(request, 'invalid_api_key_format');
-      return new NextResponse('Invalid API key', { status: 401 });
-    }
-
-    const keyType = this.configuredKeyType(apiKey);
-    if (!keyType) {
-      await this.logAuthFailure(request, 'invalid_api_key');
-      return new NextResponse('Invalid API key', { status: 401 });
-    }
-
-    const scopes = keyType === 'internal' ? ['internal'] : ['read', 'write'];
-    if (requiredScopes?.some((scope) => !scopes.includes(scope))) {
-      await this.logAuthFailure(request, 'insufficient_scope', { required: requiredScopes });
-      return new NextResponse('Insufficient scope', { status: 403 });
-    }
-    return null;
-  }
-
-  private extractAPIKey(request: NextRequest): string | null {
-    const authorization = request.headers.get('authorization');
-    if (authorization?.startsWith('Bearer ')) return authorization.slice(7).trim() || null;
-    return request.headers.get('x-api-key')?.trim() || null;
-  }
-
-  private configuredKeyType(apiKey: string): 'internal' | 'standard' | null {
-    if (this.matchesConfiguredKey(apiKey, 'INTERNAL_API_KEYS')) return 'internal';
-    if (this.matchesConfiguredKey(apiKey, 'VALID_API_KEYS')) return 'standard';
-    return null;
-  }
-
-  private matchesConfiguredKey(apiKey: string, envName: 'VALID_API_KEYS' | 'INTERNAL_API_KEYS'): boolean {
-    return (process.env[envName] || '')
-      .split(',')
-      .map((key) => key.trim())
-      .filter(Boolean)
-      .some((candidate) => {
-        const supplied = Buffer.from(apiKey);
-        const expected = Buffer.from(candidate);
-        return supplied.length === expected.length && crypto.timingSafeEqual(supplied, expected);
-      });
-  }
-
-  private async logAuthFailure(
-    request: NextRequest,
-    reason: string,
-    details: Record<string, unknown> = {},
-  ): Promise<void> {
-    const event: SecurityEvent = {
-      type: 'api_auth_failure',
-      severity: 'medium',
-      timestamp: new Date().toISOString(),
-      ip: getClientIp(request),
-      url: request.nextUrl.pathname,
-      details: { reason, method: request.method, ...details },
-    };
-    await logSecurityEvent(event);
-  }
-}
-
-export function createAPISecurityMiddleware(options?: {
-  requireAPIKey?: boolean;
-  requiredScopes?: string[];
-}) {
+export function createAPISecurityMiddleware() {
   const inputValidation = new APIInputValidationMiddleware();
-  const apiKeyAuth = new APIKeyAuthMiddleware();
 
-  return async (request: NextRequest): Promise<NextResponse | null> => {
-    const inputValidationResult = await inputValidation.validateRequest(request);
-    if (inputValidationResult) return inputValidationResult;
-
-    if (options?.requireAPIKey) {
-      return await apiKeyAuth.validateRequest(request, options.requiredScopes);
-    }
-    return null;
-  };
+  return (request: NextRequest): Promise<NextResponse | null> => inputValidation.validateRequest(request);
 }

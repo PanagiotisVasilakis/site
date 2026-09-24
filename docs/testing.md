@@ -107,10 +107,7 @@ A request that owns the marker and authoritatively re-reads an already-revoked p
 
 Run `npm run hash:prisma-integrity` from the repository root. The schema hash covers the raw `prisma/schema.prisma` bytes. The migration-tree hash recursively includes every regular file below `prisma/migrations`, including `migration_lock.toml`; it byte-sorts UTF-8 relative paths and hashes a versioned, length-prefixed path/content stream. Ambiguous or duplicate paths, symbolic links, and special files fail closed; filesystem traversal order, timestamps, and metadata are excluded. `npm run check:prisma-integrity` compares those bytes with the canonical committed `prisma/integrity-manifest.json`; only the explicit `npm run update:prisma-integrity` command rewrites that baseline.
 
-Current verified values:
-
-- Prisma schema SHA-256: `55e5f6c9ec3230009b60d2331f0b9d04a4acc143f65e72c376fd1a7c31df044b`.
-- Prisma migration tree SHA-256: `be2f0a33cd4d80f9eb71b7c1f2916b56600fd3cbc325fbf8ad8a7684c83a3d8f` across 15 files.
+The current values are recorded only in `prisma/integrity-manifest.json`. The integration support (`tests/integration/support/migrations.ts`) reads the same manifest through `checkPrismaIntegrity` and compares its per-migration SHA-256 values with the applied `_prisma_migrations` checksums.
 
 The earlier `b1763086454bf563257bbba8b092b89cea1bdd962e442da0bec49af9bbd6450c` / `bcb0d280c005f31d08a1c98a46cd3e2301b97256c5b68b88d52907c6c5bc8bd2` discrepancy was file-scope drift, not a migration change: the first command included `migration_lock.toml` among all 15 files, while the second selected only the 14 `*.sql` files. The versioned utility above is the canonical process for subsequent reports.
 

@@ -38,12 +38,12 @@ Usage: scripts/system-orchestrator.sh <command> [options]
 
 Commands:
   bootstrap   Validate env, install deps if needed, prepare DB, run migrations, optional build
-  up          Run bootstrap, then start app and verify health/metrics
+  up          Run bootstrap, then start app and verify health
   down        Stop app and stop local fallback DB (if started by orchestrator)
   restart     down + up
   status      Print app and DB status summary
   logs        Print app logs (or follow with --follow)
-  verify      Verify health and metrics endpoints on a running app
+  verify      Verify health endpoints on a running app
   build       Run production build pipeline after environment and DB readiness checks
   migrate     Run Prisma generate + migrate deploy with lock and retries
   check       Validate prerequisites and environment contract without starting services
@@ -207,11 +207,6 @@ parse_args() {
   if [[ "$PROFILE" == "production" ]]; then
     DOCKER_FALLBACK=0
   fi
-}
-
-parse_major_version() {
-  local version="$1"
-  printf '%s' "$version" | sed 's/^v//' | cut -d'.' -f1
 }
 
 normalize_semver_min() {
@@ -488,19 +483,6 @@ validate_environment_contract() {
     fi
   done
 
-  local api_key_env raw_key
-  for api_key_env in VALID_API_KEYS INTERNAL_API_KEYS METRICS_WRITE_API_KEYS; do
-    [[ -n "${!api_key_env:-}" ]] || continue
-    IFS=',' read -r -a configured_keys <<< "${!api_key_env}"
-    for raw_key in "${configured_keys[@]}"; do
-      raw_key="$(trim "$raw_key")"
-      if [[ ! "$raw_key" =~ ^[A-Za-z0-9]{32,64}$ ]]; then
-        error "$api_key_env contains an invalid key"
-        failed=1
-      fi
-    done
-  done
-
   if [[ "$PROFILE" == "production" && ( -z "${CLAIM_TOKEN_PEPPER:-}" || ${#CLAIM_TOKEN_PEPPER} -lt 32 ) ]]; then
     error "CLAIM_TOKEN_PEPPER must be at least 32 characters in production"
     failed=1
@@ -560,18 +542,6 @@ validate_environment_contract() {
     failed=1
   fi
 
-  if [[ "${DEV_SESSION_MINT_ENABLED:-0}" == "1" && ( -z "${DEV_SESSION_MINT_SECRET:-}" || ${#DEV_SESSION_MINT_SECRET} -lt 32 ) ]]; then
-    error "DEV_SESSION_MINT_SECRET must be at least 32 characters when development session minting is enabled"
-    failed=1
-  fi
-  if [[ ! "${DEV_SESSION_MINT_ENABLED:-0}" =~ ^(0|1)$ ]]; then
-    error "DEV_SESSION_MINT_ENABLED must be 0 or 1"
-    failed=1
-  fi
-  if [[ -n "${CRON_SECRET:-}" && ${#CRON_SECRET} -lt 32 ]]; then
-    error "CRON_SECRET must be at least 32 characters"
-    failed=1
-  fi
   if [[ -n "${ANALYTICS_RETENTION_DAYS:-}" && ! "${ANALYTICS_RETENTION_DAYS}" =~ ^[0-9]+$ ]]; then
     error "ANALYTICS_RETENTION_DAYS must be a non-negative integer"
     failed=1
@@ -959,11 +929,6 @@ public_page_url() {
   printf '%s' "http://127.0.0.1:${port}/en"
 }
 
-metrics_url() {
-  local port="${PORT:-3000}"
-  printf '%s' "http://127.0.0.1:${port}/api/metrics"
-}
-
 wait_for_runtime() {
   require_cmd curl
 
@@ -992,49 +957,8 @@ wait_for_runtime() {
   return 1
 }
 
-first_csv_value() {
-  local csv="$1"
-  local first="${csv%%,*}"
-  trim "$first"
-}
-
-verify_metrics_endpoint() {
-  require_cmd curl
-
-  local url
-  url="$(metrics_url)"
-  local code=""
-
-  if [[ -n "${VALID_API_KEYS:-}" ]]; then
-    local key
-    key="$(first_csv_value "$VALID_API_KEYS")"
-    if [[ -n "$key" ]]; then
-      code="$(curl -s -o /dev/null -w '%{http_code}' -H "x-api-key: $key" "$url" || true)"
-      if [[ "$code" == "200" ]]; then
-        log "Metrics endpoint verification passed with API key"
-        return 0
-      fi
-      error "Metrics endpoint returned $code with API key"
-      return 1
-    fi
-  fi
-
-  code="$(curl -s -o /dev/null -w '%{http_code}' "$url" || true)"
-  case "$code" in
-    200|401|403)
-      log "Metrics endpoint is reachable (HTTP $code)"
-      return 0
-      ;;
-    *)
-      error "Metrics endpoint verification failed (HTTP ${code:-none})"
-      return 1
-      ;;
-  esac
-}
-
 verify_runtime() {
   wait_for_runtime || die "Runtime verification failed: live/ready/page checks did not pass" 20
-  verify_metrics_endpoint || die "Runtime verification failed: metrics endpoint check failed" 20
   log "Runtime verification passed"
 }
 

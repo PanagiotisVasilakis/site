@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { withErrorHandler, validateRequestBody, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
-import { parseGuestSession, verifyGuestSessionAccess, type GuestSessionPayload } from '@/lib/guestSession';
+import { GUEST_SESSION_COOKIE, parseGuestSession, verifyGuestSessionAccess, type GuestSessionPayload } from '@/lib/guestSession';
 import { guestStore } from '@/lib/guestDataStore';
 import { checkInRequestRepository, type CheckInRequestRecord } from '@/lib/prisma-repositories/checkInRequestRepository';
 import { getFeatureFlagsAsync } from '@/lib/featureFlags';
@@ -30,7 +30,7 @@ function normalizeRequest(request: CheckInRequestRecord | undefined) {
 }
 
 async function getVerifiedSession(request: NextRequest): Promise<GuestSessionPayload> {
-  const session = parseGuestSession(request.cookies.get('guest_session')?.value);
+  const session = parseGuestSession(request.cookies.get(GUEST_SESSION_COOKIE)?.value);
   const verified = await verifyGuestSessionAccess(session);
   if (!verified) {
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Authentication required to request an arrival time');

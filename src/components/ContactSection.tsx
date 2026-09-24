@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import { useTranslation } from '@/hooks/useTranslation';
+import { getDictionary } from '@/i18n/dictionaries';
 import { getApartmentMapLocation } from '@/data/mapLocations';
 
 interface ContactSectionProps {
@@ -67,7 +67,7 @@ function ContactIcon({ name }: { name: ContactIconName }) {
 }
 
 export default function ContactSection({ locale }: ContactSectionProps) {
-  const { t } = useTranslation(locale);
+  const t = getDictionary(locale === 'el' ? 'el' : 'en');
   const isGreek = locale === 'el';
   const apartmentLocation = getApartmentMapLocation(locale === 'el' ? 'el' : 'en');
 
@@ -79,10 +79,8 @@ export default function ContactSection({ locale }: ContactSectionProps) {
     email: t.contact?.email ?? 'Email',
     connectWithUs: t.contact?.connectWithUs ?? 'Connect with us',
     description: t.contact?.description ?? '',
-    streetCity: t.contact?.streetCity ?? 'Archimidous 21 Kalamata',
-    countryPostal: t.contact?.countryPostal ?? 'Greece 24100',
   };
-  const addressParts = (apartmentLocation.address ?? `${translations.streetCity}, ${translations.countryPostal}`)
+  const addressParts = apartmentLocation.address
     .split(',')
     .map(part => part.trim())
     .filter(Boolean);
@@ -92,18 +90,18 @@ export default function ContactSection({ locale }: ContactSectionProps) {
       label: translations.address,
       value: (
         <>
-          {addressParts[0] ?? translations.streetCity}
+          {addressParts[0]}
           <br />
-          {addressParts.slice(1).join(', ') || translations.countryPostal}
+          {addressParts.slice(1).join(', ')}
         </>
       ),
-      href: apartmentLocation.directionsUrl || 'https://maps.app.goo.gl/wW1Lnh14k3psKGAm9',
+      href: apartmentLocation.directionsUrl,
       icon: 'map',
     },
     {
       label: translations.phone,
-      value: apartmentLocation.phone || '+30 695 581 0051',
-      href: `tel:${(apartmentLocation.phone || '+30 695 581 0051').replace(/[^+0-9]/g, '')}`,
+      value: apartmentLocation.phone,
+      href: `tel:${apartmentLocation.phone.replace(/[^+0-9]/g, '')}`,
       icon: 'phone',
     },
     {

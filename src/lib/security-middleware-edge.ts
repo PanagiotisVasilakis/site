@@ -1,7 +1,5 @@
 /**
- * Security middleware tailored for the Edge runtime.
- * Mirrors the critical behaviour of the Node implementation while
- * avoiding Node-specific dependencies that are unavailable in this runtime.
+ * Security headers, nonce-based CSP and CORS enforcement applied by src/proxy.ts.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -15,43 +13,19 @@ import {
 } from '@/lib/security-config';
 import { getClientIp } from '@/lib/net/getClientIp';
 
-let securityHeadersCache: Record<string, string> | null = null;
-let cacheTimestamp = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const DIRECT_HEALTH_PROBE_PATHS = new Set([
-  '/api/health',
   '/api/health/live',
   '/api/health/ready',
 ]);
 
-interface SecurityMiddlewareOptions {
-  skipPaths?: string[];
-  enableNonce?: boolean;
-  customHeaders?: Record<string, string>;
-}
-
 class SecurityHeadersMiddleware {
   private readonly config = getSecurityConfig();
-  private readonly options: SecurityMiddlewareOptions;
-
-  constructor(options: SecurityMiddlewareOptions = {}) {
-    this.options = {
-      skipPaths: ['/api/health', '/favicon.ico'],
-      enableNonce: true,
-      ...options,
-    };
-  }
 
   public handle(request: NextRequest): NextResponse {
     const response = NextResponse.next();
+    const nonce = generateNonce();
 
-    if (this.shouldSkipPath(request.nextUrl.pathname)) {
-      return response;
-    }
-
-    const nonce = this.options.enableNonce ? generateNonce() : undefined;
-
-    this.applySecurityHeaders(response, nonce);
+    this.applySecurityHeaders(response);
     this.applyCspHeaders(response, nonce);
 
     const requestHeaders = new Headers(request.headers);
@@ -60,9 +34,7 @@ class SecurityHeadersMiddleware {
     if (csp) {
       requestHeaders.set('Content-Security-Policy', csp);
     }
-    if (nonce) {
-      requestHeaders.set('x-nonce', nonce);
-    }
+    requestHeaders.set('x-nonce', nonce);
     const localeMatch = request.nextUrl.pathname.match(/^\/(en|el)(?:\/|$)/);
     requestHeaders.set('x-locale', localeMatch?.[1] ?? 'en');
 
@@ -71,31 +43,13 @@ class SecurityHeadersMiddleware {
     return forwarded;
   }
 
-  private shouldSkipPath(pathname: string): boolean {
-    return this.options.skipPaths?.some((path) => pathname.startsWith(path) || pathname === path) || false;
-  }
-
-  private applySecurityHeaders(response: NextResponse, nonce?: string): void {
-    const headers = this.getSecurityHeaders(nonce);
-
-    Object.entries(headers).forEach(([key, value]) => {
+  private applySecurityHeaders(response: NextResponse): void {
+    Object.entries(this.getSecurityHeaders()).forEach(([key, value]) => {
       response.headers.set(key, value);
     });
-
-    if (this.options.customHeaders) {
-      Object.entries(this.options.customHeaders).forEach(([key, value]) => {
-        response.headers.set(key, value);
-      });
-    }
   }
 
-  private getSecurityHeaders(nonce?: string): Record<string, string> {
-    const now = Date.now();
-
-    if (!nonce && securityHeadersCache && now - cacheTimestamp < CACHE_DURATION) {
-      return securityHeadersCache;
-    }
-
+  private getSecurityHeaders(): Record<string, string> {
     const { headers } = this.config;
     const securityHeaders: Record<string, string> = {};
 
@@ -121,15 +75,10 @@ class SecurityHeadersMiddleware {
     securityHeaders['X-Download-Options'] = 'noopen';
     securityHeaders['X-Permitted-Cross-Domain-Policies'] = 'none';
 
-    if (!nonce) {
-      securityHeadersCache = securityHeaders;
-      cacheTimestamp = now;
-    }
-
     return securityHeaders;
   }
 
-  private applyCspHeaders(response: NextResponse, nonce?: string): void {
+  private applyCspHeaders(response: NextResponse, nonce: string): void {
     if (!this.config.csp.enabled) return;
 
     let csp = buildCSPDirective(
@@ -143,10 +92,6 @@ class SecurityHeadersMiddleware {
 
     const headerName = this.config.csp.reportOnly ? 'Content-Security-Policy-Report-Only' : 'Content-Security-Policy';
     response.headers.set(headerName, csp);
-
-    if (nonce) {
-      response.headers.set('X-Nonce', nonce);
-    }
   }
 
 }
@@ -173,7 +118,7 @@ class CORSMiddleware {
         type: 'cors_violation',
         severity: 'medium',
         timestamp: new Date().toISOString(),
-        ip: getClientIp(request, { trustProxy: true }),
+        ip: getClientIp(request),
         url: request.nextUrl.pathname,
         details: {
           origin,
@@ -240,8 +185,8 @@ class CORSMiddleware {
   }
 }
 
-export function createSecurityMiddleware(options?: SecurityMiddlewareOptions) {
-  const securityHeaders = new SecurityHeadersMiddleware(options);
+export function createSecurityMiddleware() {
+  const securityHeaders = new SecurityHeadersMiddleware();
   const cors = new CORSMiddleware();
 
   return async (request: NextRequest): Promise<NextResponse> => {
@@ -256,4 +201,3 @@ export function createSecurityMiddleware(options?: SecurityMiddlewareOptions) {
   };
 }
 
-export type { SecurityMiddlewareOptions };

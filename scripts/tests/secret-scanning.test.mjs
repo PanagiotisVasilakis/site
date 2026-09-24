@@ -404,7 +404,7 @@ async function withGeneratedArtifactPolicy(options, callback) {
     const previewModeEncryptionKey = options.previewModeEncryptionKey ?? '7'.repeat(64);
     const actionId = options.actionId === false ? null : ACTION_IDENTIFIER;
     const buildId = options.buildId ?? BUILD_IDENTIFIER;
-    const nextVersion = options.nextVersion ?? '16.2.11';
+    const nextVersion = options.nextVersion ?? '16.3.6';
     const serverReference = {
       node: actionId ? { [actionId]: { workers: {}, layer: {} } } : {},
       edge: {},
@@ -667,7 +667,7 @@ test('Next internal material equal to an incident fingerprint fails closed', asy
 
 test('unknown Next version fails closed', async () => {
   await assert.rejects(
-    withGeneratedArtifactPolicy({ nextVersion: '16.2.12-unknown' }, async () => {}),
+    withGeneratedArtifactPolicy({ nextVersion: '16.3.7-unknown' }, async () => {}),
     /do not support the installed Next version/u,
   );
 });

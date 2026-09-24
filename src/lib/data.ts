@@ -4,17 +4,13 @@ import { ItemSchema, type Item } from "../data/schemas";
 import { categories } from "../data/categories";
 import type { Locale } from "@/i18n/config";
 import { logger } from '@/lib/logger-enterprise';
-export { mapsHref, telHref } from '@/lib/contactLinks';
 
 const dataRoot = path.join(process.cwd(), "src", "data", "items");
 
-export type CategoryWithCount = (typeof categories)[number] & { count: number };
-
-export function getCategoriesWithCounts(): CategoryWithCount[] {
+export function getOrderedCategories(): typeof categories {
   return categories
     .slice()
-    .sort((a,b) => (a.order ?? 999) - (b.order ?? 999))
-    .map((c) => ({ ...c, count: getItemsByCategory(c.id).length }));
+    .sort((a,b) => (a.order ?? 999) - (b.order ?? 999));
 }
 
 export function getItemsByCategory(categoryId: string): Item[] {

@@ -42,7 +42,7 @@ import {
   issueGuestSession,
   parseGuestSession,
   parseGuestSessionBinding,
-  revokeGuestSession,
+  revokeGuestSessionById,
   verifyGuestSessionAccess,
 } from '@/lib/guestSession';
 
@@ -218,9 +218,9 @@ describe('guest authentication', () => {
 
   it('revokes the session authorization chain and ignores payloads without a session id', async () => {
     refreshTokenRepositoryMock.revokeAuthorizationForSession.mockResolvedValue(true);
-    await revokeGuestSession({ type: 'guest' });
+    await revokeGuestSessionById(undefined);
     expect(refreshTokenRepositoryMock.revokeAuthorizationForSession).not.toHaveBeenCalled();
-    await revokeGuestSession({ type: 'guest', sid: 'session-1' });
+    await revokeGuestSessionById('session-1');
     expect(refreshTokenRepositoryMock.revokeAuthorizationForSession)
       .toHaveBeenCalledWith('session-1');
   });

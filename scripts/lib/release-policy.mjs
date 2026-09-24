@@ -205,11 +205,11 @@ const EXPECTED_HISTORICAL_SECRET_BASELINE = Object.freeze([
 const EXPECTED_CURRENT_SECRET_FIXTURES = Object.freeze([
   ['synthetic-release-fixture', '.env.example', 'credential-bearing-database-url', 5, 15],
   ['synthetic-test-fixture', 'tests/integration/auth/portal-eligibility-consistency.test.ts', 'generic-api-key', 29, 8],
-  ['synthetic-test-fixture', 'tests/security/client-identity-route-regression.test.ts', 'generic-api-key', 147, 18],
+  ['synthetic-test-fixture', 'tests/security/client-identity-route-regression.test.ts', 'generic-api-key', 149, 18],
   ['synthetic-test-fixture', 'tests/security/client-identity.test.ts', 'generic-api-key', 12, 10],
   ['synthetic-test-fixture', 'tests/security/portal-auth-client-identity.test.ts', 'generic-api-key', 32, 18],
   ['synthetic-test-fixture', 'tests/security/security-boundaries.test.ts', 'generic-api-key', 33, 6],
-  ['synthetic-test-fixture', 'tests/security/security-boundaries.test.ts', 'generic-api-key', 222, 10],
+  ['synthetic-test-fixture', 'tests/security/security-boundaries.test.ts', 'generic-api-key', 215, 10],
   ['synthetic-release-fixture', 'scripts/lib/release-gates.mjs', 'credential-bearing-database-url', 29, 19],
   ['synthetic-release-fixture', 'scripts/lib/release-gates.mjs', 'credential-bearing-database-url', 30, 17],
   ['synthetic-release-fixture', 'scripts/lib/release-policy.mjs', 'credential-bearing-database-url', 40, 19],
@@ -2323,9 +2323,6 @@ async function validateRuntimeCredentialContract(root, errors) {
   const adminAuth = await readOptional(path.join(root, 'src/lib/auth/admin.ts'));
   const guestAuth = await readOptional(path.join(root, 'src/lib/guestSession.ts'));
   const adminLogin = await readOptional(path.join(root, 'src/app/api/admin/login/route.ts'));
-  const devAlertVerification = await readOptional(
-    path.join(root, 'src/app/api/dev/alerts/verify-spike/route.ts'),
-  );
   if (!adminAuth?.includes("readRuntimeCredential('ADMIN_JWT_SECRET')")) {
     errors.push('admin JWT signing must use the centralized runtime credential reader');
   }
@@ -2335,13 +2332,10 @@ async function validateRuntimeCredentialContract(root, errors) {
   if (!adminLogin?.includes("readRuntimeCredential('ADMIN_DASH_SECRET')")) {
     errors.push('admin login must use the centralized runtime credential reader');
   }
-  if (!devAlertVerification?.includes("readRuntimeCredential('ADMIN_DASH_SECRET')")) {
-    errors.push('development alert verification must use the centralized runtime credential reader');
-  }
   if (guestAuth?.includes('dev-guest-secret-change-me')) {
     errors.push('fixed development guest signing credentials are forbidden');
   }
-  if ([adminAuth, guestAuth, adminLogin, devAlertVerification].some((source) => (
+  if ([adminAuth, guestAuth, adminLogin].some((source) => (
     source && /NEXT_PUBLIC_[A-Z0-9_]*(?:SECRET|TOKEN|KEY)/u.test(source)
   ))) {
     errors.push('server credentials must not be exposed through NEXT_PUBLIC variables');

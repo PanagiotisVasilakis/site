@@ -104,7 +104,7 @@ disposable PostgreSQL container and synthetic databases. `verify:release`
 never targets a persistent environment. See [Testing strategy](../docs/testing.md)
 and [Release verification](../docs/release-verification.md).
 
-Optional browser audits are manual commands: `audit:a11y`, `audit:contrast`, `audit:responsive:ux`, and `audit:lighthouse:matrix`.
+Optional browser audits are manual commands: `audit:a11y`, `audit:responsive:ux`, and `audit:lighthouse:matrix`.
 
 ## Existing production-oriented tooling
 

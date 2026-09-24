@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useEffect } from 'react';
-import { useErrorHandler } from '@/lib/errorBoundary';
-import { useErrorReporting } from '@/lib/errorReporting';
+import Link from 'next/link';
+import { errorReporter } from '@/lib/errorReporting';
 
 interface GlobalErrorProps {
   error: Error & { digest?: string };
@@ -45,8 +45,6 @@ const copy = {
 } as const;
 
 export default function GlobalError({ error, reset }: GlobalErrorProps) {
-  const { reportError: boundaryReportError } = useErrorHandler();
-  const { reportError, addBreadcrumb } = useErrorReporting();
   const isGreek = typeof window !== 'undefined' && window.location.pathname.startsWith('/el');
   const t = isGreek ? copy.el : copy.en;
 
@@ -64,27 +62,9 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
       userAgent: typeof window !== 'undefined' ? navigator.userAgent : 'unknown',
     }, error);
 
-    // Report to error tracking service
-    reportError(error, {
-      errorDigest: error.digest,
-      context: 'globalErrorPage',
-      route: typeof window !== 'undefined' ? window.location.pathname : 'unknown',
-      category: 'globalError',
-    });
-
-    // Add breadcrumb for error page display
-    addBreadcrumb('ui', 'Global error page displayed', 'error', {
-      errorName: error.name,
-      errorDigest: error.digest,
-    });
-
-    // Report to external error tracking
-    // Report using boundary error handler
-    boundaryReportError(error, 'global-error-boundary', {
-      digest: error.digest,
-      route: typeof window !== 'undefined' ? window.location.pathname : 'unknown',
-    });
-  }, [error, reportError, addBreadcrumb, boundaryReportError]);
+    // Report once per error to the server-side error log.
+    void errorReporter.reportError(error, { category: 'globalError' });
+  }, [error]);
 
   const handleReset = () => {
     console.info('Global error recovery attempted', {
@@ -107,7 +87,6 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
       errorDigest: error.digest,
       context: 'global-error-boundary',
     });
-    window.location.href = '/';
   };
 
   return (
@@ -158,12 +137,13 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
                 {t.reload}
               </button>
 
-              <button
+              <Link
+                href="/"
                 onClick={handleGoHome}
-                className="w-full px-6 py-3 border border-soft text-body surface-interactive rounded-lg transition-colors"
+                className="block w-full text-center px-6 py-3 border border-soft text-body surface-interactive rounded-lg transition-colors"
               >
                 {t.goHome}
-              </button>
+              </Link>
             </div>
 
             {/* Development Error Details */}

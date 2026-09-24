@@ -180,6 +180,11 @@ provider references; normal forward commits preserve the evidence.
 
 ## 6. Repository cleanup follow-up
 
+Status (2026-09): the source disposition below has been applied. The CI workflow,
+`CNAME`, `docs/ci.md` and the Vercel fallback are gone. The audit and remediation
+reports were later removed from the working tree and remain in git history
+(commit `7a955ea`).
+
 The external triggers must be disabled before this local cleanup commit is ever
 pushed. H0 does not perform that external step. The expected source disposition
 is:
@@ -200,8 +205,9 @@ is:
   retired deployment files without pretending to be CI.
 
 Dependency-update configuration such as Dependabot is not a deployment target.
-Its use must be decided by repository governance and must not be removed as an
-incidental side effect of hosting cleanup.
+The repository owner removed `.github/dependabot.yml` as a governance decision.
+Dependency updates are now checked manually (`npm run security:outdated`, and the
+production `npm audit` inside `validate:security`).
 
 ## 7. Verification after cleanup
 

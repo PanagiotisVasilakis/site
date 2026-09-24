@@ -44,11 +44,10 @@ function analyticsEnvelope(body: Record<string, unknown>): Record<string, unknow
   };
 }
 
-export function trackPageview(pathname: string, locale?: string) {
+export function trackPageview(pathname: string) {
   if (typeof window === 'undefined') return;
   if (dntEnabled()) return;
-  const loc = locale || pathname.split('/')[1];
-  post(analyticsEnvelope({ path: pathname, locale: loc }));
+  post(analyticsEnvelope({ path: pathname, locale: pathname.split('/')[1] }));
 }
 
 export function trackEvent(name: string, props?: Record<string, unknown>) {

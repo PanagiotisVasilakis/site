@@ -18,12 +18,9 @@ import { ApiError, readJsonBody } from '@/lib/apiErrorHandler';
 const BOT_PATTERN = /(bot|crawl|spider|slurp|headless|instrumented)/i;
 const ALLOWED_EVENTS = new Set([
   'portal_opened',
-  'origin_selected',
   'form_submitted',
   'auth_mode_changed',
-  'no_booking_cta_clicked',
   'checkin_viewed',
-  'checkin_completed',
   'booking_submitted',
   'booking_check_availability',
   'mobile_nav_house',
@@ -76,18 +73,11 @@ function sanitizeEvent(value: unknown): Pick<AnalyticsInput, 'eventName' | 'prop
         properties = { source: raw.source };
       }
       break;
-    case 'origin_selected':
-      if (raw.origin === 'GR' || raw.origin === 'ABROAD') properties.origin = raw.origin;
-      if (raw.mode === 'signup') properties.mode = raw.mode;
-      break;
     case 'form_submitted':
       if (raw.form === 'sign-in' || raw.form === 'sign-up') properties.form = raw.form;
       break;
     case 'auth_mode_changed':
       if (raw.mode === 'signin' || raw.mode === 'signup') properties.mode = raw.mode;
-      break;
-    case 'no_booking_cta_clicked':
-      if (raw.from === 'guest' || raw.from === 'home') properties.from = raw.from;
       break;
     case 'booking_submitted': {
       const nights = integer(raw.nights, 0, 365);

@@ -1,8 +1,6 @@
 import { topPaths, hourBuckets, dayBuckets, rollingAverage, percentile, vitalsSummary, analyticsStats, dailyNewPaths, vitalsRecent } from '@/lib/analyticsRepository';
 import AdminSessionManager from '@/components/AdminSessionManager';
-import { verifyAdminSession } from '@/lib/auth/admin';
-import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
+import { requireAdminPageSession } from '@/lib/adminPageAuth';
 import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
@@ -12,16 +10,8 @@ export const metadata: Metadata = {
 };
 
 export default async function AnalyticsAdminPage() {
-  // Server-side JWT verification (Node.js runtime compatible)
-  const cookieStore = await cookies();
-  const jwtCookie = cookieStore.get('admin_jwt');
+  await requireAdminPageSession();
 
-  if (!jwtCookie?.value || !(await verifyAdminSession(jwtCookie.value))) {
-    // JWT is missing or invalid, redirect to login
-    redirect('/admin/login?error=session_expired');
-  }
-
-  // If we reach here, both secret (from middleware) and JWT are valid
   const [top, summary, newPaths, vitals, recentVitals, hoursRaw, daysRaw] = await Promise.all([
     topPaths(20),
     analyticsStats(),

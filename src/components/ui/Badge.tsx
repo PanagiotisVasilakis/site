@@ -4,18 +4,11 @@ import { cva, type VariantProps } from 'class-variance-authority';
 const badgeVariants = cva('status-badge', {
   variants: {
     variant: {
-      neutral: 'badge',
-      info: 'badge',
-      success: 'status-badge--approved',
       warning: 'status-badge--pending',
-      danger: 'status-badge--rejected',
       pending: 'status-badge--pending',
       approved: 'status-badge--approved',
       rejected: 'status-badge--rejected',
     },
-  },
-  defaultVariants: {
-    variant: 'neutral',
   },
 });
 

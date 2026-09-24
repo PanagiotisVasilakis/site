@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import BookingBar from "@/components/SearchBar";
 import { getApartmentContent } from '@/data/apartmentData';
 
-interface BookingLabels {
+export interface BookingLabels {
   addDates: string;
   checkAvailability: string;
   arrivalLabel?: string;

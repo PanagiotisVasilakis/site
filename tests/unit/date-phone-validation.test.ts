@@ -5,7 +5,6 @@ import {
   dateRangeFromParams,
   dateRangeToParams,
   formatDateRange,
-  getBlockedDates,
   getNights,
   validateDateRange,
 } from '@/lib/dateUtils';
@@ -72,7 +71,6 @@ describe('date and booking validation', () => {
       error: 'Maximum stay is 30 nights',
     });
     expect(validateDateRange({ from: new Date('2030-01-11'), to: new Date('2030-01-12') })).toEqual({ valid: true });
-    expect(getBlockedDates()).toEqual([]);
   });
 
   it('computes the Athens Wi-Fi disclosure window through UTC conversion', () => {

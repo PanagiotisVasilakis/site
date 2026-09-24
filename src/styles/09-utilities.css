@@ -145,7 +145,6 @@ button[role="tab"] {
 }
 
 /* Cards and panels in dark mode should stand out slightly from background */
-[data-theme="dark"] .page-container .card,
 [data-theme="dark"] .page-container .panel {
   background: var(--layer-surface);
 }

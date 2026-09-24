@@ -83,7 +83,7 @@ const config = [
   {
     // Reviewed filesystem sinks: inputs are constant allowlists or are validated
     // and resolved beneath a fixed private root before use.
-    files: ['src/app/api/health/route.ts', 'src/lib/data.ts'],
+    files: ['src/lib/data.ts'],
     rules: { 'security/detect-non-literal-fs-filename': 'off' }
   },
   {

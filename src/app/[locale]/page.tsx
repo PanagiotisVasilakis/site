@@ -1,4 +1,4 @@
-import { getCategoriesWithCounts, pickCategoryLocale, type CategoryWithCount } from "@/lib/data";
+import { getOrderedCategories, pickCategoryLocale } from "@/lib/data";
 import { absUrl, siteUrl } from "@/lib/site";
 import { getDictionary } from "@/i18n/dictionaries";
 import { locales, type Locale } from "@/i18n/config";
@@ -14,22 +14,19 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   const nonce = (await headers()).get('x-nonce') ?? undefined;
   const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : "en";
   const t = getDictionary(eff);
-  const cats: CategoryWithCount[] = getCategoriesWithCounts();
+  const cats = getOrderedCategories();
   const featureCards: HomeFeature[] = [
     {
       href: `/${eff}/apartment`,
       label: t.house?.navLabel || 'Apartment Photos',
-      icon: '🏡',
     },
     {
       href: `/${eff}/check-in`,
       label: t.checkin?.navInfoLabel || 'Check-In Info',
-      icon: '✅',
     },
     ...cats.slice(0, 2).map((c) => ({
       href: `/${eff}/${c.slug}`,
       label: t.categories[c.slug as "phones" | "moments"] ?? (pickCategoryLocale(c, "title", eff) ?? c.title),
-      icon: c.icon ?? "📋",
     })),
   ];
 

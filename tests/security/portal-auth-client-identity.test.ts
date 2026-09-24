@@ -65,4 +65,21 @@ describe('portal auth client identity', () => {
       expect(authMocks.issueRefreshToken).not.toHaveBeenCalled();
     },
   );
+
+  it('hashes the audit IP with the shared security-event context', () => {
+    const trusted = new NextRequest('https://guest.test/api/portal/claims', {
+      method: 'POST',
+      headers: {
+        'user-agent': 'synthetic-test-client',
+        'x-origin-verified-client-ip': '203.0.113.10',
+        'x-origin-proxy-attestation': String(process.env.ORIGIN_PROXY_SHARED_SECRET),
+      },
+    });
+
+    expect(requestAuthContext(trusted)).toEqual({
+      deviceHint: 'portal-auth:device-hint:v1:synthetic-test-client',
+      ipHint: 'portal-auth:ip-hint:v1:203.0.113.10',
+      ipHash: 'security-event-ip:v1:203.0.113.10',
+    });
+  });
 });

@@ -42,10 +42,6 @@
   --tw-ring-color: var(--brand-500);
 }
 
-[data-theme="dark"] .dark\:text-brand-400 {
-  color: var(--brand-400);
-}
-
 [data-theme="dark"] .dark\:focus-visible\:ring-brand-400\/50:focus-visible {
   --tw-ring-color: color-mix(in srgb, var(--brand-400) 50%, transparent);
 }
@@ -94,8 +90,7 @@
 }
 
 /* Surface/Background Utilities */
-.surface-card,
-.card {
+.surface-card {
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
@@ -105,8 +100,7 @@
   color: var(--fg-default);
 }
 
-[data-theme="dark"] .surface-card,
-[data-theme="dark"] .card {
+[data-theme="dark"] .surface-card {
   background: linear-gradient(135deg, rgba(23, 35, 37, 0.75) 0%, rgba(17, 25, 26, 0.85) 100%);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
@@ -168,10 +162,6 @@
 }
 
 /* Layer utility backgrounds */
-.layer-surface {
-  background: var(--layer-surface);
-}
-
 .page-bg {
   background: var(--sand-50);
 }

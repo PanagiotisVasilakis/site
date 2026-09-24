@@ -5,7 +5,8 @@
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { OSRMClient, TravelMode, TravelMetrics, getOSRMClient } from '@/lib/osrmClient';
+import { OSRMClient, TravelMetrics, getOSRMClient } from '@/lib/osrmClient';
+import type { TravelMode } from '@/lib/travelFormat';
 
 interface MarkerWithCoords {
     id: string;
@@ -36,8 +37,6 @@ export interface UseTravelMetricsResult {
     data: TravelData;
     loading: boolean;
     error: string | null;
-    refetch: () => Promise<void>;
-    getMetrics: (markerId: string, mode: TravelMode) => TravelMetrics | undefined;
 }
 
 export function useTravelMetrics({
@@ -159,18 +158,9 @@ export function useTravelMetrics({
         return () => clearInterval(interval);
     }, [enabled, refreshMinutes, fetchMetrics]);
 
-    const getMetrics = useCallback(
-        (markerId: string, mode: TravelMode): TravelMetrics | undefined => {
-            return data[markerId]?.[mode];
-        },
-        [data]
-    );
-
     return {
         data,
         loading,
-        error,
-        refetch: fetchMetrics,
-        getMetrics
+        error
     };
 }

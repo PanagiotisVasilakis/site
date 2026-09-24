@@ -6,10 +6,11 @@ import {
   createRefreshCookie,
   clearSessionCookie,
   clearRefreshCookie,
+  GUEST_REFRESH_COOKIE,
+  GUEST_SESSION_COOKIE,
   parseGuestSessionBinding,
 } from '@/lib/guestSession';
 import { logger as elogger } from '@/lib/logger-enterprise';
-import { metrics } from '@/lib/metrics-collector';
 import { requestAuthContext } from '@/lib/portalAuthHttp';
 import { toSafeLocalPath } from '@/lib/safeLocalPath';
 
@@ -30,13 +31,7 @@ function clearAuthCookies(response: NextResponse): void {
   response.cookies.set(refreshCookie.name, refreshCookie.value, refreshCookie.options);
 }
 
-function unauthorizedResponse(request: NextRequest, failurePath?: string): NextResponse {
-  if (failurePath) {
-    const response = NextResponse.redirect(new URL(failurePath, request.url), 302);
-    clearAuthCookies(response);
-    return response;
-  }
-
+function unauthorizedResponse(): NextResponse {
   const response = new NextResponse('Unauthorized', { status: 401 });
   clearAuthCookies(response);
   return response;
@@ -73,14 +68,13 @@ async function issueRefreshedSession(
     device_hint: context.deviceHint,
     ip_hint: context.ipHint,
     presented_session: parseGuestSessionBinding(
-      request.cookies.get('guest_session')?.value,
+      request.cookies.get(GUEST_SESSION_COOKIE)?.value,
     ),
   });
   if (rotated.status === 'concurrent') {
     elogger.info('refresh_token.concurrent', {
       correlationId: elogger.getContext()?.correlationId,
     });
-    metrics.counter('refresh_token.concurrent', 1);
     return { status: 'concurrent' };
   }
 
@@ -88,7 +82,6 @@ async function issueRefreshedSession(
     elogger.warn('refresh_token.replay_detected', {
       correlationId: elogger.getContext()?.correlationId,
     });
-    metrics.counter('refresh_token.replay_detected', 1);
     return { status: 'failed' };
   }
 
@@ -108,7 +101,6 @@ async function issueRefreshedSession(
     new_id: rotated.rec.id,
     family_id: rotated.rec.family_id,
   });
-  metrics.counter('refresh_token.rotated', 1);
 
   return {
     status: 'refreshed',
@@ -122,9 +114,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const nextUrl = req.nextUrl;
   const nextRaw = nextUrl.searchParams.get('next');
   const nextParam = toSafeLocalPath(nextRaw, req.url) ?? undefined;
-  const refresh = req.cookies.get('guest_rt')?.value;
+  const refresh = req.cookies.get(GUEST_REFRESH_COOKIE)?.value;
   if (!refresh) {
-    return unauthorizedResponse(req);
+    return unauthorizedResponse();
   }
 
   const refreshed = await issueRefreshedSession(req, refresh);
@@ -132,7 +124,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return concurrentRefreshResponse();
   }
   if (refreshed.status === 'failed') {
-    return unauthorizedResponse(req);
+    return unauthorizedResponse();
   }
   const res = success({ refreshed: true });
   applyAuthCookies(res, refreshed.jwt, refreshed.refreshToken);

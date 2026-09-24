@@ -71,7 +71,6 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
           name: pickLocale(i, 'name', eff) ?? i.name,
           summary: pickLocale(i, 'summary', eff) ?? i.summary,
           tags: i.tags,
-          featured: i.featured,
           categorySlug: cat.slug,
           description: pickLocale(i, 'description', eff) ?? i.description,
           rating: i.rating,
@@ -85,14 +84,12 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
           location: i.location,
           website: i.website,
           directionsUrl: i.directionsUrl,
-          sourceUrls: i.sourceUrls,
           hideAddressOnFront: cat.slug === 'phones',
         }))}
         locale={eff}
         categorySlug={cat.slug}
         phonesLayout={isPhones}
         momentsLayout={isMoments}
-        emptyLabel={t.emptyState}
         ui={t.ui}
         cardLabels={{
           viewDetails: t.map?.viewDetails ?? 'View details',

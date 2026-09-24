@@ -1,0 +1,236 @@
+# Progress
+
+## Goal
+Full-repo review for refactoring and removal of legacy, redundant and unused code or files; fix approved findings one task at a time.
+
+## Baseline
+Recorded 2026-09-23 on `main` @ `cfe6ec4`, Node 22.19.0 / npm 11.18.0 (via nvm), after `npm ci`. The working tree already had the owner's intentional deletion of `.github/` plus new `CLAUDE.md` / `.claude/`.
+- Build: pass (`NEXT_PUBLIC_SITE_URL=https://guest-guide.test npm run build`, 72/72 static pages)
+- Tests: `npm run test:coverage`: 26 files, 349/349 passed. Coverage: statements 89.91%, branches 83.24%, functions 92.19%, lines 91.07% (thresholds 88/82/91/89)
+- Typecheck: clean (`npm run typecheck`)
+- Lint: clean (`npm run lint -- --max-warnings=0`, `npm run lint:security`)
+- Dead code: `npm run check:dead-code` clean. `knip --production` reports 6 exports used only by tests, 2 unused enum members, and `dotenv`/`pg` unused in production code
+- `npm ci` audit: 24 vulnerabilities (6 moderate, 17 high, 1 critical), not yet analyzed
+- Not run: `test:integration` and `verify:release` (need Docker; not requested yet)
+
+## Tasks
+- [x] Phase 1: review. DONE. REVIEW.md has R-001…R-102: 1 Critical, 1 High, 24 Medium, 75 Low, 1 Nit group.
+  - Note: `release-policy.mjs` pins package scripts, gates, Makefile and systemd markers, and secret-fixture line and column positions (`.env.example:5`, `security-boundaries.test.ts:33,222`). Every task touching those files must update the policy and allowlist in the same task.
+  - Note: rejected candidates are listed in REVIEW.md. Examples: root `instrumentation.ts` IS bundled by Turbopack; the `pg` dependency is needed.
+- [x] Phase 2: plan. The owner approved: "do everything you recommend, then list all changes". No per-task stop.
+  - Excluded (need facts or prod data I cannot get, or are SUSPECTED): content value choices (R-023 part 2), destructive schema drops (R-015 step 3, R-038, R-042 drop, R-043), R-040, R-018/R-081, R-058, R-059, R-063, R-071, R-072, R-101, and the visual redesigns R-090/R-092 (no browser verification).
+
+### Standard gates (every task)
+- G1: tests targeted at the change pass.
+- G2: `npm run typecheck` clean.
+- G3: `npm run lint -- --max-warnings=0` clean.
+- G4: `npm test` all pass. The count changes only by tests the task adds or removes, and that is noted.
+- G5: the diff contains only task-related changes.
+
+### Extra gates (where applicable)
+- R: a regression test fails before and passes after (bug fixes).
+- K: `npm run check:dead-code` clean (deletions).
+- P: `npm run test:release-policy` and `npm run validate:release-policy` (pinned files, package.json, policy-referenced files).
+- B: `npm run build` (config, deps, pages).
+- C: `npm run test:coverage` thresholds (deleting covered modules).
+- S: `npm run lint:security`.
+
+### Execution
+- [x] T01 R-001: DONE. next and eslint-config-next 16.3.6, sharp 0.35.4, postcss 8.5.28, vitest and coverage 4.1.11. New overrides: deepmerge-ts, mysql2, fast-uri, baseline-browser-mapping (reasons in docs/release-verification.md). `SUPPORTED_NEXT_VERSION` and its test fixture are now 16.3.6.
+  - Gates:
+    - prod audit: 0 vulnerabilities
+    - typecheck, lint and lint:security clean
+    - tests 349/349
+    - build OK (72 pages)
+    - release-policy 80/80 and validate passed
+    - disposition schema validated against the new build
+  - The new lint rule `no-location-assign-relative-destination` required 3 small changes: admin login and sign-out now use router.replace + refresh; the error-page "Home" is a `<Link>`.
+  - Not done: 4 dev-only highs remain in the puppeteer 24 chain (a major upgrade of the audit tooling).
+  - test:secret-scanning: 7/43 fail only because the GITLEAKS_BIN tool is not installed (environment, not code).
+- [x] T02 R-067: DONE. `images.remotePatterns` removed. Gates: typecheck, lint and build OK; policy passed.
+- [x] T03 R-002: DONE. BookingForm logs field names only. New test `tests/components/booking-form.test.tsx` fails before (circular JSON; field errors never shown) and passes after. Tests 350/350.
+- [x] T04 R-004: DONE. The client sends the first 5 stack lines, capped at 2,000 characters. New contract test `tests/routes/client-error-report.test.ts` (real reporter → real route) fails before (422) and passes after. Tests 351/351.
+- [x] T05 R-005: DONE. `calendarDate()` in guestDataExport for search and stats. New `tests/unit/guest-data-export.test.ts` (3 cases): fail before, pass after. Tests 354/354.
+- [x] T06 R-003: DONE. HealthMonitor and the Health tab deleted. The orphan bare `/api/health` alias was also deleted (its OpenAPI entry, the middleware probe-list entry, the stale eslint-security override, and its contract test; the openapi assertion is now `/health/live`). Gates: build, typecheck, lint, knip and policy OK. Tests 353/353.
+  - Note: after deleting routes, run `build` before `typecheck`, because `.next/types/validator.ts` is stale until then.
+- [x] T07 R-006: DONE. The outer try/catch in admin/guests was removed, so unexpected errors are logged at error level and the response is generic. New `tests/security/admin-guests-errors.test.ts`: fails before (the internal message leaked in `details`) and passes after. Tests 354/354.
+- [x] T08 R-007: DONE. Deleted `api/portal/{start,verify,onsite}` and their 3 OpenAPI entries. Gates: build, typecheck, lint, tests 354, knip, policy.
+- [x] T09 R-008: DONE. Deleted `BookingAlreadyLinkedError`, `linkOrCreateBooking`, `bookingRepository.create`/`findByProviderReference`/`generateId`, and the now-unused imports and types. Gates: typecheck, lint, tests 354, knip.
+- [x] T10 R-009: DONE. `parseCompositeToken` rejects id-less tokens. Removed the legacy branch in `verify` (`verify` is kept as the integration-test oracle) and `GUEST_REFRESH_ALLOW_LEGACY_SECRET_ONLY` (schema, .env.example, installer). Gates: typecheck, lint, tests 354, policy, runtime-credentials 4/4, `bash -n`.
+- [x] T11 R-010: DONE. Deleted `api/portal/dev-mint-session` and `DEV_SESSION_MINT_*` (schema field and refinement, .env.example, installer, orchestrator check, one `it.each` row). The pinned fixture moved from `security-boundaries.test.ts` line 222 to 217; updated `release-policy.mjs:212` and `current-fixture-allowlist.json`. Gates: build, typecheck, lint, tests 353 (−1 case), policy, runtime-credentials. test:secret-scanning is unchanged at 36 pass / 7 gitleaks-env fails.
+- [x] T12 R-011: DONE. `/api/errors` and the portal claim audit use `privacyHmac(ip, 'security-event-ip:v1')`; `ipHint` for refresh binding is unchanged. Two new tests (errors-route hash; `requestAuthContext` success path) fail before and pass after. The new test reads the attestation from `process.env`, so there is no new secret literal. Tests 355/355.
+- [x] T13 R-012: DONE. The `docker:security-scan` script is removed. Policy passed.
+- [x] T14 R-013: DONE (executed after T16).
+  - Deleted: `src/lib/metrics-collector.ts`, `src/lib/distributed-tracing.ts`, `api/metrics`, `api/dev/alerts/verify-spike`.
+  - Stripped metric and tracer calls from `apiErrorHandler` (and the unused `errorStatus`), `prisma.ts` (slow-query and error logs kept), `portal/refresh`, `portal/logout`, `admin/flags`.
+  - Orchestrator: removed `metrics_url`, `first_csv_value` and `verify_metrics_endpoint`.
+  - Release policy and its test: removed the verify-spike checks and fixture.
+  - Env: removed `METRICS_WRITE_API_KEYS` (schema, .env.example, installer, orchestrator loop).
+  - Gates: build, typecheck, lint, lint:security, coverage 355, knip, policy 80/80, runtime-credentials 4/4.
+- [x] T15 R-014: DONE.
+  - Routes deleted: `api/internal/{booking-outbox,cache-metrics}`, `api/alerts` (with `/webhook`), `api/security/dashboard`, `api/analytics/{stats,top,export.csv}`, `api/vitals/export.csv`, the `vitals` GET, `api/og`.
+  - OpenAPI: those entries, plus the stale `/metrics` entry left from T14 and the `ApiKeyAuth`/`CronBearer`/`WebhookBearer` schemes.
+  - Lib: `APIKeyAuthMiddleware` and the middleware options; `guestDataCache` counters and `metrics()`; `getGuestDatasetSnapshots`; `lib/csv.ts` with its test and coverage include.
+  - Env: removed `VALID_API_KEYS`/`INTERNAL_API_KEYS`/`CRON_SECRET` (schema and `isApiKeyList`, .env.example, installer, orchestrator checks).
+  - Other: nginx map (`alerts/webhook`), eslint `/api/og` exemption, CLAUDE.md API-key line.
+  - Pinned fixture moved 217 → 215 (policy and allowlist updated). The release-policy env-mask test now uses `ALERT_WEBHOOK_TOKEN`.
+  - Gates: build, typecheck, lint, lint:security, coverage (354 tests; 89.85/83.25/91.95/91.07), knip, policy 80/80, runtime-credentials.
+- [x] T16 R-015 (steps 1-2): DONE (executed before T14). Deleted `api/check-in/route.ts` and `api/check-in/complete/**` with their 3 OpenAPI entries, `guestStore.upsertCheckinCompletion` and `checkinRepository.upsert`. The read path is kept for export and stats. The `checkins` table is NOT dropped (needs a production data check). Gates: build, typecheck, lint, tests 355, knip, policy.
+- [x] T17 R-016 + R-055 + R-056: DONE.
+  - guestDataExport: a shared `toBookingExport` mapper and `withDetails()` join users and check-ins from their cached lists. No more 3N queries; stats use a Set.
+  - Deleted `getBookingById` and `exportBookingToFile`; fixed the stale header.
+  - admin/guests route: deleted the `findById` and `requests` actions; `export` returns the object directly (no stringify/parse).
+  - The page now calls `/api/admin/check-in-requests?status=all` (same `data.requests` shape). Deleted `checkInRequestRepository.getAll`.
+  - New join test: fails on the old N+1 code, passes now.
+  - Gates: build, typecheck, lint, tests 355, knip.
+- [x] T18 R-019: DONE.
+  - Keys removed from both locales:
+    - portal: 89 of 107 (regenerated from its sole consumer's 18 static accesses)
+    - common: 12
+    - house: 9, plus 6 type-only fields
+    - checkin: 15
+    - checkinInfo: 10
+  - Every key was verified by a property-access scan (`.key`, `?.key`, `['key']`) and a per-consumer check. Dynamic subtrees were excluded (categories, momentTags, rooms, momentsFilters).
+  - Gates: typecheck, lint, tests 355, validate-content, en/el parity (0 differences), rescan with 0 unused leaves.
+  - Keys read only by dead UI are removed together with T19/T21.
+- [x] T19 R-020: DONE.
+  - CategoryGridClient is reduced to the phones and moments layouts (the only categories). Removed the tag filters and `?tags=` sync, the featured/rest grids, IntersectionObserver paging, the generic map, the skeleton and FilterDrawer; `map=1` sync is kept.
+  - Deleted `TagFilters.tsx`, `FilterDrawer.tsx` (plus its 4 tests and coverage include), `ListingCardSkeleton.tsx`.
+  - Removed the `.tag-filter*` and `.divider` CSS, and 9 i18n keys only the dead UI read.
+  - Page: dropped the `emptyLabel` prop and `featured`.
+  - Gates: build, typecheck, lint, lint:security, coverage (351 tests; 89.85/83.73/91.39/90.81), knip, en/el parity.
+  - Note: a future third category would need a layout again.
+- [x] T20 R-021: DONE.
+  - Deleted `DataWarmup.tsx` and `JsonFetchHud.tsx` (and their layout mounts) and `api/categories/**` (3 routes).
+  - OpenAPI: the 3 entries, the `Category`/`Item` schemas and the `Content` tag.
+  - sw.js: removed `prewarmData`, `broadcastJsonMetric` and `isPublicDataPath`. No `/api/` responses are cached now; static `.json` files still use SWR.
+  - Tests: the public-contracts categories case was removed. The integration rate-limit test now uses `/api/health/live` as its public sample.
+  - Gates: build, typecheck, lint, coverage (350), knip, `node --check` on sw.js.
+- [x] T21 R-022: DONE.
+  - LeafletMap 612 → 391 lines. Removed routing (and `OSRMClient.getRoute`), the travel-mode toggle, the origin marker and the never-passed options (`darkTiles`, `persistKey`, `showFitButton`, `animateMarkers`, `osrmBaseUrl`, travel tuning, `onMarkerClick`, `className`, `partialUpdates`). The live defaults are now module constants, and `labels` is required.
+  - InteractiveMap: removed `center`/`onMarkerClick` and the dead apartment-insert branch.
+  - Removed 6 map i18n keys.
+  - Behavior kept: tiles and dark mode, clustering, locate/fit controls, lazy OSRM travel chips, auto-fit, refit, persisted view. CATEGORY_ICON and helpers were diffed identical to the original.
+  - Gates: build, typecheck, lint, tests 350, knip, parity. A browser smoke test is planned for the final gate.
+- [x] T22 R-023 (part 1): DONE.
+  - apartmentData: removed the unused `id`, `specs`, `distances`, `houseRules` and `location.region`/Greek names/`coordinates`.
+  - `getApartmentMapLocation` now types `address`/`phone`/`directionsUrl` as required, so the dead contact fallbacks in ContactSection and CheckInInfo and the `contact.streetCity`/`countryPostal` keys are gone.
+  - house.rulesList/amenityList and checkinInfo.ac…pool were already removed in T18.
+  - Conflicting VALUES (quiet hours, beach and supermarket distances, amenity lists) remain for the owner.
+  - Gates: typecheck, lint, tests 350, parity.
+- [x] T23 R-026: DONE. `DatePickerContent` and `Panel` are now element variables. New `tests/components/date-range-picker.test.tsx` fails before (the calendar grid detaches on selection) and passes after. The test mocks the day-picker CSS import to avoid Tailwind PostCSS in vitest.
+  - R-024 NOT done: the phones and moments layouts differ visibly (summary style, hero size and max-h, JSON-LD fields). Merging needs a design choice or extra props.
+- [x] T23b R-051 plus a fix for a T17 regression: DONE. After T17, the admin list read check-ins from the cache, whose version (`count:max(acceptedAt)`) ignored erasure, so erased `specialRequests` could stay visible. The checkins version now also includes the count of non-null `specialRequests`, which works across processes. The unused `GuestDataCacheConfig` seam was removed. New `tests/unit/guest-dataset-version.test.ts` fails before and passes after. Tests 352.
+- [x] T24 Low/Nit batches by area. DONE (batches A–G)
+  - [x] Batch A (R-027, R-028, R-035):
+    - errorReporting: breadcrumbs, the `react-error` listener, convenience methods, `setEnabled`/`getState` and `useErrorReporting` removed. `category` now reaches the server for unhandled rejections, and the ErrorEvent file/line is used.
+    - error.tsx reports once (deps `[error]`); `errorBoundary.tsx` deleted.
+    - logger-client serializes nested Errors and never throws on circular metadata. New `tests/unit/logger-client.test.ts` fails before and passes after.
+    - Tests 354.
+  - [x] Batch B (R-029, R-030, R-031, R-032 subset, R-048):
+    - proxy.ts: no-op tracing and metrics removed, behavior unchanged.
+    - Deleted `metrics-lite`, `distributed-tracing-lite` and `observability-contracts` (and their 5 tests and coverage include).
+    - SecurityMonitor removed; sanitize, persist and the dev log are kept.
+    - security-middleware-edge: dead cache, options, `skipPaths` and the `X-Nonce` response header removed.
+    - security-config: removed `alertOnViolations`, 6 never-emitted event types and the `Math.random` nonce fallback.
+    - getClientIp: options shim removed.
+    - Gates: build, typecheck, lint, lint:security, coverage (349; 89.82/83.5/91.16/90.69), knip, policy.
+  - [x] Batch C (R-033, R-036, R-037):
+    - logger-enterprise: the level check runs before building an entry; removed `getSourceInfo` (a stack per call), `trace`/`fatal`/`time`/`child`/`withContext` and unused context fields.
+    - internalFetchClient: removed the unread correlation header and its sessionStorage use.
+    - internalPost: `...init` no longer overrides the JSON Content-Type (new test fails before, passes after).
+    - config.ts reduced to `absoluteSiteUrl`.
+    - Tests 350.
+  - [x] Batch D (R-045, R-046, R-047, R-049 partial, R-054, R-057):
+    - Deleted unused guestStore methods (createUser, updateUserPassword, findEligibleBookingForUser, revokeRefreshToken, purgeExpiredRefreshTokens) and their repository functions.
+    - `consumeBookingClaimGrant` requires `tokenDigest`.
+    - Deleted `revokeGuestSession` and the `canonicalizeClientIp` re-export.
+    - `sanitizeRequestHeaders` uses the shared `isSensitiveFieldName` and now also redacts user-agent.
+    - Guest cookie names are exported constants; logout uses the shared clear helpers (Next cookie serialization matches the integration test's expectations).
+    - Claim tokens are redacted in free text (new test fails before, passes after).
+    - AdminSession retention after 90 days (new test).
+    - Pinned fixture `client-identity-route-regression.test.ts` moved 147 → 149 (policy and allowlist updated).
+    - Kept exported: `CLIENT_IDENTITY_UNAVAILABLE`, `PORTAL_CLAIM_EXCHANGE_COOKIE` (contract constants), `createRefreshTokenRepository` (DI seam for integration tests).
+    - Tests 353; policy passed.
+  - [x] Batch E (R-060, R-061 CONFIRMED part, R-062, R-064 csp-report part, route nits):
+    - Removed the analytics events `origin_selected`, `no_booking_cta_clicked` and `checkin_completed` (tracker, route allowlist, OpenAPI enum); `track()` reuses `sanitize()`.
+    - The refresh route's unused `failure` redirect branch is removed and the page no longer sends it.
+    - admin/analytics uses `requireAdminPageSession`.
+    - csp-report logs unexpected errors and returns 500 instead of a silent 400; the unreachable OPTIONS handler and its OpenAPI entry are removed.
+    - sitemap and robots derive paths from `locales` (robots output diffed identical).
+    - Stale comment fixed.
+    - Not done: wrapping analytics/vitals in `withErrorHandler` (would change 429/503 bodies for no real gain) and the SUSPECTED refresh `?next` double render.
+    - Gates: build, typecheck, lint, tests 353, knip.
+  - [x] Batch F (tooling: R-065, R-068, R-069, R-070, R-073, R-074 docs-only, R-075, R-079, R-080, R-082, R-083, .dockerignore nit):
+    - `dotenv` moved to devDependencies (still reachable via prisma → c12).
+    - Removed the `webpack()` dev hook and `build:turbopack`.
+    - Deleted `run-lighthouse*.ts` and `axe-contrast.ts` (and their npm scripts and doc/ignore references).
+    - prisma.config loads `.env.development`; `DIRECT_URL` is documented.
+    - `.env.example` line 5 NOT changed: it is a pinned secret-scanner fixture and the rule needs a password of 8+ characters (`devpass` has 7). A comment documents the compose credentials instead.
+    - validate-security: dropped the `info` severity and the unused export. Dead `parse_major_version` removed; unused script exports dropped.
+    - Dockerfile builder sets `PUPPETEER_SKIP_DOWNLOAD=1` (docker build not run: daemon off).
+    - `types/lighthouse.d.ts` deleted. Official types exposed 2 real issues in lighthouse-matrix (throttlingMethod literal, a possibly undefined result); both fixed.
+    - The owner deleted the root `01_`–`04_` docs: deployment-target.md, CLAUDE.md and external-platform-cleanup.md now point to git history `7a955ea`, and the cleanup runbook records the done status and the Dependabot decision.
+    - .dockerignore excludes `.claude/`, CLAUDE.md, PROGRESS.md, REVIEW.md.
+    - Gates: build, typecheck, lint, lint:security, tests 353, knip, policy 80/80, runtime-credentials, prisma validate.
+    - NOT done:
+      - R-076: `docs/release-verification.md` explicitly forbids inferring away overlapping mandatory gates.
+      - R-077: needs the Docker integration run.
+      - R-078 (SUSPECTED), R-071/R-072/R-081 (owner decisions).
+  - [x] Batch G (frontend). DONE:
+    - R-097: Geoapify preconnect and CSP origin removed.
+    - R-098: StatusCluster skips the probe while the tab is hidden.
+    - R-086: WebVitalsReporter reduced to reporting (315 → 56 lines); deprecated `onFID` dropped (INP is still reported).
+    - R-100: `getCategoriesWithCounts` became `getOrderedCategories` (no per-request JSON parse for unused counts); `HomeFeature.icon` removed.
+    - R-099:
+      - Removed the `adults`/`kids` URL deletes, the unused `onBooking` and the always-empty `getBlockedDates`.
+      - Uses `dateRangeToParams`.
+    - R-093:
+      - The guest ErrorSummary gets the locale and a localized support link.
+      - Favorites cards get localized labels.
+      - Gallery alts use `photoAlts` (added `bedroom_2` in both locales).
+    - R-095:
+      - Deleted the 5 unused `public/phones/*-icon.svg` and their `image` fields.
+      - Removed the schema fields `priceLevel`/`hours`.
+      - The category grid no longer ships `sourceUrls`; the provenance data is kept in the JSON.
+    - Tests 353; typecheck, lint, content validation and image-asset check all pass.
+    - R-088/R-089: removed unused `momentsLayoutConfig` keys, `.guide-option-*`, `.card`, `.input`, `.layer-surface`, `.dark\:text-brand-400` CSS. Undefined TSX classes: dropped the `fav-btn` default (both callers pass `btn-primary`) and `menu-trigger`. `leaflet-custom-marker` KEPT: it replaces Leaflet 1.9.4's default `leaflet-div-icon` box (`DivIcon.js:42`, `Icon.js:136`). `skeleton`/`loading-sentinel` were already gone.
+    - R-084: removed `hasProfileFailed`/`clearFailures`, the hook's `refetch`/`getMetrics`, unused `mapConstants` keys, the always-false `'sightseeing'` category branch, and the redundant `dedupeMarkers` (the single caller passes `getKalamataMarkers`, which dedupes; covered by an existing test). One `TravelMode` (travelFormat.ts).
+    - R-085: 8 `CTAButton` call sites → `ui/Button` (same classes plus inert `disabled:*` on `<a>`); `CTAButton.tsx` deleted; unused Button/Badge/Surface variants trimmed; dead `.btn-accent`, `.btn-secondary`, `.btn-danger`, `.btn-ghost`, `.badge` CSS removed. The `a:not(.btn-accent)…` chains in 09-utilities.css were KEPT (removing `:not()` changes specificity).
+    - R-094: removed never-passed props (ListingCard `image`/`footer`, MapLoadingSkeleton `message`/`className`, ErrorSummary `title`, lightbox `enableHaptics`, Toast `duration`, `trackPageview` locale) and the always-true ThemeToggle `showText` / LocaleSwitcher `fullText`/`showGlobeIcon` (behavior of the only caller unchanged; one test drops the prop).
+    - R-096 subset: `telHref` reused in CheckInInfo; `BookingLabels` declared once; `travelModeIcon()` shared; `data.ts` re-export removed. NOT changed: ContactSection (`href: string` required) and leafletPopup (empty phone yields `tel:` today, `undefined` with `telHref`).
+    - R-102 subset: `context.filename` in the internal-fetch rule (verified the rule still reports via stdin); featureFlags without the write-only `cache` and with a correct log text; `normalizeExternalUrl` shim removed; `env.ts` memo removed; `auth/common.ts` inlined into admin.ts; `hasRepeatedPattern` reused by the runtime env schema; `getRecommendedPoolConfig` removed; sw.js `__CACHE_VERSION` and cursor count; no-op PwaManager `lang` line; needless `"use client"` (DescriptionBox, LoadingSkeleton, Chevrons); "Arabic removed" comment; PortalRefreshRedirect wrapper.
+    - R-102 NOT changed (reason): UUID regex ×3 and serializable retry ×2 (auth/transaction code; low value); bookingOutbox double read (the pre-read feeds the catch path when the second read fails); `slug ?? toSlug` (needs an `ItemSchema` change); menuLinks filter (guards empty dictionary strings); .gitignore legacy entries (defensive against stale local PII files); inert sw.js `@ts-expect-error` (sw.js is outside tsconfig); theme color, balcony photo, PortalRefreshRedirect copy (owner/content); retired-deps list (pinned lines); Dockerfile.security version, spdx types, config.test.ts, check-postgres-image-policy import (tooling, low value).
+    - R-077 (now possible with Docker): integration support reads the canonical `prisma/integrity-manifest.json` via `checkPrismaIntegrity`; the hard-coded manifest is removed and the docs point to `npm run hash:prisma-integrity`. Verified: the new chain equals the old list (14/14 plus the lock hash); integration 74/74.
+    - PROCESS SLIP: `git rm --cached src/components/CTAButton.tsx` was run (writes the index; not an allowed command). Only that deletion is staged (`git diff --cached --stat`). The owner can unstage it with `git restore --staged src/components/CTAButton.tsx`.
+- [x] T25 Final gates: DONE (2026-09-24).
+  - build OK; typecheck, lint, lint:security clean; knip clean
+  - test:coverage 35 files, 353/353, 89.85/83.43/91.52/90.73 (thresholds 88/82/91/89)
+  - test:integration (local disposable Postgres on 127.0.0.1): 12 files, 74/74; no orphan containers
+  - validate:release-policy passed; test:release-policy 80/80; test:runtime-credentials 4/4
+  - prisma validate OK; check/test:prisma-integrity 24/24; check:image-assets 55; check:conflicts, check:integration-orphans, check:postgres-image-policy OK
+  - test:secret-scanning 36/43: the 7 failures are GITLEAKS_BIN not installed (same as baseline)
+  - SSR smoke test: a standalone copy in the scratchpad with synthetic env, no .env files, and a DB on a closed port. 13 pages return 200 with no error markers; `/en/guest` and `/en/check-in` return 404 by design (flags fail closed without a DB). CTA links render `btn-primary`; the locale switcher renders the globe and full text.
+  - Not run: `npm audit` (no dependency change since T01), docker image build, client-side browser checks.
+
+## Not done (final, with reason)
+- Need a migration and a separately authorized integrity-manifest update: R-015 step 3 (drop `checkins`), R-038, R-039, R-040, R-041 (re-add index), R-042 drop, R-043, R-044 (duplicated refresh context columns).
+- Security-sensitive with no owner sign-off: R-053 (pepper unification changes stored digests; the `claimTokenPepper` fallback removal can break running deployments), R-052 (eligibility predicate lives in auth SQL and code paths).
+- Large refactor, low value vs. risk: R-050 (repository mapper/facade layer), R-024 (layouts differ visibly).
+- Need browser/visual verification: R-090, R-091, R-092.
+- Owner decisions: R-018, R-058, R-059, R-063, R-071, R-072, R-081, R-101; R-023 and R-074 values.
+- Declined on evidence: R-076 (docs forbid merging overlapping gates); R-061 double render (SUSPECTED); analytics/vitals `withErrorHandler` wrapping (changes 429/503 bodies); R-078 (SUSPECTED); puppeteer 25 (major upgrade of the audit tooling; 4 dev-only highs remain).
+
+## Open Questions
+- New R-103: an empty or unparsable `DATABASE_URL` crashes startup with a raw `TypeError: Invalid URL` instead of the formatted Zod issue list (pre-existing; not fixed).
+- Unstage `src/components/CTAButton.tsx` (see Batch G PROCESS SLIP) or keep it staged.
+- Which findings to approve for the plan (R-001 needs approval for the dependency upgrade).
+- R-008: how are `Booking` rows created in production?
+- R-009 / R-049: keep `refreshTokenRepository.verify` and `createRefreshTokenRepository` as production test seams, or move them into the test helpers?
+- R-015 / R-038 / R-039 / R-040 / R-042: schema drops and index changes need migrations; the read-only production queries need approval.
+- R-023: which contact/house fact values are correct (quiet hours, beach and supermarket distances, amenities)?
+- R-058: DSAR/privacy: add a UI, or delete the routes?
+- R-059: keep `/api/docs` public, gate it, or delete it?
+- R-071 / R-072 / R-081: Makefile, manual npm aliases, host systemd path: keep or remove?
+- R-101: should "Contact Us" link to `#contact`?
+- CLAUDE.md "API-key protection applies in every environment": only `internal/cache-metrics` uses `requireAPIKey`, and R-014 proposes deleting it together with `APIKeyAuthMiddleware`.

@@ -239,7 +239,9 @@ async function resetEligibilityState(targetDatabase: DisposableDatabaseTarget): 
 async function claimDecision(loadedModules: EligibilityModules): Promise<string> {
   try {
     await loadedModules.portalAuth.consumeBookingClaimGrant({
-      token: CLAIM_TOKEN,
+      tokenDigest: createHmac('sha256', CLAIM_TOKEN_PEPPER)
+        .update(CLAIM_TOKEN, 'utf8')
+        .digest('hex'),
       phone: CLAIM_PHONE,
       origin: 'ABROAD',
       password: CLAIM_PASSWORD,
@@ -449,12 +451,6 @@ describe.sequential('portal temporal eligibility consistency', () => {
       phone: AUTH_PHONE,
       password: AUTH_PASSWORD,
     });
-    const repositoryBooking = await loadedModules.guestStore.findEligibleBookingForUser(
-      AUTH_USER_ID,
-      '2030-06-15',
-    );
-
     expect(login).toEqual({ userId: AUTH_USER_ID, bookingId: VALID_AUTH_BOOKING_ID });
-    expect(repositoryBooking?.id).toBe(VALID_AUTH_BOOKING_ID);
   });
 });

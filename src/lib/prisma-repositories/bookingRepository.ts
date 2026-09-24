@@ -1,12 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger-enterprise';
-import crypto from 'node:crypto';
 import { mapBookingFromDb } from '@/lib/mappers/domainMappers';
-import {
-  createPortalBookingEligibilityWindow,
-  isPortalBookingTemporallyEligible,
-  portalBookingTemporalWhere,
-} from '@/lib/portalBookingEligibility';
 
 export type BookingRecord = {
   id: string;
@@ -21,37 +15,6 @@ export type BookingRecord = {
   claimed_at?: number;
   created_at: number;
 };
-
-function generateId(): string {
-  // PostgreSQL UUID column requires pure UUID format (no prefix)
-  return crypto.randomUUID();
-}
-
-async function create(params: Omit<BookingRecord, 'id' | 'created_at'>): Promise<BookingRecord> {
-  try {
-    const id = generateId();
-    const booking = await prisma.booking.create({
-      data: {
-        id,
-        source: params.source,
-        reference: params.reference ?? null,
-        startDate: new Date(params.start_date),
-        endDate: new Date(params.end_date),
-        userId: params.user_id ?? null,
-        provider: params.provider,
-        externalReference: params.external_reference ?? null,
-        accessStatus: params.access_status,
-        claimedAt: params.claimed_at ? new Date(params.claimed_at) : null,
-      },
-    });
-
-    logger.info('Booking created (prisma)', { bookingId: id });
-    return mapBookingFromDb(booking);
-  } catch (error) {
-    logger.error('bookingRepository(prisma): create failed', error);
-    throw error;
-  }
-}
 
 async function findByReference(reference: string): Promise<BookingRecord | undefined> {
   try {
@@ -72,48 +35,12 @@ async function findByReference(reference: string): Promise<BookingRecord | undef
   }
 }
 
-async function findByProviderReference(provider: string, externalReference: string): Promise<BookingRecord | undefined> {
-  try {
-    const booking = await prisma.booking.findUnique({
-      where: { provider_externalReference: { provider, externalReference } },
-    });
-    return booking ? mapBookingFromDb(booking) : undefined;
-  } catch (error) {
-    logger.error('bookingRepository(prisma): findByProviderReference failed', error);
-    throw error;
-  }
-}
-
 async function findById(id: string): Promise<BookingRecord | undefined> {
   try {
     const booking = await prisma.booking.findUnique({ where: { id } });
     return booking ? mapBookingFromDb(booking) : undefined;
   } catch (error) {
     logger.error('bookingRepository(prisma): findById failed', error);
-    throw error;
-  }
-}
-
-async function findEligibleForUser(userId: string, nowDateISO: string): Promise<BookingRecord | undefined> {
-  try {
-    const eligibilityWindow = createPortalBookingEligibilityWindow(new Date(nowDateISO));
-    const bookingCandidates = await prisma.booking.findMany({
-      where: {
-        userId,
-        accessStatus: 'VERIFIED',
-        ...portalBookingTemporalWhere(eligibilityWindow),
-      },
-      orderBy: {
-        startDate: 'asc',
-      },
-    });
-    const booking = bookingCandidates.find((candidate) => (
-      isPortalBookingTemporallyEligible(candidate, eligibilityWindow)
-    ));
-
-    return booking ? mapBookingFromDb(booking) : undefined;
-  } catch (error) {
-    logger.error('bookingRepository(prisma): findEligibleForUser failed', error);
     throw error;
   }
 }
@@ -129,10 +56,7 @@ async function getAll(): Promise<BookingRecord[]> {
 }
 
 export const bookingRepository = {
-  create,
   findByReference,
-  findByProviderReference,
   findById,
-  findEligibleForUser,
   getAll,
 };

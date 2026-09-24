@@ -175,7 +175,13 @@ export default function UnifiedGuestClient() {
         <div id={`panel-${mode}`} role="tabpanel" aria-labelledby={`tab-${mode}`} tabIndex={-1}>
           {submitError && (
             <div className="mb-4">
-              <ErrorSummary summary={submitError.summary} details={submitError.details} onRetry={() => setSubmitError(null)} />
+              <ErrorSummary
+                summary={submitError.summary}
+                details={submitError.details}
+                onRetry={() => setSubmitError(null)}
+                locale={locale}
+                supportHref={`/${locale}#contact`}
+              />
             </div>
           )}
 

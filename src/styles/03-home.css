@@ -2,10 +2,6 @@
   color: var(--text-accent);
 }
 
-.home-typography .card {
-  color: inherit;
-}
-
 .home-typography h1,
 .home-typography h2,
 .home-typography h3,
@@ -83,98 +79,6 @@
   line-height: var(--line-height-snug);
 }
 
-.guide-option-card {
-  min-height: 13.75rem;
-  display: flex;
-  height: 100%;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.7rem;
-  border: 1px solid rgba(16, 86, 80, 0.12);
-  border-radius: 8px;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbfa 100%);
-  color: #172527;
-  padding: 1.45rem 1.2rem;
-  text-align: center;
-  box-shadow:
-    0 1px 1px rgba(20, 36, 38, 0.04),
-    0 14px 30px -22px rgba(20, 36, 38, 0.46),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
-}
-
-.guide-option-card:hover {
-  border-color: rgba(16, 86, 80, 0.22);
-  box-shadow:
-    0 2px 5px rgba(20, 36, 38, 0.06),
-    0 20px 42px -26px rgba(20, 36, 38, 0.54),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95);
-  transform: translateY(-2px);
-}
-
-.guide-option-card:focus-visible {
-  outline: none;
-  border-color: rgba(10, 128, 116, 0.5);
-  box-shadow:
-    0 0 0 3px rgba(54, 185, 171, 0.18),
-    0 18px 36px -24px rgba(20, 36, 38, 0.52),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95);
-}
-
-.guide-option-title {
-  max-width: 15rem;
-  color: inherit;
-  font-size: 1.06rem;
-  font-weight: 750;
-  line-height: var(--line-height-snug);
-}
-
-.guide-option-summary {
-  max-width: 18rem;
-  color: #4d6366;
-  display: -webkit-box;
-  flex-grow: 1;
-  font-size: 0.9rem;
-  line-height: 1.45;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-}
-
-.guide-option-meta {
-  color: #426064;
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-[data-theme="dark"] .guide-option-card {
-  border-color: rgba(134, 239, 225, 0.14);
-  background: linear-gradient(180deg, #172526 0%, #132021 100%);
-  color: #e5f2f0;
-  box-shadow:
-    0 1px 1px rgba(0, 0, 0, 0.45),
-    0 18px 38px -26px rgba(0, 0, 0, 0.92),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-
-[data-theme="dark"] .guide-option-card:hover {
-  border-color: rgba(94, 234, 212, 0.28);
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.5),
-    0 22px 46px -26px rgba(0, 0, 0, 0.96),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-[data-theme="dark"] .guide-option-summary {
-  color: #bdcecc;
-}
-
-[data-theme="dark"] .guide-option-meta {
-  color: #93e4dc;
-}
-
 [data-theme="dark"] .home-feature-card {
   border-color: rgba(134, 239, 225, 0.14);
   background: linear-gradient(180deg, #172526 0%, #132021 100%);
@@ -222,20 +126,6 @@
 
   .home-feature-label {
     font-size: 0.92rem;
-  }
-
-  .guide-option-card {
-    min-height: 10.9rem;
-    gap: 0.55rem;
-    padding: 1rem 0.7rem;
-  }
-
-  .guide-option-title {
-    font-size: 0.92rem;
-  }
-
-  .guide-option-summary {
-    font-size: 0.78rem;
   }
 }
 

@@ -7,7 +7,7 @@ import type { Locale } from '@/i18n/config';
 type Toast = { id: number; message: string; expires: number };
 
 interface ToastContextValue {
-  push: (message: string, opts?: { duration?: number }) => void;
+  push: (message: string) => void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -17,8 +17,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const locale: Locale = pathname?.startsWith('/el') ? 'el' : 'en';
   const dismissLabel = getDictionary(locale).updates?.dismiss ?? 'Dismiss';
-  const push = useCallback((message: string, opts?: { duration?: number }) => {
-    setToasts(ts => [...ts, { id: Date.now() + Math.random(), message, expires: Date.now() + (opts?.duration ?? 3000) }]);
+  const push = useCallback((message: string) => {
+    setToasts(ts => [...ts, { id: Date.now() + Math.random(), message, expires: Date.now() + 3000 }]);
   }, []);
   // GC
   useEffect(() => {

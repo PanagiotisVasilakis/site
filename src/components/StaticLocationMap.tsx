@@ -51,7 +51,7 @@ export default function StaticLocationMap({
     title: landmark.name,
     description: landmark.description ?? '',
   }));
-  const Panel = () => (
+  const panel = (
     <div className="space-y-3 text-sm">
       <section className="rounded-lg border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] p-4">
         <header className="flex items-center gap-2 mb-2">
@@ -107,7 +107,7 @@ export default function StaticLocationMap({
         {showHeading && (
           <h3 className="text-lg font-serif italic font-bold text-[color:var(--fg-default)] mb-3" data-testid="static-map-title">{title || lp?.title}</h3>
         )}
-        <Panel />
+        {panel}
       </div>
     );
   }
@@ -122,7 +122,7 @@ export default function StaticLocationMap({
               <h3 className="text-lg sm:text-xl font-serif italic font-bold page-title" data-testid="static-map-title">{title || lp?.title}</h3>
             </div>
           )}
-          <Panel />
+          {panel}
         </div>
       </div>
     </div>

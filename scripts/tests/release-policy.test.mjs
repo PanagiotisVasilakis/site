@@ -317,10 +317,6 @@ async function createBaselineFixture() {
     "readRuntimeCredential('ADMIN_DASH_SECRET');",
     '',
   ].join('\n'));
-  await writeRelative(root, 'src/app/api/dev/alerts/verify-spike/route.ts', [
-    "readRuntimeCredential('ADMIN_DASH_SECRET');",
-    '',
-  ].join('\n'));
   await writeRelative(root, 'scripts/start-standalone.mjs', [
     "import { resolve } from 'node:path';",
     "import { pathToFileURL } from 'node:url';",
@@ -1891,13 +1887,13 @@ test('release orchestrator executes every gate in order with restricted environm
     assert.deepEqual(calls.map((call) => call.args.at(-1)), ['base', 'integration', 'production']);
     assert.ok(calls.every((call) => call.environment[inheritedName] === undefined));
     assert.equal(calls[0].environment.PGHOST, 'hostile.invalid');
-    assert.equal(calls[0].environment.VALID_API_KEYS, '');
+    assert.equal(calls[0].environment.ALERT_WEBHOOK_TOKEN, '');
     assert.equal(calls[0].environment.GIT_PAGER, 'cat');
     assert.equal(calls[0].environment.GIT_TERMINAL_PROMPT, '0');
     assert.equal(calls[1].environment.INTEGRATION_POSTGRES_IMAGE, APPROVED_IMAGE);
     assert.equal(calls[2].environment.NODE_ENV, 'production');
     assert.equal(calls[2].environment.NEXT_PUBLIC_SITE_URL, 'https://release.example.invalid');
-    assert.equal(calls[2].environment.VALID_API_KEYS, '');
+    assert.equal(calls[2].environment.ALERT_WEBHOOK_TOKEN, '');
     assert.match(stdout.contents(), /PASSED: 3\/3 gates/u);
     assert.equal(stderr.contents(), '');
   } finally {

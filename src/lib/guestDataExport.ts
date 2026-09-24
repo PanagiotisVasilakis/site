@@ -1,6 +1,5 @@
 /**
- * Guest Data Export Tool
- * Tool to extract and display guest booking information from local storage
+ * Admin read model: bookings joined with their guest user and check-in completion.
  */
 
 import { guestStore } from '@/lib/guestDataStore';
@@ -35,18 +34,45 @@ interface BookingExport {
   };
 }
 
-const isDefined = <T>(value: T | null | undefined): value is T => value !== null && value !== undefined;
+// Booking dates are UTC-midnight ISO datetimes; compare them as YYYY-MM-DD calendar dates.
+const calendarDate = (isoDateTime: string): string => isoDateTime.slice(0, 10);
+
+function toBookingExport(booking: Booking, user?: User, checkin?: CheckinCompletionRec): BookingExport {
+  return {
+    booking: {
+      id: booking.id,
+      reference: booking.reference,
+      source: booking.source,
+      startDate: booking.start_date,
+      endDate: booking.end_date,
+      provider: booking.provider,
+      externalReference: booking.external_reference,
+      accessStatus: booking.access_status,
+      claimedAt: booking.claimed_at ? new Date(booking.claimed_at) : undefined,
+      createdAt: new Date(booking.created_at),
+    },
+    user: user ? {
+      id: user.id,
+      email: user.email,
+      phone: user.phone_e164,
+      countryOrigin: user.country_origin,
+      createdAt: new Date(user.created_at),
+      updatedAt: new Date(user.updated_at),
+    } : undefined,
+    checkin: checkin ? {
+      arrivalTime: checkin.arrival_time,
+      specialRequests: checkin.special_requests,
+      acceptedAt: new Date(checkin.accepted_at),
+    } : undefined,
+  };
+}
 
 class GuestDataExport {
   /**
    * Get all bookings with full details
    */
   async getAllBookings(): Promise<BookingExport[]> {
-    const bookings = await this.getAllBookingsRaw();
-    const detailed = await Promise.all(
-      bookings.map((booking) => this.getBookingDetails(booking.id))
-    );
-    return detailed.filter(isDefined);
+    return this.withDetails(await this.getAllBookingsRaw());
   }
 
   /**
@@ -62,26 +88,10 @@ class GuestDataExport {
   }
 
   /**
-   * Get booking by booking ID
-   */
-  async getBookingById(bookingId: string): Promise<BookingExport | null> {
-    const booking = await guestStore.findBookingById(bookingId);
-    if (!booking) {
-      logger.info('Booking not found', { bookingId });
-      return null;
-    }
-    return this.getBookingDetails(bookingId);
-  }
-
-  /**
    * Get all bookings for a specific user
    */
   async getBookingsByUser(userId: string): Promise<BookingExport[]> {
-    const bookings = (await this.getAllBookingsRaw()).filter((b) => b.user_id === userId);
-    const detailed = await Promise.all(
-      bookings.map((booking) => this.getBookingDetails(booking.id))
-    );
-    return detailed.filter(isDefined);
+    return this.withDetails((await this.getAllBookingsRaw()).filter((b) => b.user_id === userId));
   }
 
   /**
@@ -103,63 +113,9 @@ class GuestDataExport {
     const booking = await guestStore.findBookingById(bookingId);
     if (!booking) return null;
 
-    const user = booking.user_id ? await guestStore.findUserById(booking.user_id) : null;
-
+    const user = booking.user_id ? await guestStore.findUserById(booking.user_id) : undefined;
     const checkin = await guestStore.getCheckinCompletionByBooking(bookingId);
-
-    const result: BookingExport = {
-        booking: {
-          id: booking.id,
-          reference: booking.reference,
-          source: booking.source,
-          startDate: booking.start_date,
-          endDate: booking.end_date,
-          provider: booking.provider,
-          externalReference: booking.external_reference,
-          accessStatus: booking.access_status,
-          claimedAt: booking.claimed_at ? new Date(booking.claimed_at) : undefined,
-          createdAt: new Date(booking.created_at),
-        },
-        user: user ? {
-          id: user.id,
-          email: user.email,
-          phone: user.phone_e164,
-          countryOrigin: user.country_origin,
-          createdAt: new Date(user.created_at),
-          updatedAt: new Date(user.updated_at),
-        } : undefined,
-        checkin: checkin ? {
-          arrivalTime: checkin.arrival_time,
-          specialRequests: checkin.special_requests,
-          acceptedAt: new Date(checkin.accepted_at),
-        } : undefined,
-    };
-    return result;
-  }
-
-  /**
-   * Export booking data to JSON file
-   */
-  async exportBookingToFile(bookingId: string, filePath?: string): Promise<string | null> {
-    const bookingData = await this.getBookingDetails(bookingId);
-    if (!bookingData) {
-      logger.info('Booking not found for export', { bookingId });
-      return null;
-    }
-
-    const jsonData = JSON.stringify(bookingData, null, 2);
-    const fileName = filePath || `booking_${bookingData.booking.reference || bookingId}_${Date.now()}.json`;
-
-      // In a Node.js environment, you could write to file:
-      // fs.writeFileSync(fileName, jsonData, 'utf8');
-      
-    logger.info('Booking data exported', {
-      bookingId,
-      reference: bookingData.booking.reference,
-      fileName,
-    });
-
-    return jsonData;
+    return toBookingExport(booking, user, checkin);
   }
 
   /**
@@ -167,9 +123,9 @@ class GuestDataExport {
    */
   async searchBookingsByDateRange(startDate: string, endDate?: string): Promise<BookingExport[]> {
     const bookings = (await this.getAllBookingsRaw()).filter((booking) => {
-        const bookingStart = booking.start_date;
-        const bookingEnd = booking.end_date;
-        
+        const bookingStart = calendarDate(booking.start_date);
+        const bookingEnd = calendarDate(booking.end_date);
+
         if (endDate) {
           return bookingStart >= startDate && bookingStart <= endDate;
         } else {
@@ -178,11 +134,7 @@ class GuestDataExport {
         }
     });
 
-    const detailed = await Promise.all(
-      bookings.map((booking) => this.getBookingDetails(booking.id))
-    );
-
-    return detailed.filter(isDefined);
+    return this.withDetails(bookings);
   }
 
   /**
@@ -204,21 +156,24 @@ class GuestDataExport {
 
       const bookingsBySource: Record<string, number> = {};
       const bookingsByStatus: Record<string, number> = {};
+      const checkedInBookingIds = new Set(checkins.map((checkin) => checkin.booking_id));
 
       bookings.forEach((booking) => {
         bookingsBySource[booking.source] = (bookingsBySource[booking.source] || 0) + 1;
-        
+
         // Determine status based on dates and checkin
         const now = new Date().toISOString().split('T')[0];
-        const hasCheckin = checkins.some((checkin) => checkin.booking_id === booking.id);
-        
+        const hasCheckin = checkedInBookingIds.has(booking.id);
+
+        const bookingStart = calendarDate(booking.start_date);
+        const bookingEnd = calendarDate(booking.end_date);
         let status = 'upcoming';
-        if (booking.end_date < now) {
+        if (bookingEnd < now) {
           status = 'completed';
-        } else if (booking.start_date <= now && booking.end_date >= now) {
+        } else if (bookingStart <= now && bookingEnd >= now) {
           status = hasCheckin ? 'checked_in' : 'active';
         }
-        
+
         bookingsByStatus[status] = (bookingsByStatus[status] || 0) + 1;
       });
 
@@ -233,6 +188,20 @@ class GuestDataExport {
   }
 
   // Private helper methods
+
+  // Joins users and check-ins from their (cached) full lists instead of querying per booking.
+  private async withDetails(bookings: Booking[]): Promise<BookingExport[]> {
+    if (bookings.length === 0) return [];
+    const [users, checkins] = await Promise.all([this.getAllUsersRaw(), this.getAllCheckinsRaw()]);
+    const usersById = new Map(users.map((user) => [user.id, user]));
+    const checkinsByBookingId = new Map(checkins.map((checkin) => [checkin.booking_id, checkin]));
+    return bookings.map((booking) => toBookingExport(
+      booking,
+      booking.user_id ? usersById.get(booking.user_id) : undefined,
+      checkinsByBookingId.get(booking.id),
+    ));
+  }
+
   private async getAllBookingsRaw(): Promise<Booking[]> {
     return guestStore.getAllBookings();
   }

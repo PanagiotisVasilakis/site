@@ -7,7 +7,7 @@
  * - Profile fallbacks (e.g., 'foot' -> 'walking')
  */
 
-export type TravelMode = 'driving' | 'foot' | 'cycling';
+import type { TravelMode } from '@/lib/travelFormat';
 
 export interface TravelMetrics {
     distance: number; // meters
@@ -18,18 +18,6 @@ export interface OSRMTableResponse {
     code: string;
     distances: number[][];
     durations: number[][];
-}
-
-interface OSRMRouteResponse {
-    code: string;
-    routes?: Array<{
-        geometry?: {
-            type: string;
-            coordinates: [number, number][];
-        };
-        distance?: number;
-        duration?: number;
-    }>;
 }
 
 // Profile name candidates for each mode (OSRM servers may use different names)
@@ -141,48 +129,10 @@ export class OSRMClient {
     }
 
     /**
-     * Get route geometry and metrics between two points
-     */
-    async getRoute(
-        mode: TravelMode,
-        origin: [number, number],
-        destination: [number, number]
-    ): Promise<{ coordinates: [number, number][]; distance: number; duration: number } | null> {
-        const profile = PROFILE_CANDIDATES[mode]?.[0] || mode;
-        const url = `${this.baseUrl}/route/v1/${profile}/${origin[0]},${origin[1]};${destination[0]},${destination[1]}?overview=full&geometries=geojson`;
-
-        const data = await fetchWithRetry<OSRMRouteResponse>(url);
-        if (!data?.routes?.[0]?.geometry?.coordinates) {
-            return null;
-        }
-
-        const route = data.routes[0];
-        return {
-            coordinates: route.geometry!.coordinates,
-            distance: route.distance || 0,
-            duration: route.duration || 0
-        };
-    }
-
-    /**
-     * Check if a profile has failed (for UI feedback)
-     */
-    hasProfileFailed(mode: TravelMode): boolean {
-        return this.failedProfiles.has(mode);
-    }
-
-    /**
      * Get all failed profiles
      */
     getFailedProfiles(): TravelMode[] {
         return Array.from(this.failedProfiles) as TravelMode[];
-    }
-
-    /**
-     * Clear the failure cache (e.g., on retry)
-     */
-    clearFailures(): void {
-        this.failedProfiles.clear();
     }
 }
 

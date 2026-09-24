@@ -6,23 +6,18 @@ import type { Locale } from '@/i18n/config';
 import StaticLocationMap from './StaticLocationMap';
 import {
   APARTMENT_LOCATION,
-  dedupeMarkers,
-  markerFromMapLocation,
   toLeafletMarker,
   type MarkerData,
 } from '@/lib/mapUtils';
-import { getApartmentMapLocation } from '@/data/mapLocations';
 import type { LeafletMapLabels, LeafletMarkerData } from '@/components/LeafletMap';
 
 const LeafletMap = dynamic(() => import('@/components/LeafletMap'), { ssr: false });
 
 interface InteractiveMapProps {
   markers?: MarkerData[];
-  center?: [number, number];
   zoom?: number;
   height?: string;
   className?: string;
-  onMarkerClick?: (marker: MarkerData) => void;
   locale?: string; // for localized static fallback
   activation?: 'viewport' | 'intent';
   clusterMin?: number;
@@ -30,11 +25,9 @@ interface InteractiveMapProps {
 
 export default function InteractiveMap({
   markers = [],
-  center = APARTMENT_LOCATION,
   zoom = 13,
   height = "400px",
   className = "",
-  onMarkerClick,
   locale = 'en',
   activation = 'viewport',
   clusterMin
@@ -53,15 +46,9 @@ export default function InteractiveMap({
     fitToMarkers: mapT?.fitToMarkers ?? 'Fit to markers',
     zoomIn: mapT?.zoomIn ?? 'Zoom in',
     zoomOut: mapT?.zoomOut ?? 'Zoom out',
-    apartment: mapT?.apartmentMarkerTitle ?? 'Apartment',
     approximate: mapT?.approximate ?? 'Approximate – OSRM',
     travelUnavailable: mapT?.travelUnavailable ?? 'Travel times unavailable.',
     travelUnavailableWithDirections: mapT?.travelUnavailableWithDirections ?? 'Travel times unavailable. Use Directions for live navigation.',
-    clearRoute: mapT?.clearRoute ?? 'Clear route',
-    route: mapT?.route ?? 'Route',
-    driving: mapT?.driving ?? 'Driving',
-    walking: mapT?.walking ?? 'Walking',
-    cycling: mapT?.cycling ?? 'Cycling',
     unavailable: mapT?.unavailable ?? 'Unavailable',
   }), [mapT]);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -104,52 +91,21 @@ export default function InteractiveMap({
     return () => observer.disconnect();
   }, [hasMounted, activation]);
 
-  const leafletMarkers = useMemo<LeafletMarkerData[]>(() => {
-    const deduped = dedupeMarkers(markers);
-
-    if (!deduped.some(marker => marker.id === 'apartment' || marker.type === 'apartment')) {
-      const apartment = markerFromMapLocation(getApartmentMapLocation(eff));
-      deduped.unshift({
-        ...apartment,
-        name: mapT?.apartmentMarkerTitle || apartment.name,
-        description: mapT?.apartmentMarkerDesc || apartment.description,
-      });
-    }
-
-    return deduped.map(toLeafletMarker);
-  }, [markers, mapT, eff]);
-
-  const handleMarkerClick = useMemo(() => {
-    if (!onMarkerClick) return undefined;
-    return (marker: LeafletMarkerData) => {
-      const typed: MarkerData = {
-        id: marker.id,
-        name: marker.name,
-        description: marker.description,
-        address: marker.address,
-        phone: marker.phone,
-        phones: marker.phones,
-        website: marker.website,
-        directionsUrl: marker.directionsUrl,
-        coordinates: marker.coordinates,
-        type: (marker.type as MarkerData['type']) ?? 'attraction',
-        href: marker.href,
-      };
-      onMarkerClick(typed);
-    };
-  }, [onMarkerClick]);
+  // getKalamataMapLocations always includes the apartment marker, so no insertion is needed.
+  const leafletMarkers = useMemo<LeafletMarkerData[]>(
+    () => markers.map(toLeafletMarker),
+    [markers]
+  );
 
   return (
     <div ref={containerRef} className={`relative ${className}`} style={{ height }}>
       {shouldRenderInteractive ? (
         <LeafletMap
-          center={center}
+          center={APARTMENT_LOCATION}
           zoom={zoom}
           height={height}
           markers={leafletMarkers}
-          onMarkerClick={handleMarkerClick}
           origin={APARTMENT_LOCATION}
-          showOriginMarker={false}
           autoFitToOriginAndMarkers
           refitOnMarkerChange
           lazyTravelMetrics

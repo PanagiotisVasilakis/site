@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { locales, type Locale } from "@/i18n/config";
 import { getDictionary } from "@/i18n/dictionaries";
 import { ToastProvider } from "@/components/Toast";
-import JsonFetchHud from "@/components/JsonFetchHud";
 import TopControls from "@/components/TopControls";
 import DeferredRuntimeManagers from "@/components/DeferredRuntimeManagers";
 import DocumentLocale from "@/components/DocumentLocale";
@@ -43,7 +42,6 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   <a href="#main-content" className="skip-link">{t.skipLink || 'Skip to content'}</a>
       <ToastProvider>
       <DeferredRuntimeManagers />
-  <JsonFetchHud />
   <TopControls locale={eff} appTitle={t.appTitle} />
       {/* Update banner: light surface uses dark brand text; buttons tinted; dismiss available */}
       <div

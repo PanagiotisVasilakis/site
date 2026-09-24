@@ -4,8 +4,6 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 interface LocaleSwitcherProps {
-  fullText?: boolean;
-  showGlobeIcon?: boolean;
   className?: string;
 }
 
@@ -30,7 +28,7 @@ function swapLocale(pathname: string, next: string, searchParams?: URLSearchPara
 
 const BASE_CLASS = "w-12 h-11 md:h-9 locale-switcher inline-flex items-center justify-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold bg-black/10 hover:bg-black/20 text-slate-800 dark:bg-zinc-800/60 dark:hover:bg-zinc-700/70 white-in-dark transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/60 dark:focus-visible:ring-brand-400/50";
 
-function LocaleSwitcherContent({ fullText = false, showGlobeIcon = false, className }: LocaleSwitcherProps) {
+function LocaleSwitcherContent({ className }: LocaleSwitcherProps) {
   const pathname = usePathname() || "/en";
   const searchParams = useSearchParams();
   const isEL = pathname.startsWith("/el");
@@ -38,9 +36,7 @@ function LocaleSwitcherContent({ fullText = false, showGlobeIcon = false, classN
   
   const href = swapLocale(pathname, target, searchParams);
   
-  const displayText = fullText 
-    ? (isEL ? "English" : "Ελληνικά")
-    : (isEL ? "EN" : "EL");
+  const displayText = isEL ? "English" : "Ελληνικά";
   
   const appliedClass = className ? `${className} locale-switcher` : BASE_CLASS;
 
@@ -49,23 +45,23 @@ function LocaleSwitcherContent({ fullText = false, showGlobeIcon = false, classN
       href={href}
       className={appliedClass}
     >
-      {showGlobeIcon && <span aria-hidden className="text-sm">🌐</span>}
+      <span aria-hidden className="text-sm">🌐</span>
       {displayText}
     </Link>
   );
 }
 
-export default function LocaleSwitcher({ fullText = false, showGlobeIcon = false, className }: LocaleSwitcherProps) {
+export default function LocaleSwitcher({ className }: LocaleSwitcherProps) {
   const fallbackClass = className ? `${className} locale-switcher` : BASE_CLASS;
 
   return (
     <Suspense fallback={
       <div className={fallbackClass}>
-        {showGlobeIcon && <span aria-hidden className="text-sm">🌐</span>}
+        <span aria-hidden className="text-sm">🌐</span>
         --
       </div>
     }>
-      <LocaleSwitcherContent fullText={fullText} showGlobeIcon={showGlobeIcon} className={className} />
+      <LocaleSwitcherContent className={className} />
     </Suspense>
   );
 }

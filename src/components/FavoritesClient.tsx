@@ -2,6 +2,8 @@
 import { useFavorites } from '@/lib/favorites';
 import { useMemo } from 'react';
 import dynamic from 'next/dynamic';
+import { getDictionary } from '@/i18n/dictionaries';
+import type { Locale } from '@/i18n/config';
 const ListingCard = dynamic(() => import('@/components/ListingCard'), { ssr: false });
 
 interface FavItem {
@@ -21,8 +23,9 @@ interface Props {
   locale: string;
 }
 
-export default function FavoritesClient({ allItems, emptyLabel, titleLabel }: Props) {
+export default function FavoritesClient({ allItems, emptyLabel, titleLabel, locale }: Props) {
   const { favorites } = useFavorites();
+  const labels = getDictionary(locale as Locale).labels;
   const list = useMemo(() => allItems.filter(i => favorites.has(i.favoriteId)), [allItems, favorites]);
   return (
     <section>
@@ -36,7 +39,20 @@ export default function FavoritesClient({ allItems, emptyLabel, titleLabel }: Pr
       {list.length > 0 && (
         <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(170px,1fr))]">
           {list.map(i => (
-            <ListingCard key={i.favoriteId} id={i.id} title={i.title} subtitle={i.subtitle} rating={i.rating} icon={i.icon} href={i.href} favoriteId={i.favoriteId} />
+            <ListingCard
+              key={i.favoriteId}
+              id={i.id}
+              title={i.title}
+              subtitle={i.subtitle}
+              rating={i.rating}
+              icon={i.icon}
+              href={i.href}
+              favoriteId={i.favoriteId}
+              favLabelAdd={labels?.addFavorite}
+              favLabelRemove={labels?.removeFavorite}
+              addedToast={labels?.addedFavorite}
+              removedToast={labels?.removedFavorite}
+            />
           ))}
         </div>
       )}

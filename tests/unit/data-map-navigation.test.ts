@@ -9,7 +9,7 @@ import {
 } from '@/data/mapLocations';
 import { getDictionary } from '@/i18n/dictionaries';
 import {
-  getCategoriesWithCounts,
+  getOrderedCategories,
   getItem,
   getItemsByCategory,
   isRecentlyUpdated,
@@ -17,7 +17,6 @@ import {
   toSlug,
 } from '@/lib/data';
 import {
-  dedupeMarkers,
   getKalamataMarkers,
   markerFromMapLocation,
   toLeafletMarker,
@@ -42,13 +41,13 @@ describe('validated content access', () => {
     expect(getItem('moments', 'missing')).toBeNull();
   });
 
-  it('orders categories and reports counts from validated files', () => {
-    const categories = getCategoriesWithCounts();
+  it('orders categories and loads items from validated files', () => {
+    const categories = getOrderedCategories();
     expect(categories.length).toBeGreaterThanOrEqual(2);
     expect(categories.map(({ order }) => order ?? 999)).toEqual(
       [...categories].map(({ order }) => order ?? 999).sort((a, b) => a - b),
     );
-    expect(categories.find(({ id }) => id === 'moments')?.count).toBeGreaterThan(0);
+    expect(getItemsByCategory('moments').length).toBeGreaterThan(0);
   });
 
   it('normalizes slugs and applies locale fallback order', () => {
@@ -145,7 +144,6 @@ describe('shared map catalog', () => {
       coordinates: location.coordinates,
       type: 'apartment',
     }));
-    expect(dedupeMarkers([marker, { ...marker, name: 'duplicate' }])).toEqual([marker]);
   });
 });
 

@@ -22,7 +22,6 @@ interface PickerAnchor {
 }
 
 interface Props {
-  onBooking?: (state: BookingState) => void;
   locale?: string;
   propertyName?: string;
   labels?: {
@@ -62,7 +61,6 @@ const scheduleFrame = (callback: FrameRequestCallback) => {
 };
 
 export default function BookingBar({
-  onBooking,
   locale = "en",
   propertyName,
   labels,
@@ -103,8 +101,6 @@ export default function BookingBar({
     const dateParams = dateRangeToParams(state.dateRange);
     params.delete("checkin");
     params.delete("checkout");
-    params.delete("adults");
-    params.delete("kids");
     dateParams.forEach((value, key) => params.set(key, value));
 
     const newUrl = params.toString()
@@ -190,20 +186,7 @@ export default function BookingBar({
   }, [isDatePickerOpen, activeDateField, computeAnchor]);
 
   const checkAvailability = useCallback(() => {
-    if (onBooking) {
-      onBooking(state);
-      return;
-    }
-
-    const params = new URLSearchParams();
-
-    if (state.dateRange?.from) {
-      params.set("checkin", format(state.dateRange.from, "yyyy-MM-dd"));
-    }
-
-    if (state.dateRange?.to) {
-      params.set("checkout", format(state.dateRange.to, "yyyy-MM-dd"));
-    }
+    const params = dateRangeToParams(state.dateRange);
 
     void import("@/lib/analyticsClient")
       .then(({ trackEvent }) => {
@@ -216,7 +199,7 @@ export default function BookingBar({
 
     const bookingUrl = `/${locale}/book?${params.toString()}`;
     router.push(bookingUrl);
-  }, [onBooking, state, locale, router]);
+  }, [state, locale, router]);
 
   const arrivalLabel = labels?.arrivalLabel || t.search?.arrivalLabel || "Arrival";
   const departureLabel = labels?.departureLabel || t.search?.departureLabel || "Departure";

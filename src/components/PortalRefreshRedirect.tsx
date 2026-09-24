@@ -9,10 +9,6 @@ type PortalRefreshRedirectProps = {
   failureHref: string;
 };
 
-function toSafeLocalHref(value: string, baseHref: string): string | null {
-  return toSafeLocalPath(value, baseHref);
-}
-
 export default function PortalRefreshRedirect({
   refreshHref,
   failureHref,
@@ -32,7 +28,7 @@ export default function PortalRefreshRedirect({
     }).then((result) => {
       if (!active || result.status === 'aborted' || navigationStarted.current) return;
 
-      const safeFailureHref = toSafeLocalHref(failureHref, baseHref) || '/';
+      const safeFailureHref = toSafeLocalPath(failureHref, baseHref) || '/';
       const destination = result.status === 'refreshed' ? result.href : safeFailureHref;
       navigationStarted.current = true;
       window.location.replace(destination);

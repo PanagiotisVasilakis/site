@@ -71,7 +71,6 @@ const SecurityConfigSchema = z.object({
   monitoring: z.object({
     enabled: z.boolean(),
     logSecurityEvents: z.boolean(),
-    alertOnViolations: z.boolean(),
   }),
   apiSecurity: z.object({
     inputValidation: z.object({
@@ -141,7 +140,6 @@ const developmentConfig: SecurityConfig = {
   monitoring: {
     enabled: true,
     logSecurityEvents: true,
-    alertOnViolations: false,
   },
   apiSecurity: {
     inputValidation: {
@@ -164,7 +162,7 @@ const productionConfig: SecurityConfig = {
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
-  connectSrc: ["'self'", "https://router.project-osrm.org", "https://maps.geoapify.com"],
+  connectSrc: ["'self'", "https://router.project-osrm.org"],
       frameSrc: ["'none'"],
       manifestSrc: ["'self'"],
       workerSrc: ["'self'", "blob:"],
@@ -210,7 +208,6 @@ const productionConfig: SecurityConfig = {
   monitoring: {
     enabled: true,
     logSecurityEvents: true,
-    alertOnViolations: true,
   },
   apiSecurity: {
     inputValidation: {
@@ -258,13 +255,7 @@ export function buildCSPDirective(
 
 // Nonce generation for CSP
 export function generateNonce(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID().replace(/-/g, '');
-  }
-  
-  // Fallback for environments without crypto.randomUUID
-  return Math.random().toString(36).substring(2, 15) + 
-         Math.random().toString(36).substring(2, 15);
+  return crypto.randomUUID().replace(/-/g, '');
 }
 
 // Permission Policy builder
@@ -308,7 +299,7 @@ export function buildPermissionsPolicy(permissions: SecurityConfig['headers']['p
 
 // Security event types
 export interface SecurityEvent {
-  type: 'csp_violation' | 'rate_limit_exceeded' | 'cors_violation' | 'auth_failure' | 'suspicious_activity' | 'api_security_violation' | 'sql_injection_attempt' | 'xss_attempt' | 'api_auth_failure';
+  type: 'csp_violation' | 'cors_violation' | 'api_security_violation';
   severity: 'low' | 'medium' | 'high' | 'critical';
   timestamp: string;
   ip: string;

@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode, readJsonBody } from '@/lib/apiErrorHandler';
 import { isAdminRequest } from '@/lib/rbac';
 import { getFeatureFlagsAsync, setFeatureFlags, type FeatureFlags } from '@/lib/featureFlags';
-import { metrics } from '@/lib/metrics-collector';
 import { logger } from '@/lib/logger-enterprise';
 
 export const dynamic = 'force-dynamic';
@@ -38,12 +37,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     changed.push('checkinEnabled');
   }
 
-  metrics.counter('feature_flags.updated', 1, {
-    changed: changed.join(',') || 'none',
-    endpoint: '/api/admin/flags',
-    method: 'POST',
-  });
-  metrics.trackEvent('feature_flags_updated', { changed, before, after: updated });
   logger.info('Feature flags updated', { changed, before, after: updated });
 
   return createSuccessResponse<FeatureFlags>(updated) as NextResponse;

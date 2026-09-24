@@ -43,11 +43,16 @@ async function computeUserSnapshot(): Promise<GuestDatasetSnapshot> {
 }
 
 async function computeCheckinSnapshot(): Promise<GuestDatasetSnapshot> {
-  const aggregate = await prisma.checkin.aggregate({
-    _count: { _all: true },
-    _max: { acceptedAt: true },
-  });
-  return formatSnapshot('checkins', aggregate._count?._all ?? 0, aggregate._max?.acceptedAt);
+  const [aggregate, withSpecialRequests] = await Promise.all([
+    prisma.checkin.aggregate({
+      _count: { _all: true },
+      _max: { acceptedAt: true },
+    }),
+    // Privacy erasure nulls specialRequests without touching acceptedAt, so it must change the version too.
+    prisma.checkin.count({ where: { specialRequests: { not: null } } }),
+  ]);
+  const snapshot = formatSnapshot('checkins', aggregate._count?._all ?? 0, aggregate._max?.acceptedAt);
+  return { ...snapshot, version: `${snapshot.version}:${withSpecialRequests}` };
 }
 
 const COMPUTE_SNAPSHOT: Record<GuestDatasetKey, () => Promise<GuestDatasetSnapshot>> = {
@@ -69,11 +74,4 @@ export async function getGuestDatasetSnapshot(key: GuestDatasetKey): Promise<Gue
       error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
-}
-
-export async function getGuestDatasetSnapshots(
-  keys: GuestDatasetKey[] = [...GUEST_DATASET_KEYS]
-): Promise<Record<GuestDatasetKey, GuestDatasetSnapshot>> {
-  const entries = await Promise.all(keys.map(async (key) => [key, await getGuestDatasetSnapshot(key)] as const));
-  return Object.fromEntries(entries) as Record<GuestDatasetKey, GuestDatasetSnapshot>;
 }

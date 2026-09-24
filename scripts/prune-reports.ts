@@ -12,7 +12,6 @@ const cwd = process.cwd();
 interface Group { pattern: RegExp; label: string; }
 const groups: Group[] = [
   { pattern: /^axe-a11y-report-.*\.json$/, label: 'a11y' },
-  { pattern: /^axe-contrast-report-.*\.json$/, label: 'contrast' }
 ];
 
 function prune(pattern: RegExp, label: string) {

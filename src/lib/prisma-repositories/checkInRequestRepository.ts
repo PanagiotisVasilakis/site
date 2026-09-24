@@ -260,10 +260,6 @@ async function getStatusCounts(): Promise<CheckInRequestStatusCounts> {
   }
 }
 
-async function getAll(): Promise<CheckInRequestRecord[]> {
-  return list();
-}
-
 export const checkInRequestRepository = {
   create,
   findById,
@@ -271,5 +267,4 @@ export const checkInRequestRepository = {
   list,
   updateStatus,
   getStatusCounts,
-  getAll,
 };

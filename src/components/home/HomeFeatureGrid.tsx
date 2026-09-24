@@ -3,7 +3,6 @@ import Link from "next/link";
 export interface HomeFeature {
   href: string;
   label: string;
-  icon: string;
 }
 
 interface HomeFeatureGridProps {

@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import ThemeToggle from './ThemeToggle';
 import LocaleSwitcher from './LocaleSwitcher';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
 import { cva } from 'class-variance-authority';
@@ -35,12 +35,12 @@ const navButton = cva(
 interface TopControlsProps {
   locale: string;
   appTitle: string;
-  showCheckIn?: boolean;
 }
 
-export default function TopControls({ locale, appTitle, showCheckIn = false }: TopControlsProps) {
+export default function TopControls({ locale, appTitle }: TopControlsProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
   const dictionary = useMemo(() => getDictionary(locale as Locale), [locale]);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -49,11 +49,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
   const menuLabels = dictionary.ui;
 
   const { scrolled, hidden } = useScroll();
-  const { isSignedIn, signOut } = useGuestSession({
-    initialIsSignedIn: !!showCheckIn,
-  });
-
-  const shouldShowCheckIn = isSignedIn;
+  const { isSignedIn, signOut } = useGuestSession();
 
   const trackAnalyticsEvent = (eventName: string, props?: Record<string, unknown>) => {
     import('@/lib/analyticsClient')
@@ -62,7 +58,10 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
   };
 
   const handleSignOut = async () => {
-    if (await signOut()) window.location.href = `/${locale}`;
+    if (await signOut()) {
+      router.replace(`/${locale}`);
+      router.refresh();
+    }
   };
 
   const closeMenu = (restoreFocus = false) => {
@@ -117,8 +116,8 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
   }, [pathname]);
 
   const mobileMenuLinks = useMemo(
-    () => buildMenuLinks(locale, dictionary, shouldShowCheckIn),
-    [locale, dictionary, shouldShowCheckIn],
+    () => buildMenuLinks(locale, dictionary, isSignedIn),
+    [locale, dictionary, isSignedIn],
   );
 
   const stayLinks = mobileMenuLinks.filter(link => link.group === 'stay');
@@ -215,7 +214,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
                 </Link>
               )}
 
-              {shouldShowCheckIn && (
+              {isSignedIn && (
                 <Link
                   href={`/${locale}/check-in`}
                   className={navButton({ intent: 'secondary' })}
@@ -235,7 +234,7 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
               aria-haspopup="dialog"
               onClick={toggleMenu}
               className={clsx(
-                "menu-trigger h-11 w-11 md:h-8 md:w-8 rounded-full flex items-center justify-center transition border text-sm shadow-sm flex-shrink-0",
+                "h-11 w-11 md:h-8 md:w-8 rounded-full flex items-center justify-center transition border text-sm shadow-sm flex-shrink-0",
                 "bg-white/30 dark:bg-white/40 hover:bg-white/60 dark:hover:bg-white/60 border-white/30 dark:border-white/40",
                 open && "ring-2 ring-brand-400"
               )}
@@ -288,15 +287,10 @@ export default function TopControls({ locale, appTitle, showCheckIn = false }: T
           <div className="guest-menu-utilities" aria-label={menuLabels?.preferences || 'Preferences'}>
             <ThemeToggle
               className="guest-menu-utility"
-              showText
               lightText={menuLabels?.lightMode || 'Light'}
               darkText={menuLabels?.darkMode || 'Dark'}
             />
-            <LocaleSwitcher
-              fullText
-              showGlobeIcon
-              className="guest-menu-utility"
-            />
+            <LocaleSwitcher className="guest-menu-utility" />
           </div>
 
           <div className="guest-menu-scroll">

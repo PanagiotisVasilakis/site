@@ -15,6 +15,7 @@ describe('trusted-ingress diagnostic redaction', () => {
       'x-origin-verified-client-ip': '203.0.113.1',
       'x-origin-proxy-attestation': 'attestation-value',
       'cf-ray': 'bounded-correlation-id',
+      'user-agent': 'Mozilla/5.0 (synthetic)',
       accept: 'application/json',
     });
 
@@ -29,6 +30,7 @@ describe('trusted-ingress diagnostic redaction', () => {
       'x-origin-proxy-attestation': '[REDACTED]',
       'x-origin-verified-client-ip': '[REDACTED]',
       'x-real-ip': '[REDACTED]',
+      'user-agent': '[REDACTED]',
     });
   });
 

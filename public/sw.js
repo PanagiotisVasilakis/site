@@ -1,6 +1,6 @@
 /* basic offline-first service worker for Next.js static assets and pages */
-// Version bump strategy: use package.json version if available (from version.json), else fallback CACHE_VERSION; bump package version to invalidate.
-const CACHE_VERSION = self.__CACHE_VERSION || 'v4';
+// Bump CACHE_VERSION to invalidate the service worker caches.
+const CACHE_VERSION = 'v4';
 const CACHE_PREFIX = 'guest-guide-';
 let RUNTIME_META = { version: CACHE_VERSION, pkgVersion: undefined, precacheHash: undefined };
 let ACTIVE_CACHE_NAME = `guest-guide-${CACHE_VERSION}`; // updated after reading version.json
@@ -28,9 +28,6 @@ const PRIVATE_PAGE_PREFIXES = [
 ];
 function isPrivatePage(pathname) {
   return PRIVATE_PAGE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
-}
-function isPublicDataPath(pathname) {
-  return pathname === '/api/categories' || pathname.startsWith('/api/categories/');
 }
 function canStore(response) {
   if (!response?.ok) return false;
@@ -263,10 +260,9 @@ async function getQueueSize() {
     const tx = db.transaction(STORE, 'readonly');
     const store = tx.objectStore(STORE);
     return await new Promise((resolve) => {
-      let count = 0;
-      store.openCursor().onsuccess = (e) => {
-        const cursor = e.target.result;
-        if (cursor) { count++; cursor.continue(); } else resolve(count); };
+      const request = store.count();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => resolve(0);
     });
   } catch { return 0; }
 }
@@ -363,74 +359,7 @@ self.addEventListener('activate', (event) => {
       } catch {}
     }
   })());
-  // Pre-warm dynamic JSON endpoints so first offline visit still has basic data.
-  event.waitUntil(prewarmData());
 });
-
-async function prewarmData() {
-  try {
-    const cache = await caches.open(ACTIVE_CACHE_NAME);
-    const bust = RUNTIME_META.precacheHash || RUNTIME_META.version;
-    const withBust = (url) => bust ? `${url}?v=${bust}` : url;
-    // Helper: fetch with bust param but store under canonical URL (without param) for runtime matches.
-    const fetchAndStore = async (canonicalUrl) => {
-      try {
-        const res = await fetchInternal(withBust(canonicalUrl), { cache: 'no-store' });
-        if (canStore(res)) {
-          const clone = res.clone();
-          // Store response under canonical URL key
-          cache.put(canonicalUrl, clone).catch(()=>{});
-          return res;
-        }
-      } catch {}
-      return null;
-    };
-    const catsRes = await fetchAndStore('/api/categories');
-    if (!catsRes) return;
-    let json = null;
-    try { json = await catsRes.json(); } catch { return; }
-    const cats = Array.isArray(json?.categories) ? json.categories : [];
-    // Build a list of URLs to prewarm (bounded)
-    const toPrewarm = [];
-    for (const c of cats.slice(0,25)) { // safety cap
-      if (!c?.id) continue;
-      const listUrl = `/api/categories/${c.id}/items`;
-      toPrewarm.push(listUrl);
-    }
-    // Helper to run limited concurrency
-    async function runWithConcurrency(tasks, worker, concurrency = 5) {
-      const results = [];
-      let i = 0;
-      const runOne = async () => {
-        while (i < tasks.length) {
-          const idx = i++;
-          try { results[idx] = await worker(tasks[idx]); } catch { results[idx] = null; }
-        }
-      };
-      const workers = new Array(Math.max(1, Math.min(concurrency, tasks.length))).fill(0).map(() => runOne());
-      await Promise.all(workers);
-      return results;
-    }
-
-    // First fetch lists with limited concurrency
-    const listResults = await runWithConcurrency(toPrewarm, async (u) => await fetchAndStore(u), 5);
-    // For each successful list, prewarm first 2 item details (also limited concurrently)
-    const detailUrls = [];
-    for (const lr of (listResults || [])) {
-      if (!lr) continue;
-      try {
-        const listJson = await lr.clone().json();
-        const items = Array.isArray(listJson?.items) ? listJson.items : [];
-        for (const item of items.slice(0,2)) {
-          if (!item?.slug) continue;
-          detailUrls.push(`/api/categories/${item.categoryId ?? ''}/items/${item.slug}`.replace('//','/'));
-        }
-      } catch {}
-    }
-    // Run detail prewarm with the same concurrency cap
-    await runWithConcurrency(detailUrls, async (u) => await fetchAndStore(u), 5);
-  } catch {}
-}
 
 // Allow clients to request immediate activation of the new SW
 self.addEventListener('message', (event) => {
@@ -499,24 +428,18 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Never cache authenticated, administrative, or privacy-related routes.
-  if (url.pathname.startsWith('/api/') && !isPublicDataPath(url.pathname)) return;
+  if (url.pathname.startsWith('/api/')) return;
   if (isPrivatePage(url.pathname)) return;
 
   // Prefer network for dynamic data (JSON) routes; cache-first for static/page GETs
   if (request.method === 'GET') {
-    // JSON / API data: stale-while-revalidate so previously fetched data is available offline.
-    if (isPublicDataPath(url.pathname) || url.pathname.endsWith('.json')) {
+    // Static JSON files: stale-while-revalidate so previously fetched data is available offline.
+    if (url.pathname.endsWith('.json')) {
       event.respondWith((async () => {
         const cache = await caches.open(ACTIVE_CACHE_NAME);
         const cached = await cache.match(request);
-        // Broadcast simple metric about cache hit vs network for JSON.
-        const report = (source) => {
-          try { broadcastJsonMetric(url.pathname, source); } catch {}
-        };
-        if (cached) report('cache');
         const fetchPromise = fetchInternal(request).then(res => {
           if (canStore(res)) cache.put(request, res.clone()).catch(()=>{});
-          if (!cached) report('network');
           return res;
         }).catch(() => cached || new Response('offline', { status: 503 }));
         // Return cached immediately if present for fast offline; else wait network
@@ -607,25 +530,6 @@ self.addEventListener('fetch', (event) => {
     }
   }
 });
-
-// JSON fetch metric broadcasting (dev/diagnostic; time-based throttled)
-let __jsonMetricSent = 0;
-let __jsonMetricResetTime = Date.now();
-async function broadcastJsonMetric(path, source) {
-  const now = Date.now();
-  // Reset counter every 60 seconds
-  if (now - __jsonMetricResetTime > 60000) {
-    __jsonMetricSent = 0;
-    __jsonMetricResetTime = now;
-  }
-  
-  if (__jsonMetricSent > 50) return; // throttle to avoid noise
-  __jsonMetricSent++;
-  try {
-    const clients = await self.clients.matchAll();
-    for (const c of clients) c.postMessage({ type: 'SW_JSON_FETCH', path, source });
-  } catch {}
-}
 
 // Background sync event flush with concurrency protection
 let syncInProgress = false;

@@ -3,15 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { ApiErrorCode } from '@/lib/apiErrorTypes';
 import { dedupeById } from '@/lib/collections';
 import { mapsHref, telHref } from '@/lib/contactLinks';
-import { csvRow } from '@/lib/csv';
 import { internalGet, internalPost } from '@/lib/internalFetch';
 import { serializeJsonLd } from '@/lib/jsonLd';
-import {
-  formatTraceContextHeaders,
-  parseTraceContextHeaders,
-} from '@/lib/observability-contracts';
 import { toSafeLocalPath } from '@/lib/safeLocalPath';
-import { absUrl, normalizeExternalUrl, siteUrl } from '@/lib/site';
+import { absUrl, siteUrl } from '@/lib/site';
 import { formatTravelChip } from '@/lib/travelFormat';
 import { mapApiErrorToUI } from '@/lib/userFacingErrors';
 
@@ -55,12 +50,6 @@ describe('core utility contracts', () => {
     expect(toSafeLocalPath(input, 'https://guest.test/start')).toBeNull();
   });
 
-  it('neutralizes spreadsheet formulas and escapes CSV quotes', () => {
-    expect(csvRow(['normal', 'one,"two"', '=1+1', null])).toBe(
-      '"normal","one,""two""","\'=1+1",""\n',
-    );
-  });
-
   it('serializes JSON-LD without executable HTML delimiters', () => {
     const serialized = serializeJsonLd({ value: '</script><img src=x>&' });
     expect(serialized).not.toContain('<');
@@ -71,9 +60,6 @@ describe('core utility contracts', () => {
   it('builds canonical site URLs without rewriting unrelated origins', () => {
     expect(absUrl('en/apartment')).toBe(`${siteUrl}/en/apartment`);
     expect(absUrl('/el/about')).toBe(`${siteUrl}/el/about`);
-    expect(normalizeExternalUrl('https://yourdomain.example/en')).toBe(`${siteUrl}/en`);
-    expect(normalizeExternalUrl('https://external.example/path')).toBe('https://external.example/path');
-    expect(normalizeExternalUrl()).toBeUndefined();
   });
 
   it.each([
@@ -88,27 +74,6 @@ describe('core utility contracts', () => {
   it('returns an empty travel chip for incomplete metrics', () => {
     expect(formatTravelChip('foot')).toBe('');
     expect(formatTravelChip('foot', 100, 0)).toBe('');
-  });
-
-  it('parses and formats W3C and legacy trace context safely', () => {
-    const traceId = 'a'.repeat(32);
-    const spanId = 'b'.repeat(16);
-    const context = parseTraceContextHeaders({ traceparent: `00-${traceId}-${spanId}-01` });
-    expect(context).toEqual({ traceId, spanId, flags: 1 });
-    expect(formatTraceContextHeaders({ traceId, spanId, flags: 300 })).toEqual({
-      traceparent: `00-${traceId}-${spanId}-ff`,
-      'x-trace-id': `${traceId}:${spanId}`,
-    });
-    expect(parseTraceContextHeaders({ 'x-trace-id': `${traceId}:${spanId}` })).toEqual({ traceId, spanId, flags: 1 });
-  });
-
-  it.each([
-    `00-${'0'.repeat(32)}-${'b'.repeat(16)}-01`,
-    `00-${'a'.repeat(32)}-${'0'.repeat(16)}-01`,
-    `01-${'a'.repeat(32)}-${'b'.repeat(16)}-01`,
-    'malformed',
-  ])('rejects malformed trace context %s', (traceparent) => {
-    expect(parseTraceContextHeaders({ traceparent })).toBeNull();
   });
 
   it('maps validation errors to bounded field-safe UI data', () => {
@@ -161,6 +126,17 @@ describe('core utility contracts', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/value', expect.objectContaining({
       method: 'POST',
       body: JSON.stringify({ input: true }),
+    }));
+  });
+
+  it('keeps the JSON content type when a caller adds headers', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await internalPost('/api/value', { input: true }, { headers: { 'X-Request-Source': 'test' } });
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/value', expect.objectContaining({
+      headers: { 'Content-Type': 'application/json', 'X-Request-Source': 'test' },
     }));
   });
 });

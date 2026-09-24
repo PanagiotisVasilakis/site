@@ -6,6 +6,7 @@ import { ApiError, ApiErrorCode, createSuccessResponse, validateRequestBody, wit
 import { logger } from '@/lib/logger-enterprise';
 import { getClientIp } from '@/lib/net/getClientIp';
 import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
+import { privacyHmac } from '@/lib/privacyHash';
 import { redactSensitiveText } from '@/lib/redaction';
 
 const errorReportSchema = z.object({
@@ -57,9 +58,7 @@ export const POST = withErrorHandler(async (request: NextRequest, { signal }) =>
       eventType: 'client.error',
       severity: 'low',
       correlationId: correlationId?.slice(0, 128),
-      ipHash: clientIp === 'unknown'
-        ? null
-        : crypto.createHash('sha256').update(clientIp).digest('hex'),
+      ipHash: clientIp === 'unknown' ? null : privacyHmac(clientIp, 'security-event-ip:v1'),
       path,
       details: {
         name: redact(report.error.name),

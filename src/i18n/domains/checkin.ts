@@ -1,6 +1,6 @@
 /**
  * Check-in related translations.
- * Includes: check-in form, check-in info page, amenities, tips
+ * Includes: check-in navigation labels and the check-in info page
  */
 
 import type { Locale } from '../config';
@@ -12,26 +12,10 @@ import type { Locale } from '../config';
 export interface CheckinDictionary {
     navLabel?: string;
     navInfoLabel?: string;
-    title?: string;
-    summary?: string;
-    bookingId?: string;
-    reference?: string;
-    source?: string;
-    phone?: string;
-    dates?: string;
-    room?: string;
-    arrivalTime?: string;
-    arrivalTimeInvalid?: string;
-    specialRequests?: string;
-    acceptTerms?: string;
-    submit?: string;
-    submitted?: string;
     saving?: string;
-    loading?: string;
 }
 
 export interface CheckinInfoDictionary {
-    welcome?: string;
     welcomeMessage?: string;
     checkInOutTitle?: string;
     checkInTime?: string;
@@ -43,10 +27,6 @@ export interface CheckinInfoDictionary {
     copied?: string;
     emergencyTitle?: string;
     hostContact?: string;
-    hostName?: string;
-    emergencyServices?: string;
-    police?: string;
-    localHospital?: string;
     houseRulesTitle?: string;
     rule1?: string;
     rule2?: string;
@@ -55,12 +35,7 @@ export interface CheckinInfoDictionary {
     rule5?: string;
     rule6?: string;
     amenitiesTitle?: string;
-    ac?: string;
-    heating?: string;
-    kitchen?: string;
-    washer?: string;
     parking?: string;
-    pool?: string;
     tipsTitle?: string;
     tip1?: string;
     tip2?: string;
@@ -85,48 +60,17 @@ export const checkinTranslations: Record<Locale, CheckinDictionary> = {
     en: {
         navLabel: "Check-in",
         navInfoLabel: "Check-In Info",
-        title: "Check-in",
-        summary: "Your Booking",
-        bookingId: "Booking ID",
-        reference: "Reference",
-        source: "Source",
-        phone: "Phone",
-        dates: "Dates",
-        room: "Room",
-        arrivalTime: "Arrival time",
-        arrivalTimeInvalid: "Please enter a valid time (HH:mm)",
-        specialRequests: "Special requests",
-        acceptTerms: "I confirm my details are correct and I accept the terms.",
-        submit: "Complete Check-in",
-        submitted: "Check-in completed",
         saving: "Saving…",
-        loading: "Loading booking…",
     },
     el: {
         navLabel: "Άφιξη",
         navInfoLabel: "Πληροφορίες άφιξης",
-        title: "Άφιξη",
-        summary: "Η Κράτησή σας",
-        bookingId: "Κωδικός κράτησης",
-        reference: "Αναφορά",
-        source: "Πηγή",
-        phone: "Τηλέφωνο",
-        dates: "Ημερομηνίες",
-        room: "Δωμάτιο",
-        arrivalTime: "Ώρα άφιξης",
-        arrivalTimeInvalid: "Παρακαλώ εισάγετε έγκυρη ώρα (ΩΩ:λλ)",
-        specialRequests: "Ειδικά αιτήματα",
-        acceptTerms: "Επιβεβαιώνω ότι τα στοιχεία μου είναι σωστά και αποδέχομαι τους όρους.",
-        submit: "Ολοκλήρωση Άφιξης",
-        submitted: "Η άφιξη ολοκληρώθηκε",
         saving: "Γίνεται αποθήκευση…",
-        loading: "Φόρτωση κράτησης…",
     },
 };
 
 export const checkinInfoTranslations: Record<Locale, CheckinInfoDictionary> = {
     en: {
-        welcome: "🎉 Welcome!",
         welcomeMessage: "We're so glad you're here! Below is some helpful information for your stay.",
         checkInOutTitle: "Check-in & Check-out",
         checkInTime: "Check-in",
@@ -138,10 +82,6 @@ export const checkinInfoTranslations: Record<Locale, CheckinInfoDictionary> = {
         copied: "Copied",
         emergencyTitle: "Emergency Contacts",
         hostContact: "Your Host (24/7)",
-        hostName: "Available 24/7",
-        emergencyServices: "Emergency Services",
-        police: "Police, Fire, Ambulance",
-        localHospital: "Local Hospital",
         houseRulesTitle: "House Rules",
         rule1: "Quiet hours: 23:00 - 08:00",
         rule2: "No smoking inside the property",
@@ -150,12 +90,7 @@ export const checkinInfoTranslations: Record<Locale, CheckinInfoDictionary> = {
         rule5: "No parties or events are allowed.",
         rule6: "Guests use the terrace at their own risk.",
         amenitiesTitle: "Key Amenities",
-        ac: "Air Conditioning",
-        heating: "Heating",
-        kitchen: "Full Kitchen",
-        washer: "Washer/Dryer",
         parking: "Free Parking",
-        pool: "Swimming Pool",
         tipsTitle: "Local Tips",
         tip1: "The nearest beach is just 5 minutes walk away",
         tip2: "Supermarket \"AB Vassilopoulos\" is 300m away, open 8:00-21:00",
@@ -172,7 +107,6 @@ export const checkinInfoTranslations: Record<Locale, CheckinInfoDictionary> = {
         tvDetail: "Smart TV with Netflix and YouTube available"
     },
     el: {
-        welcome: "🎉 Καλώς ήρθατε!",
         welcomeMessage: "Χαιρόμαστε που είστε εδώ! Παρακάτω θα βρείτε μερικές χρήσιμες πληροφορίες για τη διαμονή σας.",
         checkInOutTitle: "Άφιξη & Αναχώρηση",
         checkInTime: "Άφιξη",
@@ -184,10 +118,6 @@ export const checkinInfoTranslations: Record<Locale, CheckinInfoDictionary> = {
         copied: "Αντιγράφηκε",
         emergencyTitle: "Επαφές Έκτακτης Ανάγκης",
         hostContact: "Ο Οικοδεσπότης σας (24/7)",
-        hostName: "Διαθέσιμος 24/7",
-        emergencyServices: "Υπηρεσίες Έκτακτης Ανάγκης",
-        police: "Αστυνομία, Πυροσβεστική, Ασθενοφόρο",
-        localHospital: "Τοπικό Νοσοκομείο",
         houseRulesTitle: "Κανόνες Οικίας",
         rule1: "Ώρες ησυχίας: 23:00 - 08:00",
         rule2: "Απαγορεύεται το κάπνισμα μέσα στο ακίνητο",
@@ -196,12 +126,7 @@ export const checkinInfoTranslations: Record<Locale, CheckinInfoDictionary> = {
         rule5: "Δεν επιτρέπονται πάρτι ή εκδηλώσεις.",
         rule6: "Οι επισκέπτες χρησιμοποιούν τη βεράντα με δική τους ευθύνη.",
         amenitiesTitle: "Βασικές Ανέσεις",
-        ac: "Κλιματισμός",
-        heating: "Θέρμανση",
-        kitchen: "Πλήρης Κουζίνα",
-        washer: "Πλυντήριο/Στεγνωτήριο",
         parking: "Δωρεάν Πάρκινγκ",
-        pool: "Πισίνα",
         tipsTitle: "Τοπικές Συμβουλές",
         tip1: "Η πλησιέστερη παραλία απέχει μόλις 5' με τα πόδια",
         tip2: "Το σούπερ μάρκετ \"AB Βασιλόπουλος\" απέχει 300μ, ανοιχτό 8:00-21:00",

@@ -49,6 +49,17 @@ function looksLikeLongToken(token: string): boolean {
     && parts[1].split('').every((character) => TOKEN_CHARACTERS.has(character));
 }
 
+// Booking claim capabilities: `claim_` followed by base64url (see portalAuthService).
+function containsClaimToken(token: string): boolean {
+  const start = token.indexOf('claim_');
+  if (start < 0) return false;
+  let length = 0;
+  for (let index = start + 'claim_'.length; index < token.length && TOKEN_CHARACTERS.has(token[index]); index += 1) {
+    length += 1;
+  }
+  return length >= 32;
+}
+
 /** Redact common credential and contact-data shapes without backtracking regular expressions. */
 export function redactSensitiveText(value: string, maxLength = 500): string {
   const phoneSafe = redactPhoneSequences(value.slice(0, Math.max(maxLength * 4, maxLength)));
@@ -65,7 +76,7 @@ export function redactSensitiveText(value: string, maxLength = 500): string {
     const token = phoneSafe.slice(index, end);
     output += looksLikeEmail(token)
       ? '[REDACTED_EMAIL]'
-      : looksLikeLongToken(token)
+      : looksLikeLongToken(token) || containsClaimToken(token)
         ? '[REDACTED_TOKEN]'
         : token;
     index = end;

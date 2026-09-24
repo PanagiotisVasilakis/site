@@ -19,7 +19,7 @@
       "classification": "synthetic-test-fixture",
       "path": "tests/security/client-identity-route-regression.test.ts",
       "rule": "generic-api-key",
-      "line": 147,
+      "line": 149,
       "column": 18
     },
     {
@@ -47,7 +47,7 @@
       "classification": "synthetic-test-fixture",
       "path": "tests/security/security-boundaries.test.ts",
       "rule": "generic-api-key",
-      "line": 222,
+      "line": 215,
       "column": 10
     },
     {

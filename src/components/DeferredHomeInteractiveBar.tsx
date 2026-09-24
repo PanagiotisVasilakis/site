@@ -1,15 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ComponentType } from 'react';
-
-interface BookingLabels {
-  addDates: string;
-  checkAvailability: string;
-  arrivalLabel?: string;
-  arrivalPlaceholder?: string;
-  departureLabel?: string;
-  departurePlaceholder?: string;
-}
+import type { BookingLabels } from '@/components/HomeInteractiveBar';
 
 interface Props {
   locale: string;

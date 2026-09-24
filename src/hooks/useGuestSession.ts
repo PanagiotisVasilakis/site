@@ -3,25 +3,13 @@ import internalFetch from '@/lib/internalFetchClient';
 import { emitGuestSessionChanged, onGuestSessionChange } from '@/lib/sessionSignals';
 import { logger } from '@/lib/logger-client';
 
-interface UseGuestSessionOptions {
-    initialIsSignedIn?: boolean;
-    enabled?: boolean;
-}
-
-export function useGuestSession({ initialIsSignedIn = false, enabled = true }: UseGuestSessionOptions = {}) {
-    const [isSignedIn, setIsSignedIn] = useState(initialIsSignedIn);
+export function useGuestSession() {
+    const [isSignedIn, setIsSignedIn] = useState(false);
     const checkerRef = useRef<number | null>(null);
     const inFlight = useRef<AbortController | null>(null);
     const requestVersion = useRef(0);
 
     const checkSession = useCallback(async () => {
-        if (!enabled) {
-            requestVersion.current += 1;
-            inFlight.current?.abort();
-            setIsSignedIn(false);
-            return;
-        }
-
         const version = requestVersion.current + 1;
         requestVersion.current = version;
         try {
@@ -43,7 +31,7 @@ export function useGuestSession({ initialIsSignedIn = false, enabled = true }: U
         } finally {
             if (version === requestVersion.current) inFlight.current = null;
         }
-    }, [enabled]);
+    }, []);
 
     const signOut = useCallback(async (): Promise<boolean> => {
         requestVersion.current += 1;
@@ -64,13 +52,6 @@ export function useGuestSession({ initialIsSignedIn = false, enabled = true }: U
     }, []);
 
     useEffect(() => {
-        if (!enabled) {
-            requestVersion.current += 1;
-            inFlight.current?.abort();
-            setIsSignedIn(false);
-            return;
-        }
-
         // Initial check
         checkSession();
 
@@ -106,7 +87,7 @@ export function useGuestSession({ initialIsSignedIn = false, enabled = true }: U
             inFlight.current?.abort();
             requestVersion.current += 1;
         };
-    }, [enabled, checkSession]);
+    }, [checkSession]);
 
-    return { isSignedIn, signOut, checkSession };
+    return { isSignedIn, signOut };
 }

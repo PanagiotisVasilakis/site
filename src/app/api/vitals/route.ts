@@ -2,12 +2,11 @@ import crypto from 'node:crypto';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
-import { recordVital, vitalsSummary } from '@/lib/analyticsRepository';
+import { recordVital } from '@/lib/analyticsRepository';
 import {
   createClientIdentityUnavailableResponse,
   isClientIdentityUnavailableError,
 } from '@/lib/net/clientIdentity';
-import { isAdminRequest } from '@/lib/rbac';
 import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
 import { ApiError, readJsonBody } from '@/lib/apiErrorHandler';
 
@@ -65,11 +64,4 @@ export async function POST(request: NextRequest) {
     path: safePath(parsed.data.path || request.headers.get('referer')),
   });
   return Response.json({ recorded: true }, { status: 201 });
-}
-
-export async function GET(request: NextRequest) {
-  if (!(await isAdminRequest(request))) {
-    return Response.json({ error: 'Admin credentials required' }, { status: 403 });
-  }
-  return Response.json({ vitals: await vitalsSummary() }, { headers: { 'cache-control': 'no-store, private' } });
 }

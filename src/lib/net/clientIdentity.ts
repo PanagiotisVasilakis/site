@@ -57,7 +57,6 @@ export function createClientIdentityUnavailableResponse(): NextResponse {
   });
 }
 
-export { canonicalizeClientIp } from '@/lib/net/getClientIp';
 
 function configuredRawSource(
   request: NextRequest,

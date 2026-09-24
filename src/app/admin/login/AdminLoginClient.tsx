@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import internalFetch from '@/lib/internalFetchClient';
 
 export default function AdminLoginClient() {
+  const router = useRouter();
   const [token, setToken] = useState('');
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
@@ -18,7 +20,8 @@ export default function AdminLoginClient() {
       });
       if (!response.ok) throw new Error('Authentication failed');
       setStatus('success');
-      window.location.assign('/admin');
+      router.replace('/admin');
+      router.refresh();
     } catch {
       setStatus('error');
     }

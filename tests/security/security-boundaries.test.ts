@@ -112,11 +112,6 @@ describe('runtime environment fail-closed policy', () => {
 
   it.each([
     [
-      'development session minting without its secret',
-      { DEV_SESSION_MINT_ENABLED: '1', DEV_SESSION_MINT_SECRET: undefined },
-      'DEV_SESSION_MINT_SECRET',
-    ],
-    [
       'required alert delivery without an endpoint',
       { ALERT_WEBHOOK_REQUIRED: '1', ALERT_WEBHOOK_URL: undefined },
       'ALERT_WEBHOOK_URL',
@@ -174,9 +169,7 @@ describe('runtime environment fail-closed policy', () => {
     expect(result).not.toHaveProperty('SECURITY_ENC_KEY_HEX_PREVIOUS');
   });
 
-  it('validates API key lists and production CORS origins', () => {
-    expect(runtimeEnvSchema.safeParse({ ...requiredEnv, INTERNAL_API_KEYS: `${'A'.repeat(32)},${'b'.repeat(40)}` }).success).toBe(true);
-    expect(runtimeEnvSchema.safeParse({ ...requiredEnv, INTERNAL_API_KEYS: 'short,key!' }).success).toBe(false);
+  it('validates production CORS origins', () => {
     expect(runtimeEnvSchema.safeParse(productionEnv({ ALLOWED_ORIGINS: 'http://guest.example' })).success).toBe(false);
   });
 });
@@ -229,12 +222,12 @@ describe('trusted proxy IP extraction', () => {
     } as unknown as NextRequest;
   }
 
-  it('ignores public forwarding data even when legacy options ask for trust', () => {
+  it('ignores public forwarding data without the private attestation', () => {
     vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);
-    expect(getClientIp(request({ 'x-forwarded-for': '203.0.113.10' }), { trustProxy: false })).toBe('unknown');
+    expect(getClientIp(request({ 'x-forwarded-for': '203.0.113.10' }))).toBe('unknown');
     expect(getClientIp(request({
       'x-forwarded-for': '203.0.113.10, 198.51.100.20, 192.0.2.30',
-    }), { trustProxy: true, trustedHops: 2 })).toBe('unknown');
+    }))).toBe('unknown');
   });
 
   it('accepts a canonical IPv4 only with both private headers', () => {

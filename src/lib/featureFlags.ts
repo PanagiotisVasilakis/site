@@ -9,8 +9,6 @@ const SETTING_KEY = 'feature_flags';
 const DEVELOPMENT_DEFAULTS: FeatureFlags = { portalEnabled: true, checkinEnabled: true };
 const PRODUCTION_DEFAULTS: FeatureFlags = { portalEnabled: false, checkinEnabled: false };
 
-let cache: FeatureFlags | null = null;
-
 function defaults(): FeatureFlags {
   return process.env.NODE_ENV === 'production'
     ? { ...PRODUCTION_DEFAULTS }
@@ -31,14 +29,13 @@ export async function getFeatureFlagsAsync(): Promise<FeatureFlags> {
   try {
     const { prisma } = await import('@/lib/prisma');
     const row = await prisma.operationalSetting.findUnique({ where: { key: SETTING_KEY } });
-    cache = row ? parseFlags(row.value) : defaults();
+    return row ? parseFlags(row.value) : defaults();
   } catch (error) {
-    cache = defaults();
-    logger.error('Failed to read feature flags; using fail-closed production defaults', {
+    logger.error('Failed to read feature flags; using environment defaults (disabled in production)', {
       error: error instanceof Error ? error.message : String(error),
     });
+    return defaults();
   }
-  return { ...cache };
 }
 
 export async function setFeatureFlags(partial: Partial<FeatureFlags>): Promise<FeatureFlags> {
@@ -55,6 +52,5 @@ export async function setFeatureFlags(partial: Partial<FeatureFlags>): Promise<F
       "updated_at" = CURRENT_TIMESTAMP
     RETURNING "value"
   `;
-  cache = parseFlags(rows[0]?.value);
-  return { ...cache };
+  return parseFlags(rows[0]?.value);
 }

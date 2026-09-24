@@ -113,7 +113,8 @@ export default function BookingForm({ dateRange, locale, labels, propertyName }:
   };
 
   const onInvalid = (errors: FieldErrors<BookingFormData>) => {
-    logger.warn('Booking form validation failed', { errors });
+    // Field errors carry DOM refs (circular), so log only the field names.
+    logger.warn('Booking form validation failed', { fields: Object.keys(errors) });
     // Focus is handled automatically by RHF, but we log for analytics
   };
 

@@ -213,7 +213,7 @@ export function findForbiddenEnvironmentArtifact(files) {
   return files.find((relative) => ENV_FILE_PATTERN.test(relative));
 }
 
-export function evaluateCurrentFindings(findings, allowlistEntries = []) {
+function evaluateCurrentFindings(findings, allowlistEntries = []) {
   const allowlist = new Map(allowlistEntries.map((entry) => [allowlistKey(entry), entry]));
   const accepted = [];
   const unexpected = [];

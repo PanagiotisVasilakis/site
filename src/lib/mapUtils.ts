@@ -9,7 +9,6 @@ import {
 } from '@/data/mapLocations';
 import type { Locale } from '@/i18n/config';
 import type { LeafletMarkerData } from '@/components/LeafletMap';
-import { dedupeById } from '@/lib/collections';
 
 export { APARTMENT_LOCATION };
 
@@ -59,10 +58,6 @@ export function getKalamataMarkers(
   options?: { includeApartment?: boolean; includeLandmarks?: boolean }
 ): MarkerData[] {
   return markersFromMapLocations(getKalamataMapLocations(locale, contentItems, options));
-}
-
-export function dedupeMarkers(markers: readonly MarkerData[]): MarkerData[] {
-  return dedupeById(markers);
 }
 
 export function toLeafletMarker(marker: MarkerData): LeafletMarkerData {

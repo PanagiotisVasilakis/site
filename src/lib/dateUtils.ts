@@ -50,11 +50,6 @@ function isPastDate(date: Date): boolean {
   return isBefore(startOfDay(date), startOfDay(new Date()));
 }
 
-// Get blocked dates (would typically come from an API; return none for full availability)
-export function getBlockedDates(): Date[] {
-  return [];
-}
-
 // Validate date range
 export function validateDateRange(range: DateRange, locale: DateLocale = 'en'): { valid: boolean; error?: string } {
   const errors = locale === 'el' ? {

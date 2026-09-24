@@ -19,6 +19,19 @@ interface LogMetadata {
   [key: string]: unknown;
 }
 
+// Nested Errors have non-enumerable fields and DOM refs are circular; never let logging throw.
+function stringifyMetadata(meta: LogMetadata): string {
+  try {
+    return JSON.stringify(
+      meta,
+      (_key, value: unknown) => (value instanceof Error ? { name: value.name, message: value.message } : value),
+      2,
+    );
+  } catch {
+    return '[unserializable metadata]';
+  }
+}
+
 class ClientLogger {
   private isDev = process.env.NODE_ENV === 'development';
 
@@ -32,9 +45,7 @@ class ClientLogger {
       if (meta instanceof Error) {
         metaStr = `\n  Error: ${meta.message}\n  Stack: ${meta.stack}`;
       } else {
-        metaStr = Object.keys(meta).length > 0 
-          ? `\n  ${JSON.stringify(meta, null, 2)}`
-          : '';
+        metaStr = Object.keys(meta).length > 0 ? `\n  ${stringifyMetadata(meta)}` : '';
       }
     }
 

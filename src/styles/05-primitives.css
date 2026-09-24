@@ -58,30 +58,6 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.15) inset;
 }
 
-.btn-accent {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  font-weight: 500;
-  border-radius: 999px;
-  padding: clamp(0.35rem, 1vw, 0.5rem) clamp(0.75rem, 2vw, 1rem);
-  font-size: 0.875rem;
-  line-height: 1.2;
-  min-height: clamp(32px, 6vw, 40px);
-  background: var(--accent-500);
-  color: var(--fg-inverse);
-  transition: background var(--transition-fast), transform var(--transition-fast);
-}
-
-.btn-accent:hover {
-  background: var(--accent-400);
-}
-
-.btn-accent:active {
-  transform: translateY(1px);
-}
-
 .btn-sm {
   padding: .35rem .7rem;
   font-size: .65rem;
@@ -91,7 +67,6 @@
 @media (hover: none), (pointer: coarse) {
   .btn-primary,
   .btn-outline,
-  .btn-secondary,
   .btn-tint,
   .btn-sm {
     min-height: 44px !important;
@@ -118,14 +93,6 @@
 
 [data-theme="dark"] .border-soft {
   border-color: var(--border-soft);
-}
-
-.divider {
-  border-color: var(--border-soft);
-}
-
-[data-theme="dark"] .divider {
-  border-color: var(--border-soft-strong);
 }
 
 /* Status / badges */
@@ -170,74 +137,6 @@
     width: 0.72rem;
     height: 0.72rem;
   }
-}
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: .25rem;
-  font-size: .55rem;
-  padding: .35rem .55rem;
-  min-height: 24px;
-  border-radius: 999px;
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: uppercase;
-  background: var(--brand-100);
-  color: var(--text-accent);
-}
-
-[data-theme="dark"] .badge {
-  background: var(--brand-400);
-  color: #042c28;
-}
-
-/* Inputs: elegant, accessible, theme-aware */
-.input {
-  width: 100%;
-  padding: 0.675rem 0.85rem;
-  border-radius: 10px;
-  border: 1px solid var(--border-soft);
-  background: var(--layer-surface);
-  color: var(--fg-default);
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
-}
-
-.input:hover {
-  border-color: var(--border-soft-strong);
-}
-
-.input:focus {
-  outline: none;
-  border-color: var(--brand-400);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-400) 20%, transparent);
-}
-
-.input::placeholder {
-  color: var(--placeholder-color);
-}
-
-[data-theme="dark"] .input {
-  background: rgba(17, 25, 26, 0.6);
-  border-color: var(--border-soft);
-  color: var(--foreground);
-}
-
-[data-theme="dark"] .input:hover {
-  border-color: var(--border-soft-strong);
-}
-
-[data-theme="dark"] .input:focus {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-400) 22%, transparent);
-}
-
-.input[aria-invalid="true"] {
-  border-color: #e35b5b;
-  background: color-mix(in srgb, #e35b5b 6%, var(--layer-surface));
-}
-
-[data-theme="dark"] .input[aria-invalid="true"] {
-  background: color-mix(in srgb, #e35b5b 10%, rgba(17, 25, 26, 0.6));
 }
 
 
@@ -312,7 +211,6 @@ html:not([data-theme="dark"]) .min-h-screen {
 }
 
 /* Light mode placeholder styling to match dark mode consistency */
-:not([data-theme="dark"]) .input::placeholder,
 :not([data-theme="dark"]) input::placeholder,
 :not([data-theme="dark"]) textarea::placeholder,
 :not([data-theme="dark"]) select::placeholder {

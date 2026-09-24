@@ -1,6 +1,5 @@
 // Real apartment data for Kalamata stay
 const apartmentData = {
-  id: 'kalamata-apartment',
   name: {
     en: '2-Bedroom Apartment with Mountain & Sea Views',
     el: 'Διαμέρισμα 2 Υπνοδωματίων με Θέα Βουνό & Θάλασσα'
@@ -13,14 +12,7 @@ const apartmentData = {
 
   location: {
     city: 'Kalamata',
-    region: 'Messenia',
-    country: 'Greece',
-    cityGreek: 'Καλαμάτα',
-    regionGreek: 'Μεσσηνία',
-    coordinates: {
-      lat: 37.040635,
-      lng: 22.094364
-    }
+    country: 'Greece'
   },
 
   description: {
@@ -45,14 +37,6 @@ const apartmentData = {
       'Φιλικό για οικογένειες με εξοπλισμό μωρού',
       'Κοντά σε όλες τις ανέσεις'
     ]
-  },
-
-  specs: {
-    bedrooms: 2,
-    bathrooms: 1,
-    floor: 2,
-    maxGuests: 4,
-    size: '90 m²'
   },
 
   amenities: {
@@ -80,52 +64,6 @@ const apartmentData = {
       'Πλήρως εξοπλισμένη κουζίνα',
       'Πλυντήριο ρούχων'
     ]
-  },
-
-  distances: {
-    en: [
-      { place: 'Town Hall', distance: '50m', time: '1 min walk' },
-      { place: 'Benakeio Archaeological Museum', distance: '2km', time: '15 min walk / 5 min drive' },
-      { place: 'Nearest Beach', distance: '3km', time: '5 min drive' },
-      { place: 'Kalamata Airport', distance: '6km', time: '15 min drive' },
-      { place: 'Supermarket', distance: '100m', time: '2 min walk' },
-      { place: 'Bakery', distance: '150m', time: '3 min walk' },
-      { place: 'Bus Stop', distance: '100m', time: '2 min walk' }
-    ],
-    el: [
-      { place: 'Δημαρχείο', distance: '50μ', time: '1\' με τα πόδια' },
-      { place: 'Μπενάκειο Αρχαιολογικό Μουσείο', distance: '2 χλμ', time: '15\' με τα πόδια / 5\' με αυτοκίνητο' },
-      { place: 'Κοντινότερη παραλία', distance: '3 χλμ', time: '5\' με αυτοκίνητο' },
-      { place: 'Αεροδρόμιο Καλαμάτας', distance: '6 χλμ', time: '15\' οδήγηση' },
-      { place: 'Σούπερ μάρκετ', distance: '100μ', time: '2\' με τα πόδια' },
-      { place: 'Φούρνος', distance: '150μ', time: '3\' με τα πόδια' },
-      { place: 'Στάση λεωφορείου', distance: '100μ', time: '2\' με τα πόδια' }
-    ]
-  },
-
-  houseRules: {
-    en: [
-      'No smoking inside',
-      'Quiet hours after 22:00', 
-      'Maximum 4 guests',
-      'No parties or events are allowed',
-      'Check-in: 15:00 - 22:00',
-      'Check-out: 11:00',
-      'Families with children welcome',
-      'Guests use the terrace at their own risk',
-      'Free parking space included'
-    ],
-    el: [
-      'Απαγορεύεται το κάπνισμα μέσα',
-      'Ήσυχες ώρες μετά τις 22:00',
-      'Μέγιστο 4 άτομα', 
-      'Δεν επιτρέπονται πάρτι ή εκδηλώσεις',
-      'Άφιξη: 15:00 - 22:00',
-      'Αναχώρηση: 11:00',
-      'Οικογένειες με παιδιά καλοδεχούμενες',
-      'Οι επισκέπτες χρησιμοποιούν τη βεράντα με δική τους ευθύνη',
-      'Δωρεάν θέση πάρκινγκ'
-    ]
   }
 };
 
@@ -138,9 +76,6 @@ export function getApartmentContent(locale: 'en' | 'el' = 'en') {
     description: data.description[locale],
     highlights: data.highlights[locale],
     amenities: data.amenities[locale],
-    distances: data.distances[locale],
-    houseRules: data.houseRules[locale],
-    location: data.location,
-    specs: data.specs
+    location: data.location
   };
 }

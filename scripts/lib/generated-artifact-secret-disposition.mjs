@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-const SUPPORTED_NEXT_VERSION = '16.2.11';
+const SUPPORTED_NEXT_VERSION = '16.3.6';
 const SERVER_REFERENCE_KEYS = Object.freeze(['edge', 'encryptionKey', 'node']);
 const PREVIEW_KEYS = Object.freeze([
   'previewModeEncryptionKey',

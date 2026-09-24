@@ -2,8 +2,6 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@/generated/prisma/client';
 import type { Prisma } from '@/generated/prisma/client';
 import { logger } from '@/lib/logger-enterprise';
-import { tracer, SpanStatus } from '@/lib/distributed-tracing';
-import { metrics } from '@/lib/metrics-collector';
 import { buildPrismaPgAdapterArgs } from '@/lib/prismaPgConfig';
 
 type ExtendedGlobal = typeof globalThis & {
@@ -61,18 +59,6 @@ function addPrismaInstrumentation(client: PrismaClient): void {
       model = tableMatch[1];
     }
     
-    // Record metrics
-    metrics.timer('db.query.duration', duration, {
-      model,
-      action,
-    });
-    
-    metrics.counter('db.query.total', 1, {
-      model,
-      action,
-      status: 'success',
-    });
-    
     // Log slow queries (>1000ms)
     if (duration > 1000) {
       logger.warn('Slow database query detected', {
@@ -81,71 +67,24 @@ function addPrismaInstrumentation(client: PrismaClient): void {
         duration,
         query: e.query.slice(0, 200), // Truncate long queries
       });
-      
-      // Start and finish a span for slow queries
-      const span = tracer.startSpan('db.query.slow', undefined, {
-        'db.system': 'postgresql',
-        'db.operation': action,
-        'db.model': model,
-        'db.duration': duration,
-      });
-      tracer.finishSpan(span);
     }
   });
   
   // Track errors
   clientWithEvents.$on('error', (e: Prisma.LogEvent) => {
-    metrics.counter('db.query.errors', 1);
-    
     logger.error('Prisma error', {
       message: e.message,
       target: e.target,
     });
-    
-    // Create error span
-    const span = tracer.startSpan('db.error', undefined, {
-      'db.system': 'postgresql',
-      'error.message': e.message,
-    });
-    tracer.finishSpan(span, SpanStatus.ERROR);
   });
-}
-
-/**
- * Get recommended connection pool size based on environment
- * PostgreSQL connection pooling is configured via DATABASE_URL query params:
- * - connection_limit: Max connections in the pool
- * - pool_timeout: Seconds to wait for available connection
- * 
- * Example: postgresql://user:pass@host:5432/db?connection_limit=10&pool_timeout=20
- * 
- * Recommended values:
- * - Development: 5-10 connections
- * - Production (serverless): 5-10 per instance
- * - Production (long-running): 20-50 connections
- */
-function getRecommendedPoolConfig(): { connectionLimit: number; poolTimeout: number } {
-  const env = process.env.NODE_ENV;
-  
-  if (env === 'production') {
-    // Keep the production pool bounded per application instance.
-    return { connectionLimit: 10, poolTimeout: 20 };
-  }
-  
-  // Development: a smaller pool is sufficient.
-  return { connectionLimit: 5, poolTimeout: 10 };
 }
 
 function createPrismaClient(): PrismaClient {
   const databaseUrl = assertDatabaseUrl();
   
-  // Log recommended pool config (actual config is in DATABASE_URL)
-  const poolConfig = getRecommendedPoolConfig();
   if (!prismaInitLogged && logPrismaLifecycle) {
       logger.info('Prisma client initialization', {
         environment: process.env.NODE_ENV,
-        recommendedConnectionLimit: poolConfig.connectionLimit,
-        recommendedPoolTimeout: poolConfig.poolTimeout,
         note: 'Configure via DATABASE_URL: ?connection_limit=N&pool_timeout=N',
       });
       prismaInitLogged = true;

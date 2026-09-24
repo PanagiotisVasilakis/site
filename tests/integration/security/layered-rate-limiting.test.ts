@@ -60,14 +60,14 @@ describe.sequential('A3 layered rate limiting with live PostgreSQL', () => {
 
       const [
         { NextRequest },
-        categoriesRoute,
+        liveRoute,
         readinessRoute,
         limiterModule,
         privacyModule,
         operationalModule,
       ] = await Promise.all([
         import('next/server'),
-        import('@/app/api/categories/route'),
+        import('@/app/api/health/live/route'),
         import('@/app/api/health/ready/route'),
         import('@/lib/sensitiveRateLimit'),
         import('@/lib/privacyHash'),
@@ -75,7 +75,7 @@ describe.sequential('A3 layered rate limiting with live PostgreSQL', () => {
       ]);
 
       expect(await withTestPrismaClient(target, (prisma) => prisma.rateLimit.count())).toBe(0);
-      expect((await categoriesRoute.GET()).status).toBe(200);
+      expect(liveRoute.GET().status).toBe(200);
       expect(await withTestPrismaClient(target, (prisma) => prisma.rateLimit.count())).toBe(0);
       expect((await readinessRoute.GET()).status).toBe(200);
       expect(await withTestPrismaClient(target, (prisma) => prisma.rateLimit.count())).toBe(0);

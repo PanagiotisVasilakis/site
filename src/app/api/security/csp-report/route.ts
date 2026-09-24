@@ -13,6 +13,7 @@ import {
 } from '@/lib/net/clientIdentity';
 import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
 import { ApiError, readJsonBody } from '@/lib/apiErrorHandler';
+import { logger } from '@/lib/logger-enterprise';
 
 const MAX_REPORT_BYTES = 16 * 1_024;
 const cspReportSchema = z.object({
@@ -63,17 +64,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof ApiError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
-    return NextResponse.json({ error: 'Invalid CSP report' }, { status: 400 });
+    logger.error('CSP report handling failed', error instanceof Error ? error : { error: String(error) });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
-}
-
-// Handle preflight requests
-export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: {
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  });
 }

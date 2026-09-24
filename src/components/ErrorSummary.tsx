@@ -4,14 +4,12 @@ import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
 
 export default function ErrorSummary({
-  title,
   summary,
   details,
   onRetry,
   supportHref = '/en#contact',
   locale = 'en',
 }: {
-  title?: string;
   summary: string;
   details?: string[];
   onRetry?: () => void;
@@ -19,7 +17,7 @@ export default function ErrorSummary({
   locale?: string;
 }) {
   const t = getDictionary(locale as Locale);
-  const resolvedTitle = title ?? t.errors?.title ?? 'There were some problems';
+  const resolvedTitle = t.errors?.title ?? 'There were some problems';
   const tryAgainLabel = t.errors?.tryAgain ?? 'Try again';
   const contactSupportLabel = t.errors?.contactSupport ?? 'Contact support';
   const ref = useRef<HTMLDivElement | null>(null);

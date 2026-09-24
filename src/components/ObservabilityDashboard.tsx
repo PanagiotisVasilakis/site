@@ -6,7 +6,6 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { internalGet } from '@/lib/internalFetch';
-import HealthMonitor from './HealthMonitor';
 
 type AnalyticsHit = {
   path: string;
@@ -31,7 +30,7 @@ type TopPath = {
   count: number;
 };
 
-type DashboardTab = 'overview' | 'health' | 'analytics';
+type DashboardTab = 'overview' | 'analytics';
 
 interface DashboardProps {
   refreshInterval?: number;
@@ -108,7 +107,6 @@ export default function ObservabilityDashboard({
 
   const tabs = [
     { id: 'overview', label: 'Overview' },
-    { id: 'health', label: 'Health' },
     { id: 'analytics', label: 'Analytics' },
   ] as const;
 
@@ -177,9 +175,6 @@ export default function ObservabilityDashboard({
   );
 
   const renderContent = () => {
-    if (activeTab === 'health') {
-      return <HealthMonitor refreshInterval={refreshInterval} autoRefresh={autoRefresh} />;
-    }
     if (activeTab === 'analytics') {
       return renderAnalytics();
     }
@@ -192,7 +187,7 @@ export default function ObservabilityDashboard({
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Observability Dashboard</h1>
-            <p className="mt-1 text-gray-600">Health and analytics from configured application endpoints.</p>
+            <p className="mt-1 text-gray-600">Analytics from configured application endpoints.</p>
           </div>
           <div className="flex items-center gap-4">
             {lastUpdate && <span className="text-sm text-gray-500">Last updated: {lastUpdate.toLocaleTimeString()}</span>}

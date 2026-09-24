@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { locales, type Locale } from '@/i18n/config';
 import { getItemsByCategory } from '@/lib/data';
 import type { Item } from '@/data/schemas';
-import { getVerifiedGuestSessionFromCookies } from '@/lib/guestSession';
+import { GUEST_REFRESH_COOKIE, getVerifiedGuestSessionFromCookies } from '@/lib/guestSession';
 import CheckinViewed from '@/components/analytics/CheckinViewed';
 import CheckInInfo from '@/components/CheckInInfo';
 import { notFound } from 'next/navigation';
@@ -59,7 +59,7 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
     const failMsg = encodeURIComponent('Please sign in to access check-in information');
     const failurePath = `/${eff}/guest?flash=${failMsg}`;
     const cookieStore = await cookies();
-    if (!cookieStore.get('guest_rt')?.value) {
+    if (!cookieStore.get(GUEST_REFRESH_COOKIE)?.value) {
       redirect(failurePath);
     }
 

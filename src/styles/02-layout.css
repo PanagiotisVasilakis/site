@@ -52,12 +52,6 @@ p {
     padding-top: 1rem;
     padding-bottom: 1rem;
   }
-
-  /* Make cards more compact on mobile */
-  .card {
-    padding: 0.75rem;
-    border-radius: 8px;
-  }
 }
 
 /* Coarse pointers include tablet boundary viewports such as 768x1024. */
@@ -73,11 +67,11 @@ p {
     justify-content: center;
   }
 
-  :where(.btn-primary, .btn-outline, .btn-secondary, .btn-tint, .btn-sm, .booking-button, .search-trigger, .input) {
+  :where(.btn-primary, .btn-outline, .btn-tint, .btn-sm, .booking-button, .search-trigger) {
     min-height: 44px !important;
   }
 
-  :where(.btn-primary, .btn-outline, .btn-secondary, .btn-tint, .btn-sm) {
+  :where(.btn-primary, .btn-outline, .btn-tint, .btn-sm) {
     height: auto !important;
   }
 }
@@ -88,10 +82,6 @@ p {
     padding-left: 1.5rem;
     padding-right: 1.5rem;
   }
-
-  .card {
-    padding: 1.25rem;
-  }
 }
 
 /* Desktop spacing */
@@ -99,10 +89,6 @@ p {
   .page-container {
     padding-left: 2rem;
     padding-right: 2rem;
-  }
-
-  .card {
-    padding: 1.5rem;
   }
 }
 

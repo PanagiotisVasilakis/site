@@ -6,14 +6,15 @@
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import type { JwtPayload, SignOptions } from 'jsonwebtoken';
-import { BaseAuthPayload } from './common';
 import { readRuntimeCredential } from '../runtime-credentials.js';
 
 const { sign, verify } = jwt;
 
-interface AdminAuthPayload extends BaseAuthPayload {
+interface AdminAuthPayload {
   type: 'admin';
   role: 'admin';
+  iat?: number;
+  exp?: number;
   session_id?: string;
   jti?: string;
   login_at?: number;

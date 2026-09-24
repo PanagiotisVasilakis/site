@@ -5,6 +5,7 @@ import {
   clearRefreshCookie,
   createRefreshCookie,
   createSessionCookie,
+  GUEST_REFRESH_COOKIE,
   issueGuestSession,
   parseGuestSession,
 } from '@/lib/guestSession';
@@ -16,11 +17,11 @@ export function requestAuthContext(request: NextRequest): { deviceHint: string; 
   // particular, never turn the sentinel `unknown` into a valid-looking hint.
   const ip = requireCanonicalClientIp(request);
   const userAgent = request.headers.get('user-agent') || 'unknown';
-  const ipHint = privacyHmac(ip, 'portal-auth:ip-hint:v1');
   return {
     deviceHint: privacyHmac(userAgent, 'portal-auth:device-hint:v1'),
-    ipHint,
-    ipHash: ipHint,
+    ipHint: privacyHmac(ip, 'portal-auth:ip-hint:v1'),
+    // Audit rows share the security-event IP hash so events correlate across types.
+    ipHash: privacyHmac(ip, 'security-event-ip:v1'),
   };
 }
 
@@ -35,7 +36,7 @@ export async function attachPortalAuthCookies(
   const context = requestAuthContext(request);
 
   if (!input.remember) {
-    const presentedRefreshToken = request.cookies.get('guest_rt')?.value;
+    const presentedRefreshToken = request.cookies.get(GUEST_REFRESH_COOKIE)?.value;
     if (presentedRefreshToken) {
       await guestStore.revokeRefreshFamily(presentedRefreshToken);
     }

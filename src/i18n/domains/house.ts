@@ -11,19 +11,10 @@ import type { Locale } from '../config';
 
 export interface HouseDictionary {
     navLabel: string;
-    navSubtitle: string;
     title: string;
-    location?: string;
     intro: string;
     guideTitle?: string;
-    overview: string;
-    amenities: string;
-    rules: string;
-    checkin: string;
-    emergency: string;
-    amenityList: string[];
-    rulesList: string[];
-    photoAlts?: { living: string; bedroom: string; kitchen: string; balcony?: string; bathroom?: string; };
+    photoAlts?: { living: string; bedroom: string; bedroom_2?: string; kitchen: string; balcony?: string; bathroom?: string; };
     glanceTitle?: string;
     specs?: string[];
     ctaPrimary?: string;
@@ -54,12 +45,6 @@ export interface LocationPanelDictionary {
         title: string;
         description: string;
     }>;
-    locationTownTitle?: string;
-    locationTownDescription?: string;
-    locationBeachTitle?: string;
-    locationBeachDescription?: string;
-    locationTransportTitle?: string;
-    locationTransportDescription?: string;
     howToEnableMapTitle: string;
     howToEnableSteps: string[];
 }
@@ -71,15 +56,8 @@ export interface LocationPanelDictionary {
 export const houseTranslations: Record<Locale, HouseDictionary> = {
     en: {
         navLabel: "Photo Gallery",
-        navSubtitle: "Explore the apartment and its location",
         title: "Your 2-Bedroom Apartment with Mountain & Sea Views",
-        location: "Kalamata, Greece",
         intro: "Welcome to your spacious apartment, featuring large sunny terraces and beautiful views in a quiet neighborhood near the Town Hall.",
-        overview: "Overview",
-        amenities: "Amenities",
-        rules: "House Rules",
-        checkin: "Check-in / Check-out",
-        emergency: "Emergency & Support",
         glanceTitle: "At a Glance",
         specs: [
             "2 bedrooms",
@@ -92,25 +70,7 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
         ctaPrimary: "Book",
         ctaSecondary: "Contact Us",
         guideTitle: "Your Apartment Guide",
-        amenityList: [
-            "Free Wi-Fi",
-            "Air conditioning",
-            "Large sunny terraces",
-            "Mountain & sea views",
-            "Free private parking",
-            "Baby equipment available",
-            "Fully equipped kitchen",
-            "Washing machine"
-        ],
-        rulesList: [
-            "No smoking inside",
-            "Quiet hours after 22:00",
-            "Maximum 4 guests",
-            "Check-in: 15:00-22:00",
-            "Check-out: 11:00",
-            "Families with children welcome"
-        ],
-        photoAlts: { living: 'Living area', bedroom: 'Bedroom', kitchen: 'Kitchen', balcony: 'Balcony', bathroom: 'Bathroom' },
+        photoAlts: { living: 'Living area', bedroom: 'Bedroom', bedroom_2: 'Second bedroom', kitchen: 'Kitchen', balcony: 'Balcony', bathroom: 'Bathroom' },
         rooms: {
             living_room: {
                 title: "Living Room",
@@ -144,15 +104,8 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
     },
     el: {
         navLabel: "Συλλογή Φωτογραφιών",
-        navSubtitle: "Εξερευνήστε το διαμέρισμα και την τοποθεσία του",
         title: "Το 2-υπνοδωματίων διαμέρισμά σας με θέα σε βουνό & θάλασσα",
-        location: "Καλαμάτα, Ελλάδα",
         intro: "Καλώς ήρθατε στο ευρύχωρο διαμέρισμά σας, με μεγάλες ηλιόλουστες βεράντες και όμορφη θέα σε μια ήσυχη γειτονιά κοντά στο Δημαρχείο.",
-        overview: "Επισκόπηση",
-        amenities: "Παροχές",
-        rules: "Κανόνες Σπιτιού",
-        checkin: "Άφιξη / Αναχώρηση",
-        emergency: "Έκτακτη Ανάγκη & Υποστήριξη",
         glanceTitle: "Με μια Ματιά",
         specs: [
             "2 υπνοδωμάτια",
@@ -165,25 +118,7 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
         ctaPrimary: "Κράτηση",
         ctaSecondary: "Επικοινωνία",
         guideTitle: "Ο Οδηγός του Διαμερίσματός σας",
-        amenityList: [
-            "Δωρεάν Wi-Fi",
-            "Κλιματισμός",
-            "Μεγάλες ηλιόλουστες βεράντες",
-            "Θέα βουνού και θάλασσας",
-            "Δωρεάν ιδιωτικό πάρκινγκ",
-            "Εξοπλισμός μωρού διαθέσιμος",
-            "Πλήρως εξοπλισμένη κουζίνα",
-            "Πλυντήριο ρούχων"
-        ],
-        rulesList: [
-            "Απαγορεύεται το κάπνισμα μέσα",
-            "Ήσυχες ώρες μετά τις 22:00",
-            "Μέγιστο 4 άτομα",
-            "Άφιξη: 15:00-22:00",
-            "Αναχώρηση: 11:00",
-            "Οικογένειες με παιδιά καλοδεχούμενες"
-        ],
-        photoAlts: { living: 'Καθιστικό', bedroom: 'Υπνοδωμάτιο', kitchen: 'Κουζίνα', balcony: 'Μπαλκόνι', bathroom: 'Μπάνιο' },
+        photoAlts: { living: 'Καθιστικό', bedroom: 'Υπνοδωμάτιο', bedroom_2: 'Δεύτερο υπνοδωμάτιο', kitchen: 'Κουζίνα', balcony: 'Μπαλκόνι', bathroom: 'Μπάνιο' },
         rooms: {
             living_room: {
                 title: "Καθιστικό",

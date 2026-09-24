@@ -54,7 +54,7 @@ function estimatedShannonBits(value) {
   return bitsPerCharacter * value.length;
 }
 
-function hasRepeatedPattern(value) {
+export function hasRepeatedPattern(value) {
   for (let size = 1; size <= Math.min(16, value.length / 2); size += 1) {
     if (value.length % size === 0
       && value === value.slice(0, size).repeat(value.length / size)) {

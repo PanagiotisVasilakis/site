@@ -29,7 +29,6 @@ export default defineConfig({
       reportsDirectory: './coverage',
       include: [
         'src/components/DocumentLocale.tsx',
-        'src/components/FilterDrawer.tsx',
         'src/components/PortalRefreshRedirect.tsx',
         'src/components/ThemeToggle.tsx',
         'src/components/guest/guestValidation.ts',
@@ -40,7 +39,6 @@ export default defineConfig({
         'src/lib/collections.ts',
         'src/lib/contactLinks.ts',
         'src/lib/crypto.ts',
-        'src/lib/csv.ts',
         'src/lib/data.ts',
         'src/lib/dateUtils.ts',
         'src/lib/guestSession.ts',
@@ -48,7 +46,6 @@ export default defineConfig({
         'src/lib/jsonLd.ts',
         'src/lib/mapUtils.ts',
         'src/lib/net/getClientIp.ts',
-        'src/lib/observability-contracts.ts',
         'src/lib/phone.ts',
         'src/lib/portalBookingEligibility.ts',
         'src/lib/portalRefreshClient.ts',

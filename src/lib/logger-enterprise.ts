@@ -12,20 +12,17 @@ const asyncLocalStorage = new AsyncLocalStorage<Partial<LogContext>>();
 
 interface LogContext {
   correlationId: string;
-  userId?: string;
-  sessionId?: string;
   requestId?: string;
-  userAgent?: string;
-  ip?: string;
   route?: string;
-  traceId?: string;
 }
 
 type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+// Levels this logger emits; 'trace' and 'fatal' remain valid configured thresholds.
+type EmittedLevel = 'debug' | 'info' | 'warn' | 'error';
 
 interface LogEntry {
   timestamp: string;
-  level: LogLevel;
+  level: EmittedLevel;
   message: string;
   context?: Partial<LogContext>;
   metadata?: Record<string, unknown>;
@@ -43,11 +40,6 @@ interface LogEntry {
       total: number;
     };
     cpu?: number;
-  };
-  source?: {
-    file?: string;
-    function?: string;
-    line?: number;
   };
 }
 
@@ -106,17 +98,6 @@ class EnterpriseLogger {
   setContext(context: Partial<LogContext>): void {
     const existing = asyncLocalStorage.getStore() || { correlationId: this.generateCorrelationId() };
     asyncLocalStorage.enterWith({ ...existing, ...context });
-  }
-
-  /**
-   * Run function with logging context
-   */
-  withContext<T>(context: Partial<LogContext>, fn: () => T): T {
-    const fullContext = { 
-      correlationId: this.generateCorrelationId(), 
-      ...context 
-    };
-    return asyncLocalStorage.run(fullContext, fn);
   }
 
   /**
@@ -208,38 +189,6 @@ class EnterpriseLogger {
   }
 
   /**
-   * Get source information from stack trace
-   */
-  private getSourceInfo(): LogEntry['source'] | undefined {
-    try {
-      const stack = new Error().stack;
-      if (!stack) return undefined;
-
-      const lines = stack.split('\n');
-      // Skip logger internal calls to find actual caller
-      const callerLine = lines.find(line =>
-        (line.includes('.tsx') || line.includes('.ts')) &&
-        !line.includes('logger.ts') && 
-        !line.includes('node_modules')
-      );
-
-      if (!callerLine) return undefined;
-
-      const match = callerLine.match(/at\s+(.+)\s+\((.+):(\d+):\d+\)/);
-      if (match) {
-        return {
-          function: match[1],
-          file: match[2],
-          line: parseInt(match[3], 10),
-        };
-      }
-    } catch {
-      // Ignore source info errors
-    }
-    return undefined;
-  }
-
-  /**
    * Format error for logging
    */
   private formatError(error: unknown): LogEntry['error'] | undefined {
@@ -272,7 +221,7 @@ class EnterpriseLogger {
    * Create structured log entry
    */
   private createLogEntry(
-    level: LogLevel,
+    level: EmittedLevel,
     message: string,
     metadata?: Record<string, unknown>,
     error?: unknown
@@ -285,7 +234,6 @@ class EnterpriseLogger {
       metadata: metadata ? this.sanitizeMetadata(metadata) : undefined,
       error: this.formatError(error),
       performance: this.getPerformanceMetrics(),
-      source: this.getSourceInfo(),
     };
   }
 
@@ -293,11 +241,8 @@ class EnterpriseLogger {
    * Output log entry
    */
   private output(entry: LogEntry): void {
-    if (!this.shouldLog(entry.level)) return;
-
     if (this.config.enableConsole) {
-      const consoleMethod = entry.level === 'fatal' ? 'error' : entry.level;
-      const method = console[consoleMethod] || console.log;
+      const method = console[entry.level] || console.log;
 
       if (this.config.enableStructured) {
         method(JSON.stringify(entry, null, 2));
@@ -326,16 +271,14 @@ class EnterpriseLogger {
     // - File-based logging for server environments
   }
 
-  // Public logging methods
-  trace(message: string, metadata?: Record<string, unknown>): void {
-    this.output(this.createLogEntry('trace', message, metadata));
-  }
-
+  // Public logging methods (the level check runs before any entry is built)
   debug(message: string, metadata?: Record<string, unknown>): void {
+    if (!this.shouldLog('debug')) return;
     this.output(this.createLogEntry('debug', message, metadata));
   }
 
   info(message: string, metadata?: Record<string, unknown>): void {
+    if (!this.shouldLog('info')) return;
     this.output(this.createLogEntry('info', message, metadata));
   }
 
@@ -344,6 +287,7 @@ class EnterpriseLogger {
   warn(message: string, error: unknown): void;
   warn(message: string, metadata: Record<string, unknown>, error?: unknown): void;
   warn(message: string, metadataOrError?: Record<string, unknown> | unknown, error?: unknown): void {
+    if (!this.shouldLog('warn')) return;
     // No second argument - simple message only
     if (metadataOrError === undefined) {
       this.output(this.createLogEntry('warn', message));
@@ -363,6 +307,7 @@ class EnterpriseLogger {
   error(message: string, error: unknown): void;
   error(message: string, metadata: Record<string, unknown>, error?: unknown): void;
   error(message: string, metadataOrError?: Record<string, unknown> | unknown, error?: unknown): void {
+    if (!this.shouldLog('error')) return;
     // No second argument - simple message only
     if (metadataOrError === undefined) {
       this.output(this.createLogEntry('error', message));
@@ -377,65 +322,6 @@ class EnterpriseLogger {
     }
   }
 
-  fatal(message: string, metadata?: Record<string, unknown>, error?: unknown): void {
-    this.output(this.createLogEntry('fatal', message, metadata, error));
-  }
-
-  /**
-   * Performance timing helper
-   */
-  time<T>(label: string, fn: () => T): T;
-  time<T>(label: string, fn: () => Promise<T>): Promise<T>;
-  time<T>(label: string, fn: () => T | Promise<T>): T | Promise<T> {
-    const start = performance.now();
-    
-    const logTiming = (duration: number) => {
-      this.info(`Performance: ${label}`, { 
-        performance: { duration: Math.round(duration * 100) / 100 },
-        operation: label,
-      });
-    };
-
-    try {
-      const result = fn();
-      
-      if (result instanceof Promise) {
-        return result
-          .then(value => {
-            logTiming(performance.now() - start);
-            return value;
-          })
-          .catch(error => {
-            logTiming(performance.now() - start);
-            this.error(`Performance: ${label} (failed)`, { 
-              performance: { duration: Math.round((performance.now() - start) * 100) / 100 },
-              operation: label,
-            }, error);
-            throw error;
-          });
-      } else {
-        logTiming(performance.now() - start);
-        return result;
-      }
-    } catch (error) {
-      logTiming(performance.now() - start);
-      this.error(`Performance: ${label} (failed)`, { 
-        performance: { duration: Math.round((performance.now() - start) * 100) / 100 },
-        operation: label,
-      }, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Create child logger with additional context
-   */
-  child(context: Partial<LogContext>): EnterpriseLogger {
-    const childLogger = new EnterpriseLogger(this.config);
-    const currentContext = this.getContext() || { correlationId: this.generateCorrelationId() };
-    childLogger.setContext({ ...currentContext, ...context });
-    return childLogger;
-  }
 }
 
 // Export singleton instance

@@ -5,21 +5,11 @@ export const MAP_DEFAULTS = {
   HEIGHT: {
     DEFAULT: '400px',
     COMPACT: '260px', 
-    LARGE: '500px',
     BOOKING: '260px',
-  APARTMENT_PAGE: '500px'
   },
-  
-  // Standard zoom levels
-  ZOOM: {
-    DEFAULT: 13,
-    CLOSE: 15,
-    OVERVIEW: 12
-  }
 } as const;
 
 export const MAP_CSS_CLASSES = {
   LOADING_CONTAINER: 'surface-subtle rounded-lg flex items-center justify-center',
   LOADING_TEXT: 'text-subtle text-sm',
-  MAP_CONTAINER: 'rounded-xl overflow-hidden shadow-lg'
 } as const;

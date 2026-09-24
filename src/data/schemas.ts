@@ -42,22 +42,12 @@ export const ItemSchema = z.object({
   directionsUrl: z.string().url().optional(),
   reservationUrl: z.string().url().optional(),
   sourceUrls: z.array(z.string().url()).optional(),
-  priceLevel: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]).optional(),
   rating: z.number().min(0).max(5).optional(),
   tags: z.array(z.string()).optional(),
   icon: z.string().optional(),
   image: z.string().optional(),
   heroImage: z.string().optional(),
   heroImagePosition: z.string().optional(),
-  hours: z
-    .array(
-      z.object({
-        day: z.string(),
-        open: z.string(),
-        close: z.string(),
-      })
-    )
-    .optional(),
   featured: z.boolean().optional(),
   slug: z.string().optional(),
   updatedAt: z.string().datetime().optional(),

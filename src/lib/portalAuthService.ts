@@ -111,8 +111,7 @@ export async function prepareBookingClaimExchange(
 }
 
 export async function consumeBookingClaimGrant(input: {
-  token?: string;
-  tokenDigest?: string;
+  tokenDigest: string;
   phone: string;
   origin: Origin;
   password: string;
@@ -122,12 +121,7 @@ export async function consumeBookingClaimGrant(input: {
   const normalized = normalizePhone(input.phone, input.origin);
   if (!normalized) throw new PortalAuthError('INVALID_CLAIM');
 
-  const hasRawToken = typeof input.token === 'string';
-  const hasTokenDigest = typeof input.tokenDigest === 'string';
-  if (hasRawToken === hasTokenDigest) throw new PortalAuthError('INVALID_CLAIM');
-  const tokenDigest = hasTokenDigest
-    ? input.tokenDigest!
-    : digestClaimToken(input.token!.trim());
+  const { tokenDigest } = input;
   if (!/^[a-f0-9]{64}$/u.test(tokenDigest)) throw new PortalAuthError('INVALID_CLAIM');
   const newPasswordHash = await bcrypt.hash(input.password, BCRYPT_ROUNDS);
   const now = new Date();

@@ -3,6 +3,8 @@ FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb
 ARG NEXT_PUBLIC_SITE_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
+# The browser is only needed by the optional local audit scripts, never by the image.
+ENV PUPPETEER_SKIP_DOWNLOAD=1
 WORKDIR /app
 
 RUN case "$NEXT_PUBLIC_SITE_URL" in https://*) ;; *) echo 'NEXT_PUBLIC_SITE_URL HTTPS build argument is required' >&2; exit 1 ;; esac

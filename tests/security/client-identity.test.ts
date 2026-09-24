@@ -3,10 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   CLIENT_IDENTITY_UNAVAILABLE,
-  canonicalizeClientIp,
   createClientIdentityUnavailableResponse,
   requireCanonicalClientIp,
 } from '@/lib/net/clientIdentity';
+import { canonicalizeClientIp } from '@/lib/net/getClientIp';
 
 describe('canonical client identity', () => {
   const secret = '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2';

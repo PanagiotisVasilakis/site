@@ -23,8 +23,8 @@ export interface GuestSessionPayload extends JwtPayload {
   booking?: { id?: string };
 }
 
-const COOKIE_NAME = 'guest_session';
-const REFRESH_COOKIE = 'guest_rt';
+export const GUEST_SESSION_COOKIE = 'guest_session';
+export const GUEST_REFRESH_COOKIE = 'guest_rt';
 let generatedDevSecret: string | null = null;
 
 function getGuestJwtSecret(): string {
@@ -91,7 +91,7 @@ export function parseGuestSessionBinding(
 async function getGuestSessionFromCookies(): Promise<GuestSessionPayload | null> {
   try {
     const jar = await cookies();
-    const token = jar.get(COOKIE_NAME)?.value;
+    const token = jar.get(GUEST_SESSION_COOKIE)?.value;
     return parseGuestSession(token || null);
   } catch (error) {
     logger.warn('Failed to get guest session from cookies', { error });
@@ -167,69 +167,45 @@ export async function getVerifiedGuestSessionFromCookies(): Promise<GuestSession
   return verifyGuestSessionAccess(await getGuestSessionFromCookies());
 }
 
-export async function revokeGuestSession(session: GuestSessionPayload | null | undefined): Promise<void> {
-  await revokeGuestSessionById(session?.sid);
-}
-
 export async function revokeGuestSessionById(sessionId: string | undefined): Promise<void> {
   if (!sessionId) return;
   const { refreshTokenRepository } = await import('@/lib/prisma-repositories/refreshTokenRepository');
   await refreshTokenRepository.revokeAuthorizationForSession(sessionId);
 }
 
-export function createSessionCookie(token: string): { name: string; value: string; options: { httpOnly: boolean; sameSite: 'lax'; secure: boolean; path: string; maxAge: number } } {
+type GuestCookie = {
+  name: string;
+  value: string;
+  options: { httpOnly: boolean; sameSite: 'lax'; secure: boolean; path: string; maxAge: number };
+};
+
+function guestCookie(name: string, value: string, maxAge: number): GuestCookie {
   return {
-    name: COOKIE_NAME,
-    value: token,
+    name,
+    value,
     options: {
       httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
       path: '/',
-      maxAge: 60 * 60 * 2, // 2h
+      maxAge,
     },
   };
 }
 
-export function clearSessionCookie(): { name: string; value: string; options: { httpOnly: boolean; sameSite: 'lax'; secure: boolean; path: string; maxAge: number } } {
-  return {
-    name: COOKIE_NAME,
-    value: '',
-    options: {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-      maxAge: 0,
-    },
-  };
+export function createSessionCookie(token: string): GuestCookie {
+  return guestCookie(GUEST_SESSION_COOKIE, token, GUEST_SESSION_TTL_SECONDS);
+}
+
+export function clearSessionCookie(): GuestCookie {
+  return guestCookie(GUEST_SESSION_COOKIE, '', 0);
 }
 
 // Refresh cookie helpers
-export function createRefreshCookie(token: string, maxAgeDays = 7): { name: string; value: string; options: { httpOnly: boolean; sameSite: 'lax'; secure: boolean; path: string; maxAge: number } } {
-  return {
-    name: REFRESH_COOKIE,
-    value: token,
-    options: {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-      maxAge: maxAgeDays * 24 * 60 * 60, // seconds
-    },
-  };
+export function createRefreshCookie(token: string, maxAgeDays = 7): GuestCookie {
+  return guestCookie(GUEST_REFRESH_COOKIE, token, maxAgeDays * 24 * 60 * 60);
 }
 
-export function clearRefreshCookie(): { name: string; value: string; options: { httpOnly: boolean; sameSite: 'lax'; secure: boolean; path: string; maxAge: number } } {
-  return {
-    name: REFRESH_COOKIE,
-    value: '',
-    options: {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-      maxAge: 0,
-    },
-  };
+export function clearRefreshCookie(): GuestCookie {
+  return guestCookie(GUEST_REFRESH_COOKIE, '', 0);
 }

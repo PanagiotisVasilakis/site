@@ -386,7 +386,7 @@ async function run() {
             formFactor: profile.id,
             screenEmulation: profile.screenEmulation,
             emulatedUserAgent: true,
-            throttlingMethod: 'simulate',
+            throttlingMethod: 'simulate' as const,
             throttling: profile.throttling,
             onlyCategories: ['performance'],
           },
@@ -402,6 +402,7 @@ async function run() {
             },
             config,
           );
+          if (!result) throw new Error('Lighthouse returned no result');
 
           const lhr = result.lhr;
           const score = Math.round((lhr.categories?.performance?.score ?? 0) * 100);

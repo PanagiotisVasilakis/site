@@ -75,6 +75,8 @@ vi.mock('@/lib/guestDataStore', () => ({
 }));
 
 vi.mock('@/lib/guestSession', () => ({
+  GUEST_REFRESH_COOKIE: 'guest_rt',
+  GUEST_SESSION_COOKIE: 'guest_session',
   clearRefreshCookie: vi.fn(),
   clearSessionCookie: vi.fn(),
   createRefreshCookie: vi.fn(),

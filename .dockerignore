@@ -21,7 +21,6 @@ analytics-data.json.tmp
 analytics-ratelimit.json
 analytics-ratelimit.json.tmp
 axe-a11y-report*.json
-axe-contrast-report*.json
 *.tsbuildinfo
 next-env.d.ts
 *.log
@@ -39,3 +38,9 @@ public/precache.json
 public/critical-precache.json
 public/version.json
 tmp
+
+# Local agent and review files
+.claude/
+CLAUDE.md
+PROGRESS.md
+REVIEW.md

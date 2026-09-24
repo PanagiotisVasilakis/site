@@ -15,7 +15,6 @@ export default function PwaManager() {
       }
     const eventController = new AbortController();
     const { signal } = eventController;
-  try { document.documentElement.lang = document.documentElement.getAttribute('lang') || 'en'; } catch (err) { logger.warn('Set document lang failed', err instanceof Error ? err : { error: String(err) }); }
     // SW registration & update banner
     if ('serviceWorker' in navigator) {
       const registerServiceWorker = async () => {
