@@ -13,23 +13,29 @@ export interface HouseDictionary {
     navLabel: string;
     title: string;
     intro: string;
-    guideTitle?: string;
-    photoAlts?: { living: string; bedroom: string; bedroom_2?: string; kitchen: string; balcony?: string; bathroom?: string; };
-    glanceTitle?: string;
-    specs?: string[];
-    ctaPrimary?: string;
-    ctaSecondary?: string;
-    rooms?: Partial<Record<'living_room' | 'kitchen' | 'bedroom' | 'balcony' | 'bathroom', { title?: string; description?: string }>>;
-    photoViewer?: {
-        instructions?: string;
-        counter?: string;
-        prev?: string;
-        next?: string;
-        close?: string;
-        resetZoom?: string;
+    guideTitle: string;
+    photoAlts: { living: string; bedroom: string; bedroom_2: string; kitchen: string; balcony: string; bathroom: string; };
+    glanceTitle: string;
+    specs: string[];
+    ctaPrimary: string;
+    ctaSecondary: string;
+    footerNote: string;
+    heroLabel: string;
+    specsSectionLabel: string;
+    /** `{label}` is the room title (lower-cased in English). */
+    openGallery: string;
+    rooms: Record<'living_room' | 'kitchen' | 'bedroom' | 'bedroom_2' | 'balcony' | 'bathroom', { title: string; description: string }>;
+    photoViewer: {
+        instructions: string;
+        counter: string;
+        prev: string;
+        next: string;
+        close: string;
+        resetZoom: string;
+        title: string;
+        /** `{current}` and `{total}` are replaced. */
+        thumbnail: string;
     };
-    // Index signature for extensibility (used by ApartmentCinematic)
-    [k: string]: unknown;
 }
 
 export interface LocationPanelDictionary {
@@ -38,10 +44,10 @@ export interface LocationPanelDictionary {
     city: string;
     blurb: string;
     nearby: string;
-    locationDescription?: string;
-    locationTitle?: string;
-    highlights?: Array<{
-        icon?: string;
+    locationDescription: string;
+    locationTitle: string;
+    highlights: Array<{
+        icon: string;
         title: string;
         description: string;
     }>;
@@ -69,6 +75,10 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
         ],
         ctaPrimary: "Book",
         ctaSecondary: "Contact Us",
+        footerNote: "© Kalamata Apartment",
+        heroLabel: "Apartment hero",
+        specsSectionLabel: "Specifications and actions",
+        openGallery: "Open {label} gallery",
         guideTitle: "Your Apartment Guide",
         photoAlts: { living: 'Living area', bedroom: 'Bedroom', bedroom_2: 'Second bedroom', kitchen: 'Kitchen', balcony: 'Balcony', bathroom: 'Bathroom' },
         rooms: {
@@ -83,6 +93,10 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
             bedroom: {
                 title: "Bedroom",
                 description: "A calming retreat with plush bedding, blackout shades, and built-in storage for long stays."
+            },
+            bedroom_2: {
+                title: "Second Bedroom",
+                description: "Comfortable second bedroom with ample space, perfect for families or groups."
             },
             balcony: {
                 title: "Balcony",
@@ -99,7 +113,9 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
             prev: "Previous image",
             next: "Next image",
             close: "Close viewer",
-            resetZoom: "Reset Zoom"
+            resetZoom: "Reset Zoom",
+            title: "Photo viewer",
+            thumbnail: "View image {current} of {total}"
         },
     },
     el: {
@@ -117,6 +133,10 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
         ],
         ctaPrimary: "Κράτηση",
         ctaSecondary: "Επικοινωνία",
+        footerNote: "© Διαμέρισμα Καλαμάτας",
+        heroLabel: "Εικόνα διαμερίσματος",
+        specsSectionLabel: "Προδιαγραφές και ενέργειες",
+        openGallery: "Άνοιγμα γκαλερί {label}",
         guideTitle: "Ο Οδηγός του Διαμερίσματός σας",
         photoAlts: { living: 'Καθιστικό', bedroom: 'Υπνοδωμάτιο', bedroom_2: 'Δεύτερο υπνοδωμάτιο', kitchen: 'Κουζίνα', balcony: 'Μπαλκόνι', bathroom: 'Μπάνιο' },
         rooms: {
@@ -131,6 +151,10 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
             bedroom: {
                 title: "Υπνοδωμάτιο",
                 description: "Ήρεμο δωμάτιο με αναπαυτικό στρώμα, συσκότιση και ευρύχωρες ντουλάπες για μεγαλύτερες διαμονές."
+            },
+            bedroom_2: {
+                title: "Δεύτερο Υπνοδωμάτιο",
+                description: "Άνετο δεύτερο υπνοδωμάτιο με ευρύχωρο χώρο, ιδανικό για οικογένειες ή παρέες."
             },
             balcony: {
                 title: "Μπαλκόνι",
@@ -147,7 +171,9 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
             prev: "Προηγούμενη εικόνα",
             next: "Επόμενη εικόνα",
             close: "Κλείσιμο προβολής",
-            resetZoom: "Επαναφορά ζουμ"
+            resetZoom: "Επαναφορά ζουμ",
+            title: "Προβολή φωτογραφιών",
+            thumbnail: "Προβολή εικόνας {current} από {total}"
         },
     },
 };

@@ -13,43 +13,45 @@ export interface CommonDictionary {
     appTitle: string;
     homeTitle: string;
     homeSubtitle: string;
+    homeSubline: string;
+    homeFeaturesLabel: string;
     backHome: string;
-    skipLink?: string;
-    bookingDetails?: string;
-    aboutUs?: string;
+    skipLink: string;
+    bookingDetails: string;
+    aboutUs: string;
     emptyState: string;
-    updates?: {
+    updates: {
         updateAvailable: string;
         refresh: string;
         dismiss: string;
         fromTo: string;
         assetsFromTo: string;
     };
-    search?: {
+    search: {
         addDates: string;
-        arrivalLabel?: string;
-        arrivalPlaceholder?: string;
-        departureLabel?: string;
-        departurePlaceholder?: string;
-        checkAvailability?: string;
+        arrivalLabel: string;
+        arrivalPlaceholder: string;
+        departureLabel: string;
+        departurePlaceholder: string;
+        checkAvailability: string;
     };
-    ui?: {
+    ui: {
         map: string;
         list: string;
         resetAll: string;
-        back?: string;
-        signIn?: string;
-        signOut?: string;
-        menu?: string;
-        closeMenu?: string;
-        guestGuide?: string;
-        preferences?: string;
-        lightMode?: string;
-        darkMode?: string;
-        primaryNavigation?: string;
-        yourStay?: string;
-        explore?: string;
-        account?: string;
+        back: string;
+        signIn: string;
+        signOut: string;
+        menu: string;
+        closeMenu: string;
+        guestGuide: string;
+        preferences: string;
+        lightMode: string;
+        darkMode: string;
+        primaryNavigation: string;
+        yourStay: string;
+        explore: string;
+        account: string;
     };
     cta: {
         call: string;
@@ -58,74 +60,73 @@ export interface CommonDictionary {
         reserve: string;
         home: string;
     };
-    labels?: {
-        updated?: string;
-        save?: string;
-        saved?: string;
-        favorites?: string;
-        networkOnline?: string;
-        networkOffline?: string;
-        networkSlow?: string;
-        networkReconnected?: string;
-        syncPending?: string;
-        syncIdle?: string;
-        rating?: string;
-        addedFavorite?: string;
-        removedFavorite?: string;
-        addFavorite?: string;
-        removeFavorite?: string;
-        share?: string;
-        contentUpdating?: string;
+    labels: {
+        updated: string;
+        save: string;
+        saved: string;
+        favorites: string;
+        networkOnline: string;
+        networkOffline: string;
+        networkSlow: string;
+        networkReconnected: string;
+        rating: string;
+        addedFavorite: string;
+        removedFavorite: string;
+        addFavorite: string;
+        removeFavorite: string;
+        share: string;
+        contentUpdating: string;
     };
-    a11y?: {
-        placeDetails?: string;
-        viewDetailsFor?: string;
-        openMapFor?: string;
-        switchToLight?: string;
-        switchToDark?: string;
-        toggleColorScheme?: string;
-        addNamedFavorite?: string;
-        removeNamedFavorite?: string;
+    a11y: {
+        placeDetails: string;
+        viewDetailsFor: string;
+        openMapFor: string;
+        switchToLight: string;
+        switchToDark: string;
+        toggleColorScheme: string;
+        addNamedFavorite: string;
+        removeNamedFavorite: string;
     };
-    datePicker?: {
-        calendar?: string;
-        clearSelected?: string;
-        clearDates?: string;
-        prevMonth?: string;
-        nextMonth?: string;
-        selectDates?: string;
-        applyDates?: string;
-        applyRange?: string;
-        rangePicker?: string;
+    datePicker: {
+        calendar: string;
+        clearDates: string;
+        prevMonth: string;
+        nextMonth: string;
+        selectDates: string;
+        applyDates: string;
+        applyRange: string;
+        rangePicker: string;
     };
-    momentTags?: Record<string, string>;
-    moments?: {
-        searchAndFilter?: string;
-        searchMoments?: string;
-        searchPlaceholder?: string;
-        noPlaces?: string;
-        clearSearch?: string;
-        filterByCategory?: string;
-        mapCaption?: string;
-        subtitle?: string;
+    momentTags: Record<string, string>;
+    moments: {
+        searchAndFilter: string;
+        searchMoments: string;
+        searchPlaceholder: string;
+        noPlaces: string;
+        clearSearch: string;
+        filterByCategory: string;
+        mapCaption: string;
+        subtitle: string;
     };
-    errors?: {
-        title?: string;
-        tryAgain?: string;
-        contactSupport?: string;
-        somethingWentWrong?: string;
-        unexpectedError?: string;
+    errors: {
+        title: string;
+        tryAgain: string;
+        contactSupport: string;
+        somethingWentWrong: string;
+        unexpectedError: string;
+        notFoundTitle: string;
+        notFoundBody: string;
     };
-    a2hs?: {
-        message?: string;
-        close?: string;
-        region?: string;
+    a2hs: {
+        message: string;
+        close: string;
+        region: string;
     };
     categories: {
         phones: string;
         moments: string;
     };
-    momentsFilters?: {
+    momentsFilters: {
         all: string;
         beaches: string;
         museums: string;
@@ -136,13 +137,13 @@ export interface CommonDictionary {
         sites: string;
         nearby: string;
     };
-    map?: {
+    map: {
         loading: string;
         apartmentMarkerTitle: string;
         viewDetails: string;
         deferredInteractiveLabel: string;
         travelPrompt: string;
-        openMap?: string;
+        openMap: string;
         loadMap: string;
         address: string;
         phone: string;
@@ -169,6 +170,8 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
         appTitle: "Guest Guide",
         homeTitle: "Dolce Far Niente",
         homeSubtitle: "Experience the sweet art of relaxation in a haven where you feel instantly at home.",
+        homeSubline: "Luxury apartment in Kalamata, Greece",
+        homeFeaturesLabel: "Guest guide shortcuts",
         backHome: "← Back home",
         skipLink: "Skip to content",
         bookingDetails: "Booking Details",
@@ -223,8 +226,6 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             networkOffline: "Offline",
             networkSlow: "Your connection is slow",
             networkReconnected: "Reconnected",
-            syncPending: "Syncing...",
-            syncIdle: "Up to date",
             rating: "{value} rating",
             addedFavorite: "Added to favorites",
             removedFavorite: "Removed from favorites",
@@ -245,7 +246,6 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
         },
         datePicker: {
             calendar: "Date picker calendar",
-            clearSelected: "Clear selected dates",
             clearDates: "Clear dates",
             prevMonth: "Previous month",
             nextMonth: "Next month",
@@ -299,7 +299,9 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             tryAgain: "Try again",
             contactSupport: "Contact support",
             somethingWentWrong: "Something went wrong",
-            unexpectedError: "An unexpected error occurred. You can try to recover."
+            unexpectedError: "An unexpected error occurred. You can try to recover.",
+            notFoundTitle: "Page not found",
+            notFoundBody: "This page does not exist or has moved. The guide's home page has everything for your stay."
         },
         a2hs: {
             message: "Add to Home Screen: Share → Add to Home Screen",
@@ -316,7 +318,7 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             museums: "Museums",
             restaurants: "Restaurants",
             bars: "Bars",
-            brunchs: "Brunchs",
+            brunchs: "Brunch",
             taygetos: "Taygetos",
             sites: "Sites",
             nearby: "Nearby",
@@ -348,6 +350,8 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
         appTitle: "Οδηγός Επισκεπτών",
         homeTitle: "Dolce Far Niente",
         homeSubtitle: "Ζήστε τη γλυκιά τέχνη της χαλάρωσης, σε ένα καταφύγιο που νιώθετε αμέσως σαν το σπίτι σας.",
+        homeSubline: "Πολυτελές διαμέρισμα στην Καλαμάτα",
+        homeFeaturesLabel: "Βασικές επιλογές οδηγού επισκέπτη",
         backHome: "← Πίσω στην αρχική",
         skipLink: "Μετάβαση στο περιεχόμενο",
         bookingDetails: "Στοιχεία Κράτησης",
@@ -402,8 +406,6 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             networkOffline: "Εκτός σύνδεσης",
             networkSlow: "Η σύνδεσή σας είναι αργή",
             networkReconnected: "Επανασυνδέθηκε",
-            syncPending: "Συγχρονισμός...",
-            syncIdle: "Ενημερωμένο",
             rating: "βαθμολογία {value}",
             addedFavorite: "Προστέθηκε στα αγαπημένα",
             removedFavorite: "Αφαιρέθηκε από τα αγαπημένα",
@@ -424,7 +426,6 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
         },
         datePicker: {
             calendar: "Ημερολόγιο επιλογής ημερομηνιών",
-            clearSelected: "Καθαρισμός επιλεγμένων ημερομηνιών",
             clearDates: "Καθαρισμός ημερομηνιών",
             prevMonth: "Προηγούμενος μήνας",
             nextMonth: "Επόμενος μήνας",
@@ -478,7 +479,9 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             tryAgain: "Δοκιμάστε ξανά",
             contactSupport: "Επικοινωνία με υποστήριξη",
             somethingWentWrong: "Κάτι πήγε στραβά",
-            unexpectedError: "Παρουσιάστηκε ένα απροσδόκητο σφάλμα. Μπορείτε να δοκιμάσετε ξανά."
+            unexpectedError: "Παρουσιάστηκε ένα απροσδόκητο σφάλμα. Μπορείτε να δοκιμάσετε ξανά.",
+            notFoundTitle: "Η σελίδα δεν βρέθηκε",
+            notFoundBody: "Αυτή η σελίδα δεν υπάρχει ή έχει μετακινηθεί. Στην αρχική σελίδα του οδηγού θα βρείτε όλα όσα χρειάζεστε για τη διαμονή σας."
         },
         a2hs: {
             message: "Προσθήκη στην Αρχική Οθόνη: Κοινοποίηση → Προσθήκη στην Αρχική Οθόνη",
@@ -487,7 +490,7 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
         },
         categories: {
             phones: "Χρήσιμα Τηλέφωνα",
-            moments: "Η Καλαματα μας",
+            moments: "Η Καλαμάτα μας",
         },
         momentsFilters: {
             all: "Όλα",

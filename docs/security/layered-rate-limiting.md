@@ -27,7 +27,10 @@ state. They rely on the edge/proxy layers, safe caching, and bounded queries.
   and guest authentication, claims, security-relevant refresh context,
   sensitive public writes, and privacy/security writes. Keys use the verified
   ingress identity and context-separated HMACs; raw credentials are never key
-  material. All dimensions are updated in one transaction.
+  material. All dimensions are updated in one transaction. A successful guest
+  sign-in gives back its phone-number attempt (`refundSensitiveIdentifierAttempt`),
+  so only failed attempts count against an account; the client-address
+  dimension keeps counting every attempt.
 
 Confirmed PostgreSQL saturation returns a generic `429`. A PostgreSQL limiter
 failure rolls back all limiter dimensions, returns a generic `503`, and must

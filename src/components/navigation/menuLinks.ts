@@ -5,7 +5,6 @@ export interface MenuLink {
   href: string;
   label: string;
   icon: MenuIconName;
-  event: string;
   group: 'stay' | 'explore';
   featured?: boolean;
 }
@@ -16,21 +15,20 @@ export function buildMenuLinks(
   includeCheckIn: boolean,
 ): MenuLink[] {
   const links: MenuLink[] = [
-    { href: `/${locale}/apartment`, label: dictionary.house?.navLabel ?? dictionary.house?.title ?? 'House Guide', icon: 'gallery', event: 'mobile_nav_house', group: 'stay' },
-    { href: `/${locale}/book`, label: dictionary.cta?.reserve ?? 'Book stay', icon: 'calendar', event: 'mobile_nav_book', group: 'stay', featured: true },
-    { href: `/${locale}/booking-details`, label: dictionary.bookingDetails ?? 'Booking Details', icon: 'booking', event: 'mobile_nav_booking_details', group: 'stay' },
-    { href: `/${locale}/about`, label: dictionary.aboutUs ?? 'About Us', icon: 'about', event: 'mobile_nav_about', group: 'stay' },
-    { href: `/${locale}/favorites`, label: dictionary.labels?.favorites ?? 'Favorites', icon: 'favorite', event: 'mobile_nav_favorites', group: 'explore' },
-    { href: `/${locale}/moments`, label: dictionary.categories?.moments ?? 'Kalamata Moments', icon: 'moments', event: 'mobile_nav_moments', group: 'explore' },
-    { href: `/${locale}/phones`, label: dictionary.categories?.phones ?? 'Important Phones', icon: 'phone', event: 'mobile_nav_phones', group: 'explore' },
+    { href: `/${locale}/apartment`, label: dictionary.house.navLabel, icon: 'gallery', group: 'stay' },
+    { href: `/${locale}/book`, label: dictionary.cta.reserve, icon: 'calendar', group: 'stay', featured: true },
+    { href: `/${locale}/booking-details`, label: dictionary.bookingDetails, icon: 'booking', group: 'stay' },
+    { href: `/${locale}/about`, label: dictionary.aboutUs, icon: 'about', group: 'stay' },
+    { href: `/${locale}/favorites`, label: dictionary.labels.favorites, icon: 'favorite', group: 'explore' },
+    { href: `/${locale}/moments`, label: dictionary.categories.moments, icon: 'moments', group: 'explore' },
+    { href: `/${locale}/phones`, label: dictionary.categories.phones, icon: 'phone', group: 'explore' },
   ];
 
   if (includeCheckIn) {
     links.splice(3, 0, {
       href: `/${locale}/check-in`,
-      label: dictionary.checkin?.navLabel ?? 'Check‑in',
+      label: dictionary.checkin.navLabel,
       icon: 'checkin',
-      event: 'mobile_nav_checkin',
       group: 'stay',
     });
   }

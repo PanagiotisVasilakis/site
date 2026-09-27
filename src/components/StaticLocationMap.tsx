@@ -15,6 +15,7 @@ interface StaticLocationMapProps {
 import { getDictionary } from '@/i18n/dictionaries';
 import { getKalamataLandmarks } from '@/data/mapLocations';
 import type { Locale } from '@/i18n/config';
+import { normalizeLocale } from '@/i18n/config';
 import type { MapMarkerType } from '@/data/mapLocations';
 
 type LocationHighlight = { icon?: string; title: string; description: string };
@@ -43,7 +44,7 @@ export default function StaticLocationMap({
   showHeading = true,
   variant = 'full'
 }: StaticLocationMapProps) {
-  const eff: Locale = locale === 'el' ? 'el' : 'en';
+  const eff: Locale = normalizeLocale(locale);
   const t = getDictionary(eff);
   const lp = t.locationPanel;
   const highlights: LocationHighlight[] = getKalamataLandmarks(eff).map((landmark) => ({
@@ -63,7 +64,7 @@ export default function StaticLocationMap({
       </section>
       {!compact && (
         <section className="rounded-lg border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)] p-4">
-          <div className="text-xs font-semibold text-brand-700 uppercase mb-2">{lp?.nearby}</div>
+          <div className="text-xs font-semibold text-brand-800 uppercase mb-2">{lp?.nearby}</div>
           {highlights.length > 0 ? (
             <ul className="space-y-2 text-body list-none m-0 p-0">
               {highlights.map(({ icon, title, description }) => (

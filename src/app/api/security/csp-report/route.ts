@@ -16,16 +16,23 @@ import { ApiError, readJsonBody } from '@/lib/apiErrorHandler';
 import { logger } from '@/lib/logger-enterprise';
 
 const MAX_REPORT_BYTES = 16 * 1_024;
+// Browsers always add `referrer`, `disposition` and `status-code` to report-uri
+// bodies (and `script-sample` with 'report-sample'), so the schema bounds them
+// instead of rejecting the report. Other unknown keys are stripped, never stored.
 const cspReportSchema = z.object({
   'document-uri': z.string().max(2_000).optional(),
+  referrer: z.string().max(2_000).optional(),
   'violated-directive': z.string().max(500).optional(),
   'effective-directive': z.string().max(500).optional(),
   'blocked-uri': z.string().max(2_000).optional(),
   'original-policy': z.string().max(8_000).optional(),
+  disposition: z.enum(['enforce', 'report']).optional(),
+  'status-code': z.number().int().nonnegative().max(999).optional(),
+  'script-sample': z.string().max(256).optional(),
   'source-file': z.string().max(2_000).optional(),
   'line-number': z.number().int().nonnegative().optional(),
   'column-number': z.number().int().nonnegative().optional(),
-}).strict();
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,7 +66,7 @@ export async function POST(request: NextRequest) {
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     if (isClientIdentityUnavailableError(error)) {
-      return createClientIdentityUnavailableResponse();
+      return createClientIdentityUnavailableResponse(error);
     }
     if (error instanceof ApiError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });

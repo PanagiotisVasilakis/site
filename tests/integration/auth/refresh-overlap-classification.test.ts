@@ -330,8 +330,6 @@ async function seedAuthorizationFamilies(
             salt: ROOT_SALT,
             familyId: PRIMARY_FAMILY_ID,
             expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1_000),
-            deviceHint: APPROVED_DEVICE_HASH,
-            ipHint: APPROVED_IP_HASH,
           },
           {
             id: ISOLATED_GENERATION_ID,
@@ -340,8 +338,6 @@ async function seedAuthorizationFamilies(
             salt: ISOLATED_SALT,
             familyId: ISOLATED_FAMILY_ID,
             expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1_000),
-            deviceHint: APPROVED_DEVICE_HASH,
-            ipHint: APPROVED_IP_HASH,
           },
         ],
       });
@@ -393,8 +389,6 @@ async function seedSecondarySameUserFamily(
           salt: SECONDARY_ROOT_SALT,
           familyId: SECONDARY_FAMILY_ID,
           expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1_000),
-          deviceHint: APPROVED_DEVICE_HASH,
-          ipHint: APPROVED_IP_HASH,
         },
       });
     });
@@ -435,8 +429,6 @@ async function advancePrimaryFamilyToGenerationNPlusOne(
           familyId: PRIMARY_FAMILY_ID,
           expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1_000),
           rotatedFromId: ROOT_GENERATION_ID,
-          deviceHint: APPROVED_DEVICE_HASH,
-          ipHint: APPROVED_IP_HASH,
         },
       });
     });

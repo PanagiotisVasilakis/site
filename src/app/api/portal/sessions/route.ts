@@ -4,10 +4,11 @@ import { z } from 'zod';
 import { ApiError, ApiErrorCode, createSuccessResponse, readJsonBody, ValidationError, withErrorHandler } from '@/lib/apiErrorHandler';
 import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import { getFeatureFlagsAsync } from '@/lib/featureFlags';
-import { locales, defaultLocale } from '@/i18n/config';
+import { normalizeLocale } from '@/i18n/config';
 import { PortalAuthError, authenticatePortalUser } from '@/lib/portalAuthService';
 import { attachPortalAuthCookies } from '@/lib/portalAuthHttp';
-import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
+import { checkSensitiveRateLimit, refundSensitiveIdentifierAttempt } from '@/lib/sensitiveRateLimit';
+import { logger } from '@/lib/logger-enterprise';
 import { GUEST_SESSION_COOKIE, parseGuestSession, verifyGuestSessionAccess } from '@/lib/guestSession';
 
 export const dynamic = 'force-dynamic';
@@ -23,10 +24,10 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }
   const session = parseGuestSession(request.cookies.get(GUEST_SESSION_COOKIE)?.value);
-  if (!session || !(await verifyGuestSessionAccess(session))) {
-    throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Guest session required');
-  }
-  return createSuccessResponse({ authenticated: true, bookingId: session.booking_id });
+  const access = session ? await verifyGuestSessionAccess(session) : null;
+  // A status query: "signed out" is a normal answer (every public page asks), not an error.
+  if (!access) return createSuccessResponse({ authenticated: false, bookingId: null });
+  return createSuccessResponse({ authenticated: true, bookingId: access.booking?.id ?? null });
 });
 
 export const POST = withErrorHandler(async (request: NextRequest) => {
@@ -55,9 +56,14 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     }
     throw error;
   }
+  // Only failed attempts count against the phone number; the sign-in has already succeeded,
+  // so a refund failure is logged rather than turned into an error.
+  await refundSensitiveIdentifierAttempt({ scope: 'portal-session', identifier: parsed.data.phone }).catch((error: unknown) => {
+    logger.warn('portal_session.rate_limit_refund_failed', { error: error instanceof Error ? error.name : 'unknown' });
+  });
 
   const lang = request.cookies.get('lang')?.value;
-  const locale = lang && (locales as readonly string[]).includes(lang) ? lang : String(defaultLocale);
+  const locale = normalizeLocale(lang);
   const response = createSuccessResponse({ bookingId: result.bookingId, redirect: `/${locale}/check-in` });
   await attachPortalAuthCookies(request, response, { ...result, remember: parsed.data.remember });
   return response;

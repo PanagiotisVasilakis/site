@@ -7,8 +7,8 @@ import type { Locale } from '@/i18n/config';
 export default function ShareButton({ title, text, className = "", locale = 'en' }: { title: string; text?: string; className?: string; locale?: string }) {
 	const [copied, setCopied] = useState(false);
 	const t = getDictionary(locale as Locale);
-	const copiedLabel = t.checkinInfo?.copied ?? 'Copied';
-	const shareLabel = t.labels?.share ?? 'Share';
+	const copiedLabel = t.checkinInfo.copied;
+	const shareLabel = t.labels.share;
 	const share = async () => {
 		const url = window.location.href;
 		if (navigator.share) {

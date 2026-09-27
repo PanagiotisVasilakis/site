@@ -16,11 +16,11 @@ describe('portal refresh redirect shell', () => {
   it('announces progress and exposes a safe sign-in fallback', async () => {
     render(<PortalRefreshRedirect
       refreshHref="/api/portal/refresh?next=%2Fen%2Fcheck-in"
-      failureHref="/en/guest/sign-in"
+      failureHref="/en/guest?mode=signin"
     />);
     expect(screen.getByRole('heading', { name: 'Refreshing your session' })).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Please wait');
-    expect(screen.getByRole('link', { name: 'Sign in instead' })).toHaveAttribute('href', '/en/guest/sign-in');
+    expect(screen.getByRole('link', { name: 'Sign in instead' })).toHaveAttribute('href', '/en/guest?mode=signin');
     await waitFor(() => expect(refreshPortalSession).toHaveBeenCalledWith(expect.objectContaining({
       refreshHref: '/api/portal/refresh?next=%2Fen%2Fcheck-in',
       baseHref: window.location.href,
@@ -44,7 +44,7 @@ describe('portal refresh redirect shell', () => {
     });
     const { unmount } = render(<PortalRefreshRedirect
       refreshHref="/api/portal/refresh"
-      failureHref="/en/guest/sign-in"
+      failureHref="/en/guest?mode=signin"
     />);
     await waitFor(() => expect(signal).toBeDefined());
     unmount();

@@ -4,6 +4,7 @@ import InteractiveMap from './InteractiveMap';
 import { getKalamataMarkers } from '@/lib/mapUtils';
 import type { MapContentItem } from '@/data/mapLocations';
 import type { Locale } from '@/i18n/config';
+import { normalizeLocale } from '@/i18n/config';
 
 interface ApartmentLocationMapProps {
   locale: string;
@@ -24,7 +25,7 @@ export default function ApartmentLocationMap({
   includeLandmarks = true,
   activation = 'viewport'
 }: ApartmentLocationMapProps) {
-  const effLocale: Locale = locale === 'el' ? 'el' : 'en';
+  const effLocale: Locale = normalizeLocale(locale);
   const markers = useMemo(
     () => getKalamataMarkers(effLocale, contentItems, { includeLandmarks }),
     [contentItems, effLocale, includeLandmarks]

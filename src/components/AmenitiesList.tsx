@@ -36,7 +36,7 @@ export default function AmenitiesList({
       {hasMore && (
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:text-brand-700 transition-colors"
+          className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:text-brand-900 transition-colors"
           aria-expanded={isExpanded}
         >
           {isExpanded ? (

@@ -10,15 +10,13 @@ import {
 import { momentsLayoutConfig } from '@/config/momentsLayoutConfig';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
+import { filterBySearchText } from '@/lib/searchText';
+import MapLoadingSkeleton from '@/components/MapLoadingSkeleton';
 
 // Dynamic import for map component - only loads when needed
 const ApartmentLocationMap = dynamic(() => import('@/components/ApartmentLocationMap'), {
   ssr: false,
-  loading: () => (
-    <div className="h-[400px] surface-subtle rounded-lg flex items-center justify-center">
-      <div className="text-sm text-subtle">Loading map...</div>
-    </div>
-  )
+  loading: () => <MapLoadingSkeleton height="400px" />,
 });
 
 interface Item {
@@ -49,15 +47,15 @@ interface Props {
   categorySlug: string;
   phonesLayout?: boolean;
   momentsLayout?: boolean;
-  ui?: { map: string; list: string; resetAll: string; };
-  cardLabels?: {
+  ui: { map: string; list: string; resetAll: string; };
+  cardLabels: {
     viewDetails: string;
     back: string;
     call: string;
     directions: string;
     website: string;
   };
-  momentsFilters?: { all: string; beaches: string; museums: string; restaurants: string; bars: string; brunchs: string; taygetos: string; sites: string; nearby: string; };
+  momentsFilters: { all: string; beaches: string; museums: string; restaurants: string; bars: string; brunchs: string; taygetos: string; sites: string; nearby: string; };
 }
 
 
@@ -96,20 +94,10 @@ function CategoryGridClientComponent({ items, locale, categorySlug, ui, cardLabe
   useEffect(() => {
     if (!availableMomentsFilters.includes(momentsFilter)) setMomentsFilter('all');
   }, [availableMomentsFilters, momentsFilter]);
-  const momentsFiltered = useMemo(() => {
-    const query = momentsSearch.trim().toLowerCase();
-    if (!query) return momentsCategoryFiltered;
-
-    return momentsCategoryFiltered.filter(item => {
-      const haystack = [
-        item.name,
-        item.summary,
-        item.description,
-      ].filter(Boolean).join(' ').toLowerCase();
-
-      return haystack.includes(query);
-    });
-  }, [momentsCategoryFiltered, momentsSearch]);
+  const momentsFiltered = useMemo(
+    () => filterBySearchText(momentsCategoryFiltered, momentsSearch),
+    [momentsCategoryFiltered, momentsSearch],
+  );
   const renderMomentCard = (i: Item, index: number) => (
     <MomentCard
       key={i.id}
@@ -146,8 +134,8 @@ function CategoryGridClientComponent({ items, locale, categorySlug, ui, cardLabe
       onFilterChange={setMomentsFilter}
       showMap={showMap}
       onMapToggle={() => setShowMap(m => !m)}
-      mapLabel={ui?.map || 'Map'}
-      listLabel={ui?.list || 'List'}
+      mapLabel={ui.map}
+      listLabel={ui.list}
       searchAndFilterLabel={t.moments?.searchAndFilter}
       searchMomentsLabel={t.moments?.searchMoments}
       searchPlaceholder={t.moments?.searchPlaceholder}
@@ -177,7 +165,7 @@ function CategoryGridClientComponent({ items, locale, categorySlug, ui, cardLabe
           {momentsFiltered.length === 0 && (
             <EmptyState
               message={t.moments?.noPlaces}
-              clearLabel={momentsFilter !== 'all' ? (ui?.resetAll || 'Reset all') : t.moments?.clearSearch}
+              clearLabel={momentsFilter !== 'all' ? ui.resetAll : t.moments?.clearSearch}
               onClear={(momentsSearch || momentsFilter !== 'all') ? () => {
                 setMomentsSearch('');
                 setMomentsFilter('all');
@@ -198,13 +186,13 @@ function CategoryGridClientComponent({ items, locale, categorySlug, ui, cardLabe
               contentItems={momentsFiltered.map((item) => ({ item, categorySlug }))}
             />
             <p className="moments-map-caption">
-              {(t.moments?.mapCaption ?? 'Apartment location and nearby {category}. Zoom and click markers for details.').replace('{category}', categoryLabel)}
+              {(t.moments.mapCaption).replace('{category}', categoryLabel)}
             </p>
           </div>
           {momentsFiltered.length === 0 && (
             <EmptyState
               message={t.moments?.noPlaces}
-              clearLabel={momentsFilter !== 'all' ? (ui?.resetAll || 'Reset all') : t.moments?.clearSearch}
+              clearLabel={momentsFilter !== 'all' ? ui.resetAll : t.moments?.clearSearch}
               onClear={(momentsSearch || momentsFilter !== 'all') ? () => {
                 setMomentsSearch('');
                 setMomentsFilter('all');

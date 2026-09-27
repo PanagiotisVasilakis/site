@@ -5,22 +5,24 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 
 import ErrorSummary from '@/components/ErrorSummary';
 import { isGuestFormValid, type GuestMode, type GuestOrigin } from '@/components/guest/guestValidation';
-import type { Locale } from '@/i18n/config';
+import { normalizeLocale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
+import { GUEST_TERMS_TEXT } from '@/lib/guestTermsText';
 import internalFetch from '@/lib/internalFetchClient';
 import { emitGuestSessionChanged } from '@/lib/sessionSignals';
-import { tracker } from '@/lib/tracker';
 import { mapApiErrorToUI } from '@/lib/userFacingErrors';
 
 export default function UnifiedGuestClient() {
   const params = useParams() as { locale?: string };
-  const locale = (params.locale === 'el' ? 'el' : 'en') as Locale;
+  const locale = normalizeLocale(params.locale);
   const dictionary = getDictionary(locale).portal;
   const router = useRouter();
   const search = useSearchParams();
   const searchKey = search.toString();
   const initialMode: GuestMode = search.get('mode') === 'signup' ? 'signup' : 'signin';
-  const initialFlash = search.get('flash')?.trim().slice(0, 300) || '';
+  // `?flash=` carries a message code, never text: only known codes are shown.
+  const flashCode = search.get('flash');
+  const flashMessage = flashCode === 'session_required' ? dictionary?.errors?.sessionRequired : undefined;
   const syncingFromUrlRef = useRef(false);
 
   const [mode, setMode] = useState<GuestMode>(initialMode);
@@ -33,7 +35,7 @@ export default function UnifiedGuestClient() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState<{ summary: string; details?: string[] } | null>(
-    initialFlash ? { summary: initialFlash } : null,
+    flashMessage ? { summary: flashMessage } : null,
   );
 
   const valid = useMemo(() => isGuestFormValid(mode, {
@@ -43,10 +45,6 @@ export default function UnifiedGuestClient() {
     password,
     acceptTerms,
   }), [acceptTerms, claimToken, mode, origin, password, phone]);
-
-  useEffect(() => {
-    tracker.portalOpened('unified');
-  }, []);
 
   useEffect(() => {
     const current = new URL(window.location.href);
@@ -66,8 +64,18 @@ export default function UnifiedGuestClient() {
   useEffect(() => {
     syncingFromUrlRef.current = true;
     setMode(initialMode);
-    setSubmitError(initialFlash ? { summary: initialFlash } : null);
-  }, [initialFlash, initialMode, searchKey]);
+  }, [initialMode, searchKey]);
+
+  // Show a flash message once, then drop it from the URL so a mode change or a
+  // reload does not bring it back.
+  useEffect(() => {
+    if (!flashCode) return;
+    setSubmitError(flashMessage ? { summary: flashMessage } : null);
+    const nextSearch = new URLSearchParams(searchKey);
+    nextSearch.delete('flash');
+    const query = nextSearch.toString();
+    router.replace(`/${locale}/guest${query ? `?${query}` : ''}`, { scroll: false });
+  }, [flashCode, flashMessage, locale, router, searchKey]);
 
   useEffect(() => {
     if (syncingFromUrlRef.current) {
@@ -80,7 +88,6 @@ export default function UnifiedGuestClient() {
     if (nextSearch.get('mode') === mode) return;
     nextSearch.set('mode', mode);
     router.replace(`/${locale}/guest?${nextSearch.toString()}`, { scroll: false });
-    tracker.authModeChanged(mode);
   }, [locale, mode, router, searchKey]);
 
   function changeMode(nextMode: GuestMode) {
@@ -121,18 +128,20 @@ export default function UnifiedGuestClient() {
       const json = await response.json().catch(() => null);
       if (!response.ok) {
         const mapped = mapApiErrorToUI(json, locale);
-        setSubmitError({ summary: mapped.summary, details: mapped.details });
+        // The server does not reveal whether the password or the booking dates
+        // failed (no password oracle), so the message names both causes.
+        const signInFailed = mode === 'signin' && response.status === 401 ? dictionary?.errors?.signInFailed : undefined;
+        setSubmitError({ summary: signInFailed ?? mapped.summary, details: signInFailed ? undefined : mapped.details });
         return;
       }
 
-      tracker.formSubmitted(mode === 'signup' ? 'sign-up' : 'sign-in');
       emitGuestSessionChanged(mode === 'signup' ? 'claim' : 'signin');
       if (mode === 'signup') setClaimToken('');
       router.push(json?.data?.redirect || `/${locale}/check-in`);
     } catch {
       setSubmitError({
-        summary: dictionary?.errors?.networkError || 'Network error',
-        details: [dictionary?.errors?.networkErrorDetail || 'Please check your connection and try again.'],
+        summary: dictionary.errors.networkError,
+        details: [dictionary.errors.networkErrorDetail],
       });
     } finally {
       setLoading(false);
@@ -146,16 +155,16 @@ export default function UnifiedGuestClient() {
       <section className="main-glass-container surface-card p-5" aria-labelledby="guest-auth-title">
         <header className="mb-5 text-center">
           <h1 id="guest-auth-title" className="text-2xl font-bold">
-            {mode === 'signin' ? dictionary?.signInTitle || 'Sign in' : dictionary?.signUpTitle || 'Activate booking access'}
+            {mode === 'signin' ? dictionary.signInTitle : dictionary.signUpTitle}
           </h1>
           <p className="mt-1 text-sm text-subtle">
             {mode === 'signin'
-              ? dictionary?.modeHintSignin || 'Access your booking and check-in details.'
-              : dictionary?.modeHintSignup || 'Use the one-time claim token provided by your host.'}
+              ? dictionary.modeHintSignin
+              : dictionary.modeHintSignup}
           </p>
         </header>
 
-        <div role="tablist" aria-label={dictionary?.a11y?.authMode || 'Authentication mode'} className="mb-5 flex rounded-full border border-soft p-1">
+        <div role="tablist" aria-label={dictionary.a11y.authMode} className="mb-5 flex rounded-full border border-soft p-1">
           {(['signin', 'signup'] as const).map((value) => (
             <button
               key={value}
@@ -167,7 +176,7 @@ export default function UnifiedGuestClient() {
               className={`h-11 flex-1 rounded-full text-sm font-medium ${mode === value ? 'surface-card shadow' : 'text-subtle'}`}
               onClick={() => changeMode(value)}
             >
-              {value === 'signin' ? dictionary?.signInTitle || 'Sign in' : dictionary?.signUpTitle || 'Activate access'}
+              {value === 'signin' ? dictionary.signInTitle : dictionary.signUpTitle}
             </button>
           ))}
         </div>
@@ -190,7 +199,7 @@ export default function UnifiedGuestClient() {
               <>
                 <div>
                   <label htmlFor="claim-token" className="mb-1 block text-sm font-medium">
-                    {locale === 'el' ? 'Κωδικός ενεργοποίησης κράτησης' : 'Booking claim token'} *
+                    {dictionary.claimTokenLabel} *
                   </label>
                   <input
                     id="claim-token"
@@ -205,18 +214,18 @@ export default function UnifiedGuestClient() {
                     required
                   />
                   <p className="mt-1 text-xs text-subtle">
-                    {locale === 'el' ? 'Χρησιμοποιήστε τον εφάπαξ κωδικό που σας έδωσε ο οικοδεσπότης.' : 'Use the one-time token provided by your host.'}
+                    {dictionary.claimTokenHint}
                   </p>
                 </div>
 
                 <div>
                   <label htmlFor="origin" className="mb-1 block text-sm font-medium">
-                    {dictionary?.originQuestion || 'Where are you traveling from?'} *
+                    {dictionary.originQuestion} *
                   </label>
                   <select id="origin" className={inputClass} value={origin} onChange={(event) => setOrigin(event.target.value as GuestOrigin)} required>
-                    <option value="">{locale === 'el' ? 'Επιλέξτε χώρα προέλευσης' : 'Select country of origin'}</option>
-                    <option value="GR">{dictionary?.originGR || 'Greece'}</option>
-                    <option value="ABROAD">{dictionary?.originAbroad || 'Outside Greece'}</option>
+                    <option value="">{dictionary.originPlaceholder}</option>
+                    <option value="GR">{dictionary.originGR}</option>
+                    <option value="ABROAD">{dictionary.originAbroad}</option>
                   </select>
                 </div>
               </>
@@ -224,7 +233,7 @@ export default function UnifiedGuestClient() {
 
             <div>
               <label htmlFor="guest-phone" className="mb-1 block text-sm font-medium">
-                {dictionary?.phoneLabel || 'Phone number'} *
+                {dictionary.phoneLabel} *
               </label>
               <input
                 id="guest-phone"
@@ -244,7 +253,7 @@ export default function UnifiedGuestClient() {
 
             <div>
               <label htmlFor="guest-password" className="mb-1 block text-sm font-medium">
-                {dictionary?.passwordLabel || 'Password'} *
+                {dictionary.passwordLabel} *
               </label>
               <div className="flex gap-2">
                 <input
@@ -252,7 +261,7 @@ export default function UnifiedGuestClient() {
                   name="password"
                   type={showPassword ? 'text' : 'password'}
                   autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-                  placeholder={dictionary?.passwordPlaceholder || 'At least 8 characters'}
+                  placeholder={dictionary.passwordPlaceholder}
                   className={inputClass}
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
@@ -263,7 +272,7 @@ export default function UnifiedGuestClient() {
                 <button
                   type="button"
                   className="rounded-lg border border-soft px-3 text-sm"
-                  aria-label={showPassword ? dictionary?.a11y?.hidePassword || 'Hide password' : dictionary?.a11y?.showPassword || 'Show password'}
+                  aria-label={showPassword ? dictionary.a11y.hidePassword : dictionary.a11y.showPassword}
                   aria-pressed={showPassword}
                   onClick={() => setShowPassword((value) => !value)}
                 >
@@ -275,21 +284,17 @@ export default function UnifiedGuestClient() {
             {mode === 'signup' && (
               <label className="flex items-start gap-2 text-sm">
                 <input type="checkbox" className="mt-1" checked={acceptTerms} onChange={(event) => setAcceptTerms(event.target.checked)} required />
-                <span>
-                  {locale === 'el'
-                    ? 'Επιβεβαιώνω ότι τα στοιχεία μου είναι σωστά και αποδέχομαι τους όρους χρήσης και την επεξεργασία δεδομένων για την παροχή της διαμονής.'
-                    : 'I confirm my details are correct and accept the portal terms and data processing needed to provide my stay.'}
-                </span>
+                <span>{GUEST_TERMS_TEXT[locale]}</span>
               </label>
             )}
 
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
-              <span>{dictionary?.rememberMe || 'Remember me on this device'}</span>
+              <span>{dictionary.rememberMe}</span>
             </label>
 
             <button type="submit" disabled={!valid || loading} className="btn btn-primary min-h-11 w-full disabled:cursor-not-allowed disabled:opacity-50">
-              {loading ? dictionary?.working || 'Working…' : dictionary?.continueBtn || 'Continue'}
+              {loading ? dictionary.working : dictionary.continueBtn}
             </button>
           </form>
         </div>

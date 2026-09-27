@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import WebVitalsReporter from '@/components/WebVitalsReporter';
 import { headers } from 'next/headers';
+import { normalizeLocale } from '@/i18n/config';
 
 export const metadata: Metadata = {
   // Route metadata already includes the localized site name where appropriate.
@@ -32,7 +32,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const requestHeaders = await headers();
-  const locale = requestHeaders.get('x-locale') === 'el' ? 'el' : 'en';
+  const locale = normalizeLocale(requestHeaders.get('x-locale'));
   const nonce = requestHeaders.get('x-nonce') ?? undefined;
   return (
     <html lang={locale} suppressHydrationWarning>
@@ -44,13 +44,12 @@ export default async function RootLayout({
           // attribute and report a false hydration mismatch in development.
           suppressHydrationWarning
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem('theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.setAttribute('data-theme',t);document.documentElement.classList.toggle('dark',t==='dark')}catch(e){document.documentElement.setAttribute('data-theme','light')}`,
+            __html: `try{var t=localStorage.getItem('theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.setAttribute('data-theme',t)}catch(e){document.documentElement.setAttribute('data-theme','light')}`,
           }}
         />
       </head>
       <body className="antialiased">
         <div className="min-h-svh">{children}</div>
-        <WebVitalsReporter />
       </body>
     </html>
   );

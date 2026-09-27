@@ -5,14 +5,14 @@
   "checkerVersion": "1.0.0",
   "schema": {
     "path": "prisma/schema.prisma",
-    "sha256": "55e5f6c9ec3230009b60d2331f0b9d04a4acc143f65e72c376fd1a7c31df044b",
-    "bytes": 19924
+    "sha256": "0e03a796c364163aaa411566a3d1e1e5092ec4aa83a971bd31789a0a442d0a2d",
+    "bytes": 16894
   },
   "migrations": {
     "root": "prisma/migrations",
     "treeHashAlgorithm": "sha256-prisma-migrations-v1",
-    "sha256": "be2f0a33cd4d80f9eb71b7c1f2916b56600fd3cbc325fbf8ad8a7684c83a3d8f",
-    "fileCount": 15,
+    "sha256": "83f5ff3c36f05ab36c2355b3ca5b6790f1e3ac9ad7a8e037a98ea83b4c112a6f",
+    "fileCount": 20,
     "files": [
       {
         "path": "000_init/migration.sql",
@@ -83,6 +83,31 @@
         "path": "20260715110000_remove_unused_legacy_models/migration.sql",
         "sha256": "94a00297c507e8c8aed855725fd204cd37797f5f915e801dc8bc510582562967",
         "bytes": 1326
+      },
+      {
+        "path": "20260924120000_index_outbox_stay_request/migration.sql",
+        "sha256": "a88127608b42c0f0c5277005853cde6c166c1a8f95bad01d08af6fedf75b226d",
+        "bytes": 307
+      },
+      {
+        "path": "20260924121000_drop_redundant_indexes/migration.sql",
+        "sha256": "7631d29b9ba2dea44b6f63e772c4ee621a8620ed4f1234c7d674317bf666dda7",
+        "bytes": 792
+      },
+      {
+        "path": "20260924122000_remove_dead_tables/migration.sql",
+        "sha256": "bebc4d573d21177b14a882243efce7cc999d2cb84b775d3dd1b809e7ff0f92d4",
+        "bytes": 1293
+      },
+      {
+        "path": "20260924123000_remove_checkins/migration.sql",
+        "sha256": "cc278186c056a09139ffec813d909ff712c9e2ecb86eef061cebde4c3880f85f",
+        "bytes": 926
+      },
+      {
+        "path": "20260924124000_drop_refresh_token_hints/migration.sql",
+        "sha256": "f682ef5f8ad0a02712c905f92392f795cb841d5383524b2a4767d213c5506200",
+        "bytes": 1119
       },
       {
         "path": "migration_lock.toml",

@@ -1,25 +1,24 @@
 import { categories } from '@/data/categories';
 import { getItemsByCategory, pickLocale, toSlug } from '@/lib/data';
 import { getDictionary } from '@/i18n/dictionaries';
-import { locales, type Locale } from '@/i18n/config';
+import { normalizeLocale } from '@/i18n/config';
 import Link from 'next/link';
 import FavoritesClient from '@/components/FavoritesClient';
 import type { Metadata } from 'next';
-import { normalizeLocale } from '@/lib/seo';
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
   const eff = normalizeLocale(locale);
   const dictionary = getDictionary(eff);
   return {
-    title: `${dictionary.labels?.favorites ?? 'Favorites'} | ${dictionary.appTitle}`,
+    title: `${dictionary.labels.favorites} | ${dictionary.appTitle}`,
     robots: { index: false, follow: false },
   };
 }
 
 export default async function FavoritesPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : 'en';
+  const eff = normalizeLocale(locale);
   const t = getDictionary(eff);
   const allItems = categories.flatMap(cat => {
     const items = getItemsByCategory(cat.id);
@@ -42,11 +41,11 @@ export default async function FavoritesPage({ params }: { params: Promise<{ loca
       <FavoritesClient
         allItems={allItems}
         emptyLabel={t.emptyState}
-        titleLabel={t.labels?.favorites || 'Favorites'}
+        titleLabel={t.labels.favorites}
         locale={eff}
       />
       <nav className="pt-6">
-        <Link href={`/${eff}`} className="inline-flex min-h-11 items-center text-sm text-brand-700 hover:text-brand-800 transition-colors">{t.backHome}</Link>
+        <Link href={`/${eff}`} className="inline-flex min-h-11 items-center text-sm text-brand-800 hover:text-brand-800 transition-colors">{t.backHome}</Link>
       </nav>
     </div>
   );

@@ -11,7 +11,6 @@
 .main-glass-container {
   background: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(24px) saturate(200%);
-  -webkit-backdrop-filter: blur(24px) saturate(200%);
   border: 2px solid transparent;
   background-clip: padding-box;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12),
@@ -42,7 +41,6 @@
 [data-theme="dark"] .main-glass-container {
   background: rgba(23, 35, 37, 0.95);
   backdrop-filter: blur(6px) saturate(100%);
-  -webkit-backdrop-filter: blur(6px) saturate(100%);
   border: 1px solid rgba(255, 255, 255, 0.1);
   background-clip: border-box;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3),
@@ -71,43 +69,6 @@ button[role="tab"] {
   color: var(--fg-muted) !important;
   background: transparent !important;
   border: none !important;
-}
-
-/* NOTE: Header / menu white text was previously forced globally here. Prefer applying
-   the `.white-in-dark` utility to specific header elements in components (e.g. TopControls,
-   LocaleSwitcher) instead of forcing global selectors. Keep these selectors neutral to avoid
-   unintended overrides across components. */
-.dark a[href*="guest"],
-.dark button[aria-label*="Sign"],
-.dark .locale-switcher,
-[data-theme="dark"] a[href*="guest"],
-[data-theme="dark"] button[aria-label*="Sign"],
-[data-theme="dark"] .locale-switcher {
-  color: inherit !important;
-}
-
-.dark a[href*="guest"] span,
-.dark button[aria-label*="Sign"] span,
-.dark .locale-switcher span,
-[data-theme="dark"] a[href*="guest"] span,
-[data-theme="dark"] button[aria-label*="Sign"] span,
-[data-theme="dark"] .locale-switcher span {
-  color: inherit !important;
-}
-
-/* Home link overrides (legacy) — neutral now; apply `white-in-dark` directly where needed. */
-.dark a[href$="/en"],
-.dark a[href$="/el"],
-[data-theme="dark"] a[href$="/en"],
-[data-theme="dark"] a[href$="/el"] {
-  color: inherit !important;
-}
-
-.dark a[href$="/en"] span,
-.dark a[href$="/el"] span,
-[data-theme="dark"] a[href$="/en"] span,
-[data-theme="dark"] a[href$="/el"] span {
-  color: inherit !important;
 }
 
 /* Universal page dark mode styles - applies apartment color scheme to ALL pages */

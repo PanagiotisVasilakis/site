@@ -1,19 +1,33 @@
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger-enterprise';
-import { mapBookingFromDb } from '@/lib/mappers/domainMappers';
+
+// The admin read model needs these columns only.
+const bookingSelect = {
+  id: true,
+  source: true,
+  reference: true,
+  startDate: true,
+  endDate: true,
+  userId: true,
+  provider: true,
+  externalReference: true,
+  accessStatus: true,
+  claimedAt: true,
+  createdAt: true,
+} as const;
 
 export type BookingRecord = {
   id: string;
   source: 'ONSITE' | 'EXTERNAL';
-  reference?: string;
-  start_date: string;
-  end_date: string;
-  user_id?: string;
+  reference: string | null;
+  startDate: Date;
+  endDate: Date;
+  userId: string | null;
   provider: string;
-  external_reference?: string;
-  access_status: 'PENDING' | 'VERIFIED';
-  claimed_at?: number;
-  created_at: number;
+  externalReference: string | null;
+  accessStatus: 'PENDING' | 'VERIFIED';
+  claimedAt: Date | null;
+  createdAt: Date;
 };
 
 async function findByReference(reference: string): Promise<BookingRecord | undefined> {
@@ -24,11 +38,12 @@ async function findByReference(reference: string): Promise<BookingRecord | undef
       },
       orderBy: { createdAt: 'desc' },
       take: 2,
+      select: bookingSelect,
     });
     if (bookings.length > 1) {
       throw new Error('AMBIGUOUS_BOOKING_REFERENCE');
     }
-    return bookings[0] ? mapBookingFromDb(bookings[0]) : undefined;
+    return bookings[0];
   } catch (error) {
     logger.error('bookingRepository(prisma): findByReference failed', error);
     throw error;
@@ -37,8 +52,7 @@ async function findByReference(reference: string): Promise<BookingRecord | undef
 
 async function findById(id: string): Promise<BookingRecord | undefined> {
   try {
-    const booking = await prisma.booking.findUnique({ where: { id } });
-    return booking ? mapBookingFromDb(booking) : undefined;
+    return (await prisma.booking.findUnique({ where: { id }, select: bookingSelect })) ?? undefined;
   } catch (error) {
     logger.error('bookingRepository(prisma): findById failed', error);
     throw error;
@@ -47,8 +61,7 @@ async function findById(id: string): Promise<BookingRecord | undefined> {
 
 async function getAll(): Promise<BookingRecord[]> {
   try {
-    const bookings = await prisma.booking.findMany({ orderBy: { createdAt: 'desc' } });
-    return bookings.map(mapBookingFromDb);
+    return await prisma.booking.findMany({ orderBy: { createdAt: 'desc' }, select: bookingSelect });
   } catch (error) {
     logger.error('bookingRepository(prisma): getAll failed', error);
     throw error;

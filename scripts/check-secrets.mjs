@@ -190,6 +190,10 @@ function normalizeFinding(scanRoot, finding) {
     column,
     classification: classifyRule(rule),
     fingerprint: sha256(`${diagnosticPath}\0${rule}\0${line}\0${column}`).slice(0, 16),
+    // Identifies a reviewed synthetic fixture by its value, not its position, so
+    // editing the file around it keeps the allowlist valid while a different
+    // value at the same place is still reported. Never printed.
+    valueSha256: sha256(String(finding.Secret ?? '')),
   };
 }
 
@@ -204,8 +208,7 @@ function allowlistKey(finding) {
   return [
     finding.path,
     finding.rule,
-    finding.line,
-    finding.column,
+    finding.valueSha256,
   ].join('\0');
 }
 
@@ -214,7 +217,12 @@ export function findForbiddenEnvironmentArtifact(files) {
 }
 
 function evaluateCurrentFindings(findings, allowlistEntries = []) {
-  const allowlist = new Map(allowlistEntries.map((entry) => [allowlistKey(entry), entry]));
+  // A reviewed value may occur more than once in a file: one entry per occurrence.
+  const allowlist = new Map();
+  for (const entry of allowlistEntries) {
+    const key = allowlistKey(entry);
+    allowlist.set(key, [...(allowlist.get(key) ?? []), entry]);
+  }
   const accepted = [];
   const unexpected = [];
   for (const finding of findings) {
@@ -225,10 +233,9 @@ function evaluateCurrentFindings(findings, allowlistEntries = []) {
       });
       continue;
     }
-    const known = allowlist.get(allowlistKey(finding));
+    const known = allowlist.get(allowlistKey(finding))?.shift();
     if (known) {
       accepted.push({ ...finding, classification: known.classification });
-      allowlist.delete(allowlistKey(finding));
     } else {
       unexpected.push(finding);
     }
@@ -236,7 +243,7 @@ function evaluateCurrentFindings(findings, allowlistEntries = []) {
   return {
     accepted,
     unexpected,
-    stale: [...allowlist.values()],
+    stale: [...allowlist.values()].flat(),
   };
 }
 
@@ -421,8 +428,7 @@ async function main() {
     }
     for (const stale of result.stale) {
       process.stderr.write(
-        `stale-allowlist path=${stale.path} line=${stale.line} column=${stale.column} `
-          + `rule=${stale.rule} `
+        `stale-allowlist path=${stale.path} rule=${stale.rule} `
           + `classification=${stale.classification}\n`,
       );
     }

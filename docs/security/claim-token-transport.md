@@ -20,13 +20,22 @@ record. Its capability travels through the browser as follows:
    success, validation/credential failure, expiry, and replay. A failed exchange
    clears any previously presented exchange cookie.
 
+Access reset. For a guest who lost the password of a claimed booking, the
+administrator uses `POST /api/admin/bookings/{id}/access-reset`. In one
+transaction it clears the account's password, revokes its sessions, refresh
+families and refresh tokens, and issues a new REMOTE grant for the same booking.
+The token travels exactly as in steps 1–5. Claiming it with the account's phone
+sets the new password. A password-less account can set a password only through
+a grant for a booking it already owns, so another booking's token cannot take it
+over; a different phone is refused as already claimed.
+
 No claim value is accepted from a query parameter, path segment, fragment,
 redirect, or `Location` header. The guest client removes the two legacy query
 names and any legacy claim fragment from the current history entry without
 using their values. The guest page sends `Referrer-Policy: no-referrer`;
 application diagnostics record only pathnames; Nginx access logs use `$uri`
-rather than `$request_uri`. Neither analytics nor security audit details contain
-the token or its exchange digest.
+rather than `$request_uri`. Security audit details never contain the token or
+its exchange digest.
 
 The digest cookie is not a session and grants no access by itself. It is
 bounded by the underlying grant and the claim transaction remains the only

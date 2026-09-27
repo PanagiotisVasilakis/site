@@ -8,10 +8,11 @@ import {
   buildCSPDirective,
   buildPermissionsPolicy,
   generateNonce,
-  logSecurityEvent,
   type SecurityEvent,
 } from '@/lib/security-config';
+import { logSecurityDiagnostic } from '@/lib/security-monitoring';
 import { getClientIp } from '@/lib/net/getClientIp';
+import { isSameOriginRequest } from '@/lib/net/sameOrigin';
 
 const DIRECT_HEALTH_PROBE_PATHS = new Set([
   '/api/health/live',
@@ -79,8 +80,6 @@ class SecurityHeadersMiddleware {
   }
 
   private applyCspHeaders(response: NextResponse, nonce: string): void {
-    if (!this.config.csp.enabled) return;
-
     let csp = buildCSPDirective(
       this.config.csp.directives,
       this.config.csp.useNonce ? nonce : undefined,
@@ -100,7 +99,6 @@ class CORSMiddleware {
   private readonly config = getSecurityConfig().cors;
 
   public async handle(request: NextRequest): Promise<NextResponse | null> {
-    if (!this.config.enabled) return null;
     if (!request.nextUrl.pathname.startsWith('/api/')) return null;
     // Health probes intentionally have no CORS surface. Skipping avoids an
     // attacker-controlled Origin turning a direct probe into an audit DB write.
@@ -120,13 +118,10 @@ class CORSMiddleware {
         timestamp: new Date().toISOString(),
         ip: getClientIp(request),
         url: request.nextUrl.pathname,
-        details: {
-          origin,
-          allowedOrigins: this.config.origins,
-        },
+        details: { origin },
       };
 
-      await logSecurityEvent(event);
+      logSecurityDiagnostic(event);
       return new NextResponse('CORS violation', { status: 403 });
     }
 
@@ -135,7 +130,7 @@ class CORSMiddleware {
 
   public applyActualRequestHeaders(request: NextRequest, response: NextResponse): void {
     const origin = request.headers.get('origin');
-    if (!this.config.enabled || !request.nextUrl.pathname.startsWith('/api/')
+    if (!request.nextUrl.pathname.startsWith('/api/')
       || !origin || !this.isOriginAllowed(origin, request)) return;
     response.headers.set('Access-Control-Allow-Origin', origin);
     response.headers.append('Vary', 'Origin');
@@ -162,26 +157,7 @@ class CORSMiddleware {
 
   private isOriginAllowed(origin: string, request: NextRequest): boolean {
     if (this.config.origins.includes(origin) || this.config.origins.includes('*')) return true;
-    if (origin === request.nextUrl.origin) return true;
-
-    // Next can normalize nextUrl to its configured public origin. The HTTP Host
-    // header still represents the origin the browser actually contacted.
-    try {
-      const parsedOrigin = new URL(origin);
-      const requestHost = request.headers.get('host')?.toLowerCase();
-      if (!requestHost || parsedOrigin.host.toLowerCase() !== requestHost) return false;
-
-      const trustsProxy = getClientIp(request) !== 'unknown';
-      const forwardedProtocol = trustsProxy
-        ? request.headers.get('x-forwarded-proto')?.split(',', 1)[0]?.trim().toLowerCase()
-        : undefined;
-      const requestProtocol = forwardedProtocol
-        ? `${forwardedProtocol}:`
-        : request.nextUrl.protocol;
-      return parsedOrigin.protocol === requestProtocol;
-    } catch {
-      return false;
-    }
+    return isSameOriginRequest(origin, request);
   }
 }
 

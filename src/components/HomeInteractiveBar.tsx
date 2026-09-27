@@ -3,21 +3,12 @@ import { useEffect } from "react";
 import BookingBar from "@/components/SearchBar";
 import { getApartmentContent } from '@/data/apartmentData';
 
-export interface BookingLabels {
-  addDates: string;
-  checkAvailability: string;
-  arrivalLabel?: string;
-  arrivalPlaceholder?: string;
-  departureLabel?: string;
-  departurePlaceholder?: string;
-}
 interface Props {
   locale: string;
-  labels?: BookingLabels;
   subline?: string; // localized subtitle passed from server page for SSR consistency
 }
 
-export default function HomeInteractiveBar({ locale, labels, subline }: Props) {
+export default function HomeInteractiveBar({ locale, subline }: Props) {
   const apartmentContent = getApartmentContent(locale as 'en' | 'el');
   useEffect(() => {
     const scrollIfNeeded = () => {
@@ -43,7 +34,6 @@ export default function HomeInteractiveBar({ locale, labels, subline }: Props) {
     >
       <BookingBar 
         locale={locale} 
-        labels={labels}
   propertyName={apartmentContent.shortName}
         subline={subline}
         showPropertyHeader={false}

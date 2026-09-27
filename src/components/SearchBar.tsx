@@ -24,14 +24,6 @@ interface PickerAnchor {
 interface Props {
   locale?: string;
   propertyName?: string;
-  labels?: {
-    addDates: string;
-    checkAvailability: string;
-    arrivalLabel?: string;
-    arrivalPlaceholder?: string;
-    departureLabel?: string;
-    departurePlaceholder?: string;
-  };
   subline?: string;
   showPropertyHeader?: boolean;
 }
@@ -63,7 +55,6 @@ const scheduleFrame = (callback: FrameRequestCallback) => {
 export default function BookingBar({
   locale = "en",
   propertyName,
-  labels,
   subline,
   showPropertyHeader = true,
 }: Props) {
@@ -188,30 +179,21 @@ export default function BookingBar({
   const checkAvailability = useCallback(() => {
     const params = dateRangeToParams(state.dateRange);
 
-    void import("@/lib/analyticsClient")
-      .then(({ trackEvent }) => {
-        trackEvent("booking_check_availability", {
-          hasDates: !!(state.dateRange?.from && state.dateRange?.to),
-          nights: getNights(state.dateRange),
-        });
-      })
-      .catch(() => {});
-
     const bookingUrl = `/${locale}/book?${params.toString()}`;
     router.push(bookingUrl);
   }, [state, locale, router]);
 
-  const arrivalLabel = labels?.arrivalLabel || t.search?.arrivalLabel || "Arrival";
-  const departureLabel = labels?.departureLabel || t.search?.departureLabel || "Departure";
-  const arrivalPlaceholder = labels?.arrivalPlaceholder || labels?.addDates || t.search?.arrivalPlaceholder || t.search?.addDates || "Add dates";
-  const departurePlaceholder = labels?.departurePlaceholder || labels?.addDates || t.search?.departurePlaceholder || t.search?.addDates || "Add dates";
-  const checkAvailabilityLabel = labels?.checkAvailability || t.search?.checkAvailability || "Check availability";
+  const arrivalLabel = t.search.arrivalLabel;
+  const departureLabel = t.search.departureLabel;
+  const arrivalPlaceholder = t.search.arrivalPlaceholder;
+  const departurePlaceholder = t.search.departurePlaceholder;
+  const checkAvailabilityLabel = t.search.checkAvailability;
 
   const arrivalDisplay = state.dateRange?.from ? format(state.dateRange.from, "MMM d, yyyy", { locale: dateFnsLocale }) : arrivalPlaceholder;
   const departureDisplay = state.dateRange?.to ? format(state.dateRange.to, "MMM d, yyyy", { locale: dateFnsLocale }) : departurePlaceholder;
 
   const nights = getNights(state.dateRange);
-  const hasValidDates = state.dateRange?.from && state.dateRange?.to;
+  const hasValidDates = nights >= 1;
 
   return (
     <div className="relative" ref={containerRef}>
@@ -267,7 +249,7 @@ export default function BookingBar({
               <span className="text-sm font-medium">{checkAvailabilityLabel}</span>
               {isHydrated && hasValidDates && (
                 <span className="text-xs opacity-90">
-                  {nights} {nights === 1 ? (t.booking?.night ?? "night") : (t.booking?.nights ?? "nights")}
+                  {nights} {nights === 1 ? (t.booking.night) : (t.booking.nights)}
                 </span>
               )}
             </div>

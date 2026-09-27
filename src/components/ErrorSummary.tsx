@@ -7,7 +7,7 @@ export default function ErrorSummary({
   summary,
   details,
   onRetry,
-  supportHref = '/en#contact',
+  supportHref,
   locale = 'en',
 }: {
   summary: string;
@@ -17,9 +17,9 @@ export default function ErrorSummary({
   locale?: string;
 }) {
   const t = getDictionary(locale as Locale);
-  const resolvedTitle = t.errors?.title ?? 'There were some problems';
-  const tryAgainLabel = t.errors?.tryAgain ?? 'Try again';
-  const contactSupportLabel = t.errors?.contactSupport ?? 'Contact support';
+  const resolvedTitle = t.errors.title;
+  const tryAgainLabel = t.errors.tryAgain;
+  const contactSupportLabel = t.errors.contactSupport;
   const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     // Move focus to the error summary so SR announces it
@@ -47,7 +47,7 @@ export default function ErrorSummary({
         {onRetry ? (
           <button type="button" className="btn-outline btn-sm" onClick={onRetry}>{tryAgainLabel}</button>
         ) : null}
-        <a className="btn-outline btn-sm" href={supportHref}>{contactSupportLabel}</a>
+        <a className="btn-outline btn-sm" href={supportHref ?? `/${locale}#contact`}>{contactSupportLabel}</a>
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ import { runtimeEnvSchema } from '@/lib/runtime-env-schema.js';
 const requiredEnv = {
   DATABASE_URL: 'postgresql://user:pass@localhost:5432/guest_guide',
   SECURITY_PEPPER: 'p'.repeat(16),
+  CLAIM_TOKEN_PEPPER: 'c'.repeat(32),
   GUEST_WIFI_NETWORK: 'Guest WiFi',
   GUEST_WIFI_PASSWORD: 'wifi-password',
 };
@@ -53,6 +54,9 @@ describe('runtime environment fail-closed policy', () => {
 
   it.each([
     ['non-Postgres database URL', { DATABASE_URL: 'https://database.example/db' }, 'DATABASE_URL'],
+    ['empty database URL', { DATABASE_URL: '' }, 'DATABASE_URL'],
+    ['development without a claim-token pepper', { CLAIM_TOKEN_PEPPER: undefined }, 'CLAIM_TOKEN_PEPPER'],
+    ['unparsable database URL', { DATABASE_URL: 'not a url' }, 'DATABASE_URL'],
     ['invalid time zone', { PROPERTY_TIME_ZONE: 'Mars/Olympus' }, 'PROPERTY_TIME_ZONE'],
     ['test runtime mode', { NODE_ENV: 'test' }, 'NODE_ENV'],
   ])('rejects %s', (_label, overrides, expectedPath) => {

@@ -2,16 +2,18 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { getApartmentContent } from '@/data/apartmentData';
 import {
   getApartmentMapLocation,
   type CategoryMapItem,
   type MapContentItem,
 } from '@/data/mapLocations';
+import { getApartmentContent } from '@/data/apartmentData';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
+import { normalizeLocale } from '@/i18n/config';
 import { telHref } from '@/lib/contactLinks';
 import internalFetch from '@/lib/internalFetchClient';
+import { timePattern } from '@/lib/propertyTime';
 import MapLoadingSkeleton from '@/components/MapLoadingSkeleton';
 import { MAP_DEFAULTS } from '@/lib/mapConstants';
 import WifiAccessCard from '@/components/checkin/WifiAccessCard';
@@ -57,8 +59,6 @@ type ArrivalRequest = {
 };
 
 const MAP_HEIGHT = 'clamp(240px, 35vw, 420px)';
-const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-
 const DynamicApartmentLocationMap = dynamic(() => import('@/components/ApartmentLocationMap'), {
   ssr: false,
   loading: () => <MapLoadingSkeleton height={MAP_DEFAULTS.HEIGHT.COMPACT} />,
@@ -296,9 +296,8 @@ export default function CheckInInfo({
   nearbyRestaurants = [],
   nearbyServices = [],
 }: CheckInInfoProps) {
-  const effLocale: Locale = locale === 'el' ? 'el' : 'en';
+  const effLocale: Locale = normalizeLocale(locale);
   const t = getDictionary(effLocale);
-  const apartment = getApartmentContent(effLocale);
   const apartmentLocation = getApartmentMapLocation(effLocale);
   const mapContentItems = useMemo<MapContentItem[]>(
     () => [
@@ -307,138 +306,101 @@ export default function CheckInInfo({
     ],
     [nearbyRestaurants, nearbyServices]
   );
-  const checkinStrings = ({ ...(t.checkinInfo ?? {}), ...(t.locationPanel ?? {}) }) as Record<string, string | undefined>;
   const isGreek = effLocale === 'el';
 
-  const panelHighlights = (t.locationPanel?.highlights ?? []) as Array<{
-    title: string;
-    description: string;
-  }>;
-  const locationHighlights: LocationHighlight[] = panelHighlights.map(({ title, description }) => ({
+  const locationHighlights: LocationHighlight[] = t.locationPanel.highlights.map(({ title, description }) => ({
     title,
     description,
   }));
 
+  const panel = t.checkinInfo.panel;
   const ui = {
-    guideLabel: t.house?.guideTitle ?? (isGreek ? 'Οδηγός διαμονής' : 'Guest stay guide'),
-    heroTitle: isGreek ? 'Νιώστε σαν στο σπίτι σας στην Καλαμάτα' : 'Make yourself at home in Kalamata',
-    quickActions: isGreek ? 'Γρήγορες ενέργειες' : 'Quick actions',
-    copyWifi: isGreek ? 'Αντιγραφή Wi-Fi' : 'Copy Wi-Fi',
-    openMaps: isGreek ? 'Άνοιγμα χάρτη' : 'Open Maps',
-    viewRules: isGreek ? 'Κανόνες σπιτιού' : 'House Rules',
-    guestEssentials: isGreek ? 'Βασικά για τη διαμονή' : 'Guest Essentials',
-    goodToKnow: t.checkinInfo?.additionalTitle || (isGreek ? 'Χρήσιμες πληροφορίες' : 'Good to Know'),
-    address: isGreek ? 'Διεύθυνση' : 'Address',
-    schedule: t.checkinInfo?.checkInOutTitle || (isGreek ? 'Αφιξη & αναχωρηση' : 'Check-in & Check-out'),
-    network: t.checkinInfo?.wifiNetwork || (isGreek ? 'Δίκτυο' : 'Network'),
-    password: t.checkinInfo?.wifiPassword || (isGreek ? 'Κωδικός' : 'Password'),
-    unavailable: isGreek ? 'Μη διαθέσιμο' : 'Unavailable',
-    parking: t.checkinInfo?.parking || (isGreek ? 'Δωρεάν πάρκινγκ' : 'Free Parking'),
-    keys: stripLeadingEmoji(t.checkinInfo?.keysInfo || (isGreek ? 'Κλειδιά:' : 'Keys:')).replace(/:$/, ''),
-    emergency: t.checkinInfo?.emergencyTitle || (isGreek ? 'Επαφές ανάγκης' : 'Emergency Contacts'),
-    host: t.checkinInfo?.hostContact || (isGreek ? 'Ο οικοδεσπότης σας' : 'Your Host'),
-    save: isGreek ? 'Αποθήκευση' : 'Save',
-    saving: t.checkin?.saving || (isGreek ? 'Αποθήκευση...' : 'Saving...'),
-    cancel: isGreek ? 'Ακύρωση' : 'Cancel',
-    edit: isGreek ? 'Επεξεργασία' : 'Edit',
-    saved: isGreek ? 'Οι ώρες αποθηκεύτηκαν.' : 'Check-in times saved.',
-    copied: t.checkinInfo?.copied || (isGreek ? 'Αντιγράφηκε' : 'Copied'),
-    copy: t.checkinInfo?.copy || (isGreek ? 'Αντιγραφή' : 'Copy'),
-    neighborhood: checkinStrings.locationTitle || (isGreek ? 'Εξερευνήστε τη γειτονιά' : 'Explore the Neighborhood'),
-    nearby: t.locationPanel?.nearby || (isGreek ? 'Κοντά σας' : "What's Nearby?"),
-    standardCheckIn: isGreek ? 'Κανονική ώρα άφιξης' : 'Standard check-in',
-    requestDifferentArrival: isGreek ? 'Ζητήστε διαφορετική ώρα άφιξης' : 'Request different arrival time',
-    preferredArrivalTime: isGreek ? 'Προτιμώμενη ώρα άφιξης' : 'Preferred arrival time',
-    arrivalNote: isGreek ? 'Προσθέστε σημείωση' : 'Add a note',
-    arrivalNotePlaceholder: isGreek ? 'Π.χ. φτάνουμε νωρίτερα λόγω πτήσης.' : 'E.g. we may arrive earlier because of our flight.',
-    sendRequest: isGreek ? 'Αποστολή αιτήματος' : 'Send request',
-    requestSent: isGreek ? 'Το αίτημά σας στάλθηκε. Θα επιβεβαιώσουμε τη διαθεσιμότητα το συντομότερο δυνατό.' : "Your request has been sent. We'll confirm availability as soon as possible.",
-    requestError: isGreek ? 'Δεν ήταν δυνατή η αποστολή του αιτήματος. Παρακαλούμε δοκιμάστε ξανά.' : 'Unable to send the request. Please try again.',
-    requestRequired: isGreek ? 'Επιλέξτε προτιμώμενη ώρα άφιξης.' : 'Choose a preferred arrival time.',
-    latestRequest: isGreek ? 'Τελευταίο αίτημα' : 'Latest request',
-    statusPending: isGreek ? 'Σε εκκρεμότητα' : 'Pending',
-    statusApproved: isGreek ? 'Εγκρίθηκε' : 'Confirmed',
-    statusRejected: isGreek ? 'Δεν είναι διαθέσιμο' : 'Unavailable',
-    statusPendingCopy: isGreek ? 'Το αίτημά σας έχει ληφθεί και αναμένει επιβεβαίωση.' : 'Your request has been received and is awaiting confirmation.',
-    statusApprovedCopy: isGreek ? 'Η ώρα άφιξης που ζητήσατε έχει επιβεβαιωθεί.' : 'Your requested arrival time has been confirmed.',
-    statusRejectedCopy: isGreek ? 'Η ώρα άφιξης που ζητήσατε δεν μπόρεσε να επιβεβαιωθεί. Ισχύει η κανονική ώρα άφιξης.' : 'Your requested arrival time could not be confirmed. The standard check-in time still applies.',
+    guideLabel: t.house.guideTitle,
+    heroTitle: panel.heroTitle,
+    quickActions: panel.quickActions,
+    copyWifi: panel.copyWifi,
+    openMaps: panel.openMaps,
+    viewRules: panel.viewRules,
+    guestEssentials: panel.guestEssentials,
+    goodToKnow: t.checkinInfo.additionalTitle,
+    address: panel.address,
+    schedule: t.checkinInfo.checkInOutTitle,
+    network: t.checkinInfo.wifiNetwork,
+    password: t.checkinInfo.wifiPassword,
+    unavailable: panel.unavailable,
+    wifiAvailableFrom: panel.wifiAvailableFrom,
+    parking: t.checkinInfo.parking,
+    keys: stripLeadingEmoji(t.checkinInfo.keysInfo).replace(/:$/, ''),
+    emergency: t.checkinInfo.emergencyTitle,
+    host: t.checkinInfo.hostContact,
+    save: panel.save,
+    saving: t.checkin.saving,
+    cancel: panel.cancel,
+    edit: panel.edit,
+    saved: panel.saved,
+    copied: t.checkinInfo.copied,
+    copy: t.checkinInfo.copy,
+    neighborhood: t.locationPanel.locationTitle,
+    nearby: t.locationPanel.nearby,
+    standardCheckIn: panel.standardCheckIn,
+    requestDifferentArrival: panel.requestDifferentArrival,
+    preferredArrivalTime: panel.preferredArrivalTime,
+    arrivalNote: panel.arrivalNote,
+    arrivalNotePlaceholder: panel.arrivalNotePlaceholder,
+    sendRequest: panel.sendRequest,
+    requestSent: panel.requestSent,
+    requestError: panel.requestError,
+    requestRequired: panel.requestRequired,
+    requestAlreadyPending: panel.requestAlreadyPending,
+    latestRequest: panel.latestRequest,
+    statusPending: panel.statusPending,
+    statusApproved: panel.statusApproved,
+    statusRejected: panel.statusRejected,
+    statusPendingCopy: panel.statusPendingCopy,
+    statusApprovedCopy: panel.statusApprovedCopy,
+    statusRejectedCopy: panel.statusRejectedCopy,
   };
 
   const ruleItems = [
-    t.checkinInfo?.rule1 || 'Quiet hours: 23:00 - 08:00',
-    t.checkinInfo?.rule2 || 'No smoking inside the property',
-    t.checkinInfo?.rule3 || 'Maximum capacity: 4 guests',
-    t.checkinInfo?.rule4 || 'Please respect the neighborhood',
-    t.checkinInfo?.rule5 || 'No parties or events are allowed.',
-    t.checkinInfo?.rule6 || 'Guests use the terrace at their own risk.',
+    t.checkinInfo.rule1,
+    t.checkinInfo.rule2,
+    t.checkinInfo.rule3,
+    t.checkinInfo.rule4,
+    t.checkinInfo.rule5,
+    t.checkinInfo.rule6,
   ];
 
-  const amenityGroups: Array<{ title: string; icon: IconName; items: string[] }> = [
-    {
-      title: isGreek ? 'Βασικά' : 'Essentials',
-      icon: 'home',
-      items: isGreek
-        ? ['Δωρεάν ιδιωτικό πάρκινγκ', 'Δωρεάν Wi-Fi σε όλο το κατάλυμα', 'Οικογενειακά δωμάτια', 'Δωμάτια μη καπνιστών', 'Αποθήκευση αποσκευών']
-        : ['Free private parking', 'Free Wi-Fi throughout the property', 'Family rooms', 'Non-smoking rooms', 'Luggage storage'],
-    },
-    {
-      title: isGreek ? 'Άνεση' : 'Comfort',
-      icon: 'air',
-      items: isGreek
-        ? ['Κλιματισμός', 'Θέρμανση', 'Τζάκι', 'Καθιστικό με καναπέ', 'Ηχομόνωση', 'Τηλεόραση επίπεδης οθόνης']
-        : ['Air conditioning', 'Heating', 'Fireplace', 'Seating area with sofa', 'Soundproofing', 'Flat-screen TV'],
-    },
-    {
-      title: isGreek ? 'Κουζίνα' : 'Kitchen',
-      icon: 'utensils',
-      items: isGreek
-        ? ['Πλήρως εξοπλισμένη κουζίνα', 'Καφετιέρα/βραστήρας', 'Τραπεζαρία', 'Πλυντήριο ρούχων', 'Πλυντήριο πιάτων', 'Φούρνος μικροκυμάτων', 'Ψυγείο και φούρνος']
-        : ['Fully equipped kitchen', 'Coffee/tea maker', 'Dining table', 'Washing machine', 'Dishwasher', 'Microwave', 'Refrigerator and oven'],
-    },
-    {
-      title: isGreek ? 'Μπάνιο' : 'Bathroom',
-      icon: 'bath',
-      items: isGreek
-        ? ['Ιδιωτικό μπάνιο', 'Μπανιέρα', 'Πετσέτες και λευκά είδη', 'Σεσουάρ', 'Δωρεάν προϊόντα περιποίησης']
-        : ['Private bathroom', 'Bathtub', 'Towels and linens', 'Hair dryer', 'Free toiletries'],
-    },
-    {
-      title: isGreek ? 'Εξωτερικοί χώροι & θέα' : 'Outdoor & Views',
-      icon: 'sun',
-      items: isGreek
-        ? ['Μπαλκόνι', 'Βεράντα / ηλιόλουστη βεράντα', 'Εξωτερική τραπεζαρία', 'Θέα σε θάλασσα, βουνό και πόλη']
-        : ['Balcony', 'Terrace / sun terrace', 'Outdoor dining area', 'Sea, mountain, and city views'],
-    },
-    {
-      title: isGreek ? 'Ασφάλεια' : 'Safety',
-      icon: 'shield',
-      items: isGreek
-        ? ['Ανιχνευτές καπνού', 'Πυροσβεστήρες', 'Χρηματοκιβώτιο', 'Πρόσβαση με κλειδί', 'Σίδερο']
-        : ['Smoke detectors', 'Fire extinguishers', 'Safe', 'Key access', 'Iron'],
-    },
-  ];
+  const amenityIcons: Record<string, IconName> = {
+    essentials: 'home', comfort: 'air', kitchen: 'utensils', bathroom: 'bath', outdoor: 'sun', safety: 'shield',
+  };
+  const amenityGroups = getApartmentContent(effLocale).amenityGroups.map((group) => ({
+    title: group.title,
+    icon: amenityIcons[group.id] ?? 'home',
+    items: group.items,
+  }));
 
+  const taxiPhone = nearbyServices.find((item) => item.id === 'taxi')?.phone;
   const tipItems: Array<{ text: string; icon: IconName }> = [
-    { text: t.checkinInfo?.tip1 || 'The nearest beach is just 5 minutes walk away', icon: 'waves' },
-    { text: t.checkinInfo?.tip2 || 'Supermarket "AB Vassilopoulos" is 300m away, open 8:00-21:00', icon: 'basket' },
-    { text: t.checkinInfo?.tip3 || 'Check our restaurant recommendations in the main menu', icon: 'utensils' },
-    { text: t.checkinInfo?.tip4 || 'Need a taxi? Call +30 27210 21112 or use the Taxi app', icon: 'car' },
+    { text: t.checkinInfo.tip1, icon: 'waves' },
+    { text: t.checkinInfo.tip2, icon: 'basket' },
+    { text: t.checkinInfo.tip3, icon: 'utensils' },
+    ...(taxiPhone ? [{ text: t.checkinInfo.tip4.replace('{taxiPhone}', taxiPhone), icon: 'car' as const }] : []),
   ];
 
   const goodToKnowItems: Array<{ label: string; detail: string; icon: IconName }> = [
     {
-      label: stripLeadingEmoji(t.checkinInfo?.trashInfo || 'Trash:').replace(/:$/, ''),
-      detail: t.checkinInfo?.trashDetail || 'Recycling bins are located near the main entrance',
+      label: stripLeadingEmoji(t.checkinInfo.trashInfo).replace(/:$/, ''),
+      detail: t.checkinInfo.trashDetail,
       icon: 'basket',
     },
     {
-      label: stripLeadingEmoji(t.checkinInfo?.waterInfo || 'Water:').replace(/:$/, ''),
-      detail: t.checkinInfo?.waterDetail || 'Tap water is safe to drink',
+      label: stripLeadingEmoji(t.checkinInfo.waterInfo).replace(/:$/, ''),
+      detail: t.checkinInfo.waterDetail,
       icon: 'waves',
     },
     {
-      label: stripLeadingEmoji(t.checkinInfo?.tvInfo || 'Entertainment:').replace(/:$/, ''),
-      detail: t.checkinInfo?.tvDetail || 'Smart TV with Netflix and YouTube available',
+      label: stripLeadingEmoji(t.checkinInfo.tvInfo).replace(/:$/, ''),
+      detail: t.checkinInfo.tvDetail,
       icon: 'info',
     },
   ];
@@ -459,6 +421,7 @@ export default function CheckInInfo({
   const [copiedTarget, setCopiedTarget] = useState<CopyTarget>(null);
   const [wifiNetwork, setWifiNetwork] = useState('');
   const [wifiPassword, setWifiPassword] = useState('');
+  const [wifiAvailableAt, setWifiAvailableAt] = useState<string | null>(null);
   const [checkInTime, setCheckInTime] = useState('15:00');
   const [checkOutTime, setCheckOutTime] = useState('11:00');
   const [canEditTimes, setCanEditTimes] = useState(false);
@@ -490,6 +453,7 @@ export default function CheckInInfo({
             setCanEditTimes(Boolean(data.data.canEdit));
             setWifiNetwork(data.data.wifi?.network || '');
             setWifiPassword(data.data.wifi?.password || '');
+            setWifiAvailableAt(typeof data.data.wifiAvailableAt === 'string' ? data.data.wifiAvailableAt : null);
           }
         }
       } catch (error) {
@@ -560,12 +524,12 @@ export default function CheckInInfo({
         setTimeout(() => setTimesSaved(false), 3000);
       } else {
         const error = await res.json();
-        const unknownError = isGreek ? 'Άγνωστο σφάλμα' : 'Unknown error';
-        setTimesSaveError(`${isGreek ? 'Αποτυχία αποθήκευσης' : 'Failed to save'}: ${error.error?.message || unknownError}`);
+        const unknownError = panel.unknownError;
+        setTimesSaveError(`${panel.saveFailed}: ${error.error?.message || unknownError}`);
       }
     } catch (error) {
       console.error('Failed to save preferences:', error);
-      setTimesSaveError(isGreek ? 'Αποτυχία αποθήκευσης προτιμήσεων. Παρακαλώ δοκιμάστε ξανά.' : 'Failed to save preferences. Please try again.');
+      setTimesSaveError(panel.saveFailedRetry);
     } finally {
       setSavingTimes(false);
     }
@@ -582,7 +546,7 @@ export default function CheckInInfo({
   const handleSubmitArrivalRequest = async () => {
     setArrivalRequestError('');
     setArrivalRequestSuccess('');
-    if (!timeRegex.test(requestedArrivalTime)) {
+    if (!timePattern.test(requestedArrivalTime)) {
       setArrivalRequestError(ui.requestRequired);
       return;
     }
@@ -605,8 +569,13 @@ export default function CheckInInfo({
       }
 
       setArrivalRequest(data.data?.request ?? null);
-      setArrivalRequestSuccess(ui.requestSent);
       setIsRequestingArrival(false);
+      // The server keeps the earlier pending request and discards this one.
+      if (data.data?.notification?.reason === 'request_already_pending') {
+        setArrivalRequestError(ui.requestAlreadyPending);
+        return;
+      }
+      setArrivalRequestSuccess(ui.requestSent);
       setArrivalRequestMessage('');
     } catch (error) {
       console.error('Failed to submit arrival request:', error);
@@ -629,6 +598,12 @@ export default function CheckInInfo({
   };
 
   const wifiText = `${ui.network}: ${wifiNetwork}\n${ui.password}: ${wifiPassword}`;
+  // Before the disclosure window the server returns when the details appear
+  // (24 h before check-in); shown in the guest's own time zone.
+  const wifiRevealAt = wifiAvailableAt ? new Date(wifiAvailableAt) : null;
+  const wifiNotice = !wifiNetwork && wifiRevealAt && wifiRevealAt.getTime() > Date.now()
+    ? `${ui.wifiAvailableFrom} ${new Intl.DateTimeFormat(isGreek ? 'el-GR' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(wifiRevealAt)}`
+    : null;
   const panelClass = 'checkin-panel';
   const rowClass = 'checkin-row';
   const smallLabelClass = 'checkin-label text-[0.68rem] font-semibold uppercase tracking-[0.14em]';
@@ -656,7 +631,7 @@ export default function CheckInInfo({
               {ui.heroTitle}
             </h1>
             <p className={`${bodyTextClass} mt-5 max-w-2xl text-base leading-7 sm:text-lg`}>
-              {t.checkinInfo?.welcomeMessage || "We're delighted to have you here. Below you'll find everything you need for a comfortable stay."}
+              {t.checkinInfo.welcomeMessage}
             </p>
 
             <div className="mt-7 flex flex-wrap gap-3" aria-label={ui.quickActions}>
@@ -700,22 +675,22 @@ export default function CheckInInfo({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <dt className={smallLabelClass}>{t.checkinInfo?.checkInTime || 'Check-in'}</dt>
+                  <dt className={smallLabelClass}>{t.checkinInfo.checkInTime}</dt>
                   <dd className={`${valueClass} mt-1 font-serif text-2xl font-semibold italic`}>
                     {checkInTime}
                   </dd>
                 </div>
                 <div>
-                  <dt className={smallLabelClass}>{t.checkinInfo?.checkOutTime || 'Check-out'}</dt>
+                  <dt className={smallLabelClass}>{t.checkinInfo.checkOutTime}</dt>
                   <dd className={`${valueClass} mt-1 font-serif text-2xl font-semibold italic`}>
                     {checkOutTime}
                   </dd>
                 </div>
               </div>
               <div>
-                <dt className={smallLabelClass}>{t.checkinInfo?.wifiTitle || 'Internet Access'}</dt>
+                <dt className={smallLabelClass}>{t.checkinInfo.wifiTitle}</dt>
                 <dd className={`${valueClass} mt-1 font-mono text-sm font-semibold`}>
-                  {wifiNetwork || ui.unavailable}
+                  {wifiNetwork || wifiNotice || ui.unavailable}
                 </dd>
               </div>
             </dl>
@@ -740,7 +715,7 @@ export default function CheckInInfo({
                         type="button"
                         onClick={handleEditTimes}
                         className="checkin-outline-action min-h-9 px-3 py-1 text-xs"
-                        title={isGreek ? 'Επεξεργασία ωρών (μόνο οικοδεσπότης)' : 'Edit times (host only)'}
+                        title={panel.editTimesHostOnly}
                       >
                         {ui.edit}
                       </button>
@@ -778,7 +753,7 @@ export default function CheckInInfo({
                     </label>
                     <label className="block">
                       <span className={`${mutedTextClass} text-xs font-medium`}>
-                        {t.checkinInfo?.checkOutTime || 'Check-out'}
+                        {t.checkinInfo.checkOutTime}
                       </span>
                       {isEditingTimes ? (
                         <input
@@ -837,7 +812,7 @@ export default function CheckInInfo({
                         </div>
                       )}
 
-                      {!isRequestingArrival && (
+                      {!isRequestingArrival && arrivalRequest?.status !== 'pending' && (
                         <button
                           type="button"
                           onClick={handleOpenArrivalRequest}
@@ -921,18 +896,19 @@ export default function CheckInInfo({
               <div className={rowClass}>
                 <Icon name="wifi" className={iconClass} />
                 <WifiAccessCard
-                  title={t.checkinInfo?.wifiTitle || 'Internet Access'}
+                  title={t.checkinInfo.wifiTitle}
                   networkLabel={ui.network}
                   passwordLabel={ui.password}
                   network={wifiNetwork}
                   password={wifiPassword}
                   unavailableLabel={ui.unavailable}
+                  notice={wifiNotice}
                   copyLabel={ui.copy}
                   copiedLabel={ui.copied}
                   copiedTarget={copiedTarget === 'network' || copiedTarget === 'password' ? copiedTarget : null}
                   onCopy={copyToClipboard}
-                  networkCopyLabel={isGreek ? 'Αντιγραφή ονόματος δικτύου Wi-Fi' : 'Copy Wi-Fi network name'}
-                  passwordCopyLabel={isGreek ? 'Αντιγραφή κωδικού Wi-Fi' : 'Copy Wi-Fi password'}
+                  networkCopyLabel={panel.networkCopyLabel}
+                  passwordCopyLabel={panel.passwordCopyLabel}
                 />
               </div>
 
@@ -941,7 +917,7 @@ export default function CheckInInfo({
                 <div>
                   <h3 className={`${titleClass} text-sm font-semibold`}>{ui.keys}</h3>
                   <p className={`${bodyTextClass} mt-1 text-sm leading-6`}>
-                    {t.checkinInfo?.keysDetail || 'Please leave keys in the lockbox when checking out'}
+                    {t.checkinInfo.keysDetail}
                   </p>
                 </div>
               </div>
@@ -951,7 +927,7 @@ export default function CheckInInfo({
                 <div>
                   <h3 className={`${titleClass} text-sm font-semibold`}>{ui.parking}</h3>
                   <p className={`${bodyTextClass} mt-1 text-sm leading-6`}>
-                    {apartment.highlights.find((item) => item.toLowerCase().includes('parking')) || ui.parking}
+                    {t.checkinInfo.parkingDetail}
                   </p>
                 </div>
               </div>
@@ -999,7 +975,7 @@ export default function CheckInInfo({
 
         <div className="space-y-6 lg:order-1">
           <section id="house-rules" className={`${panelClass} scroll-mt-24 p-5 sm:p-6`} aria-labelledby="house-rules-title">
-            <SectionTitle id="house-rules-title" title={t.checkinInfo?.houseRulesTitle || 'House Rules'} icon="shield" />
+            <SectionTitle id="house-rules-title" title={t.checkinInfo.houseRulesTitle} icon="shield" />
             <ul className="grid gap-3 sm:grid-cols-2">
               {ruleItems.map((rule) => (
                 <li key={rule} className="checkin-rule-item">
@@ -1013,7 +989,7 @@ export default function CheckInInfo({
           </section>
 
           <section className={`${panelClass} p-5 sm:p-6`} aria-labelledby="amenities-title">
-            <SectionTitle id="amenities-title" title={t.checkinInfo?.amenitiesTitle || 'Key Amenities'} icon="sun" />
+            <SectionTitle id="amenities-title" title={t.checkinInfo.amenitiesTitle} icon="sun" />
             <div className="grid gap-4 md:grid-cols-2">
               {amenityGroups.map((group) => (
                 <div
@@ -1039,7 +1015,7 @@ export default function CheckInInfo({
           </section>
 
           <section className={`${panelClass} p-5 sm:p-6`} aria-labelledby="tips-title">
-            <SectionTitle id="tips-title" title={t.checkinInfo?.tipsTitle || 'Local Tips'} icon="mapPin" />
+            <SectionTitle id="tips-title" title={t.checkinInfo.tipsTitle} icon="mapPin" />
             <div className="checkin-divided">
               {tipItems.map((tip) => (
                 <div key={tip.text} className="flex gap-3 py-4 first:pt-0 last:pb-0">
@@ -1053,7 +1029,7 @@ export default function CheckInInfo({
           <section className={`${panelClass} p-5 sm:p-6`} aria-labelledby="neighborhood-title">
             <SectionTitle id="neighborhood-title" eyebrow={ui.nearby} title={ui.neighborhood} icon="map" />
             <p className={`${bodyTextClass} max-w-2xl text-sm leading-6`}>
-              {checkinStrings.locationDescription || "Discover your apartment's prime location in Kalamata and explore Kalamata Moments, services, and sights within minutes."}
+              {t.locationPanel.locationDescription}
             </p>
             <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(260px,0.65fr)]">
               <div className="checkin-map-shell">

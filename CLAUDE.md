@@ -13,7 +13,8 @@ Runtime: Node 22.19.x and npm 11.18.x. `.nvmrc` does not switch Node automatical
 ```bash
 npm ci                     # also runs `prisma generate` (postinstall)
 npm run ensure-pepper      # repair local dev secrets in .env.local (never production)
-npm run system:up -- --profile development --skip-build   # env check, dev DB (Docker fallback), migrate, start, verify
+npm run system:up          # dev only: env check, dev DB (Docker fallback), migrate, start, verify
+npm run dev:proxy          # local stand-in for the Nginx identity headers; open http://localhost:3001
 npm run dev                # `next dev -H 0.0.0.0` (all interfaces); `predev` checks the pepper
 
 npm test                   # full default Vitest suite (no live DB/network)
@@ -29,12 +30,14 @@ npm run check:dead-code    # knip
 
 npm run test:integration   # disposable, digest-pinned PostgreSQL 16 container; needs local Docker
 npm run verify:release     # mandatory local release gate (30 ordered gates, needs Docker)
+npm run smoke:image        # production-image smoke of the built images with docker/docker-compose.prod.yml (isolated project, torn down)
 ```
 
 - Run the integration suite only through `npm run test:integration`. It creates and tears down its own container and databases, and its guard rejects any caller-supplied or inherited database URL. Never `docker prune` or remove its containers by label alone (see `docs/testing.md`).
-- `npm run build` runs `scripts/generate-precache.ts`, `validate-content.ts` and `generate-version.ts` before `next build` (`output: 'standalone'`). `npm start` serves `.next/standalone`.
+- `npm run build` runs `scripts/validate-content.ts` and `generate-version.ts` before `next build` (`output: 'standalone'`). `npm start` serves `.next/standalone`.
 - `docs/release-verification.md` lists the exact gate order. The repository intentionally has no GitHub Actions workflows, so `verify:release` is enforced only by operator discipline.
-- Operational workers: `npm run outbox:drain` and `npm run operations:check` (systemd timers run them every 1 and 5 minutes in production).
+- Operational workers: `npm run outbox:drain` and `npm run operations:check` in development; in production the `outbox` and `operations` one-off services of `docker/docker-compose.prod.yml` (bundled by `scripts/build-workers.mjs`), scheduled every 1 and 5 minutes by host timers.
+- Production is the Docker images only (`docker/Dockerfile.security`: `runner`, `workers`, `migrate` targets; `npm run docker:build`); the host orchestrator is development-only and there is no systemd path.
 
 ## Architecture
 
@@ -44,7 +47,7 @@ npm run verify:release     # mandatory local release gate (30 ordered gates, nee
 
 **Persistence.** The Prisma client is generated into `src/generated/prisma` (never edit it) and exposed as a lazily constructed `prisma` proxy in `src/lib/prisma.ts` using `@prisma/adapter-pg`. Some data access lives in `src/lib/prisma-repositories/`, and many routes call `prisma` directly.
 
-**Guest auth.** An administrator issues a short-lived, one-time `BookingClaimGrant` token (`api/admin/bookings/[id]/claim-grants`). The guest claims the booking with phone and password; later sign-ins use those credentials. Guest JWT cookies are backed by DB `Session` rows plus rotating `RefreshTokenFamily`/`RefreshToken` generations with absolute expiry and replay revocation. Key modules are `portalAuthService.ts`, `portalClaimExchange.ts`, `guestSession.ts` and `refreshRotationLock.ts` (a PostgreSQL advisory try-lock). Every flow applies the booking-date eligibility window from `portalBookingEligibility.ts`. `docs/testing.md` documents the concurrency and replay policy in detail. Do not restore the legacy document/surname or untrusted booking-reference authentication.
+**Guest auth.** An administrator issues a short-lived, one-time `BookingClaimGrant` token (`api/admin/bookings/[id]/claim-grants`). The guest claims the booking with phone and password; later sign-ins use those credentials. A host access reset (`api/admin/bookings/[id]/access-reset`) clears a claimed guest's password and sessions and issues a new grant for the same booking; a password-less account can set a password only through a grant for a booking it already owns. Guest JWT cookies are backed by DB `Session` rows plus rotating `RefreshTokenFamily`/`RefreshToken` generations with absolute expiry and replay revocation. Key modules are `portalAuthService.ts`, `portalClaimExchange.ts`, `guestSession.ts` and `refreshRotationLock.ts` (a PostgreSQL advisory try-lock). Every flow applies the booking-date eligibility window from `portalBookingEligibility.ts`. `docs/testing.md` documents the concurrency and replay policy in detail. Do not restore the legacy document/surname or untrusted booking-reference authentication.
 
 **Admin auth.** An `admin_jwt` cookie must match an active `AdminSession` (`src/lib/auth/admin.ts`, `adminPageAuth.ts`, `rbac.ts`).
 
@@ -52,9 +55,9 @@ npm run verify:release     # mandatory local release gate (30 ordered gates, nee
 
 **Rate limiting and client identity.** Sensitive limits are PostgreSQL-backed (`sensitiveRateLimit.ts`, `RateLimit` model) and limit both verified client identity and normalized identifiers. Client IP comes from `src/lib/net/`. Production trusts only the loopback Nginx upstream when both the private identity headers and the `ORIGIN_PROXY_SHARED_SECRET` attestation validate. Do not add a mandatory external limiter without a new architecture decision (`docs/security/layered-rate-limiting.md`).
 
-**Environment.** `src/lib/runtime-env-schema.js` is the authoritative schema, and `src/lib/env.ts` wraps it. `instrumentation.ts` validates the environment at server start and throws on failure. Production never loads `.env.local`, runs the orchestrator with `--no-docker-fallback` against a configured reachable database, and fails closed. Never put secrets in `NEXT_PUBLIC_*`.
+**Environment.** `src/lib/runtime-env-schema.js` is the authoritative schema, and `src/lib/env.ts` wraps it. `instrumentation.ts` validates the environment at server start and throws on failure. Production is the Docker image, which never contains `.env*` files (`.dockerignore`) and fails closed at start. Never put secrets in `NEXT_PUBLIC_*`.
 
-**Operations data.** Analytics, Web Vitals, security audit events, alerts and privacy requests/holds are database-backed. `operationalMonitor.ts` handles alert rules and retention. Do not add filesystem or module-memory persistence as a production source of truth.
+**Operations data.** Security audit events, alerts and privacy (erasure) requests are database-backed (there is no analytics or Web Vitals collection; CORS and request-shape violations are logged, not stored). `operationalMonitor.ts` handles alert rules and retention. Do not add filesystem or module-memory persistence as a production source of truth.
 
 **Health.** `/api/health/live` reports liveness only. `/api/health/ready` checks SQL connectivity and migration state.
 

@@ -86,19 +86,12 @@ async function createBaselineFixture() {
     },
   }, null, 2)}\n`);
   await writeRelative(root, 'node_modules/zod/index.js', 'export const z = {};\n');
-  await writeRelative(root, 'Makefile', 'PROFILE ?= development\n');
   await writeRelative(
     root,
     'scripts/system-orchestrator.sh',
-    '#!/usr/bin/env bash\nPROFILE="development"\n# Runtime profile (default: development)\nexport HOSTNAME="127.0.0.1"\n',
+    '#!/usr/bin/env bash\nPROFILE="development"\n',
   );
   await writeRelative(root, 'scripts/ensure-pepper.js', 'const SECURITY_PEPPER = true;\n');
-  await writeRelative(root, 'scripts/install-systemd-services.sh', [
-    'ADMIN_JWT_SECRET=',
-    'ADMIN_DASH_SECRET=',
-    'GUEST_JWT_SECRET=',
-    '',
-  ].join('\n'));
   await writeRelative(root, 'scripts/README.md', [
     'Active production credentials:',
     'ADMIN_JWT_SECRET ADMIN_DASH_SECRET GUEST_JWT_SECRET',
@@ -146,14 +139,13 @@ async function createBaselineFixture() {
     root,
     'config/secret-scanning/current-fixture-allowlist.json',
     `${JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion: 2,
       findings: releasePolicyInternals.expectedCurrentSecretFixtures.map(
-        ([classification, filePath, rule, line, column]) => ({
+        ([valueSha256, classification, filePath, rule]) => ({
           classification,
           path: filePath,
           rule,
-          line,
-          column,
+          valueSha256,
         }),
       ),
     }, null, 2)}\n`,
@@ -261,11 +253,6 @@ async function createBaselineFixture() {
     'limit_conn_status 429;',
     'log_format safe "limit_req=$limit_req_status limit_conn=$limit_conn_status";',
     'log_format claim_safe "$uri";',
-    '',
-  ].join('\n'));
-  await writeRelative(root, 'deploy/systemd/qr-city-guide.service', [
-    'Environment=HOSTNAME=127.0.0.1',
-    'Environment=PORT=3000',
     '',
   ].join('\n'));
   await writeRelative(root, 'src/lib/runtime-env-schema.js', [
@@ -463,6 +450,17 @@ function fixtureGate(id, environment = 'base') {
 test('accepts the restricted local-only release fixture', async () => {
   await withFixture(async (root) => {
     assert.deepEqual(await validateReleasePolicy(root), []);
+  });
+});
+
+test('rejects a system orchestrator that can target production', async () => {
+  await withFixture(async (root) => {
+    await writeFile(
+      path.join(root, 'scripts/system-orchestrator.sh'),
+      '#!/usr/bin/env bash\nPROFILE="development"\ncase "$PROFILE" in\n  production) exit 0 ;;\nesac\n',
+      'utf8',
+    );
+    assertRejected(await validateReleasePolicy(root), /system orchestrator must be development-only/u);
   });
 });
 
@@ -1498,11 +1496,10 @@ test('rejects expansion of the current secret-fixture allowlist', async () => {
       classification: 'synthetic-test-fixture',
       path: 'tests/unreviewed.ts',
       rule: 'generic-api-key',
-      line: 1,
-      column: 1,
+      valueSha256: '0'.repeat(64),
     });
     await writeFile(allowlistPath, `${JSON.stringify(allowlist, null, 2)}\n`, 'utf8');
-    assertRejected(await validateReleasePolicy(root), /reviewed exact locations/u);
+    assertRejected(await validateReleasePolicy(root), /reviewed fixture values/u);
   });
 });
 

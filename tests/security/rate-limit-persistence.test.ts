@@ -3,12 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const queryRaw = vi.hoisted(() => vi.fn());
 const transaction = vi.hoisted(() => vi.fn());
+const executeRaw = vi.hoisted(() => vi.fn());
 const privacyHmac = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/prisma', () => ({ prisma: { $transaction: transaction } }));
+vi.mock('@/lib/prisma', () => ({ prisma: { $transaction: transaction, $executeRaw: executeRaw } }));
 vi.mock('@/lib/privacyHash', () => ({ privacyHmac }));
 
-import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
-import { CLIENT_IDENTITY_UNAVAILABLE } from '@/lib/net/clientIdentity';
+import { checkSensitiveRateLimit, refundSensitiveIdentifierAttempt } from '@/lib/sensitiveRateLimit';
+const CLIENT_IDENTITY_UNAVAILABLE = 'CLIENT_IDENTITY_UNAVAILABLE'; // response contract value
 
 const attestation = '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2';
 
@@ -45,6 +46,25 @@ describe('durable sensitive-operation rate limiting', () => {
     });
     queryRaw.mockResolvedValue([{ count: 1, reset_time: new Date(Date.now() + 60_000) }]);
     transaction.mockImplementation(async (callback) => callback({ $queryRaw: queryRaw }));
+  });
+
+  it('refunds only the identifier dimension, with the key the check counted', async () => {
+    executeRaw.mockResolvedValue(1);
+    await checkSensitiveRateLimit(request('203.0.113.10'), {
+      scope: 'portal-signin',
+      identifier: '691 234 5678',
+      limit: 3,
+      windowMs: 60_000,
+    });
+    const [ipKey, identifierKey] = queryRaw.mock.calls.map((call) => call[1]);
+
+    await refundSensitiveIdentifierAttempt({ scope: 'portal-signin', identifier: '+30 691 234 5678' });
+
+    expect(executeRaw).toHaveBeenCalledOnce();
+    const [sql, key] = executeRaw.mock.calls[0];
+    expect(key).toBe(identifierKey);
+    expect(key).not.toBe(ipKey);
+    expect(sql.join('?')).toMatch(/GREATEST\("count" - 1, 0\)[\s\S]*"reset_time" > CURRENT_TIMESTAMP/);
   });
 
   it('uses both source-IP and normalized identifier dimensions', async () => {

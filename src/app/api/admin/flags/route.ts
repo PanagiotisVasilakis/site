@@ -13,13 +13,13 @@ const schema = z.object({
 }).refine((obj) => Object.keys(obj).length > 0, { message: 'At least one flag must be provided' });
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
-  if (!(await isAdminRequest(req))) throw new ApiError(ApiErrorCode.FORBIDDEN, 'Admin credentials required');
+  if (!(await isAdminRequest(req))) throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
   const flags = await getFeatureFlagsAsync();
   return createSuccessResponse<FeatureFlags>(flags) as NextResponse;
 });
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  if (!(await isAdminRequest(req))) throw new ApiError(ApiErrorCode.FORBIDDEN, 'Admin credentials required');
+  if (!(await isAdminRequest(req))) throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
   const body = await readJsonBody(req, 8 * 1_024);
   const parsed = schema.safeParse(body);
   if (!parsed.success) {

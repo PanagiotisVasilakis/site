@@ -3,11 +3,22 @@ import { Prisma } from '@/generated/prisma/client';
 
 import { prisma } from '@/lib/prisma';
 
-export function privacySubjectDigest(kind: 'user' | 'booking', id: string): string {
+function privacySubjectDigest(kind: 'user' | 'booking', id: string): string {
   return crypto.createHash('sha256').update(`privacy-subject:v1:${kind}:${id}`).digest('hex');
 }
 
-export async function createVerifiedErasureRequest(userId: string, bookingId?: string) {
+/**
+ * Erase one guest on the host's instruction (admin UI). The host verifies the
+ * guest's identity out of band; the audit note records why and on whose request.
+ */
+export async function eraseGuestByAdmin(userId: string, auditNote: string) {
+  const subject = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+  if (!subject) throw new Error('ERASURE_SUBJECT_NOT_FOUND');
+  const { request } = await createVerifiedErasureRequest(userId, auditNote);
+  return completeErasureRequest(request.id, auditNote);
+}
+
+async function createVerifiedErasureRequest(userId: string, auditNote: string) {
   const existing = await prisma.privacyRequest.findFirst({
     where: {
       userId,
@@ -23,11 +34,10 @@ export async function createVerifiedErasureRequest(userId: string, bookingId?: s
       data: {
         id: crypto.randomUUID(),
         userId,
-        bookingId: bookingId ?? null,
         subjectDigest: privacySubjectDigest('user', userId),
         requestType: 'ERASURE',
         status: 'VERIFIED',
-        auditNote: 'Identity verified through active guest session.',
+        auditNote: auditNote.slice(0, 1_024),
       },
     });
     return { request, created: true };
@@ -43,7 +53,7 @@ export async function createVerifiedErasureRequest(userId: string, bookingId?: s
   }
 }
 
-export async function completeErasureRequest(requestId: string, auditNote: string) {
+async function completeErasureRequest(requestId: string, auditNote: string) {
   return prisma.$transaction(async (tx) => {
     const request = await tx.privacyRequest.findUnique({ where: { id: requestId } });
     if (!request || request.requestType !== 'ERASURE') throw new Error('ERASURE_REQUEST_NOT_FOUND');
@@ -62,17 +72,6 @@ export async function completeErasureRequest(requestId: string, auditNote: strin
     if (!user) throw new Error('ERASURE_SUBJECT_NOT_FOUND');
 
     const bookingIds = user.bookings.map((booking) => booking.id);
-    const activeHolds = await tx.privacyHold.count({
-      where: {
-        releasedAt: null,
-        AND: [{ OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }],
-        OR: [
-          { userId: user.id },
-          ...(bookingIds.length ? [{ bookingId: { in: bookingIds } }] : []),
-        ],
-      },
-    });
-    if (activeHolds > 0) throw new Error('ERASURE_BLOCKED_BY_ACTIVE_HOLD');
 
     const checkInRequests = await tx.checkInRequest.findMany({
       where: {
@@ -133,6 +132,8 @@ export async function completeErasureRequest(requestId: string, auditNote: strin
           phone: '+999000000000',
           arrivalTime: null,
           specialRequests: null,
+          // Its undelivered events are cancelled below; nothing is left to deliver.
+          status: 'CLOSED',
         },
       });
       await tx.outboxEvent.updateMany({
@@ -151,10 +152,6 @@ export async function completeErasureRequest(requestId: string, auditNote: strin
       await tx.checkInRequest.updateMany({
         where: { OR: [{ userId: user.id }, { bookingId: { in: bookingIds } }] },
         data: { userId: null, guestName: null, guestEmail: null, guestPhone: null, message: null },
-      });
-      await tx.checkin.updateMany({
-        where: { bookingId: { in: bookingIds } },
-        data: { specialRequests: null },
       });
       await tx.bookingClaimGrant.updateMany({
         where: { bookingId: { in: bookingIds }, revokedAt: null },

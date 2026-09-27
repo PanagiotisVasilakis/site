@@ -16,7 +16,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const pathname = usePathname();
   const locale: Locale = pathname?.startsWith('/el') ? 'el' : 'en';
-  const dismissLabel = getDictionary(locale).updates?.dismiss ?? 'Dismiss';
+  const dismissLabel = getDictionary(locale).updates.dismiss;
   const push = useCallback((message: string) => {
     setToasts(ts => [...ts, { id: Date.now() + Math.random(), message, expires: Date.now() + 3000 }]);
   }, []);
@@ -33,7 +33,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {children}
     <div aria-live="polite" className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 items-center px-2">
         {toasts.map(t => (
-      <div key={t.id} className="toast-item floating-banner text-[11px] px-3 py-2 rounded-full shadow-float-soft flex items-center gap-2">
+      <div key={t.id} className="toast-item floating-banner text-[11px] px-3 py-2 rounded-full flex items-center gap-2">
             <span>{t.message}</span>
             <button aria-label={dismissLabel} className="btn-tint btn-sm" onClick={() => setToasts(ts => ts.filter(x => x.id !== t.id))}>×</button>
           </div>

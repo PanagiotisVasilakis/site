@@ -80,14 +80,6 @@ export default function AdminHomeClient() {
       href: '/admin/settings',
       action: 'Open settings',
     },
-    {
-      title: 'Analytics',
-      value: 'Monitoring',
-      body: 'Open analytics and observability dashboards.',
-      href: '/admin/analytics',
-      secondaryHref: '/admin/dashboard',
-      action: 'Open analytics',
-    },
   ]), [state, summary.pending]);
 
   return (
@@ -153,14 +145,6 @@ export default function AdminHomeClient() {
                   <span className="admin-action-muted">
                     {card.action}
                   </span>
-                )}
-                {card.secondaryHref && (
-                  <Link
-                    href={card.secondaryHref}
-                    className="admin-action-outline"
-                  >
-                    Open monitoring
-                  </Link>
                 )}
               </div>
             </div>

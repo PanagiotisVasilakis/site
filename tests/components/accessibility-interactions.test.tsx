@@ -54,7 +54,7 @@ describe('theme and document locale behavior', () => {
     localStorage.setItem('theme', 'dark');
     render(<ThemeToggle />);
     const button = await screen.findByRole('button', { name: /switch to light mode/i });
-    expect(document.documentElement).toHaveClass('dark');
+    expect(document.documentElement).not.toHaveClass('dark');
     expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
     expect(button).toHaveTextContent('Dark');
   });
@@ -65,7 +65,7 @@ describe('theme and document locale behavior', () => {
     const button = await screen.findByRole('button', { name: /switch to dark mode/i });
     await user.click(button);
     expect(localStorage.getItem('theme')).toBe('dark');
-    expect(document.documentElement).toHaveClass('dark');
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark');
     expect(button).toHaveAccessibleName(/switch to light mode/i);
   });
 
@@ -74,7 +74,7 @@ describe('theme and document locale behavior', () => {
     render(<ThemeToggle />);
     await screen.findByRole('button', { name: /switch to dark mode/i });
     act(() => media.setMatches(true));
-    await waitFor(() => expect(document.documentElement).toHaveClass('dark'));
+    await waitFor(() => expect(document.documentElement).toHaveAttribute('data-theme', 'dark'));
   });
 
   it('responds to cross-tab storage changes and uses Greek labels', async () => {
@@ -82,7 +82,7 @@ describe('theme and document locale behavior', () => {
     render(<ThemeToggle />);
     await screen.findByRole('button', { name: /σκοτεινή/i });
     act(() => window.dispatchEvent(new StorageEvent('storage', { key: 'theme', newValue: 'dark' })));
-    await waitFor(() => expect(document.documentElement).toHaveClass('dark'));
+    await waitFor(() => expect(document.documentElement).toHaveAttribute('data-theme', 'dark'));
   });
 
   it('keeps the document language synchronized on rerender', () => {

@@ -67,22 +67,6 @@ export async function proxy(req: NextRequest) {
     return redirectResponse;
   }
 
-  // Legacy /[locale]/house redirect to /[locale]/apartment (permanent for clients/SEO)
-  if (/^\/[a-zA-Z-]+\/house(\/)?$/.test(pathname)) {
-    const segs = pathname.split('/');
-    const loc = segs[1];
-    const url2 = req.nextUrl.clone();
-    url2.pathname = `/${loc}/apartment`;
-    const redirectResponse = NextResponse.redirect(url2, 308);
-
-    // Copy security headers to redirect response
-    response.headers.forEach((value, key) => {
-      redirectResponse.headers.set(key, value);
-    });
-
-    return redirectResponse;
-  }
-
   // When a locale is present in URL, ensure cookie matches it
   const current = pathname.split("/")[1] as string;
   if ((locales as readonly string[]).includes(current) && cookieLocale !== current) {

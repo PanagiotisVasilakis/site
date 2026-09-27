@@ -46,6 +46,8 @@ export interface BookingFormDictionary {
     submittedAnnounce: string;
     submittingAnnounce: string;
     submitFailed: string;
+    submitRateLimited: string;
+    submitRejected: string;
 }
 
 interface BookingDetailsPageDictionary {
@@ -57,28 +59,29 @@ interface BookingDetailsPageDictionary {
     cancellation: string[];
     contactTitle: string;
     contactIntro: string;
+    /** `{email}` and `{phone}` are replaced with `HOST_CONTACT` (src/data/contact.ts). */
     contact: string[];
     metaDescription: string;
 }
 
 export interface BookingDictionary {
     locationDesc: string;
-    completeTitle?: string;
-    yourDetails?: string;
-    datesLabel?: string;
-    durationLabel?: string;
-    notSelected?: string;
-    selectDatesPrompt?: string;
-    whatsIncluded?: string;
-    night?: string;
-    nights?: string;
-    selectDatesError?: string;
-    backToProperty?: string;
-    goBackToDates?: string;
-    showAllAmenities?: string;
-    showLessAmenities?: string;
-    form?: BookingFormDictionary;
-    detailsPage?: BookingDetailsPageDictionary;
+    completeTitle: string;
+    yourDetails: string;
+    datesLabel: string;
+    durationLabel: string;
+    notSelected: string;
+    selectDatesPrompt: string;
+    whatsIncluded: string;
+    night: string;
+    nights: string;
+    selectDatesError: string;
+    backToProperty: string;
+    goBackToDates: string;
+    showAllAmenities: string;
+    showLessAmenities: string;
+    form: BookingFormDictionary;
+    detailsPage: BookingDetailsPageDictionary;
 }
 
 // ============================================================================
@@ -138,7 +141,9 @@ export const bookingTranslations: Record<Locale, BookingDictionary> = {
             formErrorsAnnounce: "Please review and correct the highlighted fields.",
             submittedAnnounce: "Stay request received successfully.",
             submittingAnnounce: "Sending stay request, please wait...",
-            submitFailed: "Unable to send your stay request right now. Please contact the host directly."
+            submitFailed: "Unable to send your stay request right now. Please contact the host directly.",
+            submitRateLimited: "Too many requests were sent from this connection. Please wait a few minutes and try again.",
+            submitRejected: "Some details could not be accepted. Please check the dates and your phone number and try again."
         },
         detailsPage: {
             howToBookTitle: "How to Book",
@@ -165,8 +170,8 @@ export const bookingTranslations: Record<Locale, BookingDictionary> = {
             contactTitle: "Contact Us",
             contactIntro: "Ready to book your stay? Get in touch with us for personalized assistance.",
             contact: [
-                "📧 Email: dolcefarnienteapartments@gmail.com",
-                "📱 Phone: +30 695 581 0051",
+                "📧 Email: {email}",
+                "📱 Phone: {phone}",
                 "💬 WhatsApp: Available for instant booking"
             ],
             metaDescription: "Learn about our booking process, availability, and policies for your stay at our luxury apartment."
@@ -224,7 +229,9 @@ export const bookingTranslations: Record<Locale, BookingDictionary> = {
             formErrorsAnnounce: "Παρακαλώ ελέγξτε και διορθώστε τα επισημασμένα πεδία.",
             submittedAnnounce: "Το αίτημα διαμονής παραλήφθηκε με επιτυχία.",
             submittingAnnounce: "Αποστολή αιτήματος, παρακαλώ περιμένετε...",
-            submitFailed: "Δεν είναι δυνατή η αποστολή του αιτήματος αυτή τη στιγμή. Παρακαλώ επικοινωνήστε απευθείας με τον οικοδεσπότη."
+            submitFailed: "Δεν είναι δυνατή η αποστολή του αιτήματος αυτή τη στιγμή. Παρακαλώ επικοινωνήστε απευθείας με τον οικοδεσπότη.",
+            submitRateLimited: "Στάλθηκαν πάρα πολλά αιτήματα από αυτή τη σύνδεση. Περιμένετε λίγα λεπτά και δοκιμάστε ξανά.",
+            submitRejected: "Κάποια στοιχεία δεν έγιναν δεκτά. Ελέγξτε τις ημερομηνίες και τον αριθμό τηλεφώνου σας και δοκιμάστε ξανά."
         },
         detailsPage: {
             howToBookTitle: "Πώς να Κάνετε Κράτηση",
@@ -251,8 +258,8 @@ export const bookingTranslations: Record<Locale, BookingDictionary> = {
             contactTitle: "Επικοινωνήστε μαζί μας",
             contactIntro: "Έτοιμοι να κλείσετε τη διαμονή σας; Επικοινωνήστε μαζί μας για εξατομικευμένη βοήθεια.",
             contact: [
-                "📧 Email: dolcefarnienteapartments@gmail.com",
-                "📱 Τηλέφωνο: +30 695 581 0051",
+                "📧 Email: {email}",
+                "📱 Τηλέφωνο: {phone}",
                 "💬 WhatsApp: Διαθέσιμο για άμεση κράτηση"
             ],
             metaDescription: "Μάθετε για τη διαδικασία κράτησης, τη διαθεσιμότητα και τις πολιτικές για τη διαμονή σας στο πολυτελές διαμέρισμά μας."

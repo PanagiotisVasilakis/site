@@ -214,8 +214,6 @@ async function seedBoundary(
         salt: refreshHash.salt,
         familyId: AUTH_FAMILY_ID,
         expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60_000),
-        deviceHint: DEVICE_HASH,
-        ipHint: IP_HASH,
       },
     });
   }, 'seed');

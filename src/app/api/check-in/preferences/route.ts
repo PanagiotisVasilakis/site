@@ -5,11 +5,11 @@ import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import { GUEST_SESSION_COOKIE, parseGuestSession, verifyGuestSessionAccess } from '@/lib/guestSession';
 import { isAdminRequest } from '@/lib/rbac';
 import { getFeatureFlagsAsync } from '@/lib/featureFlags';
-import { wifiDisclosureWindow } from '@/lib/propertyTime';
+import { timePattern, wifiDisclosureWindow } from '@/lib/propertyTime';
 
 const preferencesSchema = z.object({
-  checkInTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Check-in time must be in HH:MM format'),
-  checkOutTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Check-out time must be in HH:MM format'),
+  checkInTime: z.string().regex(timePattern, 'Check-in time must be in HH:MM format'),
+  checkOutTime: z.string().regex(timePattern, 'Check-out time must be in HH:MM format'),
 });
 
 const PREFERENCES_KEY = 'checkin_preferences';

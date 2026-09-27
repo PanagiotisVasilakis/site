@@ -10,9 +10,15 @@ const optionalEnv = (schema) => z.preprocess(
   schema.optional(),
 );
 
+// Zod 4 still runs this refine after `.url()` fails, so an empty or unparsable
+// value must return false here instead of throwing a bare TypeError.
 function isPostgresUrl(value) {
-  const protocol = new URL(value).protocol;
-  return protocol === 'postgresql:' || protocol === 'postgres:';
+  try {
+    const protocol = new URL(value).protocol;
+    return protocol === 'postgresql:' || protocol === 'postgres:';
+  } catch {
+    return false;
+  }
 }
 
 function isTimeZone(value) {
@@ -39,7 +45,7 @@ export const runtimeEnvSchema = z.object({
   ADMIN_DASH_SECRET: optionalEnv(z.string()),
   GUEST_JWT_SECRET: optionalEnv(z.string()),
   SECURITY_PEPPER: z.string().min(16, 'SECURITY_PEPPER must be at least 16 characters'),
-  CLAIM_TOKEN_PEPPER: optionalEnv(z.string().min(32, 'CLAIM_TOKEN_PEPPER must be at least 32 characters')),
+  CLAIM_TOKEN_PEPPER: z.string().min(32, 'CLAIM_TOKEN_PEPPER must be at least 32 characters'),
   GUEST_WIFI_NETWORK: z.string().min(1, 'GUEST_WIFI_NETWORK is required'),
   GUEST_WIFI_PASSWORD: z.string().min(8, 'GUEST_WIFI_PASSWORD must be at least 8 characters'),
   PROPERTY_TIME_ZONE: z.string().refine(isTimeZone, 'PROPERTY_TIME_ZONE must be a valid IANA time zone').default('Europe/Athens'),
@@ -48,7 +54,6 @@ export const runtimeEnvSchema = z.object({
   ALLOWED_ORIGINS: z.string().optional(),
   NEXT_PUBLIC_SITE_URL: z.string().url().optional(),
   NEXT_PUBLIC_OSRM_BASE_URL: optionalEnv(z.string().url()),
-  NEXT_PUBLIC_ENABLE_PERF_TELEMETRY: optionalEnv(z.enum(['true', 'false'])),
   BUILD_SITE_URL: optionalEnv(z.string().url()),
   ORIGIN_PROXY_SHARED_SECRET: optionalEnv(z.string().refine(
     isOriginProxySecret,
@@ -63,7 +68,6 @@ export const runtimeEnvSchema = z.object({
   ALERT_WEBHOOK_TOKEN: optionalEnv(z.string().min(20)),
   ALERT_WEBHOOK_REQUIRED: z.enum(['0', '1']).optional().default('0'),
 
-  ANALYTICS_RETENTION_DAYS: z.string().regex(/^\d+$/).optional().default('30'),
   PRISMA_AUTO_DISCONNECT: optionalEnv(z.enum(['true', 'false'])),
   PRISMA_IDLE_DISCONNECT_MS: optionalEnv(z.string().regex(/^\d+$/)),
   PRISMA_LOG_LIFECYCLE: optionalEnv(z.enum(['0', '1'])),
@@ -127,9 +131,6 @@ export const runtimeEnvSchema = z.object({
   }
   if (env.NODE_ENV === 'production' && !env.ORIGIN_PROXY_SHARED_SECRET) {
     context.addIssue({ code: 'custom', path: ['ORIGIN_PROXY_SHARED_SECRET'], message: 'ORIGIN_PROXY_SHARED_SECRET is required in production' });
-  }
-  if (env.NODE_ENV === 'production' && !env.CLAIM_TOKEN_PEPPER) {
-    context.addIssue({ code: 'custom', path: ['CLAIM_TOKEN_PEPPER'], message: 'CLAIM_TOKEN_PEPPER is required in production' });
   }
   for (const [urlKey, tokenKey] of [
     ['BOOKING_REQUEST_WEBHOOK_URL', 'BOOKING_REQUEST_WEBHOOK_TOKEN'],

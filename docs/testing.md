@@ -11,7 +11,7 @@ The design goal is high-signal regression protection, not assertions against imp
 - `tests/unit`: pure formatting, validation, date/time, data, map, navigation, and adapter configuration.
 - `tests/security`: environment fail-closed rules, JWT and database-session contracts, request-body limits, error sanitization, privacy hashing/redaction, trusted proxies, durable rate limiting, limiter failure responses, and portal refresh behavior.
 - `tests/components`: jsdom interaction tests for theme state, locale synchronization, modal focus management, safe fallbacks, and request cancellation.
-- `tests/routes`: public liveness and OpenAPI contracts, and the client error-report round trip.
+- `tests/routes`: route contracts (liveness, admin bookings and claim grants, booking requests, portal refresh, CSP reports) and the client error-report round trip.
 
 The default suite deliberately does not connect to PostgreSQL, webhooks, OSRM,
 or another live service. Persistence and network boundaries are mocked at

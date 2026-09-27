@@ -1,0 +1,15 @@
+{
+  "name": "qr-city-guide-migrate",
+  "version": "0.1.1",
+  "private": true,
+  "description": "Dependency manifest of the migrate image target (docker/Dockerfile.security): the Prisma CLI that applies the committed migrations, pinned to the application's Prisma version, plus dotenv for prisma.config.ts. tests/unit/migrate-image-manifest.test.ts keeps it in sync with the root lockfile.",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22.19.0",
+    "npm": ">=11.18.0"
+  },
+  "dependencies": {
+    "dotenv": "17.4.2",
+    "prisma": "7.8.0"
+  }
+}

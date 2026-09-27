@@ -1,35 +1,37 @@
 #!/usr/bin/env node
 /*
- * Lightweight predev checker: warns if SECURITY_PEPPER is not present in env
- * This should not block `npm run dev`; it only prints guidance.
+ * Lightweight predev checker: warns if SECURITY_PEPPER or CLAIM_TOKEN_PEPPER is
+ * missing. It does not block `npm run dev` (the server's environment validation
+ * does); it only prints guidance.
  */
 import fs from 'fs';
 import path from 'path';
 
 const envPath = path.resolve(process.cwd(), '.env.local');
 
-function fileHasPepper(p) {
+function readEnvFile(p) {
   try {
-    const s = fs.readFileSync(p, 'utf8');
-    return /^\s*SECURITY_PEPPER\s*=\s*/m.test(s);
+    return fs.readFileSync(p, 'utf8');
   } catch {
-    return false;
+    return '';
   }
 }
 
-if (process.env.SECURITY_PEPPER) {
-  // Already provided via environment — good.
+const envFile = readEnvFile(envPath);
+const inEnvFile = {
+  SECURITY_PEPPER: /^\s*SECURITY_PEPPER\s*=\s*\S/m,
+  CLAIM_TOKEN_PEPPER: /^\s*CLAIM_TOKEN_PEPPER\s*=\s*\S/m,
+};
+const missing = Object.keys(inEnvFile).filter((name) => !process.env[name] && !inEnvFile[name].test(envFile));
+
+if (missing.length === 0) {
   process.exit(0);
 }
 
-if (fileHasPepper(envPath)) {
-  process.exit(0);
-}
-
-// No pepper found — warn but do not fail.
-console.warn('\n⚠️  SECURITY_PEPPER not found for local development.');
+// Missing values — warn but do not fail.
+console.warn(`\n⚠️  ${missing.join(' and ')} not found for local development.`);
 console.warn('Run `npm run ensure-pepper` to generate a local .env.local with a secure value.');
-console.warn('Alternatively, set SECURITY_PEPPER in your environment or in .env.local.');
+console.warn('Alternatively, set them in your environment or in .env.local.');
 console.warn('This is a development-time helper only — do NOT commit secrets to the repository.\n');
 
 process.exit(0);

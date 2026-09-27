@@ -9,7 +9,7 @@ import type {
 } from '@/lib/prisma-repositories/refreshTokenRepository';
 import {
   createPortalBookingEligibilityWindow,
-  isPortalBookingTemporallyEligible,
+  isPortalBookingEligible,
 } from '@/lib/portalBookingEligibility';
 import { readRuntimeCredential } from '@/lib/runtime-credentials.js';
 
@@ -154,9 +154,7 @@ export async function verifyGuestSessionAccess(
     || sessionRecord.revokedAt
     || sessionRecord.expiresAt <= now
     || !booking
-    || booking.accessStatus !== 'VERIFIED'
-    || booking.userId !== userId
-    || !isPortalBookingTemporallyEligible(booking, eligibilityWindow)) {
+    || !isPortalBookingEligible(booking, userId, eligibilityWindow)) {
     return null;
   }
 

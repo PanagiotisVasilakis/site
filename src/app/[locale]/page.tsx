@@ -1,7 +1,7 @@
 import { getOrderedCategories, pickCategoryLocale } from "@/lib/data";
 import { absUrl, siteUrl } from "@/lib/site";
 import { getDictionary } from "@/i18n/dictionaries";
-import { locales, type Locale } from "@/i18n/config";
+import { normalizeLocale } from '@/i18n/config';
 import HomeHero from "@/components/HomeHero";
 import DeferredHomeInteractiveBar from "@/components/DeferredHomeInteractiveBar";
 import DeferredContactSection from "@/components/DeferredContactSection";
@@ -12,17 +12,17 @@ import { serializeJsonLd } from '@/lib/jsonLd';
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const nonce = (await headers()).get('x-nonce') ?? undefined;
-  const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : "en";
+  const eff = normalizeLocale(locale);
   const t = getDictionary(eff);
   const cats = getOrderedCategories();
   const featureCards: HomeFeature[] = [
     {
       href: `/${eff}/apartment`,
-      label: t.house?.navLabel || 'Apartment Photos',
+      label: t.house.navLabel,
     },
     {
       href: `/${eff}/check-in`,
-      label: t.checkin?.navInfoLabel || 'Check-In Info',
+      label: t.checkin.navInfoLabel,
     },
     ...cats.slice(0, 2).map((c) => ({
       href: `/${eff}/${c.slug}`,
@@ -55,18 +55,10 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
       <div className="page-container home-typography mx-auto max-w-5xl">
         <DeferredHomeInteractiveBar
           locale={eff}
-          subline={eff === 'el' ? 'Πολυτελές διαμέρισμα στην Καλαμάτα' : 'Luxury apartment in Kalamata, Greece'}
-          labels={{
-            addDates: t.search?.addDates || 'Add dates',
-            checkAvailability: t.search?.checkAvailability || 'Check availability',
-            arrivalLabel: t.search?.arrivalLabel,
-            arrivalPlaceholder: t.search?.arrivalPlaceholder,
-            departureLabel: t.search?.departureLabel,
-            departurePlaceholder: t.search?.departurePlaceholder
-          }}
+          subline={t.homeSubline}
         />
         <HomeFeatureGrid
-          label={eff === 'el' ? 'Βασικές επιλογές οδηγού επισκέπτη' : 'Guest guide shortcuts'}
+          label={t.homeFeaturesLabel}
           features={featureCards}
         />
       </div>

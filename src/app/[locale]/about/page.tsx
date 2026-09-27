@@ -1,6 +1,7 @@
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
-import { localizedAlternates, normalizeLocale } from '@/lib/seo';
+import { normalizeLocale } from '@/i18n/config';
+import { localizedAlternates } from '@/lib/seo';
 
 interface AboutPageProps {
   params: Promise<{
@@ -24,7 +25,7 @@ export default async function AboutPage({ params }: AboutPageProps) {
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="surface-card rounded-2xl shadow-lg p-8">
           <h1 className="text-3xl page-title mb-6 font-serif italic font-bold">
-            {dictionary.aboutUs || 'About Us'}
+            {dictionary.aboutUs}
           </h1>
 
           <div className="space-y-8">
@@ -94,11 +95,11 @@ export async function generateMetadata({ params }: AboutPageProps) {
   const eff = normalizeLocale(locale);
   const dictionary = getDictionary(eff);
   return {
-    title: `${dictionary.aboutUs || 'About Us'} | Dolce Far Niente`,
+    title: `${dictionary.aboutUs} | Dolce Far Niente`,
     description: dictionary.about?.metaDescription,
     alternates: localizedAlternates(eff, '/about'),
     openGraph: {
-      title: dictionary.aboutUs || 'About Us',
+      title: dictionary.aboutUs,
       description: dictionary.about?.metaDescription,
       url: `/${eff}/about`,
       locale: eff,

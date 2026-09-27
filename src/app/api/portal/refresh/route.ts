@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withErrorHandler, createSuccessResponse as success } from '@/lib/apiErrorHandler';
+import { ApiError, ApiErrorCode, withErrorHandler, createSuccessResponse as success } from '@/lib/apiErrorHandler';
+import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 import { guestStore } from '@/lib/guestDataStore';
 import {
   createSessionCookie,
@@ -12,7 +13,6 @@ import {
 } from '@/lib/guestSession';
 import { logger as elogger } from '@/lib/logger-enterprise';
 import { requestAuthContext } from '@/lib/portalAuthHttp';
-import { toSafeLocalPath } from '@/lib/safeLocalPath';
 
 function applyAuthCookies(response: NextResponse, sessionJwt: string, refreshToken?: string): void {
   const sessionCookie = createSessionCookie(sessionJwt);
@@ -109,11 +109,14 @@ async function issueRefreshedSession(
   };
 }
 
+// The caller (src/lib/portalRefreshClient.ts) navigates to its validated `next`
+// itself. The route never redirects: an absolute Location built from req.url
+// would carry the server bind host (0.0.0.0 / localhost), not the public host.
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  // Support GET-style redirect flow too by allowing query params in POST.
-  const nextUrl = req.nextUrl;
-  const nextRaw = nextUrl.searchParams.get('next');
-  const nextParam = toSafeLocalPath(nextRaw, req.url) ?? undefined;
+  // No token rotation while the portal is switched off (same 404 as its other routes).
+  if (!(await getFeatureFlagsAsync()).portalEnabled) {
+    throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
+  }
   const refresh = req.cookies.get(GUEST_REFRESH_COOKIE)?.value;
   if (!refresh) {
     return unauthorizedResponse();
@@ -128,13 +131,5 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
   const res = success({ refreshed: true });
   applyAuthCookies(res, refreshed.jwt, refreshed.refreshToken);
-
-  // If next is provided, perform a redirect after setting cookies
-  if (nextParam) {
-    const redirectResponse = NextResponse.redirect(new URL(nextParam, req.url), 302);
-    applyAuthCookies(redirectResponse, refreshed.jwt, refreshed.refreshToken);
-    return redirectResponse;
-  }
-
   return res;
 });

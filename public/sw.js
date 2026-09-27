@@ -1,550 +1,130 @@
-/* basic offline-first service worker for Next.js static assets and pages */
-// Bump CACHE_VERSION to invalidate the service worker caches.
-const CACHE_VERSION = 'v4';
+/* Minimal service worker: offline fallback pages, immutable build assets and images.
+ *
+ * HTML is network-first. Nothing is precached except the offline pages and
+ * icons, so a redirect (e.g. `/` → `/en`) is never replayed from the cache and
+ * online visitors always get the current deploy. Visited public pages are kept
+ * for offline reading. PwaManager registers `/sw.js?v=<version>&build=<build>`
+ * from /version.json, so every build installs a new worker and a new cache.
+ */
+const params = new URL(self.location.href).searchParams;
+const VERSION = params.get('v') || '0.0.0';
+const BUILD = params.get('build') || 'unversioned';
 const CACHE_PREFIX = 'guest-guide-';
-let RUNTIME_META = { version: CACHE_VERSION, pkgVersion: undefined, precacheHash: undefined };
-let ACTIVE_CACHE_NAME = `guest-guide-${CACHE_VERSION}`; // updated after reading version.json
-// Keep core shell + locale root + offline pages for all supported locales.
-const CORE_ASSETS = [
-  '/',
-  '/en','/el',
+const CACHE_NAME = `${CACHE_PREFIX}${BUILD}`;
+
+const OFFLINE_ASSETS = [
   '/offline',
-  '/en/offline','/el/offline',
-  '/favicon.ico',
+  '/en/offline',
+  '/el/offline',
   '/app.webmanifest',
-  // Key icons / imagery likely referenced above the fold (add more as needed)
+  '/favicon.ico',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
-  '/icons/apple-touch-icon.png'
+  '/icons/apple-touch-icon.png',
 ];
-// Internal fetch helper to centralize internal route calls (for lint compliance)
-function fetchInternal(input, init) { return fetch(input, init); }
 
+// Never stored: authenticated, administrative or per-guest pages.
 const PRIVATE_PAGE_PREFIXES = [
   '/admin',
   '/en/check-in', '/el/check-in',
   '/en/guest', '/el/guest',
   '/en/portal', '/el/portal',
 ];
+
+// Internal fetch helper (keeps the internal-fetch lint rule satisfied).
+function fetchInternal(input, init) { return fetch(input, init); }
+
 function isPrivatePage(pathname) {
   return PRIVATE_PAGE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
-function canStore(response) {
-  if (!response?.ok) return false;
-  const cacheControl = response.headers.get('cache-control')?.toLowerCase() || '';
-  return !cacheControl.includes('no-store') && !cacheControl.includes('private');
-}
 
-// Cache validation helper to prevent serving corrupted responses
-async function validateCachedResponse(response) {
-  if (!response) return false;
-  try {
-    // Check if response is readable and has valid headers
-    if (!response.ok && response.status !== 0) return false;
-    
-    // For HTML responses, verify basic structure integrity
-    if (response.headers.get('content-type')?.includes('text/html')) {
-      const clone = response.clone();
-      const text = await clone.text();
-      // Basic validation - should have opening tag and some content
-      if (text.length < 10 || !text.includes('<')) return false;
-    }
-    
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-// Cache storage management for quota exceeded scenarios
-async function manageCacheStorage(cache) {
-  try {
-    const keys = await cache.keys();
-    // Remove oldest 25% of cached items to free up space
-    const keysToDelete = keys.slice(0, Math.floor(keys.length * 0.25));
-    await Promise.all(keysToDelete.map(key => cache.delete(key)));
-  } catch {
-    // If management fails, clear all cache as last resort
-    try {
-      const keys = await cache.keys();
-      await Promise.all(keys.map(key => cache.delete(key)));
-    } catch {}
-  }
-}
-
-// Simple IndexedDB wrapper for queueing failed analytics POSTs
-const DB_NAME = 'analytics-queue-db';
-const STORE = 'queue';
-const MAX_ANALYTICS_REPLAY_ATTEMPTS = 5;
-const MAX_ANALYTICS_QUEUE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-function openQueueDb() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { autoIncrement: true });
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-function isQueueableAnalyticsBody(body) {
-  if (typeof body !== 'string' || body.length === 0 || body.length > 100 * 1024) return false;
-  try {
-    if (new TextEncoder().encode(body).byteLength > 100 * 1024) return false;
-    const parsed = JSON.parse(body);
-    return !Array.isArray(parsed) || parsed.length <= 50;
-  } catch {
-    return false;
-  }
-}
-
-async function enqueue(body) {
-  if (!isQueueableAnalyticsBody(body)) return false;
-  try {
-    const db = await openQueueDb();
-    
-    // Use a single transaction for atomic queue management
-    const tx = db.transaction(STORE, 'readwrite');
-    const store = tx.objectStore(STORE);
-    
-    // Get current queue size within the same transaction
-    const sizeRequest = store.count();
-    const currentSize = await new Promise((resolve, reject) => {
-      sizeRequest.onsuccess = () => resolve(sizeRequest.result);
-      sizeRequest.onerror = () => reject(sizeRequest.error);
-    });
-    
-    // If queue is full, remove oldest entries atomically
-    if (currentSize >= 100) {
-      console.warn('Analytics queue full, dropping oldest entries');
-      
-      // Get oldest entries to delete
-      const deletePromises = [];
-      const cursor = store.openCursor();
-      
-      await new Promise((resolve, reject) => {
-        let deletedCount = 0;
-        cursor.onsuccess = (e) => {
-          const cur = e.target.result;
-          if (cur && deletedCount < 10) {
-            deletePromises.push(
-              new Promise((delResolve, delReject) => {
-                const deleteReq = store.delete(cur.primaryKey);
-                deleteReq.onsuccess = () => delResolve();
-                deleteReq.onerror = () => delReject(deleteReq.error);
-              })
-            );
-            deletedCount++;
-            cur.continue();
-          } else {
-            resolve();
-          }
-        };
-        cursor.onerror = () => reject(cursor.error);
-      });
-      
-      // Wait for all deletions to complete
-      await Promise.all(deletePromises);
-    }
-    
-    // Add new entry atomically
-    await new Promise((resolve, reject) => {
-      const req = store.add({ body, timestamp: Date.now() });
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-    
-    // Ensure transaction completes
-    await new Promise((resolve, reject) => {
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-    
-    broadcastQueueSize();
-    return true;
-  } catch (err) {
-    console.error('Failed to enqueue analytics:', err);
-    return false;
-  }
-}
-async function flushQueue() {
-  try {
-    const db = await openQueueDb();
-    const tx = db.transaction(STORE, 'readonly');
-    const store = tx.objectStore(STORE);
-    const payloads = [];
-    await new Promise((resolve, reject) => {
-      const cursorRequest = store.openCursor();
-      cursorRequest.onsuccess = (e) => {
-        const cursor = e.target.result;
-        if (cursor) {
-          payloads.push({
-            key: cursor.primaryKey,
-            value: cursor.value,
-            body: cursor.value.body,
-          });
-          cursor.continue();
-        } else {
-          resolve();
-        }
-      };
-      cursorRequest.onerror = () => reject(cursorRequest.error);
-    });
-    if (payloads.length) {
-      // Send payloads individually to support servers that expect single-event POSTs.
-      for (const item of payloads) {
-        const attempts = Number(item.value.attempts || 0);
-        const timestamp = Number(item.value.timestamp || Date.now());
-        try {
-          // body is stored as a JSON string
-          const response = await fetchInternal('/api/analytics', {
-            method: 'POST',
-            body: item.body,
-            headers: { 'content-type': 'application/json' },
-          });
-          if (!response.ok) {
-            throw new Error(`analytics replay failed with ${response.status}`);
-          }
-          await deleteQueueEntry(item.key);
-        } catch (err) {
-          const nextAttempts = attempts + 1;
-          const expired = Date.now() - timestamp > MAX_ANALYTICS_QUEUE_AGE_MS;
-          if (nextAttempts >= MAX_ANALYTICS_REPLAY_ATTEMPTS || expired) {
-            console.warn('Dropping analytics payload after replay limit', {
-              attempts: nextAttempts,
-              expired,
-              error: err instanceof Error ? err.message : String(err),
-            });
-            await deleteQueueEntry(item.key);
-          } else {
-            await updateQueueEntry(item.key, {
-              ...item.value,
-              attempts: nextAttempts,
-              lastAttempt: Date.now(),
-            });
-          }
-        }
-      }
-    }
-    broadcastQueueSize();
-  } catch {}
-}
-
-async function deleteQueueEntry(key) {
-  const db = await openQueueDb();
-  const tx = db.transaction(STORE, 'readwrite');
-  const store = tx.objectStore(STORE);
-  await new Promise((resolve, reject) => {
-    const req = store.delete(key);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function updateQueueEntry(key, value) {
-  const db = await openQueueDb();
-  const tx = db.transaction(STORE, 'readwrite');
-  const store = tx.objectStore(STORE);
-  await new Promise((resolve, reject) => {
-    const req = store.put(value, key);
-    req.onsuccess = () => resolve();
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function getQueueSize() {
-  try {
-    const db = await openQueueDb();
-    const tx = db.transaction(STORE, 'readonly');
-    const store = tx.objectStore(STORE);
-    return await new Promise((resolve) => {
-      const request = store.count();
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => resolve(0);
-    });
-  } catch { return 0; }
-}
-let bqsTimer = null;
-function broadcastQueueSize() {
-  if (bqsTimer) return; // debounce within 500ms window
-  bqsTimer = setTimeout(async () => {
-    bqsTimer = null;
-    try {
-      const size = await getQueueSize();
-      const clients = await self.clients.matchAll();
-      for (const c of clients) c.postMessage({ type: 'ANALYTICS_QUEUE_SIZE', size });
-    } catch {}
-  }, 500);
+function isStorable(response) {
+  return Boolean(response && response.ok && !response.redirected && response.type === 'basic');
 }
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
-    // Attempt to fetch version metadata first to derive cache name
-    try {
-      const vRes = await fetchInternal('/version.json', { cache: 'no-store' });
-      if (vRes.ok) {
-        const meta = await vRes.json();
-        if (meta?.version) {
-          RUNTIME_META.pkgVersion = meta.version;
-          RUNTIME_META.precacheHash = meta.precacheHash;
-          if (!RUNTIME_META.version || RUNTIME_META.version === CACHE_VERSION) RUNTIME_META.version = meta.version;
-          const suffix = meta.precacheHash ? `${meta.version}-${meta.precacheHash.slice(0,8)}` : meta.version;
-          ACTIVE_CACHE_NAME = `guest-guide-${suffix}`;
-        }
-      }
-    } catch {}
-  const cache = await caches.open(ACTIVE_CACHE_NAME);
-    try {
-      // Prefer a smaller critical precache to reduce install cost. Fall back to full precache.
-      let urls = [];
-      try {
-        const crit = await fetchInternal('/critical-precache.json', { cache: 'no-store' });
-        if (crit.ok) urls = await crit.json();
-      } catch {}
-      if (!urls || urls.length === 0) {
-        try {
-          const res = await fetchInternal('/precache.json', { cache: 'no-store' });
-          if (res.ok) urls = await res.json();
-        } catch {}
-      }
-      // Add assets in parallel (best-effort) to speed up install; individual failures ignored.
-      const allAssets = [...CORE_ASSETS, ...(Array.isArray(urls) ? urls : [])];
-      await Promise.allSettled(allAssets.map(u => cache.add(u).catch(() => {})));
-    } catch {
-      await Promise.allSettled(CORE_ASSETS.map(u => cache.add(u).catch(() => {})));
-    }
+    const cache = await caches.open(CACHE_NAME);
+    await Promise.allSettled(OFFLINE_ASSETS.map((url) => cache.add(url)));
   })());
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.map((k) => (
-      k.startsWith(CACHE_PREFIX) && k !== ACTIVE_CACHE_NAME ? caches.delete(k) : null
-    )))).then(() => self.clients.claim())
-  );
-  // Fetch runtime version metadata (non-fatal if missing)
   event.waitUntil((async () => {
-    try {
-      const res = await fetchInternal('/version.json', { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        RUNTIME_META = { ...RUNTIME_META, ...data, version: data.version || RUNTIME_META.version };
-        // Keep naming consistent with install: include precacheHash when present
-        const suffix = data.precacheHash ? `${data.version}-${data.precacheHash.slice(0,8)}` : data.version || RUNTIME_META.version;
-        if (data.version) ACTIVE_CACHE_NAME = `guest-guide-${suffix}`;
-        // SECONDARY CLEANUP: now that ACTIVE_CACHE_NAME may have changed based on version.json,
-        // remove any older caches not caught by initial pass.
-        try {
-          const keys = await caches.keys();
-          await Promise.all(keys.map(k => (
-            k.startsWith(CACHE_PREFIX) && k !== ACTIVE_CACHE_NAME ? caches.delete(k) : null
-          )));
-        } catch {}
-      }
-    } catch {}
-    // Broadcast version info to all clients so UI can display it
-    try {
-      const clients = await self.clients.matchAll();
-      for (const c of clients) c.postMessage({ type: 'RUNTIME_VERSION', meta: RUNTIME_META, cache: ACTIVE_CACHE_NAME });
-    } catch {}
-  })());
-  // Try to register periodic sync for precache refresh
-  event.waitUntil((async () => {
-    if ('periodicSync' in registration) {
-      try {
-    // @ts-expect-error periodicSync not yet in TS lib
-        await registration.periodicSync.register('precache-refresh', { minInterval: 24 * 60 * 60 * 1000 });
-      } catch {}
-    }
+    const keys = await caches.keys();
+    await Promise.all(keys.map((key) => (
+      key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME ? caches.delete(key) : null
+    )));
+    await self.clients.claim();
+    const clients = await self.clients.matchAll();
+    for (const client of clients) client.postMessage({ type: 'RUNTIME_VERSION', meta: { version: VERSION, build: BUILD } });
   })());
 });
 
-// Allow clients to request immediate activation of the new SW
 self.addEventListener('message', (event) => {
   if (!event.data) return;
-  if (event.data.type === 'SKIP_WAITING' && self.skipWaiting) {
-    self.skipWaiting();
-  }
+  if (event.data.type === 'SKIP_WAITING') self.skipWaiting();
   if (event.data.type === 'REQUEST_VERSION') {
-    // Respond directly to requesting client only
-    event.source?.postMessage({ type: 'RUNTIME_VERSION', meta: RUNTIME_META, cache: ACTIVE_CACHE_NAME });
-  }
-  if (event.data.type === 'QUEUE_ANALYTICS' && event.data.body) {
-    enqueue(event.data.body).then((queued) => {
-      if (!queued) return;
-      broadcastQueueSize();
-      if ('sync' in registration) {
-    // @ts-expect-error Background Sync type missing
-        registration.sync.register('analytics-sync').catch(()=>{});
-      } else {
-        flushQueue();
-      }
-    });
-  }
-  if (event.data.type === 'REPLAY_ANALYTICS') {
-    flushQueue();
+    event.source?.postMessage({ type: 'RUNTIME_VERSION', meta: { version: VERSION, build: BUILD } });
   }
 });
 
-// Periodic sync event
-self.addEventListener('periodicsync', (event) => {
-  // @ts-expect-error periodicSync event tag not typed
-  if (event.tag === 'precache-refresh') {
-    // @ts-expect-error waitUntil overload not typed for periodic sync event
-  // NOTE: Previously used undefined CACHE_NAME; intentionally using ACTIVE_CACHE_NAME.
-  event.waitUntil(fetchInternal('/precache.json', { cache: 'no-store' }).then(r => r.json()).then(async (urls) => {
-  const cache = await caches.open(ACTIVE_CACHE_NAME);
-      for (const u of urls) cache.add(u).catch(()=>{});
-    }).catch(()=>{}));
+async function networkFirstPage(request, pathname) {
+  const cache = await caches.open(CACHE_NAME);
+  try {
+    const response = await fetchInternal(request);
+    if (isStorable(response) && !isPrivatePage(pathname)) {
+      cache.put(request, response.clone()).catch(() => {});
+    }
+    return response;
+  } catch {
+    const cached = isPrivatePage(pathname) ? undefined : await cache.match(request);
+    if (cached) return cached;
+    const locale = pathname.split('/')[1];
+    return (await cache.match(`/${locale}/offline`))
+      || (await cache.match('/offline'))
+      || new Response('Offline', { status: 503, statusText: 'Offline', headers: { 'content-type': 'text/plain' } });
   }
-});
+}
+
+async function cacheFirst(request) {
+  const cache = await caches.open(CACHE_NAME);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+  const response = await fetchInternal(request);
+  if (isStorable(response)) cache.put(request, response.clone()).catch(() => {});
+  return response;
+}
+
+async function staleWhileRevalidate(request) {
+  const cache = await caches.open(CACHE_NAME);
+  const cached = await cache.match(request);
+  const network = fetchInternal(request)
+    .then((response) => {
+      if (isStorable(response)) cache.put(request, response.clone()).catch(() => {});
+      return response;
+    })
+    .catch(() => undefined);
+  return cached || (await network) || new Response('', { status: 504 });
+}
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+  if (request.method !== 'GET') return;
   const url = new URL(request.url);
-
-  // Only handle same-origin requests
   if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith('/api/')) return;
 
-  // Intercept analytics POST for offline queueing
-  if (request.method === 'POST' && url.pathname === '/api/analytics') {
-    event.respondWith((async () => {
-      try {
-        return await fetch(request.clone());
-      } catch {
-        const body = await request.clone().text();
-        const queued = await enqueue(body);
-        if (!queued) return new Response('invalid analytics payload', { status: 400 });
-        if ('sync' in registration) {
-          // @ts-expect-error Background Sync type missing
-          registration.sync.register('analytics-sync').catch(()=>{});
-        }
-        return new Response('queued', { status: 202 });
-      }
-    })());
+  if (request.mode === 'navigate') {
+    event.respondWith(networkFirstPage(request, url.pathname));
     return;
   }
-
-  // Never cache authenticated, administrative, or privacy-related routes.
-  if (url.pathname.startsWith('/api/')) return;
-  if (isPrivatePage(url.pathname)) return;
-
-  // Prefer network for dynamic data (JSON) routes; cache-first for static/page GETs
-  if (request.method === 'GET') {
-    // Static JSON files: stale-while-revalidate so previously fetched data is available offline.
-    if (url.pathname.endsWith('.json')) {
-      event.respondWith((async () => {
-        const cache = await caches.open(ACTIVE_CACHE_NAME);
-        const cached = await cache.match(request);
-        const fetchPromise = fetchInternal(request).then(res => {
-          if (canStore(res)) cache.put(request, res.clone()).catch(()=>{});
-          return res;
-        }).catch(() => cached || new Response('offline', { status: 503 }));
-        // Return cached immediately if present for fast offline; else wait network
-        return cached || fetchPromise;
-      })());
-      return;
-    }
-    // HTML navigation requests: offline-first but revalidate in background
-    if (request.headers.get('accept')?.includes('text/html')) {
-      event.respondWith((async () => {
-        const cached = await caches.match(request);
-        if (cached) {
-          // Revalidate in background
-          fetchInternal(request).then((res) => {
-            if (canStore(res)) return caches.open(ACTIVE_CACHE_NAME).then((c) => c.put(request, res));
-          }).catch(() => {});
-          return cached;
-        }
-        try {
-          const res = await fetch(request);
-          // Only cache successful responses to avoid storing 404s/errors
-          if (canStore(res)) {
-            const copy = res.clone();
-            caches.open(ACTIVE_CACHE_NAME).then((c) => c.put(request, copy)).catch(()=>{});
-          }
-          return res;
-        } catch {
-          // Fallback to locale-aware offline page if possible
-          const localePath = url.pathname.split('/')[1];
-          const offline = await caches.match(`/${localePath}/offline`) || await caches.match('/offline');
-          return offline || new Response('Offline', { status: 503, statusText: 'Offline' });
-        }
-      })());
-      return;
-    }
-
-    // Runtime image requests: stale-while-revalidate for fast display + silent freshness
-    if (url.pathname.match(/\.(png|jpg|jpeg|svg|webp|avif)$/)) {
-      event.respondWith((async () => {
-        const cache = await caches.open(ACTIVE_CACHE_NAME);
-        const cached = await cache.match(request);
-        
-        // Validate cached response before serving
-        const validCached = cached && await validateCachedResponse(cached) ? cached : null;
-        
-        const fetchPromise = fetchInternal(request).then(res => {
-          if (canStore(res)) {
-            cache.put(request, res.clone()).catch(async (err) => {
-              // Handle storage quota exceeded
-              if (err.name === 'QuotaExceededError') {
-                await manageCacheStorage(cache);
-                // Retry cache operation after cleanup
-                cache.put(request, res.clone()).catch(() => {});
-              }
-            });
-          }
-          return res;
-        }).catch(() => validCached || Promise.reject('offline'));
-        return validCached || fetchPromise;
-      })());
-      return;
-    }
-    // Other static assets (Next chunks, css/js): cache-first with populate
-    if (url.pathname.startsWith('/_next') || url.pathname.match(/\.(css|js|ico)$/)) {
-      event.respondWith(
-        caches.match(request).then(async (cached) => {
-          const validCached = cached && await validateCachedResponse(cached) ? cached : null;
-          return validCached || fetchInternal(request).then(async (res) => {
-            if (canStore(res)) {
-              try {
-                const cache = await caches.open(ACTIVE_CACHE_NAME);
-                await cache.put(request, res.clone());
-              } catch (err) {
-                if (err.name === 'QuotaExceededError') {
-                  const cache = await caches.open(ACTIVE_CACHE_NAME);
-                  await manageCacheStorage(cache);
-                  try {
-                    await cache.put(request, res.clone());
-                  } catch {}
-                }
-              }
-            }
-            return res;
-          });
-        })
-      );
-      return;
-    }
+  // Content-hashed build output never changes under the same URL.
+  if (url.pathname.startsWith('/_next/static/')) {
+    event.respondWith(cacheFirst(request));
+    return;
   }
-});
-
-// Background sync event flush with concurrency protection
-let syncInProgress = false;
-self.addEventListener('sync', (event) => {
-  // @ts-expect-error Background Sync event tag not typed
-  if (event.tag === 'analytics-sync') {
-    // @ts-expect-error waitUntil typed generically
-    event.waitUntil((async () => {
-      if (syncInProgress) return; // Prevent concurrent sync operations
-      syncInProgress = true;
-      try {
-        await flushQueue();
-      } finally {
-        syncInProgress = false;
-      }
-    })());
+  if (/\.(?:png|jpe?g|webp|avif|svg|ico)$/u.test(url.pathname)) {
+    event.respondWith(staleWhileRevalidate(request));
   }
 });

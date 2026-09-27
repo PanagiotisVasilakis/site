@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger-enterprise';
+import { adminListPageArgs, toAdminListPage } from '@/lib/adminListPage';
 import { CheckInRequestStatus, Prisma } from '@/generated/prisma/client';
 import type { CheckInRequest } from '@/generated/prisma/client';
 import crypto from 'node:crypto';
@@ -16,6 +17,8 @@ export type CheckInRequestRecord = {
   status: CheckInRequestStatus;
   created_at: number;
   updated_at: number;
+  /** Status of the latest webhook notification; set by list() only. */
+  notification_status?: 'PENDING' | 'LEASED' | 'DELIVERED' | 'DEAD';
 };
 
 type CreateCheckInRequestInput = {
@@ -37,6 +40,7 @@ type NotificationEvent = {
 type ListCheckInRequestParams = {
   status?: CheckInRequestStatus;
   limit?: number;
+  cursor?: string;
 };
 
 type CheckInRequestStatusCounts = {
@@ -165,15 +169,21 @@ async function findLatestForGuest(params: { bookingId?: string; userId?: string 
   }
 }
 
-async function list(params: ListCheckInRequestParams = {}): Promise<CheckInRequestRecord[]> {
+async function list(
+  params: ListCheckInRequestParams = {},
+): Promise<{ requests: CheckInRequestRecord[]; nextCursor: string | null }> {
   try {
-    const limit = Math.min(Math.max(params.limit ?? 100, 1), 500);
-    const requests = await prisma.checkInRequest.findMany({
+    const limit = Math.min(Math.max(params.limit ?? 100, 1), 200);
+    const rows = await prisma.checkInRequest.findMany({
       where: params.status ? { status: params.status } : undefined,
-      orderBy: { createdAt: 'desc' },
-      take: limit,
+      ...adminListPageArgs(limit, params.cursor),
+      include: { outboxEvents: { orderBy: { createdAt: 'desc' }, take: 1, select: { status: true } } },
     });
-    return requests.map(mapRequest);
+    const page = toAdminListPage(rows, limit, params.cursor);
+    return {
+      requests: page.items.map((row) => ({ ...mapRequest(row), notification_status: row.outboxEvents[0]?.status })),
+      nextCursor: page.nextCursor,
+    };
   } catch (error) {
     logger.error('checkInRequestRepository(prisma): list failed', error);
     throw error;
@@ -192,6 +202,9 @@ async function updateStatus(
           const current = await tx.checkInRequest.findUnique({ where: { id } });
           if (!current) throw new CheckInRequestNotFoundError(id);
           if (current.status === status) return { request: current, changed: false };
+          // A decision is final: checked inside the transaction so two admins
+          // deciding at once cannot flip each other's answer.
+          if (current.status !== CheckInRequestStatus.PENDING) throw new CheckInRequestAlreadyDecidedError(id);
 
           const updated = await tx.checkInRequest.update({ where: { id }, data: { status } });
           const notificationEventId = process.env.CHECKIN_REQUEST_WEBHOOK_URL
@@ -228,7 +241,9 @@ async function updateStatus(
     });
     return { request: mapRequest(result.request), notificationEventId: result.notificationEventId, changed: result.changed };
   } catch (error) {
-    logger.error('checkInRequestRepository(prisma): updateStatus failed', error);
+    if (!(error instanceof CheckInRequestNotFoundError || error instanceof CheckInRequestAlreadyDecidedError)) {
+      logger.error('checkInRequestRepository(prisma): updateStatus failed', error);
+    }
     throw error;
   }
 }
@@ -237,6 +252,13 @@ export class CheckInRequestNotFoundError extends Error {
   constructor(id: string) {
     super(`Check-in request ${id} was not found`);
     this.name = 'CheckInRequestNotFoundError';
+  }
+}
+
+export class CheckInRequestAlreadyDecidedError extends Error {
+  constructor(id: string) {
+    super(`Check-in request ${id} was already approved or rejected`);
+    this.name = 'CheckInRequestAlreadyDecidedError';
   }
 }
 
@@ -260,11 +282,29 @@ async function getStatusCounts(): Promise<CheckInRequestStatusCounts> {
   }
 }
 
+// Requeues the request's exhausted webhook notifications; the outbox worker
+// delivers them on its next run. Returns how many were requeued.
+async function retryFailedNotifications(id: string): Promise<number> {
+  const retried = await prisma.outboxEvent.updateMany({
+    where: { checkInRequestId: id, status: 'DEAD' },
+    data: {
+      status: 'PENDING',
+      attemptCount: 0,
+      nextAttemptAt: new Date(),
+      lastError: null,
+      leaseOwner: null,
+      leaseExpiresAt: null,
+    },
+  });
+  return retried.count;
+}
+
 export const checkInRequestRepository = {
   create,
   findById,
   findLatestForGuest,
   list,
+  retryFailedNotifications,
   updateStatus,
   getStatusCounts,
 };

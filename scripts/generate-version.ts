@@ -2,8 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
-// Generate a small version metadata file consumed by client + service worker.
-// Strategy: use package.json version + timestamp + optional GIT_COMMIT env.
+// Version metadata for the client (public/version.json). PwaManager registers
+// `/sw.js?v=<version>&build=<build>`, so a new build installs a new service
+// worker and cache. `build` is the release commit when GIT_COMMIT is set
+// (reproducible), otherwise a hash of the version and build time.
 const root = process.cwd();
 const pkgPath = path.join(root, 'package.json');
 const outFile = path.join(root, 'public', 'version.json');
@@ -12,16 +14,12 @@ function main() {
   try {
     const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) as { version?: string };
     const version = pkg.version || '0.0.0';
-    // Hash precache manifest (ensures cache bust when URL set changes even if version unchanged)
-    let precacheHash = '';
-    try {
-      const precachePath = path.join(root, 'public', 'precache.json');
-      const precacheContent = fs.readFileSync(precachePath);
-      precacheHash = crypto.createHash('sha256').update(precacheContent).digest('hex');
-    } catch {}
     const commit = process.env.GIT_COMMIT || '';
-    const ts = new Date().toISOString();
-    const data = { version, commit, timestamp: ts, precacheHash };
+    const timestamp = new Date().toISOString();
+    const build = commit
+      ? commit.slice(0, 12)
+      : crypto.createHash('sha256').update(`${version}:${timestamp}`).digest('hex').slice(0, 12);
+    const data = { version, commit, build, timestamp };
     fs.writeFileSync(outFile, JSON.stringify(data, null, 2));
     console.log(`Wrote ${outFile}: ${JSON.stringify(data)}`);
   } catch (e) {

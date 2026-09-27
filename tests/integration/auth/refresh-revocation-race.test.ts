@@ -150,8 +150,6 @@ async function seedBoundAuthorizationChain(
           salt: ROOT_SALT,
           familyId: FAMILY_ID,
           expiresAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1_000),
-          deviceHint: DEVICE_HASH,
-          ipHint: IP_HASH,
         },
       });
     });

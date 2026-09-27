@@ -4,8 +4,8 @@ import { categories } from "@/data/categories";
 import { getItemsByCategory, toSlug, pickLocale, pickCategoryLocale } from "@/lib/data";
 import { notFound } from "next/navigation";
 import { getDictionary } from "@/i18n/dictionaries";
-import { locales, type Locale } from "@/i18n/config";
-import { localizedAlternates, normalizeLocale } from '@/lib/seo';
+import { normalizeLocale } from '@/i18n/config';
+import { localizedAlternates } from '@/lib/seo';
 import type { Metadata } from 'next';
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string; category: string }> }): Promise<Metadata> {
@@ -31,7 +31,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 
 export default async function CategoryPage({ params }: { params: Promise<{ locale: string; category: string }> }) {
   const { locale, category } = await params;
-  const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : "en";
+  const eff = normalizeLocale(locale);
   const t = getDictionary(eff);
   const cat = categories.find((c) => c.slug === category);
   if (!cat) return notFound();
@@ -42,7 +42,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
   const isMoments = cat.slug === 'moments';
   const useMomentsShell = isPhones || isMoments;
   const pageTitle = isMoments ? t.categories.moments : (t.categories[cat.slug as "phones" | "moments"] ?? (pickCategoryLocale(cat, "title", eff) ?? cat.title));
-  const pageDescription = isMoments ? (t.moments?.subtitle ?? "Curated local recommendations for your stay") : (pickCategoryLocale(cat, "description", eff) ?? cat.description);
+  const pageDescription = isMoments ? (t.moments.subtitle) : (pickCategoryLocale(cat, "description", eff) ?? cat.description);
 
   return (
     <div className={useMomentsShell ? "page-container mx-0 max-w-full safe-bottom px-4 moments-page" : "page-container mx-auto max-w-3xl safe-bottom"}>
@@ -57,9 +57,9 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
             <span aria-hidden>🗒️</span>
             <span>{t.emptyState}</span>
           </div>
-          <div className="text-xs text-subtle">{t.labels?.contentUpdating ?? 'Content updating – please check again later.'}</div>
+          <div className="text-xs text-subtle">{t.labels.contentUpdating}</div>
           <div>
-            <Link href={`/${locale}`} className="underline text-brand-700 hover:text-brand-800 transition-colors">{t.cta.home}</Link>
+            <Link href={`/${locale}`} className="underline text-brand-800 hover:text-brand-800 transition-colors">{t.cta.home}</Link>
           </div>
         </div>
       )}
@@ -92,8 +92,8 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
         momentsLayout={isMoments}
         ui={t.ui}
         cardLabels={{
-          viewDetails: t.map?.viewDetails ?? 'View details',
-          back: t.ui?.back ?? 'Back',
+          viewDetails: t.map.viewDetails,
+          back: t.ui.back,
           call: t.cta.call,
           directions: t.cta.directions,
           website: t.cta.website,

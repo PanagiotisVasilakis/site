@@ -55,11 +55,11 @@ vi.mock('@/lib/logger-enterprise', () => ({ logger: mocks.logger }));
 
 import { POST as exchangeClaim } from '@/app/api/portal/claim-exchange/route';
 import { POST as consumeClaim } from '@/app/api/portal/claims/route';
-import {
-  PORTAL_CLAIM_EXCHANGE_COOKIE,
-  createPortalClaimExchangeCookie,
-} from '@/lib/portalClaimExchange';
+import { createPortalClaimExchangeCookie } from '@/lib/portalClaimExchange';
 import { PortalAuthError } from '@/lib/portalAuthService';
+
+// Cookie name of the short-lived exchange (transport contract).
+const PORTAL_CLAIM_EXCHANGE_COOKIE = 'booking_claim_exchange';
 
 const TOKEN = `claim_${'T'.repeat(43)}`;
 const TOKEN_DIGEST = 'a1'.repeat(32);
@@ -191,9 +191,10 @@ describe('claim capability transport', () => {
   it('never creates or parses a claim capability in application URLs', () => {
     const source = [
       readFileSync('src/app/[locale]/guest/UnifiedGuestClient.tsx', 'utf8'),
-      readFileSync('src/app/[locale]/guest/sign-up/page.tsx', 'utf8'),
+      readFileSync('src/app/[locale]/guest/page.tsx', 'utf8'),
       readFileSync('src/app/admin/guests/page.tsx', 'utf8'),
       readFileSync('src/app/api/admin/bookings/[id]/claim-grants/route.ts', 'utf8'),
+      readFileSync('src/app/api/admin/bookings/[id]/access-reset/route.ts', 'utf8'),
       readFileSync('src/app/api/portal/claim-exchange/route.ts', 'utf8'),
       readFileSync('src/app/api/portal/claims/route.ts', 'utf8'),
       readFileSync('src/lib/portalClaimExchange.ts', 'utf8'),

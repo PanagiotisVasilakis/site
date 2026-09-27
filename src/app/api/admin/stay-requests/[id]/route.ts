@@ -12,7 +12,7 @@ export const PATCH = withErrorHandler(async (
   request: NextRequest,
   context?: { params: Promise<Record<string, string>> },
 ) => {
-  if (!(await isAdminRequest(request))) throw new ApiError(ApiErrorCode.FORBIDDEN, 'Admin credentials required');
+  if (!(await isAdminRequest(request))) throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
   const { id } = context ? await context.params : { id: '' };
   const body = schema.safeParse(await readJsonBody(request, 8 * 1_024));
   if (!body.success) throw new ApiError(ApiErrorCode.VALIDATION_ERROR, 'Invalid action');
@@ -21,6 +21,8 @@ export const PATCH = withErrorHandler(async (
       await prisma.$transaction(async (tx) => {
         const existing = await tx.stayRequest.findUnique({ where: { id }, include: { outboxEvents: true } });
         if (!existing) throw new ApiError(ApiErrorCode.NOT_FOUND, 'Stay request not found');
+        // A closed request (by the admin or by a guest erasure) is final.
+        if (existing.status === 'CLOSED') throw new ApiError(ApiErrorCode.CONFLICT, 'This stay request is closed');
 
         if (body.data.action === 'retry_delivery') {
           const retried = await tx.outboxEvent.updateMany({
@@ -44,6 +46,9 @@ export const PATCH = withErrorHandler(async (
         if (existing.outboxEvents.some((event) => event.status === 'PENDING' || event.status === 'LEASED')) {
           throw new ApiError(ApiErrorCode.VALIDATION_ERROR, 'A request with pending delivery cannot be closed');
         }
+        // Closing acknowledges a failed delivery: its DEAD events stop counting
+        // towards the "Dead outbox events" alert.
+        await tx.outboxEvent.deleteMany({ where: { stayRequestId: id, status: 'DEAD' } });
         await tx.stayRequest.update({ where: { id }, data: { status: 'CLOSED' } });
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
       break;

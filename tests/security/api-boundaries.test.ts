@@ -172,6 +172,17 @@ describe('security header builders', () => {
     expect(getSecurityConfig().headers.hsts.enabled).toBe(true);
   });
 
+  it('does not require CORP from cross-origin map tiles in production', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const { createSecurityMiddleware } = await import('@/lib/security-middleware-edge');
+
+    const response = await createSecurityMiddleware()(new NextRequest('https://guide.example/en'));
+
+    // OpenStreetMap and Carto tiles are loaded no-CORS and send no Cross-Origin-Resource-Policy.
+    expect(response.headers.get('cross-origin-embedder-policy')).toBe('unsafe-none');
+    expect(response.headers.get('cross-origin-opener-policy')).toBe('same-origin');
+  });
+
   it('adds a nonce while removing unsafe-inline from script-src', () => {
     const directives = getSecurityConfig().csp.directives;
     const csp = buildCSPDirective(directives, 'nonce-value');

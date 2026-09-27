@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { ApiError, ApiErrorCode, createSuccessResponse, readJsonBody, ValidationError, withErrorHandler } from '@/lib/apiErrorHandler';
 import { verifyAdminSession } from '@/lib/auth/admin';
+import { isSameOriginRequest } from '@/lib/net/sameOrigin';
 import { issueBookingClaimGrant, PortalAuthError } from '@/lib/portalAuthService';
 
 export const dynamic = 'force-dynamic';
@@ -18,15 +19,16 @@ export const POST = withErrorHandler(async (
 ) => {
   const token = request.cookies.get('admin_jwt')?.value;
   const admin = token ? await verifyAdminSession(token) : null;
-  if (!admin?.session_id) throw new ApiError(ApiErrorCode.FORBIDDEN, 'Admin credentials required');
+  if (!admin?.session_id) throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
 
   const origin = request.headers.get('origin');
-  if (origin && origin !== request.nextUrl.origin) {
+  if (origin && !isSameOriginRequest(origin, request)) {
     throw new ApiError(ApiErrorCode.FORBIDDEN, 'Cross-origin admin mutation rejected');
   }
   const parsed = schema.safeParse(await readJsonBody(request, 8 * 1_024));
   if (!parsed.success) throw new ValidationError(parsed.error.issues);
   const { id } = await context.params;
+  if (!z.string().uuid().safeParse(id).success) throw new ApiError(ApiErrorCode.NOT_FOUND, 'Booking not found');
 
   try {
     const grant = await issueBookingClaimGrant({
@@ -47,6 +49,12 @@ export const POST = withErrorHandler(async (
     if (error instanceof PortalAuthError) {
       if (error.code === 'BOOKING_ALREADY_CLAIMED') {
         throw new ApiError(ApiErrorCode.CONFLICT, 'Booking is already claimed');
+      }
+      if (error.code === 'BOOKING_NOT_IN_ACCESS_WINDOW') {
+        throw new ApiError(
+          ApiErrorCode.CONFLICT,
+          'Claim tokens can be issued from 7 days before check-in until the check-out date',
+        );
       }
       throw new ApiError(ApiErrorCode.NOT_FOUND, 'Booking not found');
     }

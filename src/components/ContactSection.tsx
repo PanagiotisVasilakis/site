@@ -3,6 +3,9 @@
 import type { ReactNode } from 'react';
 import { getDictionary } from '@/i18n/dictionaries';
 import { getApartmentMapLocation } from '@/data/mapLocations';
+import { HOST_CONTACT } from '@/data/contact';
+import { telHref } from '@/lib/contactLinks';
+import { normalizeLocale } from '@/i18n/config';
 
 interface ContactSectionProps {
   locale: string;
@@ -67,18 +70,17 @@ function ContactIcon({ name }: { name: ContactIconName }) {
 }
 
 export default function ContactSection({ locale }: ContactSectionProps) {
-  const t = getDictionary(locale === 'el' ? 'el' : 'en');
-  const isGreek = locale === 'el';
-  const apartmentLocation = getApartmentMapLocation(locale === 'el' ? 'el' : 'en');
+  const t = getDictionary(normalizeLocale(locale));
+  const apartmentLocation = getApartmentMapLocation(normalizeLocale(locale));
 
   const translations = {
-    contactUs: t.contact?.title ?? 'Contact Us',
-    followUs: t.contact?.followUs ?? 'Follow Us',
-    address: t.contact?.address ?? (isGreek ? 'Διεύθυνση' : 'Address'),
-    phone: t.contact?.phone ?? 'Phone',
-    email: t.contact?.email ?? 'Email',
-    connectWithUs: t.contact?.connectWithUs ?? 'Connect with us',
-    description: t.contact?.description ?? '',
+    contactUs: t.contact.title,
+    followUs: t.contact.followUs,
+    address: t.contact.address,
+    phone: t.contact.phone,
+    email: t.contact.email,
+    connectWithUs: t.contact.connectWithUs,
+    description: t.contact.description,
   };
   const addressParts = apartmentLocation.address
     .split(',')
@@ -101,13 +103,13 @@ export default function ContactSection({ locale }: ContactSectionProps) {
     {
       label: translations.phone,
       value: apartmentLocation.phone,
-      href: `tel:${apartmentLocation.phone.replace(/[^+0-9]/g, '')}`,
+      href: telHref(apartmentLocation.phone) ?? '',
       icon: 'phone',
     },
     {
       label: translations.email,
-      value: 'dolcefarnienteapartments@gmail.com',
-      href: 'mailto:dolcefarnienteapartments@gmail.com',
+      value: HOST_CONTACT.email,
+      href: `mailto:${HOST_CONTACT.email}`,
       icon: 'mail',
     },
   ];

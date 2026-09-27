@@ -7,6 +7,6 @@ export async function requireAdminPageSession(): Promise<void> {
   const jwtCookie = cookieStore.get('admin_jwt');
 
   if (!jwtCookie?.value || !(await verifyAdminSession(jwtCookie.value))) {
-    redirect('/admin/login?error=session_expired');
+    redirect('/admin/login');
   }
 }

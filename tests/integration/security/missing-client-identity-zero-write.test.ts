@@ -109,8 +109,8 @@ function bookingPayload(sequence: number): Record<string, unknown> {
     propertyName: 'D1A integration property',
     locale: 'en',
     dateRange: {
-      from: '2030-06-01T00:00:00.000Z',
-      to: '2030-06-08T00:00:00.000Z',
+      from: '2030-06-01',
+      to: '2030-06-08',
     },
     guest: {
       firstName: 'Integration',

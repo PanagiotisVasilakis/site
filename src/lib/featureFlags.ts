@@ -15,14 +15,21 @@ function defaults(): FeatureFlags {
     : { ...DEVELOPMENT_DEFAULTS };
 }
 
+// Check-in pages and APIs need a guest session, which only the portal issues,
+// so check-in is effective only while the portal is enabled. The stored
+// check-in value is kept and applies again when the portal is re-enabled.
+function effective(flags: FeatureFlags): FeatureFlags {
+  return { portalEnabled: flags.portalEnabled, checkinEnabled: flags.portalEnabled && flags.checkinEnabled };
+}
+
 function parseFlags(value: unknown): FeatureFlags {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return defaults();
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return effective(defaults());
   const record = value as Record<string, unknown>;
   const fallback = defaults();
-  return {
+  return effective({
     portalEnabled: typeof record.portalEnabled === 'boolean' ? record.portalEnabled : fallback.portalEnabled,
     checkinEnabled: typeof record.checkinEnabled === 'boolean' ? record.checkinEnabled : fallback.checkinEnabled,
-  };
+  });
 }
 
 export async function getFeatureFlagsAsync(): Promise<FeatureFlags> {

@@ -51,12 +51,6 @@ export default function TopControls({ locale, appTitle }: TopControlsProps) {
   const { scrolled, hidden } = useScroll();
   const { isSignedIn, signOut } = useGuestSession();
 
-  const trackAnalyticsEvent = (eventName: string, props?: Record<string, unknown>) => {
-    import('@/lib/analyticsClient')
-      .then(m => m.trackEvent(eventName, props))
-      .catch(() => { });
-  };
-
   const handleSignOut = async () => {
     if (await signOut()) {
       router.replace(`/${locale}`);
@@ -155,10 +149,7 @@ export default function TopControls({ locale, appTitle }: TopControlsProps) {
         href={link.href}
         className={clsx("guest-menu-link", link.featured && "is-featured", active && "is-active")}
         aria-current={active ? 'page' : undefined}
-        onClick={() => {
-          if (link.event) trackAnalyticsEvent(link.event, { destination: link.href });
-          setOpen(false);
-        }}
+        onClick={() => setOpen(false)}
       >
         <span className="guest-menu-link-icon"><MenuIcon name={link.icon} /></span>
         <span className="guest-menu-link-label">{link.label}</span>
@@ -186,7 +177,7 @@ export default function TopControls({ locale, appTitle }: TopControlsProps) {
           <Link
             href={`/${locale}`}
             className={clsx(navButton({ intent: 'primary' }), "group min-w-0 max-w-fit focus:outline-none focus-visible:ring-2 ring-brand-400/60")}
-            aria-label={dictionary.cta?.home ?? 'Home'}
+            aria-label={dictionary.cta.home}
           >
             <span className="text-sm leading-none flex-shrink-0" aria-hidden>🏠</span>
             <span className="truncate max-w-[200px] text-[11px]" title={appTitle}>{appTitle}</span>
@@ -198,19 +189,19 @@ export default function TopControls({ locale, appTitle }: TopControlsProps) {
                 <button
                   onClick={handleSignOut}
                   className={navButton({ intent: 'primary' })}
-                  title={dictionary.ui?.signOut || "Sign out"}
+                  title={dictionary.ui.signOut}
                 >
                   <span aria-hidden className="text-sm leading-none flex-shrink-0">👤</span>
-                  <span className="text-[11px]">{dictionary.ui?.signOut || "Sign out"}</span>
+                  <span className="text-[11px]">{dictionary.ui.signOut}</span>
                 </button>
               ) : (
                 <Link
                   href={`/${locale}/guest?mode=signin`}
                   className={navButton({ intent: 'primary' })}
-                  title={dictionary.ui?.signIn || "Sign in"}
+                  title={dictionary.ui.signIn}
                 >
                   <span aria-hidden className="text-sm leading-none flex-shrink-0">👤</span>
-                  <span className="text-[11px]">{dictionary.ui?.signIn || "Sign in"}</span>
+                  <span className="text-[11px]">{dictionary.ui.signIn}</span>
                 </Link>
               )}
 
@@ -218,9 +209,8 @@ export default function TopControls({ locale, appTitle }: TopControlsProps) {
                 <Link
                   href={`/${locale}/check-in`}
                   className={navButton({ intent: 'secondary' })}
-                  onClick={() => trackAnalyticsEvent('checkin_nav_clicked')}
                 >
-                  {dictionary.checkin?.navLabel ?? 'Check‑in'}
+                  {dictionary.checkin.navLabel}
                 </Link>
               )}
             </div>
@@ -228,7 +218,7 @@ export default function TopControls({ locale, appTitle }: TopControlsProps) {
             <button
               ref={triggerRef}
               type="button"
-              aria-label={open ? (menuLabels?.closeMenu || 'Close menu') : (menuLabels?.menu || 'Open menu')}
+              aria-label={open ? menuLabels.closeMenu : menuLabels.menu}
               aria-expanded={open}
               aria-controls={panelId}
               aria-haspopup="dialog"
@@ -247,7 +237,7 @@ export default function TopControls({ locale, appTitle }: TopControlsProps) {
         <button
           type="button"
           tabIndex={open ? 0 : -1}
-          aria-label={menuLabels?.closeMenu || 'Close menu'}
+          aria-label={menuLabels.closeMenu}
           className={clsx("guest-menu-backdrop", open && "is-open")}
           onClick={() => closeMenu(true)}
         />
@@ -268,7 +258,7 @@ export default function TopControls({ locale, appTitle }: TopControlsProps) {
               <span className="guest-menu-monogram" aria-hidden>DF</span>
               <span>
                 <strong id={`${panelId}-title`}>{appTitle}</strong>
-                <small>{menuLabels?.guestGuide || 'Your stay, at a glance'}</small>
+                <small>{menuLabels.guestGuide}</small>
               </span>
             </Link>
             <button
@@ -276,7 +266,7 @@ export default function TopControls({ locale, appTitle }: TopControlsProps) {
               type="button"
               className="guest-menu-close"
               onClick={() => closeMenu(true)}
-              aria-label={menuLabels?.closeMenu || 'Close menu'}
+              aria-label={menuLabels.closeMenu}
             >
               <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
                 <path d="m5 5 10 10M15 5 5 15" strokeLinecap="round" />
@@ -284,26 +274,26 @@ export default function TopControls({ locale, appTitle }: TopControlsProps) {
             </button>
           </header>
 
-          <div className="guest-menu-utilities" aria-label={menuLabels?.preferences || 'Preferences'}>
+          <div className="guest-menu-utilities" aria-label={menuLabels.preferences}>
             <ThemeToggle
               className="guest-menu-utility"
-              lightText={menuLabels?.lightMode || 'Light'}
-              darkText={menuLabels?.darkMode || 'Dark'}
+              lightText={menuLabels.lightMode}
+              darkText={menuLabels.darkMode}
             />
             <LocaleSwitcher className="guest-menu-utility" />
           </div>
 
           <div className="guest-menu-scroll">
-            <nav className="guest-menu-nav" aria-label={menuLabels?.primaryNavigation || 'Primary navigation'}>
+            <nav className="guest-menu-nav" aria-label={menuLabels.primaryNavigation}>
               <div className="guest-menu-group">
-                <p className="guest-menu-eyebrow">{menuLabels?.yourStay || 'Your stay'}</p>
+                <p className="guest-menu-eyebrow">{menuLabels.yourStay}</p>
                 <div className="guest-menu-links">
                   {stayLinks.map(renderMenuLink)}
                 </div>
               </div>
 
               <div className="guest-menu-group">
-                <p className="guest-menu-eyebrow">{menuLabels?.explore || 'Explore Kalamata'}</p>
+                <p className="guest-menu-eyebrow">{menuLabels.explore}</p>
                 <div className="guest-menu-links">
                   {exploreLinks.map(renderMenuLink)}
                 </div>
@@ -323,8 +313,8 @@ export default function TopControls({ locale, appTitle }: TopControlsProps) {
               >
                 <span className="guest-menu-account-icon"><MenuIcon name="user" /></span>
                 <span>
-                  <small>{menuLabels?.account || 'Guest account'}</small>
-                  <strong>{menuLabels?.signOut || "Sign out"}</strong>
+                  <small>{menuLabels.account}</small>
+                  <strong>{menuLabels.signOut}</strong>
                 </span>
                 <span className="guest-menu-link-arrow"><ChevronIcon /></span>
               </button>
@@ -336,8 +326,8 @@ export default function TopControls({ locale, appTitle }: TopControlsProps) {
               >
                 <span className="guest-menu-account-icon"><MenuIcon name="user" /></span>
                 <span>
-                  <small>{menuLabels?.account || 'Guest account'}</small>
-                  <strong>{menuLabels?.signIn || "Sign in"}</strong>
+                  <small>{menuLabels.account}</small>
+                  <strong>{menuLabels.signIn}</strong>
                 </span>
                 <span className="guest-menu-link-arrow"><ChevronIcon /></span>
               </Link>

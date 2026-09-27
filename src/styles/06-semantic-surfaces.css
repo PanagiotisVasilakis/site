@@ -3,49 +3,6 @@
   color: var(--fg-muted);
 }
 
-.text-brand-600 {
-  color: var(--brand-600);
-}
-
-.text-brand-700 {
-  color: var(--brand-800);
-}
-
-.text-brand-800 {
-  color: var(--brand-800);
-}
-
-/* Compatibility utilities for existing Tailwind-style brand classes. */
-.bg-brand-600 {
-  background-color: var(--brand-600);
-}
-
-.bg-brand-700,
-.hover\:bg-brand-700:hover {
-  background-color: var(--brand-700);
-}
-
-.ring-brand-400 {
-  --tw-ring-color: var(--brand-400);
-}
-
-.ring-brand-400\/60,
-.focus-visible\:ring-brand-400\/60:focus-visible {
-  --tw-ring-color: color-mix(in srgb, var(--brand-400) 60%, transparent);
-}
-
-.focus-visible\:ring-brand-200:focus-visible {
-  --tw-ring-color: var(--brand-200);
-}
-
-.focus\:ring-brand-500:focus {
-  --tw-ring-color: var(--brand-500);
-}
-
-[data-theme="dark"] .dark\:focus-visible\:ring-brand-400\/50:focus-visible {
-  --tw-ring-color: color-mix(in srgb, var(--brand-400) 50%, transparent);
-}
-
 /* ============================================================================
    GLOBAL SEMANTIC COLOR CLASSES
    These auto-adapt to light/dark mode for consistent styling across all pages.
@@ -93,7 +50,6 @@
 .surface-card {
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
@@ -177,7 +133,6 @@
 /* Soft glass panel: backdrop blur + translucent surface using color-mix */
 .backdrop-blur {
   backdrop-filter: blur(10px) saturate(160%);
-  -webkit-backdrop-filter: blur(10px) saturate(160%);
 }
 
 /* Apartment hero title - white in light mode, white in dark mode */

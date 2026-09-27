@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+
 import type { Prisma, PrismaClient } from '@/generated/prisma/client';
 import { verifySensitive } from '@/lib/crypto';
 import { logger } from '@/lib/logger-enterprise';
@@ -5,8 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { refreshGenerationAdvisoryLockKey } from '@/lib/refreshRotationLock';
 import {
   createPortalBookingEligibilityWindow,
-  isPortalBookingTemporallyEligible,
-  type PortalBookingEligibilityWindow,
+  isPortalBookingEligible,
 } from '@/lib/portalBookingEligibility';
 
 export type GuestRefreshTokenRec = {
@@ -20,8 +21,6 @@ export type GuestRefreshTokenRec = {
   revoked_at?: number;
   rotated_from_id?: string;
   last_used_at?: number;
-  device_hint?: string;
-  ip_hint?: string;
 };
 
 export type RefreshSessionBinding =
@@ -91,8 +90,6 @@ function mapToken(token: {
   revokedAt: Date | null;
   rotatedFromId: string | null;
   lastUsedAt: Date | null;
-  deviceHint: string | null;
-  ipHint: string | null;
 }): GuestRefreshTokenRec {
   return {
     id: token.id,
@@ -105,8 +102,6 @@ function mapToken(token: {
     revoked_at: token.revokedAt ? token.revokedAt.getTime() : undefined,
     rotated_from_id: token.rotatedFromId ?? undefined,
     last_used_at: token.lastUsedAt ? token.lastUsedAt.getTime() : undefined,
-    device_hint: token.deviceHint ?? undefined,
-    ip_hint: token.ipHint ?? undefined,
   };
 }
 
@@ -192,15 +187,27 @@ async function revokeFamilyGraph(
   `;
 }
 
-function bookingIsEligible(booking: {
-  userId: string | null;
-  accessStatus: string;
-  startDate: Date;
-  endDate: Date;
-}, userId: string, eligibilityWindow: PortalBookingEligibilityWindow): boolean {
-  return booking.userId === userId
-    && booking.accessStatus === 'VERIFIED'
-    && isPortalBookingTemporallyEligible(booking, eligibilityWindow);
+/**
+ * Persist a probable refresh-token theft as a high-severity audit event in the
+ * same transaction as the family revocation. The operational alert rule
+ * "Recent high-severity security events" fires on it. Details carry only the
+ * random family id and the revocation reason.
+ */
+async function recordRefreshTheftSignal(
+  tx: Prisma.TransactionClient,
+  familyId: string,
+  reason: 'refresh_token_replay' | 'suspicious_refresh_overlap',
+): Promise<void> {
+  await tx.securityAuditEvent.create({
+    data: {
+      id: crypto.randomUUID(),
+      eventType: 'portal.refresh_token_replay',
+      severity: 'high',
+      correlationId: logger.getContext()?.correlationId ?? null,
+      path: '/api/portal/refresh',
+      details: { reason, familyId },
+    },
+  });
 }
 
 async function create(
@@ -229,7 +236,7 @@ async function create(
         throw new Error('Refresh authorization session is invalid');
       }
       const booking = await tx.booking.findUnique({ where: { id: session.bookingId } });
-      if (!booking || !bookingIsEligible(booking, userId, eligibilityWindow)) {
+      if (!booking || !isPortalBookingEligible(booking, userId, eligibilityWindow)) {
         throw new Error('Refresh authorization booking is invalid');
       }
       if (await tx.refreshTokenFamily.findUnique({ where: { id: familyId } })) {
@@ -253,8 +260,6 @@ async function create(
           salt,
           familyId,
           expiresAt: new Date(Math.min(expiresAt, family.absoluteExpiresAt.getTime())),
-          deviceHint: opts?.deviceHint ?? null,
-          ipHint: opts?.ipHint ?? null,
         },
       });
     });
@@ -343,7 +348,7 @@ async function rotate(
     && initialSession.userId === initial.userId
     && !initialSession.revokedAt
     && initialBooking !== null
-    && bookingIsEligible(
+    && isPortalBookingEligible(
       initialBooking,
       initial.userId,
       createPortalBookingEligibilityWindow(initialNow),
@@ -400,6 +405,7 @@ async function rotate(
 
       if (candidate.revokedAt) {
         await revokeFamilyGraph(tx, candidate.familyId, now, 'refresh_token_replay');
+        await recordRefreshTheftSignal(tx, candidate.familyId, 'refresh_token_replay');
         logger.warn('Refresh token replay detected; family revoked', {
           tokenId: candidate.id,
           familyId: candidate.familyId,
@@ -433,7 +439,7 @@ async function rotate(
       }
 
       const booking = await tx.booking.findUnique({ where: { id: session.bookingId } });
-      if (!booking || !bookingIsEligible(booking, candidate.userId, eligibilityWindow)) {
+      if (!booking || !isPortalBookingEligible(booking, candidate.userId, eligibilityWindow)) {
         await revokeFamilyGraph(tx, candidate.familyId, now, 'booking_ineligible');
         return { status: 'invalid' } as const;
       }
@@ -471,8 +477,6 @@ async function rotate(
             candidate.family.absoluteExpiresAt.getTime(),
           )),
           rotatedFromId: candidate.id,
-          deviceHint: candidate.deviceHint,
-          ipHint: candidate.ipHint,
         },
       });
 
@@ -526,6 +530,7 @@ async function rotate(
       const now = new Date();
       if (result.disposition === 'suspicious') {
         await revokeFamilyGraph(tx, candidate.familyId, now, 'suspicious_refresh_overlap');
+        await recordRefreshTheftSignal(tx, candidate.familyId, 'suspicious_refresh_overlap');
         logger.warn('Unapproved refresh overlap detected; family revoked', {
           tokenId: candidate.id,
           familyId: candidate.familyId,
@@ -542,6 +547,7 @@ async function rotate(
       }
       if (candidate.revokedAt) {
         await revokeFamilyGraph(tx, candidate.familyId, now, 'refresh_token_replay');
+        await recordRefreshTheftSignal(tx, candidate.familyId, 'refresh_token_replay');
         logger.warn('Refresh token replay detected after generation contention; family revoked', {
           tokenId: candidate.id,
           familyId: candidate.familyId,

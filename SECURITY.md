@@ -25,8 +25,8 @@ This project uses a server-side secret named `SECURITY_PEPPER` for additional cr
 
 ## Production
 
-- Use a root-owned systemd environment file or an equivalent local secret
-  injection mechanism for every production secret listed in
+- Inject every production secret at runtime from root-owned VPS configuration
+  (never baked into the image) for every secret listed in
   [`scripts/README.md`](scripts/README.md#required-runtime-configuration).
 
 - Do not copy `.env.local` into deployment artifacts or commit it to the repository.

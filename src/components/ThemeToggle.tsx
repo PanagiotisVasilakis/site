@@ -46,10 +46,8 @@ export default function ThemeToggle({
     const root = document.documentElement;
     if (theme === 'dark') {
       root.setAttribute('data-theme', 'dark');
-      root.classList.add('dark');
     } else {
       root.setAttribute('data-theme', 'light');
-      root.classList.remove('dark');
     }
   }, [theme, mounted]);
   // Listen to system changes only if user hasn't chosen explicitly
@@ -89,8 +87,8 @@ export default function ThemeToggle({
   const icon = mounted ? (theme === 'dark' ? '🌞' : '🌙') : '🌙';
   const visibleText = mounted && theme === 'dark' ? darkText : lightText;
   const label = mounted
-    ? (theme === 'dark' ? (a11y?.switchToLight ?? 'Switch to light mode') : (a11y?.switchToDark ?? 'Switch to dark mode'))
-    : (a11y?.toggleColorScheme ?? 'Toggle color scheme');
+    ? (theme === 'dark' ? a11y.switchToLight : a11y.switchToDark)
+    : a11y.toggleColorScheme;
   return (
     <button
       type="button"

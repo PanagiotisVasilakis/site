@@ -22,6 +22,13 @@ interface MomentsItem {
 
 interface MomentsDetailLayoutProps {
     nonce?: string;
+    /** Extra schema.org Place fields (e.g. for phones: address, telephone, hero image). */
+    structuredData?: {
+        address?: string;
+        telephone?: string;
+        aggregateRating?: { '@type': 'AggregateRating'; ratingValue: number };
+        image?: string;
+    };
     item: MomentsItem;
     categorySlug: string;
     locale?: string;
@@ -41,9 +48,10 @@ interface MomentsDetailLayoutProps {
             website: string;
             reserve: string;
         };
-        labels?: {
-            updated?: string;
+        labels: {
+            updated: string;
         };
+        momentTags?: Record<string, string>;
     };
 }
 
@@ -59,6 +67,7 @@ export function MomentsDetailLayout({
     urls,
     translations,
     nonce,
+    structuredData,
 }: MomentsDetailLayoutProps) {
     const config = momentsLayoutConfig.detail;
     const t = translations;
@@ -78,6 +87,7 @@ export function MomentsDetailLayout({
                         description: item.summary,
                         url: urls.schemaUrl,
                         image: item.image,
+                        ...structuredData,
                     }),
                 }}
             />
@@ -90,7 +100,7 @@ export function MomentsDetailLayout({
                             {item.name}
                             {isRecentlyUpdated && (
                                 <span className={momentsLayoutConfig.updatedBadge.class}>
-                                    {t.labels?.updated ?? 'Updated'}
+                                    {t.labels.updated}
                                 </span>
                             )}
                         </h1>
@@ -149,7 +159,7 @@ export function MomentsDetailLayout({
                 <div className={config.tagsContainerClass}>
                     {item.tags.map((tag) => (
                         <span key={tag} className={config.tagClass}>
-                            {tag}
+                            {t.momentTags?.[tag] ?? tag}
                         </span>
                     ))}
                 </div>

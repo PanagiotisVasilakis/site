@@ -1,5 +1,5 @@
 import { getDictionary } from "@/i18n/dictionaries";
-import { locales, type Locale } from "@/i18n/config";
+import { normalizeLocale } from '@/i18n/config';
 import OfflineActions from "@/components/OfflineActions";
 import type { Metadata } from 'next';
 
@@ -7,7 +7,7 @@ export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function OfflineLocalePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : "en";
+  const eff = normalizeLocale(locale);
   const t = getDictionary(eff);
   const greek = eff === "el";
   const homeHref = `/${eff}`;

@@ -16,16 +16,16 @@ interface MomentsToolbarProps {
     searchPlaceholder?: string;
     filterByCategoryLabel?: string;
     availableFilters?: readonly MomentsFilterKey[];
-    filters?: {
-        all?: string;
-        beaches?: string;
-        museums?: string;
-        restaurants?: string;
-        bars?: string;
-        brunchs?: string;
-        taygetos?: string;
-        sites?: string;
-        nearby?: string;
+    filters: {
+        all: string;
+        beaches: string;
+        museums: string;
+        restaurants: string;
+        bars: string;
+        brunchs: string;
+        taygetos: string;
+        sites: string;
+        nearby: string;
     };
 }
 

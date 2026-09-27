@@ -21,7 +21,7 @@ const handler = async (request: NextRequest) => {
   if (earlyResponse) return earlyResponse;
 
   if (!(await isAdminRequest(request))) {
-    throw new ApiError(ApiErrorCode.FORBIDDEN, 'Admin credentials required');
+    throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
   }
 
   const { searchParams } = new URL(request.url);

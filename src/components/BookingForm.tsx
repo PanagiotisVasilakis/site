@@ -5,14 +5,16 @@ import { useForm, FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import clsx from 'clsx';
-import { DateRange, formatDateRange, getNights } from '@/lib/dateUtils';
-import { trackEvent } from '@/lib/analyticsClient';
+import { dateRangeFromParams, formatDateRange } from '@/lib/dateUtils';
 import internalFetch from '@/lib/internalFetchClient';
 import { logger } from '@/lib/logger-client';
 import type { BookingFormDictionary } from '@/i18n/domains/booking';
+import { normalizeLocale } from '@/i18n/config';
 
 interface BookingFormProps {
-  dateRange: DateRange;
+  /** Calendar dates exactly as selected (`yyyy-MM-dd`); never serialized instants. */
+  checkIn: string;
+  checkOut: string;
   locale: string;
   labels: BookingFormDictionary;
   propertyName: string;
@@ -27,7 +29,12 @@ interface BookingFormData {
   specialRequests?: string;
 }
 
-export default function BookingForm({ dateRange, locale, labels, propertyName }: BookingFormProps) {
+export default function BookingForm({ checkIn, checkOut, locale, labels, propertyName }: BookingFormProps) {
+  // Local-midnight dates in this runtime, used only for display and night counts.
+  const dateRange = useMemo(
+    () => dateRangeFromParams(new URLSearchParams({ checkin: checkIn, checkout: checkOut })),
+    [checkIn, checkOut],
+  );
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [idempotencyKey] = useState(() => globalThis.crypto.randomUUID());
@@ -71,12 +78,6 @@ export default function BookingForm({ dateRange, locale, labels, propertyName }:
   const onSubmit = async (data: BookingFormData) => {
     setSubmitError('');
     try {
-      // Track booking attempt
-      trackEvent('booking_submitted', {
-        nights: getNights(dateRange),
-        hasArrivalTime: Boolean(data.arrivalTime),
-      });
-
       const response = await internalFetch('/api/booking-requests', {
         method: 'POST',
         headers: {
@@ -86,10 +87,7 @@ export default function BookingForm({ dateRange, locale, labels, propertyName }:
         body: JSON.stringify({
           propertyName,
           locale,
-          dateRange: {
-            from: dateRange.from?.toISOString(),
-            to: dateRange.to?.toISOString(),
-          },
+          dateRange: { from: checkIn, to: checkOut },
           guest: {
             ...data,
             arrivalTime: data.arrivalTime || undefined,
@@ -100,7 +98,10 @@ export default function BookingForm({ dateRange, locale, labels, propertyName }:
 
       const responseBody = await response.json().catch(() => null);
       if (!response.ok || !responseBody?.success) {
-        setSubmitError(responseBody?.error?.message || labels.submitFailed);
+        // Server messages are English; show the localized text for the status.
+        setSubmitError(response.status === 429
+          ? labels.submitRateLimited
+          : response.status === 422 ? labels.submitRejected : labels.submitFailed);
         return;
       }
 
@@ -137,7 +138,7 @@ export default function BookingForm({ dateRange, locale, labels, propertyName }:
           </p>
           <div className="bg-green-50 rounded-lg p-4 text-sm space-y-1">
             <div><strong>{labels.propertyLabel}</strong> {propertyName}</div>
-            <div><strong>{labels.datesLabel}</strong> {formatDateRange(dateRange, locale === 'el' ? 'el' : 'en')}</div>
+            <div><strong>{labels.datesLabel}</strong> {formatDateRange(dateRange, normalizeLocale(locale))}</div>
           </div>
         </div>
         <div className="flex gap-3 justify-center">
@@ -165,7 +166,6 @@ export default function BookingForm({ dateRange, locale, labels, propertyName }:
       {/* Live region for form-wide announcements */}
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {Object.keys(errors).length > 0 && labels.formErrorsAnnounce}
-        {submitError && labels.submitFailed}
         {isSubmitting && labels.submittingAnnounce}
       </div>
 

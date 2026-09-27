@@ -1,12 +1,14 @@
 import { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { logger } from '@/lib/logger-enterprise';
 import {
-  CLIENT_IDENTITY_UNAVAILABLE,
+  ClientIdentityUnavailableError,
   createClientIdentityUnavailableResponse,
   requireCanonicalClientIp,
 } from '@/lib/net/clientIdentity';
 import { canonicalizeClientIp } from '@/lib/net/getClientIp';
+const CLIENT_IDENTITY_UNAVAILABLE = 'CLIENT_IDENTITY_UNAVAILABLE'; // response contract value
 
 describe('canonical client identity', () => {
   const secret = '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2';
@@ -78,5 +80,17 @@ describe('canonical client identity', () => {
     });
     expect(JSON.stringify(await createClientIdentityUnavailableResponse().json()))
       .not.toContain(CLIENT_IDENTITY_UNAVAILABLE);
+  });
+
+  it('logs only the bounded rejection reason at warn level', () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    createClientIdentityUnavailableResponse(new ClientIdentityUnavailableError('missing'));
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][1]).toEqual({ reason: 'missing' });
+    const logged = JSON.stringify(warn.mock.calls);
+    for (const value of ['x-origin', 'forwarded', CLIENT_IDENTITY_UNAVAILABLE]) {
+      expect(logged).not.toContain(value);
+    }
   });
 });

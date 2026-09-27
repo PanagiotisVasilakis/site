@@ -6,12 +6,12 @@ import { GUEST_SESSION_COOKIE, parseGuestSession, verifyGuestSessionAccess, type
 import { guestStore } from '@/lib/guestDataStore';
 import { checkInRequestRepository, type CheckInRequestRecord } from '@/lib/prisma-repositories/checkInRequestRepository';
 import { getFeatureFlagsAsync } from '@/lib/featureFlags';
+import { timePattern } from '@/lib/propertyTime';
 
-const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const requestSchema = z.object({
-  requestedTime: z.string().regex(timeRegex, 'Requested time must be in HH:MM format'),
+  requestedTime: z.string().regex(timePattern, 'Requested time must be in HH:MM format'),
   message: z.string().trim().max(500, 'Message must be 500 characters or fewer').optional(),
 });
 
@@ -77,8 +77,8 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   const created = await checkInRequestRepository.create({
     bookingId: safeUuid(session.booking?.id),
     userId: safeUuid(session.user?.id),
-    guestEmail: user?.email,
-    guestPhone: user?.phone_e164,
+    guestEmail: user?.email ?? undefined,
+    guestPhone: user?.phoneE164,
     requestedTime: body.requestedTime,
     message,
   }, {
@@ -95,5 +95,6 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     : { status: delivered ? 'sent' as const : 'queued' as const };
 
   const correlationId = request.headers.get('x-correlation-id') ?? undefined;
-  return createSuccessResponse({ request: normalizeRequest(created.request), notification }, undefined, correlationId);
+  // 201 for a new request; 200 when the pending request was kept (nothing was created).
+  return createSuccessResponse({ request: normalizeRequest(created.request), notification }, created.created ? 201 : 200, correlationId);
 });

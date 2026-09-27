@@ -58,17 +58,26 @@ export default function AdminSettingsClient() {
             {([
               ['portalEnabled', 'Guest portal', 'Allow guests with verified reservations to sign in.'],
               ['checkinEnabled', 'Check-in workflow', 'Expose verified guest check-in tools and arrival requests.'],
-            ] as const).map(([key, label, description]) => (
-              <label key={key} className="flex items-start justify-between gap-4 rounded border border-soft p-4">
-                <span><strong className="block">{label}</strong><span className="text-sm text-body">{description}</span></span>
-                <input
-                  type="checkbox"
-                  checked={flags[key]}
-                  onChange={(event) => void save({ [key]: event.target.checked })}
-                  className="h-5 w-5"
-                />
-              </label>
-            ))}
+            ] as const).map(([key, label, description]) => {
+              // Check-in needs guest sign-in, so it is only available with the portal on.
+              const blocked = key === 'checkinEnabled' && !flags.portalEnabled;
+              return (
+                <label key={key} className="flex items-start justify-between gap-4 rounded border border-soft p-4">
+                  <span>
+                    <strong className="block">{label}</strong>
+                    <span className="text-sm text-body">{description}</span>
+                    {blocked && <span className="mt-1 block text-sm text-body">Requires the guest portal.</span>}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={flags[key]}
+                    disabled={blocked}
+                    onChange={(event) => void save({ [key]: event.target.checked })}
+                    className="h-5 w-5"
+                  />
+                </label>
+              );
+            })}
           </fieldset>
         )}
       </section>

@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { ApiError, ApiErrorCode, createSuccessResponse, readJsonBody, ValidationError, withErrorHandler } from '@/lib/apiErrorHandler';
 import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import { getFeatureFlagsAsync } from '@/lib/featureFlags';
-import { locales, defaultLocale } from '@/i18n/config';
+import { normalizeLocale } from '@/i18n/config';
 import { PortalAuthError, consumeBookingClaimGrant } from '@/lib/portalAuthService';
 import {
   clearPresentedPortalClaimExchange,
@@ -68,7 +68,7 @@ const claim = withErrorHandler(async (request: NextRequest) => {
   }
 
   const lang = request.cookies.get('lang')?.value;
-  const locale = lang && (locales as readonly string[]).includes(lang) ? lang : String(defaultLocale);
+  const locale = normalizeLocale(lang);
   const response = createSuccessResponse({
     bookingId: result.bookingId,
     redirect: `/${locale}/check-in`,

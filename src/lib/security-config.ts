@@ -3,90 +3,84 @@
  * Centralized security configuration with environment-specific settings
  */
 
-import { z } from 'zod';
+type SourceList = string[];
 
-// Security configuration schema
-const SecurityConfigSchema = z.object({
-  csp: z.object({
-    enabled: z.boolean(),
-    reportOnly: z.boolean(),
-    directives: z.object({
-      defaultSrc: z.array(z.string()),
-      scriptSrc: z.array(z.string()),
-      styleSrc: z.array(z.string()),
-      imgSrc: z.array(z.string()),
-      fontSrc: z.array(z.string()),
-      connectSrc: z.array(z.string()),
-      frameSrc: z.array(z.string()),
-      manifestSrc: z.array(z.string()),
-      workerSrc: z.array(z.string()),
-      frameAncestors: z.array(z.string()),
-      baseUri: z.array(z.string()),
-      formAction: z.array(z.string()),
-    }),
-    useNonce: z.boolean(),
-    reportUri: z.string().optional(),
-  }),
-  headers: z.object({
-    hsts: z.object({
-      enabled: z.boolean(),
-      maxAge: z.number(),
-      includeSubDomains: z.boolean(),
-      preload: z.boolean(),
-    }),
-    frameOptions: z.enum(['DENY', 'SAMEORIGIN', 'ALLOW-FROM']),
-    contentTypeOptions: z.boolean(),
-    referrerPolicy: z.enum([
-      'no-referrer',
-      'no-referrer-when-downgrade',
-      'origin',
-      'origin-when-cross-origin',
-      'same-origin',
-      'strict-origin',
-      'strict-origin-when-cross-origin',
-      'unsafe-url'
-    ]),
-    permissionsPolicy: z.object({
-      geolocation: z.array(z.string()),
-      microphone: z.array(z.string()),
-      camera: z.array(z.string()),
-      payment: z.array(z.string()),
-      accelerometer: z.array(z.string()),
-      gyroscope: z.array(z.string()),
-      magnetometer: z.array(z.string()),
-      usb: z.array(z.string()),
-    }),
-    crossOriginEmbedderPolicy: z.enum(['unsafe-none', 'require-corp', 'credentialless']),
-    crossOriginOpenerPolicy: z.enum(['unsafe-none', 'same-origin-allow-popups', 'same-origin']),
-    crossOriginResourcePolicy: z.enum(['same-site', 'same-origin', 'cross-origin']),
-  }),
-  cors: z.object({
-    enabled: z.boolean(),
-    origins: z.array(z.string()),
-    methods: z.array(z.string()),
-    allowedHeaders: z.array(z.string()),
-    credentials: z.boolean(),
-    maxAge: z.number(),
-  }),
-  monitoring: z.object({
-    enabled: z.boolean(),
-    logSecurityEvents: z.boolean(),
-  }),
-  apiSecurity: z.object({
-    inputValidation: z.object({
-      enabled: z.boolean(),
-      maxPayloadSize: z.number(),
-      allowedContentTypes: z.array(z.string()),
-    }),
-  }),
-});
+// Static, per-environment security settings. Plain types: the values are
+// constants in this file, so they are checked at compile time, not per request.
+export interface SecurityConfig {
+  csp: {
+    reportOnly: boolean;
+    directives: {
+      defaultSrc: SourceList;
+      scriptSrc: SourceList;
+      styleSrc: SourceList;
+      imgSrc: SourceList;
+      fontSrc: SourceList;
+      connectSrc: SourceList;
+      frameSrc: SourceList;
+      manifestSrc: SourceList;
+      workerSrc: SourceList;
+      frameAncestors: SourceList;
+      baseUri: SourceList;
+      formAction: SourceList;
+    };
+    useNonce: boolean;
+    reportUri?: string;
+  };
+  headers: {
+    hsts: {
+      enabled: boolean;
+      maxAge: number;
+      includeSubDomains: boolean;
+      preload: boolean;
+    };
+    frameOptions: 'DENY' | 'SAMEORIGIN' | 'ALLOW-FROM';
+    contentTypeOptions: boolean;
+    referrerPolicy:
+      | 'no-referrer'
+      | 'no-referrer-when-downgrade'
+      | 'origin'
+      | 'origin-when-cross-origin'
+      | 'same-origin'
+      | 'strict-origin'
+      | 'strict-origin-when-cross-origin'
+      | 'unsafe-url';
+    permissionsPolicy: {
+      geolocation: SourceList;
+      microphone: SourceList;
+      camera: SourceList;
+      payment: SourceList;
+      accelerometer: SourceList;
+      gyroscope: SourceList;
+      magnetometer: SourceList;
+      usb: SourceList;
+    };
+    crossOriginEmbedderPolicy: 'unsafe-none' | 'require-corp' | 'credentialless';
+    crossOriginOpenerPolicy: 'unsafe-none' | 'same-origin-allow-popups' | 'same-origin';
+    crossOriginResourcePolicy: 'same-site' | 'same-origin' | 'cross-origin';
+  };
+  cors: {
+    origins: string[];
+    methods: string[];
+    allowedHeaders: string[];
+    credentials: boolean;
+    maxAge: number;
+  };
+  apiSecurity: {
+    inputValidation: {
+      maxPayloadSize: number;
+      allowedContentTypes: string[];
+    };
+  };
+}
 
-export type SecurityConfig = z.infer<typeof SecurityConfigSchema>;
+// The map's routing client (LeafletMap) calls NEXT_PUBLIC_OSRM_BASE_URL with the
+// same default; the environment schema rejects a malformed value at startup.
+const osrmOrigin = new URL(process.env.NEXT_PUBLIC_OSRM_BASE_URL || 'https://router.project-osrm.org').origin;
 
 // Environment-specific configurations
 const developmentConfig: SecurityConfig = {
   csp: {
-    enabled: true,
     reportOnly: true, // Report-only mode in development
     directives: {
       defaultSrc: ["'self'"],
@@ -94,7 +88,7 @@ const developmentConfig: SecurityConfig = {
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
-      connectSrc: ["'self'", "https://router.project-osrm.org", "wss:", "ws:"],
+      connectSrc: ["'self'", osrmOrigin, "wss:", "ws:"],
       frameSrc: ["'self'"],
       manifestSrc: ["'self'"],
       workerSrc: ["'self'", "blob:"],
@@ -130,20 +124,14 @@ const developmentConfig: SecurityConfig = {
     crossOriginResourcePolicy: 'cross-origin',
   },
   cors: {
-    enabled: true,
     origins: ['http://localhost:3000', 'http://127.0.0.1:3000'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     credentials: true,
     maxAge: 86400,
   },
-  monitoring: {
-    enabled: true,
-    logSecurityEvents: true,
-  },
   apiSecurity: {
     inputValidation: {
-      enabled: true,
       maxPayloadSize: 1024 * 1024, // 1MB
       allowedContentTypes: ['application/json'],
     },
@@ -152,7 +140,6 @@ const developmentConfig: SecurityConfig = {
 
 const productionConfig: SecurityConfig = {
   csp: {
-    enabled: true,
     reportOnly: false, // Enforce in production
     directives: {
       defaultSrc: ["'self'"],
@@ -162,7 +149,7 @@ const productionConfig: SecurityConfig = {
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
-  connectSrc: ["'self'", "https://router.project-osrm.org"],
+      connectSrc: ["'self'", osrmOrigin],
       frameSrc: ["'none'"],
       manifestSrc: ["'self'"],
       workerSrc: ["'self'", "blob:"],
@@ -193,25 +180,20 @@ const productionConfig: SecurityConfig = {
       magnetometer: [],
       usb: [],
     },
-    crossOriginEmbedderPolicy: 'require-corp',
+    // require-corp would block the no-CORS OpenStreetMap/Carto tiles (no CORP header).
+    crossOriginEmbedderPolicy: 'unsafe-none',
     crossOriginOpenerPolicy: 'same-origin',
     crossOriginResourcePolicy: 'same-origin',
   },
   cors: {
-    enabled: true,
     origins: process.env.ALLOWED_ORIGINS?.split(',').map((origin) => origin.trim()).filter(Boolean) || [],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'X-API-Key'],
     credentials: true,
     maxAge: 86400,
   },
-  monitoring: {
-    enabled: true,
-    logSecurityEvents: true,
-  },
   apiSecurity: {
     inputValidation: {
-      enabled: true,
       maxPayloadSize: 512 * 1024, // 512KB in production (more restrictive)
       allowedContentTypes: ['application/json'],
     },
@@ -222,16 +204,7 @@ const productionConfig: SecurityConfig = {
 export function getSecurityConfig(): SecurityConfig {
   const env = process.env.NODE_ENV || 'development';
 
-  const config = env === 'production' ? productionConfig : developmentConfig;
-  
-  // Validate configuration
-  const result = SecurityConfigSchema.safeParse(config);
-  if (!result.success) {
-    console.error('Invalid security configuration:', result.error);
-    throw new Error('Security configuration validation failed');
-  }
-  
-  return result.data;
+  return env === 'production' ? productionConfig : developmentConfig;
 }
 
 // CSP directive builders
@@ -306,29 +279,4 @@ export interface SecurityEvent {
   userAgent?: string;
   url: string;
   details: Record<string, unknown>;
-}
-
-// Security monitoring utilities
-//
-// Keep this API awaitable: request handlers must not finish while the durable
-// audit write is still only queued in the JavaScript microtask queue. The
-// dynamic import still avoids the configuration/monitoring module cycle and
-// keeps the browser bundle free of the server-only persistence code.
-export async function logSecurityEvent(event: SecurityEvent): Promise<void> {
-  const config = getSecurityConfig();
-  
-  if (!config.monitoring.enabled || !config.monitoring.logSecurityEvents) {
-    return;
-  }
-
-  // Use dynamic import to avoid circular dependency
-  if (typeof window === 'undefined') { // Server-side only
-    try {
-      const { recordSecurityEvent } = await import('./security-monitoring');
-      await recordSecurityEvent(event);
-    } catch (error) {
-      console.error('Failed to record security event:', error);
-      console.warn('Security event recording unavailable', { type: event.type, severity: event.severity });
-    }
-  }
 }

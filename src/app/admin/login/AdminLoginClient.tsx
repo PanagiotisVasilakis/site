@@ -8,6 +8,7 @@ export default function AdminLoginClient() {
   const router = useRouter();
   const [token, setToken] = useState('');
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [message, setMessage] = useState('Authentication failed');
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -18,11 +19,20 @@ export default function AdminLoginClient() {
         body: JSON.stringify({ token }),
         headers: { 'content-type': 'application/json' },
       });
-      if (!response.ok) throw new Error('Authentication failed');
+      if (!response.ok) {
+        // 401 stays generic; 400/429/503 explain themselves (disabled login,
+        // rate limit, missing ingress identity).
+        const body = await response.json().catch(() => null) as { error?: string | { message?: string } } | null;
+        const serverMessage = typeof body?.error === 'string' ? body.error : body?.error?.message;
+        setMessage(response.status !== 401 && serverMessage ? serverMessage : 'Authentication failed');
+        setStatus('error');
+        return;
+      }
       setStatus('success');
       router.replace('/admin');
       router.refresh();
     } catch {
+      setMessage('Unable to reach the server. Check your connection and try again.');
       setStatus('error');
     }
   }
@@ -48,7 +58,7 @@ export default function AdminLoginClient() {
         </div>
         <button type="submit" className="btn-primary btn-sm">Login</button>
         <div aria-live="polite">
-          {status === 'error' && <p id="admin-login-error" className="text-sm text-red-600">Authentication failed</p>}
+          {status === 'error' && <p id="admin-login-error" className="text-sm text-red-600">{message}</p>}
         </div>
       </form>
     </main>

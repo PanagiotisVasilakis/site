@@ -18,7 +18,6 @@ import {
 } from '@/lib/data';
 import {
   getKalamataMarkers,
-  markerFromMapLocation,
   toLeafletMarker,
 } from '@/lib/mapUtils';
 
@@ -138,7 +137,7 @@ describe('shared map catalog', () => {
 
   it('converts between shared and Leaflet marker representations without PII expansion', () => {
     const location = getApartmentMapLocation('en');
-    const marker = markerFromMapLocation(location);
+    const marker = getKalamataMarkers('en').find((candidate) => candidate.id === 'apartment')!;
     expect(toLeafletMarker(marker)).toEqual(expect.objectContaining({
       id: 'apartment',
       coordinates: location.coordinates,
@@ -167,7 +166,6 @@ describe('navigation and popup presentation', () => {
     expect(buildMenuLinks('en', getDictionary('en'), true)).toContainEqual(expect.objectContaining({
       href: '/en/check-in',
       icon: 'checkin',
-      event: 'mobile_nav_checkin',
     }));
   });
 

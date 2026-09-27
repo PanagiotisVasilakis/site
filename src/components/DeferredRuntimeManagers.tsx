@@ -2,10 +2,6 @@
 
 import { useEffect, useState, type ComponentType } from 'react';
 
-interface RuntimeManagers {
-  PwaManager: ComponentType;
-  Analytics: ComponentType;
-}
 
 function scheduleIdle(callback: () => void) {
   if (typeof window === 'undefined') return () => {};
@@ -44,29 +40,15 @@ function scheduleIdle(callback: () => void) {
 }
 
 export default function DeferredRuntimeManagers() {
-  const [managers, setManagers] = useState<RuntimeManagers | null>(null);
+  const [PwaManager, setPwaManager] = useState<ComponentType | null>(null);
 
   useEffect(() => {
     return scheduleIdle(() => {
-      void Promise.all([
-        import('@/components/PwaManager'),
-        import('@/components/Analytics'),
-      ]).then(([pwa, analytics]) => {
-        setManagers({
-          PwaManager: pwa.default,
-          Analytics: analytics.default,
-        });
+      void import('@/components/PwaManager').then((pwa) => {
+        setPwaManager(() => pwa.default);
       });
     });
   }, []);
 
-  if (!managers) return null;
-
-  const { PwaManager, Analytics } = managers;
-  return (
-    <>
-      <PwaManager />
-      <Analytics />
-    </>
-  );
+  return PwaManager ? <PwaManager /> : null;
 }

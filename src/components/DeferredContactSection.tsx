@@ -6,9 +6,13 @@ interface Props {
   locale: string;
 }
 
+const CONTACT_HASH = '#contact';
+
 export default function DeferredContactSection(props: Props) {
   const [Component, setComponent] = useState<ComponentType<Props> | null>(null);
   const ref = useRef<HTMLDivElement | null>(null);
+  // Set when a #contact link asked for the section before it was loaded.
+  const scrollWhenLoaded = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -21,6 +25,11 @@ export default function DeferredContactSection(props: Props) {
         if (!cancelled) setComponent(() => module.default);
       });
     };
+    const loadForHash = () => {
+      if (window.location.hash !== CONTACT_HASH) return;
+      scrollWhenLoaded.current = true;
+      load();
+    };
 
     if ('IntersectionObserver' in window && ref.current) {
       observer = new IntersectionObserver((entries) => {
@@ -32,15 +41,25 @@ export default function DeferredContactSection(props: Props) {
       observer.observe(ref.current);
     }
 
+    loadForHash();
+    window.addEventListener('hashchange', loadForHash);
     timeoutId = window.setTimeout(load, 3500);
 
     return () => {
       cancelled = true;
       observer?.disconnect();
+      window.removeEventListener('hashchange', loadForHash);
       if (timeoutId !== null) window.clearTimeout(timeoutId);
     };
   }, [Component]);
 
+  useEffect(() => {
+    if (!Component || !scrollWhenLoaded.current) return;
+    scrollWhenLoaded.current = false;
+    document.getElementById('contact')?.scrollIntoView({ block: 'start' });
+  }, [Component]);
+
   if (Component) return <Component {...props} />;
-  return <div ref={ref} className="min-h-[280px]" aria-hidden="true" />;
+  // Carries the anchor until the section loads, so #contact links land here.
+  return <div ref={ref} id="contact" className="min-h-[280px]" aria-hidden="true" />;
 }

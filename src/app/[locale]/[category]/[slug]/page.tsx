@@ -1,21 +1,13 @@
-import { Suspense } from "react";
 import { categories } from "@/data/categories";
 import { getItem, getItemsByCategory, toSlug, pickLocale, isRecentlyUpdated } from "@/lib/data";
 import { mapsHref, telHref } from "@/lib/contactLinks";
 import { absUrl } from "@/lib/site";
-import { ResponsiveImage } from "@/components/ResponsiveImage";
-import { Button } from "@/components/ui/Button";
-import { Skeleton } from "@/components/Skeleton";
-import FavoriteButton from "@/components/FavoriteButton";
-import ShareButton from "@/components/ShareButton";
-import DescriptionBox from "@/components/DescriptionBox";
 import { MomentsDetailLayout } from "@/components/moments";
 import { notFound } from "next/navigation";
 import { getDictionary } from "@/i18n/dictionaries";
-import { locales, type Locale } from "@/i18n/config";
+import { normalizeLocale } from '@/i18n/config';
 import { headers } from 'next/headers';
-import { serializeJsonLd } from '@/lib/jsonLd';
-import { localizedAlternates, normalizeLocale } from '@/lib/seo';
+import { localizedAlternates } from '@/lib/seo';
 import type { Metadata } from 'next';
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string; category: string; slug: string }> }): Promise<Metadata> {
@@ -48,7 +40,7 @@ export const dynamic = 'force-dynamic';
 export default async function ItemPage({ params }: { params: Promise<{ locale: string; category: string; slug: string }> }) {
   const { locale, category, slug } = await params;
   const nonce = (await headers()).get('x-nonce') ?? undefined;
-  const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : "en";
+  const eff = normalizeLocale(locale);
   const t = getDictionary(eff ?? "en");
   const cat = categories.find((c) => c.slug === category);
   if (!cat) return notFound();
@@ -64,121 +56,43 @@ export default async function ItemPage({ params }: { params: Promise<{ locale: s
   const recently = isRecentlyUpdated(item);
   const heroImage = item.heroImage ?? item.image;
 
-  // Use centralized layout for moments category
-  if (cat.slug === 'moments') {
-    // Compute URLs server-side to avoid client-side node imports
-    const momentsTel = telHref(item.phone);
-    const momentsMaps = item.directionsUrl || mapsHref(item.address, item.location?.lat, item.location?.lng);
-    const momentsWebsite = item.website || undefined;
-    const momentsReservationUrl = item.reservationUrl || undefined;
-
-    return (
-      <MomentsDetailLayout
-        item={{
-          id: item.id,
-          name,
-          summary,
-          image: item.image,
-          heroImage: item.heroImage,
-          heroImagePosition: item.heroImagePosition,
-          tags: item.tags,
-          descriptionTitle,
-          description,
-        }}
-        categorySlug={cat.slug}
-        locale={eff}
-        isRecentlyUpdated={recently}
-        urls={{
-          tel: momentsTel,
-          maps: momentsMaps,
-          website: momentsWebsite,
-          reservationUrl: momentsReservationUrl,
-          schemaUrl: absUrl(`/${eff}/${cat.slug}/${slug}`),
-        }}
-        translations={{
-          cta: t.cta,
-          labels: t.labels,
-        }}
-        nonce={nonce}
-      />
-    );
-  }
-
-  // Default layout for other categories
-  const tel = telHref(item.phone);
-  const maps = item.directionsUrl || mapsHref(item.address, item.location?.lat, item.location?.lng);
-  const website = item.website || undefined;
-  const reservationUrl = item.reservationUrl || undefined;
-
+  // One layout for every category; phones add their contact fields to the structured data.
   return (
-    <div className="page-container mx-auto max-w-7xl space-y-6 safe-bottom">
-      <script
-        nonce={nonce}
-        type="application/ld+json"
-        suppressHydrationWarning
-        dangerouslySetInnerHTML={{
-          __html: serializeJsonLd({
-            '@context': 'https://schema.org',
-            '@type': 'Place',
-            name,
-            description: summary,
-            address,
-            url: absUrl(`/${eff}/${cat.slug}/${slug}`),
-            telephone: item.phone,
-            aggregateRating: item.rating ? { '@type': 'AggregateRating', ratingValue: item.rating } : undefined,
-            image: heroImage,
-          })
-        }}
-      />
-      <header className="flex flex-col gap-2 pt-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-serif italic font-bold flex items-center gap-2">{name}{recently && <span className="text-xs rounded bg-amber-200 text-amber-900 px-2 py-0.5">{t.labels?.updated ?? 'Updated'}</span>}</h1>
-            {summary && <p className="text-body text-sm">{summary}</p>}
-          </div>
-        </div>
-      </header>
-      {heroImage && (
-        <Suspense fallback={<Skeleton className="w-full h-60" />}>
-          <ResponsiveImage src={heroImage} alt={name} width={800} height={500} className="w-full" priority />
-        </Suspense>
-      )}
-
-      <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
-        {tel && (
-          <Button variant="primary" asChild aria-label={`${t.cta.call} ${name}`}>
-            <a href={tel}>{t.cta.call}</a>
-          </Button>
-        )}
-        {maps && (
-          <Button variant="primary" asChild aria-label={`${t.cta.directions} ${name}`}>
-            <a href={maps} target="_blank">{t.cta.directions}</a>
-          </Button>
-        )}
-        {website && (
-          <Button variant="primary" asChild aria-label={`${t.cta.website} ${name}`}>
-            <a href={website} target="_blank">{t.cta.website}</a>
-          </Button>
-        )}
-        {reservationUrl && (
-          <Button variant="primary" asChild aria-label={`${t.cta.reserve} ${name}`}>
-            <a href={reservationUrl} target="_blank">{t.cta.reserve}</a>
-          </Button>
-        )}
-        <ShareButton title={name} text={summary} className="btn-primary" locale={eff} />
-        <FavoriteButton id={`${cat.id}:${item.id}`} label={name} locale={eff} />
-      </div>
-
-      <DescriptionBox title={descriptionTitle} description={description} />
-
-      {item.tags && item.tags.length > 0 && (
-        <div className="flex flex-wrap gap-2 pt-4">
-          {item.tags.map((tp) => (
-            <span key={tp} className="text-xs rounded-full px-2 py-1 border border-[color:var(--border-soft)] bg-[color:var(--layer-surface)]">{tp}</span>
-          ))}
-        </div>
-      )}
-    </div>
+    <MomentsDetailLayout
+      item={{
+        id: item.id,
+        name,
+        summary,
+        image: item.image,
+        heroImage: item.heroImage,
+        heroImagePosition: item.heroImagePosition,
+        tags: item.tags,
+        descriptionTitle,
+        description,
+      }}
+      categorySlug={cat.slug}
+      locale={eff}
+      isRecentlyUpdated={recently}
+      urls={{
+        tel: telHref(item.phone),
+        maps: item.directionsUrl || mapsHref(item.address, item.location?.lat, item.location?.lng),
+        website: item.website || undefined,
+        reservationUrl: item.reservationUrl || undefined,
+        schemaUrl: absUrl(`/${eff}/${cat.slug}/${slug}`),
+      }}
+      translations={{
+        cta: t.cta,
+        labels: t.labels,
+        momentTags: t.momentTags,
+      }}
+      structuredData={cat.slug === 'moments' ? undefined : {
+        address,
+        telephone: item.phone,
+        aggregateRating: item.rating ? { '@type': 'AggregateRating', ratingValue: item.rating } : undefined,
+        image: heroImage,
+      }}
+      nonce={nonce}
+    />
   );
 }
 

@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { logger } from '@/lib/logger-enterprise';
+
 import {
   canonicalizeClientIp,
   getClientIp,
@@ -7,7 +9,7 @@ import {
   VERIFIED_CLIENT_IP_HEADER,
 } from '@/lib/net/getClientIp';
 
-export const CLIENT_IDENTITY_UNAVAILABLE = 'CLIENT_IDENTITY_UNAVAILABLE' as const;
+const CLIENT_IDENTITY_UNAVAILABLE = 'CLIENT_IDENTITY_UNAVAILABLE' as const;
 export type ClientIdentityUnavailableReason =
   | 'missing'
   | 'sentinel'
@@ -44,8 +46,18 @@ export function isClientIdentityUnavailableError(
       && error.code === CLIENT_IDENTITY_UNAVAILABLE);
 }
 
-/** Stable public mapping; never include the internal code or rejection reason. */
-export function createClientIdentityUnavailableResponse(): NextResponse {
+/**
+ * Stable public mapping; never include the internal code or rejection reason.
+ *
+ * Only the bounded rejection reason is logged (warn level), so a missing or
+ * misconfigured trusted-ingress hop, or a local run without
+ * `npm run dev:proxy`, is diagnosable next to the access-log line. Header
+ * values, addresses and route details are never logged here.
+ */
+export function createClientIdentityUnavailableResponse(error?: unknown): NextResponse {
+  logger.warn('Client identity unavailable; request rejected before persistence', {
+    reason: error instanceof ClientIdentityUnavailableError ? error.reason : 'unspecified',
+  });
   return NextResponse.json({
     success: false,
     error: { message: 'Service temporarily unavailable' },

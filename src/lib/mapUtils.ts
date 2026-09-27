@@ -29,7 +29,7 @@ export interface MarkerData {
   sourceUrls?: string[];
 }
 
-export function markerFromMapLocation(location: MapLocation): MarkerData {
+function markerFromMapLocation(location: MapLocation): MarkerData {
   return {
     id: location.id,
     name: location.name,

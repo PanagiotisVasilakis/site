@@ -5,26 +5,28 @@ import type { Booking } from '@/lib/guestDataStore';
 const guestStore = vi.hoisted(() => ({
   getAllBookings: vi.fn(),
   getAllUsers: vi.fn(),
-  getAllCheckins: vi.fn(),
   findBookingById: vi.fn(),
   findUserById: vi.fn(),
-  getCheckinCompletionByBooking: vi.fn(),
 }));
 
 vi.mock('@/lib/guestDataStore', () => ({ guestStore }));
 
 import { guestDataExport } from '@/lib/guestDataExport';
 
-// Mirrors domainMappers: PostgreSQL DATE columns arrive as UTC-midnight ISO datetimes.
+// PostgreSQL DATE columns arrive from Prisma as UTC-midnight Dates.
 function booking(id: string, start: string, end: string): Booking {
   return {
     id,
     source: 'EXTERNAL',
-    start_date: new Date(`${start}T00:00:00Z`).toISOString(),
-    end_date: new Date(`${end}T00:00:00Z`).toISOString(),
+    reference: null,
+    startDate: new Date(`${start}T00:00:00Z`),
+    endDate: new Date(`${end}T00:00:00Z`),
+    userId: null,
     provider: 'test',
-    access_status: 'PENDING',
-    created_at: 0,
+    externalReference: null,
+    accessStatus: 'PENDING',
+    claimedAt: null,
+    createdAt: new Date(0),
   };
 }
 
@@ -39,10 +41,8 @@ const bookings = [
 beforeEach(() => {
   guestStore.getAllBookings.mockResolvedValue(bookings);
   guestStore.getAllUsers.mockResolvedValue([]);
-  guestStore.getAllCheckins.mockResolvedValue([]);
   guestStore.findBookingById.mockImplementation(async (id: string) => bookings.find((b) => b.id === id) ?? null);
   guestStore.findUserById.mockResolvedValue(null);
-  guestStore.getCheckinCompletionByBooking.mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -60,27 +60,23 @@ describe('guest data export date handling', () => {
     expect(result.map((entry) => entry.booking.id).sort()).toEqual(['starts-on-day', 'starts-on-range-end']);
   });
 
-  it('joins users and check-ins from their lists without per-booking lookups', async () => {
+  it('joins users from their list without per-booking lookups', async () => {
     guestStore.getAllBookings.mockResolvedValue([
-      { ...booking('with-guest', '2030-07-14', '2030-07-16'), user_id: 'user-1' },
+      { ...booking('with-guest', '2030-07-14', '2030-07-16'), userId: 'user-1' },
       booking('without-guest', '2030-07-20', '2030-07-22'),
     ]);
     guestStore.getAllUsers.mockResolvedValue([
-      { id: 'user-1', phone_e164: '+12025550100', country_origin: 'GR', created_at: 0, updated_at: 0 },
-    ]);
-    guestStore.getAllCheckins.mockResolvedValue([
-      { booking_id: 'with-guest', arrival_time: '15:00', accepted_at: 0 },
+      { id: 'user-1', email: null, phoneE164: '+12025550100', countryOrigin: 'GR', createdAt: new Date(0), updatedAt: new Date(0) },
     ]);
 
     const result = await guestDataExport.getAllBookings();
 
-    expect(result.map((entry) => [entry.booking.id, entry.user?.phone, entry.checkin?.arrivalTime])).toEqual([
-      ['with-guest', '+12025550100', '15:00'],
-      ['without-guest', undefined, undefined],
+    expect(result.map((entry) => [entry.booking.id, entry.user?.phone])).toEqual([
+      ['with-guest', '+12025550100'],
+      ['without-guest', undefined],
     ]);
     expect(guestStore.findBookingById).not.toHaveBeenCalled();
     expect(guestStore.findUserById).not.toHaveBeenCalled();
-    expect(guestStore.getCheckinCompletionByBooking).not.toHaveBeenCalled();
   });
 
   it('counts a booking that starts today as active', async () => {

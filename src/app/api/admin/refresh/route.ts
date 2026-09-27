@@ -18,11 +18,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
   }
   
-  // Validate that the token contains expected structure
-  if (payload.type !== 'admin' || payload.role !== 'admin') {
-    return NextResponse.json({ error: 'Invalid admin session' }, { status: 401 });
-  }
-  
   const loginAt = payload.login_at;
   const sessionId = payload.session_id;
   if (!loginAt || !sessionId || Date.now() / 1000 - loginAt > 86400) {
@@ -42,7 +37,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   };
   const ttlSeconds = Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
   const fresh = signAdmin(cleanPayload, ttlSeconds);
-  const res = NextResponse.json({ success: true }, { status: 200 });
+  const res = NextResponse.json({ success: true, expiresAt: expiresAt.toISOString() }, { status: 200 });
   
   // Enhanced cookie security
   res.cookies.set('admin_jwt', fresh, {

@@ -170,8 +170,7 @@ const EXPECTED_PACKAGE_SCRIPTS = Object.freeze({
   'prisma:validate': 'prisma validate',
   'test:integration': 'tsx tests/integration/run.ts',
   'validate:security': 'tsx scripts/validate-security.ts',
-  build:
-    'tsx scripts/generate-precache.ts && tsx scripts/validate-content.ts && tsx scripts/generate-version.ts && next build',
+  build: 'tsx scripts/validate-content.ts && tsx scripts/generate-version.ts && next build',
   'hash:prisma-integrity': 'node scripts/hash-prisma-integrity.mjs',
   'check:integration-orphans': 'node scripts/check-integration-orphans.mjs',
 });
@@ -202,19 +201,20 @@ const EXPECTED_HISTORICAL_SECRET_BASELINE = Object.freeze([
   ['retired-unused-encryption-credential', '70034c89f223bf572c23197f842077ab9c5b2764:docs/DEPLOYMENT_SUCCESS.md:generic-api-key:71'],
 ]);
 
+// Reviewed synthetic fixtures: [SHA-256 of the matched value, classification,
+// path, rule], one entry per occurrence; identified by value, not line/column.
 const EXPECTED_CURRENT_SECRET_FIXTURES = Object.freeze([
-  ['synthetic-release-fixture', '.env.example', 'credential-bearing-database-url', 5, 15],
-  ['synthetic-test-fixture', 'tests/integration/auth/portal-eligibility-consistency.test.ts', 'generic-api-key', 29, 8],
-  ['synthetic-test-fixture', 'tests/security/client-identity-route-regression.test.ts', 'generic-api-key', 149, 18],
-  ['synthetic-test-fixture', 'tests/security/client-identity.test.ts', 'generic-api-key', 12, 10],
-  ['synthetic-test-fixture', 'tests/security/portal-auth-client-identity.test.ts', 'generic-api-key', 32, 18],
-  ['synthetic-test-fixture', 'tests/security/security-boundaries.test.ts', 'generic-api-key', 33, 6],
-  ['synthetic-test-fixture', 'tests/security/security-boundaries.test.ts', 'generic-api-key', 215, 10],
-  ['synthetic-release-fixture', 'scripts/lib/release-gates.mjs', 'credential-bearing-database-url', 29, 19],
-  ['synthetic-release-fixture', 'scripts/lib/release-gates.mjs', 'credential-bearing-database-url', 30, 17],
-  ['synthetic-release-fixture', 'scripts/lib/release-policy.mjs', 'credential-bearing-database-url', 40, 19],
-  ['synthetic-release-fixture', 'scripts/lib/release-policy.mjs', 'credential-bearing-database-url', 41, 17],
-  ['synthetic-test-fixture', 'tests/unit/integration-database-safety.test.ts', 'credential-bearing-database-url', 228, 28],
+  ['601428e918c818f9b37731838dd5300b569c2d1d0334417972f1ceaa4bfaf395', 'synthetic-test-fixture', 'tests/integration/auth/portal-eligibility-consistency.test.ts', 'generic-api-key'],
+  ['a03ebd66251f74c4f8568f4eb752b9d7bf9f626905e54d8baab71821f4e7fe08', 'synthetic-test-fixture', 'tests/security/client-identity-route-regression.test.ts', 'generic-api-key'],
+  ['a03ebd66251f74c4f8568f4eb752b9d7bf9f626905e54d8baab71821f4e7fe08', 'synthetic-test-fixture', 'tests/security/client-identity.test.ts', 'generic-api-key'],
+  ['a03ebd66251f74c4f8568f4eb752b9d7bf9f626905e54d8baab71821f4e7fe08', 'synthetic-test-fixture', 'tests/security/portal-auth-client-identity.test.ts', 'generic-api-key'],
+  ['a03ebd66251f74c4f8568f4eb752b9d7bf9f626905e54d8baab71821f4e7fe08', 'synthetic-test-fixture', 'tests/security/security-boundaries.test.ts', 'generic-api-key'],
+  ['a03ebd66251f74c4f8568f4eb752b9d7bf9f626905e54d8baab71821f4e7fe08', 'synthetic-test-fixture', 'tests/security/security-boundaries.test.ts', 'generic-api-key'],
+  ['b3cc0475bb78a5026098858e9889acf666d31062d513d303314eca31d36e72f2', 'synthetic-release-fixture', 'scripts/lib/release-gates.mjs', 'credential-bearing-database-url'],
+  ['b3cc0475bb78a5026098858e9889acf666d31062d513d303314eca31d36e72f2', 'synthetic-release-fixture', 'scripts/lib/release-gates.mjs', 'credential-bearing-database-url'],
+  ['b3cc0475bb78a5026098858e9889acf666d31062d513d303314eca31d36e72f2', 'synthetic-release-fixture', 'scripts/lib/release-policy.mjs', 'credential-bearing-database-url'],
+  ['b3cc0475bb78a5026098858e9889acf666d31062d513d303314eca31d36e72f2', 'synthetic-release-fixture', 'scripts/lib/release-policy.mjs', 'credential-bearing-database-url'],
+  ['9af99f4fb48256293bb5aedf463b7ced38e91093450b9c648396df4a00ee3b66', 'synthetic-test-fixture', 'tests/unit/integration-database-safety.test.ts', 'credential-bearing-database-url'],
 ]);
 
 const FORBIDDEN_PLATFORM_PATHS = Object.freeze([
@@ -432,7 +432,6 @@ async function validateActiveScripts(root, errors) {
     ...await filesBelow(path.join(root, 'scripts'), root),
     ...await filesBelow(path.join(root, 'deploy'), root),
     ...await filesBelow(path.join(root, 'docker'), root),
-    'Makefile',
     'Dockerfile',
     'docker-compose.yml',
   ]
@@ -484,8 +483,6 @@ async function validateTrustedIngress(root, errors) {
   const geo = await readOptional(path.join(root, 'deploy/nginx/includes/cloudflare-geo.conf'));
   const imageSource = await readOptional(path.join(root, 'deploy/nginx/image.lock.json'));
   const runbook = await readOptional(path.join(root, 'docs/deployment/origin-ingress-runbook.md'));
-  const systemd = await readOptional(path.join(root, 'deploy/systemd/qr-city-guide.service'));
-  const orchestrator = await readOptional(path.join(root, 'scripts/system-orchestrator.sh'));
   const runtimeSchema = await readOptional(path.join(root, 'src/lib/runtime-env-schema.js'));
   const identitySource = await readOptional(path.join(root, 'src/lib/net/getClientIp.ts'));
 
@@ -544,13 +541,6 @@ async function validateTrustedIngress(root, errors) {
     errors.push('Nginx image lock must be valid JSON');
   }
 
-  if (!systemd?.includes('Environment=HOSTNAME=127.0.0.1')
-    || !systemd.includes('Environment=PORT=3000')) {
-    errors.push('the host application upstream must bind only to 127.0.0.1:3000');
-  }
-  if (!orchestrator?.includes('export HOSTNAME="127.0.0.1"')) {
-    errors.push('the production orchestrator must enforce loopback application binding');
-  }
   if (!runtimeSchema?.includes('ORIGIN_PROXY_SHARED_SECRET')
     || !runtimeSchema.includes('64-character hexadecimal secret')
     || !runtimeSchema.includes('non-placeholder')) {
@@ -657,17 +647,12 @@ async function validateLayeredRateLimiting(root, errors) {
 }
 
 async function validateLocalDefaults(root, errors) {
-  const makefile = await readOptional(path.join(root, 'Makefile'));
-  if (makefile === undefined || !/^PROFILE \?= development$/mu.test(makefile)
-    || /^PROFILE \?= production$/mu.test(makefile)) {
-    errors.push('Makefile must default to the development profile');
-  }
-
+  // Production runs the immutable Docker image; the host orchestrator is a
+  // development helper and must not be able to target production.
   const orchestrator = await readOptional(path.join(root, 'scripts/system-orchestrator.sh'));
   if (orchestrator === undefined || !/^PROFILE="development"$/mu.test(orchestrator)
-    || /^PROFILE="production"$/mu.test(orchestrator)
-    || !/Runtime profile \(default: development\)/u.test(orchestrator)) {
-    errors.push('system orchestrator must default to development in code and usage text');
+    || /PROFILE="production"|--profile production|^\s*production\)/mu.test(orchestrator)) {
+    errors.push('system orchestrator must be development-only');
   }
 }
 
@@ -740,20 +725,19 @@ async function validateSecretScanning(root, errors) {
     path.join(root, 'config/secret-scanning/current-fixture-allowlist.json'),
   );
   if (fixtureSource === undefined) {
-    errors.push('the location-exact current secret-fixture allowlist is required');
+    errors.push('the value-exact current secret-fixture allowlist is required');
   } else {
     try {
       const fixture = JSON.parse(fixtureSource);
       const actual = fixture.findings?.map((finding) => [
+        finding.valueSha256,
         finding.classification,
         finding.path,
         finding.rule,
-        finding.line,
-        finding.column,
       ]);
-      if (fixture.schemaVersion !== 1
+      if (fixture.schemaVersion !== 2
         || JSON.stringify(actual) !== JSON.stringify(EXPECTED_CURRENT_SECRET_FIXTURES)) {
-        errors.push('current secret-fixture allowlist must match the reviewed exact locations');
+        errors.push('current secret-fixture allowlist must match the reviewed fixture values');
       }
     } catch {
       errors.push('current secret-fixture allowlist must contain valid JSON');
@@ -2302,7 +2286,6 @@ async function validateRuntimeCredentialContract(root, errors) {
     'src/lib/runtime-env-schema.js',
     'scripts/ensure-pepper.js',
     'scripts/system-orchestrator.sh',
-    'scripts/install-systemd-services.sh',
     'scripts/README.md',
     'SECURITY.md',
   ];

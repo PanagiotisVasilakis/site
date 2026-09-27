@@ -24,8 +24,9 @@ export function useGuestSession() {
                 headers: { 'cache-control': 'no-cache' }
             });
 
-            const ok = res.ok; // 200 when session verified
-            if (version === requestVersion.current) setIsSignedIn(ok);
+            const body = res.ok ? await res.json().catch(() => null) : null;
+            const signedIn = body?.data?.authenticated === true;
+            if (version === requestVersion.current) setIsSignedIn(signedIn);
         } catch {
             // Preserve the last verified state during transient network failures.
         } finally {

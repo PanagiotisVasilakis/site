@@ -6,7 +6,7 @@
 import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from './logger-enterprise';
-import { isSensitiveFieldName } from './redaction';
+import { redactHeaders } from './redaction';
 import { z } from 'zod';
 import type { ApiErrorCode } from './apiErrorTypes';
 import { ApiErrorCode as ErrorCodes } from './apiErrorTypes';
@@ -260,7 +260,7 @@ export function withErrorHandler(
         logger.info('API request started', {
           method,
           url,
-          headers: sanitizeRequestHeaders(request.headers),
+          headers: redactHeaders(request.headers),
         });
       }
 
@@ -350,15 +350,8 @@ export function withErrorHandler(
       const identityUnavailable = isClientIdentityUnavailableError(error);
 
       if (identityUnavailable) {
-        if (mergedConfig.enableErrorLogging) {
-          logger.debug('API dependency unavailable', {
-            method,
-            url,
-            status: HttpStatusCodes.SERVICE_UNAVAILABLE,
-            duration: Math.round(duration * 100) / 100,
-          });
-        }
-        return createClientIdentityUnavailableResponse();
+        // The helper logs the bounded reason at warn level.
+        return createClientIdentityUnavailableResponse(error);
       }
       
       // Handle known API errors
@@ -565,20 +558,4 @@ export function validateRequestBody<T>(schema: z.ZodSchema<T>, maxBytes = DEFAUL
  */
 function generateCorrelationId(): string {
   return crypto.randomUUID();
-}
-
-// Header names the shared field-name classification does not already cover.
-const SENSITIVE_HEADER_NAMES = new Set(['forwarded', 'x-api-key']);
-
-export function sanitizeRequestHeaders(headers: Headers): Record<string, string> {
-  const sanitized: Record<string, string> = {};
-  headers.forEach((value, key) => {
-    if (isSensitiveFieldName(key) || SENSITIVE_HEADER_NAMES.has(key.toLowerCase())) {
-      sanitized[key] = '[REDACTED]';
-    } else {
-      sanitized[key] = value;
-    }
-  });
-  
-  return sanitized;
 }

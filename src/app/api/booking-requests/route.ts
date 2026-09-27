@@ -23,9 +23,10 @@ const bookingRequestSchema = z.object({
       && [...language].every((character) => character >= 'a' && character <= 'z')
       && (!region || (region.length === 2 && [...region].every((character) => character >= 'A' && character <= 'Z')));
   }, 'Invalid locale'),
+  // Calendar dates (`yyyy-MM-dd`), stored as UTC midnight in DATE columns.
   dateRange: z.object({
-    from: z.string().datetime(),
-    to: z.string().datetime(),
+    from: z.iso.date(),
+    to: z.iso.date(),
   }),
   guest: z.object({
     firstName: z.string().trim().min(1).max(100),
@@ -39,15 +40,41 @@ const bookingRequestSchema = z.object({
     specialRequests: z.string().trim().max(1000).optional(),
   }),
 }).superRefine((value, context) => {
-  const from = new Date(value.dateRange.from);
-  const to = new Date(value.dateRange.to);
-  if (to <= from) {
+  if (value.dateRange.to <= value.dateRange.from) {
     context.addIssue({ code: 'custom', path: ['dateRange', 'to'], message: 'End date must be after start date' });
   }
 });
 
+function calendarDateToUtc(value: string): Date {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
 function errorResponse(message: string, status: number) {
   return NextResponse.json({ success: false, error: { message } }, { status });
+}
+
+type StayRequestFields = {
+  propertyName: string;
+  locale: string;
+  startDate: Date;
+  endDate: Date;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  arrivalTime: string | null;
+  specialRequests: string | null;
+};
+
+// Standard idempotency semantics: a replayed key returns the original request
+// only when the payload is the same; reusing it for another request is a 422.
+function replayResponse(stored: StayRequestFields & { id: string; status: string }, incoming: StayRequestFields) {
+  const same = stored.startDate.getTime() === incoming.startDate.getTime()
+    && stored.endDate.getTime() === incoming.endDate.getTime()
+    && (['propertyName', 'locale', 'firstName', 'lastName', 'email', 'phone', 'arrivalTime', 'specialRequests'] as const)
+      .every((field) => stored[field] === incoming[field]);
+  if (!same) return errorResponse('This Idempotency-Key was already used for a different booking request', 422);
+  return NextResponse.json({ success: true, data: { id: stored.id, status: stored.status.toLowerCase() } }, { status: 200 });
 }
 
 function idempotencyKey(request: NextRequest): string | null {
@@ -85,7 +112,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     if (isClientIdentityUnavailableError(error)) {
-      return createClientIdentityUnavailableResponse();
+      return createClientIdentityUnavailableResponse(error);
     }
     if (error instanceof ApiError) {
       return errorResponse(error.message, error.statusCode);
@@ -94,10 +121,21 @@ export async function POST(request: NextRequest) {
   }
   if (!limit.allowed) return errorResponse('Too many booking requests. Please try again later.', 429);
 
+  const record: StayRequestFields = {
+    propertyName: parsed.data.propertyName,
+    locale: parsed.data.locale,
+    startDate: calendarDateToUtc(parsed.data.dateRange.from),
+    endDate: calendarDateToUtc(parsed.data.dateRange.to),
+    firstName: parsed.data.guest.firstName,
+    lastName: parsed.data.guest.lastName,
+    email: parsed.data.guest.email,
+    phone,
+    arrivalTime: parsed.data.guest.arrivalTime || null,
+    specialRequests: parsed.data.guest.specialRequests || null,
+  };
+
   const existing = await prisma.stayRequest.findUnique({ where: { idempotencyKey: key } });
-  if (existing) {
-    return NextResponse.json({ success: true, data: { id: existing.id, status: existing.status.toLowerCase() } }, { status: 200 });
-  }
+  if (existing) return replayResponse(existing, record);
 
   const id = crypto.randomUUID();
   const eventId = crypto.randomUUID();
@@ -105,16 +143,7 @@ export async function POST(request: NextRequest) {
     await prisma.stayRequest.create({
       data: {
         id,
-        propertyName: parsed.data.propertyName,
-        locale: parsed.data.locale,
-        startDate: new Date(parsed.data.dateRange.from),
-        endDate: new Date(parsed.data.dateRange.to),
-        firstName: parsed.data.guest.firstName,
-        lastName: parsed.data.guest.lastName,
-        email: parsed.data.guest.email,
-        phone,
-        arrivalTime: parsed.data.guest.arrivalTime || null,
-        specialRequests: parsed.data.guest.specialRequests || null,
+        ...record,
         idempotencyKey: key,
         outboxEvents: {
           create: {
@@ -132,9 +161,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
       const raced = await prisma.stayRequest.findUnique({ where: { idempotencyKey: key } });
-      if (raced) {
-        return NextResponse.json({ success: true, data: { id: raced.id, status: raced.status.toLowerCase() } }, { status: 200 });
-      }
+      if (raced) return replayResponse(raced, record);
     }
     throw error;
   }

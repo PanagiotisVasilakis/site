@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger-enterprise';
 
-export const GUEST_DATASET_KEYS = ['bookings', 'users', 'checkins'] as const;
+export const GUEST_DATASET_KEYS = ['bookings', 'users'] as const;
 export type GuestDatasetKey = typeof GUEST_DATASET_KEYS[number];
 
 export type GuestDatasetSnapshot = {
@@ -42,23 +42,9 @@ async function computeUserSnapshot(): Promise<GuestDatasetSnapshot> {
   return formatSnapshot('users', aggregate._count?._all ?? 0, aggregate._max?.updatedAt);
 }
 
-async function computeCheckinSnapshot(): Promise<GuestDatasetSnapshot> {
-  const [aggregate, withSpecialRequests] = await Promise.all([
-    prisma.checkin.aggregate({
-      _count: { _all: true },
-      _max: { acceptedAt: true },
-    }),
-    // Privacy erasure nulls specialRequests without touching acceptedAt, so it must change the version too.
-    prisma.checkin.count({ where: { specialRequests: { not: null } } }),
-  ]);
-  const snapshot = formatSnapshot('checkins', aggregate._count?._all ?? 0, aggregate._max?.acceptedAt);
-  return { ...snapshot, version: `${snapshot.version}:${withSpecialRequests}` };
-}
-
 const COMPUTE_SNAPSHOT: Record<GuestDatasetKey, () => Promise<GuestDatasetSnapshot>> = {
   bookings: computeBookingSnapshot,
   users: computeUserSnapshot,
-  checkins: computeCheckinSnapshot,
 };
 
 export async function getGuestDatasetSnapshot(key: GuestDatasetKey): Promise<GuestDatasetSnapshot> {

@@ -26,13 +26,14 @@ function normalizeIdentifier(value: string): string {
   return phone?.e164 ?? normalized;
 }
 
+function limiterKey(scope: string, dimension: string): string {
+  return `sensitive:${privacyHmac(`${scope}|${dimension}`, 'sensitive-rate-limit:v1')}`;
+}
+
 function buildKeys(ip: string, options: RateLimitOptions): string[] {
   const dimensions = [`ip:${ip}`];
   if (options.identifier) dimensions.push(`identifier:${normalizeIdentifier(options.identifier)}`);
-  return dimensions.map((dimension) => {
-    const raw = `${options.scope}|${dimension}`;
-    return `sensitive:${privacyHmac(raw, 'sensitive-rate-limit:v1')}`;
-  });
+  return dimensions.map((dimension) => limiterKey(options.scope, dimension));
 }
 
 export async function checkSensitiveRateLimit(
@@ -78,4 +79,19 @@ export async function checkSensitiveRateLimit(
     remaining: Math.min(...records.map((record) => Math.max(0, options.limit - record.count))),
     resetAt: new Date(Math.max(...records.map((record) => new Date(record.reset_time).getTime()))),
   };
+}
+
+/**
+ * Gives back the attempt that a successful operation (e.g. a correct sign-in) counted on the
+ * identifier dimension, so legitimate use never locks an account out; failed attempts keep counting.
+ * The client-address dimension is not refunded: it keeps limiting guesses spread over many identifiers,
+ * which a caller could otherwise offset with successful operations on an account of its own.
+ */
+export async function refundSensitiveIdentifierAttempt(options: { scope: string; identifier: string }): Promise<void> {
+  const key = limiterKey(options.scope, `identifier:${normalizeIdentifier(options.identifier)}`);
+  const { prisma } = await import('@/lib/prisma');
+  await prisma.$executeRaw`
+    UPDATE "rate_limits" SET "count" = GREATEST("count" - 1, 0)
+    WHERE "key" = ${key} AND "reset_time" > CURRENT_TIMESTAMP
+  `;
 }

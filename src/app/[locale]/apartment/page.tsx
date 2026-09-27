@@ -1,17 +1,17 @@
-import { locales, type Locale } from '@/i18n/config';
+import { normalizeLocale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 import { housePhotosByRoom, type HousePhotoRoomKey } from '@/data/housePhotos';
 import ApartmentCinematic from '@/components/ApartmentCinematic';
 import type { ApartmentPhotoWithAlt } from '@/types/apartment';
 import type { Metadata } from 'next';
-import { localizedAlternates, normalizeLocale } from '@/lib/seo';
+import { localizedAlternates } from '@/lib/seo';
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
   const eff = normalizeLocale(locale);
   const dictionary = getDictionary(eff);
-  const title = dictionary.house?.title ?? (eff === 'el' ? 'Το διαμέρισμα' : 'The apartment');
-  const description = dictionary.house?.intro ?? dictionary.homeSubtitle;
+  const title = dictionary.house.title;
+  const description = dictionary.house.intro;
   return {
     title: `${title} | ${dictionary.appTitle}`,
     description,
@@ -32,7 +32,7 @@ export const dynamic = 'auto';
 
 export default async function ApartmentPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : 'en';
+  const eff = normalizeLocale(locale);
   const t = getDictionary(eff);
   const ht = t.house; // reuse existing dictionary namespace
 

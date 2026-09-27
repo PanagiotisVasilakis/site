@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { errorReporter } from '@/lib/errorReporting';
+import { HOST_CONTACT } from '@/data/contact';
 
 interface GlobalErrorProps {
   error: Error & { digest?: string };
@@ -178,7 +179,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
             <div className="pt-4 border-t border-gray-200">
               <p className="text-sm text-subtle">
                 {t.needHelp}{' '}
-                <a href="mailto:dolcefarnienteapartments@gmail.com" className="text-blue-600 hover:underline">
+                <a href={`mailto:${HOST_CONTACT.email}`} className="text-blue-600 hover:underline">
                   {t.supportTeam}
                 </a>
                 {error.digest && (

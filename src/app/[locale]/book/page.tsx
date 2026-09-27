@@ -2,9 +2,9 @@ import React, { Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
-import { locales, type Locale } from '@/i18n/config';
+import { normalizeLocale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
-import { dateRangeFromParams, formatDateRange, validateDateRange, getNights } from '@/lib/dateUtils';
+import { dateRangeFromParams, dateRangeToParams, formatDateRange, validateDateRange, getNights } from '@/lib/dateUtils';
 // Removed unused Skeleton import
 import { BookingFormSkeleton } from '@/components/LoadingSkeleton';
 import BookingForm from '@/components/BookingForm';
@@ -14,18 +14,18 @@ import { getApartmentContent } from '@/data/apartmentData';
 import MapLoadingSkeleton from '@/components/MapLoadingSkeleton';
 import { MAP_DEFAULTS } from '@/lib/mapConstants';
 import type { Metadata } from 'next';
-import { localizedAlternates, normalizeLocale } from '@/lib/seo';
+import { localizedAlternates } from '@/lib/seo';
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
   const eff = normalizeLocale(locale);
   const dictionary = getDictionary(eff);
-  const title = dictionary.booking?.completeTitle ?? (eff === 'el' ? 'Αίτημα κράτησης' : 'Booking request');
+  const title = dictionary.booking.completeTitle;
   return {
     title: `${title} | ${dictionary.appTitle}`,
-    description: dictionary.booking?.locationDesc,
+    description: dictionary.booking.locationDesc,
     alternates: localizedAlternates(eff, '/book'),
-    openGraph: { title, description: dictionary.booking?.locationDesc, url: `/${eff}/book`, locale: eff, type: 'website' },
+    openGraph: { title, description: dictionary.booking.locationDesc, url: `/${eff}/book`, locale: eff, type: 'website' },
   };
 }
 
@@ -51,7 +51,7 @@ export default async function BookingPage({
   const { locale } = await params;
   const booking = await searchParams;
 
-  const eff = (locales as readonly string[]).includes(locale) ? (locale as Locale) : "en";
+  const eff = normalizeLocale(locale);
   const t = getDictionary(eff);
 
   // Parse date range from URL
@@ -59,6 +59,9 @@ export default async function BookingPage({
   if (booking.checkin) urlParams.set('checkin', booking.checkin);
   if (booking.checkout) urlParams.set('checkout', booking.checkout);
   const dateRange = dateRangeFromParams(urlParams);
+  // Normalized calendar strings for the client form; a Date would cross the
+  // server/client boundary as an instant and shift by the time-zone offset.
+  const calendarDates = dateRangeToParams(dateRange);
 
   // Validate booking parameters
   const hasValidDates = dateRange.from && dateRange.to;
@@ -78,7 +81,7 @@ export default async function BookingPage({
   const canBook = dateValidation.valid;
 
   // Reuse the already-translated specs (bedrooms, bathroom, floor, size)
-  const specChips = (t.house?.specs ?? []).slice(0, 4);
+  const specChips = t.house.specs.slice(0, 4);
 
   return (
     <div className="min-h-screen">
@@ -87,7 +90,7 @@ export default async function BookingPage({
         <div className="mb-8">
           <Link
             href={`/${eff}`}
-            className="inline-flex min-h-11 items-center gap-2 text-sm text-brand-700 hover:text-brand-800 font-medium transition-colors"
+            className="inline-flex min-h-11 items-center gap-2 text-sm text-brand-800 hover:text-brand-800 font-medium transition-colors"
           >
             {t.booking?.backToProperty}
           </Link>
@@ -127,14 +130,14 @@ export default async function BookingPage({
 
             {/* Validation Errors */}
             {!dateValidation.valid && (
-              <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-4 dark:bg-red-950/60 dark:border-red-900">
                 <div className="flex items-center gap-2">
                   <span className="text-red-600" aria-hidden>⚠️</span>
                   <span className="text-sm text-red-800">{dateValidation.error}</span>
                 </div>
                 <Link
                   href={`/${eff}`}
-                  className="inline-flex min-h-11 items-center text-sm text-red-600 hover:text-red-700 font-medium mt-1"
+                  className="inline-flex min-h-11 items-center text-sm text-red-700 hover:text-red-800 font-medium mt-1"
                 >
                   {t.booking?.goBackToDates}
                 </Link>
@@ -150,7 +153,8 @@ export default async function BookingPage({
                 {canBook ? (
                   <Suspense fallback={<BookingFormSkeleton />}>
                     <BookingForm
-                      dateRange={dateRange}
+                      checkIn={calendarDates.get('checkin') ?? ''}
+                      checkOut={calendarDates.get('checkout') ?? ''}
                       locale={eff}
                       labels={t.booking!.form!}
                       propertyName={property.name}

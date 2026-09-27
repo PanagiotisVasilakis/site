@@ -1,6 +1,8 @@
 import type { Locale } from '@/i18n/config';
+import { normalizeLocale } from '@/i18n/config';
 import { dedupeById } from '@/lib/collections';
 import { getApartmentContent } from '@/data/apartmentData';
+import { HOST_CONTACT } from '@/data/contact';
 
 export const APARTMENT_LOCATION: [number, number] = [22.094364, 37.040635];
 
@@ -252,7 +254,7 @@ export function getApartmentMapLocation(
     name: apartment.shortName,
     description: apartment.description,
     address,
-    phone: '+30 695 581 0051',
+    phone: HOST_CONTACT.phone,
     directionsUrl: 'https://maps.app.goo.gl/wW1Lnh14k3psKGAm9',
     coordinates: APARTMENT_LOCATION,
     category: 'apartment',
@@ -269,7 +271,7 @@ function createMapLocationFromItem(
     return null;
   }
 
-  const eff: Locale = locale === 'el' ? 'el' : 'en';
+  const eff: Locale = normalizeLocale(locale);
   const name = pickLocalized(item, 'name', eff) ?? item.name;
   const description = pickLocalized(item, 'summary', eff) ?? pickLocalized(item, 'description', eff);
   const address = pickLocalized(item, 'address', eff);

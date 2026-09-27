@@ -1,6 +1,8 @@
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
-import { localizedAlternates, normalizeLocale } from '@/lib/seo';
+import { normalizeLocale } from '@/i18n/config';
+import { localizedAlternates } from '@/lib/seo';
+import { HOST_CONTACT } from '@/data/contact';
 
 interface BookingDetailsPageProps {
   params: Promise<{
@@ -24,7 +26,7 @@ export default async function BookingDetailsPage({ params }: BookingDetailsPageP
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="surface-card rounded-2xl shadow-lg p-8">
           <h1 className="text-3xl page-title mb-6 font-serif italic font-bold">
-            {dictionary.bookingDetails || 'Booking Details'}
+            {dictionary.bookingDetails}
           </h1>
 
           <div className="space-y-6">
@@ -50,7 +52,7 @@ export default async function BookingDetailsPage({ params }: BookingDetailsPageP
               </p>
               <div className="space-y-2 text-body">
                 {dp?.contact.map((item) => (
-                  <p key={item}>{item}</p>
+                  <p key={item}>{item.replace('{email}', HOST_CONTACT.email).replace('{phone}', HOST_CONTACT.phone)}</p>
                 ))}
               </div>
             </div>
@@ -66,11 +68,11 @@ export async function generateMetadata({ params }: BookingDetailsPageProps) {
   const eff = normalizeLocale(locale);
   const dictionary = getDictionary(eff);
   return {
-    title: `${dictionary.bookingDetails || 'Booking Details'} | Dolce Far Niente`,
+    title: `${dictionary.bookingDetails} | Dolce Far Niente`,
     description: dictionary.booking?.detailsPage?.metaDescription,
     alternates: localizedAlternates(eff, '/booking-details'),
     openGraph: {
-      title: dictionary.bookingDetails || 'Booking Details',
+      title: dictionary.bookingDetails,
       description: dictionary.booking?.detailsPage?.metaDescription,
       url: `/${eff}/booking-details`,
       locale: eff,

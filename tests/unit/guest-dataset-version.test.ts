@@ -1,28 +1,36 @@
 import { describe, expect, it, vi } from 'vitest';
 
 const prismaMock = vi.hoisted(() => ({
-  checkin: { aggregate: vi.fn(), count: vi.fn() },
+  booking: { aggregate: vi.fn() },
+  user: { aggregate: vi.fn() },
 }));
 
 vi.mock('@/lib/prisma', () => ({ prisma: prismaMock }));
 
-import { getGuestDatasetSnapshot } from '@/lib/guestDatasetVersion';
+import { GUEST_DATASET_KEYS, getGuestDatasetSnapshot } from '@/lib/guestDatasetVersion';
 
 describe('guest dataset versions', () => {
-  it('changes the check-in version when erasure clears special requests', async () => {
-    prismaMock.checkin.aggregate.mockResolvedValue({
-      _count: { _all: 3 },
-      _max: { acceptedAt: new Date('2030-07-14T12:00:00Z') },
-    });
+  it('tracks bookings and users only', () => {
+    expect(GUEST_DATASET_KEYS).toEqual(['bookings', 'users']);
+  });
 
-    prismaMock.checkin.count.mockResolvedValue(2);
-    const beforeErasure = await getGuestDatasetSnapshot('checkins');
+  it('changes the booking version when a booking is updated', async () => {
+    prismaMock.booking.aggregate.mockResolvedValue({ _count: { _all: 3 }, _max: { updatedAt: new Date('2030-07-14T12:00:00Z') } });
+    const before = await getGuestDatasetSnapshot('bookings');
 
-    // Erasure nulls specialRequests but leaves row count and acceptedAt unchanged.
-    prismaMock.checkin.count.mockResolvedValue(1);
-    const afterErasure = await getGuestDatasetSnapshot('checkins');
+    prismaMock.booking.aggregate.mockResolvedValue({ _count: { _all: 3 }, _max: { updatedAt: new Date('2030-07-14T12:05:00Z') } });
+    const after = await getGuestDatasetSnapshot('bookings');
 
-    expect(afterErasure.rowCount).toBe(beforeErasure.rowCount);
-    expect(afterErasure.version).not.toBe(beforeErasure.version);
+    expect(after.rowCount).toBe(before.rowCount);
+    expect(after.version).not.toBe(before.version);
+  });
+
+  it('reports an error version instead of throwing when the query fails', async () => {
+    prismaMock.user.aggregate.mockRejectedValue(new Error('database unavailable'));
+
+    const snapshot = await getGuestDatasetSnapshot('users');
+
+    expect(snapshot).toMatchObject({ key: 'users', rowCount: -1, error: 'database unavailable' });
+    expect(snapshot.version).toMatch(/^error:/u);
   });
 });

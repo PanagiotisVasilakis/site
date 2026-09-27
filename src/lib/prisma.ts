@@ -120,7 +120,7 @@ function getActivePrismaClient(): PrismaClient {
   if (!client || typeof client.$disconnect !== 'function') {
     const hint = process.env.NODE_ENV === 'production'
       ? 'DATABASE_URL must be configured on the server.'
-      : 'Set DATABASE_URL in your environment or run `docker-compose up pg` for the development database.';
+      : 'Set DATABASE_URL (npm run ensure-pepper writes the local one to .env.local; scripts run with tsx need it exported in the shell) and start the development database with `npm run db:start`.';
     logger.error('Prisma client requested but no DATABASE_URL is configured', { hint });
     throw new Error(`Prisma client is not initialized. ${hint}`);
   }

@@ -60,3 +60,14 @@ export function isPortalBookingTemporallyEligible(
     && endTime >= window.businessToday.getTime()
     && startTime <= window.inclusiveMaximumStartDate.getTime();
 }
+
+/** A booking gives portal access to this user: owned, verified and inside the date window. */
+export function isPortalBookingEligible(
+  booking: PortalBookingDateRange & { userId: string | null; accessStatus: string },
+  userId: string,
+  window: PortalBookingEligibilityWindow,
+): boolean {
+  return booking.userId === userId
+    && booking.accessStatus === 'VERIFIED'
+    && isPortalBookingTemporallyEligible(booking, window);
+}

@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
+import { normalizeLocale } from '@/i18n/config';
 import StaticLocationMap from './StaticLocationMap';
 import {
   APARTMENT_LOCATION,
@@ -32,24 +33,24 @@ export default function InteractiveMap({
   activation = 'viewport',
   clusterMin
 }: InteractiveMapProps) {
-  const eff: Locale = locale === 'el' ? 'el' : 'en';
+  const eff: Locale = normalizeLocale(locale);
   const dict = useMemo(() => getDictionary(eff), [eff]);
   const mapT = dict.map;
   const leafletLabels = useMemo<LeafletMapLabels>(() => ({
-    address: mapT?.address ?? 'Address',
-    phone: mapT?.phone ?? 'Phone',
-    directions: mapT?.directions ?? 'Directions',
-    website: mapT?.website ?? 'Website',
-    details: mapT?.viewDetails ?? 'Details',
-    locateMe: mapT?.locateMe ?? 'Locate me',
-    locationUnavailable: mapT?.locationUnavailable ?? 'Your location is unavailable. Check browser location permission and try again.',
-    fitToMarkers: mapT?.fitToMarkers ?? 'Fit to markers',
-    zoomIn: mapT?.zoomIn ?? 'Zoom in',
-    zoomOut: mapT?.zoomOut ?? 'Zoom out',
-    approximate: mapT?.approximate ?? 'Approximate – OSRM',
-    travelUnavailable: mapT?.travelUnavailable ?? 'Travel times unavailable.',
-    travelUnavailableWithDirections: mapT?.travelUnavailableWithDirections ?? 'Travel times unavailable. Use Directions for live navigation.',
-    unavailable: mapT?.unavailable ?? 'Unavailable',
+    address: mapT.address,
+    phone: mapT.phone,
+    directions: mapT.directions,
+    website: mapT.website,
+    details: mapT.viewDetails,
+    locateMe: mapT.locateMe,
+    locationUnavailable: mapT.locationUnavailable,
+    fitToMarkers: mapT.fitToMarkers,
+    zoomIn: mapT.zoomIn,
+    zoomOut: mapT.zoomOut,
+    approximate: mapT.approximate,
+    travelUnavailable: mapT.travelUnavailable,
+    travelUnavailableWithDirections: mapT.travelUnavailableWithDirections,
+    unavailable: mapT.unavailable,
   }), [mapT]);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [shouldRenderInteractive, setShouldRenderInteractive] = useState(false);
@@ -117,9 +118,7 @@ export default function InteractiveMap({
         <div className="absolute inset-0 flex flex-col items-center justify-center rounded-lg border border-[color:var(--border-soft)] surface-subtle text-center text-sm text-[color:var(--text-accent)]">
           <div className="mb-2 text-3xl" aria-hidden>🗺️</div>
           <p className="max-w-xs leading-relaxed px-6">
-            {activation === 'intent'
-              ? (mapT?.deferredInteractiveLabel || 'Interactive map is ready when you need it.')
-              : (mapT?.deferredInteractiveLabel || 'Interactive map loads once it is in view to keep things speedy.')}
+            {mapT.deferredInteractiveLabel}
           </p>
           {activation === 'intent' && (
             <button
@@ -127,7 +126,7 @@ export default function InteractiveMap({
               className="btn-tint mt-4 min-h-11"
               onClick={() => setShouldRenderInteractive(true)}
             >
-              {mapT?.loadMap || 'Load map'}
+              {mapT.loadMap}
             </button>
           )}
         </div>

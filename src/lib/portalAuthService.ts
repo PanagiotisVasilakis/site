@@ -1,6 +1,9 @@
 import bcrypt from 'bcrypt';
 import crypto from 'node:crypto';
 
+import type { Prisma } from '@/generated/prisma/client';
+
+import { requirePepper } from '@/lib/pepper';
 import { prisma } from '@/lib/prisma';
 import { normalizePhone, type Origin } from '@/lib/phone';
 import { GUEST_TERMS_CONTENT_HASH, GUEST_TERMS_VERSION } from '@/lib/guestTerms';
@@ -18,7 +21,9 @@ export type PortalAuthFailureCode =
   | 'INVALID_CLAIM'
   | 'BOOKING_ALREADY_CLAIMED'
   | 'INVALID_CREDENTIALS'
-  | 'NO_ELIGIBLE_BOOKING';
+  | 'NO_ELIGIBLE_BOOKING'
+  | 'BOOKING_NOT_IN_ACCESS_WINDOW'
+  | 'BOOKING_NOT_CLAIMED';
 
 export class PortalAuthError extends Error {
   constructor(readonly code: PortalAuthFailureCode) {
@@ -27,16 +32,8 @@ export class PortalAuthError extends Error {
   }
 }
 
-function claimTokenPepper(): string {
-  const value = process.env.CLAIM_TOKEN_PEPPER || process.env.SECURITY_PEPPER;
-  if (process.env.NODE_ENV === 'production' && !value) {
-    throw new Error('CLAIM_TOKEN_PEPPER is required in production');
-  }
-  return value || 'development-only-claim-token-pepper';
-}
-
 function digestClaimToken(rawToken: string): string {
-  return crypto.createHmac('sha256', claimTokenPepper()).update(rawToken, 'utf8').digest('hex');
+  return crypto.createHmac('sha256', requirePepper('CLAIM_TOKEN_PEPPER')).update(rawToken, 'utf8').digest('hex');
 }
 
 function isSerializationConflict(error: unknown): boolean {
@@ -64,25 +61,98 @@ export async function issueBookingClaimGrant(input: {
     if (booking.userId && booking.accessStatus === 'VERIFIED') {
       throw new PortalAuthError('BOOKING_ALREADY_CLAIMED');
     }
+    // The exchange and the claim enforce the same window; a token issued
+    // outside it could never be used.
+    if (!isPortalBookingTemporallyEligible(booking, createPortalBookingEligibilityWindow(now))) {
+      throw new PortalAuthError('BOOKING_NOT_IN_ACCESS_WINDOW');
+    }
+    await replaceOpenClaimGrant(tx, { ...input, tokenDigest, expiresAt, now });
+  });
 
-    await tx.bookingClaimGrant.updateMany({
-      where: {
-        bookingId: input.bookingId,
-        channel: input.channel,
-        consumedAt: null,
-        revokedAt: null,
-        expiresAt: { gt: now },
-      },
-      data: { revokedAt: now },
+  return { token, expiresAt };
+}
+
+async function replaceOpenClaimGrant(
+  tx: Prisma.TransactionClient,
+  input: {
+    bookingId: string;
+    channel: 'REMOTE' | 'ONSITE';
+    adminSessionId: string;
+    tokenDigest: string;
+    expiresAt: Date;
+    now: Date;
+  },
+): Promise<void> {
+  await tx.bookingClaimGrant.updateMany({
+    where: {
+      bookingId: input.bookingId,
+      channel: input.channel,
+      consumedAt: null,
+      revokedAt: null,
+      expiresAt: { gt: input.now },
+    },
+    data: { revokedAt: input.now },
+  });
+  await tx.bookingClaimGrant.create({
+    data: {
+      id: crypto.randomUUID(),
+      bookingId: input.bookingId,
+      tokenDigest: input.tokenDigest,
+      channel: input.channel,
+      expiresAt: input.expiresAt,
+      issuedByAdminSessionId: input.adminSessionId,
+    },
+  });
+}
+
+/**
+ * Host-initiated access reset for a guest who lost the password of an already
+ * claimed booking: clears the password, revokes every session and refresh
+ * family of the guest, and issues a fresh claim token for the same booking.
+ * Claiming it with the same phone sets a new password (null-hash branch of
+ * consumeBookingClaimGrant); a different phone is refused as already claimed.
+ */
+export async function resetGuestAccess(input: {
+  bookingId: string;
+  adminSessionId: string;
+  ttlMinutes?: number;
+}): Promise<{ token: string; expiresAt: Date }> {
+  const ttlMinutes = Math.min(Math.max(input.ttlMinutes ?? CLAIM_TOKEN_TTL_MINUTES, 5), 24 * 60);
+  const token = `claim_${crypto.randomBytes(32).toString('base64url')}`;
+  const tokenDigest = digestClaimToken(token);
+  const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
+  const now = new Date();
+
+  await prisma.$transaction(async (tx) => {
+    const booking = await tx.booking.findUnique({ where: { id: input.bookingId } });
+    if (!booking) throw new PortalAuthError('INVALID_CLAIM');
+    if (!booking.userId || booking.accessStatus !== 'VERIFIED') throw new PortalAuthError('BOOKING_NOT_CLAIMED');
+    if (!isPortalBookingTemporallyEligible(booking, createPortalBookingEligibilityWindow(now))) {
+      throw new PortalAuthError('BOOKING_NOT_IN_ACCESS_WINDOW');
+    }
+    const userId = booking.userId;
+    await tx.user.update({ where: { id: userId }, data: { passwordHash: null } });
+    await tx.refreshTokenFamily.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: now, revocationReason: 'admin_access_reset' },
     });
-    await tx.bookingClaimGrant.create({
+    await tx.refreshToken.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: now } });
+    await tx.session.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: now } });
+    await replaceOpenClaimGrant(tx, {
+      bookingId: input.bookingId,
+      channel: 'REMOTE',
+      adminSessionId: input.adminSessionId,
+      tokenDigest,
+      expiresAt,
+      now,
+    });
+    await tx.securityAuditEvent.create({
       data: {
         id: crypto.randomUUID(),
-        bookingId: input.bookingId,
-        tokenDigest,
-        channel: input.channel,
-        expiresAt,
-        issuedByAdminSessionId: input.adminSessionId,
+        eventType: 'portal.access_reset',
+        severity: 'medium',
+        path: '/api/admin/bookings/access-reset',
+        details: { bookingId: input.bookingId },
       },
     });
   });
@@ -147,6 +217,10 @@ export async function consumeBookingClaimGrant(input: {
         const matches = await bcrypt.compare(input.password, existingUser.passwordHash);
         if (!matches) throw new PortalAuthError('INVALID_CREDENTIALS');
       } else {
+        // A password-less account (after a host access reset) may set a new
+        // password only through a grant for a booking it already owns;
+        // otherwise any claim token plus the guest's phone would take it over.
+        if (grant.booking.userId !== existingUser.id) throw new PortalAuthError('INVALID_CREDENTIALS');
         await tx.user.update({
           where: { id: existingUser.id },
           data: { passwordHash: newPasswordHash, countryOrigin: input.origin },

@@ -25,29 +25,29 @@ interface MomentsFilterMenuProps {
     onChange: (filter: MomentsFilterKey) => void;
     filterByCategoryLabel?: string;
     availableFilters?: readonly MomentsFilterKey[];
-    ui?: {
-        all?: string;
-        beaches?: string;
-        museums?: string;
-        restaurants?: string;
-        bars?: string;
-        brunchs?: string;
-        taygetos?: string;
-        sites?: string;
-        nearby?: string;
+    ui: {
+        all: string;
+        beaches: string;
+        museums: string;
+        restaurants: string;
+        bars: string;
+        brunchs: string;
+        taygetos: string;
+        sites: string;
+        nearby: string;
     };
 }
 
 const labelsFor = (ui: MomentsFilterMenuProps['ui']): Record<MomentsFilterKey, string> => ({
-    all: ui?.all || 'All',
-    beaches: ui?.beaches || 'Beaches',
-    museums: ui?.museums || 'Museums',
-    restaurants: ui?.restaurants || 'Restaurants',
-    bars: ui?.bars || 'Bars',
-    brunchs: ui?.brunchs || 'Brunchs',
-    taygetos: ui?.taygetos || 'Taygetos',
-    sites: ui?.sites || 'Sites',
-    nearby: ui?.nearby || 'Nearby',
+    all: ui.all,
+    beaches: ui.beaches,
+    museums: ui.museums,
+    restaurants: ui.restaurants,
+    bars: ui.bars,
+    brunchs: ui.brunchs,
+    taygetos: ui.taygetos,
+    sites: ui.sites,
+    nearby: ui.nearby,
 });
 
 /**

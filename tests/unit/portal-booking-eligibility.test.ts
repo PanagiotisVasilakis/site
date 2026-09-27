@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createPortalBookingEligibilityWindow,
+  isPortalBookingEligible,
   isPortalBookingTemporallyEligible,
   portalBookingTemporalWhere,
 } from '@/lib/portalBookingEligibility';
@@ -109,5 +110,28 @@ describe('portal booking temporal eligibility', () => {
       endDate: new Date(Number.NaN),
     }, window)).toBe(false);
     expect(() => createPortalBookingEligibilityWindow(new Date(Number.NaN))).toThrow(TypeError);
+  });
+});
+
+describe('isPortalBookingEligible', () => {
+  const window = createPortalBookingEligibilityWindow(new Date('2030-07-10T12:00:00.000Z'));
+  const owned = {
+    userId: 'user-1',
+    accessStatus: 'VERIFIED',
+    startDate: new Date('2030-07-09T00:00:00.000Z'),
+    endDate: new Date('2030-07-12T00:00:00.000Z'),
+  };
+
+  it('accepts an owned, verified booking inside the window', () => {
+    expect(isPortalBookingEligible(owned, 'user-1', window)).toBe(true);
+  });
+
+  it.each([
+    ['another user', { userId: 'user-2' }],
+    ['an unclaimed booking', { userId: null }],
+    ['a pending booking', { accessStatus: 'PENDING' }],
+    ['a stay that ended', { startDate: new Date('2030-07-01T00:00:00.000Z'), endDate: new Date('2030-07-05T00:00:00.000Z') }],
+  ])('refuses %s', (_label, overrides) => {
+    expect(isPortalBookingEligible({ ...owned, ...overrides }, 'user-1', window)).toBe(false);
   });
 });

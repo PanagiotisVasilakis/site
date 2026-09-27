@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import internalFetch from '@/lib/internalFetchClient'
 import { Badge } from '@/components/ui'
+import { createPortalBookingEligibilityWindow, isPortalBookingTemporallyEligible } from '@/lib/portalBookingEligibility'
 
 interface BookingData {
   booking: {
@@ -24,11 +25,6 @@ interface BookingData {
     email?: string
     phone: string
     countryOrigin: string
-  }
-  checkin?: {
-    arrivalTime: string
-    specialRequests?: string
-    acceptedAt: string
   }
 }
 
@@ -50,9 +46,16 @@ interface Statistics {
   totalBookings: number
   totalUsers: number
   totalClaimedBookings: number
-  totalCheckins: number
   bookingsBySource: Record<string, number>
   bookingsByStatus: Record<string, number>
+}
+
+// Same calendar-date window the claim exchange enforces (UTC DATE values).
+function isWithinClaimWindow(booking: { startDate: string; endDate: string }): boolean {
+  return isPortalBookingTemporallyEligible(
+    { startDate: new Date(booking.startDate), endDate: new Date(booking.endDate) },
+    createPortalBookingEligibilityWindow(new Date()),
+  )
 }
 
 export default function GuestDataViewer() {
@@ -64,6 +67,8 @@ export default function GuestDataViewer() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchType, setSearchType] = useState<'reference' | 'phone' | 'date'>('reference')
   const [claimGrant, setClaimGrant] = useState<{ bookingId: string; token: string; expiresAt: string } | null>(null)
+  const [newBooking, setNewBooking] = useState({ startDate: '', endDate: '', source: 'ONSITE', externalReference: '' })
+  const [createdBookingId, setCreatedBookingId] = useState('')
 
   const fetchAllBookings = async () => {
     setLoading(true)
@@ -188,6 +193,76 @@ export default function GuestDataViewer() {
     }
   }
 
+  const createBooking = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setLoading(true)
+    setError('')
+    setCreatedBookingId('')
+    try {
+      const response = await internalFetch('/api/admin/bookings', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          startDate: newBooking.startDate,
+          endDate: newBooking.endDate,
+          source: newBooking.source,
+          externalReference: newBooking.externalReference.trim() || undefined,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.success) throw new Error(data.error?.message || 'Booking creation failed')
+      setCreatedBookingId(data.data.booking.id)
+      setNewBooking({ startDate: '', endDate: '', source: 'ONSITE', externalReference: '' })
+      await Promise.all([fetchAllBookings(), fetchStatistics()])
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Booking creation failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const resetGuestAccess = async (bookingId: string, phone: string) => {
+    if (!window.confirm(`Reset the password and sign-in sessions of ${phone} and issue a new claim token?`)) return
+    setLoading(true)
+    setError('')
+    try {
+      const response = await internalFetch(`/api/admin/bookings/${bookingId}/access-reset`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ confirm: true, ttlMinutes: 30 }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.success) throw new Error(data.error?.message || 'Access reset failed')
+      setClaimGrant({ bookingId, token: data.data.claimToken, expiresAt: data.data.expiresAt })
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Access reset failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const eraseGuest = async (userId: string, phone: string) => {
+    if (!window.confirm(`Erase all personal data of the guest ${phone}? This cannot be undone.`)) return
+    const auditNote = window.prompt('Reason and requester (kept in the privacy audit record):')?.trim() ?? ''
+    if (auditNote.length < 3) return
+    setLoading(true)
+    setError('')
+    try {
+      const response = await internalFetch(`/api/admin/guests/${userId}/erase`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ confirm: true, auditNote }),
+      })
+      const data = await response.json()
+      if (!response.ok || !data.success) throw new Error(data.error?.message || 'Erasure failed')
+      await Promise.all([fetchAllBookings(), fetchStatistics()])
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Erasure failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     fetchAllBookings()
     fetchStatistics()
@@ -218,7 +293,7 @@ export default function GuestDataViewer() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 text-center"
+            className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center"
           >
             <div className="surface-card p-4 rounded-lg shadow">
               <div className="text-2xl font-bold text-blue-600">{stats.totalBookings}</div>
@@ -231,10 +306,6 @@ export default function GuestDataViewer() {
             <div className="surface-card p-4 rounded-lg shadow">
               <div className="text-2xl font-bold text-purple-600">{stats.totalClaimedBookings}</div>
               <div className="text-sm text-subtle">Claimed Bookings</div>
-            </div>
-            <div className="surface-card p-4 rounded-lg shadow">
-              <div className="text-2xl font-bold text-orange-600">{stats.totalCheckins}</div>
-              <div className="text-sm text-subtle">Check-ins</div>
             </div>
           </motion.div>
         )}
@@ -298,6 +369,72 @@ export default function GuestDataViewer() {
             </div>
           </motion.div>
         )}
+
+        {/* Create booking */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.18 }}
+          className="surface-card rounded-lg shadow p-6 mb-6"
+        >
+          <h2 className="text-xl font-serif italic font-bold section-title mb-1">Create Booking</h2>
+          <p className="text-body text-sm mb-4">Add a confirmed stay, then issue a claim token for the guest.</p>
+          <form onSubmit={createBooking} className="grid grid-cols-1 sm:grid-cols-5 gap-4 items-end">
+            <label className="text-sm text-body flex flex-col gap-1">
+              Check-in
+              <input
+                type="date"
+                required
+                value={newBooking.startDate}
+                onChange={(e) => setNewBooking((current) => ({ ...current, startDate: e.target.value }))}
+                className="px-4 py-2 border border-soft rounded-lg surface-interactive"
+              />
+            </label>
+            <label className="text-sm text-body flex flex-col gap-1">
+              Check-out
+              <input
+                type="date"
+                required
+                min={newBooking.startDate || undefined}
+                value={newBooking.endDate}
+                onChange={(e) => setNewBooking((current) => ({ ...current, endDate: e.target.value }))}
+                className="px-4 py-2 border border-soft rounded-lg surface-interactive"
+              />
+            </label>
+            <label className="text-sm text-body flex flex-col gap-1">
+              Source
+              <select
+                value={newBooking.source}
+                onChange={(e) => setNewBooking((current) => ({ ...current, source: e.target.value }))}
+                className="px-4 py-2 border border-soft rounded-lg surface-interactive"
+              >
+                <option value="ONSITE">Direct / on-site</option>
+                <option value="EXTERNAL">External platform</option>
+              </select>
+            </label>
+            <label className="text-sm text-body flex flex-col gap-1">
+              Reference (optional)
+              <input
+                type="text"
+                maxLength={128}
+                value={newBooking.externalReference}
+                onChange={(e) => setNewBooking((current) => ({ ...current, externalReference: e.target.value }))}
+                placeholder="HMABC123"
+                className="px-4 py-2 border border-soft rounded-lg surface-interactive"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            >
+              Create booking
+            </button>
+          </form>
+          {createdBookingId && (
+            <p className="text-sm text-body mt-3" role="status">Booking {createdBookingId} created.</p>
+          )}
+        </motion.div>
 
         {/* Search */}
         <motion.div
@@ -394,7 +531,8 @@ export default function GuestDataViewer() {
                 key={booking.booking.id}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.1 * index }}
+                // Only the first few cards are staggered; the rest appear at once.
+                transition={{ delay: Math.min(index, 5) * 0.1 }}
                 className="surface-panel rounded-lg shadow p-6"
               >
                 <div className="flex justify-between items-start mb-4">
@@ -403,7 +541,7 @@ export default function GuestDataViewer() {
                       Booking {booking.booking.reference || booking.booking.id}
                     </h3>
                     <p className="text-body">
-                      {booking.booking.startDate} to {booking.booking.endDate}
+                      {new Date(booking.booking.startDate).toLocaleDateString(undefined, { timeZone: 'UTC' })} to {new Date(booking.booking.endDate).toLocaleDateString(undefined, { timeZone: 'UTC' })}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -414,7 +552,9 @@ export default function GuestDataViewer() {
                       <button
                         type="button"
                         onClick={() => issueClaimGrant(booking.booking.id)}
-                        className="rounded-full bg-emerald-100 px-3 py-1 text-sm text-emerald-900 hover:bg-emerald-200"
+                        disabled={!isWithinClaimWindow(booking.booking)}
+                        title={isWithinClaimWindow(booking.booking) ? undefined : 'Claim tokens can be issued from 7 days before check-in until the check-out date'}
+                        className="rounded-full bg-emerald-100 px-3 py-1 text-sm text-emerald-900 hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         Issue claim
                       </button>
@@ -425,6 +565,25 @@ export default function GuestDataViewer() {
                     >
                       Export
                     </button>
+                    {booking.booking.accessStatus === 'VERIFIED' && booking.user && (
+                      <button
+                        type="button"
+                        onClick={() => resetGuestAccess(booking.booking.id, booking.user!.phone)}
+                        disabled={!isWithinClaimWindow(booking.booking)}
+                        title="Clears the guest's password and sessions and issues a new claim token"
+                        className="px-3 py-1 bg-amber-100 text-amber-900 rounded-full text-sm hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Reset access
+                      </button>
+                    )}
+                    {booking.user && (
+                      <button
+                        onClick={() => eraseGuest(booking.user!.id, booking.user!.phone)}
+                        className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm hover:bg-red-200 dark:bg-red-900/40 dark:text-red-300"
+                      >
+                        Erase guest
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -448,15 +607,6 @@ export default function GuestDataViewer() {
                     <p className="text-sm text-body">🔗 Provider: {booking.booking.provider}</p>
                     <p className="text-sm text-body">📝 Created: {new Date(booking.booking.createdAt).toLocaleDateString()}</p>
                   </div>
-                  {booking.checkin && (
-                    <div>
-                      <h4 className="font-medium text-text-accent">Check-in</h4>
-                      <p className="text-sm text-body">⏰ {booking.checkin.arrivalTime}</p>
-                      {booking.checkin.specialRequests && (
-                        <p className="text-sm text-body">💬 {booking.checkin.specialRequests}</p>
-                      )}
-                    </div>
-                  )}
                 </div>
 
               </motion.div>

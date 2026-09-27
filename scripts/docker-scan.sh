@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly IMAGE_REF="${1:-${DOCKER_IMAGE_REF:-villa-app:latest}}"
+readonly IMAGE_REF="${1:-${DOCKER_IMAGE_REF:?pass the image reference (npm run docker:scan uses scripts/image-tag.sh)}}"
 readonly REQUESTED_SCANNER="${DOCKER_SCAN_SCANNER:-auto}"
 
 fail_missing_scanner() {

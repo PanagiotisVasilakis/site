@@ -1,3 +1,26 @@
+# Production Compose definition for the deployment target in
+# docs/architecture/deployment-target.md: one release commit, three immutable images
+# from `npm run docker:build` (scripts/image-tag.sh), PostgreSQL on the same host,
+# and the two workers as one-off runs under the `ops` profile.
+#
+#   APP_IMAGE         web image reference, e.g. villa-app:0123456789ab; the worker and
+#                     migration images are derived from it (-workers, -migrate)
+#   APP_ENV_FILE      root-owned env file with the application runtime configuration
+#   MIGRATE_ENV_FILE  root-owned env file for `migrate deploy` (its own database role)
+#
+# Nothing is read from a repository checkout at run time. The application port is
+# published on loopback only; the host Nginx is the only ingress.
+name: qr-city-guide
+
+x-hardened: &hardened
+  read_only: true
+  tmpfs:
+    - /tmp
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
 services:
   db:
     image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
@@ -20,6 +43,59 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  web:
+    <<: *hardened
+    image: ${APP_IMAGE:?APP_IMAGE is required (npm run docker:build prints it)}
+    env_file: ${APP_ENV_FILE:?APP_ENV_FILE is required (root-owned application env file)}
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    tmpfs:
+      - /tmp
+      # Next.js image-optimizer cache; the image creates this directory for uid 1001.
+      - /app/.next/cache/images:uid=1001,gid=1001,mode=0750
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # One-off per release, before the new web image starts: docker compose run --rm migrate
+  migrate:
+    <<: *hardened
+    image: ${APP_IMAGE:?APP_IMAGE is required (npm run docker:build prints it)}-migrate
+    env_file: ${MIGRATE_ENV_FILE:?MIGRATE_ENV_FILE is required (root-owned migration env file)}
+    profiles:
+      - ops
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  # Every minute from a host timer: docker compose run --rm --no-deps outbox
+  outbox:
+    <<: *hardened
+    image: ${APP_IMAGE:?APP_IMAGE is required (npm run docker:build prints it)}-workers
+    command: ["node", "dist/workers/drain-outbox.mjs"]
+    env_file: ${APP_ENV_FILE:?APP_ENV_FILE is required (root-owned application env file)}
+    profiles:
+      - ops
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  # Every five minutes from a host timer: docker compose run --rm --no-deps operations
+  operations:
+    <<: *hardened
+    image: ${APP_IMAGE:?APP_IMAGE is required (npm run docker:build prints it)}-workers
+    command: ["node", "dist/workers/run-operational-maintenance.mjs"]
+    env_file: ${APP_ENV_FILE:?APP_ENV_FILE is required (root-owned application env file)}
+    profiles:
+      - ops
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
 
 volumes:
   postgres-prod-data:

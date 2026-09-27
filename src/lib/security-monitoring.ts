@@ -6,6 +6,7 @@
 import crypto from 'node:crypto';
 import type { Prisma } from '@/generated/prisma/client';
 
+import { logger } from '@/lib/logger-enterprise';
 import type { SecurityEvent } from '@/lib/security-config';
 import { isSensitiveFieldName, redactSensitiveText } from '@/lib/redaction';
 import { privacyHmac } from '@/lib/privacyHash';
@@ -32,6 +33,24 @@ function pathnameOnly(rawUrl: string): string {
   if (!rawUrl || rawUrl === 'unknown') return 'unknown';
   try {
     return new URL(rawUrl, 'http://localhost').pathname.slice(0, 512);
+  } catch {
+    return 'invalid';
+  }
+}
+
+/**
+ * Reduce a CSP report URL to origin + path. Query strings and fragments can
+ * carry tokens; `data:`/`blob:` payloads are reduced to their scheme and CSP
+ * keywords (`inline`, `eval`, …) are kept as they are.
+ */
+function reportUrlWithoutQuery(rawUrl: string | undefined): string | undefined {
+  if (!rawUrl) return undefined;
+  const scheme = /^([a-z][a-z\d+.-]*):/iu.exec(rawUrl)?.[1]?.toLowerCase();
+  if (!scheme) return rawUrl.slice(0, 64);
+  if (scheme !== 'http' && scheme !== 'https') return `${scheme}:`;
+  try {
+    const parsed = new URL(rawUrl);
+    return `${parsed.origin}${parsed.pathname}`.slice(0, 512);
   } catch {
     return 'invalid';
   }
@@ -74,8 +93,25 @@ async function persistSecurityEvent(event: SecurityEvent, ipHash: string | null)
   }, { maxWait: 1_000, timeout: 2_500 });
 }
 
+/**
+ * Application-log-only record for high-volume diagnostics that any client can
+ * trigger before authentication (CORS and request-shape violations). Writing
+ * them to PostgreSQL would let a single client drive one INSERT per request;
+ * they are medium severity and feed no alert rule.
+ */
+export function logSecurityDiagnostic(event: SecurityEvent): void {
+  const sanitized = sanitizeEvent(event);
+  logger.warn('Security diagnostic', {
+    type: sanitized.event.type,
+    severity: sanitized.event.severity,
+    sourceHash: sanitized.event.ip,
+    path: sanitized.event.url,
+    details: sanitized.event.details,
+  });
+}
+
 // Convenience function for recording events
-export async function recordSecurityEvent(event: SecurityEvent): Promise<void> {
+async function recordSecurityEvent(event: SecurityEvent): Promise<void> {
   const sanitized = sanitizeEvent(event);
   if (process.env.NODE_ENV === 'development') {
     console.warn('🔐 Security Event:', {
@@ -100,8 +136,11 @@ export async function recordSecurityEvent(event: SecurityEvent): Promise<void> {
 type CspReport = {
   'document-uri'?: string;
   'violated-directive'?: string;
+  'effective-directive'?: string;
   'blocked-uri'?: string;
   'original-policy'?: string;
+  disposition?: 'enforce' | 'report';
+  'status-code'?: number;
   'source-file'?: string;
   'line-number'?: number;
   'column-number'?: number;
@@ -119,11 +158,15 @@ export async function handleCSPViolation(
     ip: request.ip || 'unknown',
     userAgent: request.userAgent,
     url: violationReport['document-uri'] || 'unknown',
+    // `referrer` and `script-sample` are accepted by the route but never stored.
     details: {
       violatedDirective: violationReport['violated-directive'],
-      blockedURI: violationReport['blocked-uri'],
+      effectiveDirective: violationReport['effective-directive'],
+      disposition: violationReport.disposition,
+      statusCode: violationReport['status-code'],
+      blockedURI: reportUrlWithoutQuery(violationReport['blocked-uri']),
       originalPolicy: violationReport['original-policy'],
-      sourceFile: violationReport['source-file'],
+      sourceFile: reportUrlWithoutQuery(violationReport['source-file']),
       lineNumber: violationReport['line-number'],
       columnNumber: violationReport['column-number'],
     },

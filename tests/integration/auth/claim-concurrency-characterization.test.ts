@@ -427,8 +427,6 @@ async function readSafeClaimRaceState(
           expiresAt: true,
           revokedAt: true,
           rotatedFromId: true,
-          deviceHint: true,
-          ipHint: true,
         },
       }),
       prisma.rateLimit.findMany({ select: { count: true } }),
@@ -498,9 +496,7 @@ async function readSafeClaimRaceState(
         family
         && token
         && family.deviceHash?.length === 64
-        && family.ipHash?.length === 64
-        && token.deviceHint === family.deviceHash
-        && token.ipHint === family.ipHash,
+        && family.ipHash?.length === 64,
       ),
       descendants: tokens.filter((record) => Boolean(record.rotatedFromId)).length,
       rateLimitRecords: rateLimits.length,

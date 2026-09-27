@@ -24,7 +24,7 @@ vi.mock('@/lib/guestSession', () => ({
   parseGuestSession: authMocks.parseGuestSession,
 }));
 
-import { CLIENT_IDENTITY_UNAVAILABLE } from '@/lib/net/clientIdentity';
+const CLIENT_IDENTITY_UNAVAILABLE = 'CLIENT_IDENTITY_UNAVAILABLE'; // response contract value
 import { attachPortalAuthCookies, requestAuthContext } from '@/lib/portalAuthHttp';
 
 describe('portal auth client identity', () => {

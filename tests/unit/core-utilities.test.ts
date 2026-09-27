@@ -1,9 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { ApiErrorCode } from '@/lib/apiErrorTypes';
 import { dedupeById } from '@/lib/collections';
 import { mapsHref, telHref } from '@/lib/contactLinks';
-import { internalGet, internalPost } from '@/lib/internalFetch';
 import { serializeJsonLd } from '@/lib/jsonLd';
 import { toSafeLocalPath } from '@/lib/safeLocalPath';
 import { absUrl, siteUrl } from '@/lib/site';
@@ -110,33 +109,5 @@ describe('core utility contracts', () => {
   it('uses localized safe fallbacks for unknown errors', () => {
     expect(mapApiErrorToUI(null).summary).toContain('Something went wrong');
     expect(mapApiErrorToUI({ error: { code: ApiErrorCode.GATEWAY_TIMEOUT } }, 'el').summary).toContain('προσωρινά');
-  });
-
-  it('enforces relative internal fetches and JSON request semantics', async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ value: 1 }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ value: 2 }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(null, { status: 503 }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    await expect(internalGet<{ value: number }>('/api/value')).resolves.toEqual({ value: 1 });
-    await expect(internalPost<{ value: number }>('/api/value', { input: true })).resolves.toEqual({ value: 2 });
-    await expect(internalGet('/api/failure')).rejects.toThrow('Request failed: 503');
-    await expect(internalGet('https://external.test')).rejects.toThrow('relative path');
-    expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/value', expect.objectContaining({
-      method: 'POST',
-      body: JSON.stringify({ input: true }),
-    }));
-  });
-
-  it('keeps the JSON content type when a caller adds headers', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    await internalPost('/api/value', { input: true }, { headers: { 'X-Request-Source': 'test' } });
-
-    expect(fetchMock).toHaveBeenCalledWith('/api/value', expect.objectContaining({
-      headers: { 'Content-Type': 'application/json', 'X-Request-Source': 'test' },
-    }));
   });
 });

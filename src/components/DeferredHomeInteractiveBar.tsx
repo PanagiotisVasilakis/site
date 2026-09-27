@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useState, type ComponentType } from 'react';
-import type { BookingLabels } from '@/components/HomeInteractiveBar';
 
 interface Props {
   locale: string;
-  labels?: BookingLabels;
   subline?: string;
 }
 
@@ -28,11 +26,25 @@ export default function DeferredHomeInteractiveBar(props: Props) {
   const [Component, setComponent] = useState<ComponentType<Props> | null>(null);
 
   useEffect(() => {
-    return defer(() => {
+    let loaded = false;
+    const load = () => {
+      if (loaded) return;
+      loaded = true;
       void import('@/components/HomeInteractiveBar').then((module) => {
         setComponent(() => module.default);
       });
-    });
+    };
+    // A #book-now link needs the bar now; HomeInteractiveBar scrolls to it on mount.
+    const loadForHash = () => {
+      if (window.location.hash === '#book-now') load();
+    };
+    loadForHash();
+    window.addEventListener('hashchange', loadForHash);
+    const cancelDefer = defer(load);
+    return () => {
+      window.removeEventListener('hashchange', loadForHash);
+      cancelDefer();
+    };
   }, []);
 
   if (Component) return <Component {...props} />;

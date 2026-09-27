@@ -7,6 +7,7 @@ interface WifiAccessCardProps {
   network: string;
   password: string;
   unavailableLabel: string;
+  notice?: string | null;
   copyLabel: string;
   copiedLabel: string;
   copiedTarget: WifiCopyTarget | null;
@@ -35,6 +36,7 @@ export default function WifiAccessCard({
   network,
   password,
   unavailableLabel,
+  notice,
   copyLabel,
   copiedLabel,
   copiedTarget,
@@ -84,6 +86,7 @@ export default function WifiAccessCard({
           </div>
         ))}
       </dl>
+      {notice && <p className="checkin-muted-text mt-2 text-sm" role="status">{notice}</p>}
     </div>
   );
 }

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { sanitizeRequestHeaders } from '@/lib/apiErrorHandler';
-import { isSensitiveFieldName } from '@/lib/redaction';
+import { isSensitiveFieldName, redactHeaders } from '@/lib/redaction';
 
 describe('trusted-ingress diagnostic redaction', () => {
   it('redacts every public and private identity header while preserving safe fields', () => {
@@ -19,7 +18,7 @@ describe('trusted-ingress diagnostic redaction', () => {
       accept: 'application/json',
     });
 
-    expect(sanitizeRequestHeaders(headers)).toEqual({
+    expect(redactHeaders(headers)).toEqual({
       accept: 'application/json',
       authorization: '[REDACTED]',
       'cf-connecting-ip': '[REDACTED]',

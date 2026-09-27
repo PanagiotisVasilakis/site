@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Local development orchestrator. Production runs the immutable Docker image
+# (docs/architecture/deployment-target.md); this script never targets it.
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -13,10 +16,8 @@ MIGRATION_LOCK_FILE="$RUNTIME_DIR/migrate.lock"
 PROFILE="development"
 STRICT_MODE=0
 DOCKER_FALLBACK=1
-SKIP_BUILD=0
 SKIP_MIGRATE=0
 SKIP_VERIFY=0
-FOREGROUND=0
 FORCE_INSTALL=0
 VERBOSE=0
 LOG_FOLLOW=0
@@ -27,47 +28,45 @@ SUBCOMMAND=""
 COMPOSE_IMPL=""
 
 DB_MODE=""
-DB_COMPOSE_FILE=""
-DB_SERVICE=""
-DB_CONTAINER=""
+DB_COMPOSE_FILE="docker-compose.yml"
+DB_SERVICE="db"
+DB_CONTAINER="site-dev-db"
 DB_LOCAL_URL=""
 
 usage() {
   cat <<'USAGE'
 Usage: scripts/system-orchestrator.sh <command> [options]
 
+Local development only. Production runs the Docker image (see
+docs/architecture/deployment-target.md).
+
 Commands:
-  bootstrap   Validate env, install deps if needed, prepare DB, run migrations, optional build
-  up          Run bootstrap, then start app and verify health
-  down        Stop app and stop local fallback DB (if started by orchestrator)
+  bootstrap   Validate env, install deps if needed, prepare DB, run migrations
+  up          Run bootstrap, then start `npm run dev` and verify health
+  down        Stop the app and the local fallback DB (if this script started it)
   restart     down + up
   status      Print app and DB status summary
   logs        Print app logs (or follow with --follow)
   verify      Verify health endpoints on a running app
-  build       Run production build pipeline after environment and DB readiness checks
   migrate     Run Prisma generate + migrate deploy with lock and retries
-  check       Validate prerequisites and environment contract without starting services
+  check       Validate prerequisites and environment without starting services
 
 Options:
-  --profile <production|development>       Runtime profile (default: development)
-  --strict                                 Add lint + typecheck + coverage gate before build/start
-  --db-only                                Validate only DB-related environment and skip app build/start requirements
+  --strict                                 Add lint + typecheck + coverage gate before start
+  --db-only                                Validate only DB-related environment and skip app requirements
   --no-docker-fallback                     Fail instead of starting local DB when DATABASE_URL is unreachable
-  --skip-build                             Skip build step where applicable
   --skip-migrate                           Skip migration step where applicable
   --skip-verify                            Skip runtime endpoint verification
-  --foreground                             Start app in foreground (disables post-start verify)
   --force-install                          Force npm ci even if node_modules exists
   --timeout <seconds>                      Startup verification timeout (default: 120)
   --follow                                 For logs command, follow output
   --verbose                                Verbose command tracing
   --help                                   Show this help
+  (--profile development and --skip-build are accepted for compatibility and ignored.)
 
 Examples:
-  scripts/system-orchestrator.sh up --profile production
-  scripts/system-orchestrator.sh up --profile development --skip-build
-  scripts/system-orchestrator.sh bootstrap --profile development --db-only --skip-build --skip-migrate
-  scripts/system-orchestrator.sh migrate --profile production
+  scripts/system-orchestrator.sh up
+  scripts/system-orchestrator.sh bootstrap --db-only --skip-migrate
   scripts/system-orchestrator.sh logs --follow
 USAGE
 }
@@ -95,13 +94,6 @@ die() {
   exit "$code"
 }
 
-trim() {
-  local value="$1"
-  value="${value#"${value%%[![:space:]]*}"}"
-  value="${value%"${value##*[![:space:]]}"}"
-  printf '%s' "$value"
-}
-
 ensure_runtime_dir() {
   mkdir -p "$RUNTIME_DIR"
 }
@@ -109,13 +101,6 @@ ensure_runtime_dir() {
 require_cmd() {
   local cmd="$1"
   command -v "$cmd" >/dev/null 2>&1 || die "Required command not found: $cmd" 10
-}
-
-validate_profile() {
-  case "$PROFILE" in
-    production|development) ;;
-    *) die "Invalid profile '$PROFILE'. Use production or development." 11 ;;
-  esac
 }
 
 parse_args() {
@@ -128,7 +113,7 @@ parse_args() {
   shift
 
   case "$SUBCOMMAND" in
-    bootstrap|up|down|restart|status|logs|verify|build|migrate|check) ;;
+    bootstrap|up|down|restart|status|logs|verify|migrate|check) ;;
     -h|--help|help)
       usage
       exit 0
@@ -141,9 +126,11 @@ parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --profile)
-        PROFILE="${2:-}"
-        [[ -n "$PROFILE" ]] || die "--profile requires a value"
+        [[ "${2:-}" == "development" ]] || die "Only the development profile exists; production runs the Docker image" 11
         shift 2
+        ;;
+      --skip-build)
+        shift
         ;;
       --strict)
         STRICT_MODE=1
@@ -157,20 +144,12 @@ parse_args() {
         DOCKER_FALLBACK=0
         shift
         ;;
-      --skip-build)
-        SKIP_BUILD=1
-        shift
-        ;;
       --skip-migrate)
         SKIP_MIGRATE=1
         shift
         ;;
       --skip-verify)
         SKIP_VERIFY=1
-        shift
-        ;;
-      --foreground)
-        FOREGROUND=1
         shift
         ;;
       --force-install)
@@ -199,24 +178,6 @@ parse_args() {
         ;;
     esac
   done
-
-  validate_profile
-
-  # Production must never replace its configured database with a local
-  # development container. This is an invariant, not an opt-out flag.
-  if [[ "$PROFILE" == "production" ]]; then
-    DOCKER_FALLBACK=0
-  fi
-}
-
-normalize_semver_min() {
-  local version="${1#v}"
-  local major minor patch
-  IFS='.' read -r major minor patch _ <<< "$version"
-  minor="${minor:-0}"
-  patch="${patch:-0}"
-  patch="${patch%%[^0-9]*}"
-  printf '%s.%s.%s' "$major" "$minor" "${patch:-0}"
 }
 
 version_at_least() {
@@ -262,17 +223,11 @@ check_node_and_npm_versions() {
   require_cmd node
   require_cmd npm
 
-  local current_node
-  local required_node=""
-  local current_npm required_npm=""
-
+  local current_node current_npm required_node required_npm
   current_node="$(node -v)"
-
-  if [[ -f "$REPO_ROOT/.nvmrc" ]]; then
-    required_node="$(normalize_semver_min "$(tr -d '[:space:]' < "$REPO_ROOT/.nvmrc")")"
-    if ! version_at_least "$current_node" "$required_node"; then
-      die "Node $required_node+ required by .nvmrc, found $current_node" 12
-    fi
+  required_node="$(package_engine_min node)"
+  if [[ -n "$required_node" ]] && ! version_at_least "$current_node" "$required_node"; then
+    die "Node $required_node+ is required, found $current_node" 12
   fi
 
   current_npm="$(npm -v)"
@@ -310,82 +265,38 @@ compose() {
   fi
 }
 
-env_candidates() {
-  case "$PROFILE" in
-    production)
-      # Never load developer-local overrides in production mode.
-      printf '%s\n' ".env.production.local" ".env.production" ".env"
-      ;;
-    development)
-      printf '%s\n' ".env.development.local" ".env.local" ".env.development" ".env"
-      ;;
-  esac
-}
-
-set_env_if_unset() {
-  local key="$1"
-  local value="$2"
-  if [[ -z "${!key:-}" ]]; then
-    export "$key=$value"
-  fi
-}
-
-load_env_file_if_present() {
-  local file_path="$1"
-  [[ -f "$file_path" ]] || return 0
-
-  log "Loading env file: ${file_path#$REPO_ROOT/}"
-
-  local raw line key value first_char last_char
-  while IFS= read -r raw || [[ -n "$raw" ]]; do
-    line="${raw%$'\r'}"
-    line="$(trim "$line")"
-
-    [[ -z "$line" ]] && continue
-    [[ "$line" == \#* ]] && continue
-
-    if [[ "$line" == export\ * ]]; then
-      line="${line#export }"
-    fi
-
-    [[ "$line" == *=* ]] || continue
-
-    key="$(trim "${line%%=*}")"
-    value="$(trim "${line#*=}")"
-
-    if [[ -z "$key" ]]; then
-      continue
-    fi
-
-    if [[ ${#value} -ge 2 ]]; then
-      first_char="${value:0:1}"
-      last_char="${value: -1}"
-      if [[ "$first_char" == '"' && "$last_char" == '"' ]]; then
-        value="${value:1:${#value}-2}"
-      elif [[ "$first_char" == "'" && "$last_char" == "'" ]]; then
-        value="${value:1:${#value}-2}"
-      fi
-    fi
-
-    set_env_if_unset "$key" "$value"
-  done < "$file_path"
-}
-
+# Load the development env files with the same parser and precedence as
+# `next dev` (dotenv; the first file that defines a key wins; values already
+# in the process environment are kept).
 load_environment() {
-  local rel
-  while IFS= read -r rel; do
-    [[ -n "$rel" ]] || continue
-    load_env_file_if_present "$REPO_ROOT/$rel"
-  done < <(env_candidates)
+  local exports
+  exports="$(cd "$REPO_ROOT" && node --input-type=module <<'NODE'
+import fs from 'node:fs';
+import dotenv from 'dotenv';
+
+const files = ['.env.development.local', '.env.local', '.env.development', '.env'];
+const merged = {};
+for (const file of files) {
+  if (!fs.existsSync(file)) continue;
+  process.stderr.write(`[system] Loading env file: ${file}\n`);
+  for (const [key, value] of Object.entries(dotenv.parse(fs.readFileSync(file)))) {
+    if (!(key in merged)) merged[key] = value;
+  }
+}
+const quote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`;
+for (const [key, value] of Object.entries(merged)) {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/u.test(key)) continue;
+  if (process.env[key] !== undefined && process.env[key] !== '') continue;
+  process.stdout.write(`export ${key}=${quote(value)}\n`);
+}
+NODE
+)"
+  eval "$exports"
 }
 
 maybe_ensure_pepper() {
   if [[ -n "${SECURITY_PEPPER:-}" && ${#SECURITY_PEPPER} -ge 16 ]]; then
     return
-  fi
-
-  if [[ "$PROFILE" == "production" ]]; then
-    die "SECURITY_PEPPER missing or invalid; production configuration is never auto-repaired" 14
   fi
 
   warn "SECURITY_PEPPER missing or invalid; running npm run ensure-pepper"
@@ -398,166 +309,21 @@ maybe_ensure_pepper() {
   load_environment
 }
 
-is_valid_url() {
-  local value="$1"
-  node --input-type=module -e "try { new URL(process.argv[1]); process.exit(0); } catch { process.exit(1); }" "$value"
-}
-
-is_postgres_url() {
-  local value="$1"
-  node --input-type=module -e "try { const protocol = new URL(process.argv[1]).protocol; process.exit(protocol === 'postgres:' || protocol === 'postgresql:' ? 0 : 1); } catch { process.exit(1); }" "$value"
-}
-
-is_exact_origin() {
-  local value="$1"
-  node --input-type=module -e "try { const url = new URL(process.argv[1]); process.exit(url.origin === process.argv[1] ? 0 : 1); } catch { process.exit(1); }" "$value"
-}
-
-validate_environment_contract() {
-  local failed=0
-
-  if (( DB_ONLY_MODE )); then
-    if [[ -n "${DATABASE_URL:-}" ]] && ! is_postgres_url "$DATABASE_URL"; then
-      error "DATABASE_URL must be a valid postgres or postgresql URL"
-      failed=1
-    fi
-
-    if (( failed )); then
-      die "Environment validation failed" 14
-    fi
-
-    log "Environment contract validation passed (db-only mode)"
-    return
-  fi
-
+validate_database_url() {
   if [[ -z "${DATABASE_URL:-}" ]]; then
-    error "DATABASE_URL is required"
-    failed=1
-  elif ! is_postgres_url "$DATABASE_URL"; then
-    error "DATABASE_URL must be a valid postgres or postgresql URL"
-    failed=1
+    fallback_database_url
+    export DATABASE_URL="$DB_LOCAL_URL"
+    log "DATABASE_URL not set; using the local fallback database URL"
   fi
-
-  if [[ -z "${SECURITY_PEPPER:-}" || ${#SECURITY_PEPPER} -lt 16 ]]; then
-    error "SECURITY_PEPPER must be at least 16 characters"
-    failed=1
-  fi
-
-  if [[ -z "${GUEST_WIFI_NETWORK:-}" ]]; then
-    error "GUEST_WIFI_NETWORK is required"
-    failed=1
-  fi
-
-  if [[ -z "${GUEST_WIFI_PASSWORD:-}" || ${#GUEST_WIFI_PASSWORD} -lt 8 ]]; then
-    error "GUEST_WIFI_PASSWORD must be at least 8 characters"
-    failed=1
-  fi
-
-  if [[ "$PROFILE" == "production" && -z "${NEXT_PUBLIC_SITE_URL:-}" ]]; then
-    error "NEXT_PUBLIC_SITE_URL is required in production"
-    failed=1
-  elif [[ -n "${NEXT_PUBLIC_SITE_URL:-}" ]] && ! is_valid_url "$NEXT_PUBLIC_SITE_URL"; then
-    error "NEXT_PUBLIC_SITE_URL is not a valid URL"
-    failed=1
-  elif [[ "$PROFILE" == "production" && -n "${NEXT_PUBLIC_SITE_URL:-}" && "$NEXT_PUBLIC_SITE_URL" != https://* ]]; then
-    error "NEXT_PUBLIC_SITE_URL must use HTTPS in production"
-    failed=1
-  fi
-  if [[ -n "${BUILD_SITE_URL:-}" && "${NEXT_PUBLIC_SITE_URL:-}" != "$BUILD_SITE_URL" ]]; then
-    error "NEXT_PUBLIC_SITE_URL does not match the URL compiled into this image"
-    failed=1
-  fi
-
-  local configured_origin
-  local -a configured_origins configured_keys
-  IFS=',' read -r -a configured_origins <<< "${ALLOWED_ORIGINS:-}"
-  for configured_origin in "${configured_origins[@]}"; do
-    configured_origin="$(trim "$configured_origin")"
-    [[ -n "$configured_origin" ]] || continue
-    if ! is_exact_origin "$configured_origin"; then
-      error "ALLOWED_ORIGINS contains an invalid origin"
-      failed=1
-    elif [[ "$PROFILE" == "production" && "$configured_origin" != https://* ]]; then
-      error "ALLOWED_ORIGINS must use HTTPS in production"
-      failed=1
-    fi
-  done
-
-  if [[ "$PROFILE" == "production" && ( -z "${CLAIM_TOKEN_PEPPER:-}" || ${#CLAIM_TOKEN_PEPPER} -lt 32 ) ]]; then
-    error "CLAIM_TOKEN_PEPPER must be at least 32 characters in production"
-    failed=1
-  fi
-
-  if [[ -n "${ORIGIN_PROXY_SHARED_SECRET:-}" \
-    && ! "${ORIGIN_PROXY_SHARED_SECRET}" =~ ^[0-9A-Fa-f]{64}$ ]]; then
-    error "ORIGIN_PROXY_SHARED_SECRET must be a 64-character hexadecimal secret"
-    failed=1
-  elif [[ "$PROFILE" == "production" && -z "${ORIGIN_PROXY_SHARED_SECRET:-}" ]]; then
-    error "ORIGIN_PROXY_SHARED_SECRET is required in production"
-    failed=1
-  fi
-
-  local url_key token_key url_value token_value
-  for url_key in BOOKING_REQUEST_WEBHOOK_URL CHECKIN_REQUEST_WEBHOOK_URL; do
-    if [[ "$url_key" == "BOOKING_REQUEST_WEBHOOK_URL" ]]; then
-      token_key="BOOKING_REQUEST_WEBHOOK_TOKEN"
-    else
-      token_key="CHECKIN_REQUEST_WEBHOOK_TOKEN"
-    fi
-    url_value="${!url_key:-}"
-    token_value="${!token_key:-}"
-
-    if [[ -n "$url_value" ]] && ! is_valid_url "$url_value"; then
-      error "$url_key is not a valid URL"
-      failed=1
-    fi
-    if [[ -n "$url_value" && ${#token_value} -lt 20 ]]; then
-      error "$token_key must be at least 20 characters when $url_key is configured"
-      failed=1
-    fi
-    if [[ "$PROFILE" == "production" && -n "$url_value" && "$url_value" != https://* ]]; then
-      error "$url_key must use HTTPS in production"
-      failed=1
-    fi
-  done
-
-  if [[ -n "${ALERT_WEBHOOK_URL:-}" ]] && ! is_valid_url "$ALERT_WEBHOOK_URL"; then
-    error "ALERT_WEBHOOK_URL is not a valid URL"
-    failed=1
-  fi
-  if [[ "$PROFILE" == "production" && -n "${ALERT_WEBHOOK_URL:-}" && "$ALERT_WEBHOOK_URL" != https://* ]]; then
-    error "ALERT_WEBHOOK_URL must use HTTPS in production"
-    failed=1
-  fi
-  if [[ -n "${ALERT_WEBHOOK_TOKEN:-}" && ${#ALERT_WEBHOOK_TOKEN} -lt 20 ]]; then
-    error "ALERT_WEBHOOK_TOKEN must be at least 20 characters"
-    failed=1
-  fi
-  if [[ "${ALERT_WEBHOOK_REQUIRED:-0}" == "1" && -z "${ALERT_WEBHOOK_URL:-}" ]]; then
-    error "ALERT_WEBHOOK_URL is required when ALERT_WEBHOOK_REQUIRED=1"
-    failed=1
-  fi
-  if [[ ! "${ALERT_WEBHOOK_REQUIRED:-0}" =~ ^(0|1)$ ]]; then
-    error "ALERT_WEBHOOK_REQUIRED must be 0 or 1"
-    failed=1
-  fi
-
-  if [[ -n "${ANALYTICS_RETENTION_DAYS:-}" && ! "${ANALYTICS_RETENTION_DAYS}" =~ ^[0-9]+$ ]]; then
-    error "ANALYTICS_RETENTION_DAYS must be a non-negative integer"
-    failed=1
-  fi
-
-  if (( failed )); then
-    die "Environment validation failed" 14
-  fi
-
-  log "Environment contract validation passed"
+  (cd "$REPO_ROOT" && node --input-type=module -e "try { const protocol = new URL(process.argv[1]).protocol; process.exit(protocol === 'postgres:' || protocol === 'postgresql:' ? 0 : 1); } catch { process.exit(1); }" "$DATABASE_URL") \
+    || die "DATABASE_URL must be a valid postgres or postgresql URL" 14
 }
 
 database_reachable() {
   local db_url="$1"
 
-  DATABASE_URL_TO_TEST="$db_url" node --input-type=module <<'NODE'
+  # Resolve `pg` from the repository, whatever the caller's working directory.
+  (cd "$REPO_ROOT" && DATABASE_URL_TO_TEST="$db_url" node --input-type=module <<'NODE'
 import pg from 'pg';
 
 const connectionString = process.env.DATABASE_URL_TO_TEST;
@@ -574,18 +340,20 @@ try {
   process.exit(1);
 }
 NODE
+)
 }
 
-choose_fallback_database() {
-  DB_COMPOSE_FILE="docker-compose.yml"
-  DB_SERVICE="db"
-  DB_CONTAINER="site-dev-db"
-
+fallback_database_url() {
   local user="${POSTGRES_USER:-devuser}"
   local password="${POSTGRES_PASSWORD:-devpass}"
   local database="${POSTGRES_DB:-site_dev}"
   local port="${POSTGRES_PORT:-5433}"
   DB_LOCAL_URL="postgresql://${user}:${password}@localhost:${port}/${database}"
+}
+
+fallback_container_running() {
+  command -v docker >/dev/null 2>&1 \
+    && [[ "$(docker inspect --format '{{.State.Status}}' "$DB_CONTAINER" 2>/dev/null || true)" == "running" ]]
 }
 
 ensure_docker_available() {
@@ -620,21 +388,12 @@ wait_for_container_ready() {
 }
 
 start_fallback_database() {
-  if [[ "$PROFILE" == "production" ]]; then
-    die "Invariant violation: local database fallback is forbidden in production" 17
-  fi
-
-  choose_fallback_database
+  fallback_database_url
   ensure_docker_available
   resolve_compose_impl
 
   log "Starting fallback database using $DB_COMPOSE_FILE"
   compose -f "$REPO_ROOT/$DB_COMPOSE_FILE" up -d "$DB_SERVICE"
-
-  if [[ -z "$DB_CONTAINER" ]]; then
-    DB_CONTAINER="$(compose -f "$REPO_ROOT/$DB_COMPOSE_FILE" ps -q "$DB_SERVICE")"
-    [[ -n "$DB_CONTAINER" ]] || die "Unable to resolve fallback database container" 16
-  fi
 
   wait_for_container_ready "$DB_CONTAINER" 90 || die "Fallback database failed to become ready" 16
 
@@ -644,9 +403,16 @@ start_fallback_database() {
 }
 
 prepare_database() {
+  fallback_database_url
   if database_reachable "$DATABASE_URL"; then
-    DB_MODE="managed"
-    log "DATABASE_URL is reachable"
+    # A reachable URL that points at this script's fallback container is still
+    # "local": `down` must stop it (e.g. after `npm run db:start`).
+    if [[ "$DATABASE_URL" == "$DB_LOCAL_URL" ]] && fallback_container_running; then
+      DB_MODE="local"
+    else
+      DB_MODE="managed"
+    fi
+    log "DATABASE_URL is reachable (${DB_MODE})"
     return
   fi
 
@@ -676,13 +442,10 @@ ensure_dependencies() {
     if (( missing_build_dependencies )); then
       warn "node_modules exists but required build dependencies are missing"
     fi
-    log "Installing dependencies via npm ci --include=dev"
+    log "Installing dependencies via npm ci"
     (
       cd "$REPO_ROOT"
-      # NODE_ENV=production makes npm omit devDependencies by default. Production
-      # bootstrap still needs the checked-in build toolchain before standalone output
-      # can be produced, so make the install mode explicit.
-      npm ci --include=dev
+      npm ci
     )
     return
   fi
@@ -784,58 +547,6 @@ run_strict_quality_gate_if_requested() {
   )
 }
 
-run_build_pipeline() {
-  if (( SKIP_BUILD )); then
-    warn "Skipping build due to --skip-build"
-    return
-  fi
-
-  log "Running build pipeline"
-  (
-    cd "$REPO_ROOT"
-    npm run build
-    # Materialize the standalone public/static tree and its writable cache before
-    # a hardened systemd service mounts only the cache path read-write.
-    node scripts/prepare-standalone.mjs
-  )
-}
-
-app_command_for_profile() {
-  case "$PROFILE" in
-    # The production build pipeline already materializes public/static assets.
-    # Starting the server directly avoids rerunning the mutating npm prestart hook
-    # inside a read-only systemd sandbox.
-    production) printf '%s' "node scripts/start-standalone.mjs .next/standalone/server.js" ;;
-    development) printf '%s' "npm run dev" ;;
-  esac
-}
-
-validate_standalone_runtime_tree() {
-  [[ "$PROFILE" == "production" ]] || return
-
-  local required_path
-  for required_path in \
-    ".next/standalone/server.js" \
-    ".next/standalone/.next/static" \
-    ".next/standalone/.next/cache/images" \
-    ".next/standalone/public"; do
-    if [[ ! -e "$REPO_ROOT/$required_path" ]]; then
-      die "Prepared standalone runtime is missing $required_path; run the production build first" 19
-    fi
-  done
-}
-
-set_node_env_for_profile() {
-  case "$PROFILE" in
-    production)
-      export NODE_ENV="production"
-      export HOSTNAME="127.0.0.1"
-      export PORT="${PORT:-3000}"
-      ;;
-    development) export NODE_ENV="development" ;;
-  esac
-}
-
 app_is_running() {
   [[ -f "$APP_PID_FILE" ]] || return 1
   local pid
@@ -855,11 +566,10 @@ write_state() {
   ensure_runtime_dir
 
   : > "$STATE_FILE"
-  write_state_value "PROFILE" "$PROFILE"
   write_state_value "DB_MODE" "${DB_MODE:-managed}"
-  write_state_value "DB_COMPOSE_FILE" "${DB_COMPOSE_FILE:-}"
-  write_state_value "DB_SERVICE" "${DB_SERVICE:-}"
-  write_state_value "DB_CONTAINER" "${DB_CONTAINER:-}"
+  write_state_value "DB_COMPOSE_FILE" "$DB_COMPOSE_FILE"
+  write_state_value "DB_SERVICE" "$DB_SERVICE"
+  write_state_value "DB_CONTAINER" "$DB_CONTAINER"
   write_state_value "APP_COMMAND" "$app_cmd"
   write_state_value "APP_LOG_FILE" "$APP_LOG_FILE"
   write_state_value "STARTED_AT" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -873,25 +583,12 @@ load_state() {
 }
 
 start_app() {
-  local app_cmd
-  app_cmd="$(app_command_for_profile)"
-
-  set_node_env_for_profile
+  local app_cmd="npm run dev"
+  export NODE_ENV="development"
   ensure_runtime_dir
-  validate_standalone_runtime_tree
 
   if app_is_running; then
     die "Application already running with PID $(cat "$APP_PID_FILE")" 19
-  fi
-
-  if (( FOREGROUND )); then
-    warn "Starting in foreground; runtime verification is skipped"
-    write_state "$app_cmd"
-    (
-      cd "$REPO_ROOT"
-      exec bash -lc "$app_cmd"
-    )
-    return 0
   fi
 
   : > "$APP_LOG_FILE"
@@ -1008,11 +705,6 @@ stop_fallback_database_if_needed() {
     return
   fi
 
-  if [[ -z "${DB_COMPOSE_FILE:-}" ]]; then
-    warn "State indicates local DB mode but compose file is missing"
-    return
-  fi
-
   if ! command -v docker >/dev/null 2>&1; then
     warn "Docker not found; unable to stop local fallback DB"
     return
@@ -1026,10 +718,11 @@ stop_fallback_database_if_needed() {
   resolve_compose_impl
   log "Stopping local fallback DB (${DB_COMPOSE_FILE})"
   compose -f "$REPO_ROOT/$DB_COMPOSE_FILE" down || warn "Failed to stop fallback DB cleanly"
+  rm -f "$STATE_FILE"
 }
 
 run_preflight() {
-  set_node_env_for_profile
+  export NODE_ENV="development"
   check_node_and_npm_versions
 
   if (( DOCKER_FALLBACK )) && ! command -v docker >/dev/null 2>&1; then
@@ -1041,7 +734,7 @@ run_preflight() {
   if (( DB_ONLY_MODE == 0 )); then
     maybe_ensure_pepper
   fi
-  validate_environment_contract
+  validate_database_url
 }
 
 run_bootstrap_sequence() {
@@ -1049,6 +742,8 @@ run_bootstrap_sequence() {
 
   if (( DB_ONLY_MODE )); then
     prepare_database
+    # Record the DB mode so `down` can stop a fallback DB started here.
+    write_state "none"
     log "DB-only bootstrap completed"
     return
   fi
@@ -1059,14 +754,6 @@ run_bootstrap_sequence() {
   run_prisma_generate
   run_migrations_with_retry
   run_strict_quality_gate_if_requested
-
-  if [[ "$PROFILE" == "production" ]]; then
-    run_build_pipeline
-  else
-    if (( SKIP_BUILD == 0 )); then
-      log "Skipping mandatory build because profile is $PROFILE"
-    fi
-  fi
 }
 
 cmd_bootstrap() {
@@ -1077,10 +764,6 @@ cmd_bootstrap() {
 cmd_up() {
   run_bootstrap_sequence
   start_app
-
-  if (( FOREGROUND )); then
-    return
-  fi
 
   if (( SKIP_VERIFY )); then
     warn "Skipping runtime verification due to --skip-verify"
@@ -1103,22 +786,16 @@ cmd_restart() {
 
 cmd_status() {
   local app_state="stopped"
-  local profile_label="$PROFILE"
-
-  if load_state && [[ -n "${PROFILE:-}" ]]; then
-    profile_label="$PROFILE"
-  fi
 
   if app_is_running; then
     app_state="running (pid $(cat "$APP_PID_FILE"))"
   fi
 
   printf 'Application: %s\n' "$app_state"
-  printf 'Profile: %s\n' "$profile_label"
 
   if load_state; then
     printf 'Database mode: %s\n' "${DB_MODE:-unknown}"
-    if [[ -n "${DB_CONTAINER:-}" && "${DB_MODE:-}" == "local" ]] && command -v docker >/dev/null 2>&1; then
+    if [[ "${DB_MODE:-}" == "local" ]] && command -v docker >/dev/null 2>&1; then
       local db_status
       db_status="$(docker ps --filter "name=${DB_CONTAINER}" --format '{{.Status}}' | head -n 1 || true)"
       printf 'Fallback DB: %s (%s)\n' "${DB_CONTAINER}" "${db_status:-not running}"
@@ -1151,20 +828,8 @@ cmd_logs() {
 }
 
 cmd_verify() {
-  run_preflight
-  ensure_dependencies
-  validate_runtime_environment_contract
+  load_environment
   verify_runtime
-}
-
-cmd_build() {
-  run_preflight
-  ensure_dependencies
-  validate_runtime_environment_contract
-  prepare_database
-  run_prisma_generate
-  run_build_pipeline
-  log "Build completed"
 }
 
 cmd_migrate() {
@@ -1205,7 +870,6 @@ main() {
     status) cmd_status ;;
     logs) cmd_logs ;;
     verify) cmd_verify ;;
-    build) cmd_build ;;
     migrate) cmd_migrate ;;
     check) cmd_check ;;
     *) die "Unhandled command: $SUBCOMMAND" ;;

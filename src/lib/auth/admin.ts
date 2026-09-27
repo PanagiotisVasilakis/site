@@ -92,7 +92,10 @@ export async function createAdminSession(): Promise<{ id: string; loginAt: numbe
   return { id, loginAt: Math.floor(now.getTime() / 1000) };
 }
 
-export async function verifyAdminSession(token: string): Promise<(JwtPayload & AdminAuthPayload) | null> {
+/** The verified token payload and the server-side expiry of its active session. */
+export async function readActiveAdminSession(
+  token: string,
+): Promise<{ payload: JwtPayload & AdminAuthPayload; expiresAt: Date } | null> {
   const payload = verifyAdmin(token);
   if (!payload) return null;
   if (!payload.session_id) return null;
@@ -106,7 +109,11 @@ export async function verifyAdminSession(token: string): Promise<(JwtPayload & A
     || record.absoluteExpiresAt <= now) {
     return null;
   }
-  return payload;
+  return { payload, expiresAt: record.expiresAt };
+}
+
+export async function verifyAdminSession(token: string): Promise<(JwtPayload & AdminAuthPayload) | null> {
+  return (await readActiveAdminSession(token))?.payload ?? null;
 }
 
 export async function refreshAdminSession(sessionId: string): Promise<Date | null> {

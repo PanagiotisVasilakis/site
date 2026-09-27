@@ -1,4 +1,3 @@
-import { checkinRepository, type CheckinRecord } from '@/lib/prisma-repositories/checkinRepository';
 import { userRepository, type UserRecord } from '@/lib/prisma-repositories/userRepository';
 import { bookingRepository, type BookingRecord } from '@/lib/prisma-repositories/bookingRepository';
 import {
@@ -20,7 +19,6 @@ import { normalizePhone } from '@/lib/phone';
 export type User = UserRecord;
 export type Booking = BookingRecord;
 
-export type CheckinCompletionRec = CheckinRecord;
 export type GuestRefreshTokenRec = PrismaGuestRefreshTokenRec;
 
 export const guestStore = {
@@ -42,11 +40,6 @@ export const guestStore = {
   
   async findBookingById(id: string): Promise<Booking | undefined> {
     return bookingRepository.findById(id);
-  },
-
-  // Check-in completion
-  async getCheckinCompletionByBooking(booking_id: string): Promise<CheckinCompletionRec | undefined> {
-    return checkinRepository.getByBookingId(booking_id);
   },
 
   // Refresh tokens
@@ -154,10 +147,6 @@ export const guestStore = {
 
   async getAllUsers(): Promise<User[]> {
     return guestDataCache.get('users', () => userRepository.getAll());
-  },
-
-  async getAllCheckins(): Promise<CheckinCompletionRec[]> {
-    return guestDataCache.get('checkins', () => checkinRepository.getAll());
   },
 
 };

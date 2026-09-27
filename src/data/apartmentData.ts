@@ -20,25 +20,133 @@ const apartmentData = {
     el: 'Ένα ευρύχωρο διαμέρισμα 2 υπνοδωματίων στον 2ο όροφο, με μεγάλες ηλιόλουστες βεράντες και θέα σε βουνό και θάλασσα, σε ήσυχη γειτονιά μόλις 50 μ. από το νέο Δημαρχείο. Παρέχονται δωρεάν Wi-Fi και κλιματισμός. Για οικογένειες διατίθενται παρκοκρέβατο, εξοπλισμός μπάνιου μωρού και καρεκλάκι φαγητού. Σε μικρή απόσταση υπάρχουν σούπερ μάρκετ, φούρνος και στάση λεωφορείου, ενώ στο κατάλυμα παρέχεται δωρεάν εξωτερικό ιδιωτικό πάρκινγκ.'
   },
 
-  highlights: {
-    en: [
-      'Mountain and sea views from terraces',
-      'Quiet neighborhood location',  
-      'Just 50m from Town Hall',
-      'Free private parking',
-      'Family-friendly with baby equipment',
-      'Walking distance to amenities'
-    ],
-    el: [
-      'Θέα βουνού και θάλασσας από βεράντες',
-      'Ήσυχη γειτονιά',
-      'Μόλις 50μ από το Δημαρχείο', 
-      'Δωρεάν ιδιωτικό πάρκινγκ',
-      'Φιλικό για οικογένειες με εξοπλισμό μωρού',
-      'Κοντά σε όλες τις ανέσεις'
-    ]
-  },
-
+  // Detailed amenities shown on the check-in page, grouped by area.
+  amenityGroups: [
+    {
+      id: 'essentials',
+      title: { en: "Essentials", el: "Βασικά" },
+      items: {
+        en: [
+          "Free private parking",
+          "Free Wi-Fi throughout the property",
+          "Family rooms",
+          "Non-smoking rooms",
+          "Luggage storage",
+        ],
+        el: [
+          "Δωρεάν ιδιωτικό πάρκινγκ",
+          "Δωρεάν Wi-Fi σε όλο το κατάλυμα",
+          "Οικογενειακά δωμάτια",
+          "Δωμάτια μη καπνιστών",
+          "Αποθήκευση αποσκευών",
+        ],
+      },
+    },
+    {
+      id: 'comfort',
+      title: { en: "Comfort", el: "Άνεση" },
+      items: {
+        en: [
+          "Air conditioning",
+          "Heating",
+          "Fireplace",
+          "Seating area with sofa",
+          "Soundproofing",
+          "Flat-screen TV",
+        ],
+        el: [
+          "Κλιματισμός",
+          "Θέρμανση",
+          "Τζάκι",
+          "Καθιστικό με καναπέ",
+          "Ηχομόνωση",
+          "Τηλεόραση επίπεδης οθόνης",
+        ],
+      },
+    },
+    {
+      id: 'kitchen',
+      title: { en: "Kitchen", el: "Κουζίνα" },
+      items: {
+        en: [
+          "Fully equipped kitchen",
+          "Coffee/tea maker",
+          "Dining table",
+          "Washing machine",
+          "Dishwasher",
+          "Microwave",
+          "Refrigerator and oven",
+        ],
+        el: [
+          "Πλήρως εξοπλισμένη κουζίνα",
+          "Καφετιέρα/βραστήρας",
+          "Τραπεζαρία",
+          "Πλυντήριο ρούχων",
+          "Πλυντήριο πιάτων",
+          "Φούρνος μικροκυμάτων",
+          "Ψυγείο και φούρνος",
+        ],
+      },
+    },
+    {
+      id: 'bathroom',
+      title: { en: "Bathroom", el: "Μπάνιο" },
+      items: {
+        en: [
+          "Private bathroom",
+          "Bathtub",
+          "Towels and linens",
+          "Hair dryer",
+          "Free toiletries",
+        ],
+        el: [
+          "Ιδιωτικό μπάνιο",
+          "Μπανιέρα",
+          "Πετσέτες και λευκά είδη",
+          "Σεσουάρ",
+          "Δωρεάν προϊόντα περιποίησης",
+        ],
+      },
+    },
+    {
+      id: 'outdoor',
+      title: { en: "Outdoor & Views", el: "Εξωτερικοί χώροι & θέα" },
+      items: {
+        en: [
+          "Balcony",
+          "Terrace / sun terrace",
+          "Outdoor dining area",
+          "Sea, mountain, and city views",
+        ],
+        el: [
+          "Μπαλκόνι",
+          "Βεράντα / ηλιόλουστη βεράντα",
+          "Εξωτερική τραπεζαρία",
+          "Θέα σε θάλασσα, βουνό και πόλη",
+        ],
+      },
+    },
+    {
+      id: 'safety',
+      title: { en: "Safety", el: "Ασφάλεια" },
+      items: {
+        en: [
+          "Smoke detectors",
+          "Fire extinguishers",
+          "Safe",
+          "Key access",
+          "Iron",
+        ],
+        el: [
+          "Ανιχνευτές καπνού",
+          "Πυροσβεστήρες",
+          "Χρηματοκιβώτιο",
+          "Πρόσβαση με κλειδί",
+          "Σίδερο",
+        ],
+      },
+    },
+  ],
   amenities: {
     en: [
       'Free Wi-Fi',
@@ -74,8 +182,8 @@ export function getApartmentContent(locale: 'en' | 'el' = 'en') {
     name: data.name[locale],
     shortName: data.shortName[locale],
     description: data.description[locale],
-    highlights: data.highlights[locale],
     amenities: data.amenities[locale],
+    amenityGroups: data.amenityGroups.map((group) => ({ id: group.id, title: group.title[locale], items: group.items[locale] })),
     location: data.location
   };
 }

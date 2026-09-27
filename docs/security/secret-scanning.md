@@ -35,9 +35,13 @@ GITLEAKS_BIN=/absolute/protected/path/gitleaks npm run verify:release
 
 The gate independently verifies the extracted binary hash and exact version.
 It performs no network download. The only accepted current findings are
-versioned, location-exact synthetic test fixtures or documented placeholders.
-Adding, moving, or removing such a fixture requires an explicit reviewed
-allowlist diff; any other finding fails closed. Scanner reports exist only in a
+versioned, value-exact synthetic test fixtures or documented placeholders:
+each allowlist entry names the path, the rule and the SHA-256 of the matched
+value (`valueSha256`, never the value itself), one entry per occurrence. Editing
+a file around a fixture keeps it accepted; a different value at the same place
+is reported. Adding or removing a fixture, or changing its value, requires an
+explicit reviewed allowlist diff (the same entries are pinned in
+`scripts/lib/release-policy.mjs`); any other finding fails closed. Scanner reports exist only in a
 mode-`0700` operating-system temporary directory, are mode `0600`, and are
 deleted after redacted evaluation.
 

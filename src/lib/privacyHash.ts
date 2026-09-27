@@ -1,12 +1,10 @@
 import crypto from 'node:crypto';
 
+import { requirePepper } from '@/lib/pepper';
+
 export function privacyHmac(value: string, context: string): string {
-  const pepper = process.env.SECURITY_PEPPER;
-  if (process.env.NODE_ENV === 'production' && !pepper) {
-    throw new Error('SECURITY_PEPPER is required for privacy-preserving hashes');
-  }
   return crypto
-    .createHmac('sha256', pepper || 'development-only-privacy-hash-pepper')
+    .createHmac('sha256', requirePepper('SECURITY_PEPPER'))
     .update(`${context}\0${value}`)
     .digest('hex');
 }

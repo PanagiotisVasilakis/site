@@ -769,6 +769,14 @@ describe.sequential('refresh authorization generation regressions', () => {
         },
       },
     });
+    const theftSignals = await withTestPrismaClient(authTarget, (prisma) => prisma.securityAuditEvent.findMany({
+      where: { eventType: 'portal.refresh_token_replay' },
+      select: { severity: true, details: true },
+    }));
+    expect(theftSignals).toEqual([{
+      severity: 'high',
+      details: { reason: 'refresh_token_replay', familyId: expect.any(String) },
+    }]);
   });
 
   it.each([

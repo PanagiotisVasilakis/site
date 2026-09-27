@@ -9,11 +9,9 @@ const mocks = vi.hoisted(() => ({
   rateLimitTransaction: vi.fn(),
   stayRequestFindUnique: vi.fn(),
   stayRequestCreate: vi.fn(),
-  privacyRequestFindMany: vi.fn(),
   getFeatureFlagsAsync: vi.fn(),
   consumeBookingClaimGrant: vi.fn(),
   deliverOutboxEvent: vi.fn(),
-  createVerifiedErasureRequest: vi.fn(),
   getVerifiedGuestSessionFromCookies: vi.fn(),
   rotateRefreshToken: vi.fn(),
   logger: {
@@ -43,18 +41,11 @@ vi.mock('@/lib/prisma', () => ({
       findUnique: mocks.stayRequestFindUnique,
       create: mocks.stayRequestCreate,
     },
-    privacyRequest: {
-      findMany: mocks.privacyRequestFindMany,
-    },
   },
 }));
 
 vi.mock('@/lib/bookingOutbox', () => ({
   deliverOutboxEvent: mocks.deliverOutboxEvent,
-}));
-
-vi.mock('@/lib/privacyService', () => ({
-  createVerifiedErasureRequest: mocks.createVerifiedErasureRequest,
 }));
 
 vi.mock('@/lib/featureFlags', () => ({
@@ -91,7 +82,6 @@ vi.mock('@/lib/logger-enterprise', () => ({ logger: mocks.logger }));
 
 import { POST as adminLogin } from '@/app/api/admin/login/route';
 import { POST as createBookingRequest } from '@/app/api/booking-requests/route';
-import { POST as createErasureRequest } from '@/app/api/dsar/requests/route';
 import { POST as claimBooking } from '@/app/api/portal/claims/route';
 import { POST as refreshPortalSession } from '@/app/api/portal/refresh/route';
 
@@ -209,8 +199,8 @@ describe('missing client identity route boundary', () => {
         propertyName: 'D1A Test Property',
         locale: 'en',
         dateRange: {
-          from: '2030-06-01T12:00:00.000Z',
-          to: '2030-06-08T12:00:00.000Z',
+          from: '2030-06-01',
+          to: '2030-06-08',
         },
         guest: {
           firstName: 'D1A',
@@ -246,8 +236,8 @@ describe('missing client identity route boundary', () => {
         propertyName: 'A3 Test Property',
         locale: 'en',
         dateRange: {
-          from: '2030-06-01T12:00:00.000Z',
-          to: '2030-06-08T12:00:00.000Z',
+          from: '2030-06-01',
+          to: '2030-06-08',
         },
         guest: {
           firstName: 'A3',
@@ -312,26 +302,5 @@ describe('missing client identity route boundary', () => {
     ]);
     expect(mocks.rateLimitQuery).not.toHaveBeenCalled();
     expect(mocks.rotateRefreshToken).not.toHaveBeenCalled();
-  });
-
-  it('blocks a privacy mutation before limiter or erasure-request creation', async () => {
-    const response = await createErasureRequest(request('/api/dsar/requests', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        cookie: 'guest_session=privacy-session-sensitive-marker',
-      },
-      body: JSON.stringify({ type: 'ERASURE', confirm: true }),
-    }), { params: Promise.resolve({}) });
-
-    await expectGenericIdentityUnavailable(response, [
-      'privacy-erasure-request',
-      'privacy-user-sensitive-marker',
-      'privacy-booking-sensitive-marker',
-      'privacy-session-sensitive-marker',
-    ]);
-    expect(mocks.rateLimitQuery).not.toHaveBeenCalled();
-    expect(mocks.privacyRequestFindMany).not.toHaveBeenCalled();
-    expect(mocks.createVerifiedErasureRequest).not.toHaveBeenCalled();
   });
 });

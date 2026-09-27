@@ -1,4 +1,5 @@
 import type { LeafletMapLabels, LeafletMarkerData } from '@/components/LeafletMap';
+import { telHref } from '@/lib/contactLinks';
 
 export function escapeMapHtml(value: string): string {
   return value
@@ -7,10 +8,6 @@ export function escapeMapHtml(value: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
-}
-
-function phoneHref(phone: string): string {
-  return `tel:${phone.replace(/[^+0-9]/g, '')}`;
 }
 
 function popupLink(href: string | undefined, label: string): string {
@@ -24,7 +21,7 @@ export function buildBasePopupHtml(
 ): string {
   const phones = marker.phones?.length ? marker.phones : marker.phone ? [marker.phone] : [];
   const phoneHtml = phones.map((phone) => (
-    `<a class="map-popup-contact" href="${escapeMapHtml(phoneHref(phone))}">${escapeMapHtml(phone)}</a>`
+    `<a class="map-popup-contact" href="${escapeMapHtml(telHref(phone) ?? '')}">${escapeMapHtml(phone)}</a>`
   )).join('');
   const actionLinks = [
     popupLink(marker.directionsUrl, labels.directions),

@@ -137,4 +137,47 @@ describe.sequential('A3 layered rate limiting with live PostgreSQL', () => {
       await dropIsolatedDatabase(target);
     }
   });
+  it('refunds only the identifier dimension, never below zero, and keeps counting the client address', async () => {
+    const target = await createIsolatedDatabase(runtime, 'a3_identifier_refund');
+    try {
+      await applyMigrationsFromEmpty(target);
+      setApplicationEnvironment(target.databaseUrl);
+      await resetApplicationPrismaSingleton();
+
+      const [{ NextRequest }, limiterModule, privacyModule] = await Promise.all([
+        import('next/server'),
+        import('@/lib/sensitiveRateLimit'),
+        import('@/lib/privacyHash'),
+      ]);
+      const headers = {
+        'x-origin-verified-client-ip': '198.51.100.74',
+        'x-origin-proxy-attestation': process.env.ORIGIN_PROXY_SHARED_SECRET ?? '',
+      };
+      const options = { scope: 'a3-refund', identifier: '691 234 5678', limit: 3, windowMs: 60_000 };
+      const attempt = () => limiterModule.checkSensitiveRateLimit(
+        new NextRequest('http://integration.invalid/api/sensitive-refund', { headers }),
+        options,
+      );
+      const key = (dimension: string) => `sensitive:${privacyModule.privacyHmac(`a3-refund|${dimension}`, 'sensitive-rate-limit:v1')}`;
+      const count = (dimension: string) => withTestPrismaClient(target, async (prisma) => (
+        await prisma.rateLimit.findUnique({ where: { key: key(dimension) } })
+      )?.count);
+
+      for (let round = 1; round <= 3; round += 1) {
+        expect((await attempt()).allowed).toBe(true);
+        await limiterModule.refundSensitiveIdentifierAttempt({ scope: 'a3-refund', identifier: '+30 691 234 5678' });
+        expect(await count('identifier:+306912345678')).toBe(0);
+        expect(await count('ip:198.51.100.74')).toBe(round);
+      }
+
+      await limiterModule.refundSensitiveIdentifierAttempt({ scope: 'a3-refund', identifier: '6912345678' });
+      expect(await count('identifier:+306912345678')).toBe(0);
+
+      // Successful operations do not buy extra client-address budget.
+      expect((await attempt()).allowed).toBe(false);
+    } finally {
+      await resetApplicationPrismaSingleton();
+      await dropIsolatedDatabase(target);
+    }
+  });
 });

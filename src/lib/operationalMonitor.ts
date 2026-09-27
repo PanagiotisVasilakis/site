@@ -13,6 +13,10 @@ type RuleDefinition = {
   read: (windowMinutes: number) => Promise<number>;
 };
 
+// A privacy erasure cancels undelivered events by marking them DEAD with the
+// payload replaced by { redacted: true }; those are not delivery failures.
+const ERASURE_CANCELLED_OUTBOX = { status: 'DEAD' as const, payload: { path: ['redacted'], equals: true } };
+
 const RULES: RuleDefinition[] = [
   {
     name: 'Dead outbox events',
@@ -22,7 +26,13 @@ const RULES: RuleDefinition[] = [
     threshold: 0,
     windowMinutes: 5,
     severity: 'critical',
-    read: () => prisma.outboxEvent.count({ where: { status: 'DEAD' } }),
+    read: async () => {
+      const [dead, cancelled] = await prisma.$transaction([
+        prisma.outboxEvent.count({ where: { status: 'DEAD' } }),
+        prisma.outboxEvent.count({ where: ERASURE_CANCELLED_OUTBOX }),
+      ]);
+      return dead - cancelled;
+    },
   },
   {
     name: 'Stale pending outbox',
@@ -191,8 +201,7 @@ export async function evaluateOperationalAlerts(): Promise<{ opened: number; res
 export async function runRetention(): Promise<Record<string, number>> {
   const now = Date.now();
   const days = (value: number) => new Date(now - value * 86_400_000);
-  const analyticsDays = Math.max(1, Number.parseInt(process.env.ANALYTICS_RETENTION_DAYS || '30', 10));
-  const [rateLimits, sessions, tokens, families, grants, analyticsHits, analyticsVitals, securityEvents, metrics, logs, outbox, adminSessions] = await prisma.$transaction([
+  const [rateLimits, sessions, tokens, families, grants, securityEvents, outbox, deadOutbox, adminSessions] = await prisma.$transaction([
     prisma.rateLimit.deleteMany({ where: { resetTime: { lt: new Date() } } }),
     prisma.session.deleteMany({ where: { expiresAt: { lt: days(7) } } }),
     prisma.refreshToken.deleteMany({ where: { expiresAt: { lt: days(30) } } }),
@@ -203,12 +212,13 @@ export async function runRetention(): Promise<Record<string, number>> {
         OR: [{ consumedAt: { not: null } }, { revokedAt: { not: null } }],
       },
     }),
-    prisma.analyticsHit.deleteMany({ where: { occurredAt: { lt: days(analyticsDays) } } }),
-    prisma.analyticsVital.deleteMany({ where: { occurredAt: { lt: days(analyticsDays) } } }),
     prisma.securityAuditEvent.deleteMany({ where: { occurredAt: { lt: days(90) } } }),
-    prisma.metric.deleteMany({ where: { recordedAt: { lt: days(30) } } }),
-    prisma.log.deleteMany({ where: { timestamp: { lt: days(30) } } }),
     prisma.outboxEvent.deleteMany({ where: { status: 'DELIVERED', deliveredAt: { lt: days(30) } } }),
+    // Erasure-cancelled events at once; failed deliveries after 30 days (until
+    // then the admin can retry them, or close the stay request).
+    prisma.outboxEvent.deleteMany({
+      where: { OR: [ERASURE_CANCELLED_OUTBOX, { status: 'DEAD', updatedAt: { lt: days(30) } }] },
+    }),
     // Longer than claim-grant retention, so issued grants keep their admin-session link while they exist.
     prisma.adminSession.deleteMany({ where: { absoluteExpiresAt: { lt: days(90) } } }),
   ]);
@@ -218,12 +228,9 @@ export async function runRetention(): Promise<Record<string, number>> {
     tokens: tokens.count,
     families: families.count,
     grants: grants.count,
-    analyticsHits: analyticsHits.count,
-    analyticsVitals: analyticsVitals.count,
     securityEvents: securityEvents.count,
-    metrics: metrics.count,
-    logs: logs.count,
     outbox: outbox.count,
+    deadOutbox: deadOutbox.count,
     adminSessions: adminSessions.count,
   };
 }

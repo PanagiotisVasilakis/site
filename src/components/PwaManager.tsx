@@ -1,5 +1,6 @@
 "use client";
 import { useEffect } from 'react';
+import internalFetch from '@/lib/internalFetchClient';
 import { logger } from '@/lib/logger-client';
 
 export default function PwaManager() {
@@ -19,7 +20,18 @@ export default function PwaManager() {
     if ('serviceWorker' in navigator) {
       const registerServiceWorker = async () => {
         try {
-          const reg = await navigator.serviceWorker.register('/sw.js');
+          // Versioned script URL: every build installs a new worker (and cache).
+          let scriptUrl = '/sw.js';
+          try {
+            const res = await internalFetch('/version.json', { cache: 'no-store' });
+            if (res.ok) {
+              const meta = await res.json() as { version?: string; build?: string };
+              if (meta.version && meta.build) {
+                scriptUrl = `/sw.js?v=${encodeURIComponent(meta.version)}&build=${encodeURIComponent(meta.build)}`;
+              }
+            }
+          } catch { /* offline: keep the current registration's script */ }
+          const reg = await navigator.serviceWorker.register(scriptUrl);
           // Request current runtime version
           navigator.serviceWorker.controller?.postMessage({ type: 'REQUEST_VERSION' });
           const showBanner = () => {
@@ -68,7 +80,7 @@ export default function PwaManager() {
         const reg = await navigator.serviceWorker.getRegistration();
         const banner = document.getElementById('update-banner');
         const newV = banner?.getAttribute('data-new-version');
-        const newHash = banner?.getAttribute('data-new-hash-full');
+        const newBuild = banner?.getAttribute('data-new-build');
         if (reg?.waiting) {
           const activated = await new Promise<boolean>((resolve) => {
             let settled = false;
@@ -87,7 +99,7 @@ export default function PwaManager() {
           if (!activated) throw new Error('Timed out waiting for the updated service worker to activate');
         }
         if (newV) localStorage.setItem('app-version', newV);
-        if (newHash) localStorage.setItem('app-precache-hash', newHash);
+        if (newBuild) localStorage.setItem('app-build', newBuild);
         window.location.reload();
   } catch (err) { logger.error('Update reload handler failed', err instanceof Error ? err : { error: String(err) }); }
     }, { signal });
@@ -106,40 +118,37 @@ export default function PwaManager() {
     navigator.serviceWorker?.addEventListener('message', (e: MessageEvent) => {
       if (e.data?.type === 'RUNTIME_VERSION') {
         const meta = e.data.meta || {};
-        const newVersion = meta.version || meta.pkgVersion;
-        const newHash: string | undefined = meta.precacheHash;
+        const newVersion: string | undefined = meta.version;
+        const newBuild: string | undefined = meta.build;
         if (!newVersion) return;
         const storedVersion = localStorage.getItem('app-version');
-        const storedHash = localStorage.getItem('app-precache-hash');
-        const shortNewHash = newHash ? newHash.slice(0,8) : '';
+        const storedBuild = localStorage.getItem('app-build');
+        const shortNewBuild = newBuild ? newBuild.slice(0,8) : '';
         if (!storedVersion) {
           localStorage.setItem('app-version', newVersion);
-          if (newHash) localStorage.setItem('app-precache-hash', newHash);
+          if (newBuild) localStorage.setItem('app-build', newBuild);
           return;
         }
         const banner = document.getElementById('update-banner');
         const versionChanged = storedVersion !== newVersion;
-        const hashChanged = !!newHash && newHash !== storedHash;
-        if (banner && (versionChanged || hashChanged)) {
+        const buildChanged = !!newBuild && newBuild !== storedBuild;
+        if (banner && (versionChanged || buildChanged)) {
           const span = banner.querySelector('span');
           if (span) {
             const updateTpl = banner.getAttribute('data-t-update-fromto') || 'Update available: {old} → {new}';
             const assetsTpl = banner.getAttribute('data-t-assets-fromto') || 'Assets updated: {old} → {new}';
             if (versionChanged) {
               span.textContent = updateTpl.replace('{old}', storedVersion || '').replace('{new}', newVersion || '');
-            } else if (hashChanged) {
-              const oldShort = storedHash ? storedHash.slice(0,8) : '';
-              span.textContent = assetsTpl.replace('{old}', oldShort || 'old').replace('{new}', shortNewHash || '');
+            } else if (buildChanged) {
+              const oldShort = storedBuild ? storedBuild.slice(0,8) : '';
+              span.textContent = assetsTpl.replace('{old}', oldShort || 'old').replace('{new}', shortNewBuild || '');
             }
           }
           banner.setAttribute('data-old-version', storedVersion);
           banner.setAttribute('data-new-version', newVersion);
-          const updateKey = newHash ? `${newVersion}:${newHash}` : newVersion;
+          const updateKey = newBuild ? `${newVersion}:${newBuild}` : newVersion;
           banner.setAttribute('data-update-key', updateKey);
-          if (hashChanged && newHash) {
-            banner.setAttribute('data-new-hash', shortNewHash);
-            banner.setAttribute('data-new-hash-full', newHash);
-          }
+          if (buildChanged && newBuild) banner.setAttribute('data-new-build', newBuild);
           // If user previously dismissed this same new version, keep hidden.
           const dismissedUpdate = localStorage.getItem('update-dismissed-version');
           if (dismissedUpdate === updateKey) {

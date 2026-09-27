@@ -39,14 +39,14 @@ import { aboutTranslations } from './domains/about';
  * This maintains backward compatibility with existing code.
  */
 export type Dictionary = CommonDictionary & {
-  house?: HouseDictionary;
-  locationPanel?: LocationPanelDictionary;
-  booking?: BookingDictionary;
-  checkin?: CheckinDictionary;
-  checkinInfo?: CheckinInfoDictionary;
-  portal?: PortalDictionary;
-  contact?: ContactDictionary;
-  about?: AboutDictionary;
+  house: HouseDictionary;
+  locationPanel: LocationPanelDictionary;
+  booking: BookingDictionary;
+  checkin: CheckinDictionary;
+  checkinInfo: CheckinInfoDictionary;
+  portal: PortalDictionary;
+  contact: ContactDictionary;
+  about: AboutDictionary;
 };
 
 // ============================================================================

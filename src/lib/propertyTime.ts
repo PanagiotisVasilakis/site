@@ -1,4 +1,6 @@
-const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+// Zero-padded 24-hour HH:MM, the format <input type="time"> produces. Every
+// stored or requested property time must match it (wifiDisclosureWindow throws otherwise).
+export const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
 function timeZoneOffsetMs(instant: Date, timeZone: string): number {
   const parts = new Intl.DateTimeFormat('en-CA', {

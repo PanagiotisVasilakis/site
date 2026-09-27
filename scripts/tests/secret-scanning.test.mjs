@@ -58,6 +58,55 @@ test('synthetic high-entropy credential assignment fails', async () => {
   assert.ok(result.unexpected.every((finding) => finding.classification === 'secret-assignment'));
 });
 
+async function scanWithAllowlist(contents, allowlist) {
+  return withFixture(async (root) => {
+    await writeFile(path.join(root, 'fixture.env'), contents, { encoding: 'utf8', mode: 0o600 });
+    return scanPathForTest(root, { allowlist });
+  });
+}
+
+function reviewedDatabaseUrl(password) {
+  return ['postgresql', '://', 'fixture_operator', ':', password, '@', 'db.example.invalid', ':5432/fixture'].join('');
+}
+
+test('a reviewed fixture is identified by its value, so moving it keeps it accepted', async () => {
+  const line = `DATABASE_URL=${reviewedDatabaseUrl('Synthetic9Credential7Only')}\n`;
+  const [finding] = (await scanWithAllowlist(line, [])).unexpected;
+  const entry = { classification: 'synthetic-test-fixture', path: finding.path, rule: finding.rule, valueSha256: finding.valueSha256 };
+
+  const moved = await scanWithAllowlist(`# a comment above\n\n${line}`, [entry]);
+
+  assert.equal(finding.valueSha256.length, 64);
+  assert.deepEqual(moved.unexpected, []);
+  assert.deepEqual(moved.stale, []);
+  assert.equal(moved.accepted.length, 1);
+});
+
+test('a different value at the reviewed position is reported and the entry goes stale', async () => {
+  const reviewed = `DATABASE_URL=${reviewedDatabaseUrl('Synthetic9Credential7Only')}\n`;
+  const [finding] = (await scanWithAllowlist(reviewed, [])).unexpected;
+  const entry = { classification: 'synthetic-test-fixture', path: finding.path, rule: finding.rule, valueSha256: finding.valueSha256 };
+
+  const swapped = await scanWithAllowlist(`DATABASE_URL=${reviewedDatabaseUrl('Different8Value6Entirely')}\n`, [entry]);
+
+  assert.equal(swapped.unexpected.length, 1);
+  assert.equal(swapped.stale.length, 1);
+});
+
+test('each occurrence of a reviewed value needs its own entry', async () => {
+  const line = `DATABASE_URL=${reviewedDatabaseUrl('Synthetic9Credential7Only')}\n`;
+  const [finding] = (await scanWithAllowlist(line, [])).unexpected;
+  const entry = { classification: 'synthetic-test-fixture', path: finding.path, rule: finding.rule, valueSha256: finding.valueSha256 };
+
+  const once = await scanWithAllowlist(`${line}${line}`, [entry]);
+  const twice = await scanWithAllowlist(`${line}${line}`, [entry, { ...entry }]);
+
+  assert.equal(once.accepted.length, 1);
+  assert.equal(once.unexpected.length, 1);
+  assert.deepEqual(twice.unexpected, []);
+  assert.equal(twice.accepted.length, 2);
+});
+
 test('synthetic private key fails', async () => {
   const opening = ['-----BEGIN', ' PRIVATE KEY-----'].join('');
   const closing = ['-----END', ' PRIVATE KEY-----'].join('');

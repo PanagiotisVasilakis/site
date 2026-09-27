@@ -325,7 +325,6 @@
   background: rgba(255, 255, 255, 0.92);
   color: var(--fg-default);
   backdrop-filter: blur(8px) saturate(160%);
-  -webkit-backdrop-filter: blur(8px) saturate(160%);
   box-shadow: var(--shadow-float-soft);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-lg);

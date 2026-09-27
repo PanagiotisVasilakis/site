@@ -4,7 +4,11 @@ import { CheckInRequestStatus } from '@/generated/prisma/client';
 import { withErrorHandler, validateRequestBody, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import { isAdminRequest } from '@/lib/rbac';
-import { CheckInRequestNotFoundError, checkInRequestRepository } from '@/lib/prisma-repositories/checkInRequestRepository';
+import {
+  CheckInRequestAlreadyDecidedError,
+  CheckInRequestNotFoundError,
+  checkInRequestRepository,
+} from '@/lib/prisma-repositories/checkInRequestRepository';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +17,8 @@ const idSchema = z.string().uuid();
 const updateSchema = z.object({
   status: z.enum(['approved', 'rejected']),
 });
+const retrySchema = z.object({ action: z.literal('retry_delivery') }).strict();
+const bodySchema = z.union([retrySchema, updateSchema]);
 
 const statusMap: Record<z.infer<typeof updateSchema>['status'], CheckInRequestStatus> = {
   approved: CheckInRequestStatus.APPROVED,
@@ -27,16 +33,26 @@ export const PATCH = withErrorHandler(async (
   if (earlyResponse) return earlyResponse;
 
   if (!(await isAdminRequest(request))) {
-    throw new ApiError(ApiErrorCode.FORBIDDEN, 'Admin credentials required');
+    throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
   }
 
   const params = await context.params;
   const id = idSchema.parse(params.id);
-  const body = await validateRequestBody(updateSchema)(request);
-  const nextStatus = statusMap[body.status];
+  const body = await validateRequestBody(bodySchema)(request);
 
   const existing = await checkInRequestRepository.findById(id);
   if (!existing) throw new ApiError(ApiErrorCode.NOT_FOUND, 'Check-in request not found');
+
+  if ('action' in body) {
+    const retried = await checkInRequestRepository.retryFailedNotifications(id);
+    if (retried === 0) throw new ApiError(ApiErrorCode.CONFLICT, 'No failed notification is available to retry');
+    return createSuccessResponse({
+      request: { id: existing.id, status: existing.status.toLowerCase() },
+      notification: { status: 'queued' as const },
+    }, undefined, request.headers.get('x-correlation-id') ?? undefined);
+  }
+
+  const nextStatus = statusMap[body.status];
   if (existing.status === nextStatus) {
     return createSuccessResponse({
       request: { id: existing.id, status: existing.status.toLowerCase() },
@@ -50,6 +66,9 @@ export const PATCH = withErrorHandler(async (
   } catch (error) {
     if (error instanceof CheckInRequestNotFoundError) {
       throw new ApiError(ApiErrorCode.NOT_FOUND, 'Check-in request not found');
+    }
+    if (error instanceof CheckInRequestAlreadyDecidedError) {
+      throw new ApiError(ApiErrorCode.CONFLICT, 'Only pending requests can be approved or rejected');
     }
     throw error;
   }

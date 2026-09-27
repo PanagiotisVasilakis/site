@@ -1,89 +1,71 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "findings": [
-    {
-      "classification": "synthetic-release-fixture",
-      "path": ".env.example",
-      "rule": "credential-bearing-database-url",
-      "line": 5,
-      "column": 15
-    },
     {
       "classification": "synthetic-test-fixture",
       "path": "tests/integration/auth/portal-eligibility-consistency.test.ts",
       "rule": "generic-api-key",
-      "line": 29,
-      "column": 8
+      "valueSha256": "601428e918c818f9b37731838dd5300b569c2d1d0334417972f1ceaa4bfaf395"
     },
     {
       "classification": "synthetic-test-fixture",
       "path": "tests/security/client-identity-route-regression.test.ts",
       "rule": "generic-api-key",
-      "line": 149,
-      "column": 18
+      "valueSha256": "a03ebd66251f74c4f8568f4eb752b9d7bf9f626905e54d8baab71821f4e7fe08"
     },
     {
       "classification": "synthetic-test-fixture",
       "path": "tests/security/client-identity.test.ts",
       "rule": "generic-api-key",
-      "line": 12,
-      "column": 10
+      "valueSha256": "a03ebd66251f74c4f8568f4eb752b9d7bf9f626905e54d8baab71821f4e7fe08"
     },
     {
       "classification": "synthetic-test-fixture",
       "path": "tests/security/portal-auth-client-identity.test.ts",
       "rule": "generic-api-key",
-      "line": 32,
-      "column": 18
+      "valueSha256": "a03ebd66251f74c4f8568f4eb752b9d7bf9f626905e54d8baab71821f4e7fe08"
     },
     {
       "classification": "synthetic-test-fixture",
       "path": "tests/security/security-boundaries.test.ts",
       "rule": "generic-api-key",
-      "line": 33,
-      "column": 6
+      "valueSha256": "a03ebd66251f74c4f8568f4eb752b9d7bf9f626905e54d8baab71821f4e7fe08"
     },
     {
       "classification": "synthetic-test-fixture",
       "path": "tests/security/security-boundaries.test.ts",
       "rule": "generic-api-key",
-      "line": 215,
-      "column": 10
+      "valueSha256": "a03ebd66251f74c4f8568f4eb752b9d7bf9f626905e54d8baab71821f4e7fe08"
     },
     {
       "classification": "synthetic-release-fixture",
       "path": "scripts/lib/release-gates.mjs",
       "rule": "credential-bearing-database-url",
-      "line": 29,
-      "column": 19
+      "valueSha256": "b3cc0475bb78a5026098858e9889acf666d31062d513d303314eca31d36e72f2"
     },
     {
       "classification": "synthetic-release-fixture",
       "path": "scripts/lib/release-gates.mjs",
       "rule": "credential-bearing-database-url",
-      "line": 30,
-      "column": 17
+      "valueSha256": "b3cc0475bb78a5026098858e9889acf666d31062d513d303314eca31d36e72f2"
     },
     {
       "classification": "synthetic-release-fixture",
       "path": "scripts/lib/release-policy.mjs",
       "rule": "credential-bearing-database-url",
-      "line": 40,
-      "column": 19
+      "valueSha256": "b3cc0475bb78a5026098858e9889acf666d31062d513d303314eca31d36e72f2"
     },
     {
       "classification": "synthetic-release-fixture",
       "path": "scripts/lib/release-policy.mjs",
       "rule": "credential-bearing-database-url",
-      "line": 41,
-      "column": 17
+      "valueSha256": "b3cc0475bb78a5026098858e9889acf666d31062d513d303314eca31d36e72f2"
     },
     {
       "classification": "synthetic-test-fixture",
       "path": "tests/unit/integration-database-safety.test.ts",
       "rule": "credential-bearing-database-url",
-      "line": 228,
-      "column": 28
+      "valueSha256": "9af99f4fb48256293bb5aedf463b7ced38e91093450b9c648396df4a00ee3b66"
     }
   ]
 }

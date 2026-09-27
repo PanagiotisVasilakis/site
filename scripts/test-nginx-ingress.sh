@@ -126,8 +126,15 @@ if ! grep -Fq 'HTTP/1.1 429 Too Many Requests' <<<"$rate_output"; then
   exit 1
 fi
 
-if rg -n '172\.30\.(?:240|241)\.' "$REPO_ROOT/deploy/nginx/includes" "$REPO_ROOT/deploy/nginx/nginx.conf.template"; then
+# grep exits 0 on a match, 1 on none and 2 on an error; only 1 passes.
+network_scan=0
+grep -rEn '172\.30\.(240|241)\.' "$REPO_ROOT/deploy/nginx/includes" "$REPO_ROOT/deploy/nginx/nginx.conf.template" || network_scan=$?
+if (( network_scan == 0 )); then
   echo 'Production Nginx artifacts contain a test network.' >&2
+  exit 1
+fi
+if (( network_scan != 1 )); then
+  echo 'Could not scan the production Nginx artifacts for test networks.' >&2
   exit 1
 fi
 

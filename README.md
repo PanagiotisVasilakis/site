@@ -9,7 +9,7 @@ Localized Next.js guest guide, booking-request site, and authenticated guest che
 - Guest access: an administrator issues a short-lived, one-time booking claim token. The guest claims the booking with a phone number and password; later sign-ins use those credentials.
 - Sessions: short-lived guest/admin cookies, server-side session records, rotating refresh-token families, absolute expiry, logout revocation, and replay detection.
 - Check-in requests: persisted with transactional outbox notifications for creation and status changes.
-- Operations: database-backed analytics, Web Vitals, security audit events, alert rules, privacy requests/holds, retention, and retry workers.
+- Operations: database-backed security audit events, alert rules, privacy requests/holds, retention, and retry workers.
 
 Legacy phone plus surname/document verification is intentionally not part of the supported authentication flow.
 
@@ -20,10 +20,10 @@ Use Node 22.19 and npm 11.18, then:
 ```bash
 npm ci
 npm run ensure-pepper
-npm run system:up -- --profile development --skip-build
+npm run system:up
 ```
 
-The development orchestrator validates the environment, provisions a local PostgreSQL fallback when needed, applies migrations, starts the app, and verifies readiness plus a localized page. See [scripts/README.md](scripts/README.md) for the complete runbook.
+`ensure-pepper` writes the local `.env.local` (docker-compose `DATABASE_URL` and development secrets), so no manual copy of `.env.example` is needed. The development orchestrator validates the environment, provisions a local PostgreSQL fallback when needed, applies migrations, starts the app, and verifies readiness plus a localized page. See [scripts/README.md](scripts/README.md) for the complete runbook.
 
 ## Release verification
 
@@ -35,14 +35,14 @@ This repository-owned command is the mandatory local gate for a commit that may 
 
 ## Operations
 
-The systemd installer creates the app service plus two timers:
+Production runs one immutable Docker image on the VPS behind the host Nginx (see the [deployment target](docs/architecture/deployment-target.md)); the host orchestrator is a local development helper only. The production workers are:
 
-- a one-minute leased outbox drain for booking and check-in webhooks;
-- a five-minute operational alert and retention run.
+- a one-minute leased outbox drain for booking and check-in webhooks (`npm run outbox:drain`);
+- a five-minute operational alert and retention run (`npm run operations:check`).
 
-Production startup never loads `.env.local`, never provisions a Docker fallback database, and requires an explicit trusted-proxy topology. Secrets belong in the deployment secret store or the root-owned systemd environment file.
+Production startup never loads `.env.local` and requires an explicit trusted-proxy topology. Secrets are injected at runtime from root-owned VPS configuration.
 
-The production container runs as a non-root user. Its build requires an HTTPS `NEXT_PUBLIC_SITE_URL` because Next.js compiles canonical URLs and the sitemap into the output. Build it with `NEXT_PUBLIC_SITE_URL=https://your-host.example npm run docker:build`.
+Production runs as non-root containers built from `docker/Dockerfile.security`. `NEXT_PUBLIC_SITE_URL=https://your-host.example npm run docker:build` builds three images of one commit (`scripts/docker-build.sh`): the web runtime `villa-app:<first 12 hex of the commit>`, the workers `…-workers` (both operational workers bundled by `scripts/build-workers.mjs`, no checkout or `node_modules` inside) and `…-migrate` (the Prisma CLI from its own lockfile in `docker/migrate/`, plus this commit's migrations). The tag carries `-dirty` when the working tree has uncommitted changes; the HTTPS site URL is required because Next.js compiles canonical URLs and the sitemap into the output, and the commit is recorded in `public/version.json` and the `org.opencontainers.image.revision` label.
 
 ## Documentation
 
@@ -55,4 +55,3 @@ The production container runs as a non-root user. Its build requires an HTTPS `N
 - [Setup and runtime](scripts/README.md)
 - [Testing strategy](docs/testing.md)
 - [Secret handling and incident response](SECURITY.md)
-- Runtime OpenAPI UI: `/api/docs`

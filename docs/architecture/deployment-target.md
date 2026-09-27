@@ -158,16 +158,9 @@ centrally enforced pre-merge protection.
 Acceptance of this ADR is not evidence that the target is deployable. These
 blockers were re-checked against the repository on 2026-09-24 and remain open:
 
-- `docker/docker-compose.prod.yml` defines only PostgreSQL; it does not define
-  the application, worker execution, or an immutable image reference.
-- `docker/Dockerfile.security` contains the standalone web runtime but not the
-  outbox, operations, or migration runtimes required by this decision.
-- the production systemd units execute the web process and workers from the
-  host repository with `node`, `npm`, and `tsx`, instead of an immutable release
-  artifact;
-- `scripts/system-orchestrator.sh` can install development dependencies, build,
-  migrate, and start production from the host checkout;
-- the current image build and scan commands default to `villa-app:latest`;
+- the Compose worker schedule (`scripts/README.md`, "Worker schedule") is a
+  documented host-timer example; the installed timers, their single-flight
+  locks and journald visibility on the VPS still require recorded evidence;
 - the versioned reverse-proxy and trusted-ingress contract exist, but live
   Netcup firewall, Cloudflare Full (strict), AOP, and certificate evidence is
   still required;

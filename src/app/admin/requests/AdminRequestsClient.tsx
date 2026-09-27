@@ -19,6 +19,7 @@ type CheckInRequest = {
   requestedTime: string;
   message?: string;
   status: RequestStatus;
+  notificationStatus?: 'pending' | 'leased' | 'delivered' | 'dead' | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -74,6 +75,9 @@ export default function AdminRequestsClient() {
   const [summary, setSummary] = useState<Summary>(emptySummary);
   const [filter, setFilter] = useState<RequestFilter>('pending');
   const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const loadVersionRef = useRef(0);
@@ -97,6 +101,7 @@ export default function AdminRequestsClient() {
       if (!response.ok || !data?.success) {
         setRequests([]);
         setSummary(emptySummary);
+        setNextCursor(null);
         setFeedback({
           type: 'error',
           message: data?.error?.message || 'Unable to load arrival requests',
@@ -104,13 +109,17 @@ export default function AdminRequestsClient() {
         return;
       }
 
-      setRequests(data.data?.requests ?? []);
+      const loaded: CheckInRequest[] = data.data?.requests ?? [];
+      setRequests(loaded);
       setSummary(data.data?.summary ?? emptySummary);
+      setTotal(data.data?.total ?? loaded.length);
+      setNextCursor(data.data?.nextCursor ?? null);
     } catch (error) {
       if (controller.signal.aborted || version !== loadVersionRef.current) return;
       console.error('Failed to load arrival requests', error);
       setRequests([]);
       setSummary(emptySummary);
+      setNextCursor(null);
       setFeedback({ type: 'error', message: 'Unable to load arrival requests' });
     } finally {
       if (version === loadVersionRef.current) {
@@ -135,10 +144,65 @@ export default function AdminRequestsClient() {
     ['Total', summary.total],
   ]), [summary]);
 
+  const loadMore = async () => {
+    if (!nextCursor) return;
+    const version = loadVersionRef.current;
+    setLoadingMore(true);
+    try {
+      const response = await internalFetch(
+        `/api/admin/check-in-requests?status=${filterRef.current}&cursor=${encodeURIComponent(nextCursor)}`,
+      );
+      const data = await response.json().catch(() => null);
+      if (version !== loadVersionRef.current) return;
+      if (!response.ok || !data?.success) {
+        setFeedback({ type: 'error', message: data?.error?.message || 'Unable to load more requests' });
+        return;
+      }
+      const more: CheckInRequest[] = data.data?.requests ?? [];
+      setRequests((current) => {
+        const known = new Set(current.map((request) => request.id));
+        return [...current, ...more.filter((request) => !known.has(request.id))];
+      });
+      setSummary(data.data?.summary ?? emptySummary);
+      setTotal(data.data?.total ?? 0);
+      setNextCursor(data.data?.nextCursor ?? null);
+    } catch (error) {
+      if (version !== loadVersionRef.current) return;
+      console.error('Failed to load more arrival requests', error);
+      setFeedback({ type: 'error', message: 'Unable to load more requests' });
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const changeFilter = (nextFilter: RequestFilter) => {
     filterRef.current = nextFilter;
     setFilter(nextFilter);
     void loadRequests(nextFilter);
+  };
+
+  const retryNotification = async (requestId: string) => {
+    setActionId(requestId);
+    setFeedback(null);
+    try {
+      const response = await internalFetch(`/api/admin/check-in-requests/${requestId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'retry_delivery' }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) {
+        setFeedback({ type: 'error', message: data?.error?.message || 'Unable to retry the notification' });
+        return;
+      }
+      await loadRequests(filterRef.current, false);
+      setFeedback({ type: 'success', message: 'Notification queued for delivery.' });
+    } catch (error) {
+      console.error('Failed to retry notification', error);
+      setFeedback({ type: 'error', message: 'Unable to retry the notification' });
+    } finally {
+      setActionId(null);
+    }
   };
 
   const updateRequestStatus = async (requestId: string, status: Exclude<RequestStatus, 'pending'>) => {
@@ -267,6 +331,9 @@ export default function AdminRequestsClient() {
                         <Badge variant={request.status}>
                           {request.status}
                         </Badge>
+                        {request.notificationStatus === 'dead' && (
+                          <Badge variant="rejected">Notification failed</Badge>
+                        )}
                       </div>
                       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
                         <div>
@@ -307,6 +374,17 @@ export default function AdminRequestsClient() {
                     </div>
                   </div>
 
+                  {request.notificationStatus === 'dead' && (
+                    <button
+                      type="button"
+                      onClick={() => retryNotification(request.id)}
+                      disabled={isActing}
+                      className="admin-action-outline lg:w-56"
+                    >
+                      {isActing ? 'Updating...' : 'Retry notification'}
+                    </button>
+                  )}
+
                   {isPending && (
                     <div className="grid gap-2 sm:grid-cols-2 lg:w-56 lg:grid-cols-1">
                       <button
@@ -333,6 +411,17 @@ export default function AdminRequestsClient() {
           })
         )}
       </section>
+
+      {!loading && requests.length > 0 && (
+        <div className="mt-6 flex flex-col items-center gap-3">
+          <p className="text-sm text-body" role="status">Showing {requests.length} of {total}</p>
+          {nextCursor && (
+            <button type="button" onClick={() => void loadMore()} disabled={loadingMore} className="admin-action-outline">
+              {loadingMore ? 'Loading...' : 'Load more'}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

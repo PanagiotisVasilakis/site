@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  // `next dev` would otherwise rewrite the tracked CLAUDE.md/AGENTS.md on every start.
+  agentRules: false,
+  poweredByHeader: false,
   outputFileTracingIncludes: {
     '/*': [
       './node_modules/sharp/**/*',

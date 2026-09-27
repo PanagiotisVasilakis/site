@@ -4,30 +4,12 @@ import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { ApartmentPhotoWithAlt } from '@/types/apartment';
+import type { HouseDictionary } from '@/i18n/domains/house';
 
 
 
 type AltMap = Partial<Record<ApartmentPhotoWithAlt['altKey'], string>> | undefined;
-type LightboxLabels = {
-  title?: string;
-  instructions?: string;
-  counter?: string;
-  prev?: string;
-  next?: string;
-  close?: string;
-  resetZoom?: string;
-  thumbnail?: string;
-};
-const DEFAULT_LIGHTBOX_LABELS: Required<LightboxLabels> = {
-  title: 'Photo viewer',
-  instructions: 'Photo viewer controls: Use arrow keys to navigate between images, Home/End keys to jump to first/last image, Escape to close viewer.',
-  counter: 'Currently viewing image {current} of {total}.',
-  prev: 'Previous image',
-  next: 'Next image',
-  close: 'Close viewer',
-  resetZoom: 'Reset Zoom',
-  thumbnail: 'View image {current} of {total}',
-};
+type LightboxLabels = HouseDictionary['photoViewer'];
 
 const FOCUSABLE_SELECTOR = [
   'a[href]',
@@ -48,7 +30,7 @@ interface Props {
   photos: ApartmentPhotoWithAlt[];
   alts: AltMap;
   locale?: string;
-  labels?: LightboxLabels;
+  labels: LightboxLabels;
 }
 
 const variants = {
@@ -103,16 +85,7 @@ export default function ApartmentGalleryLightbox({ photos, alts, locale = 'en', 
 
 
 
-  const resolvedLabels = useMemo(() => ({
-    title: labels?.title ?? (locale === 'el' ? 'Προβολή φωτογραφιών' : DEFAULT_LIGHTBOX_LABELS.title),
-    instructions: labels?.instructions ?? DEFAULT_LIGHTBOX_LABELS.instructions,
-    counter: labels?.counter ?? DEFAULT_LIGHTBOX_LABELS.counter,
-    prev: labels?.prev ?? DEFAULT_LIGHTBOX_LABELS.prev,
-    next: labels?.next ?? DEFAULT_LIGHTBOX_LABELS.next,
-    close: labels?.close ?? DEFAULT_LIGHTBOX_LABELS.close,
-    resetZoom: labels?.resetZoom ?? (locale === 'el' ? 'Επαναφορά ζουμ' : DEFAULT_LIGHTBOX_LABELS.resetZoom),
-    thumbnail: labels?.thumbnail ?? (locale === 'el' ? 'Προβολή εικόνας {current} από {total}' : DEFAULT_LIGHTBOX_LABELS.thumbnail),
-  }), [labels, locale]);
+  const resolvedLabels = labels;
 
   const counterDisplay = `${numberFormatter.format(index + 1)}/${numberFormatter.format(total)}`;
 
