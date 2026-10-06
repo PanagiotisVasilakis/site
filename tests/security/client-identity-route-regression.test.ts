@@ -7,11 +7,9 @@ const mocks = vi.hoisted(() => ({
   signAdmin: vi.fn(),
   rateLimitQuery: vi.fn(),
   rateLimitTransaction: vi.fn(),
-  stayRequestFindUnique: vi.fn(),
-  stayRequestCreate: vi.fn(),
+  securityAuditEventCreate: vi.fn(),
   getFeatureFlagsAsync: vi.fn(),
   consumeBookingClaimGrant: vi.fn(),
-  deliverOutboxEvent: vi.fn(),
   getVerifiedGuestSessionFromCookies: vi.fn(),
   rotateRefreshToken: vi.fn(),
   logger: {
@@ -37,15 +35,8 @@ vi.mock('@/lib/auth/admin', () => ({
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     $transaction: mocks.rateLimitTransaction,
-    stayRequest: {
-      findUnique: mocks.stayRequestFindUnique,
-      create: mocks.stayRequestCreate,
-    },
+    securityAuditEvent: { create: mocks.securityAuditEventCreate },
   },
-}));
-
-vi.mock('@/lib/bookingOutbox', () => ({
-  deliverOutboxEvent: mocks.deliverOutboxEvent,
 }));
 
 vi.mock('@/lib/featureFlags', () => ({
@@ -81,11 +72,13 @@ vi.mock('@/lib/guestSession', () => ({
 vi.mock('@/lib/logger-enterprise', () => ({ logger: mocks.logger }));
 
 import { POST as adminLogin } from '@/app/api/admin/login/route';
-import { POST as createBookingRequest } from '@/app/api/booking-requests/route';
+import { POST as reportClientError } from '@/app/api/errors/route';
 import { POST as claimBooking } from '@/app/api/portal/claims/route';
 import { POST as refreshPortalSession } from '@/app/api/portal/refresh/route';
+import { POST as reportCspViolation } from '@/app/api/security/csp-report/route';
 
 const ATTACKER_IP = '203.0.113.195';
+const REPORT_MARKER = 'd1a-report-sensitive-marker';
 
 function request(
   path: string,
@@ -98,6 +91,39 @@ function request(
   headers.set('forwarded', `for=${ATTACKER_IP};proto=https`);
   return new NextRequest(`https://guest.example${path}`, { ...init, headers });
 }
+
+// Unauthenticated public writes: each stores a security_audit_events row only
+// after its per-address and global limiter calls.
+const publicReportWrites = [
+  {
+    scope: 'client-error-report',
+    send: (headers: Record<string, string> = {}) => reportClientError(request('/api/errors', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...headers },
+      body: JSON.stringify({
+        error: { name: 'Error', message: REPORT_MARKER },
+        context: {
+          url: `https://guest.example/en/${REPORT_MARKER}`,
+          timestamp: new Date().toISOString(),
+        },
+      }),
+    }), { params: Promise.resolve({}) }),
+  },
+  {
+    scope: 'csp-report',
+    send: (headers: Record<string, string> = {}) => reportCspViolation(request('/api/security/csp-report', {
+      method: 'POST',
+      headers: { 'content-type': 'application/csp-report', ...headers },
+      body: JSON.stringify({
+        'csp-report': {
+          'document-uri': `https://guest.example/en/${REPORT_MARKER}`,
+          'violated-directive': 'script-src-elem',
+          'blocked-uri': `https://cdn.example/${REPORT_MARKER}.js`,
+        },
+      }),
+    })),
+  },
+] as const;
 
 async function expectGenericIdentityUnavailable(
   response: Response,
@@ -139,13 +165,16 @@ describe('missing client identity route boundary', () => {
     vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2');
     vi.stubEnv('SECURITY_PEPPER', 'a3-route-test-security-pepper-only');
     vi.stubEnv('ADMIN_DASH_SECRET', SYNTHETIC_ADMIN_DASH_CREDENTIAL);
-    vi.stubEnv('BOOKING_REQUEST_WEBHOOK_URL', 'https://hooks.example/booking');
+    // Keeps the CSP audit write reachable (it is skipped without a URL); Prisma is mocked.
+    vi.stubEnv('DATABASE_URL', 'postgresql://user:pass@127.0.0.1:1/db');
     mocks.rateLimitQuery.mockResolvedValue([{
       count: 1,
       reset_time: new Date(Date.now() + 60_000),
     }]);
     mocks.rateLimitTransaction.mockImplementation(async (callback) => callback({
       $queryRaw: mocks.rateLimitQuery,
+      $executeRawUnsafe: vi.fn(),
+      securityAuditEvent: { create: mocks.securityAuditEventCreate },
     }));
     mocks.getVerifiedGuestSessionFromCookies.mockResolvedValue({
       user: { id: 'privacy-user-sensitive-marker' },
@@ -186,75 +215,41 @@ describe('missing client identity route boundary', () => {
     expect(mocks.signAdmin).not.toHaveBeenCalled();
   });
 
-  it('blocks a public booking write before limiter, domain, or outbox mutation', async () => {
-    const idempotencyKey = 'd1a-booking-key-0001';
-    const email = 'd1a-private-guest@example.test';
-    const response = await createBookingRequest(request('/api/booking-requests', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'idempotency-key': idempotencyKey,
-      },
-      body: JSON.stringify({
-        propertyName: 'D1A Test Property',
-        locale: 'en',
-        dateRange: {
-          from: '2030-06-01',
-          to: '2030-06-08',
-        },
-        guest: {
-          firstName: 'D1A',
-          lastName: 'Private',
-          email,
-          phone: '+12025550123',
-        },
-      }),
-    }));
+  it.each(publicReportWrites)('blocks a public $scope write before either limiter call or audit persistence', async ({ scope, send }) => {
+    const response = await send();
 
-    await expectGenericIdentityUnavailable(response, [
-      'booking-request',
-      idempotencyKey,
-      email,
-    ]);
+    await expectGenericIdentityUnavailable(response, [scope, REPORT_MARKER]);
+    expect(mocks.rateLimitTransaction).not.toHaveBeenCalled();
     expect(mocks.rateLimitQuery).not.toHaveBeenCalled();
-    expect(mocks.stayRequestFindUnique).not.toHaveBeenCalled();
-    expect(mocks.stayRequestCreate).not.toHaveBeenCalled();
-    expect(mocks.deliverOutboxEvent).not.toHaveBeenCalled();
+    expect(mocks.securityAuditEventCreate).not.toHaveBeenCalled();
   });
 
-  it('returns generic 503 and leaves domain state untouched when PostgreSQL limiter fails', async () => {
+  it.each(publicReportWrites)('keeps $scope zero-write behavior when private identity has an invalid attestation', async ({ scope, send }) => {
+    const response = await send({
+      'x-origin-verified-client-ip': '203.0.113.10',
+      'x-origin-proxy-attestation': 'fedcba9876543210'.repeat(4),
+    });
+
+    await expectGenericIdentityUnavailable(response, [scope, REPORT_MARKER, '203.0.113.10']);
+    expect(mocks.rateLimitTransaction).not.toHaveBeenCalled();
+    expect(mocks.rateLimitQuery).not.toHaveBeenCalled();
+    expect(mocks.securityAuditEventCreate).not.toHaveBeenCalled();
+  });
+
+  it.each(publicReportWrites)('returns generic 503 without an audit write when the PostgreSQL limiter fails ($scope)', async ({ send }) => {
     mocks.rateLimitQuery.mockRejectedValue(new Error('synthetic database diagnostics'));
-    const response = await createBookingRequest(request('/api/booking-requests', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'idempotency-key': 'a3-booking-key-000001',
-        'x-origin-verified-client-ip': '198.51.100.73',
-        'x-origin-proxy-attestation': process.env.ORIGIN_PROXY_SHARED_SECRET ?? '',
-      },
-      body: JSON.stringify({
-        propertyName: 'A3 Test Property',
-        locale: 'en',
-        dateRange: {
-          from: '2030-06-01',
-          to: '2030-06-08',
-        },
-        guest: {
-          firstName: 'A3',
-          lastName: 'Failure',
-          email: 'a3-limiter-failure@example.test',
-          phone: '+12025550124',
-        },
-      }),
-    }));
+    const response = await send({
+      'x-origin-verified-client-ip': '198.51.100.73',
+      'x-origin-proxy-attestation': process.env.ORIGIN_PROXY_SHARED_SECRET ?? '',
+    });
 
     expect(response.status).toBe(503);
     expect(response.headers.get('retry-after')).toBeNull();
-    expect(await response.text()).toMatch(/temporarily unavailable/i);
+    const body = await response.text();
+    expect(body).toMatch(/temporarily unavailable/i);
+    expect(body).not.toContain('synthetic database diagnostics');
     expect(mocks.rateLimitTransaction).toHaveBeenCalledOnce();
-    expect(mocks.stayRequestFindUnique).not.toHaveBeenCalled();
-    expect(mocks.stayRequestCreate).not.toHaveBeenCalled();
-    expect(mocks.deliverOutboxEvent).not.toHaveBeenCalled();
+    expect(mocks.securityAuditEventCreate).not.toHaveBeenCalled();
   });
 
   it('blocks a claim before grant, ownership, audit, or credential mutation', async () => {

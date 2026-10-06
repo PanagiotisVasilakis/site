@@ -1,4 +1,4 @@
-FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS builder
+FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS builder
 
 ARG NEXT_PUBLIC_SITE_URL
 # The release commit: public/version.json and the service-worker cache name derive their build id from it.
@@ -6,6 +6,8 @@ ARG GIT_COMMIT
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
 ENV GIT_COMMIT=${GIT_COMMIT}
+# Inlined into the client bundle so stored client error reports name the bundle's build.
+ENV NEXT_PUBLIC_BUILD_VERSION=${GIT_COMMIT}
 # The browser is only needed by the optional local audit scripts, never by the image.
 ENV PUPPETEER_SKIP_DOWNLOAD=1
 WORKDIR /app
@@ -17,14 +19,14 @@ RUN npm install --global npm@11.18.0
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
 COPY prisma.config.ts ./
-RUN npm ci --audit=false --fund=false && npm cache clean --force
+RUN npm ci --strict-allow-scripts --audit=false --fund=false && npm cache clean --force
 COPY . .
 RUN npm run build
 RUN npm run build:workers
 
 # Outbox and operations workers: two self-contained bundles, no checkout, no node_modules.
 # Run one per invocation from the production Compose file (services `outbox` and `operations`).
-FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS workers
+FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS workers
 
 ARG GIT_COMMIT
 
@@ -56,7 +58,7 @@ CMD ["node", "dist/workers/drain-outbox.mjs"]
 # Prisma migrate deploy, run once per release. The CLI is installed from its own lockfile
 # (docker/migrate/, pinned to the application's Prisma version) together with the committed
 # schema and migrations of this build.
-FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS migrate
+FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS migrate
 
 ARG GIT_COMMIT
 
@@ -81,7 +83,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 # Install, drop the package managers and fix ownership/modes in one layer (a later chown/chmod
 # would copy every file into another layer).
 RUN npm install --global npm@11.18.0 \
-  && npm ci --omit=dev --audit=false --fund=false \
+  && npm ci --omit=dev --strict-allow-scripts --audit=false --fund=false \
   && npm cache clean --force \
   && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn-* \
   && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /usr/local/bin/yarn /usr/local/bin/yarnpkg \
@@ -95,14 +97,14 @@ STOPSIGNAL SIGTERM
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 CMD ["node", "node_modules/prisma/build/index.js", "migrate", "deploy"]
 
-FROM node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2 AS runner
+FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS runner
 
 ARG NEXT_PUBLIC_SITE_URL
 ARG GIT_COMMIT
 
 LABEL org.opencontainers.image.title="QR City Guest Guide" \
       org.opencontainers.image.revision="${GIT_COMMIT}" \
-      org.opencontainers.image.description="Guest guide and booking request application" \
+      org.opencontainers.image.description="Guest guide and check-in portal application" \
       org.opencontainers.image.version="0.1.1" \
       org.opencontainers.image.licenses="UNLICENSED"
 

@@ -12,7 +12,7 @@
  *
  * Optional env vars:
  * - RESPONSIVE_BASE_URL=http://localhost:3000
- * - RESPONSIVE_PATHS=/en,/el,/en/guest?mode=signin,/en/book
+ * - RESPONSIVE_PATHS=/en,/el,/en/guest?mode=signin,/en/availability
  * - RESPONSIVE_VIEWPORTS=phone-360x640,desktop-1366x768
  * - RESPONSIVE_CHROME_PATH=/usr/bin/google-chrome
  * - RESPONSIVE_UX_FAIL_ON_ISSUES=1
@@ -103,6 +103,40 @@ const WAIT_IDLE_TIMEOUT_MS = 12000;
 const SHOULD_CAPTURE_SCREENSHOTS = process.env.RESPONSIVE_SCREENSHOTS !== '0';
 const FAIL_ON_ISSUES = process.env.RESPONSIVE_UX_FAIL_ON_ISSUES === '1';
 const CHROME_PATH = process.env.RESPONSIVE_CHROME_PATH || process.env.CHROME_PATH;
+// Local only (same as audit-vitals.ts): dead proxy for every other host, host resolver limited to localhost,
+// and every request that is not to this machine is aborted (map tiles and other third parties never load).
+const LOCAL_ONLY_ARGS = [
+  '--proxy-server=http://127.0.0.1:9',
+  '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1',
+];
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
+
+function isLocalUrl(url: string) {
+  if (/^(data|blob|about):/.test(url)) return true;
+  try {
+    return LOOPBACK_HOSTS.has(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** Aborts every request of the page that is not to this machine; logs each blocked host once. */
+async function blockNonLocalRequests(page: Page, blockedHosts: Set<string>) {
+  // With request interception on, navigations the service worker answers come back without a response;
+  // the audit checks rendered pages, not offline behaviour, so the service worker is bypassed.
+  await page.setBypassServiceWorker(true);
+  await page.setRequestInterception(true);
+  page.on('request', (request) => {
+    if (isLocalUrl(request.url())) {
+      void request.continue();
+      return;
+    }
+    const host = URL.canParse(request.url()) ? new URL(request.url()).host : 'an unparsable URL';
+    if (!blockedHosts.has(host)) console.log(`[responsive-ux] blocked non-loopback request to ${host}`);
+    blockedHosts.add(host);
+    void request.abort();
+  });
+}
 
 const VIEWPORTS: ViewportPreset[] = [
   {
@@ -202,7 +236,7 @@ const DEFAULT_ROUTES: RouteTarget[] = [
   { id: 'home-el', path: '/el', journey: 'home-discovery', locale: 'el' },
   { id: 'guest-signin-en', path: '/en/guest?mode=signin', journey: 'guest-auth', locale: 'en' },
   { id: 'guest-signup-en', path: '/en/guest?mode=signup', journey: 'guest-auth', locale: 'en' },
-  { id: 'booking-en', path: '/en/book', journey: 'booking-flow', locale: 'en' },
+  { id: 'availability-en', path: '/en/availability', journey: 'booking-flow', locale: 'en' },
   { id: 'check-in-en', path: '/en/check-in', journey: 'check-in-flow', locale: 'en' },
   { id: 'apartment-en', path: '/en/apartment', journey: 'property-details', locale: 'en' },
   { id: 'favorites-en', path: '/en/favorites', journey: 'favorites', locale: 'en' },
@@ -581,6 +615,9 @@ async function collectMetrics(page: Page): Promise<ViewMetrics> {
 }
 
 async function runAudit() {
+  if (!LOOPBACK_HOSTS.has(new URL(DEFAULT_BASE_URL).hostname)) {
+    throw new Error(`RESPONSIVE_BASE_URL must be a loopback URL (got ${new URL(DEFAULT_BASE_URL).hostname})`);
+  }
   const runStarted = Date.now();
   const timestamp = toTimestampSafe();
   const outputDir = path.join(process.cwd(), 'reports', 'responsive-ux');
@@ -605,7 +642,7 @@ async function runAudit() {
     browser = await puppeteer.launch({
       headless: true,
       executablePath: CHROME_PATH,
-      args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
+      args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', ...LOCAL_ONLY_ARGS],
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -662,10 +699,12 @@ async function runAudit() {
   }
 
   const cells: AuditCell[] = [];
+  const blockedHosts = new Set<string>();
 
   try {
     for (const viewport of viewports) {
       const page = await browser.newPage();
+      await blockNonLocalRequests(page, blockedHosts);
       await page.setViewport({
         width: viewport.width,
         height: viewport.height,

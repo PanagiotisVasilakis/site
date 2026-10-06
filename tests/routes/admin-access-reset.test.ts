@@ -53,7 +53,7 @@ describe('admin guest access reset route', () => {
 
   it.each([
     ['BOOKING_NOT_CLAIMED', 'use Issue claim'],
-    ['BOOKING_NOT_IN_ACCESS_WINDOW', '7 days before check-in'],
+    ['BOOKING_NOT_IN_ACCESS_WINDOW', '7 days before check-in until the check-out date (UTC calendar dates)'],
   ] as const)('answers 409 with guidance for %s', async (code, guidance) => {
     mocks.resetGuestAccess.mockRejectedValue(new PortalAuthError(code));
 

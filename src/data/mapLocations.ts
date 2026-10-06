@@ -1,6 +1,7 @@
 import type { Locale } from '@/i18n/config';
 import { normalizeLocale } from '@/i18n/config';
 import { dedupeById } from '@/lib/collections';
+import { pickLocale } from '@/lib/localize';
 import { getApartmentContent } from '@/data/apartmentData';
 import { HOST_CONTACT } from '@/data/contact';
 
@@ -33,11 +34,12 @@ export interface MapLocation {
   website?: string;
   directionsUrl?: string;
   coordinates: MapCoordinates;
-  category: string;
   markerType: MapMarkerType;
   href?: string;
-  rating?: number;
-  sourceUrls?: string[];
+  /** The place's number in the guide's map list (identity §8 MapCard); set only when numbering is asked for. */
+  number?: number;
+  /** A pre-formatted popup meta line, e.g. "Museum · 1.5 km" (identity §8 MapCard popup). */
+  meta?: string;
 }
 
 export interface CategoryMapItem {
@@ -58,8 +60,6 @@ export interface CategoryMapItem {
   phones?: string[];
   website?: string;
   directionsUrl?: string;
-  sourceUrls?: string[];
-  rating?: number;
   tags?: string[];
   location?: { lat: number; lng: number };
   slug?: string;
@@ -68,6 +68,7 @@ export interface CategoryMapItem {
 export interface MapContentItem {
   item: CategoryMapItem;
   categorySlug: string;
+  meta?: string;
 }
 
 interface LocalizedMapText {
@@ -81,7 +82,6 @@ interface KalamataLandmarkDefinition {
   description: LocalizedMapText;
   address: LocalizedMapText;
   coordinates: MapCoordinates;
-  category: 'landmarks';
   markerType: MapMarkerType;
   sourceUrls: string[];
 }
@@ -100,7 +100,6 @@ const KALAMATA_LANDMARKS: readonly KalamataLandmarkDefinition[] = [
     },
     address: { en: 'Almyros, Verga, Kalamata', el: 'Αλμυρός, Βέργα, Καλαμάτα' },
     coordinates: [22.155378, 36.99795],
-    category: 'landmarks',
     markerType: 'beach',
     sourceUrls: [
       'https://visit-kalamata.gr/en/almyrosen/',
@@ -116,7 +115,6 @@ const KALAMATA_LANDMARKS: readonly KalamataLandmarkDefinition[] = [
     },
     address: { en: 'Kordia Beach, Kalamata', el: 'Παραλία Κορδίας, Καλαμάτα' },
     coordinates: [22.0894, 37.027],
-    category: 'landmarks',
     markerType: 'beach',
     sourceUrls: [
       'https://www.blueflag.gr/el/beach/dytiki-kalamata-paralia-kordia',
@@ -132,7 +130,6 @@ const KALAMATA_LANDMARKS: readonly KalamataLandmarkDefinition[] = [
     },
     address: { en: 'Vasileos Georgiou Square, Kalamata', el: 'Πλατεία Βασιλέως Γεωργίου, Καλαμάτα' },
     coordinates: [22.1110293, 37.0381278],
-    category: 'landmarks',
     markerType: 'city-center',
     sourceUrls: [
       'https://kalamata.gr/el/component/gmapfp/308:plateia-georgiou?view=gmapfp',
@@ -148,7 +145,6 @@ const KALAMATA_LANDMARKS: readonly KalamataLandmarkDefinition[] = [
     },
     address: { en: '23rd of March Square, Kalamata', el: 'Πλατεία 23ης Μαρτίου, Καλαμάτα' },
     coordinates: [22.1131936, 37.0429578],
-    category: 'landmarks',
     markerType: 'sightseeing',
     sourceUrls: [
       'https://greece.terrabook.com/el/messinia/page/plateia-23-martiou/',
@@ -164,7 +160,6 @@ const KALAMATA_LANDMARKS: readonly KalamataLandmarkDefinition[] = [
     },
     address: { en: '150 Athinon Avenue, Kalamata', el: 'Αθηνών 150, Καλαμάτα' },
     coordinates: [22.0958081, 37.0416033],
-    category: 'landmarks',
     markerType: 'church',
     sourceUrls: [
       'https://kalamata.gr/el/component/gmapfp/420:2014-01-13-09-09-51?view=gmapfp',
@@ -179,7 +174,6 @@ const KALAMATA_LANDMARKS: readonly KalamataLandmarkDefinition[] = [
     },
     address: { en: 'Athinon Avenue, Kalamata', el: 'Λεωφόρος Αθηνών, Καλαμάτα' },
     coordinates: [22.0911789, 37.0433823],
-    category: 'landmarks',
     markerType: 'shop',
     sourceUrls: [
       'https://www.sklavenitis.gr/about/katastimata/',
@@ -197,7 +191,7 @@ function getDirectionsUrl(coordinates: MapCoordinates): string {
   return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
 }
 
-export function getKalamataLandmarks(locale: Locale = 'en'): MapLocation[] {
+export function getKalamataLandmarks(locale: Locale): MapLocation[] {
   return KALAMATA_LANDMARKS.map((landmark) => ({
     id: landmark.id,
     name: localizedText(landmark.name, locale),
@@ -205,20 +199,8 @@ export function getKalamataLandmarks(locale: Locale = 'en'): MapLocation[] {
     address: localizedText(landmark.address, locale),
     directionsUrl: getDirectionsUrl(landmark.coordinates),
     coordinates: landmark.coordinates,
-    category: landmark.category,
     markerType: landmark.markerType,
-    sourceUrls: [...landmark.sourceUrls],
   }));
-}
-
-function pickLocalized(item: CategoryMapItem, key: 'name' | 'summary' | 'description' | 'address', locale: Locale): string | undefined {
-  const localized = item[`${key}_${locale}` as keyof CategoryMapItem];
-  const english = item[`${key}_en` as keyof CategoryMapItem];
-  const base = item[key];
-  if (typeof localized === 'string' && localized.trim()) return localized;
-  if (typeof base === 'string' && base.trim()) return base;
-  if (typeof english === 'string' && english.trim()) return english;
-  return undefined;
 }
 
 function markerTypeForItem(item: CategoryMapItem, categorySlug: string): MapMarkerType {
@@ -242,7 +224,7 @@ function markerTypeForItem(item: CategoryMapItem, categorySlug: string): MapMark
 }
 
 export function getApartmentMapLocation(
-  locale: Locale = 'en',
+  locale: Locale,
 ): MapLocation & { address: string; phone: string; directionsUrl: string } {
   const apartment = getApartmentContent(locale);
   const address = locale === 'el'
@@ -257,14 +239,12 @@ export function getApartmentMapLocation(
     phone: HOST_CONTACT.phone,
     directionsUrl: 'https://maps.app.goo.gl/wW1Lnh14k3psKGAm9',
     coordinates: APARTMENT_LOCATION,
-    category: 'apartment',
     markerType: 'apartment',
   };
 }
 
 function createMapLocationFromItem(
-  item: CategoryMapItem,
-  categorySlug: string,
+  { item, categorySlug, meta }: MapContentItem,
   locale: Locale | string
 ): MapLocation | null {
   if (!item.location || typeof item.location.lat !== 'number' || typeof item.location.lng !== 'number') {
@@ -272,9 +252,9 @@ function createMapLocationFromItem(
   }
 
   const eff: Locale = normalizeLocale(locale);
-  const name = pickLocalized(item, 'name', eff) ?? item.name;
-  const description = pickLocalized(item, 'summary', eff) ?? pickLocalized(item, 'description', eff);
-  const address = pickLocalized(item, 'address', eff);
+  const name = pickLocale(item, 'name', eff) ?? item.name;
+  const description = pickLocale(item, 'summary', eff) ?? pickLocale(item, 'description', eff);
+  const address = pickLocale(item, 'address', eff);
   const phones = item.phones?.length ? item.phones : item.phone ? [item.phone] : undefined;
 
   return {
@@ -287,33 +267,32 @@ function createMapLocationFromItem(
     website: item.website,
     directionsUrl: item.directionsUrl ?? getDirectionsUrl([item.location.lng, item.location.lat]),
     coordinates: [item.location.lng, item.location.lat],
-    category: categorySlug,
     markerType: markerTypeForItem(item, categorySlug),
-    rating: item.rating,
     href: `/${eff}/${categorySlug}/${item.slug || item.id}`,
-    sourceUrls: item.sourceUrls,
+    meta,
   };
 }
 
-function dedupeMapLocations(locations: MapLocation[]): MapLocation[] {
-  return dedupeById(locations);
-}
-
+/**
+ * The apartment, the curated landmarks and the content items that have coordinates. With `numbered`,
+ * the content items are numbered 1…n in the given order, so the map pins match the guide's list.
+ */
 export function getKalamataMapLocations(
   locale: Locale,
   contentItems: readonly MapContentItem[] = [],
-  options: { includeApartment?: boolean; includeLandmarks?: boolean } = {}
+  { numbered = false }: { numbered?: boolean } = {},
 ): MapLocation[] {
-  const { includeApartment = true, includeLandmarks = true } = options;
-  const locations: MapLocation[] = [];
+  const locations: MapLocation[] = [getApartmentMapLocation(locale)];
 
-  if (includeApartment) locations.push(getApartmentMapLocation(locale));
-  if (includeLandmarks) locations.push(...getKalamataLandmarks(locale));
+  locations.push(...getKalamataLandmarks(locale));
 
-  contentItems.forEach(({ item, categorySlug }) => {
-    const location = createMapLocationFromItem(item, categorySlug, locale);
-    if (location) locations.push(location);
+  let count = 0;
+  contentItems.forEach((contentItem) => {
+    const location = createMapLocationFromItem(contentItem, locale);
+    if (!location) return;
+    count += 1;
+    locations.push(numbered ? { ...location, number: count } : location);
   });
 
-  return dedupeMapLocations(locations);
+  return dedupeById(locations);
 }

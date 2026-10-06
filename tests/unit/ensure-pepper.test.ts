@@ -58,4 +58,47 @@ describe('ensure-pepper local environment bootstrap', () => {
     expect(fs.readFileSync('.runtime/ensure-pepper-test/.env.local', 'utf8')).toBe(first);
     expect(output).toContain('no action taken');
   });
+
+  it('generates SECURITY_PEPPER when the existing line is empty', () => {
+    fs.writeFileSync('.runtime/ensure-pepper-test/.env.local', 'SECURITY_PEPPER=\n');
+
+    const output = run();
+
+    expect(fs.readFileSync('.runtime/ensure-pepper-test/.env.local', 'utf8')).toMatch(/^SECURITY_PEPPER=[0-9a-f]{64}$/m);
+    expect(output).toContain('Generated SECURITY_PEPPER');
+  });
+
+  it('generates SECURITY_PEPPER when the empty line is followed by other lines', () => {
+    fs.writeFileSync('.runtime/ensure-pepper-test/.env.local', 'SECURITY_PEPPER=\nFOO=bar\n');
+
+    const output = run();
+
+    expect(fs.readFileSync('.runtime/ensure-pepper-test/.env.local', 'utf8')).toMatch(/^SECURITY_PEPPER=[0-9a-f]{64}$/m);
+    expect(output).toContain('Generated SECURITY_PEPPER');
+  });
+
+  it('generates DATABASE_URL, CLAIM_TOKEN_PEPPER and ORIGIN_PROXY_SHARED_SECRET when empty lines are followed by other lines', () => {
+    fs.writeFileSync(
+      '.runtime/ensure-pepper-test/.env.local',
+      'DATABASE_URL=\nCLAIM_TOKEN_PEPPER=\nORIGIN_PROXY_SHARED_SECRET=\nFOO=bar\n',
+    );
+
+    run();
+
+    const env = fs.readFileSync('.runtime/ensure-pepper-test/.env.local', 'utf8');
+    expect(env).toMatch(/^DATABASE_URL=postgresql:\/\/devuser:devpass@localhost:5433\/site_dev$/m);
+    expect(env).toMatch(/^CLAIM_TOKEN_PEPPER=[0-9a-f]{64}$/m);
+    expect(env).toMatch(/^ORIGIN_PROXY_SHARED_SECRET=[0-9a-f]{64}$/m);
+  });
+
+  it('keeps a non-empty SECURITY_PEPPER', () => {
+    fs.writeFileSync('.runtime/ensure-pepper-test/.env.local', 'SECURITY_PEPPER=abc\n');
+
+    const output = run();
+
+    const env = fs.readFileSync('.runtime/ensure-pepper-test/.env.local', 'utf8');
+    expect(env.match(/^SECURITY_PEPPER=/gm)).toHaveLength(1);
+    expect(env).toMatch(/^SECURITY_PEPPER=abc$/m);
+    expect(output).not.toContain('Generated SECURITY_PEPPER');
+  });
 });

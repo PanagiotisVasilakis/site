@@ -1,12 +1,12 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { withErrorHandler, validateRequestBody, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
-import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import { GUEST_SESSION_COOKIE, parseGuestSession, verifyGuestSessionAccess, type GuestSessionPayload } from '@/lib/guestSession';
 import { guestStore } from '@/lib/guestDataStore';
 import { checkInRequestRepository, type CheckInRequestRecord } from '@/lib/prisma-repositories/checkInRequestRepository';
 import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 import { timePattern } from '@/lib/propertyTime';
+import { createPortalBookingEligibilityWindow } from '@/lib/portalBookingEligibility';
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -64,20 +64,26 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }
 
-  const guard = createAPISecurityMiddleware();
-  const early = await guard(request);
-  if (early) return early;
-
   const session = await getVerifiedSession(request);
-  const parseBody = validateRequestBody(requestSchema);
+  const parseBody = validateRequestBody(requestSchema, 4 * 1_024);
   const body = await parseBody(request);
   const message = body.message?.trim() || undefined;
+
+  // Allowed up to and including the check-in date (UTC calendar dates, as in portalBookingEligibility).
+  const { prisma } = await import('@/lib/prisma');
+  const booking = session.booking?.id
+    ? await prisma.booking.findUnique({ where: { id: session.booking.id }, select: { startDate: true } })
+    : null;
+  const { businessToday } = createPortalBookingEligibilityWindow(new Date());
+  if (!booking || booking.startDate.getTime() < businessToday.getTime()) {
+    throw new ApiError(ApiErrorCode.CONFLICT, 'Arrival time requests are closed once the stay has started');
+  }
+
   const user = session.user?.id ? await guestStore.findUserById(session.user.id) : undefined;
 
   const created = await checkInRequestRepository.create({
     bookingId: safeUuid(session.booking?.id),
     userId: safeUuid(session.user?.id),
-    guestEmail: user?.email ?? undefined,
     guestPhone: user?.phoneE164,
     requestedTime: body.requestedTime,
     message,

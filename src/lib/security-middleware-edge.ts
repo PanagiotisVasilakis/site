@@ -13,6 +13,7 @@ import {
 import { logSecurityDiagnostic } from '@/lib/security-monitoring';
 import { getClientIp } from '@/lib/net/getClientIp';
 import { isSameOriginRequest } from '@/lib/net/sameOrigin';
+import { locales } from '@/i18n/config';
 
 const DIRECT_HEALTH_PROBE_PATHS = new Set([
   '/api/health/live',
@@ -23,25 +24,22 @@ class SecurityHeadersMiddleware {
   private readonly config = getSecurityConfig();
 
   public handle(request: NextRequest): NextResponse {
-    const response = NextResponse.next();
     const nonce = generateNonce();
-
-    this.applySecurityHeaders(response);
-    this.applyCspHeaders(response, nonce);
+    const csp = this.buildCsp(nonce);
 
     const requestHeaders = new Headers(request.headers);
-    const csp = response.headers.get('Content-Security-Policy')
-      || response.headers.get('Content-Security-Policy-Report-Only');
-    if (csp) {
-      requestHeaders.set('Content-Security-Policy', csp);
+    if (csp.value) {
+      requestHeaders.set('Content-Security-Policy', csp.value);
     }
     requestHeaders.set('x-nonce', nonce);
-    const localeMatch = request.nextUrl.pathname.match(/^\/(en|el)(?:\/|$)/);
-    requestHeaders.set('x-locale', localeMatch?.[1] ?? 'en');
+    const { pathname } = request.nextUrl;
+    const pathLocale = locales.find((l) => pathname === `/${l}` || pathname.startsWith(`/${l}/`));
+    requestHeaders.set('x-locale', pathLocale ?? 'en');
 
-    const forwarded = NextResponse.next({ request: { headers: requestHeaders } });
-    response.headers.forEach((value, key) => forwarded.headers.set(key, value));
-    return forwarded;
+    const response = NextResponse.next({ request: { headers: requestHeaders } });
+    this.applySecurityHeaders(response);
+    response.headers.set(csp.headerName, csp.value);
+    return response;
   }
 
   private applySecurityHeaders(response: NextResponse): void {
@@ -73,13 +71,12 @@ class SecurityHeadersMiddleware {
     securityHeaders['Cross-Origin-Opener-Policy'] = headers.crossOriginOpenerPolicy;
     securityHeaders['Cross-Origin-Resource-Policy'] = headers.crossOriginResourcePolicy;
     securityHeaders['X-DNS-Prefetch-Control'] = 'on';
-    securityHeaders['X-Download-Options'] = 'noopen';
     securityHeaders['X-Permitted-Cross-Domain-Policies'] = 'none';
 
     return securityHeaders;
   }
 
-  private applyCspHeaders(response: NextResponse, nonce: string): void {
+  private buildCsp(nonce: string): { headerName: string; value: string } {
     let csp = buildCSPDirective(
       this.config.csp.directives,
       this.config.csp.useNonce ? nonce : undefined,
@@ -90,7 +87,7 @@ class SecurityHeadersMiddleware {
     }
 
     const headerName = this.config.csp.reportOnly ? 'Content-Security-Policy-Report-Only' : 'Content-Security-Policy';
-    response.headers.set(headerName, csp);
+    return { headerName, value: csp };
   }
 
 }

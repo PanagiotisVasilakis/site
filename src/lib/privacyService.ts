@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { Prisma } from '@/generated/prisma/client';
+import type { PrivacyRequest } from '@/generated/prisma/client';
 
 import { prisma } from '@/lib/prisma';
 
@@ -18,6 +19,21 @@ export async function eraseGuestByAdmin(userId: string, auditNote: string) {
   return completeErasureRequest(request.id, auditNote);
 }
 
+/**
+ * Erase one guest for automatic retention, only if every booking of the guest still
+ * ended before `bookingsEndedBefore`. The predicate is re-checked inside the erasure
+ * transaction, so a booking claimed after the caller selected the guest keeps the
+ * account. Returns false (nothing erased) when the predicate no longer holds or the
+ * guest is already gone; otherwise it is the same audited erasure as eraseGuestByAdmin.
+ */
+export async function eraseGuestForRetention(userId: string, auditNote: string, bookingsEndedBefore: Date) {
+  const subject = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+  if (!subject) return false;
+  const { request, created } = await createVerifiedErasureRequest(userId, auditNote);
+  const completed = await completeErasureRequest(request.id, auditNote, { bookingsEndedBefore, createdRequest: created });
+  return completed !== null;
+}
+
 async function createVerifiedErasureRequest(userId: string, auditNote: string) {
   const existing = await prisma.privacyRequest.findFirst({
     where: {
@@ -27,7 +43,7 @@ async function createVerifiedErasureRequest(userId: string, auditNote: string) {
     },
     orderBy: { requestedAt: 'desc' },
   });
-  if (existing) return { request: existing, created: false };
+  if (existing) return { request: await ensureVerified(existing, auditNote), created: false };
 
   try {
     const request = await prisma.privacyRequest.create({
@@ -47,13 +63,36 @@ async function createVerifiedErasureRequest(userId: string, auditNote: string) {
         where: { userId, requestType: 'ERASURE', status: { in: ['PENDING', 'VERIFIED'] } },
         orderBy: { requestedAt: 'desc' },
       });
-      if (raced) return { request: raced, created: false };
+      if (raced) return { request: await ensureVerified(raced, auditNote), created: false };
     }
     throw error;
   }
 }
 
-async function completeErasureRequest(requestId: string, auditNote: string) {
+// The application writes only VERIFIED erasure requests; a PENDING row is legacy
+// data from the removed self-service flow. The admin has verified the guest, so
+// upgrade it instead of letting completion refuse it. The upgrade is guarded on
+// the row still being PENDING so a stale read cannot overwrite a request that a
+// concurrent call already completed; completion re-reads the row in its
+// transaction and decides from the current status.
+async function ensureVerified<T extends { id: string; status: string }>(request: T, auditNote: string) {
+  if (request.status !== 'PENDING') return request;
+  await prisma.privacyRequest.updateMany({
+    where: { id: request.id, status: 'PENDING' },
+    data: { status: 'VERIFIED', auditNote: auditNote.slice(0, 1_024) },
+  });
+  return request;
+}
+
+type RetentionGuard = { bookingsEndedBefore: Date; createdRequest: boolean };
+
+async function completeErasureRequest(requestId: string, auditNote: string): Promise<PrivacyRequest>;
+async function completeErasureRequest(
+  requestId: string,
+  auditNote: string,
+  guard: RetentionGuard,
+): Promise<PrivacyRequest | null>;
+async function completeErasureRequest(requestId: string, auditNote: string, guard?: RetentionGuard) {
   return prisma.$transaction(async (tx) => {
     const request = await tx.privacyRequest.findUnique({ where: { id: requestId } });
     if (!request || request.requestType !== 'ERASURE') throw new Error('ERASURE_REQUEST_NOT_FOUND');
@@ -64,11 +103,18 @@ async function completeErasureRequest(requestId: string, auditNote: string) {
       where: { id: request.userId },
       select: {
         id: true,
-        email: true,
-        phoneE164: true,
-        bookings: { select: { id: true } },
+        bookings: { select: { id: true, endDate: true } },
       },
     });
+    if (guard) {
+      const stillExpired = user !== null && user.bookings.length > 0
+        && user.bookings.every((booking) => booking.endDate < guard.bookingsEndedBefore);
+      if (!stillExpired) {
+        // Skipped: drop the request this call created so no VERIFIED request is left behind.
+        if (guard.createdRequest) await tx.privacyRequest.delete({ where: { id: request.id } });
+        return null;
+      }
+    }
     if (!user) throw new Error('ERASURE_SUBJECT_NOT_FOUND');
 
     const bookingIds = user.bookings.map((booking) => booking.id);
@@ -83,61 +129,20 @@ async function completeErasureRequest(requestId: string, auditNote: string) {
       select: { id: true },
     });
     const checkInRequestIds = checkInRequests.map((entry) => entry.id);
-    const stayRequestFilters = [
-      ...(user.email ? [{ email: user.email }] : []),
-      { phone: user.phoneE164 },
-    ];
-    const stayRequests = await tx.stayRequest.findMany({
-      where: { OR: stayRequestFilters },
-      select: { id: true },
-    });
-    const stayRequestIds = stayRequests.map((entry) => entry.id);
-    if (checkInRequestIds.length || stayRequestIds.length) {
+    if (checkInRequestIds.length) {
       const activeDeliveries = await tx.outboxEvent.count({
         where: {
           status: 'LEASED',
           leaseExpiresAt: { gt: new Date() },
-          OR: [
-            ...(checkInRequestIds.length ? [{ checkInRequestId: { in: checkInRequestIds } }] : []),
-            ...(stayRequestIds.length ? [{ stayRequestId: { in: stayRequestIds } }] : []),
-          ],
+          checkInRequestId: { in: checkInRequestIds },
         },
       });
       if (activeDeliveries > 0) throw new Error('ERASURE_BLOCKED_BY_ACTIVE_DELIVERY');
-    }
-    if (checkInRequestIds.length) {
       await tx.outboxEvent.updateMany({
         where: {
           checkInRequestId: { in: checkInRequestIds },
           status: { in: ['PENDING', 'LEASED'] },
         },
-        data: {
-          payload: { redacted: true, reason: 'privacy_erasure' },
-          status: 'DEAD',
-          leaseOwner: null,
-          leaseExpiresAt: null,
-          lastError: 'Delivery cancelled because the data subject was erased.',
-        },
-      });
-    }
-
-    for (const stayRequest of stayRequests) {
-      const suffix = stayRequest.id.replace(/-/g, '').slice(0, 20);
-      await tx.stayRequest.update({
-        where: { id: stayRequest.id },
-        data: {
-          firstName: 'Erased',
-          lastName: 'Subject',
-          email: `erased+${suffix}@invalid.local`,
-          phone: '+999000000000',
-          arrivalTime: null,
-          specialRequests: null,
-          // Its undelivered events are cancelled below; nothing is left to deliver.
-          status: 'CLOSED',
-        },
-      });
-      await tx.outboxEvent.updateMany({
-        where: { stayRequestId: stayRequest.id, status: { in: ['PENDING', 'LEASED'] } },
         data: {
           payload: { redacted: true, reason: 'privacy_erasure' },
           status: 'DEAD',
@@ -157,12 +162,15 @@ async function completeErasureRequest(requestId: string, auditNote: string) {
         where: { bookingId: { in: bookingIds }, revokedAt: null },
         data: { revokedAt: new Date() },
       });
+      // R-195 decision (a): externalReference is kept on erasure. It is the host's own
+      // platform reservation code (bookkeeping link to the Airbnb reservation, GDPR Art. 17(3)(b))
+      // and identifies no one by itself once userId is cleared. Tax retention period still to be
+      // confirmed by the accountant. Option (b), keeping TermsAcceptance, was NOT done: it is still
+      // deleted with the user via onDelete: Cascade.
       await tx.booking.updateMany({
         where: { id: { in: bookingIds } },
         data: {
           userId: null,
-          reference: null,
-          externalReference: null,
           accessStatus: 'PENDING',
           claimedAt: null,
         },

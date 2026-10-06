@@ -6,9 +6,11 @@ async function main() {
   process.stdout.write(`${JSON.stringify({ worker: 'outbox', ...result, at: new Date().toISOString() })}\n`);
 }
 
-// Close the pool explicitly: with PRISMA_AUTO_DISCONNECT=false (.env.example)
-// the idle pg connections would keep the process alive for up to 300 s.
+// Close the pool explicitly: this is what lets the run exit, since idle pg
+// connections would otherwise keep the process alive for up to 300 s.
 async function disconnect() {
+  // No client was created: src/lib/prisma.ts only builds one when DATABASE_URL is set.
+  if (!process.env.DATABASE_URL) return;
   try {
     await prisma.$disconnect();
   } catch (error) {

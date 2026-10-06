@@ -27,10 +27,13 @@ state. They rely on the edge/proxy layers, safe caching, and bounded queries.
   and guest authentication, claims, security-relevant refresh context,
   sensitive public writes, and privacy/security writes. Keys use the verified
   ingress identity and context-separated HMACs; raw credentials are never key
-  material. All dimensions are updated in one transaction. A successful guest
-  sign-in gives back its phone-number attempt (`refundSensitiveIdentifierAttempt`),
-  so only failed attempts count against an account; the client-address
-  dimension keeps counting every attempt.
+  material. The client-address dimension keys an IPv4 client (including an
+  IPv4-mapped IPv6 address) by its full address and an IPv6 client by its /64
+  network, because one subscriber normally controls a whole /64; only the
+  limiter groups addresses this way. All dimensions are updated in one
+  transaction. A successful guest sign-in gives back its phone-number attempt
+  (`refundSensitiveIdentifierAttempt`), so only failed attempts count against
+  an account; the client-address dimension keeps counting every attempt.
 
 Confirmed PostgreSQL saturation returns a generic `429`. A PostgreSQL limiter
 failure rolls back all limiter dimensions, returns a generic `503`, and must
@@ -48,9 +51,10 @@ public reads.
 
 Administrator login has no anonymous, globally enforcing bucket. Until named
 administrator identities exist, the authoritative budget is the privacy-HMAC
-key of the verified source: five attempts in a fixed fifteen-minute window.
-Saturating source A does not consume source B's budget, while A's sixth attempt
-is still denied.
+key of the verified source (the full IPv4 address, or the IPv6 /64, see above):
+five attempts in a fixed fifteen-minute window. Saturating source A does not
+consume source B's budget unless both are IPv6 addresses in one /64, while A's
+sixth attempt is still denied.
 
 Public forwarding headers cannot select that source; the limiter requires the
 private canonical IP and a valid proxy attestation. Credentials and

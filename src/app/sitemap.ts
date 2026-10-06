@@ -4,14 +4,15 @@ import { getItemsByCategory, toSlug } from '@/lib/data';
 import { siteUrl } from '@/lib/site';
 import { locales } from '@/i18n/config';
 
+// Only the indexable public pages: the noindex sections (robots.ts) are left out. No lastModified:
+// the content is static data with no per-page update date, and a build date would claim changes.
 export default function sitemap(): MetadataRoute.Sitemap {
 	const urls: MetadataRoute.Sitemap = [];
 	for (const locale of locales) {
 		urls.push({ url: `${siteUrl}/${locale}`, changeFrequency: 'weekly', priority: 0.8 });
-		urls.push({ url: `${siteUrl}/${locale}/book`, changeFrequency: 'weekly', priority: 0.7 });
+		urls.push({ url: `${siteUrl}/${locale}/availability`, changeFrequency: 'weekly', priority: 0.8 });
 		urls.push({ url: `${siteUrl}/${locale}/apartment`, changeFrequency: 'monthly', priority: 0.8 });
-		urls.push({ url: `${siteUrl}/${locale}/booking-details`, changeFrequency: 'monthly', priority: 0.5 });
-		urls.push({ url: `${siteUrl}/${locale}/about`, changeFrequency: 'monthly', priority: 0.5 });
+		urls.push({ url: `${siteUrl}/${locale}/privacy`, changeFrequency: 'yearly', priority: 0.3 });
 		for (const c of categories) {
 			urls.push({ url: `${siteUrl}/${locale}/${c.slug}`, changeFrequency: 'weekly', priority: 0.7 });
 			const items = getItemsByCategory(c.id);
@@ -21,6 +22,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
 			}
 		}
 	}
-	// Intentionally exclude /check-in and other protected paths
 	return urls;
 }

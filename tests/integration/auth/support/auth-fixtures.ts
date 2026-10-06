@@ -7,7 +7,6 @@ export interface AuthPrincipalFixture {
   userId: string;
   bookingId: string;
   familyId: string;
-  email: string;
   phoneE164: string;
   provider: string;
   externalReference: string;
@@ -17,7 +16,6 @@ export const REVOKED_SESSION_FIXTURE: AuthPrincipalFixture = {
   userId: '11000000-0000-4000-8000-000000000001',
   bookingId: '21000000-0000-4000-8000-000000000001',
   familyId: 'pr02a-primary-refresh-family',
-  email: 'revoked-session-guest@example.invalid',
   phoneE164: '+12025550101',
   provider: 'integration-auth-fixture',
   externalReference: 'revoked-session-booking-001',
@@ -27,7 +25,6 @@ export const ISOLATED_AUTH_FIXTURE: AuthPrincipalFixture = {
   userId: '11000000-0000-4000-8000-000000000002',
   bookingId: '21000000-0000-4000-8000-000000000002',
   familyId: 'pr02a-isolated-refresh-family',
-  email: 'isolated-session-guest@example.invalid',
   phoneE164: '+12025550102',
   provider: 'integration-auth-fixture',
   externalReference: 'isolated-session-booking-002',
@@ -91,9 +88,7 @@ async function createPrincipal(
   await prisma.user.create({
     data: {
       id: fixture.userId,
-      email: fixture.email,
       phoneE164: fixture.phoneE164,
-      countryOrigin: 'ABROAD',
     },
   });
   await prisma.booking.create({
@@ -206,6 +201,7 @@ export async function resetAuthFixtures(
       prisma.session.deleteMany(),
       prisma.booking.deleteMany(),
       prisma.user.deleteMany(),
+      prisma.securityAuditEvent.deleteMany(),
     ]);
   }, 'cleanup');
 }

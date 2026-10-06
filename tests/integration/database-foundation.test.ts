@@ -65,7 +65,6 @@ describe.sequential('disposable PostgreSQL integration foundation', () => {
         where: { id: SYNTHETIC_FIXTURE.userId },
         include: { bookings: true },
       })).resolves.toMatchObject({
-        email: SYNTHETIC_FIXTURE.email,
         phoneE164: SYNTHETIC_FIXTURE.phoneE164,
         bookings: [{ id: SYNTHETIC_FIXTURE.bookingId }],
       });

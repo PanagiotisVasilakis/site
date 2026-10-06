@@ -247,15 +247,6 @@ function evaluateCurrentFindings(findings, allowlistEntries = []) {
   };
 }
 
-export function evaluateHistoricalFindings(findings, baselineEntries) {
-  const expected = new Set(baselineEntries.map((entry) => entry.fingerprint));
-  const unexpected = findings.filter((finding) => !expected.has(finding.fingerprint));
-  const missing = baselineEntries.filter(
-    (entry) => !findings.some((finding) => finding.fingerprint === entry.fingerprint),
-  );
-  return { unexpected, missing };
-}
-
 export function formatFinding(finding) {
   return [
     `path=${finding.path}`,

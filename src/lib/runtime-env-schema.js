@@ -10,7 +10,7 @@ const optionalEnv = (schema) => z.preprocess(
   schema.optional(),
 );
 
-// Zod 4 still runs this refine after `.url()` fails, so an empty or unparsable
+// Zod 4 still runs this refine after the `z.url()` check fails, so an empty or unparsable
 // value must return false here instead of throwing a bare TypeError.
 function isPostgresUrl(value) {
   try {
@@ -36,10 +36,35 @@ function isOriginProxySecret(value) {
     && !/^(?:deadbeef|changeme|placeholder)/iu.test(value);
 }
 
+// The Airbnb calendar export URL carries a secret token in its query string,
+// so validation messages must never echo the value.
+const AIRBNB_CALENDAR_HOSTS = new Set(['www.airbnb.com', 'airbnb.com', 'www.airbnb.gr', 'airbnb.gr']);
+const AIRBNB_CALENDAR_PATH = /^\/calendar\/ical\/\d+\.ics$/;
+
+/**
+ * An https Airbnb calendar export URL: no userinfo, default port, `/calendar/ical/<listing>.ics`.
+ * @param {string} value
+ * @returns {boolean}
+ */
+export function isAirbnbCalendarUrl(value) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  return url.protocol === 'https:'
+    && url.username === ''
+    && url.password === ''
+    && url.port === ''
+    && AIRBNB_CALENDAR_HOSTS.has(url.hostname)
+    && AIRBNB_CALENDAR_PATH.test(url.pathname);
+}
+
 export const runtimeEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'production']).default('development'),
 
-  DATABASE_URL: z.string().url().min(1, 'DATABASE_URL is required').refine(isPostgresUrl, 'DATABASE_URL must use postgres or postgresql'),
+  DATABASE_URL: z.url().min(1, 'DATABASE_URL is required').refine(isPostgresUrl, 'DATABASE_URL must use postgres or postgresql'),
 
   ADMIN_JWT_SECRET: optionalEnv(z.string()),
   ADMIN_DASH_SECRET: optionalEnv(z.string()),
@@ -52,29 +77,32 @@ export const runtimeEnvSchema = z.object({
 
 
   ALLOWED_ORIGINS: z.string().optional(),
-  NEXT_PUBLIC_SITE_URL: z.string().url().optional(),
-  NEXT_PUBLIC_OSRM_BASE_URL: optionalEnv(z.string().url()),
-  BUILD_SITE_URL: optionalEnv(z.string().url()),
+  NEXT_PUBLIC_SITE_URL: optionalEnv(z.url()),
+  BUILD_SITE_URL: optionalEnv(z.url()),
   ORIGIN_PROXY_SHARED_SECRET: optionalEnv(z.string().refine(
     isOriginProxySecret,
     'ORIGIN_PROXY_SHARED_SECRET must be a non-placeholder 64-character hexadecimal secret',
   )),
 
-  BOOKING_REQUEST_WEBHOOK_URL: optionalEnv(z.string().url()),
-  BOOKING_REQUEST_WEBHOOK_TOKEN: optionalEnv(z.string().min(20)),
-  CHECKIN_REQUEST_WEBHOOK_URL: optionalEnv(z.string().url()),
+  CHECKIN_REQUEST_WEBHOOK_URL: optionalEnv(z.url()),
   CHECKIN_REQUEST_WEBHOOK_TOKEN: optionalEnv(z.string().min(20)),
-  ALERT_WEBHOOK_URL: optionalEnv(z.string().url()),
+  ALERT_WEBHOOK_URL: optionalEnv(z.url()),
   ALERT_WEBHOOK_TOKEN: optionalEnv(z.string().min(20)),
   ALERT_WEBHOOK_REQUIRED: z.enum(['0', '1']).optional().default('0'),
+  AIRBNB_ICAL_URL: optionalEnv(z.string().refine(
+    isAirbnbCalendarUrl,
+    'AIRBNB_ICAL_URL must be an https Airbnb calendar export URL (/calendar/ical/<listing id>.ics)',
+  )),
+  // Public CARTO basemaps key: sent to browsers in tile URLs, but never logged.
+  CARTO_BASEMAPS_KEY: optionalEnv(z.string().regex(
+    /^[A-Za-z0-9_-]{8,128}$/,
+    'CARTO_BASEMAPS_KEY must be 8-128 characters of letters, digits, "_" or "-"',
+  )),
 
-  PRISMA_AUTO_DISCONNECT: optionalEnv(z.enum(['true', 'false'])),
-  PRISMA_IDLE_DISCONNECT_MS: optionalEnv(z.string().regex(/^\d+$/)),
   PRISMA_LOG_LIFECYCLE: optionalEnv(z.enum(['0', '1'])),
   LOG_LEVEL: optionalEnv(z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal'])),
   LOG_CONSOLE: optionalEnv(z.enum(['true', 'false'])),
   LOG_STRUCTURED: optionalEnv(z.enum(['true', 'false'])),
-  LOG_PERFORMANCE: optionalEnv(z.enum(['true', 'false'])),
   LOG_MAX_METADATA_SIZE: optionalEnv(z.string().regex(/^\d+$/)),
 
 }).superRefine((env, context) => {
@@ -133,7 +161,6 @@ export const runtimeEnvSchema = z.object({
     context.addIssue({ code: 'custom', path: ['ORIGIN_PROXY_SHARED_SECRET'], message: 'ORIGIN_PROXY_SHARED_SECRET is required in production' });
   }
   for (const [urlKey, tokenKey] of [
-    ['BOOKING_REQUEST_WEBHOOK_URL', 'BOOKING_REQUEST_WEBHOOK_TOKEN'],
     ['CHECKIN_REQUEST_WEBHOOK_URL', 'CHECKIN_REQUEST_WEBHOOK_TOKEN'],
   ]) {
     const url = env[urlKey];

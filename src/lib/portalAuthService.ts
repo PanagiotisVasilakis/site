@@ -5,7 +5,7 @@ import type { Prisma } from '@/generated/prisma/client';
 
 import { requirePepper } from '@/lib/pepper';
 import { prisma } from '@/lib/prisma';
-import { normalizePhone, type Origin } from '@/lib/phone';
+import { normalizePhone, phoneLookupCandidates, type Origin } from '@/lib/phone';
 import { GUEST_TERMS_CONTENT_HASH, GUEST_TERMS_VERSION } from '@/lib/guestTerms';
 import {
   createPortalBookingEligibilityWindow,
@@ -223,7 +223,7 @@ export async function consumeBookingClaimGrant(input: {
         if (grant.booking.userId !== existingUser.id) throw new PortalAuthError('INVALID_CREDENTIALS');
         await tx.user.update({
           where: { id: existingUser.id },
-          data: { passwordHash: newPasswordHash, countryOrigin: input.origin },
+          data: { passwordHash: newPasswordHash },
         });
       }
       userId = existingUser.id;
@@ -233,7 +233,6 @@ export async function consumeBookingClaimGrant(input: {
         data: {
           id: userId,
           phoneE164: normalized.e164,
-          countryOrigin: input.origin,
           passwordHash: newPasswordHash,
         },
       });
@@ -313,8 +312,8 @@ export async function authenticatePortalUser(input: {
   phone: string;
   password: string;
 }): Promise<{ userId: string; bookingId: string }> {
-  const primaryPhone = normalizePhone(input.phone);
-  if (!primaryPhone) throw new PortalAuthError('INVALID_CREDENTIALS');
+  const phoneCandidates = phoneLookupCandidates(input.phone);
+  if (phoneCandidates.length === 0) throw new PortalAuthError('INVALID_CREDENTIALS');
   const now = new Date();
   const eligibilityWindow = createPortalBookingEligibilityWindow(now);
 
@@ -322,10 +321,10 @@ export async function authenticatePortalUser(input: {
   // then support the local 10-digit format used by Greek guests at claim time.
   // The fallback only runs when the primary identifier has no account, keeping
   // account selection deterministic if both canonical numbers exist.
-  const greekLocalPhone = normalizePhone(input.phone, 'GR');
-  let user = await prisma.user.findUnique({ where: { phoneE164: primaryPhone.e164 } });
-  if (!user && greekLocalPhone && greekLocalPhone.e164 !== primaryPhone.e164) {
-    user = await prisma.user.findUnique({ where: { phoneE164: greekLocalPhone.e164 } });
+  let user = null;
+  for (const phoneE164 of phoneCandidates) {
+    user = await prisma.user.findUnique({ where: { phoneE164 } });
+    if (user) break;
   }
   if (!user?.passwordHash || !(await bcrypt.compare(input.password, user.passwordHash))) {
     throw new PortalAuthError('INVALID_CREDENTIALS');

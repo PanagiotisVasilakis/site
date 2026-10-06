@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { guestDataExport } from '@/lib/guestDataExport';
 import { withErrorHandler } from '@/lib/apiErrorHandler';
 import { createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
-import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import { isAdminRequest } from '@/lib/rbac';
 
 interface QueryParams {
@@ -14,12 +14,9 @@ interface QueryParams {
   endDate?: string;
 }
 
-const guard = createAPISecurityMiddleware();
+const isoDate = z.iso.date();
 
 const handler = async (request: NextRequest) => {
-  const earlyResponse = await guard(request);
-  if (earlyResponse) return earlyResponse;
-
   if (!(await isAdminRequest(request))) {
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
   }
@@ -78,6 +75,12 @@ const handler = async (request: NextRequest) => {
           'Missing required parameter: startDate'
         );
       }
+      if (!isoDate.safeParse(params.startDate).success || !isoDate.optional().safeParse(params.endDate).success) {
+        throw new ApiError(
+          ApiErrorCode.VALIDATION_ERROR,
+          'startDate and endDate must be YYYY-MM-DD'
+        );
+      }
       const searchResults = await guestDataExport.searchBookingsByDateRange(
         params.startDate,
         params.endDate
@@ -101,6 +104,9 @@ const handler = async (request: NextRequest) => {
           ApiErrorCode.VALIDATION_ERROR,
           'Missing required parameter: bookingId'
         );
+      }
+      if (!z.uuid().safeParse(params.bookingId).success) {
+        throw new ApiError(ApiErrorCode.NOT_FOUND, 'Booking not found');
       }
       const exportData = await guestDataExport.getBookingDetails(params.bookingId);
       if (!exportData) {

@@ -113,19 +113,17 @@ export function logSecurityDiagnostic(event: SecurityEvent): void {
 // Convenience function for recording events
 async function recordSecurityEvent(event: SecurityEvent): Promise<void> {
   const sanitized = sanitizeEvent(event);
-  if (process.env.NODE_ENV === 'development') {
-    console.warn('🔐 Security Event:', {
-      type: sanitized.event.type,
-      severity: sanitized.event.severity,
-      sourceHash: sanitized.event.ip,
-      url: sanitized.event.url,
-      details: sanitized.event.details,
-    });
-  }
+  logger.debug('Security event', {
+    type: sanitized.event.type,
+    severity: sanitized.event.severity,
+    sourceHash: sanitized.event.ip,
+    url: sanitized.event.url,
+    details: sanitized.event.details,
+  });
   try {
     await persistSecurityEvent(sanitized.event, sanitized.ipHash);
   } catch (error) {
-    console.error('Failed to persist security event', {
+    logger.error('Failed to persist security event', {
       type: sanitized.event.type,
       error: error instanceof Error ? error.message : 'unknown error',
     });
@@ -149,14 +147,13 @@ type CspReport = {
 
 export async function handleCSPViolation(
   violationReport: CspReport, 
-  request: { ip?: string; userAgent?: string }
+  request: { ip?: string }
 ): Promise<void> {
   const event: SecurityEvent = {
     type: 'csp_violation',
     severity: 'medium',
     timestamp: new Date().toISOString(),
     ip: request.ip || 'unknown',
-    userAgent: request.userAgent,
     url: violationReport['document-uri'] || 'unknown',
     // `referrer` and `script-sample` are accepted by the route but never stored.
     details: {

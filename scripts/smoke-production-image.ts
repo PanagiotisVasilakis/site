@@ -229,9 +229,23 @@ async function main(): Promise<number> {
       const imgSrc = csp.split(';').map((directive) => directive.trim()).find((directive) => directive.startsWith('img-src ')) ?? '';
       assert(/\shttps:(\s|$)/u.test(imgSrc), `img-src does not allow https images: ${imgSrc}`);
       assert(response.headers.get('cross-origin-embedder-policy') === 'unsafe-none', `COEP ${response.headers.get('cross-origin-embedder-policy')}`);
-      assert((response.headers.get('strict-transport-security') ?? '').startsWith('max-age='), 'HSTS missing');
+      const hsts = response.headers.get('strict-transport-security');
+      assert(hsts === 'max-age=63072000; includeSubDomains', `HSTS ${hsts}`);
       assert(response.headers.get('x-frame-options') === 'DENY', 'x-frame-options');
       assert(!response.headers.has('x-powered-by'), 'x-powered-by present');
+    });
+    await check('/en/availability → 200', async () => {
+      const response = await fetch(`${BASE}/en/availability`, { redirect: 'manual' });
+      assert(response.status === 200, `status ${response.status}`);
+    });
+    await check('/en/book → 308 to /en/availability (query dropped, security headers kept)', async () => {
+      const response = await fetch(`${BASE}/en/book?checkin=2030-07-10&checkout=2030-07-12`, { redirect: 'manual' });
+      assert(response.status === 308, `status ${response.status}`);
+      const location = response.headers.get('location') ?? '';
+      const target = new URL(location, BASE);
+      assert(target.pathname === '/en/availability' && target.search === '', `location ${location}`);
+      assert((response.headers.get('content-security-policy') ?? '').includes("frame-ancestors 'none'"), 'no CSP on the redirect');
+      assert(response.headers.get('x-content-type-options') === 'nosniff', 'x-content-type-options');
     });
     await check('/version.json names the build', async () => {
       const version = await json<{ commit?: string; build?: string }>(await fetch(`${BASE}/version.json`));
@@ -303,8 +317,16 @@ async function main(): Promise<number> {
     });
     await check('offline: visited page and offline fallback', async () => {
       await page.goto(`${BASE}/en/apartment`, { waitUntil: 'networkidle0' });
+      // page.setOfflineMode only reaches the page's own targets, not the service worker, which would
+      // keep fetching from the network; emulate offline on the service-worker target as well.
+      const serviceWorker = await (await page.browser().waitForTarget((target) => target.type() === 'service_worker', { timeout: 10_000 })).createCDPSession();
+      const setOffline = async (value: boolean) => {
+        await page.setOfflineMode(value);
+        await serviceWorker.send('Network.emulateNetworkConditions', { offline: value, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
+      };
+      await serviceWorker.send('Network.enable');
       offline = true;
-      await page.setOfflineMode(true);
+      await setOffline(true);
       try {
         const visited = await page.goto(`${BASE}/en/apartment`, { waitUntil: 'load' });
         assert(visited?.status() === 200 && (await page.$('main')), `visited page offline: ${visited?.status()}`);
@@ -312,7 +334,8 @@ async function main(): Promise<number> {
         const text = await page.evaluate(() => document.body.innerText);
         assert(unvisited?.status() === 200 && /offline|σύνδεση/iu.test(text), `unvisited page offline: ${unvisited?.status()} ${text.slice(0, 80)}`);
       } finally {
-        await page.setOfflineMode(false);
+        await setOffline(false);
+        await serviceWorker.detach();
         offline = false;
       }
     });
@@ -333,7 +356,7 @@ async function main(): Promise<number> {
       assert(response.status === 200 && admin.get('admin_jwt'), `status ${response.status}`);
     }, { fatal: true });
     await check('admin creates a booking (201)', async () => {
-      const response = await call(admin, 'POST', '/api/admin/bookings', { startDate: calendarDate(0), endDate: calendarDate(3) });
+      const response = await call(admin, 'POST', '/api/admin/bookings', { startDate: calendarDate(1), endDate: calendarDate(4) });
       assert(response.status === 201, `status ${response.status}`);
       bookingId = (await json<{ data: { booking: { id: string } } }>(response)).data.booking.id;
     }, { fatal: true });
@@ -367,13 +390,14 @@ async function main(): Promise<number> {
     await check('silent refresh: refresh cookie alone ends on /en/check-in', async () => {
       const refreshToken = guest.get('guest_rt');
       assert(refreshToken, 'no refresh cookie');
-      await page.deleteCookie(...(await page.cookies()));
-      await page.setCookie({ name: 'guest_rt', value: refreshToken, domain: 'localhost', path: '/', httpOnly: true, secure: true, sameSite: 'Lax' });
+      const context = page.browserContext();
+      await context.deleteCookie(...(await context.cookies()));
+      await context.setCookie({ name: 'guest_rt', value: refreshToken, domain: 'localhost', path: '/', httpOnly: true, secure: true, sameSite: 'Lax' });
       const response = await page.goto(`${BASE}/en/check-in`, { waitUntil: 'networkidle0', timeout: 60_000 });
       const pathname = new URL(page.url()).pathname;
       assert(pathname === '/en/check-in', `ended on ${pathname}`);
       assert(response?.status() === 200, `status ${response?.status()}`);
-      assert((await page.cookies()).some((cookie) => cookie.name === 'guest_session'), 'no new guest session cookie');
+      assert((await context.cookies()).some((cookie) => cookie.name === 'guest_session'), 'no new guest session cookie');
     });
 
     await check('outbox worker run', () => {
@@ -384,8 +408,10 @@ async function main(): Promise<number> {
     await check('operations worker run', () => {
       const event = lastJsonLine(compose(['--profile', 'ops', 'run', '--rm', '--no-deps', 'operations']));
       const alerts = event.alerts as { evaluated?: number } | undefined;
-      assert(event.worker === 'operations' && alerts?.evaluated === 3, JSON.stringify(event));
-      return `alerts evaluated ${String(alerts.evaluated)}`;
+      const calendar = event.calendar as { status?: string } | undefined;
+      // The smoke environment sets no AIRBNB_ICAL_URL, so the calendar sync must not run.
+      assert(event.worker === 'operations' && alerts?.evaluated === 4 && calendar?.status === 'not_configured', JSON.stringify(event));
+      return `alerts evaluated ${String(alerts.evaluated)}, calendar ${calendar.status}`;
     });
   } finally {
     await browser?.close().catch(() => undefined);

@@ -1,27 +1,22 @@
 "use client";
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
 import { normalizeLocale } from '@/i18n/config';
 import StaticLocationMap from './StaticLocationMap';
-import {
-  APARTMENT_LOCATION,
-  toLeafletMarker,
-  type MarkerData,
-} from '@/lib/mapUtils';
+import { APARTMENT_LOCATION } from '@/data/mapLocations';
 import type { LeafletMapLabels, LeafletMarkerData } from '@/components/LeafletMap';
 
 const LeafletMap = dynamic(() => import('@/components/LeafletMap'), { ssr: false });
 
 interface InteractiveMapProps {
-  markers?: MarkerData[];
+  markers?: readonly LeafletMarkerData[];
   zoom?: number;
   height?: string;
   className?: string;
   locale?: string; // for localized static fallback
-  activation?: 'viewport' | 'intent';
-  clusterMin?: number;
+  cartoBasemapsKey?: string;
 }
 
 export default function InteractiveMap({
@@ -30,8 +25,7 @@ export default function InteractiveMap({
   height = "400px",
   className = "",
   locale = 'en',
-  activation = 'viewport',
-  clusterMin
+  cartoBasemapsKey,
 }: InteractiveMapProps) {
   const eff: Locale = normalizeLocale(locale);
   const dict = useMemo(() => getDictionary(eff), [eff]);
@@ -42,15 +36,12 @@ export default function InteractiveMap({
     directions: mapT.directions,
     website: mapT.website,
     details: mapT.viewDetails,
+    home: mapT.home,
     locateMe: mapT.locateMe,
     locationUnavailable: mapT.locationUnavailable,
     fitToMarkers: mapT.fitToMarkers,
     zoomIn: mapT.zoomIn,
     zoomOut: mapT.zoomOut,
-    approximate: mapT.approximate,
-    travelUnavailable: mapT.travelUnavailable,
-    travelUnavailableWithDirections: mapT.travelUnavailableWithDirections,
-    unavailable: mapT.unavailable,
   }), [mapT]);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [shouldRenderInteractive, setShouldRenderInteractive] = useState(false);
@@ -62,7 +53,6 @@ export default function InteractiveMap({
 
   useEffect(() => {
     if (!hasMounted) return;
-    if (activation === 'intent') return;
     const el = containerRef.current;
     if (!el) return;
 
@@ -90,13 +80,7 @@ export default function InteractiveMap({
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasMounted, activation]);
-
-  // getKalamataMapLocations always includes the apartment marker, so no insertion is needed.
-  const leafletMarkers = useMemo<LeafletMarkerData[]>(
-    () => markers.map(toLeafletMarker),
-    [markers]
-  );
+  }, [hasMounted]);
 
   return (
     <div ref={containerRef} className={`relative ${className}`} style={{ height }}>
@@ -105,34 +89,17 @@ export default function InteractiveMap({
           center={APARTMENT_LOCATION}
           zoom={zoom}
           height={height}
-          markers={leafletMarkers}
-          origin={APARTMENT_LOCATION}
-          autoFitToOriginAndMarkers
-          refitOnMarkerChange
-          lazyTravelMetrics
-          clusterMin={clusterMin}
-          travelPrompt={mapT?.travelPrompt}
+          markers={markers}
           labels={leafletLabels}
+          cartoBasemapsKey={cartoBasemapsKey}
         />
       ) : (
-        <div className="absolute inset-0 flex flex-col items-center justify-center rounded-lg border border-[color:var(--border-soft)] surface-subtle text-center text-sm text-[color:var(--text-accent)]">
-          <div className="mb-2 text-3xl" aria-hidden>🗺️</div>
-          <p className="max-w-xs leading-relaxed px-6">
-            {mapT.deferredInteractiveLabel}
-          </p>
-          {activation === 'intent' && (
-            <button
-              type="button"
-              className="btn-tint mt-4 min-h-11"
-              onClick={() => setShouldRenderInteractive(true)}
-            >
-              {mapT.loadMap}
-            </button>
-          )}
+        <div className="map-placeholder">
+          <p className="map-placeholder__text">{mapT.deferredInteractiveLabel}</p>
         </div>
       )}
       <noscript>
-        <StaticLocationMap height={height} className="mt-4" title={mapT?.apartmentMarkerTitle} locale={locale} showHeading={false} />
+        <StaticLocationMap height={height} className="mt-4" locale={locale} />
       </noscript>
     </div>
   );

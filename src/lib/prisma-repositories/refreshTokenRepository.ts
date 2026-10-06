@@ -356,8 +356,7 @@ async function rotate(
     && initialBindingApproved;
   const generationLockKey = refreshGenerationAdvisoryLockKey(initial.id);
   const sameRefreshContext = !!replacement.deviceHash
-    && replacement.deviceHash === initial.family.deviceHash
-    && (!initial.family.ipHash || replacement.ipHash === initial.family.ipHash);
+    && replacement.deviceHash === initial.family.deviceHash;
 
   try {
     const result: RefreshTokenRotationResult | RefreshGenerationContention =

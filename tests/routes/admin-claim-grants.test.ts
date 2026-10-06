@@ -83,7 +83,7 @@ describe('admin claim-grant issuance origin and id checks', () => {
     const response = await issue({ headers: { origin: 'http://localhost:3000', host: 'localhost:3000' } });
 
     expect(response.status).toBe(409);
-    expect(JSON.stringify(await response.json())).toContain('7 days before check-in');
+    expect(JSON.stringify(await response.json())).toContain('7 days before check-in until the check-out date (UTC calendar dates)');
   });
 
   it('answers 404 for a booking id that is not a UUID without reaching the database layer', async () => {

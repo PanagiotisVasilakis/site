@@ -1,0 +1,640 @@
+/* Kalamata guide (docs/design/identity.md §8 GuideCard, GuideFilters, Card, Tile; §9.5 list, detail,
+   favourites; §9.6 important phones). Replaces 10-moments.css. Unlayered (O38); the two-class
+   colour rules and the focus box-shadow resets date from the legacy cascade that R3-V12b deleted, and are
+   kept as they are. Static by construction: motion (M21 burst, M25 calm mode,
+   card hover lift) is in motion.css. The Leaflet map's own styles are in map.css, loaded with the map. */
+
+/* Page shell and head */
+.guide-page {
+  max-width: calc(var(--container) + 2 * var(--gutter));
+  margin: 0 auto;
+  padding: 40px var(--gutter) var(--space-section);
+}
+.guide-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 24px;
+  margin-bottom: 28px;
+}
+.guide-head .guide-head__text { max-width: 900px; }
+.guide-head .guide-head__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-d1);
+  font-weight: 400;
+  line-height: var(--text-d1--line-height);
+  letter-spacing: var(--text-d1--letter-spacing);
+  color: var(--color-fg);
+  text-wrap: balance;
+}
+.guide-head .guide-head__lead {
+  max-width: 38em;
+  margin: 14px 0 0;
+  font-size: var(--text-lead);
+  line-height: var(--text-lead--line-height);
+  color: var(--color-fg-muted);
+  text-wrap: pretty;
+}
+
+/* "Saved" link (O41: the way back to /favorites) */
+.guide-head .guide-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-fg);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  text-decoration: none;
+}
+.guide-head .guide-saved svg { color: var(--color-primary-text); }
+.guide-head .guide-saved .guide-saved__count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--radius-control);
+  background: var(--color-primary);
+  color: var(--color-primary-fg);
+  font-size: var(--text-micro);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+@media (hover: hover) and (pointer: fine) {
+  .guide-head .guide-saved:hover { background: var(--color-surface-sunken); }
+}
+
+/* GuideFilters: search, chips with counts, List/Map, the live result count */
+.guide-filters {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.guide-filters .guide-search {
+  position: relative;
+  display: block;
+  max-width: 560px;
+}
+.guide-filters .guide-search__icon {
+  position: absolute;
+  top: 50%;
+  left: 15px;
+  color: var(--color-fg-muted);
+  pointer-events: none;
+  translate: 0 -50%;
+}
+.guide-filters .guide-search__input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 16px 0 46px;
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-field);
+  background: var(--color-surface);
+  color: var(--color-fg);
+  font: 400 1rem/1.2 var(--font-text);
+}
+.guide-filters .guide-search__input::placeholder { color: var(--color-fg-muted); opacity: 1; }
+.guide-filters .guide-search__input:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+  box-shadow: none;
+}
+.guide-filters .guide-filters__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.guide-filters .guide-chips {
+  display: flex;
+  flex: 1 1 320px;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  scroll-padding-inline: var(--gutter);
+  scrollbar-width: none;
+  /* Room for the focus ring inside the scroller. */
+  padding: 6px 4px;
+  margin: -6px -4px;
+}
+.guide-filters .guide-view { margin-left: auto; }
+.guide-filters .guide-view .ui-seg__item { gap: 6px; min-height: 40px; padding: 0 14px; font-size: .875rem; }
+.guide-filters .guide-count {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-fg-muted);
+}
+
+/* Card grid: 1 / 2 / 3 columns at base / sm / lg (§9.5) */
+.guide-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+}
+@media (min-width: 640px) {
+  .guide-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .guide-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+}
+
+/* GuideCard (§8 GuideCard + Card): one stretched link; Directions and Save sit above it. */
+.guide-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-rest);
+}
+.guide-card .guide-card__media {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: var(--color-surface-sunken);
+}
+.guide-card .guide-card__frame,
+.guide-detail .guide-detail__frame {
+  position: absolute;
+  inset: 0;
+}
+.guide-card .guide-card__img,
+.guide-detail .guide-detail__img { object-fit: cover; }
+.guide-card .guide-card__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px 20px 16px;
+}
+.guide-card .guide-card__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-h3);
+  font-weight: 400;
+  line-height: var(--text-h3--line-height);
+  color: var(--color-fg);
+  text-wrap: balance;
+}
+.guide-card .guide-card__link {
+  color: inherit;
+  text-decoration: none;
+}
+.guide-card .guide-card__link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+}
+.guide-card .guide-card__link:focus-visible { outline: none; box-shadow: none; }
+.guide-card .guide-card__link:focus-visible::after {
+  outline: 3px solid var(--color-focus);
+  outline-offset: -3px;
+  border-radius: var(--radius-card);
+}
+.guide-card .guide-card__summary {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--text-caption);
+  line-height: var(--text-caption--line-height);
+  color: var(--color-fg-muted);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.guide-card .guide-card__footer {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+.guide-card .guide-card__directions { gap: 6px; min-height: 44px; }
+@media (hover: hover) and (pointer: fine) {
+  .guide-card:hover { box-shadow: var(--shadow-raised); }
+  .guide-card:hover .guide-card__link { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .18em; }
+}
+
+/* Meta line: category (olive) · distance (fg-muted) */
+.guide-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin: 0;
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--text-label--line-height);
+}
+.guide-meta .guide-meta__cat { color: var(--color-olive); }
+.guide-meta .guide-meta__sep,
+.guide-meta .guide-meta__dist {
+  color: var(--color-fg-muted);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* §7.3 art tile: band-bg, the band-accent category icon and the category name. */
+.guide-art.guide-art {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background:
+    radial-gradient(120% 90% at 18% 0%, color-mix(in srgb, var(--color-band-accent) 16%, transparent), transparent 60%),
+    var(--color-band-bg);
+  color: var(--color-band-accent);
+}
+.guide-art .guide-art__label.guide-art__label {
+  color: var(--color-band-fg);
+  font-size: var(--text-label);
+  font-weight: 600;
+  letter-spacing: var(--text-label--letter-spacing);
+  text-transform: uppercase;
+}
+.guide-art .guide-art__label:lang(el) { text-transform: none; font-size: .875rem; }
+
+/* Save (§8 GuideCard): heart / heart-filled in primary-text, aria-pressed */
+.guide-save {
+  position: relative;
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-primary-text);
+  cursor: pointer;
+}
+.guide-save[aria-pressed="true"] { border-color: var(--color-primary-text); }
+.guide-save:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+  box-shadow: none;
+}
+.guide-save .guide-save__icon.guide-save__icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  color: var(--color-primary-text);
+}
+.guide-save.guide-save--labelled {
+  display: inline-flex;
+  gap: 8px;
+  width: auto;
+  height: auto;
+  min-height: 48px;
+  padding: 0 22px 0 16px;
+  border-color: var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  font: 600 1rem/1.1 var(--font-text);
+}
+.guide-save .guide-save__text.guide-save__text { color: var(--color-accent); }
+@media (hover: hover) and (pointer: fine) {
+  .guide-save:hover { background: var(--color-surface-sunken); }
+}
+/* M21 burst dots: hidden unless the motion gate animates them (motion.css). */
+.guide-save .guide-save__burst {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.guide-save .guide-save__burst i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  opacity: 0;
+}
+
+/* Map view: the lazy map, then the numbered list that matches the pins */
+.guide-map { display: grid; gap: 16px; }
+.guide-map .guide-map__frame { height: clamp(360px, 62vh, 560px); }
+.guide-map .guide-map__note {
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-fg-muted);
+}
+.guide-map .guide-map__list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0 32px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--color-border);
+}
+@media (min-width: 768px) {
+  .guide-map .guide-map__list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.guide-map .guide-map__item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.guide-map .guide-map__num.guide-map__num {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--color-pin-fg);
+  box-shadow: 0 0 0 2px var(--color-pin-bg);
+  color: var(--color-pin-bg);
+  font-size: var(--text-label);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.guide-map .guide-map__text { display: grid; gap: 2px; min-width: 0; }
+.guide-map .guide-map__link {
+  color: var(--color-fg);
+  font-weight: 600;
+  text-decoration: none;
+}
+.guide-map .guide-map__link:hover { text-decoration: underline; text-underline-offset: .2em; }
+.guide-map .guide-map__meta.guide-map__meta {
+  font-size: var(--text-label);
+  color: var(--color-fg-muted);
+}
+
+/* The deferred map's placeholder (InteractiveMap, before Leaflet mounts; also the check-in map). */
+.map-placeholder {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 24px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-sunken);
+}
+.map-placeholder .map-placeholder__text {
+  max-width: 28em;
+  margin: 0;
+  font-size: var(--text-caption);
+  text-align: center;
+  color: var(--color-fg-muted);
+}
+
+/* Detail (§9.5): hero 16:10 with radius-card below xl, a full-bleed band at xl */
+.guide-detail { padding: 24px 0 var(--space-section); }
+.guide-detail .guide-detail__back,
+.guide-detail .guide-detail__main,
+.guide-detail .guide-nearby {
+  box-sizing: content-box;
+  max-width: var(--container);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+.guide-detail .guide-detail__back { margin-block: 0 16px; }
+.guide-detail .guide-back { gap: 6px; min-height: 44px; }
+.guide-detail .guide-detail__hero {
+  position: relative;
+  width: min(var(--container), 100% - 2 * var(--gutter));
+  margin-inline: auto;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: var(--color-surface-sunken);
+  box-shadow: var(--shadow-raised);
+}
+@media (min-width: 1280px) {
+  .guide-detail .guide-detail__hero {
+    width: 100%;
+    height: min(68vh, 640px);
+    aspect-ratio: auto;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+.guide-detail .guide-detail__main {
+  display: grid;
+  grid-template-areas: "head" "actions" "facts" "body";
+  gap: 24px 64px;
+  padding-top: 32px;
+}
+@media (min-width: 1024px) {
+  .guide-detail .guide-detail__main {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+    grid-template-areas: "head actions" "body facts";
+    align-items: start;
+  }
+}
+.guide-detail .guide-detail__head { grid-area: head; display: grid; gap: 12px; }
+.guide-detail .guide-detail__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-d1);
+  font-weight: 400;
+  line-height: var(--text-d1--line-height);
+  letter-spacing: var(--text-d1--letter-spacing);
+  color: var(--color-fg);
+  text-wrap: balance;
+}
+.guide-detail .guide-detail__lead {
+  max-width: 38em;
+  margin: 0;
+  font-size: var(--text-lead);
+  line-height: var(--text-lead--line-height);
+  color: var(--color-fg-muted);
+}
+.guide-detail .guide-detail__actions {
+  grid-area: actions;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+@media (min-width: 1024px) {
+  .guide-detail .guide-detail__actions { align-self: end; }
+}
+.guide-detail .guide-facts {
+  grid-area: facts;
+  margin: 0;
+  padding: 4px 20px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-rest);
+}
+.guide-detail .guide-facts__row { padding: 14px 0; }
+.guide-detail .guide-facts__row + .guide-facts__row { border-top: 1px solid var(--color-border); }
+.guide-detail .guide-facts__term {
+  margin: 0 0 6px;
+  font-size: var(--text-label);
+  font-weight: 600;
+  letter-spacing: var(--text-label--letter-spacing);
+  text-transform: uppercase;
+  color: var(--color-fg-muted);
+}
+.guide-detail .guide-facts__term:lang(el) { text-transform: none; font-size: .875rem; }
+.guide-detail .guide-facts__value { margin: 0; color: var(--color-fg); }
+.guide-detail .guide-facts__phones { display: flex; flex-wrap: wrap; gap: 8px; font-variant-numeric: tabular-nums; }
+.guide-detail .guide-detail__body { grid-area: body; max-width: 65ch; }
+.guide-detail .guide-detail__subtitle {
+  margin: 0 0 12px;
+  font-family: var(--font-display);
+  font-size: var(--text-d3);
+  font-weight: 400;
+  line-height: var(--text-d3--line-height);
+  color: var(--color-fg);
+}
+.guide-detail .guide-detail__text {
+  margin: 0;
+  font-size: var(--text-body);
+  line-height: 1.7;
+  color: var(--color-fg);
+}
+.guide-detail .guide-nearby { margin-top: var(--space-section); }
+.guide-detail .guide-nearby__title {
+  margin: 0 0 24px;
+  font-family: var(--font-display);
+  font-size: var(--text-d3);
+  font-weight: 400;
+  line-height: var(--text-d3--line-height);
+  color: var(--color-fg);
+}
+
+/* Important phones (§9.6): the band first, then hairline-separated rows (no cards) */
+.sos-band {
+  display: grid;
+  gap: 20px;
+  align-items: center;
+  margin-bottom: 48px;
+  padding: 28px 24px;
+  border-radius: var(--radius-card);
+  background:
+    radial-gradient(120% 120% at 100% 0%, color-mix(in srgb, var(--color-band-accent) 14%, transparent), transparent 55%),
+    var(--color-band-bg);
+  box-shadow: var(--shadow-raised);
+}
+@media (min-width: 768px) {
+  .sos-band { grid-template-columns: minmax(0, 1fr) auto; padding: 36px 40px; }
+}
+.sos-band .sos-band__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-d3);
+  font-weight: 400;
+  line-height: var(--text-d3--line-height);
+  color: var(--color-band-fg);
+  text-wrap: balance;
+}
+.sos-band .sos-band__lead { margin: 10px 0 0; color: var(--color-band-muted); }
+.sos-band .ui-btn:focus-visible { outline-color: var(--color-band-focus); }
+.phone-group + .phone-group { margin-top: 40px; }
+.phone-group .phone-group__title {
+  margin: 0 0 12px;
+  font-family: var(--font-text);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--text-label--line-height);
+  letter-spacing: var(--text-label--letter-spacing);
+  text-transform: uppercase;
+  color: var(--color-primary-text);
+}
+.phone-group .phone-group__title:lang(el) { text-transform: none; font-size: .875rem; }
+.phone-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--color-border);
+}
+.phone-rows .phone-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+@media (min-width: 640px) {
+  .phone-rows .phone-row { grid-template-columns: 64px minmax(0, 1fr) auto; align-items: center; }
+}
+.phone-rows .phone-row__thumb.phone-row__thumb {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: var(--radius-tile);
+  background: var(--color-primary-tint);
+  color: var(--color-primary-text);
+}
+.phone-rows .phone-row__img { width: 100%; height: 100%; object-fit: cover; }
+.phone-rows .phone-row__body { display: grid; gap: 4px; min-width: 0; }
+.phone-rows .phone-row__name {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--color-fg);
+}
+/* 44 px touch targets without layout gaps (R3-V12a, replaces the legacy global min-height rule): the inline name
+   link grows only its hit box (vertical padding on an inline box does not move lines); the numbers (flex items)
+   cancel their padding with negative margins, and 8 px side padding meets the next number in the 16 px gap. */
+.phone-rows .phone-row__link { padding-block: 12px; color: inherit; text-decoration: none; }
+.phone-rows .phone-row__link:hover { text-decoration: underline; text-underline-offset: .2em; }
+.phone-rows .phone-row__text {
+  margin: 0;
+  font-size: var(--text-caption);
+  line-height: var(--text-caption--line-height);
+  color: var(--color-fg-muted);
+}
+.phone-rows .phone-row__numbers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 16px;
+  margin: 2px 0 0;
+}
+.phone-rows .phone-row__number {
+  padding: 10px 8px;
+  margin: -10px -8px;
+  color: var(--color-fg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-decoration: underline;
+  text-decoration-color: var(--color-border-strong);
+  text-decoration-thickness: 1px;
+  text-underline-offset: .25em;
+}
+.phone-rows .phone-row__call { grid-column: 2; justify-self: start; }
+@media (min-width: 640px) {
+  .phone-rows .phone-row__call { grid-column: 3; }
+}
+.phone-rows .phone-row__link:focus-visible,
+.phone-rows .phone-row__number:focus-visible,
+.guide-map .guide-map__link:focus-visible,
+.guide-head .guide-saved:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+  box-shadow: none;
+}

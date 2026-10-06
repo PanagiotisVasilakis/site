@@ -1,0 +1,120 @@
+/* GalleryLightbox (docs/design/identity.md §8, §5.5, §5.7). Unlayered (O38); colour
+   rules carry two classes (see apartment.css). A full-screen modal <dialog> on `viewer-bg` with a native
+   scroll-snap track; the motion rules at the end are gated (§5.2). */
+
+.lightbox {
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+}
+.lightbox.lightbox {
+  background: var(--color-viewer-bg);
+  color: var(--color-fg-on-photo);
+}
+.lightbox[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.lightbox::backdrop {
+  background: var(--color-viewer-bg);
+}
+:root:has(.lightbox[open]) { overflow: hidden; }
+
+/* Top bar: room name, "7 / 25" (tabular), close (44 px). */
+.lightbox .lightbox__bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: calc(8px + env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left));
+}
+.lightbox .lightbox__room {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-fg-on-photo);
+}
+.lightbox .lightbox__count {
+  margin: 0;
+  font-size: var(--text-caption);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-fg-on-photo);
+}
+
+/* Track: one photo per view; a swipe is a native horizontal scroll that snaps. */
+.lightbox .lightbox__track {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.lightbox .lightbox__track::-webkit-scrollbar { display: none; }
+.lightbox .lightbox__slide {
+  position: relative;
+  flex: 0 0 100%;
+  height: 100%;
+  margin: 0;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+}
+.lightbox .lightbox__img {
+  object-fit: contain;
+  user-select: none;
+}
+
+/* Previous / next: 48 px glass buttons at md and up (swipe and keys below md). */
+.lightbox .lightbox__nav {
+  display: none;
+}
+@media (min-width: 768px) {
+  .lightbox .lightbox__nav {
+    position: absolute;
+    top: 50%;
+    display: inline-grid;
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    transform: translateY(-50%);
+  }
+  .lightbox .lightbox__nav--prev { left: 16px; }
+  .lightbox .lightbox__nav--next { right: 16px; }
+}
+.lightbox .ui-icon-btn:focus-visible {
+  outline-color: var(--color-band-focus);
+}
+
+/* §5.7 fallback without View Transitions: a 200 ms crossfade in. During a photo View Transition (photoMorph.ts
+   sets html[data-vt="photo"]) the morph replaces it. Reduced motion: instant. */
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-motion="full"]:not([data-vt="photo"]) .lightbox[open] {
+    animation: lightbox-fade-in 200ms var(--ease-glide);
+  }
+
+  :root[data-motion="full"][data-vt="photo"]::view-transition-group(gallery-photo) {
+    animation-duration: var(--dur-page);
+    animation-timing-function: var(--ease-glide);
+  }
+
+  :root[data-motion="full"][data-vt="photo"]::view-transition-old(root),
+  :root[data-motion="full"][data-vt="photo"]::view-transition-new(root) {
+    animation-duration: 200ms;
+  }
+}
+
+@keyframes lightbox-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

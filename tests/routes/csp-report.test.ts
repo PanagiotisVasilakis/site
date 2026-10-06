@@ -80,6 +80,38 @@ describe('CSP report endpoint', () => {
     expect(mocks.securityAuditEventCreate.mock.calls[0][0].data.details.blockedURI).toBe(expected);
   });
 
+  it('checks the per-address limit first and then a limit shared by all clients', async () => {
+    const response = await report(chromiumReport);
+
+    expect(response.status).toBe(204);
+    expect(mocks.checkSensitiveRateLimit).toHaveBeenCalledTimes(2);
+    expect(mocks.checkSensitiveRateLimit.mock.calls[0][1]).toEqual({ scope: 'csp-report', limit: 30, windowMs: 60_000 });
+    expect(mocks.checkSensitiveRateLimit.mock.calls[1][1]).toEqual({
+      scope: 'csp-report-global', identifier: 'global', limit: 500, windowMs: 3_600_000,
+    });
+  });
+
+  it('answers 429 without storing when the shared limit is exhausted', async () => {
+    mocks.checkSensitiveRateLimit
+      .mockResolvedValueOnce({ allowed: true })
+      .mockResolvedValueOnce({ allowed: false });
+
+    const response = await report(chromiumReport);
+
+    expect(response.status).toBe(429);
+    expect(mocks.securityAuditEventCreate).not.toHaveBeenCalled();
+  });
+
+  it('does not count a report against the shared limit when the per-address limit denies it', async () => {
+    mocks.checkSensitiveRateLimit.mockResolvedValueOnce({ allowed: false });
+
+    const response = await report(chromiumReport);
+
+    expect(response.status).toBe(429);
+    expect(mocks.checkSensitiveRateLimit).toHaveBeenCalledTimes(1);
+    expect(mocks.securityAuditEventCreate).not.toHaveBeenCalled();
+  });
+
   it('rejects a malformed report without storing it', async () => {
     const response = await report({ 'csp-report': { ...chromiumReport['csp-report'], 'line-number': 'twelve' } });
 

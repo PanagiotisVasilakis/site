@@ -21,6 +21,7 @@ type RotationResult = Awaited<ReturnType<RefreshTokenRepository['rotate']>>;
 type OverlapKind =
   | 'same-context'
   | 'same-context-invalid-binding'
+  | 'same-agent-other-ip'
   | 'different-context'
   | 'different-context-owner-rollback'
   | 'completed-replay-contention';
@@ -73,6 +74,12 @@ interface AuthorizationState {
     activeSessionCount: number;
     usable: boolean;
   };
+  theftSignals: TheftSignal[];
+}
+
+interface TheftSignal {
+  severity: string;
+  details: unknown;
 }
 
 interface OverlapResult {
@@ -129,6 +136,14 @@ interface GenerationIsolationResult {
   predecessorMarkerHeldThroughCompletion: boolean;
   state: FamilyRotationState;
   isolatedState: FamilyRotationState;
+}
+
+interface ContendedReplayResult {
+  contender: SafeRotationEvidence;
+  markerHeldThroughCompletion: boolean;
+  familyReason: string | null;
+  state: FamilyRotationState;
+  theftSignals: TheftSignal[];
 }
 
 interface RollbackRetryResult {
@@ -249,15 +264,11 @@ async function seedAuthorizationFamilies(
         data: [
           {
             id: PRIMARY_USER_ID,
-            email: 'overlap-primary@example.invalid',
             phoneE164: '+12025550301',
-            countryOrigin: 'ABROAD',
           },
           {
             id: ISOLATED_USER_ID,
-            email: 'overlap-isolated@example.invalid',
             phoneE164: '+12025550302',
-            countryOrigin: 'ABROAD',
           },
         ],
       });
@@ -551,13 +562,20 @@ function createReplacement(
   };
 }
 
+async function readTheftSignals(client: PrismaClient): Promise<TheftSignal[]> {
+  return client.securityAuditEvent.findMany({
+    where: { eventType: 'portal.refresh_token_replay' },
+    select: { severity: true, details: true },
+  });
+}
+
 async function readAuthorizationState(
   client: PrismaClient,
   repository: RefreshTokenRepository,
 ): Promise<AuthorizationState> {
   const [primaryFamily, primaryTokens, primarySessions, isolatedFamily, isolatedTokens,
     isolatedSessions, rootVerification, replacementVerification, contenderVerification,
-    isolatedVerification] =
+    isolatedVerification, theftSignals] =
     await Promise.all([
       client.refreshTokenFamily.findUnique({ where: { id: PRIMARY_FAMILY_ID } }),
       client.refreshToken.findMany({
@@ -579,6 +597,7 @@ async function readAuthorizationState(
       repository.verify(`${WINNER_GENERATION_ID}.${WINNER_SECRET}`),
       repository.verify(`${CONTENDER_GENERATION_ID}.${CONTENDER_SECRET}`),
       repository.verify(`${ISOLATED_GENERATION_ID}.${ISOLATED_SECRET}`),
+      readTheftSignals(client),
     ]);
 
   const sessionsById = new Map(primarySessions.map((session) => [session.id, session]));
@@ -617,6 +636,7 @@ async function readAuthorizationState(
       activeSessionCount: isolatedSessions.filter((session) => !session.revokedAt).length,
       usable: Boolean(isolatedVerification),
     },
+    theftSignals,
   };
 }
 
@@ -814,21 +834,30 @@ async function executeOverlap(
                 CONTENDER_SALT,
                 kind === 'same-context'
                   || kind === 'same-context-invalid-binding'
+                  || kind === 'same-agent-other-ip'
                   || kind === 'completed-replay-contention'
                   ? 'approved'
                   : 'suspicious',
               );
+            let contenderRotation: Parameters<RefreshTokenRepository['rotate']>[1] =
+              contenderReplacement;
+            if (kind === 'same-context-invalid-binding') {
+              contenderRotation = {
+                ...contenderReplacement,
+                presentedSession: { status: 'invalid' as const },
+              };
+            } else if (kind === 'same-agent-other-ip') {
+              contenderRotation = { ...contenderReplacement, ipHash: SUSPICIOUS_IP_HASH };
+            }
             contenderPromise = contenderRepository.rotate(
               `${ROOT_GENERATION_ID}.${ROOT_SECRET}`,
-              kind === 'same-context-invalid-binding'
-                ? { ...contenderReplacement, presentedSession: { status: 'invalid' as const } }
-                : contenderReplacement,
+              contenderRotation,
             );
             void contenderPromise.catch(() => undefined);
 
             let contenderWaitObserved = false;
             let contenderResult: RotationResult;
-            if (kind === 'same-context') {
+            if (kind === 'same-context' || kind === 'same-agent-other-ip') {
               contenderResult = await withDeadline(
                 contenderPromise,
                 'same-context concurrent classification',
@@ -1154,6 +1183,108 @@ async function executeGenerationIsolation(
   ));
 }
 
+async function executeContendedCompletedReplay(
+  target: DisposableDatabaseTarget,
+  now: Date,
+): Promise<ContendedReplayResult> {
+  const [{ createRefreshTokenRepository }, { refreshGenerationAdvisoryLockKey }] =
+    await Promise.all([
+      import('@/lib/prisma-repositories/refreshTokenRepository'),
+      import('@/lib/refreshRotationLock'),
+    ]);
+  const predecessorMarkerKey = refreshGenerationAdvisoryLockKey(ROOT_GENERATION_ID);
+
+  return withTestPrismaClient(target, async (markerClient) => (
+    withTestPrismaClient(target, async (contenderClient) => (
+      withTestPrismaClient(target, async (monitorClient) => {
+        const contenderRepository = createRefreshTokenRepository(contenderClient);
+        const monitorRepository = createRefreshTokenRepository(monitorClient);
+        const markerReady = createDeferred<number>();
+        const releaseMarker = createDeferred<void>();
+        let contenderPromise: Promise<RotationResult> | undefined;
+
+        // A plain transaction, not a rotating owner, holds the already-rotated
+        // root generation's marker. The replay therefore fails the try-lock,
+        // is classified for the authoritative recheck, and runs that recheck
+        // alone with no owner competing for the User row.
+        const markerPromise = markerClient.$transaction(async (tx) => {
+          const backendRows = await tx.$queryRaw<Array<{ pid: number }>>`
+            SELECT pg_backend_pid() AS "pid"
+          `;
+          const heldRows = await tx.$queryRaw<Array<{ held: boolean }>>`
+            SELECT TRUE AS "held"
+            FROM (
+              SELECT pg_advisory_xact_lock(${predecessorMarkerKey}::bigint)
+            ) AS generation_marker
+          `;
+          if (backendRows.length !== 1 || heldRows.length !== 1 || !heldRows[0].held) {
+            throw new Error('Synthetic replayed-generation marker was not acquired.');
+          }
+          markerReady.resolve(backendRows[0].pid);
+          await releaseMarker.promise;
+        }, { timeout: 12_000 });
+        void markerPromise.catch((error: unknown) => markerReady.reject(error));
+
+        try {
+          const markerPid = await markerReady.promise;
+          if (!(await advisoryLockIsHeld(monitorClient, markerPid))) {
+            throw new Error('PostgreSQL did not expose the replayed-generation marker.');
+          }
+
+          contenderPromise = contenderRepository.rotate(
+            `${ROOT_GENERATION_ID}.${ROOT_SECRET}`,
+            createReplacement(
+              now,
+              CONTENDER_GENERATION_ID,
+              CONTENDER_SECRET,
+              CONTENDER_SALT,
+              'approved',
+            ),
+          );
+          void contenderPromise.catch(() => undefined);
+          const contenderResult = await withDeadline(
+            contenderPromise,
+            'replay of a rotated generation while its marker is held',
+          );
+          const markerHeldThroughCompletion = await advisoryLockIsHeld(
+            monitorClient,
+            markerPid,
+          );
+
+          releaseMarker.resolve(undefined);
+          await markerPromise;
+          const [family, state, theftSignals] = await Promise.all([
+            monitorClient.refreshTokenFamily.findUnique({ where: { id: PRIMARY_FAMILY_ID } }),
+            readFamilyRotationState(monitorClient, monitorRepository, {
+              familyId: PRIMARY_FAMILY_ID,
+              bookingId: PRIMARY_BOOKING_ID,
+              rootId: ROOT_GENERATION_ID,
+              rootSecret: ROOT_SECRET,
+              replacementId: WINNER_GENERATION_ID,
+              replacementSecret: WINNER_SECRET,
+            }),
+            readTheftSignals(monitorClient),
+          ]);
+
+          return {
+            contender: safeRotationEvidence(contenderResult),
+            markerHeldThroughCompletion,
+            familyReason: family?.revocationReason ?? null,
+            state,
+            theftSignals,
+          };
+        } finally {
+          releaseMarker.resolve(undefined);
+          await Promise.allSettled([
+            markerPromise,
+            ...(contenderPromise ? [contenderPromise] : []),
+          ]);
+        }
+      })
+    ))
+  ));
+}
+
 async function executeRollbackThenRetry(
   target: DisposableDatabaseTarget,
   now: Date,
@@ -1298,6 +1429,19 @@ async function runFreshGenerationIsolation(): Promise<GenerationIsolationResult>
   }
 }
 
+async function runFreshContendedCompletedReplay(): Promise<ContendedReplayResult> {
+  const target = await createIsolatedDatabase(runtime, 'contended_completed_replay');
+  try {
+    await applyMigrationsFromEmpty(target);
+    const now = new Date();
+    await seedAuthorizationFamilies(target, now);
+    await advancePrimaryFamilyToGenerationNPlusOne(target, now);
+    return await executeContendedCompletedReplay(target, now);
+  } finally {
+    await dropIsolatedDatabase(target);
+  }
+}
+
 async function runFreshRollbackThenRetry(): Promise<RollbackRetryResult> {
   const target = await createIsolatedDatabase(runtime, 'rollback_then_retry');
   try {
@@ -1309,6 +1453,16 @@ async function runFreshRollbackThenRetry(): Promise<RollbackRetryResult> {
     await dropIsolatedDatabase(target);
   }
 }
+
+const SUSPICIOUS_OVERLAP_THEFT_SIGNAL = {
+  severity: 'high',
+  details: { reason: 'suspicious_refresh_overlap', familyId: PRIMARY_FAMILY_ID },
+} as const;
+
+const REPLAY_THEFT_SIGNAL = {
+  severity: 'high',
+  details: { reason: 'refresh_token_replay', familyId: PRIMARY_FAMILY_ID },
+} as const;
 
 const ACTIVE_ISOLATED_FAMILY = {
   familyRevoked: false,
@@ -1363,10 +1517,48 @@ describe.sequential('refresh overlap classification through PostgreSQL contentio
             contenderUsable: false,
           },
           isolated: ACTIVE_ISOLATED_FAMILY,
+          theftSignals: [],
         },
       });
     }
   }, 600_000);
+
+  it('classifies a same-device overlap from a different IP as concurrent without revocation', async () => {
+    const result = await runFreshOverlap('same-agent-other-ip', 1);
+    expect(result).toEqual({
+      owner: {
+        status: 'rotated',
+        familyId: PRIMARY_FAMILY_ID,
+        oldId: ROOT_GENERATION_ID,
+        replacementId: WINNER_GENERATION_ID,
+        sessionId: WINNER_GENERATION_ID,
+        sessionTokenIssued: true,
+      },
+      contender: { status: 'concurrent', familyId: PRIMARY_FAMILY_ID },
+      ownerLockObserved: true,
+      contenderWaitObserved: false,
+      state: {
+        primary: {
+          familyRevoked: false,
+          familyReason: null,
+          tokenCount: 2,
+          activeTokenCount: 1,
+          revokedTokenCount: 1,
+          descendantCount: 1,
+          activeDescendantCount: 1,
+          sessionCount: 2,
+          activeSessionCount: 1,
+          revokedSessionCount: 1,
+          generationSessionPairingValid: true,
+          rootUsable: false,
+          replacementUsable: true,
+          contenderUsable: false,
+        },
+        isolated: ACTIVE_ISOLATED_FAMILY,
+        theftSignals: [],
+      },
+    });
+  }, 120_000);
 
   it('revokes after 15 different-context overlaps while preserving the approved winner result', async () => {
     for (let repetition = 1; repetition <= 15; repetition += 1) {
@@ -1401,6 +1593,7 @@ describe.sequential('refresh overlap classification through PostgreSQL contentio
             contenderUsable: false,
           },
           isolated: ACTIVE_ISOLATED_FAMILY,
+          theftSignals: [SUSPICIOUS_OVERLAP_THEFT_SIGNAL],
         },
       });
     }
@@ -1438,6 +1631,7 @@ describe.sequential('refresh overlap classification through PostgreSQL contentio
           contenderUsable: false,
         },
         isolated: ACTIVE_ISOLATED_FAMILY,
+        theftSignals: [SUSPICIOUS_OVERLAP_THEFT_SIGNAL],
       },
     });
   }, 120_000);
@@ -1490,6 +1684,7 @@ describe.sequential('refresh overlap classification through PostgreSQL contentio
             contenderUsable: false,
           },
           isolated: ACTIVE_ISOLATED_FAMILY,
+          theftSignals: [REPLAY_THEFT_SIGNAL],
         },
       });
     }
@@ -1582,6 +1777,27 @@ describe.sequential('refresh overlap classification through PostgreSQL contentio
     });
   }, 120_000);
 
+  it('revokes and records one theft signal when a rotated generation is replayed under contention', async () => {
+    const result = await runFreshContendedCompletedReplay();
+    expect(result).toEqual({
+      contender: { status: 'replayed', familyId: PRIMARY_FAMILY_ID },
+      markerHeldThroughCompletion: true,
+      familyReason: 'refresh_token_replay',
+      state: {
+        familyRevoked: true,
+        tokenCount: 2,
+        activeTokenCount: 0,
+        descendantCount: 1,
+        sessionCount: 2,
+        activeSessionCount: 0,
+        rootUsable: false,
+        replacementUsable: false,
+        generationSessionPairingValid: true,
+      },
+      theftSignals: [REPLAY_THEFT_SIGNAL],
+    });
+  }, 120_000);
+
   it('releases a rolled-back owner marker and permits the next legal refresh', async () => {
     const result = await runFreshRollbackThenRetry();
     expect(result).toEqual({
@@ -1616,6 +1832,7 @@ describe.sequential('refresh overlap classification through PostgreSQL contentio
           contenderUsable: true,
         },
         isolated: ACTIVE_ISOLATED_FAMILY,
+        theftSignals: [],
       },
     });
   }, 120_000);
@@ -1648,6 +1865,7 @@ describe.sequential('refresh overlap classification through PostgreSQL contentio
           contenderUsable: false,
         },
         isolated: ACTIVE_ISOLATED_FAMILY,
+        theftSignals: [SUSPICIOUS_OVERLAP_THEFT_SIGNAL],
       },
     });
   }, 120_000);

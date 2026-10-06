@@ -21,7 +21,11 @@ npm run verify:release
 - a local Docker daemon reachable through a Unix or Windows named-pipe socket,
   plus Docker Buildx;
 - enough local disk for the digest-pinned PostgreSQL image, disposable database,
-  coverage output, and Next.js build; and
+  coverage output, and Next.js build;
+- the digest-pinned Nginx image from `deploy/nginx/image.lock.json`
+  (`repository@digest`) already present in the local Docker image store. Gate 7
+  does not pull it and fails with the exact `docker pull` command when it is
+  missing; and
 - registry/network availability for read-only OCI registry inspection, an
   immutable pull into the local Docker image store, and the existing production
   dependency audit.
@@ -38,6 +42,12 @@ workstation. Cold registry access, the intentionally repeated test
 coverage, and the production build can extend that substantially; reserve
 approximately 5–15 minutes. This is an operational estimate, not a timeout or
 performance guarantee.
+
+Gate 24 runs `npm run build` (`next build`) in the working tree and reuses
+`.next/cache`. When a change adds a new CSS `@import` to
+`src/app/globals.css`, delete `.next/cache/turbopack` before
+`npm run verify:release`: a stale Turbopack cache can drop the new sheet.
+Docker builds start clean (`.next` is in `.dockerignore`).
 
 ## Exact gate order
 
@@ -80,30 +90,32 @@ be diagnosed without the orchestrator printing environment values.
 | 29 | Staged and untracked candidate whitespace | `npm --ignore-scripts run check:candidate-diff` |
 | 30 | Disposable-container orphan check | `npm --ignore-scripts run check:integration-orphans` |
 
-`proxy-agent@8.0.2` is a dev-only peer-resolution anchor and is intentionally
-not imported by application code. Knip ignores exactly that dependency, while
-full `npm ls` and explicit dependency-tree evidence remain mandatory; nested
-`proxy-agent@6.5.0` remains required for the legacy Puppeteer chain.
-
 `package.json` `overrides` and their reasons:
 
-- `next@16.3.6` → `postcss`, `sharp`: keep Next's nested copies on the patched
-  direct versions (`postcss` GHSA-fxqj-rqcc-2cmp, `sharp` GHSA-rgj7-g3m4-5g8c).
-  Rename the key whenever `next` is bumped.
+- No `next`-scoped override. `next@16.3.6` pins `postcss` 8.5.23 exactly (a
+  nested copy; GHSA-fxqj-rqcc-2cmp affects `<= 8.5.22`) and `sharp` `^0.35.4`
+  (dedupes to the root 0.35.4; GHSA-rgj7-g3m4-5g8c is fixed in 0.35.4). A
+  version-keyed override would only dedupe `postcss` and would silently stop
+  applying on the next `next` bump. Whenever `next` is bumped, re-check with
+  `npm ls postcss sharp` and `npm audit --omit=dev` (must report 0).
 - `baseline-browser-mapping`: GHSA-w5vr-8v7q-w6rv (reached through `next`).
-- `deepmerge-ts`, `mysql2`, `fast-uri`: `prisma@7.x` pins vulnerable versions
-  (GHSA-ggr8-5vv4-36mx, GHSA-3f6p-5ww8-9rcr, GHSA-7p8r-x3mc-p8w7 and related).
-  `npm audit --omit=dev` includes them because `prisma` is a peer of
-  `@prisma/client`. `@prisma/config` only calls `deepmerge(a, b)`, and `mysql2`
-  is used only by Prisma Studio's MySQL adapter. Remove these overrides when
-  Prisma ships patched pins.
-- `@prisma/dev`, `@sentry/node`: pre-existing pins for the Prisma CLI and the
-  Lighthouse chain. Re-check both on the next Prisma or Lighthouse upgrade.
+- `deepmerge-ts`, `mysql2`: `prisma@7.10.0` pins vulnerable versions exactly
+  (`@prisma/config` → `deepmerge-ts` 7.1.5, `prisma` → `mysql2` 3.15.3;
+  GHSA-ggr8-5vv4-36mx, GHSA-3f6p-5ww8-9rcr and related). `fast-uri`
+  (GHSA-7p8r-x3mc-p8w7 and related) arrives through `@prisma/dev` →
+  `@prisma/streams-local` → `ajv` with the caret range `^3.0.1`; the override
+  keeps it at a patched version. `npm audit --omit=dev` includes them because
+  `prisma` is a peer of `@prisma/client`. `@prisma/config` only calls
+  `deepmerge(a, b)`, and `mysql2` is used only by Prisma Studio's MySQL adapter.
+  Remove these overrides when Prisma ships patched pins (re-check with
+  `npm ls deepmerge-ts mysql2 fast-uri`).
+- The former `@prisma/dev` pin was removed with the Prisma 7.10.0 upgrade,
+  which requires `@prisma/dev` 0.24.17 itself.
 
 `scripts/lib/generated-artifact-secret-disposition.mjs` supports exactly one
 Next version (`SUPPORTED_NEXT_VERSION`). A Next upgrade must update that
-constant and the matching fixture in `scripts/tests/secret-scanning.test.mjs`,
-after confirming that the build's manifest schema still validates.
+constant (the test fixture follows it) after confirming that the build's
+manifest schema still validates.
 
 The default Vitest suite and the explicit unit/security/coverage invocations
 overlap intentionally. The explicit gates preserve the agreed release contract
@@ -171,7 +183,7 @@ reviewed change.
 The current approved reference is:
 
 ```text
-postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
 ```
 
 A digest change is a separate, small supply-chain review:
@@ -193,6 +205,108 @@ A digest change is a separate, small supply-chain review:
 Never accept a digest from a blog, mutable provider build, or unauthenticated
 copy-and-paste without verifying the registry bytes and provenance.
 
+## Controlled Node base-image digest update
+
+All four stages of `docker/Dockerfile.security` (`builder`, `workers`,
+`migrate`, `runner`) use one Node base image. The current approved reference is
+Node 22.23.3 on Alpine 3.24:
+
+```text
+node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402
+```
+
+Review it on each Node 22.x security release. A digest change is a separate,
+small supply-chain review:
+
+1. Inspect the official Docker Library tags `node:22-alpine` and the exact
+   release tag (for example `node:22.23.3-alpine`) with
+   `docker buildx imagetools inspect`, and again with `--raw`.
+2. Select the top-level multi-platform OCI-index digest, never an
+   architecture-specific child or third-party mirror. Both tags must resolve to
+   it, and the SHA-256 of the `--raw` bytes must equal it.
+3. Verify the raw index contains official `linux/amd64` and `linux/arm64/v8`
+   descriptors, and that `NODE_VERSION` in each platform's image config
+   (`--format '{{json .Image}}'`) is the intended release.
+4. Replace every occurrence of the old digest (the four `FROM` lines and this
+   documentation) in one reviewed diff, keeping the `node:22-alpine@sha256:`
+   form, and confirm that a repository search finds no old digest left
+   outside the `REVIEW.md` and `PROGRESS.md` journals.
+5. Run `npm run verify:release`, then `npm run docker:build`,
+   `npm run docker:scan` and `npm run smoke:image` before accepting the update.
+   The build fails closed if the pinned `dumb-init` apk version no longer
+   resolves on the new Alpine base.
+
+## Container image vulnerability scan
+
+`npm run docker:scan` scans the three images of one build (web, `-workers`,
+`-migrate`) with `scripts/docker-scan.sh`. It is not part of
+`verify:release`; run it after `npm run docker:build`. Every scanner fails on a
+HIGH or CRITICAL vulnerability, and the script exits 127 instead of passing
+when no scanner is available. `DOCKER_SCAN_SCANNER` selects the scanner:
+
+| Value | Scanner |
+| --- | --- |
+| `auto` (default) | a host `trivy` binary if installed, else the pinned Trivy container if a Docker engine is reachable, else Docker Scout |
+| `trivy` | the host `trivy` binary |
+| `trivy-container` | the pinned Trivy container (below) |
+| `scout` | the Docker Scout CLI plugin |
+
+Docker Scout comes last because it sends the image SBOM to Docker's service.
+
+**Trivy container mode.** Nothing is installed on the host. The script writes
+the image with `docker save` to `image.tar` in a private directory created by
+`mktemp -d` under `$TMPDIR` (default `/tmp`; it needs free disk space for one
+image and is removed on exit), then runs the official Trivy image pinned by
+digest:
+
+```text
+aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
+```
+
+The container runs with `--read-only` (plus a `noexec` tmpfs on `/tmp`),
+`--cap-drop ALL` and `--security-opt no-new-privileges`. It receives only the
+tarball, mounted read-only (`:ro`), and its database cache. It never receives
+the Docker socket, so it cannot reach the Docker engine or other images. The
+cache is the named Docker volume `qr-city-guide-trivy-cache` rather than a host
+directory, so no root-owned files appear in the operator's home on a Linux host
+and removal is one command (`docker volume rm qr-city-guide-trivy-cache`).
+`docker save` writes the tarball with mode `0600`, and the container's root has
+no `CAP_DAC_OVERRIDE`, so the script makes the tarball world-readable inside its
+private `0700` directory.
+
+Only downloads leave the machine. Trivy fetches its vulnerability database
+(and, when it scans Java archives, its Java database) from
+`ghcr.io/aquasecurity`, pinned instead of the default `mirror.gcr.io` first
+choice, and matches the image locally. `--skip-version-check` and
+`--disable-telemetry` together suppress Trivy's update check and usage ping
+(Trivy 0.69.3 skips the request only when both are set), and `--offline-scan`
+stops dependency lookups against external APIs. Nothing about the image is
+uploaded.
+
+**Why 0.69.3.** The Trivy releases 0.69.4 to 0.69.6 and their images (and
+`latest` during that window) were compromised from 2026-03-19 (the TeamPCP
+supply-chain attack, advisory GHSA-69fq-xp46-6x23, which names 0.69.2 and
+0.69.3 as safe). Never use a tag without the digest. The pinned image was
+created on 2026-03-03, before the compromise, and its multi-platform index has
+the same digest on Docker Hub (`aquasec/trivy`) and GHCR
+(`ghcr.io/aquasecurity/trivy`). Change the pin like the other base images:
+inspect both registries with `docker buildx imagetools inspect` and `--raw`,
+check that the SHA-256 of the raw bytes equals the digest on both, check the
+release against Aqua's advisories, and update the script, the pinned value in
+`tests/unit/docker-scan-script.test.ts` and the reference and version wording
+in this section in one reviewed diff.
+
+**Coverage limits.** Trivy reports the Alpine `apk` packages and the
+`package.json` files under `node_modules`. The `-workers` image has no
+`node_modules`: `scripts/build-workers.mjs` bundles its dependencies (including
+`pg` and the Prisma runtime) into two `.mjs` files, so Trivy checks only its
+`apk` packages there, and the bundled npm code is covered by the root
+`npm audit --omit=dev` in `validate:security`. The Node runtime that the official
+base image installs outside `apk` is not in its report, so Node security
+releases are tracked through the base-image update above. Trivy 0.69.3 has no
+end-of-life entry for Alpine 3.24 and logs `This OS version is not on the EOL
+list`; the vulnerability data itself comes from the downloaded database.
+
 ## Restricted policy boundary
 
 `npm run validate:release-policy` is a static, repository-specific checker. It
@@ -202,6 +316,14 @@ platform dependencies and deployment scripts; an altered gate profile;
 deployment, push, publication, or persistent migration inside the local gate;
 tag-only PostgreSQL references; production-default database mutation; and
 commands that combine staging and production database credentials.
+
+For `docker/Dockerfile.security` it checks only the `runner` stage: exactly one
+`USER 1001:1001`, no `ADD`, and a `RUN` that removes `npm` and `npx`. It does not
+model the copied files, their imports or the `workers` and `migrate` stages.
+That the three images start with everything they import is proven at run time
+by `npm run smoke:image`, a mandatory release step outside `verify:release`
+because it needs the locally built images (see the release sequence in
+[`scripts/README.md`](../scripts/README.md#production)).
 
 It intentionally scans active package/scripts/configuration surfaces and known
 deployment artifact locations, not natural-language documentation. It is not a general shell, YAML, Docker, or data-flow

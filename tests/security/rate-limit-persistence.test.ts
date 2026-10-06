@@ -158,11 +158,91 @@ describe('durable sensitive-operation rate limiting', () => {
 
     expect(privacyHmac).toHaveBeenCalledOnce();
     expect(privacyHmac).toHaveBeenCalledWith(
-      'portal-signin|ip:2001:db8::1',
+      'portal-signin|ip6:2001:db8:0:0::/64',
       'sensitive-rate-limit:v1',
     );
     expect(queryRaw).toHaveBeenCalledOnce();
     expect(decision.allowed).toBe(true);
+  });
+
+  async function addressDimension(ip: string, identifier?: string) {
+    privacyHmac.mockClear();
+    queryRaw.mockClear();
+    await checkSensitiveRateLimit(request(ip), {
+      scope: 'portal-signin', identifier, limit: 3, windowMs: 60_000,
+    });
+    return {
+      dimension: privacyHmac.mock.calls[0][0] as string,
+      key: queryRaw.mock.calls[0][1] as string,
+      identifierKey: queryRaw.mock.calls[1]?.[1] as string | undefined,
+    };
+  }
+
+  it('groups IPv6 clients by their /64 network for the address dimension', async () => {
+    const first = await addressDimension('2001:db8:1:2::1');
+    const rotated = await addressDimension('2001:db8:1:2:ffff::9');
+
+    expect(first.dimension).toBe('portal-signin|ip6:2001:db8:1:2::/64');
+    expect(rotated.dimension).toBe(first.dimension);
+    expect(rotated.key).toBe(first.key);
+
+    // Canonical IPv6 without a zero run stays uncompressed (no '::'), e.g. SLAAC/privacy addresses.
+    const full = await addressDimension('2a02:587:c4a0:1b00:a1b2:c3d4:e5f6:789a');
+    const fullRotated = await addressDimension('2a02:587:c4a0:1b00:1:2:3:4');
+
+    expect(full.dimension).toBe('portal-signin|ip6:2a02:587:c4a0:1b00::/64');
+    expect(fullRotated.key).toBe(full.key);
+  });
+
+  it.each([
+    ['2001:db8:1:3::1', 'portal-signin|ip6:2001:db8:1:3::/64'],
+    ['2001:db8::1:2:3:4', 'portal-signin|ip6:2001:db8:0:0::/64'],
+    ['2001::1:2:3:4:5', 'portal-signin|ip6:2001:0:0:1::/64'],
+  ] as const)('keeps %j outside the 2001:db8:1:2::/64 bucket', async (ip, expected) => {
+    const reference = await addressDimension('2001:db8:1:2::1');
+    const other = await addressDimension(ip);
+
+    expect(other.dimension).toBe(expected);
+    expect(other.key).not.toBe(reference.key);
+  });
+
+  it('expands compressed and fully written IPv6 forms to the same /64 key', async () => {
+    const loopback = await addressDimension('::1');
+    const expanded = await addressDimension('0000:0000:0000:0000:0000:0000:0000:0001');
+    const sameNetwork = await addressDimension('0:0:0:0:1::');
+
+    expect(loopback.dimension).toBe('portal-signin|ip6:0:0:0:0::/64');
+    expect(expanded.key).toBe(loopback.key);
+    expect(sameNetwork.key).toBe(loopback.key);
+  });
+
+  it('groups an IPv6 address written with an embedded IPv4 tail by its /64', async () => {
+    const embedded = await addressDimension('64:ff9b::192.0.2.1');
+    const sameNetwork = await addressDimension('64:ff9b::1');
+
+    expect(embedded.dimension).toBe('portal-signin|ip6:64:ff9b:0:0::/64');
+    expect(sameNetwork.key).toBe(embedded.key);
+  });
+
+  it('keeps IPv4 and IPv4-mapped IPv6 clients on the full IPv4 key', async () => {
+    const ipv4 = await addressDimension('203.0.113.7');
+    const mapped = await addressDimension('::ffff:203.0.113.7');
+
+    expect(ipv4.dimension).toBe('portal-signin|ip:203.0.113.7');
+    expect(mapped.dimension).toBe(ipv4.dimension);
+    expect(mapped.key).toBe(ipv4.key);
+  });
+
+  it('leaves the identifier dimension and its refund independent of IPv6 grouping', async () => {
+    executeRaw.mockResolvedValue(1);
+    const ipv4 = await addressDimension('203.0.113.7', '691 234 5678');
+    const ipv6 = await addressDimension('2001:db8:1:2::1', '691 234 5678');
+
+    await refundSensitiveIdentifierAttempt({ scope: 'portal-signin', identifier: '+30 691 234 5678' });
+
+    expect(ipv6.identifierKey).toBe(ipv4.identifierKey);
+    expect(executeRaw).toHaveBeenCalledOnce();
+    expect(executeRaw.mock.calls[0][1]).toBe(ipv6.identifierKey);
   });
 
   it.each([

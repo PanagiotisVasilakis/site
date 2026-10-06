@@ -4,10 +4,12 @@ import { useEffect, useState, useCallback } from 'react';
 interface Labels {
   online: string; offline: string; reconnecting: string; slow: string;
 }
-interface Props { className?: string; labels: Labels; pollMs?: number; }
+interface Props { labels: Labels; }
+
+const POLL_MS = 15_000;
 
 // Network status indicator in a single pill for compact header usage.
-export default function StatusCluster({ className = '', labels, pollMs = 15000 }: Props) {
+export default function StatusCluster({ labels }: Props) {
   // Ensure SSR and first client paint match to avoid hydration mismatches
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
@@ -80,10 +82,8 @@ export default function StatusCluster({ className = '', labels, pollMs = 15000 }
     }
   }, []);
 
-  // Optional polling to verify connectivity beyond onLine
+  // Polling to verify connectivity beyond onLine
   useEffect(() => {
-    if (!pollMs || pollMs < 5000) return;
-    
     let timer: ReturnType<typeof setTimeout> | undefined;
     let aborted = false;
     
@@ -91,7 +91,7 @@ export default function StatusCluster({ className = '', labels, pollMs = 15000 }
       if (aborted) return;
       // Skip the network probe while the tab is hidden; online/offline events still apply.
       if (document.hidden) {
-        timer = setTimeout(probe, pollMs);
+        timer = setTimeout(probe, POLL_MS);
         return;
       }
 
@@ -114,7 +114,7 @@ export default function StatusCluster({ className = '', labels, pollMs = 15000 }
         setIsOnline(current => current ? false : current);
       } finally {
         if (!aborted) {
-          timer = setTimeout(probe, pollMs);
+          timer = setTimeout(probe, POLL_MS);
         }
       }
     }
@@ -125,7 +125,7 @@ export default function StatusCluster({ className = '', labels, pollMs = 15000 }
       aborted = true;
       if (timer) clearTimeout(timer);
     };
-  }, [pollMs]);
+  }, []);
 
   const slowRaw = isOnline && effectiveType && /^(2g|slow-2g)$/i.test(effectiveType);
   const netStateRaw = !isOnline ? 'offline' : reconnecting ? 'reconnecting' : slowRaw ? 'slow' : 'online';
@@ -136,23 +136,19 @@ export default function StatusCluster({ className = '', labels, pollMs = 15000 }
   const netLabel = hydrated ? netLabelRaw : labels.online;
 
   const aria = `${netLabel}.`;
-  const dotColorVar = netState === 'offline' ? 'var(--badge-warn-bg)' : netState === 'slow' ? 'var(--brand-400)' : 'var(--brand-500)';
-  const warn = netState === 'offline';
 
+  // Colours come from tokens per state (components/stay.css, R3-V9).
   return (
     <span
       role="status"
-      className={`net-status ${className}`.trim()}
-      data-state={warn ? 'offline' : 'online'}
+      className="net-status"
+      data-state={netState}
       aria-live="polite"
       aria-label={aria}
       title={aria}
-      style={{ display: 'inline-flex', gap: '.5rem' }}
     >
-      <span className="net-status-dot" aria-hidden style={{ background: dotColorVar }} />
-      <span className="flex items-center gap-1">
-        <span>{netLabel}</span>
-      </span>
+      <span className="net-status-dot" aria-hidden />
+      <span className="net-status__label">{netLabel}</span>
     </span>
   );
 }

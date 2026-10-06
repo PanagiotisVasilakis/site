@@ -1,31 +1,40 @@
 import Link from "next/link";
-import CategoryGridClient from '@/components/CategoryGridClient';
+import GuideList, { SavedLink } from '@/components/guide/GuideList';
+import { PhonesDirectory } from '@/components/guide/PhonesDirectory';
+import { favoriteIdOf, sortByDistance, toGuideEntry } from '@/components/guide/guideEntries';
+import { EmptyPanel } from '@/components/ui/EmptyPanel';
 import { categories } from "@/data/categories";
-import { getItemsByCategory, toSlug, pickLocale, pickCategoryLocale } from "@/lib/data";
+import { getItemsByCategory, pickCategoryLocale } from "@/lib/data";
 import { notFound } from "next/navigation";
-import { getDictionary } from "@/i18n/dictionaries";
+import { getDictionary, type Dictionary } from "@/i18n/dictionaries";
 import { normalizeLocale } from '@/i18n/config';
-import { localizedAlternates } from '@/lib/seo';
+import type { Category } from '@/data/schemas';
+import type { Locale } from '@/i18n/config';
+import { localizedAlternates, localizedOpenGraph } from '@/lib/seo';
 import type { Metadata } from 'next';
+
+/** The page title and lead: the guide (§9.5) and the phones page (§9.6) have their own; other categories use their data. */
+function pageCopy(cat: Category, locale: Locale, t: Dictionary): { title: string; lead?: string } {
+  if (cat.slug === 'moments') return { title: t.guide.title, lead: t.guide.lead };
+  if (cat.slug === 'phones') return { title: t.guide.phonesTitle, lead: t.guide.phonesLead };
+  return {
+    title: pickCategoryLocale(cat, 'title', locale) ?? cat.title,
+    lead: pickCategoryLocale(cat, 'description', locale) ?? cat.description,
+  };
+}
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string; category: string }> }): Promise<Metadata> {
   const { locale, category } = await params;
   const eff = normalizeLocale(locale);
-  const dictionary = getDictionary(eff);
   const cat = categories.find((candidate) => candidate.slug === category);
   if (!cat) return { robots: { index: false, follow: false } };
-  const title = dictionary.categories[cat.slug as 'phones' | 'moments']
-    ?? pickCategoryLocale(cat, 'title', eff)
-    ?? cat.title;
-  const description = cat.slug === 'moments'
-    ? dictionary.moments?.subtitle
-    : pickCategoryLocale(cat, 'description', eff) ?? cat.description;
+  const { title, lead: description } = pageCopy(cat, eff, getDictionary(eff));
   const suffix = `/${cat.slug}`;
   return {
-    title: `${title} | ${dictionary.appTitle}`,
+    title,
     description,
     alternates: localizedAlternates(eff, suffix),
-    openGraph: { title, description, url: `/${eff}${suffix}`, locale: eff, type: 'website' },
+    openGraph: localizedOpenGraph(eff, suffix),
   };
 }
 
@@ -36,79 +45,41 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
   const cat = categories.find((c) => c.slug === category);
   if (!cat) return notFound();
   const items = getItemsByCategory(cat.id);
-  // Filtering & segmentation handled client-side now
+  const entries = sortByDistance(items.map((item) => toGuideEntry(item, cat, eff, t)));
+  const { title, lead } = pageCopy(cat, eff, t);
+  // The Saved count covers only ids that still resolve to a place, like the favourites page (all categories).
+  const knownFavoriteIds = categories.flatMap((c) => getItemsByCategory(c.id).map((item) => favoriteIdOf(c, item)));
 
-  const isPhones = cat.slug === 'phones';
-  const isMoments = cat.slug === 'moments';
-  const useMomentsShell = isPhones || isMoments;
-  const pageTitle = isMoments ? t.categories.moments : (t.categories[cat.slug as "phones" | "moments"] ?? (pickCategoryLocale(cat, "title", eff) ?? cat.title));
-  const pageDescription = isMoments ? (t.moments.subtitle) : (pickCategoryLocale(cat, "description", eff) ?? cat.description);
+  if (cat.slug === 'phones' && entries.length > 0) {
+    return <PhonesDirectory entries={entries} locale={eff} title={title} lead={lead} />;
+  }
 
   return (
-    <div className={useMomentsShell ? "page-container mx-0 max-w-full safe-bottom px-4 moments-page" : "page-container mx-auto max-w-3xl safe-bottom"}>
-      <header className={useMomentsShell ? "moments-hero" : "mb-4"}>
-        <h1 className={useMomentsShell ? "moments-hero-title" : "text-2xl font-serif italic font-bold page-title"}>{pageTitle}</h1>
-        {pageDescription && <p className={useMomentsShell ? "moments-hero-subtitle" : "text-sm opacity-80 text-body"}>{pageDescription}</p>}
+    <div className="guide-page">
+      <header className="guide-head">
+        <div className="guide-head__text">
+          <h1 className="guide-head__title">{title}</h1>
+          {lead ? <p className="guide-head__lead">{lead}</p> : null}
+        </div>
+        <SavedLink locale={eff} favoriteIds={knownFavoriteIds} />
       </header>
 
-      {items.length === 0 && (
-        <div className="surface-card p-6 text-sm text-body flex flex-col gap-3 rounded-lg shadow-sm">
-          <div className="flex items-center gap-3">
-            <span aria-hidden>🗒️</span>
-            <span>{t.emptyState}</span>
-          </div>
-          <div className="text-xs text-subtle">{t.labels.contentUpdating}</div>
-          <div>
-            <Link href={`/${locale}`} className="underline text-brand-800 hover:text-brand-800 transition-colors">{t.cta.home}</Link>
-          </div>
-        </div>
+      {entries.length === 0 ? (
+        <EmptyPanel
+          variant="panel"
+          icon="info"
+          title={t.emptyState}
+          action={<Link href={`/${eff}`} className="ui-btn ui-btn--secondary ui-btn--md">{t.cta.home}</Link>}
+        >
+          {t.labels.contentUpdating}
+        </EmptyPanel>
+      ) : (
+        <GuideList
+          entries={entries}
+          locale={eff}
+          cartoBasemapsKey={process.env.CARTO_BASEMAPS_KEY || undefined}
+        />
       )}
-
-      <CategoryGridClient
-        items={items.map(i => ({
-          id: i.id,
-          slug: i.slug ?? toSlug(i.name),
-          name: pickLocale(i, 'name', eff) ?? i.name,
-          summary: pickLocale(i, 'summary', eff) ?? i.summary,
-          tags: i.tags,
-          categorySlug: cat.slug,
-          description: pickLocale(i, 'description', eff) ?? i.description,
-          rating: i.rating,
-          icon: i.icon ?? cat.icon,
-          image: i.image,
-          heroImage: i.heroImage,
-          heroImagePosition: i.heroImagePosition,
-          phone: i.phone,
-          phones: i.phones,
-          address: pickLocale(i, 'address', eff) ?? i.address,
-          location: i.location,
-          website: i.website,
-          directionsUrl: i.directionsUrl,
-          hideAddressOnFront: cat.slug === 'phones',
-        }))}
-        locale={eff}
-        categorySlug={cat.slug}
-        phonesLayout={isPhones}
-        momentsLayout={isMoments}
-        ui={t.ui}
-        cardLabels={{
-          viewDetails: t.map.viewDetails,
-          back: t.ui.back,
-          call: t.cta.call,
-          directions: t.cta.directions,
-          website: t.cta.website,
-        }}
-        momentsFilters={t.momentsFilters}
-      />
-
     </div>
   );
-}
-
-export function generateStaticParams() {
-  const all = [] as Array<{ locale: string; category: string }>;
-  for (const c of categories) {
-    for (const locale of ["en", "el"]) all.push({ locale, category: c.slug });
-  }
-  return all;
 }

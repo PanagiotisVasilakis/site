@@ -1,0 +1,596 @@
+/* Motion system skeleton (docs/design/identity.md §5.2, §5.7, §5.8).
+
+   Gate: only `data-motion="full"` on <html> arms motion, and only without an OS reduce preference.
+   - Utilities: the `motion-ok:` variant below.
+   - Plain CSS: put every motion rule inside
+       @media (prefers-reduced-motion: no-preference) { :root[data-motion="full"] … { … } }
+     and scroll-driven rules additionally inside @supports (animation-timeline: view()).
+   The global duration reset in the safety net below (moved from 05-primitives.css in R3-V12b) does not stop
+   scroll-driven animations, hence the gate. */
+@custom-variant motion-ok {
+  @media (prefers-reduced-motion: no-preference) {
+    &:where(:root[data-motion="full"] *) {
+      @slot;
+    }
+  }
+}
+
+/* Safety net. !important in the earliest layer (base) beats !important in later layers and in unlayered CSS. */
+@layer base {
+  ::view-transition {
+    pointer-events: none;
+  }
+
+  :root:not([data-motion="full"])::view-transition-group(*),
+  :root:not([data-motion="full"])::view-transition-old(*),
+  :root:not([data-motion="full"])::view-transition-new(*) {
+    animation: none !important;
+  }
+
+  /* OS reduce: every CSS animation and transition ends at once; View Transition pseudo-elements (which `*`
+     does not match) do not animate at all. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) {
+      animation: none !important;
+    }
+  }
+}
+
+/* §5.7 theme switch (graft 5): ThemeSwitch sets html[data-vt="theme"] and --vt-x/--vt-y (the switch's centre)
+   around document.startViewTransition; the new theme is revealed as a growing circle. ThemeSwitch calls the
+   API only under data-motion="full"; the safety net above also stops it otherwise. */
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-motion="full"][data-vt="theme"]::view-transition-old(root),
+  :root[data-motion="full"][data-vt="theme"]::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+
+  :root[data-motion="full"][data-vt="theme"]::view-transition-new(root) {
+    animation: vt-theme-reveal 760ms var(--ease-glide) both;
+  }
+}
+
+@keyframes vt-theme-reveal {
+  from {
+    clip-path: circle(0 at var(--vt-x, 50%) var(--vt-y, 0));
+  }
+
+  to {
+    clip-path: circle(150vmax at var(--vt-x, 50%) var(--vt-y, 0));
+  }
+}
+
+/* Home hero (§5.5 M1-M4; M5 is the WebGL island). Static by construction: the default hero styles in
+   components/hero.css are the final state. The H1 and the hero <img> are never at opacity 0 (LCP). */
+@media (prefers-reduced-motion: no-preference) {
+  /* M1: one warm light pass through the letters; line 2 slides in from .35em. Ends by 4.2 s. */
+  :root[data-motion="full"] .hero .hero__line {
+    background: linear-gradient(100deg, #FFF8EE 0 42%, #FFD6A0 50%, #FFF8EE 58% 100%) 100% 0 / 260% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: hero-sweep var(--dur-sweep) var(--ease-sweep) .5s both;
+  }
+  :root[data-motion="full"] .hero .hero__line--2 {
+    animation: hero-sweep var(--dur-sweep) var(--ease-sweep) .8s both, hero-slide-in 1.4s var(--ease-glide) .15s both;
+  }
+
+  /* M2: lede, price and CTAs rise 18 px (staggered 0 / .25 / .4 s). */
+  :root[data-motion="full"] .hero .hero__lede,
+  :root[data-motion="full"] .hero .hero__price,
+  :root[data-motion="full"] .hero .hero__actions > .ui-btn {
+    animation: hero-rise .9s var(--ease-glide) both;
+  }
+  :root[data-motion="full"] .hero .hero__price { animation-delay: .25s; }
+  :root[data-motion="full"] .hero .hero__actions > .ui-btn { animation-delay: .4s; }
+
+  /* Scroll hint (≥ 768 px): the line runs twice and ends by 4.6 s. */
+  :root[data-motion="full"] .hero .hero__hint-line {
+    transform-origin: top;
+    animation: hero-hint 1.8s var(--ease-sweep) 1s 2 both;
+  }
+
+  @supports (animation-timeline: view()) {
+    :root[data-motion="full"] .hero { view-timeline: --hero block; }
+
+    /* M3 recede (graft 1): the stage tilts back into a card as the hero leaves the view. */
+    :root[data-motion="full"] .hero .hero__stage {
+      animation: hero-recede linear both;
+      animation-timeline: --hero;
+      animation-range: exit 0% exit 100%;
+    }
+    :root[data-motion="full"] .hero .hero__stage::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgb(var(--scrim));
+      opacity: 0;
+      pointer-events: none;
+      animation: hero-recede-dim linear both;
+      animation-timeline: --hero;
+      animation-range: exit 0% exit 100%;
+    }
+    :root[data-motion="full"] .hero .hero__content {
+      animation: hero-content-exit linear both;
+      animation-timeline: --hero;
+      animation-range: exit 0% exit 70%;
+    }
+
+    /* M4 dolly (T1). The shader does the dolly once the WebGL canvas is on. */
+    :root[data-motion="full"] .hero .hero__img {
+      animation: hero-dolly linear both;
+      animation-timeline: --hero;
+      animation-range: exit 0% exit 100%;
+    }
+    :root[data-motion="full"] .hero[data-gl="on"] .hero__img { animation: none; }
+  }
+}
+
+@keyframes hero-sweep {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+
+@keyframes hero-slide-in {
+  from { transform: translateX(.35em); }
+}
+
+@keyframes hero-rise {
+  from { opacity: 0; transform: translateY(18px); }
+}
+
+@keyframes hero-hint {
+  0% { transform: scaleY(0); }
+  60% { transform: scaleY(1); }
+  100% { transform: scaleY(1); opacity: 0; }
+}
+
+@keyframes hero-recede {
+  to { transform: perspective(1400px) translateY(6%) rotateX(16deg) scale(.86); border-radius: var(--radius-card); }
+}
+
+@keyframes hero-recede-dim {
+  to { opacity: .55; }
+}
+
+@keyframes hero-content-exit {
+  to { opacity: 0; transform: translateY(-80px); }
+}
+
+@keyframes hero-dolly {
+  to { transform: scale(1.14) translateY(3%); }
+}
+
+/* Home sections (§5.5 M6-M12). Static by construction: components/home.css holds the final states, and
+   HomeRevealObserver adds `is-in` to each `[data-reveal]` element once it is in view. Without `linear()`
+   support --ease-shutter is `ease` (tokens.css), so these transitions keep running. */
+@media (prefers-reduced-motion: no-preference) {
+  /* M6 fact strip: the tiles open like louvres from rotateX(-86deg), 75 ms apart. */
+  :root[data-motion="full"] .facts .fact,
+  :root[data-motion="full"] .facts .facts__more {
+    transition: transform var(--dur-reveal) var(--ease-shutter) calc(var(--i) * 75ms), opacity 450ms ease calc(var(--i) * 75ms);
+  }
+  :root[data-motion="full"] .facts:not(.is-in) .fact,
+  :root[data-motion="full"] .facts:not(.is-in) .facts__more {
+    opacity: 0;
+    transform: rotateX(-86deg);
+  }
+
+  /* M8 highlights: rise 40 px and untilt from rotateX(18deg), 90 ms apart; then a pointer tilt (≤ 6°)
+     from --tx/--ty. M9: the cards flip edge-on while the season changes (the content swaps at 50 %).
+     Both animations stay in one list, so ending the flip does not replay the rise. */
+  :root[data-motion="full"] .intro .hl {
+    transform: rotateX(var(--ty, 0deg)) rotateY(var(--tx, 0deg));
+    transition: transform 180ms var(--ease-glide);
+  }
+  :root[data-motion="full"] .highlights-stage:not(.is-in) .hl {
+    opacity: 0;
+    transform: translateY(40px) rotateX(18deg);
+  }
+  :root[data-motion="full"] .highlights-stage.is-in .hl {
+    animation: hl-rise 700ms var(--ease-glide) calc(var(--i) * 90ms) backwards;
+  }
+  :root[data-motion="full"] .highlights-stage.is-in .highlights.is-flipping .hl {
+    animation: hl-rise 700ms var(--ease-glide) calc(var(--i) * 90ms) backwards, hl-flip 640ms var(--ease-sweep) calc(var(--i) * 70ms) both;
+  }
+
+  /* M10 balcony window: louvred shutters swing open to ±104°, a warm flare fades, the photo settles. */
+  :root[data-motion="full"] .window .shutter {
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    bottom: 0;
+    display: block;
+    width: 50%;
+    border: 8px solid var(--color-shutter-frame);
+    border-radius: 2px;
+    background:
+      linear-gradient(90deg, rgb(0 0 0 / .22), transparent 14%, transparent 86%, rgb(0 0 0 / .22)),
+      linear-gradient(180deg, transparent calc(50% - 6px), var(--color-shutter-frame) calc(50% - 6px) calc(50% + 6px), transparent calc(50% + 6px)),
+      repeating-linear-gradient(180deg, var(--color-shutter-hi) 0 2px, var(--color-shutter) 2px 12px, var(--color-shutter-lo) 12px 15px, rgb(255 214 160 / .75) 15px 16px);
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / .25);
+    backface-visibility: visible;
+    transition: transform var(--dur-shutter) var(--ease-shutter);
+  }
+  :root[data-motion="full"] .window .shutter--l { left: 0; transform-origin: 0 50%; }
+  :root[data-motion="full"] .window .shutter--r { right: 0; transform-origin: 100% 50%; transition-delay: 90ms; }
+  :root[data-motion="full"] .window .shutter__knob {
+    position: absolute;
+    top: calc(50% - 5px);
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #C9A15B;
+    box-shadow: 0 1px 2px rgb(0 0 0 / .5);
+  }
+  :root[data-motion="full"] .window .shutter--l .shutter__knob { right: 6px; }
+  :root[data-motion="full"] .window .shutter--r .shutter__knob { left: 6px; }
+  :root[data-motion="full"] .window.is-in .shutter--l { transform: rotateY(-104deg); }
+  :root[data-motion="full"] .window.is-in .shutter--r { transform: rotateY(104deg); }
+  :root[data-motion="full"] .window .window__img { transition: transform 2600ms var(--ease-glide); }
+  :root[data-motion="full"] .window:not(.is-in) .window__img { transform: scale(1.14); }
+  :root[data-motion="full"] .window.is-in .window__light { animation: window-flare 2600ms var(--ease-glide) both; }
+
+  @media (min-width: 1024px) {
+    /* M12 deck: the six cards pile, then fan out once in view; the active card lifts (also static);
+       the stage tilts toward the pointer (≤ 6°, --rx/--ry from the component). */
+    :root[data-motion="full"] .rooms .room-card {
+      transition: transform 800ms var(--ease-shutter);
+    }
+    :root[data-motion="full"] .rooms .room-card__3d {
+      transition: filter var(--dur-ui), box-shadow var(--dur-ui);
+    }
+    :root[data-motion="full"] .rooms .rooms-deck:not(.is-in) .room-card {
+      transform: translate3d(0, 0, calc(var(--apos) * -20px)) rotateZ(calc(var(--pos) * 2deg));
+    }
+    :root[data-motion="full"] .rooms .rooms-track {
+      transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+      transition: transform 900ms var(--ease-glide);
+    }
+  }
+
+  @supports (animation-timeline: view()) {
+    /* M7 kinetic band: the rows move against each other with the scroll only. */
+    :root[data-motion="full"] .kinetic { view-timeline: --kinetic block; }
+    :root[data-motion="full"] .kinetic .kinetic__row--a .kinetic__text {
+      animation: kinetic-a linear both;
+      animation-timeline: --kinetic;
+      animation-range: cover;
+    }
+    :root[data-motion="full"] .kinetic .kinetic__row--b .kinetic__text {
+      animation: kinetic-b linear both;
+      animation-timeline: --kinetic;
+      animation-range: cover;
+    }
+
+    /* M11 coverflow (< lg): each card turns by its place in the row's own horizontal scroll. */
+    @media (max-width: 1023.98px) {
+      :root[data-motion="full"] .rooms .room-card__3d {
+        animation: room-coverflow linear both;
+        animation-timeline: view(inline);
+      }
+    }
+  }
+}
+
+@keyframes hl-rise {
+  from { opacity: 0; transform: translateY(40px) rotateX(18deg); }
+}
+
+@keyframes hl-flip {
+  0% { transform: rotateY(0); }
+  50% { transform: rotateY(90deg); }
+  100% { transform: rotateY(0); }
+}
+
+@keyframes window-flare {
+  0% { opacity: 0; }
+  25% { opacity: .95; }
+  100% { opacity: 0; }
+}
+
+@keyframes kinetic-a {
+  from { transform: translateX(4%); }
+  to { transform: translateX(-38%); }
+}
+
+@keyframes kinetic-b {
+  from { transform: translateX(-40%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes room-coverflow {
+  0% { opacity: .7; transform: perspective(900px) translateZ(-40px) rotateY(34deg) scale(.9); }
+  50% { opacity: 1; transform: perspective(900px) translateZ(0) rotateY(0) scale(1); }
+  100% { opacity: .7; transform: perspective(900px) translateZ(-40px) rotateY(-34deg) scale(.9); }
+}
+
+/* Home sections 7-11 (§5.5 M13-M15, M24; the host letter fades only). Static by construction:
+   components/home.css holds the final states (flat plan, visible cells, instant <details>). */
+@media (prefers-reduced-motion: no-preference) {
+  /* M13: the 14 cells flip in, 45 ms apart. */
+  :root[data-motion="full"] .teaser .night {
+    transition: transform 700ms var(--ease-shutter) calc(var(--i) * 45ms), opacity 300ms ease calc(var(--i) * 45ms);
+  }
+  :root[data-motion="full"] .teaser .nights:not(.is-in) .night {
+    opacity: 0;
+    transform: rotateY(-90deg);
+  }
+
+  /* M14: the plan tilts (40°/−6°, 50°/−14° at lg) and follows a fine pointer (--px/--py from
+     ReliefTilt); the contour layers and the pins rise once in view; the home pin pulses twice. */
+  :root[data-motion="full"] .location .relief {
+    --rx0: 40deg;
+    --rz0: -6deg;
+    transform: rotateX(calc(var(--rx0) - var(--py, 0) * 8deg)) rotateZ(calc(var(--rz0) + var(--px, 0) * 8deg));
+    transition: transform 900ms var(--ease-glide);
+  }
+  :root[data-motion="full"] .location .relief__layer {
+    transform: translateZ(calc(var(--z) * 1px));
+    transition: transform 1200ms var(--ease-shutter), opacity 600ms ease;
+  }
+  :root[data-motion="full"] .location .relief__contour--2 { transition-delay: 120ms; }
+  :root[data-motion="full"] .location .relief__contour--3 { transition-delay: 240ms; }
+  :root[data-motion="full"] .location .relief__contour--4 { transition-delay: 300ms; }
+  :root[data-motion="full"] .location .relief__pins { transition-delay: 420ms; }
+  :root[data-motion="full"] .location .relief-wrap:not(.is-in) .relief__contour,
+  :root[data-motion="full"] .location .relief-wrap:not(.is-in) .relief__pins {
+    opacity: 0;
+    transform: translateZ(0);
+  }
+  /* The pins counter-rotate so they stand up from the tilted plan. */
+  :root[data-motion="full"] .location .pin {
+    transform: translate(-50%, -100%) rotateZ(calc(-1 * (var(--rz0) + var(--px, 0) * 8deg))) rotateX(calc(-1 * (var(--rx0) - var(--py, 0) * 8deg)));
+  }
+  :root[data-motion="full"] .location .relief-wrap.is-in .pin--home {
+    animation: pin-pulse 1.6s var(--ease-glide) 1.2s 2;
+  }
+  @media (min-width: 1024px) {
+    :root[data-motion="full"] .location .relief { --rx0: 50deg; --rz0: -14deg; }
+  }
+
+  /* The host letter fades in (§8: fade only). */
+  :root[data-motion="full"] .host .letter { transition: opacity var(--dur-reveal) var(--ease-glide); }
+  :root[data-motion="full"] .host .letter:not(.is-in) { opacity: 0; }
+
+  /* M24: the answer's height animates where ::details-content and interpolate-size exist. */
+  :root[data-motion="full"] .faq .faq__q::after { transition: transform var(--dur-ui) var(--ease-glide); }
+  @supports (interpolate-size: allow-keywords) {
+    :root[data-motion="full"] .faq { interpolate-size: allow-keywords; }
+    :root[data-motion="full"] .faq .faq__item::details-content {
+      block-size: 0;
+      overflow: clip;
+      transition: block-size var(--dur-ui) var(--ease-glide), content-visibility var(--dur-ui) allow-discrete;
+    }
+    :root[data-motion="full"] .faq .faq__item[open]::details-content { block-size: auto; }
+  }
+
+  /* M15: the gulf's waves drift with the scroll. */
+  @supports (animation-timeline: view()) {
+    :root[data-motion="full"] .location { view-timeline: --location block; }
+    :root[data-motion="full"] .location .relief__waves {
+      animation: relief-waves linear both;
+      animation-timeline: --location;
+      animation-range: cover;
+    }
+  }
+}
+
+@keyframes pin-pulse {
+  0%, 100% { box-shadow: 0 10px 18px -8px rgb(0 0 0 / .45), 0 0 0 0 rgb(242 178 122 / .7); }
+  60% { box-shadow: 0 10px 18px -8px rgb(0 0 0 / .45), 0 0 0 14px rgb(242 178 122 / 0); }
+}
+
+@keyframes relief-waves {
+  from { transform: translateX(-60px); }
+  to { transform: translateX(0); }
+}
+
+/* Kalamata guide (§5.5 M21, M25; §5.7 shared element; §8 Card hover). Static by construction: guide.css
+   holds the final states; without the gate nothing moves (the heart only changes its fill). */
+@media (prefers-reduced-motion: no-preference) {
+  /* M25 calm mode (guide lists, phones): cards and rows fade up 10 px, 60 ms apart (--i inline). */
+  :root[data-motion="full"] .guide-grid .guide-card,
+  :root[data-motion="full"] .phone-rows .phone-row,
+  :root[data-motion="full"] .guide-map .guide-map__item {
+    animation: calm-rise 520ms var(--ease-glide) calc(min(var(--i, 0), 12) * 60ms) backwards;
+  }
+
+  /* §8 Card hover (fine pointers): lift 4 px; the image scales 1.05 over 900 ms. */
+  :root[data-motion="full"] .guide-card {
+    transition: transform var(--dur-ui) var(--ease-glide), box-shadow var(--dur-ui) var(--ease-glide);
+  }
+  :root[data-motion="full"] .guide-card .guide-card__img { transition: transform 900ms var(--ease-glide); }
+  @media (hover: hover) and (pointer: fine) {
+    :root[data-motion="full"] .guide-card:hover { transform: translateY(-4px); }
+    :root[data-motion="full"] .guide-card:hover .guide-card__img { transform: scale(1.05); }
+    /* The back link's arrow nudges backwards. */
+    :root[data-motion="full"] .guide-back:hover .ui-btn__arrow { transform: translateX(-4px); }
+  }
+
+  /* M21 favourite burst: six dots scale out and fade (400 ms); the heart pops 1 → 1.25 → 1. */
+  :root[data-motion="full"] .guide-save .guide-save__burst i {
+    animation: save-burst 400ms var(--ease-glide) both;
+  }
+  :root[data-motion="full"] .guide-save .guide-save__icon:has(.guide-save__burst) svg {
+    animation: save-pop 400ms var(--ease-glide);
+  }
+
+  /* §5.7 guide card → detail morph (React <ViewTransition share="morph">). */
+  :root[data-motion="full"]::view-transition-group(.morph) {
+    animation-duration: var(--dur-page);
+    animation-timing-function: var(--ease-glide);
+  }
+
+  /* Toast rises in. */
+  :root[data-motion="full"] .ui-toasts .ui-toast { animation: calm-rise var(--dur-ui) var(--ease-glide) backwards; }
+}
+
+@keyframes calm-rise {
+  from { opacity: 0; transform: translateY(10px); }
+}
+
+@keyframes save-burst {
+  0% { opacity: 1; transform: rotate(calc(var(--i) * 60deg)) translateY(0) scale(.4); }
+  100% { opacity: 0; transform: rotate(calc(var(--i) * 60deg)) translateY(-22px) scale(1); }
+}
+
+@keyframes save-pop {
+  50% { transform: scale(1.25); }
+}
+
+/* R3-V14 motion and 3D pass (§5.5 M26-M35; M30 is in ui.css, M31/M32 in shell.css, M35 in map.css). Same rules as above: static by construction, gated, transform
+   and opacity only (the glare is a small gradient layer); scroll-driven rules inside @supports. */
+@media (prefers-reduced-motion: no-preference) {
+  /* M26 brand mark intro: the header's sun rises behind the waves while they draw. Only on the first full-motion
+     load of the session (the boot script sets data-intro; SiteHeader removes it when the sun has risen).
+     Not in the calm stay header. */
+  :root[data-motion="full"][data-intro] .site-header:not(.site-header--stay) .brand-mark__waves {
+    animation: brand-waves-draw 1.2s var(--ease-sweep) .15s backwards;
+  }
+  :root[data-motion="full"][data-intro] .site-header:not(.site-header--stay) .brand-mark__sun {
+    animation: brand-sun-rise 1s var(--ease-glide) .45s backwards;
+  }
+
+  /* M27 pointer tilt + glare (fine pointers): pointerEffectsRuntime.ts writes --tilt-x/--tilt-y (≤ 6°) and
+     --glare-x/--glare-y on a [data-tilt] element and marks it data-tilt-active; when the pointer leaves, the
+     values go and the transform springs back. The room deck tilts only at ≥ lg (the coverflow keeps M11). */
+  @media (hover: hover) and (pointer: fine) {
+    :root[data-motion="full"] .guide-card {
+      transition: transform 700ms var(--ease-shutter), box-shadow var(--dur-ui) var(--ease-glide);
+    }
+    :root[data-motion="full"] .guide-card[data-tilt-active] {
+      transform: perspective(900px) translateY(-4px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+      transition: transform 140ms var(--ease-glide), box-shadow var(--dur-ui) var(--ease-glide);
+    }
+    :root[data-motion="full"] .host .letter {
+      transition: opacity var(--dur-reveal) var(--ease-glide), transform 700ms var(--ease-shutter);
+    }
+    :root[data-motion="full"] .host .letter[data-tilt-active] {
+      transform: perspective(1400px) rotate(-.8deg) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+      transition: opacity var(--dur-reveal) var(--ease-glide), transform 140ms var(--ease-glide);
+    }
+    /* The glare stays off text: over the guide card's photo (its media clips it), under the letter's text. */
+    :root[data-motion="full"] .guide-card .guide-card__media::after,
+    :root[data-motion="full"] .host .letter::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      background: radial-gradient(circle at var(--glare-x, 50%) var(--glare-y, 50%), rgb(255 255 255 / .55), transparent 58%);
+      mix-blend-mode: soft-light;
+      opacity: 0;
+      transition: opacity 600ms var(--ease-glide);
+    }
+    :root[data-motion="full"] .guide-card .guide-card__media::after { z-index: 1; }
+    /* The letter is always a stacking context (its resting rotate), so -1 paints over its paper only. */
+    :root[data-motion="full"] .host .letter::after { z-index: -1; }
+    :root[data-motion="full"] .guide-card[data-tilt-active] .guide-card__media::after,
+    :root[data-motion="full"] .host .letter[data-tilt-active]::after {
+      opacity: 1;
+      transition-duration: var(--dur-ui);
+    }
+
+    @media (min-width: 1024px) {
+      :root[data-motion="full"] .rooms .room-card__3d {
+        transition: filter var(--dur-ui), box-shadow var(--dur-ui), transform 700ms var(--ease-shutter);
+      }
+      :root[data-motion="full"] .rooms .room-card__3d[data-tilt-active] {
+        transform: perspective(900px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+        transition: filter var(--dur-ui), box-shadow var(--dur-ui), transform 140ms var(--ease-glide);
+      }
+      /* Over the photo and its scrim, under the caption (z-index 1, later in the DOM). */
+      :root[data-motion="full"] .rooms .room-card__3d::before {
+        content: "";
+        position: absolute;
+        z-index: 1;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(circle at var(--glare-x, 50%) var(--glare-y, 50%), rgb(255 255 255 / .5), transparent 58%);
+        mix-blend-mode: soft-light;
+        opacity: 0;
+        transition: opacity 600ms var(--ease-glide);
+      }
+      :root[data-motion="full"] .rooms .room-card__3d[data-tilt-active]::before {
+        opacity: 1;
+        transition-duration: var(--dur-ui);
+      }
+    }
+  }
+
+  /* M29 §5.7 the header stays put across navigations (Next view-transitions guide, "Anchoring the header"):
+     its own group, above the morphing photos, with no animation. Not during the theme reveal or the photo
+     morph (data-vt), which treat the page as one. */
+  :root[data-motion="full"]:not([data-vt]) .site-header { view-transition-name: site-header; }
+  :root[data-motion="full"]::view-transition-group(site-header) {
+    z-index: 100;
+    animation: none;
+  }
+  :root[data-motion="full"]::view-transition-old(site-header) { display: none; }
+  :root[data-motion="full"]::view-transition-new(site-header) { animation: none; }
+
+  @supports (animation-timeline: view()) {
+    /* M28 section headings rise out of a 3D plane as they scroll in (marketing pages: the Section primitive
+       is not used on the calm stay routes, which stay-routes.test.tsx checks). */
+    :root[data-motion="full"] .ui-section .ui-section__title {
+      transform-origin: 50% 100%;
+      animation: section-title-rise linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 30%;
+    }
+    /* Until a heading has risen, its tilted top edge projects wider than the column (perspective), which
+       widened the document on home at 360–1024 px (R3-V13 overflow audit). `clip` trims only what lies
+       outside the main box (the viewport width) and creates no scroll container, so sticky and view()
+       timelines are unchanged. */
+    :root[data-motion="full"] .site-main { overflow-x: clip; }
+
+    /* M33 apartment lead photo (CSS layered parallax; §5.10 gives the apartment no deferred WebGL budget):
+       the photo drifts inside its frame while the frame recedes slightly as it leaves the view. */
+    :root[data-motion="full"] .apt-lead { view-timeline: --apt-lead block; }
+    :root[data-motion="full"] .apt-lead .apt-lead__frame {
+      animation: apt-lead-depth linear both;
+      animation-timeline: --apt-lead;
+      animation-range: cover 0% cover 100%;
+    }
+    :root[data-motion="full"] .apt-lead .apt-lead__open {
+      animation: apt-lead-recede linear both;
+      animation-timeline: --apt-lead;
+      animation-range: exit 0% exit 100%;
+    }
+  }
+}
+
+@keyframes brand-waves-draw {
+  from { stroke-dasharray: 1 1.1; stroke-dashoffset: 1.02; }
+  to { stroke-dasharray: 1 1.1; stroke-dashoffset: 0; }
+}
+
+@keyframes brand-sun-rise {
+  from { opacity: 0; transform: translateY(6px); }
+}
+
+@keyframes section-title-rise {
+  from { opacity: 0; transform: perspective(600px) translateY(.5em) rotateX(-58deg); }
+  to { opacity: 1; transform: perspective(600px) translateY(0) rotateX(0); }
+}
+
+@keyframes apt-lead-depth {
+  from { transform: translateY(-5%) scale(1.12); }
+  to { transform: translateY(5%) scale(1.12); }
+}
+
+@keyframes apt-lead-recede {
+  to { transform: perspective(1400px) rotateX(7deg) scale(.95); }
+}

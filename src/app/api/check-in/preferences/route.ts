@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { withErrorHandler, validateRequestBody, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
-import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import { GUEST_SESSION_COOKIE, parseGuestSession, verifyGuestSessionAccess } from '@/lib/guestSession';
 import { isAdminRequest } from '@/lib/rbac';
 import { getFeatureFlagsAsync } from '@/lib/featureFlags';
@@ -114,16 +113,11 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }
 
-  // Request shape checks only (content type and body size)
-  const guard = createAPISecurityMiddleware();
-  const early = await guard(request);
-  if (early) return early;
-
   if (!(await isAdminRequest(request))) {
     throw new ApiError(ApiErrorCode.FORBIDDEN, 'Admin credentials required to update preferences');
   }
 
-  const parseBody = validateRequestBody(preferencesSchema);
+  const parseBody = validateRequestBody(preferencesSchema, 4 * 1_024);
   const body = await parseBody(request);
 
   const prefs: CheckInPreferences = {

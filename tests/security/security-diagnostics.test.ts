@@ -3,13 +3,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   transaction: vi.fn(),
-  logger: { warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn(), trace: vi.fn(), getContext: vi.fn() },
+  logger: {
+    warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn(), trace: vi.fn(), getContext: vi.fn(), setContext: vi.fn(),
+  },
 }));
 
 vi.mock('@/lib/prisma', () => ({ prisma: { $transaction: mocks.transaction } }));
 vi.mock('@/lib/logger-enterprise', () => ({ logger: mocks.logger }));
+vi.mock('@/lib/featureFlags', () => ({ getFeatureFlagsAsync: async () => ({ portalEnabled: true }) }));
 
-import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
+import { POST as claimPost } from '@/app/api/portal/claims/route';
 import { createSecurityMiddleware } from '@/lib/security-middleware-edge';
 
 describe('pre-authentication security diagnostics', () => {
@@ -31,14 +34,15 @@ describe('pre-authentication security diagnostics', () => {
     }));
   });
 
-  it('rejects a wrong content type with 415, a log line and no database write', async () => {
-    const response = await createAPISecurityMiddleware()(new NextRequest('https://guide.example/api/portal/claims', {
+  it('rejects a wrong content type on a JSON route with a 415 JSON envelope, a log line and no database write', async () => {
+    const response = await claimPost(new NextRequest('https://guide.example/api/portal/claims', {
       method: 'POST',
       headers: { 'content-type': 'text/plain' },
       body: 'x',
-    }));
+    }), { params: Promise.resolve({}) });
 
-    expect(response?.status).toBe(415);
+    expect(response.status).toBe(415);
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'UNSUPPORTED_MEDIA_TYPE' } });
     expect(mocks.transaction).not.toHaveBeenCalled();
     expect(mocks.logger.warn).toHaveBeenCalledWith('Security diagnostic', expect.objectContaining({
       type: 'api_security_violation',

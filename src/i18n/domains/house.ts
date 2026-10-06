@@ -1,45 +1,34 @@
 /**
  * House/Apartment translations.
- * Includes: apartment details, amenities, rules, room descriptions
+ * The apartment page (identity §9.2) and its photo viewer; the copy is the owner-approved R3-C1 text.
+ * Claims come from src/data/apartmentData.ts, the photos and the owner's facts (views of the mountain and the sea, O45).
  */
 
 import type { Locale } from '../config';
+import type { ApartmentPhotoId } from '@/data/apartmentPhotos';
+import type { IconName } from '@/components/icons/iconNames';
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface HouseDictionary {
-    navLabel: string;
+    /** The page H1 and the metadata title. */
     title: string;
+    eyebrow: string;
+    /** The page lead and the metadata description. */
     intro: string;
     guideTitle: string;
-    photoAlts: { living: string; bedroom: string; bedroom_2: string; kitchen: string; balcony: string; bathroom: string; };
-    glanceTitle: string;
-    specs: string[];
-    ctaPrimary: string;
-    ctaSecondary: string;
-    footerNote: string;
-    heroLabel: string;
-    specsSectionLabel: string;
-    /** `{label}` is the room title (lower-cased in English). */
-    openGallery: string;
-    rooms: Record<'living_room' | 'kitchen' | 'bedroom' | 'bedroom_2' | 'balcony' | 'bathroom', { title: string; description: string }>;
-    photoViewer: {
-        instructions: string;
-        counter: string;
-        prev: string;
-        next: string;
-        close: string;
-        resetZoom: string;
-        title: string;
-        /** `{current}` and `{total}` are replaced. */
-        thumbnail: string;
-    };
+    roomsNavLabel: string;
+    amenities: { eyebrow: string; title: string };
+    cta: { eyebrow: string; title: string; lead: string; seeDates: string; contact: string };
+    /** GalleryLightbox; `{current}` and `{total}` are replaced in `counter`. */
+    viewer: { dialog: string; close: string; previous: string; next: string; counter: string };
+    /** Descriptive alt text per marketing photo (identity §7.1). */
+    photoAlts: Record<ApartmentPhotoId, string>;
 }
 
 export interface LocationPanelDictionary {
-    title: string;
     apartmentTitle: string;
     city: string;
     blurb: string;
@@ -47,7 +36,7 @@ export interface LocationPanelDictionary {
     locationDescription: string;
     locationTitle: string;
     highlights: Array<{
-        icon: string;
+        icon: IconName;
         title: string;
         description: string;
     }>;
@@ -61,168 +50,150 @@ export interface LocationPanelDictionary {
 
 export const houseTranslations: Record<Locale, HouseDictionary> = {
     en: {
-        navLabel: "Photo Gallery",
-        title: "Your 2-Bedroom Apartment with Mountain & Sea Views",
-        intro: "Welcome to your spacious apartment, featuring large sunny terraces and beautiful views in a quiet neighborhood near the Town Hall.",
-        glanceTitle: "At a Glance",
-        specs: [
-            "2 bedrooms",
-            "1 bathroom",
-            "2nd floor",
-            "90 m²",
-            "Mountain & sea views",
-            "Free parking"
-        ],
-        ctaPrimary: "Book",
-        ctaSecondary: "Contact Us",
-        footerNote: "© Kalamata Apartment",
-        heroLabel: "Apartment hero",
-        specsSectionLabel: "Specifications and actions",
-        openGallery: "Open {label} gallery",
-        guideTitle: "Your Apartment Guide",
-        photoAlts: { living: 'Living area', bedroom: 'Bedroom', bedroom_2: 'Second bedroom', kitchen: 'Kitchen', balcony: 'Balcony', bathroom: 'Bathroom' },
-        rooms: {
-            living_room: {
-                title: "Living Room",
-                description: "An airy lounge with soft seating, daylight, and access to the balcony for relaxed gatherings."
-            },
-            kitchen: {
-                title: "Kitchen",
-                description: "Fully equipped with modern appliances and a breakfast nook for easy meals and morning coffee."
-            },
-            bedroom: {
-                title: "Bedroom",
-                description: "A calming retreat with plush bedding, blackout shades, and built-in storage for long stays."
-            },
-            bedroom_2: {
-                title: "Second Bedroom",
-                description: "Comfortable second bedroom with ample space, perfect for families or groups."
-            },
-            balcony: {
-                title: "Balcony",
-                description: "Open-air terrace capturing both mountain and sea breezes, perfect for sunset unwinding."
-            },
-            bathroom: {
-                title: "Bathroom",
-                description: "Bright bathroom with rainfall shower, premium amenities, and ample counter space."
-            }
+        title: "The apartment",
+        eyebrow: "2nd floor · Kalamata",
+        intro: "Two bedrooms, a bright open-plan living room and a sunny balcony, 50 m from Kalamata Town Hall. Taygetos at breakfast, the gulf a short drive away.",
+        guideTitle: "Your apartment guide",
+        roomsNavLabel: "Rooms",
+        amenities: { eyebrow: "Amenities", title: "What you will find" },
+        cta: {
+            eyebrow: "Availability",
+            title: "See when it is free",
+            lead: "Free nights and their prices are on the availability calendar.",
+            seeDates: "See free dates",
+            contact: "Questions? Contact us",
         },
-        photoViewer: {
-            instructions: "Photo viewer controls: Use arrow keys to navigate between images, Home/End keys to jump to first/last image, Escape to close viewer.",
-            counter: "Currently viewing image {current} of {total}.",
-            prev: "Previous image",
-            next: "Next image",
-            close: "Close viewer",
-            resetZoom: "Reset Zoom",
-            title: "Photo viewer",
-            thumbnail: "View image {current} of {total}"
+        viewer: {
+            dialog: "Photo viewer",
+            close: "Close photo viewer",
+            previous: "Previous photo",
+            next: "Next photo",
+            counter: "{current} / {total}",
+        },
+        photoAlts: {
+            living_8: "Open-plan living room with a corner sofa, the dining table and the kitchen behind",
+            living_6: "Corner sofa and coffee table, with the kitchen across the room",
+            living_2: "Dining table with dark wooden chairs, the fireplace behind",
+            living_7: "Sofa facing the corner fireplace, with tall curtained windows",
+            living_1: "Entrance hall with a shoe cabinet and the front door open",
+            living_4: "Metal leaf artwork on a white wall",
+            living_5: "Two small elephant figures on a white shelf",
+            kitchen_2: "Wooden kitchen with an oven, an extractor hood and the fridge",
+            kitchen_6: "Breakfast bar with stools next to the dishwasher",
+            kitchen_3: "Counter with a coffee maker, a French press and a dish rack",
+            kitchen_4: "Sink, kettle and cabinets along the kitchen wall",
+            kitchen_5: "Stainless-steel fridge, microwave and oven",
+            kitchen_1: "Fruit bowl on the breakfast bar",
+            bedroom_1: "Double bed against a terracotta wall",
+            bedroom_2: "Double bed with folded towels and a mirrored wardrobe",
+            bedroom_3: "Bedroom with a storage bench and a small table with a mirror",
+            bedroom_2_5: "Second bedroom with a light green wardrobe and towels folded on the bed",
+            bedroom_2_6: "Pillows and a bedside table with a silver heart",
+            bedroom_2_3: "Bed with a white bedside table",
+            bedroom_2_1: "Towels folded into elephants on the bed",
+            bathroom_6: "Washbasin with towels on hooks and a mirror",
+            bathroom_7: "Vanity unit, towel radiator and hair dryer",
+            bathroom_3: "Washing machine under a wall cabinet",
+            bathroom_4: "Shell decoration and a storage basket",
+            balcony_1: "Balcony table for four among plants, with the rooftops and Taygetos beyond",
         },
     },
     el: {
-        navLabel: "Συλλογή Φωτογραφιών",
-        title: "Το 2-υπνοδωματίων διαμέρισμά σας με θέα σε βουνό & θάλασσα",
-        intro: "Καλώς ήρθατε στο ευρύχωρο διαμέρισμά σας, με μεγάλες ηλιόλουστες βεράντες και όμορφη θέα σε μια ήσυχη γειτονιά κοντά στο Δημαρχείο.",
-        glanceTitle: "Με μια Ματιά",
-        specs: [
-            "2 υπνοδωμάτια",
-            "1 μπάνιο",
-            "2ος όροφος",
-            "90 τ.μ.",
-            "Θέα βουνό & θάλασσα",
-            "Δωρεάν πάρκινγκ"
-        ],
-        ctaPrimary: "Κράτηση",
-        ctaSecondary: "Επικοινωνία",
-        footerNote: "© Διαμέρισμα Καλαμάτας",
-        heroLabel: "Εικόνα διαμερίσματος",
-        specsSectionLabel: "Προδιαγραφές και ενέργειες",
-        openGallery: "Άνοιγμα γκαλερί {label}",
-        guideTitle: "Ο Οδηγός του Διαμερίσματός σας",
-        photoAlts: { living: 'Καθιστικό', bedroom: 'Υπνοδωμάτιο', bedroom_2: 'Δεύτερο υπνοδωμάτιο', kitchen: 'Κουζίνα', balcony: 'Μπαλκόνι', bathroom: 'Μπάνιο' },
-        rooms: {
-            living_room: {
-                title: "Καθιστικό",
-                description: "Φωτεινό καθιστικό με άνετο καναπέ, ημέρας φως και πρόσβαση στο μπαλκόνι για στιγμές χαλάρωσης."
-            },
-            kitchen: {
-                title: "Κουζίνα",
-                description: "Πλήρως εξοπλισμένη με σύγχρονες ηλεκτρικές συσκευές και χώρο πρωινού για εύκολα γεύματα."
-            },
-            bedroom: {
-                title: "Υπνοδωμάτιο",
-                description: "Ήρεμο δωμάτιο με αναπαυτικό στρώμα, συσκότιση και ευρύχωρες ντουλάπες για μεγαλύτερες διαμονές."
-            },
-            bedroom_2: {
-                title: "Δεύτερο Υπνοδωμάτιο",
-                description: "Άνετο δεύτερο υπνοδωμάτιο με ευρύχωρο χώρο, ιδανικό για οικογένειες ή παρέες."
-            },
-            balcony: {
-                title: "Μπαλκόνι",
-                description: "Ανοιχτός χώρος με δροσερό αεράκι βουνού και θάλασσας, ιδανικός για χαλάρωση στο ηλιοβασίλεμα."
-            },
-            bathroom: {
-                title: "Μπάνιο",
-                description: "Φωτεινό μπάνιο με ντους βροχής, ποιοτικά προϊόντα και άνετο πάγκο."
-            }
+        title: "Το διαμέρισμα",
+        eyebrow: "2ος όροφος · Καλαμάτα",
+        intro: "Δύο υπνοδωμάτια, ένα φωτεινό ενιαίο καθιστικό και ένα ηλιόλουστο μπαλκόνι, 50 μ. από το Δημαρχείο της Καλαμάτας. Ο Ταΰγετος στο πρωινό σας, ο κόλπος λίγα λεπτά με το αυτοκίνητο.",
+        guideTitle: "Ο οδηγός του διαμερίσματός σας",
+        roomsNavLabel: "Δωμάτια",
+        amenities: { eyebrow: "Παροχές", title: "Τι θα βρείτε" },
+        cta: {
+            eyebrow: "Διαθεσιμότητα",
+            title: "Δείτε πότε είναι ελεύθερο",
+            lead: "Οι ελεύθερες νύχτες και οι τιμές τους βρίσκονται στο ημερολόγιο διαθεσιμότητας.",
+            seeDates: "Δείτε ελεύθερες ημερομηνίες",
+            contact: "Ερωτήσεις; Επικοινωνήστε μαζί μας",
         },
-        photoViewer: {
-            instructions: "Χειρισμός προβολής: Χρησιμοποιήστε τα βελάκια για εναλλαγή εικόνων, τα πλήκτρα Home/End για μετάβαση στην πρώτη/τελευταία εικόνα, και το πλήκτρο Escape για κλείσιμο.",
-            counter: "Προβάλλεται η εικόνα {current} από {total}.",
-            prev: "Προηγούμενη εικόνα",
-            next: "Επόμενη εικόνα",
+        viewer: {
+            dialog: "Προβολή φωτογραφιών",
             close: "Κλείσιμο προβολής",
-            resetZoom: "Επαναφορά ζουμ",
-            title: "Προβολή φωτογραφιών",
-            thumbnail: "Προβολή εικόνας {current} από {total}"
+            previous: "Προηγούμενη φωτογραφία",
+            next: "Επόμενη φωτογραφία",
+            counter: "{current} / {total}",
+        },
+        photoAlts: {
+            living_8: "Ενιαίο καθιστικό με γωνιακό καναπέ, την τραπεζαρία και την κουζίνα στο βάθος",
+            living_6: "Γωνιακός καναπές και τραπεζάκι σαλονιού, με την κουζίνα απέναντι",
+            living_2: "Τραπεζαρία με σκούρες ξύλινες καρέκλες και το τζάκι πίσω της",
+            living_7: "Καναπές απέναντι στο γωνιακό τζάκι, με ψηλά παράθυρα και κουρτίνες",
+            living_1: "Η είσοδος με παπουτσοθήκη και την εξώπορτα ανοιχτή",
+            living_4: "Μεταλλικό διακοσμητικό με φύλλα σε λευκό τοίχο",
+            living_5: "Δύο μικρά διακοσμητικά ελεφαντάκια σε λευκό ράφι",
+            kitchen_2: "Ξύλινη κουζίνα με φούρνο, απορροφητήρα και ψυγείο",
+            kitchen_6: "Πάγκος πρωινού με σκαμπό, δίπλα στο πλυντήριο πιάτων",
+            kitchen_3: "Πάγκος με καφετιέρα, γαλλική πρέσα και πιατοθήκη",
+            kitchen_4: "Νεροχύτης, βραστήρας και ντουλάπια στον τοίχο της κουζίνας",
+            kitchen_5: "Ανοξείδωτο ψυγείο, φούρνος μικροκυμάτων και φούρνος",
+            kitchen_1: "Φρουτιέρα στον πάγκο πρωινού",
+            bedroom_1: "Διπλό κρεβάτι μπροστά σε τοίχο σε χρώμα τερακότας",
+            bedroom_2: "Διπλό κρεβάτι με διπλωμένες πετσέτες και ντουλάπα με καθρέφτη",
+            bedroom_3: "Υπνοδωμάτιο με μπαούλο και μικρό τραπέζι με καθρέφτη",
+            bedroom_2_5: "Δεύτερο υπνοδωμάτιο με ανοιχτοπράσινη ντουλάπα και πετσέτες διπλωμένες στο κρεβάτι",
+            bedroom_2_6: "Μαξιλάρια και κομοδίνο με μια ασημένια καρδιά",
+            bedroom_2_3: "Κρεβάτι με λευκό κομοδίνο",
+            bedroom_2_1: "Πετσέτες διπλωμένες σε σχήμα ελέφαντα πάνω στο κρεβάτι",
+            bathroom_6: "Νιπτήρας με πετσέτες σε κρεμάστρες και καθρέφτη",
+            bathroom_7: "Έπιπλο νιπτήρα, θερμαινόμενη πετσετοκρεμάστρα και σεσουάρ",
+            bathroom_3: "Πλυντήριο ρούχων κάτω από ντουλάπι",
+            bathroom_4: "Διακοσμητικά κοχύλια και καλάθι αποθήκευσης",
+            balcony_1: "Τραπέζι για τέσσερις ανάμεσα σε φυτά στο μπαλκόνι, με τις στέγες και τον Ταΰγετο πίσω",
         },
     },
 };
 
 export const locationPanelTranslations: Record<Locale, LocationPanelDictionary> = {
     en: {
-        title: "Explore the Neighborhood",
-        apartmentTitle: "2-Bedroom Apartment with Views",
+        apartmentTitle: "Two-bedroom apartment with views",
         city: "Kalamata, Greece",
-        blurb: "A quiet neighborhood just 50m from the Town Hall, with stunning mountain and sea views.",
-        nearby: "What's Nearby?",
-        locationDescription: "Discover your apartment's prime location in Kalamata and explore Kalamata Moments, services, and sights within minutes.",
-        locationTitle: "Explore the Neighborhood",
+        blurb: "A quiet street 50 m from the Town Hall, with views of the mountain and the sea.",
+        nearby: "What's nearby?",
+        locationDescription: "Museums, services and places near the apartment, in the Kalamata guide.",
+        locationTitle: "Explore the neighbourhood",
         highlights: [
-            { icon: "🏛️", title: "Town Hall", description: "50 m (1' walk)" },
-            { icon: "🏺", title: "Archaeological Museum", description: "2 km (15' walk)" },
-            { icon: "✈️", title: "Kalamata Airport", description: "6 km (15' drive)" },
-            { icon: "🏙️", title: "City Center", description: "1.5 km (14' walk / 4' drive)" },
-            { icon: "🏖️", title: "Beach Access", description: "1 km (5' drive to the coast)" },
-            { icon: "🚗", title: "Bus Stop", description: "100 m (3' walk)" },
+            { icon: "museum", title: "Town Hall", description: "50 m · 1 min walk" },
+            { icon: "museum", title: "Public Library–Art Gallery", description: "about 15 min walk · 5 min by car" },
+            { icon: "museum", title: "Archaeological Museum of Messenia (Benakeion)", description: "about 15 min walk · 5 min by car" },
+            { icon: "plane", title: "Kalamata Airport", description: "6 km · 15 min by car" },
+            { icon: "map-pin", title: "City centre", description: "1.5 km · about 15 min walk, 4 min by car" },
+            { icon: "beach", title: "Nearest beach", description: "5 min by car" },
+            { icon: "bus", title: "Bus stop", description: "100 m · 3 min walk" },
         ],
         howToEnableMapTitle: "How to use the interactive map:",
         howToEnableSteps: [
             "Make sure JavaScript is enabled in your browser",
             "Pan or zoom the map to explore the neighborhood",
-            "Tap a marker to open details and travel times"
+            "Tap a marker to open details"
         ]
     },
     el: {
-        title: "Τοποθεσία & Κοντινά",
-        apartmentTitle: "Διαμέρισμα 2 Υπνοδωματίων με Θέα",
+        apartmentTitle: "Διαμέρισμα δύο υπνοδωματίων με θέα",
         city: "Καλαμάτα, Ελλάδα",
-        blurb: "Μια ήσυχη γειτονιά μόλις 50μ από το Δημαρχείο, με εκπληκτική θέα σε βουνό και θάλασσα.",
+        blurb: "Ήσυχος δρόμος 50 μ. από το Δημαρχείο, με θέα σε βουνό και θάλασσα.",
         nearby: "Τι υπάρχει κοντά;",
-        locationDescription: "Ανακαλύψτε την εξαιρετική τοποθεσία του διαμερίσματός σας στην Καλαμάτα και εξερευνήστε τις Στιγμές Καλαμάτας, υπηρεσίες και αξιοθέατα μέσα σε λίγα λεπτά.",
-        locationTitle: "Εξερευνήστε τη Γειτονιά",
+        locationDescription: "Μουσεία, υπηρεσίες και μέρη κοντά στο διαμέρισμα, στον οδηγό Καλαμάτας.",
+        locationTitle: "Εξερευνήστε τη γειτονιά",
         highlights: [
-            { icon: "🏛️", title: "Δημαρχείο", description: "50 μ (1' με τα πόδια)" },
-            { icon: "🏺", title: "Μπενάκειο Αρχαιολογικό Μουσείο", description: "2 χλμ (15' με τα πόδια)" },
-            { icon: "✈️", title: "Αεροδρόμιο Καλαμάτας", description: "6 χλμ (15' οδήγηση)" },
-            { icon: "🏙️", title: "Κέντρο Πόλης", description: "1,5 χλμ (14' περπάτημα / 4' οδήγηση)" },
-            { icon: "🏖️", title: "Πρόσβαση στην Παραλία", description: "1 χλμ (5' με αυτοκίνητο)" },
-            { icon: "🚗", title: "Στάση Λεωφορείου", description: "100 μ (3' με τα πόδια)" },
+            { icon: "museum", title: "Δημαρχείο", description: "50 μ. · 1 λεπτό με τα πόδια" },
+            { icon: "museum", title: "Δημόσια Βιβλιοθήκη–Πινακοθήκη", description: "περίπου 15 λεπτά με τα πόδια · 5 λεπτά με το αυτοκίνητο" },
+            { icon: "museum", title: "Μπενάκειο Αρχαιολογικό Μουσείο Μεσσηνίας", description: "περίπου 15 λεπτά με τα πόδια · 5 λεπτά με το αυτοκίνητο" },
+            { icon: "plane", title: "Αεροδρόμιο Καλαμάτας", description: "6 χλμ. · 15 λεπτά με το αυτοκίνητο" },
+            { icon: "map-pin", title: "Κέντρο πόλης", description: "1,5 χλμ. · περίπου 15 λεπτά με τα πόδια, 4 λεπτά με το αυτοκίνητο" },
+            { icon: "beach", title: "Κοντινότερη παραλία", description: "5 λεπτά με το αυτοκίνητο" },
+            { icon: "bus", title: "Στάση λεωφορείου", description: "100 μ. · 3 λεπτά με τα πόδια" },
         ],
         howToEnableMapTitle: "Πώς να χρησιμοποιήσετε τον διαδραστικό χάρτη:",
         howToEnableSteps: [
             "Βεβαιωθείτε ότι η JavaScript είναι ενεργοποιημένη στο πρόγραμμα περιήγησης",
             "Μετακινήστε ή μεγεθύνετε τον χάρτη για να εξερευνήσετε τη γειτονιά",
-            "Πατήστε έναν δείκτη για να δείτε λεπτομέρειες και χρόνους διαδρομής"
+            "Πατήστε έναν δείκτη για να δείτε λεπτομέρειες"
         ]
     },
 };

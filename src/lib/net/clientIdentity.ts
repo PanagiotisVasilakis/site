@@ -15,7 +15,8 @@ export type ClientIdentityUnavailableReason =
   | 'sentinel'
   | 'malformed'
   | 'multi_value'
-  | 'unsupported_format';
+  | 'unsupported_format'
+  | 'attestation_rejected';
 
 /**
  * Internal control-flow error for operations that require an available,
@@ -104,7 +105,9 @@ export function requireCanonicalClientIp(
   const canonical = canonicalizeClientIp(selected);
   if (!canonical) {
     throw new ClientIdentityUnavailableError(
-      selected === 'unknown' && rawSource === null ? 'sentinel' : unavailableReason(selected),
+      // After the checks above, a non-null source is a valid IP, so a null
+      // result here means the attestation did not match the configured secret.
+      rawSource === null ? 'sentinel' : 'attestation_rejected',
     );
   }
   return canonical;

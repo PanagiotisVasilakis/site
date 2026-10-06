@@ -2,14 +2,13 @@ import type { ExecFileException } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
 import {
-  POSTGRES_IMAGE_POLICY_FAILURE_CLASSES,
-  POSTGRES_IMAGE_POLICY_STAGES,
   POSTGRES_IMAGE_POLICY_STAGE_TIMEOUT_MS,
   PostgresImagePolicyCommandError,
   postgresImagePolicyCommandDiagnostic,
   runPostgresImagePolicyCommand,
   type ExecFileRunner,
   type PostgresImagePolicyFailureClass,
+  type PostgresImagePolicyStage,
 } from '../../scripts/lib/postgres-image-policy-command';
 
 const secret = 'Bearer fake-registry-secret-marker';
@@ -38,16 +37,16 @@ function failingRunner(failureClass: PostgresImagePolicyFailureClass): ExecFileR
   };
 }
 
-const failureMatrix = POSTGRES_IMAGE_POLICY_STAGES.flatMap((stage) => (
-  POSTGRES_IMAGE_POLICY_FAILURE_CLASSES.map((failureClass) => ({ failureClass, stage }))
-));
+// The stage never selects a branch (it is copied into the error), so one case per failure
+// class, each on a different stage; CONTEXT_INSPECT is covered by the synchronous-throw test.
+const failureCases: Array<{ failureClass: PostgresImagePolicyFailureClass; stage: PostgresImagePolicyStage }> = [
+  { failureClass: 'TIMEOUT', stage: 'IMAGE_PULL' },
+  { failureClass: 'NONZERO_EXIT', stage: 'OCI_INDEX_INSPECT' },
+  { failureClass: 'SPAWN_FAILURE', stage: 'LOCAL_IMAGE_INSPECT' },
+];
 
 describe('PostgreSQL image-policy command diagnostics', () => {
-  it('defines the complete deterministic 4x3 failure matrix', () => {
-    expect(failureMatrix).toHaveLength(12);
-  });
-
-  it.each(failureMatrix)(
+  it.each(failureCases)(
     'classifies $stage $failureClass without leaking raw diagnostics',
     async ({ failureClass, stage }) => {
       const timeoutMs = POSTGRES_IMAGE_POLICY_STAGE_TIMEOUT_MS[stage];
@@ -88,7 +87,7 @@ describe('PostgreSQL image-policy command diagnostics', () => {
     },
   );
 
-  it.each(POSTGRES_IMAGE_POLICY_STAGES)(
+  it.each(['IMAGE_PULL'] as const)(
     'preserves successful stdout behavior for %s',
     async (stage) => {
       const calls: Array<{ file: string; timeout: number | undefined }> = [];

@@ -1,0 +1,310 @@
+/* Apartment page (docs/design/identity.md §9.2, §7.3). Unlayered (O38); the two-class colour rules
+   (0,2,0) date from the legacy cascade that R3-V12b deleted, and are kept as they are. */
+
+.apt {
+  --apt-chips-top: calc(var(--header-offset) + var(--header-h) + 8px);
+  --apt-chips-h: 56px;
+  padding-bottom: var(--space-section);
+}
+
+.apt-head,
+.apt-lead,
+.apt-chips,
+.apt-room {
+  max-width: calc(var(--container) + 2 * var(--gutter));
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+/* Page head: eyebrow, H1 (d1), one-paragraph lead, the inline facts. The header sits in the flow on this route
+   (not in shellLinks HERO_ROUTES), so the head needs no room for it. */
+.apt-head {
+  padding-top: clamp(40px, 7vw, 88px);
+  padding-bottom: clamp(28px, 4vw, 44px);
+}
+.apt-head .apt-head__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: .7em;
+  margin: 0 0 16px;
+  font-family: var(--font-text);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--text-label--line-height);
+  letter-spacing: var(--text-label--letter-spacing);
+  text-transform: uppercase;
+  color: var(--color-primary-text);
+}
+.apt-head .apt-head__eyebrow::before {
+  content: "";
+  width: 28px;
+  height: 1px;
+  background: currentColor;
+  opacity: .7;
+}
+/* §2.6: Greek labels stay in sentence case, 14 px. */
+.apt-head .apt-head__eyebrow:lang(el) {
+  font-size: .875rem;
+  text-transform: none;
+}
+.apt-head .apt-head__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-d1);
+  font-weight: 400;
+  line-height: var(--text-d1--line-height);
+  letter-spacing: var(--text-d1--letter-spacing);
+  color: var(--color-fg);
+  text-wrap: balance;
+}
+.apt-head .apt-head__lead {
+  max-width: 38em;
+  margin: 20px 0 0;
+  font-size: var(--text-lead);
+  line-height: var(--text-lead--line-height);
+  color: var(--color-fg-muted);
+  text-wrap: pretty;
+}
+
+/* Inline facts (FactStrip `inline`, no overlap): 2 columns on mobile, 3 at sm, one row at lg. */
+.facts-inline {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 24px;
+  margin: 32px 0 0;
+  padding: 24px 0 0;
+  border-top: 1px solid var(--color-border);
+  list-style: none;
+}
+@media (min-width: 640px) {
+  .facts-inline { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .facts-inline { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+.facts-inline .fact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.facts-inline .fact__num {
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 1.5rem + .8vw, 2.25rem);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-fg);
+}
+.facts-inline .fact__unit {
+  margin-left: .12em;
+  font-size: .55em;
+}
+/* "P" drawn as a road sign, like the home FactStrip. */
+.facts-inline .fact__num--sign {
+  display: inline-grid;
+  place-items: center;
+  width: 1.2em;
+  height: 1.2em;
+  border: 2px solid currentColor;
+  border-radius: 6px;
+  font-family: var(--font-text);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.facts-inline .fact__label {
+  font-size: var(--text-caption);
+  line-height: var(--text-caption--line-height);
+  color: var(--color-fg-muted);
+}
+
+/* Lead photo: living_8, 4:5 on mobile, 3:2 at md; the LCP element. */
+.apt-lead {
+  margin-bottom: 8px;
+}
+.apt-lead .apt-lead__open {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-card);
+  background: var(--color-surface-sunken);
+  overflow: hidden;
+  cursor: zoom-in;
+}
+@media (min-width: 768px) {
+  .apt-lead .apt-lead__open { aspect-ratio: 3 / 2; }
+}
+.apt-lead .apt-lead__frame {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+.apt-lead .apt-lead__img {
+  object-fit: cover;
+  object-position: 42% 100%;
+}
+
+/* Sticky room chips below the header; the row scrolls sideways on narrow screens. */
+.apt-chips {
+  position: sticky;
+  top: var(--apt-chips-top);
+  z-index: 20;
+  margin-top: 16px;
+}
+.apt-chips .apt-chips__list {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 8px;
+  overflow-x: auto;
+  scroll-padding-inline: var(--gutter);
+  scrollbar-width: none;
+  list-style: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-glass);
+  box-shadow: var(--shadow-rest);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.apt-chips .apt-chips__list::-webkit-scrollbar { display: none; }
+.apt-chips .apt-chip {
+  text-decoration: none;
+}
+.apt-chips .apt-chip.apt-chip {
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
+/* The current room: the Chip "pressed" look (§8), as aria-current on a link. */
+.apt-chips .apt-chip.apt-chip[aria-current="true"] {
+  border-color: var(--color-fg);
+  background: var(--color-fg);
+  color: var(--color-bg);
+}
+@media (hover: hover) and (pointer: fine) {
+  .apt-chips .apt-chip.apt-chip:hover:not([aria-current="true"]) { background: var(--color-surface-sunken); }
+}
+
+/* Room sections: title d3, one line, masonry columns (2 / 3 at md / 4 at xl; 8 / 12 px gap). */
+.apt-room {
+  padding-top: clamp(40px, 6vw, 72px);
+  scroll-margin-top: calc(var(--apt-chips-top) + var(--apt-chips-h) + 8px);
+}
+.apt-room .apt-room__head {
+  margin-bottom: 20px;
+}
+.apt-room .apt-room__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-d3);
+  font-weight: 400;
+  line-height: var(--text-d3--line-height);
+  letter-spacing: var(--text-d3--letter-spacing);
+  color: var(--color-fg);
+}
+.apt-room .apt-room__line {
+  margin: 8px 0 0;
+  font-size: var(--text-body);
+  color: var(--color-fg-muted);
+}
+
+.apt-masonry {
+  columns: 2;
+  column-gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 768px) {
+  .apt-masonry { columns: 3; column-gap: 12px; }
+}
+@media (min-width: 1280px) {
+  .apt-masonry { columns: 4; }
+}
+.apt-masonry.apt-masonry--single {
+  columns: 1;
+  max-width: 820px;
+}
+.apt-masonry .apt-masonry__item {
+  break-inside: avoid;
+  margin-bottom: 8px;
+}
+@media (min-width: 768px) {
+  .apt-masonry .apt-masonry__item { margin-bottom: 12px; }
+}
+.apt-masonry .apt-tile {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-tile);
+  background: var(--color-surface-sunken);
+  overflow: hidden;
+  cursor: zoom-in;
+  /* Keyboard focus scrolls a tile below the sticky room chips, not under them (R-362). */
+  scroll-margin-top: calc(var(--apt-chips-top) + var(--apt-chips-h) + 8px);
+}
+.apt-masonry .apt-tile__img {
+  object-fit: cover;
+}
+
+.apt-lead .apt-lead__open:focus-visible,
+.apt-masonry .apt-tile:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+/* Amenities: grouped lists with a §6 icon, 2 columns at md. */
+.apt-amenities .apt-amenities__grid {
+  display: grid;
+  gap: 32px 48px;
+}
+@media (min-width: 768px) {
+  .apt-amenities .apt-amenities__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.apt-amenities .apt-amenity__title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 12px;
+  font-family: var(--font-text);
+  font-size: var(--text-h3);
+  font-weight: 600;
+  line-height: var(--text-h3--line-height);
+  color: var(--color-fg);
+}
+.apt-amenities .apt-amenity__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--color-primary-tint);
+  color: var(--color-primary-text);
+}
+.apt-amenities .apt-amenity__list {
+  margin: 0;
+  padding: 0 0 0 56px;
+  list-style: none;
+}
+.apt-amenities .apt-amenity__item {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
+  color: var(--color-fg-muted);
+}
+
+/* CTA: See free dates (primary), Book on Airbnb (secondary, only with a listing URL), contact link. */
+.apt-cta .apt-cta__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.apt-cta .apt-cta__contact {
+  margin: 24px 0 0;
+}

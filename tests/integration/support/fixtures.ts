@@ -11,7 +11,6 @@ import type {
 export const SYNTHETIC_FIXTURE = {
   userId: '10000000-0000-4000-8000-000000000001',
   bookingId: '20000000-0000-4000-8000-000000000001',
-  email: 'integration-guest@example.invalid',
   phoneE164: '+12025550100',
   provider: 'integration-fixture',
   externalReference: 'synthetic-booking-001',
@@ -29,12 +28,11 @@ export async function seedDeterministicFixtures(
       await client.query({
         text: `
           INSERT INTO users (
-            id, email, phone_e164, password_hash, country_origin, created_at, updated_at
-          ) VALUES ($1, $2, $3, NULL, 'ABROAD', $4, $4)
+            id, phone_e164, password_hash, created_at, updated_at
+          ) VALUES ($1, $2, NULL, $3, $3)
         `,
         values: [
           SYNTHETIC_FIXTURE.userId,
-          SYNTHETIC_FIXTURE.email,
           SYNTHETIC_FIXTURE.phoneE164,
           SYNTHETIC_FIXTURE.createdAt,
         ],
@@ -42,9 +40,9 @@ export async function seedDeterministicFixtures(
       await client.query({
         text: `
           INSERT INTO bookings (
-            id, source, reference, start_date, end_date, user_id, provider,
+            id, source, start_date, end_date, user_id, provider,
             external_reference, access_status, claimed_at, created_at, updated_at
-          ) VALUES ($1, 'EXTERNAL', NULL, $2, $3, $4, $5, $6, 'VERIFIED', $7, $7, $7)
+          ) VALUES ($1, 'EXTERNAL', $2, $3, $4, $5, $6, 'VERIFIED', $7, $7, $7)
         `,
         values: [
           SYNTHETIC_FIXTURE.bookingId,

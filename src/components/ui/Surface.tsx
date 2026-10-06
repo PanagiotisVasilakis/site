@@ -4,7 +4,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 const surfaceVariants = cva('', {
   variants: {
     variant: {
-      card: 'surface-card',
+      card: 'admin-card',
     },
     padding: {
       sm: 'p-4',
@@ -13,16 +13,12 @@ const surfaceVariants = cva('', {
       xl: 'p-8',
     },
     radius: {
-      md: 'rounded-lg',
-      lg: 'rounded-xl',
+      md: 'rounded-tile',
+      lg: 'rounded-card',
     },
     shadow: {
       sm: 'shadow-sm',
       lg: 'shadow-lg',
-    },
-    border: {
-      none: '',
-      soft: 'border border-soft',
     },
   },
   defaultVariants: {
@@ -30,16 +26,15 @@ const surfaceVariants = cva('', {
     padding: 'md',
     radius: 'md',
     shadow: 'sm',
-    border: 'soft',
   },
 });
 
 type SurfaceProps = HTMLAttributes<HTMLDivElement> & VariantProps<typeof surfaceVariants>;
 
-export function Surface({ className, variant, padding, radius, shadow, border, ...props }: SurfaceProps) {
+export function Surface({ className, variant, padding, radius, shadow, ...props }: SurfaceProps) {
   return (
     <div
-      className={surfaceVariants({ variant, padding, radius, shadow, border, className })}
+      className={surfaceVariants({ variant, padding, radius, shadow, className })}
       {...props}
     />
   );

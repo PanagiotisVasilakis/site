@@ -30,8 +30,25 @@ function limiterKey(scope: string, dimension: string): string {
   return `sensitive:${privacyHmac(`${scope}|${dimension}`, 'sensitive-rate-limit:v1')}`;
 }
 
+/**
+ * Client-address dimension. IPv4 (IPv4-mapped IPv6 already arrives as IPv4) keeps the full
+ * address. IPv6 is grouped by its /64 network, because one subscriber normally controls a whole
+ * /64 and could otherwise rotate addresses inside it. `ip` is the canonical WHATWG serialization
+ * from requireCanonicalClientIp: lowercase hex pieces with at most one `::` and no dotted-quad
+ * tail (an embedded IPv4 tail arrives as its two hex pieces).
+ */
+function limiterAddressDimension(ip: string): string {
+  if (!ip.includes(':')) return `ip:${ip}`;
+  const [head, tail] = ip.split('::');
+  const pieces = (part: string | undefined) => (part ? part.split(':') : []);
+  const left = pieces(head);
+  const right = pieces(tail);
+  const hextets = [...left, ...Array<string>(8 - left.length - right.length).fill('0'), ...right];
+  return `ip6:${hextets.slice(0, 4).join(':')}::/64`;
+}
+
 function buildKeys(ip: string, options: RateLimitOptions): string[] {
-  const dimensions = [`ip:${ip}`];
+  const dimensions = [limiterAddressDimension(ip)];
   if (options.identifier) dimensions.push(`identifier:${normalizeIdentifier(options.identifier)}`);
   return dimensions.map((dimension) => limiterKey(options.scope, dimension));
 }

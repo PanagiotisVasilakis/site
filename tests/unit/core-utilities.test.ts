@@ -6,7 +6,6 @@ import { mapsHref, telHref } from '@/lib/contactLinks';
 import { serializeJsonLd } from '@/lib/jsonLd';
 import { toSafeLocalPath } from '@/lib/safeLocalPath';
 import { absUrl, siteUrl } from '@/lib/site';
-import { formatTravelChip } from '@/lib/travelFormat';
 import { mapApiErrorToUI } from '@/lib/userFacingErrors';
 
 describe('core utility contracts', () => {
@@ -59,20 +58,6 @@ describe('core utility contracts', () => {
   it('builds canonical site URLs without rewriting unrelated origins', () => {
     expect(absUrl('en/apartment')).toBe(`${siteUrl}/en/apartment`);
     expect(absUrl('/el/about')).toBe(`${siteUrl}/el/about`);
-  });
-
-  it.each([
-    ['foot', 750, 1_800, '🚶', '750m • 30m'],
-    ['driving', 12_400, 5_400, '🚗', '12km • 1h30m'],
-    ['cycling', 1_250, 3_600, '🚲', '1.3km • 1h'],
-  ] as const)('formats %s travel metrics', (mode, distance, duration, icon, text) => {
-    expect(formatTravelChip(mode, distance, duration)).toContain(icon);
-    expect(formatTravelChip(mode, distance, duration)).toContain(text);
-  });
-
-  it('returns an empty travel chip for incomplete metrics', () => {
-    expect(formatTravelChip('foot')).toBe('');
-    expect(formatTravelChip('foot', 100, 0)).toBe('');
   });
 
   it('maps validation errors to bounded field-safe UI data', () => {

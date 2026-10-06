@@ -2,7 +2,6 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { CheckInRequestStatus } from '@/generated/prisma/client';
 import { withErrorHandler, validateRequestBody, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
-import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import { isAdminRequest } from '@/lib/rbac';
 import {
   CheckInRequestAlreadyDecidedError,
@@ -12,11 +11,10 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-const guard = createAPISecurityMiddleware();
-const idSchema = z.string().uuid();
+const idSchema = z.uuid();
 const updateSchema = z.object({
   status: z.enum(['approved', 'rejected']),
-});
+}).strict();
 const retrySchema = z.object({ action: z.literal('retry_delivery') }).strict();
 const bodySchema = z.union([retrySchema, updateSchema]);
 
@@ -29,16 +27,13 @@ export const PATCH = withErrorHandler(async (
   request: NextRequest,
   context: { params: Promise<Record<string, string>> }
 ) => {
-  const earlyResponse = await guard(request);
-  if (earlyResponse) return earlyResponse;
-
   if (!(await isAdminRequest(request))) {
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
   }
 
   const params = await context.params;
   const id = idSchema.parse(params.id);
-  const body = await validateRequestBody(bodySchema)(request);
+  const body = await validateRequestBody(bodySchema, 4 * 1_024)(request);
 
   const existing = await checkInRequestRepository.findById(id);
   if (!existing) throw new ApiError(ApiErrorCode.NOT_FOUND, 'Check-in request not found');

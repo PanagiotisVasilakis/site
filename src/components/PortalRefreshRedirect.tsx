@@ -1,20 +1,36 @@
 "use client";
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Icon } from '@/components/icons/Icon';
+import { StatusPage } from '@/components/stay/StatusPage';
+import { normalizeLocale } from '@/i18n/config';
+import { getDictionary } from '@/i18n/dictionaries';
 import { refreshPortalSession } from '@/lib/portalRefreshClient';
 import { toSafeLocalPath } from '@/lib/safeLocalPath';
 
 type PortalRefreshRedirectProps = {
+  locale: string;
   refreshHref: string;
   failureHref: string;
 };
 
+/** identity §9.8: no spinner; after this long the page says "Still working…" and offers the manual link. */
+const STILL_WORKING_MS = 5_000;
+
 export default function PortalRefreshRedirect({
+  locale,
   refreshHref,
   failureHref,
 }: PortalRefreshRedirectProps) {
+  const t = getDictionary(normalizeLocale(locale)).stay.refresh;
   const navigationStarted = useRef(false);
+  const [stillWorking, setStillWorking] = useState(false);
   const safeFailureLink = toSafeLocalPath(failureHref) ?? '/';
+
+  useEffect(() => {
+    const timer = setTimeout(() => setStillWorking(true), STILL_WORKING_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -41,16 +57,21 @@ export default function PortalRefreshRedirect({
   }, [failureHref, refreshHref]);
 
   return (
-    <div className="page-bg min-h-[50vh] px-4 py-10">
-      <div className="surface-card mx-auto max-w-md rounded-lg p-6 text-center shadow-sm">
-        <h1 className="page-title text-xl font-serif italic font-bold">Refreshing your session</h1>
-        <p className="mt-3 text-sm text-body" role="status">
-          Please wait while we restore access to your check-in information.
-        </p>
-        <a className="btn-primary mt-5" href={safeFailureLink}>
-          Sign in instead
+    <StatusPage title={t.title} lead={stillWorking ? t.stillWorking : t.lead} role="status">
+      {stillWorking ? (
+        <a className="ui-btn ui-btn--link-arrow status-page__link" href={safeFailureLink}>
+          {t.signIn}
+          <Icon name="arrow-right" size={18} className="ui-btn__arrow" />
         </a>
-      </div>
-    </div>
+      ) : (
+        // Without client code neither the refresh nor the timer runs, so the manual link is there from the start.
+        <noscript>
+          <a className="ui-btn ui-btn--link-arrow status-page__link" href={safeFailureLink}>
+            {t.signIn}
+            <Icon name="arrow-right" size={18} className="ui-btn__arrow" />
+          </a>
+        </noscript>
+      )}
+    </StatusPage>
   );
 }

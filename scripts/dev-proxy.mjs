@@ -5,7 +5,7 @@
  * Sensitive routes resolve client identity only from the two private headers
  * that Nginx overwrites in production (docs/security/trusted-ingress.md). A
  * browser cannot send them, so `next dev` alone answers 503 on admin login,
- * guest sign-in/claims, booking requests and the other limited routes. This
+ * guest sign-in/claims and the other limited routes. This
  * proxy listens on loopback, drops any client-supplied private headers, adds
  * the attestation (ORIGIN_PROXY_SHARED_SECRET) and the socket peer address,
  * and forwards HTTP and WebSocket (HMR) traffic to the dev server.

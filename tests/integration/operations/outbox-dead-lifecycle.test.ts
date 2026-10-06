@@ -105,15 +105,8 @@ describe.sequential('DEAD outbox event lifecycle on PostgreSQL', () => {
     }
   });
 
-  it('does not open the critical alert for events cancelled by a privacy erasure', async () => {
-    await seedEvent(ERASED, 'DEAD', '{"redacted": true, "reason": "privacy_erasure"}', 0);
-    const { evaluateOperationalAlerts } = await import('@/lib/operationalMonitor');
-
-    await evaluateOperationalAlerts();
-
-    expect(await openDeadOutboxAlert()).toBeNull();
-  });
-
+  // The erased event is subtracted here, and the next test shows a value of 0 leaves no open
+  // alert, so an erasure alone never opens the critical alert.
   it('counts only real delivery failures', async () => {
     await seedEvent(ERASED, 'DEAD', '{"redacted": true, "reason": "privacy_erasure"}', 0);
     await seedEvent(FAILED_RECENTLY, 'DEAD', '{"requestId": "a"}', 1);

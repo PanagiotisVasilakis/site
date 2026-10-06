@@ -1,0 +1,439 @@
+/* Availability page (docs/design/identity.md §9.3): Calendar (react-day-picker 9 skinned through `classNames`,
+   no react-day-picker stylesheet), legend, SummaryCard, QuoteBar and the no-JS night list (§8).
+   Unlayered (O38); the two-class colour rules (0,2,0) date from the legacy cascade that R3-V12b deleted, and
+   are kept as they are. Motion is gated (§5.2). */
+
+/* Page */
+.avail-page {
+  width: min(100% - 2 * var(--gutter), var(--container));
+  margin: 0 auto;
+  padding-top: 24px;
+  font-family: var(--font-text);
+}
+.avail-page.avail-page { color: var(--color-fg); }
+.avail-page__head {
+  display: grid;
+  gap: 14px;
+  max-width: 46rem;
+  margin-bottom: 28px;
+}
+.avail-page .avail-page__back { justify-self: start; font-size: .9375rem; gap: 6px; }
+.avail-page .avail-page__title {
+  margin: 0;
+  color: var(--color-fg);
+  font-family: var(--font-display);
+  font-size: var(--text-d1);
+  font-weight: 400;
+  line-height: var(--text-d1--line-height);
+  letter-spacing: var(--text-d1--letter-spacing);
+  text-wrap: balance;
+}
+.avail-page .avail-page__lead {
+  max-width: 38em;
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: var(--text-lead);
+  line-height: var(--text-lead--line-height);
+  text-wrap: pretty;
+}
+.avail-page__planner { display: grid; gap: 16px; }
+.avail-page .avail-page__updated { margin: 0; color: var(--color-fg-muted); font-size: .8125rem; }
+.avail-page__contact-card {
+  max-width: 30rem;
+  padding: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-rest);
+}
+.avail-page__sections {
+  display: grid;
+  gap: 44px;
+  margin-top: var(--space-section);
+}
+
+/* Planner layout: calendar → legend → note → SummaryCard below lg; calendar | sticky card at ≥ lg */
+.planner {
+  display: grid;
+  align-items: start;
+  gap: 24px;
+}
+.planner__calendar { display: grid; gap: 14px; min-width: 0; }
+.planner__summary { min-width: 0; }
+@media (min-width: 1024px) {
+  .planner { grid-template-columns: minmax(0, 1fr) 380px; gap: 32px; }
+  .planner__summary { position: sticky; top: 90px; }
+}
+.planner__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.planner__toolbar:empty { display: none; }
+.planner__nav { display: flex; gap: 8px; }
+.planner .planner__clear { margin-left: auto; }
+
+/* Calendar months: stacked below md, two side by side at ≥ md */
+.cal__months { display: grid; gap: 16px; }
+.cal[data-layout="pair"] .cal__months {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  perspective: 1600px;
+}
+.cal__month {
+  padding: 14px 10px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-rest);
+}
+@media (min-width: 640px) {
+  .cal__month { padding: 18px 14px 14px; }
+}
+.cal__caption { display: flex; justify-content: center; padding: 0 0 10px; }
+.cal .cal__caption-label {
+  color: var(--color-fg);
+  font-family: var(--font-display);
+  font-size: 1.625rem;
+  font-weight: 400;
+  line-height: 1.15;
+}
+.cal__grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.cal .cal__weekday {
+  padding: 0 0 8px;
+  color: var(--color-fg-muted);
+  font-size: .75rem;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+.cal .cal__weekday:lang(el) { letter-spacing: .04em; text-transform: none; }
+.cal .cal__abbr { text-decoration: none; cursor: default; }
+
+/* Day cells (≥ 44 px; 58 px tall on mobile): date 16 px 600 + price 12 px */
+.cal__day { padding: 2px 0; text-align: center; }
+.cal .cal__btn {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+  min-height: 58px;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 12px;
+  background: var(--color-cal-free-bg);
+  color: var(--color-fg);
+  font-family: var(--font-text);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums lining-nums;
+  cursor: pointer;
+}
+@media (min-width: 768px) {
+  .cal .cal__btn { min-height: 52px; }
+}
+.cal .cal__price,
+.cal .cal__note {
+  color: var(--color-cal-price);
+  font-size: .75rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.cal .cal__price--best {
+  padding: 1px 6px;
+  border-radius: var(--radius-control);
+  background: var(--color-cal-best-bg);
+  color: var(--color-cal-best-fg);
+}
+.cal .cal__btn:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: -3px;
+}
+.cal .cal__day--today .cal__date {
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+/* Booked: hatch (135°, 1.5 px stripe, 7 px period), struck date */
+.cal .cal__day--booked .cal__btn {
+  background:
+    repeating-linear-gradient(135deg, var(--color-cal-booked-hatch) 0 1.5px, transparent 1.5px 7px),
+    var(--color-cal-booked-bg);
+  color: var(--color-cal-booked-fg);
+}
+.cal .cal__day--booked .cal__date { text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.cal .cal__day--booked .cal__note { color: var(--color-cal-booked-fg); }
+/* Check-out only: the first booked night after the check-in stays clickable */
+.cal .cal__day--out .cal__btn { box-shadow: inset 0 0 0 1.5px var(--color-border-strong); }
+
+/* Past, beyond the horizon, or not a possible check-in/check-out now */
+.cal .cal__day--disabled .cal__btn { cursor: default; }
+.cal .cal__day--disabled:not(.cal__day--booked) .cal__btn { opacity: .45; }
+
+/* Your stay: check-in and check-out in cal-selected (12 px outer radius), the nights between in cal-range */
+.cal .cal__day--middle .cal__btn {
+  border-radius: 0;
+  background: var(--color-cal-range-bg);
+}
+.cal .cal__day--selected:not(.cal__day--middle) .cal__btn {
+  background: var(--color-cal-selected-bg);
+  color: var(--color-cal-selected-fg);
+}
+.cal .cal__day--selected:not(.cal__day--middle) .cal__price:not(.cal__price--best) { color: var(--color-cal-selected-fg); }
+.cal .cal__day--start .cal__btn { border-radius: 12px 4px 4px 12px; }
+.cal .cal__day--end .cal__btn { border-radius: 4px 12px 12px 4px; }
+/* Hidden days (the other month's dates) carry the range modifiers too, but no button: no band there. */
+.cal .cal__day--start:not(.cal__day--hidden) { background: linear-gradient(90deg, transparent 50%, var(--color-cal-range-bg) 50%) content-box; }
+.cal .cal__day--end:not(.cal__day--hidden) { background: linear-gradient(90deg, var(--color-cal-range-bg) 50%, transparent 50%) content-box; }
+
+@media (hover: hover) and (pointer: fine) {
+  .cal .cal__day:not(.cal__day--disabled):not(.cal__day--selected):not(.cal__day--booked) .cal__btn:hover {
+    background: var(--color-surface-sunken);
+  }
+}
+
+/* Legend */
+.cal-legend { display: grid; gap: 8px; font-size: .8125rem; line-height: 1.3; }
+.cal-legend .cal-legend__title { margin: 0; color: var(--color-fg); font-weight: 600; }
+.cal-legend__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cal-legend .cal-legend__item { display: inline-flex; align-items: center; gap: 8px; color: var(--color-fg-muted); }
+.cal-legend .cal-legend__swatch {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 7px;
+  background: var(--color-cal-free-bg);
+  color: var(--color-cal-price);
+  font-size: .75rem;
+  font-weight: 600;
+}
+.cal-legend .cal-legend__swatch--best {
+  width: auto;
+  padding: 0 6px;
+  border-color: transparent;
+  border-radius: var(--radius-control);
+  background: var(--color-cal-best-bg);
+  color: var(--color-cal-best-fg);
+}
+.cal-legend .cal-legend__swatch--booked {
+  background:
+    repeating-linear-gradient(135deg, var(--color-cal-booked-hatch) 0 1.5px, transparent 1.5px 7px),
+    var(--color-cal-booked-bg);
+}
+.cal-legend .cal-legend__swatch--stay { border-color: transparent; background: var(--color-cal-selected-bg); }
+
+/* SummaryCard: surface, radius-dialog, shadow-raised; sticky at ≥ lg (see .planner__summary) */
+.summary-card {
+  display: grid;
+  gap: 14px;
+  padding: 22px 20px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-dialog);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-raised);
+  font-family: var(--font-text);
+}
+@media (min-width: 640px) {
+  .summary-card { padding: 28px; }
+}
+.summary-card.summary-card { color: var(--color-fg); }
+.summary-card:focus { outline: none; }
+.summary-card:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
+.summary-card .summary-card__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--color-primary-text);
+  font-family: var(--font-text);
+  font-size: .8125rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.summary-card .summary-card__eyebrow:lang(el) { font-size: .875rem; letter-spacing: .04em; text-transform: none; }
+.summary-card__eyebrow::before {
+  content: "";
+  width: 28px;
+  height: 1px;
+  background: currentColor;
+}
+.summary-card .summary-card__empty { margin: 0; color: var(--color-fg-muted); }
+.summary-card .summary-card__dates {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 400;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.summary-card .summary-card__sub { margin: 0; color: var(--color-fg-muted); font-size: .9375rem; }
+.summary-card__lines { display: grid; gap: 8px; margin: 0; }
+.summary-card__line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 16px;
+}
+.summary-card .summary-card__value { margin: 0; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums lining-nums; }
+.summary-card .summary-card__detail {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  gap: 2px 14px;
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: .8125rem;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.summary-card__total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 14px;
+  border-top: 1.5px dashed var(--color-border-strong);
+  font-weight: 600;
+}
+.summary-card .summary-card__total-value {
+  display: inline-block;
+  color: var(--color-primary-text);
+  font-family: var(--font-display);
+  font-size: 2.75rem;
+  font-weight: 400;
+  line-height: 1;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.summary-card .summary-card__request { margin: 0; font-weight: 600; }
+.summary-card .summary-card__fine,
+.summary-card .summary-card__trust { margin: 0; color: var(--color-fg-muted); font-size: .8125rem; }
+
+.booking-options { display: grid; gap: 10px; }
+.booking-options__row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+
+/* QuoteBar (below lg): glass pill, fixed 12 px from the edges */
+.quote-bar {
+  position: fixed;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  left: 12px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 7px 7px 20px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-glass-bar);
+  box-shadow: var(--shadow-overlay);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  backdrop-filter: blur(16px) saturate(1.2);
+  font-family: var(--font-text);
+}
+.quote-bar.quote-bar { color: var(--color-fg); }
+.quote-bar .quote-bar__text { min-width: 0; margin: 0; font-size: .9375rem; font-weight: 600; font-variant-numeric: tabular-nums lining-nums; }
+@media (min-width: 1024px) {
+  .quote-bar { display: none; }
+}
+
+/* No-JS list of the next nights (rendered inside <noscript>) */
+.nights-list {
+  padding: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+.nights-list .nights-list__title {
+  margin: 0 0 12px;
+  color: var(--color-fg);
+  font-family: var(--font-display);
+  font-size: var(--text-h3);
+  font-weight: 400;
+  line-height: 1.15;
+}
+.nights-list__items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.nights-list__item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.nights-list .nights-list__status { font-weight: 600; }
+
+/* Motion (§5.5 M19, M20, M22), gated by §5.2 */
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-motion="full"] .cal .cal__btn { transition: background-color var(--dur-micro) var(--ease-glide); }
+
+  /* M19 month turn at ≥ md: rotateY(±58deg) translateZ(-40px) → flat, 560 ms, origin at the spine.
+     The parity attribute alternates the (identical) keyframe names so every turn restarts the animation. */
+  :root[data-motion="full"] .cal[data-layout="pair"] .cal__month:first-child { transform-origin: right center; }
+  :root[data-motion="full"] .cal[data-layout="pair"] .cal__month:last-child { transform-origin: left center; }
+  :root[data-motion="full"] .cal[data-turn="next"][data-turn-parity="0"] .cal__month { animation: cal-turn-next-a 560ms var(--ease-sweep); }
+  :root[data-motion="full"] .cal[data-turn="next"][data-turn-parity="1"] .cal__month { animation: cal-turn-next-b 560ms var(--ease-sweep); }
+  :root[data-motion="full"] .cal[data-turn="prev"][data-turn-parity="0"] .cal__month { animation: cal-turn-prev-a 560ms var(--ease-sweep); }
+  :root[data-motion="full"] .cal[data-turn="prev"][data-turn-parity="1"] .cal__month { animation: cal-turn-prev-b 560ms var(--ease-sweep); }
+
+  /* M20 range light: one pass across the chosen nights (55 ms per cell), then the total bumps */
+  :root[data-motion="full"] .cal .cal__day--middle .cal__btn::after,
+  :root[data-motion="full"] .cal .cal__day--end .cal__btn::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--color-sun);
+    opacity: 0;
+    pointer-events: none;
+    animation: cal-range-light 480ms var(--ease-glide) calc(var(--i, 0) * 55ms);
+  }
+  :root[data-motion="full"] .summary-card .summary-card__total-value { animation: summary-total-bump 500ms var(--ease-glide); }
+
+  /* M22 QuoteBar slides up */
+  :root[data-motion="full"] .quote-bar { transition: transform var(--dur-ui) var(--ease-glide); }
+  @starting-style {
+    :root[data-motion="full"] .quote-bar { transform: translateY(160%); }
+  }
+}
+
+@keyframes cal-turn-next-a { from { transform: rotateY(-58deg) translateZ(-40px); } }
+@keyframes cal-turn-next-b { from { transform: rotateY(-58deg) translateZ(-40px); } }
+@keyframes cal-turn-prev-a { from { transform: rotateY(58deg) translateZ(-40px); } }
+@keyframes cal-turn-prev-b { from { transform: rotateY(58deg) translateZ(-40px); } }
+@keyframes cal-range-light {
+  0% { opacity: 0; }
+  35% { opacity: .45; }
+  100% { opacity: 0; }
+}
+@keyframes summary-total-bump {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-4px); }
+}

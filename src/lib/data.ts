@@ -4,6 +4,7 @@ import { ItemSchema, type Item } from "../data/schemas";
 import { categories } from "../data/categories";
 import type { Locale } from "@/i18n/config";
 import { logger } from '@/lib/logger-enterprise';
+import { pickLocale } from '@/lib/localize';
 
 const dataRoot = path.join(process.cwd(), "src", "data", "items");
 
@@ -34,11 +35,11 @@ export function getItemsByCategory(categoryId: string): Item[] {
     if (Array.isArray(jsonResult)) {
       parsed = jsonResult;
     } else {
-      console.warn(`Data file ${categoryId}.json does not contain an array, got:`, typeof jsonResult);
+      logger.warn('Category data file does not contain an array', { categoryId, receivedType: typeof jsonResult });
       return [];
     }
   } catch (err) { 
-    console.warn(`Failed to parse JSON from ${categoryId}.json:`, err);
+    logger.warn('Category data file is not valid JSON', { categoryId, errorName: err instanceof Error ? err.name : typeof err });
     return []; 
   }
   const items: Item[] = [];
@@ -73,13 +74,6 @@ export function getItem(categoryId: string, slug: string): Item | null {
   return items.find((i) => (i.slug ?? toSlug(i.name)) === slug) ?? null;
 }
 
-export function isRecentlyUpdated(item: Item, days = 30): boolean {
-  if (!item.updatedAt) return false;
-  const updated = Date.parse(item.updatedAt);
-  if (isNaN(updated)) return false;
-  return Date.now() - updated < days * 86400_000;
-}
-
 export function toSlug(name: string): string {
   return name
     .toLowerCase()
@@ -87,14 +81,7 @@ export function toSlug(name: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
-export function pickLocale<T extends Record<string, unknown>>(obj: T, baseKey: string, locale: Locale): string | undefined {
-  const lk = `${baseKey}_${locale}`;
-  const ek = `${baseKey}_en`;
-  const lv = obj[lk];
-  const bv = obj[baseKey];
-  const ev = obj[ek];
-  return (typeof lv === "string" && lv) || (typeof bv === "string" && bv) || (typeof ev === "string" && ev) || undefined;
-}
+export { pickLocale };
 
 export const pickCategoryLocale = (
   cat: import("@/data/schemas").Category,

@@ -4,7 +4,7 @@ import security from 'eslint-plugin-security';
 
 const config = [
   {
-    ignores: ['**/node_modules/**', '**/.next/**', '**/coverage/**', 'out/**', 'build/**', 'dist/**', 'next-env.d.ts', '**/reports/**'],
+    ignores: ['**/node_modules/**', '**/.next/**', '**/coverage/**', 'out/**', 'build/**', 'dist/**', 'next-env.d.ts', '**/reports/**', '.runtime/**'],
   },
   ...nextCoreWebVitals,
   ...nextTypescript,
@@ -74,9 +74,8 @@ const config = [
     // bootstrap is a constant nonce-protected payload.
     files: [
       'src/app/\\[locale\\]/page.tsx',
-      'src/app/\\[locale\\]/\\[category\\]/\\[slug\\]/page.tsx',
       'src/app/layout.tsx',
-      'src/components/moments/MomentsDetailLayout.tsx',
+      'src/components/guide/GuideDetail.tsx',
     ],
     rules: { 'react/no-danger': 'off' }
   },

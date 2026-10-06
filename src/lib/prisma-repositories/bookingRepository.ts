@@ -5,7 +5,6 @@ import { logger } from '@/lib/logger-enterprise';
 const bookingSelect = {
   id: true,
   source: true,
-  reference: true,
   startDate: true,
   endDate: true,
   userId: true,
@@ -19,7 +18,6 @@ const bookingSelect = {
 export type BookingRecord = {
   id: string;
   source: 'ONSITE' | 'EXTERNAL';
-  reference: string | null;
   startDate: Date;
   endDate: Date;
   userId: string | null;
@@ -33,9 +31,7 @@ export type BookingRecord = {
 async function findByReference(reference: string): Promise<BookingRecord | undefined> {
   try {
     const bookings = await prisma.booking.findMany({
-      where: {
-        OR: [{ reference }, { externalReference: reference }],
-      },
+      where: { externalReference: reference },
       orderBy: { createdAt: 'desc' },
       take: 2,
       select: bookingSelect,

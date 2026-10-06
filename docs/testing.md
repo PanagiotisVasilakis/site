@@ -8,15 +8,21 @@ The design goal is high-signal regression protection, not assertions against imp
 
 ## Test layers
 
-- `tests/unit`: pure formatting, validation, date/time, data, map, navigation, and adapter configuration.
+- `tests/unit`: pure formatting, validation, date/time, data, map, navigation, and adapter configuration; the availability domain (iCal fetch and parsing, calendar sync, stay quotes, money); SEO metadata and the sitemap; worker, retention and alert logic; and the design system's contrast table (`design-tokens.test.ts`) and motion gate (`motion-css-gate.test.ts`).
 - `tests/security`: environment fail-closed rules, JWT and database-session contracts, request-body limits, error sanitization, privacy hashing/redaction, trusted proxies, durable rate limiting, limiter failure responses, and portal refresh behavior.
-- `tests/components`: jsdom interaction tests for theme state, locale synchronization, modal focus management, safe fallbacks, and request cancellation.
-- `tests/routes`: route contracts (liveness, admin bookings and claim grants, booking requests, portal refresh, CSP reports) and the client error-report round trip.
+- `tests/components`: jsdom rendering and interaction tests for the public pages (home, apartment, availability planner, guide, privacy), the stay routes (including that they carry no booking call-to-action), guest sign-in and check-in, the admin, theme and motion switches, modal focus management, safe fallbacks, and request cancellation.
+- `tests/routes`: route contracts (liveness, admin bookings, claim grants, access reset, rate periods, availability sync and guests, check-in arrival requests, portal sign-in and refresh, CSP reports) and the client error-report round trip.
 
-The default suite deliberately does not connect to PostgreSQL, webhooks, OSRM,
+Size on 2026-10-06: the default suite has 150 files and 1,787 tests (69 unit, 17 security, 44 component and 20 route files); the integration suite has 22 files and 121 tests.
+
+The default suite deliberately does not connect to PostgreSQL, webhooks,
 or another live service. Persistence and network boundaries are mocked at
 their adapters. This keeps `npm test` fast, repeatable, and independent of
-subscriptions or infrastructure availability.
+subscriptions or infrastructure availability. One exception: where a test
+must prove how Node's built-in `fetch` behaves (for example that outbound
+webhooks refuse redirects), it may start a throwaway `node:http` server on
+`127.0.0.1` with an ephemeral port inside the test and close it afterwards;
+it never reaches a real service.
 
 The separate `tests/integration` profile uses a real, disposable PostgreSQL 16 container. It is opt-in, excluded from the default Vitest profile, and owns its complete container/database lifecycle. It does not use the development Compose service or any caller-supplied database URL.
 
@@ -39,7 +45,7 @@ npm run validate:release-policy # verify the restricted local release profile
 npm run check:postgres-image-policy # verify/pull the approved OCI index
 ```
 
-The system orchestrator's `--strict` option also runs lint, typecheck, and the coverage gate before build or startup.
+The system orchestrator's `--strict` option also runs lint, typecheck, and the coverage gate before startup.
 
 ## Disposable PostgreSQL integration lifecycle
 
@@ -97,9 +103,9 @@ Each operation captures its clock once, derives the window with UTC calendar ari
 
 Refresh concurrency uses a transaction-scoped PostgreSQL advisory try-lock derived from the immutable predecessor generation UUID. Raw refresh credentials, elapsed time, IP, and device fingerprints do not prove overlap. The marker is attempted before the canonical `User → RefreshTokenFamily` row-lock order and is released automatically on commit or rollback.
 
-Only a contender whose committed preflight shows an active generation, valid session/booking binding, and approved same context may map observed marker contention to cookie-free `409 REFRESH_IN_PROGRESS`; the owner remains the sole `200` winner. Every different-context, invalid-binding, revoked, or ambiguous contender ends its try-lock transaction and enters a separately bounded cleanup transaction using `User → RefreshTokenFamily`. If the owner locks User first, cleanup revokes every committed descendant; if cleanup locks User first, the owner later observes the revoked family and cannot issue a credential.
+Only a contender whose committed preflight shows an active generation, valid session/booking binding, and the same device hash as the family (the client IP is not compared, because it changes on mobile networks) may map observed marker contention to cookie-free `409 REFRESH_IN_PROGRESS`; the owner remains the sole `200` winner. Every different-device-hash, invalid-binding, revoked, or ambiguous contender ends its try-lock transaction and enters a separately bounded cleanup transaction using `User → RefreshTokenFamily`. If the owner locks User first, cleanup revokes every committed descendant; if cleanup locks User first, the owner later observes the revoked family and cannot issue a credential.
 
-A request that owns the marker and authoritatively re-reads an already-revoked predecessor is completed replay: it atomically revokes the family, all family tokens, and paired sessions before returning `401` and clearing both auth cookies. Integration coverage uses PostgreSQL lock barriers rather than ordering sleeps and includes 20 same-context overlaps, 15 different-context overlaps, five fresh-database completed-replay commit witnesses, invalid bindings, family/generation isolation, and owner rollback/retry.
+A request that owns the marker and authoritatively re-reads an already-revoked predecessor is completed replay: it atomically revokes the family, all family tokens, and paired sessions before returning `401` and clearing both auth cookies. Integration coverage uses PostgreSQL lock barriers rather than ordering sleeps and includes 20 same-context overlaps, one same-device-hash overlap from a different IP (`409`, family intact), 15 different-context overlaps, five fresh-database completed-replay commit witnesses, invalid bindings, family/generation isolation, and owner rollback/retry.
 
 ## Prisma integrity hashing
 

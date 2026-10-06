@@ -105,15 +105,3 @@ export function isSensitiveFieldName(key: string): boolean {
   ]
     .some((sensitive) => normalized.includes(sensitive));
 }
-
-// Header names the field-name classification does not already cover.
-const SENSITIVE_HEADER_NAMES = new Set(['forwarded', 'x-api-key']);
-
-/** Request headers for diagnostics, with identity, credential and cookie values replaced. */
-export function redactHeaders(headers: Headers): Record<string, string> {
-  const redacted: Record<string, string> = {};
-  headers.forEach((value, key) => {
-    redacted[key] = isSensitiveFieldName(key) || SENSITIVE_HEADER_NAMES.has(key.toLowerCase()) ? '[REDACTED]' : value;
-  });
-  return redacted;
-}

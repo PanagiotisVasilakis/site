@@ -32,7 +32,6 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
     name: pickLocale(item, 'name', eff) ?? item.name,
     summary: pickLocale(item, 'summary', eff),
     slug: item.slug,
-    rating: item.rating,
       tags: item.tags,
     location: item.location,
     phone: item.phone,
@@ -40,7 +39,6 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
       address: pickLocale(item, 'address', eff),
     website: item.website,
     directionsUrl: item.directionsUrl,
-    sourceUrls: item.sourceUrls,
   });
 
   const nearbyRestaurants = getItemsByCategory('moments').map(mapItem);
@@ -60,11 +58,12 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
   }
 
   return (
-    <div className="page-container checkin-page mx-auto max-w-[1200px]">
+    <div className="stay-page checkin-page">
       <CheckInInfo
         locale={eff}
         nearbyRestaurants={nearbyRestaurants}
         nearbyServices={nearbyServices}
+        cartoBasemapsKey={process.env.CARTO_BASEMAPS_KEY || undefined}
       />
     </div>
   );

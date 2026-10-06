@@ -21,7 +21,8 @@ export default function PwaManager() {
       const registerServiceWorker = async () => {
         try {
           // Versioned script URL: every build installs a new worker (and cache).
-          let scriptUrl = '/sw.js';
+          // Register only a versioned URL; the unversioned one would replace the build's cache.
+          let scriptUrl: string | null = null;
           try {
             const res = await internalFetch('/version.json', { cache: 'no-store' });
             if (res.ok) {
@@ -30,8 +31,11 @@ export default function PwaManager() {
                 scriptUrl = `/sw.js?v=${encodeURIComponent(meta.version)}&build=${encodeURIComponent(meta.build)}`;
               }
             }
-          } catch { /* offline: keep the current registration's script */ }
-          const reg = await navigator.serviceWorker.register(scriptUrl);
+          } catch { /* offline or unreachable: attach to the current registration below */ }
+          const reg = scriptUrl
+            ? await navigator.serviceWorker.register(scriptUrl)
+            : await navigator.serviceWorker.getRegistration();
+          if (!reg) return;
           // Request current runtime version
           navigator.serviceWorker.controller?.postMessage({ type: 'REQUEST_VERSION' });
           const showBanner = () => {

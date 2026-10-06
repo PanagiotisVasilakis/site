@@ -43,18 +43,18 @@ export default function AdminSettingsClient() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <Surface padding="lg" radius="lg" shadow="lg" border="none">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-accent-subtle">Admin</p>
-        <h1 className="mt-2 font-serif text-4xl font-semibold italic page-title">Operational settings</h1>
-        <p className="mt-3 text-sm text-body">These shared settings are stored in the database and apply to every app instance.</p>
-        <Link href="/admin" className="admin-action-outline mt-5 inline-flex">Back to operations</Link>
+      <Surface padding="lg" radius="lg" shadow="lg">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] admin-eyebrow">Admin</p>
+        <h1 className="mt-2 font-display text-4xl font-semibold italic admin-title">Operational settings</h1>
+        <p className="mt-3 text-sm admin-muted">These shared settings are stored in the database and apply to every app instance.</p>
+        <Link href="/admin" className="admin-action-outline shell-link mt-5 inline-flex">Back to operations</Link>
       </Surface>
 
-      {error && <div className="feedback-error mt-5 rounded-lg p-3" role="alert">{error}</div>}
-      <section className="surface-card mt-6 rounded-lg border border-soft p-5" aria-busy={!flags || saving}>
+      {error && <div className="feedback-error mt-5 rounded-tile p-3" role="alert">{error}</div>}
+      <section className="admin-card mt-6 rounded-tile border p-5" aria-busy={!flags || saving}>
         {!flags ? <p>Loading settings…</p> : (
           <fieldset disabled={saving} className="space-y-4">
-            <legend className="font-serif text-2xl font-semibold italic section-title">Guest features</legend>
+            <legend className="font-display text-2xl font-semibold italic admin-title">Guest features</legend>
             {([
               ['portalEnabled', 'Guest portal', 'Allow guests with verified reservations to sign in.'],
               ['checkinEnabled', 'Check-in workflow', 'Expose verified guest check-in tools and arrival requests.'],
@@ -62,11 +62,11 @@ export default function AdminSettingsClient() {
               // Check-in needs guest sign-in, so it is only available with the portal on.
               const blocked = key === 'checkinEnabled' && !flags.portalEnabled;
               return (
-                <label key={key} className="flex items-start justify-between gap-4 rounded border border-soft p-4">
+                <label key={key} className="admin-rule flex items-start justify-between gap-4 rounded border p-4">
                   <span>
                     <strong className="block">{label}</strong>
-                    <span className="text-sm text-body">{description}</span>
-                    {blocked && <span className="mt-1 block text-sm text-body">Requires the guest portal.</span>}
+                    <span className="text-sm admin-muted">{description}</span>
+                    {blocked && <span className="mt-1 block text-sm admin-muted">Requires the guest portal.</span>}
                   </span>
                   <input
                     type="checkbox"

@@ -43,7 +43,6 @@ interface SafeClaimState {
   existingUser: null | {
     present: boolean;
     passwordUnchanged: boolean;
-    originUnchanged: boolean;
   };
   booking: {
     ownerPresent: boolean;
@@ -141,7 +140,6 @@ async function seedClaim(
           id: EXISTING_USER_ID,
           phoneE164: SYNTHETIC_PHONE,
           passwordHash,
-          countryOrigin: 'ABROAD',
         },
       });
     }
@@ -211,7 +209,6 @@ async function safeClaimState(
       existingUser: existingUserExpectation ? {
         present: Boolean(existingUser),
         passwordUnchanged: existingUser?.passwordHash === existingUserExpectation.passwordHash,
-        originUnchanged: existingUser?.countryOrigin === 'ABROAD',
       } : null,
       booking: {
         ownerPresent: Boolean(booking.userId),
@@ -251,10 +248,13 @@ async function resetClaimState(targetDatabase: DisposableDatabaseTarget): Promis
 async function performClaimRequest(options: {
   remember: boolean;
   token?: string;
+  beforeClaim?: () => Promise<void>;
 }): Promise<{
   response: Awaited<ReturnType<typeof import('@/app/api/portal/claims/route')['POST']>>;
   responseText: string;
   http: SafeHttpEvidence;
+  claimRouteReached: boolean;
+  exchangeCookieCleared: boolean;
 }> {
   const [{ NextRequest }, exchangeRoute, claimRoute] = await Promise.all([
     import('next/server'),
@@ -295,10 +295,13 @@ async function performClaimRequest(options: {
         sessionCookieSet: false,
         refreshCookieSet: false,
       },
+      claimRouteReached: false,
+      exchangeCookieCleared: false,
     };
   }
   const exchangeCookie = exchangeResponse.cookies.get('booking_claim_exchange')?.value;
   if (!exchangeCookie) throw new Error('Claim exchange did not issue its short-lived cookie');
+  await options.beforeClaim?.();
   const request = new NextRequest(CLAIM_URL, {
     method: 'POST',
     headers: {
@@ -330,7 +333,37 @@ async function performClaimRequest(options: {
       sessionCookieSet: Boolean(response.cookies.get('guest_session')?.value),
       refreshCookieSet: Boolean(response.cookies.get('guest_rt')?.value),
     },
+    claimRouteReached: true,
+    exchangeCookieCleared: response.cookies.get('booking_claim_exchange')?.maxAge === 0,
   };
+}
+
+async function updateAfterExchange(
+  targetDatabase: DisposableDatabaseTarget,
+  change: 'far-future-booking' | 'grant-revoked' | 'grant-expired',
+): Promise<void> {
+  const now = new Date();
+  await withTestPrismaClient(targetDatabase, async (prisma) => {
+    if (change === 'far-future-booking') {
+      await prisma.booking.update({
+        where: { id: BOOKING_ID },
+        data: {
+          startDate: utcDateOffset(now, 30),
+          endDate: utcDateOffset(now, 37),
+        },
+      });
+    } else if (change === 'grant-revoked') {
+      await prisma.bookingClaimGrant.update({
+        where: { id: GRANT_ID },
+        data: { revokedAt: now },
+      });
+    } else {
+      await prisma.bookingClaimGrant.update({
+        where: { id: GRANT_ID },
+        data: { expiresAt: new Date(now.getTime() - 60_000) },
+      });
+    }
+  }, 'seed');
 }
 
 async function successfulRememberState(
@@ -403,73 +436,99 @@ describe.sequential('booking claim eligibility-window defect gate', () => {
     }
   });
 
-  it.each([
-    ['new identity without remember-me', false, false],
-    ['new identity with remember-me', false, true],
-    ['existing identity without remember-me', true, false],
-    ['existing identity with remember-me', true, true],
-  ])('rejects a +30-day grant for %s without side effects', async (
-    _label,
-    includeExistingUser,
-    remember,
-  ) => {
+  it('rejects a +30-day grant at the exchange without side effects', async () => {
     const claimTarget = requireTarget();
-    const existingUserExpectation = await seedClaim(claimTarget, {
-      startOffset: 30,
-      endOffset: 37,
-      includeExistingUser,
+    await seedClaim(claimTarget, { startOffset: 30, endOffset: 37 });
+    const before = await safeClaimState(claimTarget);
+    const { responseText, http, claimRouteReached } = await performClaimRequest({
+      remember: false,
     });
-    const before = await safeClaimState(claimTarget, existingUserExpectation);
-    const { responseText, http } = await performClaimRequest({ remember });
-    const after = await safeClaimState(claimTarget, existingUserExpectation);
+    const after = await safeClaimState(claimTarget);
 
     expect(responseText).not.toContain(CLAIM_TOKEN);
-    expect(responseText).not.toContain(SYNTHETIC_PHONE);
-    expect(responseText).not.toContain(SYNTHETIC_PASSWORD);
     expect(responseText).not.toContain(claimTarget.databaseUrl);
-
-    expect({ before, http, after }).toEqual({
-      before: {
-        users: includeExistingUser ? 1 : 0,
-        existingUser: includeExistingUser ? {
-          present: true,
-          passwordUnchanged: true,
-          originUnchanged: true,
-        } : null,
-        booking: { ownerPresent: false, accessStatus: 'PENDING', claimed: false },
-        grant: { consumed: false, revoked: false },
-        termsAcceptances: 0,
-        bookingClaimAuditEvents: 0,
-        sessions: 0,
-        refreshFamilies: 0,
-        refreshTokens: 0,
-        rateLimitRecords: 0,
-      },
-      http: {
-        status: 401,
-        success: false,
-        errorCode: 'UNAUTHORIZED',
-        sessionCookieSet: false,
-        refreshCookieSet: false,
-      },
-      after: {
-        users: includeExistingUser ? 1 : 0,
-        existingUser: includeExistingUser ? {
-          present: true,
-          passwordUnchanged: true,
-          originUnchanged: true,
-        } : null,
-        booking: { ownerPresent: false, accessStatus: 'PENDING', claimed: false },
-        grant: { consumed: false, revoked: false },
-        termsAcceptances: 0,
-        bookingClaimAuditEvents: 0,
-        sessions: 0,
-        refreshFamilies: 0,
-        refreshTokens: 0,
-        rateLimitRecords: 1,
-      },
+    expect(claimRouteReached).toBe(false);
+    expect(http).toEqual({
+      status: 401,
+      success: false,
+      errorCode: 'UNAUTHORIZED',
+      sessionCookieSet: false,
+      refreshCookieSet: false,
     });
+    expect({ ...after, rateLimitRecords: before.rateLimitRecords }).toEqual(before);
+    expect(after.rateLimitRecords).toBe(1);
   });
+
+  it.each([
+    ['far-future-booking', false, false],
+    ['far-future-booking', false, true],
+    ['far-future-booking', true, false],
+    ['far-future-booking', true, true],
+    ['grant-revoked', false, false],
+    ['grant-expired', false, false],
+  ] as const)(
+    'rejects a claim after exchange (%s, existing identity: %s, remember-me: %s) without side effects',
+    async (change, includeExistingUser, remember) => {
+      const claimTarget = requireTarget();
+      const existingUserExpectation = await seedClaim(claimTarget, {
+        startOffset: 0,
+        endOffset: 7,
+        includeExistingUser,
+      });
+      const before = await safeClaimState(claimTarget, existingUserExpectation);
+      const {
+        responseText,
+        http,
+        claimRouteReached,
+        exchangeCookieCleared,
+      } = await performClaimRequest({
+        remember,
+        beforeClaim: () => updateAfterExchange(claimTarget, change),
+      });
+      const after = await safeClaimState(claimTarget, existingUserExpectation);
+
+      expect(responseText).not.toContain(CLAIM_TOKEN);
+      expect(responseText).not.toContain(SYNTHETIC_PHONE);
+      expect(responseText).not.toContain(SYNTHETIC_PASSWORD);
+      expect(responseText).not.toContain(claimTarget.databaseUrl);
+
+      const unchangedIdentity = {
+        users: includeExistingUser ? 1 : 0,
+        existingUser: includeExistingUser ? {
+          present: true,
+          passwordUnchanged: true,
+        } : null,
+        booking: { ownerPresent: false, accessStatus: 'PENDING', claimed: false },
+        termsAcceptances: 0,
+        bookingClaimAuditEvents: 0,
+        sessions: 0,
+        refreshFamilies: 0,
+        refreshTokens: 0,
+      };
+      expect({ before, http, claimRouteReached, exchangeCookieCleared, after }).toEqual({
+        before: {
+          ...unchangedIdentity,
+          grant: { consumed: false, revoked: false },
+          rateLimitRecords: 0,
+        },
+        http: {
+          status: 401,
+          success: false,
+          errorCode: 'UNAUTHORIZED',
+          sessionCookieSet: false,
+          refreshCookieSet: false,
+        },
+        claimRouteReached: true,
+        exchangeCookieCleared: true,
+        after: {
+          ...unchangedIdentity,
+          grant: { consumed: false, revoked: change === 'grant-revoked' },
+          // Exchange: one client-address key; claims: client-address and phone keys.
+          rateLimitRecords: 3,
+        },
+      });
+    },
+  );
 
   it('allows the inclusive +7 boundary with remember-me and preserves session-token pairing', async () => {
     const claimTarget = requireTarget();

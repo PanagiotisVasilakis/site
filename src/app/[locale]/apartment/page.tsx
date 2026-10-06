@@ -1,10 +1,29 @@
 import { normalizeLocale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
-import { housePhotosByRoom, type HousePhotoRoomKey } from '@/data/housePhotos';
-import ApartmentCinematic from '@/components/ApartmentCinematic';
-import type { ApartmentPhotoWithAlt } from '@/types/apartment';
+import type { HomeRoomKey } from '@/i18n/domains/home';
+import { APARTMENT_LEAD_PHOTO_ID, APARTMENT_PHOTOS, APARTMENT_ROOMS, type ApartmentRoomKey } from '@/data/apartmentPhotos';
+import ApartmentAmenities from '@/components/apartment/ApartmentAmenities';
+import ApartmentCta from '@/components/apartment/ApartmentCta';
+import ApartmentGallery from '@/components/gallery/ApartmentGallery';
+import FactStrip from '@/components/home/FactStrip';
+import AvailabilityBookBar from '@/components/shell/AvailabilityBookBar';
 import type { Metadata } from 'next';
-import { localizedAlternates } from '@/lib/seo';
+import { logger } from '@/lib/logger-enterprise';
+import { readPublicAvailability, type PublicAvailability } from '@/lib/prisma-repositories/availabilityRepository';
+import { localizedAlternates, localizedOpenGraph } from '@/lib/seo';
+
+// The BookBar price comes from the availability read: rendered per request, like home and availability.
+export const dynamic = 'force-dynamic';
+
+/** The room names and lines are the home rooms showcase's (one source for both pages). */
+const ROOM_COPY: Readonly<Record<ApartmentRoomKey, HomeRoomKey>> = {
+  living: 'living',
+  kitchen: 'kitchen',
+  'bedroom-1': 'bedroom1',
+  'bedroom-2': 'bedroom2',
+  bathroom: 'bathroom',
+  balcony: 'balcony',
+};
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
@@ -13,47 +32,52 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const title = dictionary.house.title;
   const description = dictionary.house.intro;
   return {
-    title: `${title} | ${dictionary.appTitle}`,
+    title,
     description,
     alternates: localizedAlternates(eff, '/apartment'),
-    openGraph: {
-      title,
-      description,
-      url: `/${eff}/apartment`,
-      locale: eff,
-      type: 'website',
-      images: [{ url: '/house/balcony/balcony_1_hero.webp', alt: title }],
-    },
+    openGraph: localizedOpenGraph(eff, '/apartment'),
   };
 }
 
-// Remove force-static to allow client components with dynamic imports
-export const dynamic = 'auto';
+/** The availability data for the BookBar price (identity §1.4, §8), or null. */
+async function apartmentAvailability(now: Date): Promise<PublicAvailability | null> {
+  try {
+    return await readPublicAvailability(now);
+  } catch {
+    // No details: the error may carry connection data. The page then shows no BookBar.
+    logger.error('Apartment price could not be read');
+    return null;
+  }
+}
 
+/** identity §9.2: page head, lead photo, room chips and galleries, amenities, CTA, BookBar (§8). */
 export default async function ApartmentPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const eff = normalizeLocale(locale);
   const t = getDictionary(eff);
-  const ht = t.house; // reuse existing dictionary namespace
-
-  const roomOrder: HousePhotoRoomKey[] = ['living','kitchen','bedroom','bedroom_2','balcony','bathroom'];
-  const photos: ApartmentPhotoWithAlt[] = roomOrder.flatMap((room) =>
-    housePhotosByRoom[room].map((src) => ({
-      src,
-      altKey: room,
-    }))
-  );
-
-  // Custom hero image for the apartment page (balcony view)
-  const heroPhoto: ApartmentPhotoWithAlt = {
-    src: '/house/balcony/balcony_1.jpeg',
-    altKey: 'balcony',
-  };
-  const photosWithHero = [heroPhoto, ...photos];
+  const ht = t.house;
+  const rooms = APARTMENT_ROOMS.map((key) => ({ key, ...t.home.rooms.items[ROOM_COPY[key]] }));
+  const photos = APARTMENT_PHOTOS.map((photo) => ({ ...photo, alt: ht.photoAlts[photo.id] }));
+  const availability = await apartmentAvailability(new Date());
 
   return (
-    <div className="cancel-top-gap">
-      <ApartmentCinematic locale={eff} houseText={ht} photos={photosWithHero} />
+    <div className="apt">
+      {/* data-hero: the page's lead area for the BookBar (it shows once the head has left the view). */}
+      <header className="apt-head" data-hero>
+        <p className="apt-head__eyebrow">{ht.eyebrow}</p>
+        <h1 className="apt-head__title">{ht.title}</h1>
+        <p className="apt-head__lead">{ht.intro}</p>
+        <FactStrip locale={eff} inline />
+      </header>
+      <ApartmentGallery
+        rooms={rooms}
+        photos={photos}
+        leadId={APARTMENT_LEAD_PHOTO_ID}
+        labels={{ rooms: ht.roomsNavLabel, viewer: ht.viewer }}
+      />
+      <ApartmentAmenities locale={eff} />
+      <ApartmentCta locale={eff} />
+      <AvailabilityBookBar availability={availability} locale={eff} />
     </div>
   );
 }

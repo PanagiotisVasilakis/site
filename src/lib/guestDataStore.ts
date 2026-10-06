@@ -12,9 +12,8 @@ import {
 } from '@/lib/guestSession';
 import { hashSensitive } from '@/lib/crypto';
 import { logger } from '@/lib/logger-enterprise';
-import { guestDataCache } from '@/lib/guestDataCache';
 import crypto from 'node:crypto';
-import { normalizePhone } from '@/lib/phone';
+import { phoneLookupCandidates } from '@/lib/phone';
 
 export type User = UserRecord;
 export type Booking = BookingRecord;
@@ -24,9 +23,12 @@ export type GuestRefreshTokenRec = PrismaGuestRefreshTokenRec;
 export const guestStore = {
   // Users
   async findUserByPhone(phone: string): Promise<User | undefined> {
-    const normalized = normalizePhone(phone);
-    if (!normalized) return undefined;
-    return userRepository.findByPhone(normalized.e164);
+    // Same candidates and order as guest sign-in.
+    for (const candidate of phoneLookupCandidates(phone)) {
+      const user = await userRepository.findByPhone(candidate);
+      if (user) return user;
+    }
+    return undefined;
   },
   
   async findUserById(user_id: string): Promise<User | undefined> {
@@ -142,11 +144,11 @@ export const guestStore = {
   
   // Admin helpers - get all data for export/analysis
   async getAllBookings(): Promise<Booking[]> {
-    return guestDataCache.get('bookings', () => bookingRepository.getAll());
+    return bookingRepository.getAll();
   },
 
   async getAllUsers(): Promise<User[]> {
-    return guestDataCache.get('users', () => userRepository.getAll());
+    return userRepository.getAll();
   },
 
 };

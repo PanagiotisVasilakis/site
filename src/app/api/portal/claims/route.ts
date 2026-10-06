@@ -2,7 +2,6 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
 import { ApiError, ApiErrorCode, createSuccessResponse, readJsonBody, ValidationError, withErrorHandler } from '@/lib/apiErrorHandler';
-import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 import { normalizeLocale } from '@/i18n/config';
 import { PortalAuthError, consumeBookingClaimGrant } from '@/lib/portalAuthService';
@@ -29,9 +28,6 @@ const claim = withErrorHandler(async (request: NextRequest) => {
   if (!(await getFeatureFlagsAsync()).portalEnabled) {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }
-  const early = await createAPISecurityMiddleware()(request);
-  if (early) return early;
-
   const parsed = schema.safeParse(await readJsonBody(request, 16 * 1_024));
   if (!parsed.success) throw new ValidationError(parsed.error.issues);
   const rateLimit = await checkSensitiveRateLimit(request, {

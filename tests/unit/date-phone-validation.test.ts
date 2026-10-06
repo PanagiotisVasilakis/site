@@ -1,78 +1,10 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { isGuestFormValid } from '@/components/guest/guestValidation';
-import {
-  dateRangeFromParams,
-  dateRangeToParams,
-  formatDateRange,
-  getNights,
-  validateDateRange,
-} from '@/lib/dateUtils';
 import { normalizePhone } from '@/lib/phone';
 import { wifiDisclosureWindow } from '@/lib/propertyTime';
-import { normalizeStayRequestPhone } from '@/lib/stayRequestPhone';
 
-describe('date and booking validation', () => {
-  afterEach(() => vi.useRealTimers());
-
-  it('counts calendar nights across a DST boundary', () => {
-    const from = new Date('2026-10-24T12:00:00+03:00');
-    const to = new Date('2026-10-25T12:00:00+02:00');
-    expect((to.getTime() - from.getTime()) / 3_600_000).toBe(25);
-    expect(getNights({ from, to })).toBe(1);
-  });
-
-  it('never returns a negative night count', () => {
-    expect(getNights({ from: new Date('2030-01-03'), to: new Date('2030-01-01') })).toBe(0);
-    expect(getNights({})).toBe(0);
-  });
-
-  it('formats English and Greek date ranges', () => {
-    const range = { from: new Date(2030, 8, 10), to: new Date(2030, 8, 12) };
-    expect(formatDateRange(range, 'en')).toMatch(/Sep/i);
-    expect(formatDateRange(range, 'el')).toMatch(/Σεπ/i);
-    expect(formatDateRange({}, 'en')).toBe('');
-  });
-
-  it('round-trips valid date ranges through query params', () => {
-    const params = dateRangeToParams({
-      from: new Date(2030, 0, 2),
-      to: new Date(2030, 0, 9),
-    });
-    expect(params.toString()).toBe('checkin=2030-01-02&checkout=2030-01-09');
-    const parsed = dateRangeFromParams(params);
-    expect(parsed.from?.getFullYear()).toBe(2030);
-    expect(parsed.to?.getDate()).toBe(9);
-  });
-
-  it('rejects malformed query dates without throwing', () => {
-    const result = dateRangeFromParams(new URLSearchParams('checkin=not-a-date&checkout=2030-13-99'));
-    expect(result).toEqual({ from: undefined, to: undefined });
-  });
-
-  it('returns every validation failure in decision order', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2030-01-10T12:00:00Z'));
-    expect(validateDateRange({})).toEqual({ valid: false, error: 'Please select a check-in date' });
-    expect(validateDateRange({ from: new Date('2030-01-09') })).toEqual({
-      valid: false,
-      error: 'Check-in date cannot be in the past',
-    });
-    expect(validateDateRange({ from: new Date('2030-01-11') })).toEqual({
-      valid: false,
-      error: 'Please select a check-out date',
-    });
-    expect(validateDateRange({ from: new Date('2030-01-12'), to: new Date('2030-01-11') }, 'el')).toEqual({
-      valid: false,
-      error: 'Η αναχώρηση πρέπει να είναι μετά την άφιξη',
-    });
-    expect(validateDateRange({ from: new Date('2030-01-11'), to: new Date('2030-02-20') })).toEqual({
-      valid: false,
-      error: 'Maximum stay is 30 nights',
-    });
-    expect(validateDateRange({ from: new Date('2030-01-11'), to: new Date('2030-01-12') })).toEqual({ valid: true });
-  });
-
+describe('Wi-Fi disclosure window', () => {
   it('computes the Athens Wi-Fi disclosure window through UTC conversion', () => {
     const window = wifiDisclosureWindow({
       startDate: new Date('2026-07-20T00:00:00.000Z'),
@@ -108,11 +40,6 @@ describe('phone and guest form validation', () => {
 
   it.each(['', '123', '+1', '++30698', 'abcd', '+03012345678'])('rejects invalid phone %s', (input) => {
     expect(normalizePhone(input, 'GR')).toBeNull();
-  });
-
-  it('normalizes stay-request numbers using the property country', () => {
-    expect(normalizeStayRequestPhone('695 123 4567')).toBe('+306951234567');
-    expect(normalizeStayRequestPhone('invalid')).toBeNull();
   });
 
   const validCredentials = {

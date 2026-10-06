@@ -6,6 +6,12 @@ Cloudflare dashboard has been changed.
 ## Preconditions
 
 - Cloudflare DNS records for the production hostname are proxied.
+- Every other web-facing DNS record of the domain is also proxied or serves
+  valid HTTPS itself, because the application sends HSTS with
+  `includeSubDomains`. Universal SSL covers only the apex and first-level
+  subdomains (e.g. `www`), so do not host a web service on a deeper subdomain
+  such as `a.b.example.com` without its own certificate. Mail (MX) records
+  are not affected by HSTS.
 - SSL/TLS mode is **Full (strict)** and the origin certificate matches the
   hostname.
 - **Authenticated Origin Pull** is enabled and Nginx trusts the current
@@ -35,6 +41,11 @@ If validation fails, trigger the timed rollback or restore the exported ruleset
 through the provider console. Do not temporarily allow `0.0.0.0/0` or `::/0`.
 
 ## Nginx rendering and validation
+
+Production Nginx must run the official image pinned in
+`deploy/nginx/image.lock.json` (currently `nginx:1.30.5-alpine`, the tested
+build) and never a build older than 1.30.4 on the stable branch or 1.31.3 on
+mainline (CVE-2026-42533).
 
 Render only `${ORIGIN_PROXY_SHARED_SECRET}` in
 `deploy/nginx/nginx.conf.template` (for the official image, set

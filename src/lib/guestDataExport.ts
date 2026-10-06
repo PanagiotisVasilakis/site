@@ -9,7 +9,6 @@ import { logger } from '@/lib/logger-enterprise';
 interface BookingExport {
   booking: {
     id: string;
-    reference?: string;
     source: string;
     startDate: string;
     endDate: string;
@@ -21,9 +20,7 @@ interface BookingExport {
   };
   user?: {
     id: string;
-    email?: string;
     phone: string;
-    countryOrigin: string;
     createdAt: Date;
     updatedAt: Date;
   };
@@ -36,7 +33,6 @@ function toBookingExport(booking: Booking, user?: User): BookingExport {
   return {
     booking: {
       id: booking.id,
-      reference: booking.reference ?? undefined,
       source: booking.source,
       startDate: booking.startDate.toISOString(),
       endDate: booking.endDate.toISOString(),
@@ -48,9 +44,7 @@ function toBookingExport(booking: Booking, user?: User): BookingExport {
     },
     user: user ? {
       id: user.id,
-      email: user.email ?? undefined,
       phone: user.phoneE164,
-      countryOrigin: user.countryOrigin,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     } : undefined,
@@ -118,8 +112,7 @@ class GuestDataExport {
         if (endDate) {
           return bookingStart >= startDate && bookingStart <= endDate;
         } else {
-          return bookingStart === startDate || bookingEnd === startDate ||
-                 (bookingStart <= startDate && bookingEnd >= startDate);
+          return bookingStart <= startDate && bookingEnd >= startDate;
         }
     });
 
@@ -144,12 +137,12 @@ class GuestDataExport {
       const bookingsBySource: Record<string, number> = {};
       const bookingsByStatus: Record<string, number> = {};
 
+      const now = new Date().toISOString().slice(0, 10);
+
       bookings.forEach((booking) => {
         bookingsBySource[booking.source] = (bookingsBySource[booking.source] || 0) + 1;
 
         // Determine status based on dates
-        const now = new Date().toISOString().split('T')[0];
-
         const bookingStart = calendarDate(booking.startDate);
         const bookingEnd = calendarDate(booking.endDate);
         let status = 'upcoming';
@@ -173,7 +166,7 @@ class GuestDataExport {
 
   // Private helper methods
 
-  // Joins users from their (cached) full list instead of querying per booking.
+  // Joins users from one full-list query instead of querying per booking.
   private async withDetails(bookings: Booking[]): Promise<BookingExport[]> {
     if (bookings.length === 0) return [];
     const usersById = new Map((await this.getAllUsersRaw()).map((user) => [user.id, user]));

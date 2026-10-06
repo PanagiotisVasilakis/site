@@ -1,17 +1,22 @@
 import { categories } from '@/data/categories';
-import { getItemsByCategory, pickLocale, toSlug } from '@/lib/data';
+import { getItemsByCategory } from '@/lib/data';
 import { getDictionary } from '@/i18n/dictionaries';
 import { normalizeLocale } from '@/i18n/config';
-import Link from 'next/link';
-import FavoritesClient from '@/components/FavoritesClient';
+import FavoritesList from '@/components/guide/FavoritesList';
+import { sortByDistance, toGuideEntry } from '@/components/guide/guideEntries';
+import { localizedAlternates, localizedOpenGraph } from '@/lib/seo';
 import type { Metadata } from 'next';
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
   const eff = normalizeLocale(locale);
   const dictionary = getDictionary(eff);
+  // The list lives on the visitor's device: nothing to index, so not in the sitemap (robots.ts).
   return {
-    title: `${dictionary.labels.favorites} | ${dictionary.appTitle}`,
+    title: dictionary.guide.favouritesTitle,
+    description: dictionary.guide.favouritesLead,
+    alternates: localizedAlternates(eff, '/favorites'),
+    openGraph: localizedOpenGraph(eff, '/favorites'),
     robots: { index: false, follow: false },
   };
 }
@@ -20,37 +25,18 @@ export default async function FavoritesPage({ params }: { params: Promise<{ loca
   const { locale } = await params;
   const eff = normalizeLocale(locale);
   const t = getDictionary(eff);
-  const allItems = categories.flatMap(cat => {
-    const items = getItemsByCategory(cat.id);
-    return items.map(i => {
-      // Safely access localized properties with proper validation
-      const itemRecord = i && typeof i === 'object' ? i as Record<string, unknown> : {};
-      return {
-        id: i.id,
-        title: pickLocale(itemRecord, 'name', eff) || i.name,
-        subtitle: pickLocale(itemRecord, 'summary', eff) || i.summary,
-        rating: i.rating,
-        icon: cat.icon,
-        href: `/${eff}/${cat.slug}/${i.slug || toSlug(i.name)}`,
-        favoriteId: `${cat.slug}:${i.id}`,
-      };
-    });
-  });
+  const entries = sortByDistance(categories.flatMap((cat) => (
+    getItemsByCategory(cat.id).map((item) => toGuideEntry(item, cat, eff, t))
+  )));
   return (
-    <div className="page-container mx-auto max-w-4xl">
-      <FavoritesClient
-        allItems={allItems}
-        emptyLabel={t.emptyState}
-        titleLabel={t.labels.favorites}
-        locale={eff}
-      />
-      <nav className="pt-6">
-        <Link href={`/${eff}`} className="inline-flex min-h-11 items-center text-sm text-brand-800 hover:text-brand-800 transition-colors">{t.backHome}</Link>
-      </nav>
+    <div className="guide-page">
+      <header className="guide-head">
+        <div className="guide-head__text">
+          <h1 className="guide-head__title">{t.guide.favouritesTitle}</h1>
+          <p className="guide-head__lead">{t.guide.favouritesLead}</p>
+        </div>
+      </header>
+      <FavoritesList entries={entries} locale={eff} />
     </div>
   );
-}
-
-export function generateStaticParams() {
-  return ['en','el'].map(locale => ({ locale }));
 }

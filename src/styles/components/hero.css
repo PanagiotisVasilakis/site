@@ -1,0 +1,170 @@
+/* Home hero, "living photograph" (docs/design/identity.md §5.6, §7.1, §7.2, §9.1). Unlayered (O38); the
+   two-class colour and type rules (0,2,0) date from the legacy cascade that R3-V12b deleted. Motion (M1-M4) is in motion.css.
+   The scrim geometry is measured (§3.3 hero contrast): keep it exactly. */
+
+/* Below 100svh so the photo stays the LCP element (§7.2). */
+.hero {
+  position: relative;
+  height: min(760px, 88svh);
+  min-height: 600px;
+  touch-action: pan-y;
+}
+.hero__stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  isolation: isolate;
+  background: #5D6A70;
+}
+.hero__media {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+}
+.hero__media picture,
+.hero .hero__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.hero .hero__img {
+  object-fit: cover;
+  object-position: 50% 50%;
+  transform-origin: 60% 60%;
+}
+.hero__gl {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity var(--dur-gl-fade) var(--ease-glide);
+}
+.hero__gl.is-ready { opacity: 1; }
+.hero__tint {
+  position: absolute;
+  inset: 0;
+  background: var(--hero-tint);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+.hero__scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgb(var(--scrim) / .30) 0%, rgb(var(--scrim) / 0) 16%, rgb(var(--scrim) / 0) 50%, rgb(var(--scrim) / .3) 100%);
+}
+
+/* The text scrim follows the text block (§7.1): 0 → .58 at 150 px → .80 at 150 px + 30 % → .90. */
+.hero__content {
+  position: absolute;
+  inset: auto 0 0 0;
+  max-width: calc(var(--container) + 2 * var(--gutter));
+  margin: 0 auto;
+  padding: 0 var(--gutter) calc(52px + env(safe-area-inset-bottom));
+}
+.hero__content::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: calc(50% - 50vw);
+  right: calc(50% - 50vw);
+  top: -150px;
+  bottom: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgb(var(--scrim) / 0) 0, rgb(var(--scrim) / .58) 150px, rgb(var(--scrim) / .8) calc(150px + 30%), rgb(var(--scrim) / .9) 100%);
+}
+.hero .hero__title {
+  margin: 0 0 24px -.04em;
+  font-family: var(--font-display);
+  font-size: var(--text-hero);
+  font-style: italic;
+  font-weight: 400;
+  line-height: var(--text-hero--line-height);
+  letter-spacing: var(--text-hero--letter-spacing);
+  color: var(--color-fg-on-photo);
+  filter: drop-shadow(0 2px 24px rgb(0 0 0 / .18));
+}
+.hero__line { display: block; }
+.hero__line--2 { padding-left: .9em; }
+.hero .hero__lede {
+  max-width: 30em;
+  margin: 0 0 24px;
+  font-size: var(--text-lead);
+  line-height: 1.5;
+  color: var(--color-fg-on-photo);
+  text-shadow: 0 1px 12px rgb(0 0 0 / .35);
+  text-wrap: pretty;
+}
+.hero__facts { display: block; }
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.hero__actions .ui-btn { padding: 0 18px; }
+.hero .hero__price {
+  width: 100%;
+  margin: 0;
+  font-size: .9375rem;
+  line-height: 1.1;
+  color: var(--color-fg-on-photo-accent);
+}
+.hero .hero__price-value {
+  margin: 0 .1em;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-fg-on-photo);
+}
+.hero__hint { display: none; }
+
+@media (min-width: 768px) {
+  .hero {
+    height: min(900px, 88svh);
+    min-height: 640px;
+  }
+  .hero .hero__img { object-position: 60% 40%; }
+  .hero__content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 64px;
+    align-items: end;
+    padding-bottom: 88px;
+  }
+  .hero .hero__title { grid-column: 1 / -1; }
+  .hero .hero__lede { margin-bottom: 0; }
+  .hero__actions { justify-content: flex-end; }
+  .hero .hero__price {
+    width: auto;
+    margin-right: 12px;
+  }
+  /* Above the CTA row, inside the text scrim: at top: 50% (the mockup) it sat on bare photo and
+     measured 2.73:1 at 768 px light. */
+  .hero .hero__hint {
+    position: absolute;
+    bottom: 168px;
+    right: var(--gutter);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    font-size: .75rem;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: rgb(255 248 238 / .8);
+    writing-mode: vertical-rl;
+  }
+  .hero .hero__hint:lang(el) {
+    letter-spacing: .04em;
+    text-transform: none;
+  }
+  .hero__hint-line {
+    width: 1px;
+    height: 64px;
+    background: linear-gradient(rgb(255 248 238 / 0), rgb(255 248 238 / .8));
+  }
+}

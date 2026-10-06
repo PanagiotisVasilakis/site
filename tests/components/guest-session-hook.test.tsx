@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fetchMock = vi.hoisted(() => vi.fn());
@@ -18,21 +18,15 @@ function status(authenticated: boolean) {
 describe('useGuestSession', () => {
   beforeEach(() => fetchMock.mockReset());
 
-  it('is signed in when the status endpoint reports an authenticated session', async () => {
+  it('tracks the authenticated flag of the status endpoint (signed in, then signed out on authenticated: false)', async () => {
     fetchMock.mockResolvedValue(status(true));
-
     const { result } = renderHook(() => useGuestSession());
-
     await waitFor(() => expect(result.current.isSignedIn).toBe(true));
-  });
 
-  it('stays signed out when the status endpoint answers 200 with authenticated: false', async () => {
     fetchMock.mockResolvedValue(status(false));
+    act(() => { window.dispatchEvent(new Event('focus')); });
 
-    const { result } = renderHook(() => useGuestSession());
-
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/portal/sessions', expect.objectContaining({ method: 'GET' })));
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(result.current.isSignedIn).toBe(false);
+    await waitFor(() => expect(result.current.isSignedIn).toBe(false));
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/portal/sessions', expect.objectContaining({ method: 'GET' }));
   });
 });

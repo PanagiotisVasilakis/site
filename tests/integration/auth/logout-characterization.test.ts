@@ -32,7 +32,6 @@ const THIRD_CONTROL_FIXTURE: AuthPrincipalFixture = {
   userId: '11000000-0000-4000-8000-000000000004',
   bookingId: '21000000-0000-4000-8000-000000000004',
   familyId: 'pr02b-logout-third-control-family',
-  email: 'logout-third-control@example.invalid',
   phoneE164: '+12025550104',
   provider: 'integration-auth-fixture',
   externalReference: 'logout-third-control-booking-004',
@@ -212,9 +211,7 @@ async function seedThirdControlPrincipal(
     await prisma.user.create({
       data: {
         id: THIRD_CONTROL_FIXTURE.userId,
-        email: THIRD_CONTROL_FIXTURE.email,
         phoneE164: THIRD_CONTROL_FIXTURE.phoneE164,
-        countryOrigin: 'ABROAD',
       },
     });
     await prisma.booking.create({

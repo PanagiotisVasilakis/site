@@ -1,5 +1,3 @@
-export {};
-
 export type HousePhotoRoomKey = 'living' | 'kitchen' | 'bedroom' | 'bedroom_2' | 'balcony' | 'bathroom';
 
 export const housePhotosByRoom: Record<HousePhotoRoomKey, string[]> = {

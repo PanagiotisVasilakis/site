@@ -3,7 +3,7 @@ import { z } from 'zod';
 // Query parameters of the paginated admin lists (`?limit=&cursor=`).
 export const adminListPageQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).optional(),
-  cursor: z.string().uuid().optional(),
+  cursor: z.uuid().optional(),
 });
 
 /**

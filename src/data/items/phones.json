@@ -9,11 +9,69 @@
     "summary_el": "Ευρωπαϊκός αριθμός έκτακτης ανάγκης 24/7 για αστυνομία, πυροσβεστική και ιατρική βοήθεια",
     "description": "Free 24/7 emergency line across Greece and the EU. Call 112 for immediate help from police, fire or ambulance services.",
     "description_el": "Δωρεάν γραμμή έκτακτης ανάγκης 24/7 σε Ελλάδα και ΕΕ. Καλέστε το 112 για άμεση βοήθεια από αστυνομία, πυροσβεστική ή ασθενοφόρο.",
-    "icon": "🆘",
     "heroImage": "/phones/sos-hero.webp",
     "heroImagePosition": "center center",
-    "tags": ["emergency", "safety"],
-    "featured": true
+    "tags": ["emergency", "safety"]
+  },
+  {
+    "id": "ambulance-166",
+    "categoryId": "phones",
+    "name": "Ambulance (EKAB) 166",
+    "name_el": "Ασθενοφόρο ΕΚΑΒ 166",
+    "phone": "166",
+    "summary": "National ambulance service for medical emergencies",
+    "summary_el": "Εθνικό Κέντρο Άμεσης Βοήθειας για επείγοντα ιατρικά περιστατικά",
+    "tags": ["emergency", "medical"]
+  },
+  {
+    "id": "fire-service-199",
+    "categoryId": "phones",
+    "name": "Fire service 199",
+    "name_el": "Πυροσβεστική 199",
+    "phone": "199",
+    "summary": "Fire and rescue emergencies",
+    "summary_el": "Πυρκαγιές και διάσωση",
+    "tags": ["emergency", "safety"]
+  },
+  {
+    "id": "police-100",
+    "categoryId": "phones",
+    "name": "Police 100",
+    "name_el": "Αστυνομία 100",
+    "phone": "100",
+    "summary": "Police emergency line",
+    "summary_el": "Γραμμή έκτακτης ανάγκης της αστυνομίας",
+    "tags": ["emergency", "police", "safety"]
+  },
+  {
+    "id": "coast-guard-108",
+    "categoryId": "phones",
+    "name": "Coast guard 108",
+    "name_el": "Λιμενικό 108",
+    "phone": "108",
+    "summary": "Emergencies at sea",
+    "summary_el": "Έκτακτα περιστατικά στη θάλασσα",
+    "tags": ["emergency", "safety"]
+  },
+  {
+    "id": "child-sos-1056",
+    "categoryId": "phones",
+    "name": "Child SOS line 1056",
+    "name_el": "Γραμμή SOS για παιδιά 1056",
+    "phone": "1056",
+    "summary": "SOS line of The Smile of the Child for children in danger",
+    "summary_el": "Γραμμή SOS του «Χαμόγελου του Παιδιού» για παιδιά σε κίνδυνο",
+    "tags": ["emergency", "safety"]
+  },
+  {
+    "id": "poison-centre",
+    "categoryId": "phones",
+    "name": "Poison Centre",
+    "name_el": "Κέντρο Δηλητηριάσεων",
+    "phone": "+30 210 7793777",
+    "summary": "Advice on poisoning",
+    "summary_el": "Οδηγίες για δηλητηριάσεις",
+    "tags": ["emergency", "medical"]
   },
   {
     "id": "police",
@@ -23,7 +81,6 @@
     "phone": "+30 27210 44600",
     "summary": "Police services and public safety",
     "summary_el": "Αστυνομικές υπηρεσίες και δημόσια ασφάλεια",
-    "icon": "🚓",
     "address": "Iroon Polytechniou 3-5, Kalamata 241 00",
     "address_el": "Ηρ. Πολυτεχνείου 3-5, Καλαμάτα 241 00",
     "location": {
@@ -42,8 +99,7 @@
       "https://www.govmap.gr/item/astynomiki-dieythynsi-messinias",
       "https://unsplash.com/photos/TbZAMYvA2cg",
       "https://github.com/lucide-icons/lucide/blob/main/icons/shield.svg"
-    ],
-    "featured": true
+    ]
   },
   {
     "id": "fire-department",
@@ -53,7 +109,6 @@
     "phone": "+30 27210 92100",
     "summary": "Fire and rescue services",
     "summary_el": "Υπηρεσίες πυρόσβεσης και διάσωσης",
-    "icon": "🚒",
     "address": "Solonos 7, Kalamata 241 31",
     "address_el": "Σόλωνος 7, Καλαμάτα 241 31",
     "location": {
@@ -78,7 +133,6 @@
     "phone": "+30 27213 63000",
     "summary": "24/7 public hospital and emergency care",
     "summary_el": "Δημόσιο νοσοκομείο 24/7 και επείγουσα φροντίδα",
-    "icon": "🏥",
     "address": "Antikalamos, Kalamata 241 00",
     "address_el": "Αντικαλαμός, Καλαμάτα 241 00",
     "location": {
@@ -96,13 +150,12 @@
       "https://www.govmap.gr/item/geniko-nosokomeio-kalamatas",
       "https://unsplash.com/photos/8PB_TFEy2XQ",
       "https://github.com/lucide-icons/lucide/blob/main/icons/hospital.svg"
-    ],
-    "featured": true
+    ]
   },
   {
     "id": "taxi",
     "categoryId": "phones",
-    "name": "Radio Taxi Kalamatas",
+    "name": "Kalamata Radio Taxi",
     "name_el": "Ραδιοταξί Καλαμάτας",
     "phone": "+30 27210 21112",
     "phones": [
@@ -112,9 +165,8 @@
     ],
     "summary": "Local taxi dispatch line",
     "summary_el": "Τοπική γραμμή ραδιοταξί",
-    "description": "Radio Taxi Kalamatas contact numbers for local rides in and around the city.",
+    "description": "Kalamata Radio Taxi contact numbers for local rides in and around the city.",
     "description_el": "Τηλέφωνα επικοινωνίας του Ραδιοταξί Καλαμάτας για διαδρομές μέσα και γύρω από την πόλη.",
-    "icon": "🚕",
     "heroImage": "/phones/taxi-hero.webp",
     "heroImagePosition": "center center",
     "tags": ["transport"]

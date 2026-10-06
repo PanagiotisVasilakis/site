@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default async function AdminSettingsPage() {
   await requireAdminPageSession();
   return (
-    <main className="admin-page-shell min-h-screen">
+    <main>
       <AdminSettingsClient />
     </main>
   );

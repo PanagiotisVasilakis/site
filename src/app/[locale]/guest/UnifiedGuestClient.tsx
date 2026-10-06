@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 
 import ErrorSummary from '@/components/ErrorSummary';
@@ -16,6 +17,8 @@ export default function UnifiedGuestClient() {
   const params = useParams() as { locale?: string };
   const locale = normalizeLocale(params.locale);
   const dictionary = getDictionary(locale).portal;
+  const legalDictionary = getDictionary(locale).legal;
+  const stayDictionary = getDictionary(locale).stay;
   const router = useRouter();
   const search = useSearchParams();
   const searchKey = search.toString();
@@ -49,6 +52,7 @@ export default function UnifiedGuestClient() {
   useEffect(() => {
     const current = new URL(window.location.href);
     const before = current.toString();
+    // Spelled out on purpose: the release policy (scripts/lib/release-policy.mjs) checks these exact lines.
     current.searchParams.delete('claim');
     current.searchParams.delete('claimToken');
     if (/^#.*claim(?:Token)?=/iu.test(current.hash)) current.hash = '';
@@ -116,7 +120,10 @@ export default function UnifiedGuestClient() {
         const exchangeJson = await exchangeResponse.json().catch(() => null);
         if (!exchangeResponse.ok) {
           const mapped = mapApiErrorToUI(exchangeJson, locale);
-          setSubmitError({ summary: mapped.summary, details: mapped.details });
+          // The exchange checks only the token, so a 401 means the token itself
+          // was refused (unknown, expired or already used).
+          const tokenRefused = exchangeResponse.status === 401 ? dictionary?.errors?.claimTokenInvalid : undefined;
+          setSubmitError({ summary: tokenRefused ?? mapped.summary, details: tokenRefused ? undefined : mapped.details });
           return;
         }
       }
@@ -148,23 +155,24 @@ export default function UnifiedGuestClient() {
     }
   }
 
-  const inputClass = 'w-full rounded-lg border border-soft bg-[var(--layer-surface)] px-3 py-3 text-[color:var(--fg-default)] outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--focus-ring)]';
+  // identity §9.7 (restyle only): §8 Field classes (components/ui.css), the rest in components/stay.css.
+  const inputClass = 'ui-field__input';
 
   return (
-    <div className="mx-auto max-w-md p-4">
-      <section className="main-glass-container surface-card p-5" aria-labelledby="guest-auth-title">
-        <header className="mb-5 text-center">
-          <h1 id="guest-auth-title" className="text-2xl font-bold">
-            {mode === 'signin' ? dictionary.signInTitle : dictionary.signUpTitle}
+    <div className="guest-auth">
+      <section className="guest-auth__card" aria-labelledby="guest-auth-title">
+        <header className="guest-auth__head">
+          <h1 id="guest-auth-title" className="guest-auth__title">
+            {mode === 'signin' ? stayDictionary.hub.portalSignInTitle : stayDictionary.guest.setUpTitle}
           </h1>
-          <p className="mt-1 text-sm text-subtle">
+          <p className="guest-auth__lead">
             {mode === 'signin'
               ? dictionary.modeHintSignin
               : dictionary.modeHintSignup}
           </p>
         </header>
 
-        <div role="tablist" aria-label={dictionary.a11y.authMode} className="mb-5 flex rounded-full border border-soft p-1">
+        <div role="tablist" aria-label={dictionary.a11y.authMode} className="ui-seg guest-auth__tabs">
           {(['signin', 'signup'] as const).map((value) => (
             <button
               key={value}
@@ -173,7 +181,7 @@ export default function UnifiedGuestClient() {
               role="tab"
               aria-selected={mode === value}
               aria-controls={`panel-${value}`}
-              className={`h-11 flex-1 rounded-full text-sm font-medium ${mode === value ? 'surface-card shadow' : 'text-subtle'}`}
+              className="ui-seg__item guest-auth__tab"
               onClick={() => changeMode(value)}
             >
               {value === 'signin' ? dictionary.signInTitle : dictionary.signUpTitle}
@@ -183,7 +191,7 @@ export default function UnifiedGuestClient() {
 
         <div id={`panel-${mode}`} role="tabpanel" aria-labelledby={`tab-${mode}`} tabIndex={-1}>
           {submitError && (
-            <div className="mb-4">
+            <div className="guest-auth__error">
               <ErrorSummary
                 summary={submitError.summary}
                 details={submitError.details}
@@ -194,11 +202,11 @@ export default function UnifiedGuestClient() {
             </div>
           )}
 
-          <form onSubmit={submit} noValidate className="space-y-4">
+          <form onSubmit={submit} noValidate className="guest-auth__form">
             {mode === 'signup' && (
               <>
-                <div>
-                  <label htmlFor="claim-token" className="mb-1 block text-sm font-medium">
+                <div className="ui-field">
+                  <label htmlFor="claim-token" className="ui-field__label">
                     {dictionary.claimTokenLabel} *
                   </label>
                   <input
@@ -213,16 +221,16 @@ export default function UnifiedGuestClient() {
                     maxLength={256}
                     required
                   />
-                  <p className="mt-1 text-xs text-subtle">
+                  <p className="ui-field__hint">
                     {dictionary.claimTokenHint}
                   </p>
                 </div>
 
-                <div>
-                  <label htmlFor="origin" className="mb-1 block text-sm font-medium">
+                <div className="ui-field">
+                  <label htmlFor="origin" className="ui-field__label">
                     {dictionary.originQuestion} *
                   </label>
-                  <select id="origin" className={inputClass} value={origin} onChange={(event) => setOrigin(event.target.value as GuestOrigin)} required>
+                  <select id="origin" className={`${inputClass} ui-field__select`} value={origin} onChange={(event) => setOrigin(event.target.value as GuestOrigin)} required>
                     <option value="">{dictionary.originPlaceholder}</option>
                     <option value="GR">{dictionary.originGR}</option>
                     <option value="ABROAD">{dictionary.originAbroad}</option>
@@ -231,8 +239,8 @@ export default function UnifiedGuestClient() {
               </>
             )}
 
-            <div>
-              <label htmlFor="guest-phone" className="mb-1 block text-sm font-medium">
+            <div className="ui-field">
+              <label htmlFor="guest-phone" className="ui-field__label">
                 {dictionary.phoneLabel} *
               </label>
               <input
@@ -251,11 +259,11 @@ export default function UnifiedGuestClient() {
               />
             </div>
 
-            <div>
-              <label htmlFor="guest-password" className="mb-1 block text-sm font-medium">
+            <div className="ui-field">
+              <label htmlFor="guest-password" className="ui-field__label">
                 {dictionary.passwordLabel} *
               </label>
-              <div className="flex gap-2">
+              <div className="guest-auth__password">
                 <input
                   id="guest-password"
                   name="password"
@@ -271,7 +279,7 @@ export default function UnifiedGuestClient() {
                 />
                 <button
                   type="button"
-                  className="rounded-lg border border-soft px-3 text-sm"
+                  className="ui-btn ui-btn--secondary ui-btn--md guest-auth__reveal"
                   aria-label={showPassword ? dictionary.a11y.hidePassword : dictionary.a11y.showPassword}
                   aria-pressed={showPassword}
                   onClick={() => setShowPassword((value) => !value)}
@@ -282,18 +290,23 @@ export default function UnifiedGuestClient() {
             </div>
 
             {mode === 'signup' && (
-              <label className="flex items-start gap-2 text-sm">
-                <input type="checkbox" className="mt-1" checked={acceptTerms} onChange={(event) => setAcceptTerms(event.target.checked)} required />
-                <span>{GUEST_TERMS_TEXT[locale]}</span>
-              </label>
+              <div className="guest-auth__terms">
+                <label className="guest-auth__check">
+                  <input type="checkbox" className="guest-auth__checkbox" checked={acceptTerms} onChange={(event) => setAcceptTerms(event.target.checked)} required />
+                  <span>{GUEST_TERMS_TEXT[locale]}</span>
+                </label>
+                <p className="guest-auth__privacy">
+                  <Link href={`/${locale}/privacy`} className="guest-auth__link shell-link">{legalDictionary.privacy.title}</Link>
+                </p>
+              </div>
             )}
 
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+            <label className="guest-auth__check">
+              <input type="checkbox" className="guest-auth__checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
               <span>{dictionary.rememberMe}</span>
             </label>
 
-            <button type="submit" disabled={!valid || loading} className="btn btn-primary min-h-11 w-full disabled:cursor-not-allowed disabled:opacity-50">
+            <button type="submit" disabled={!valid || loading} aria-busy={loading} className="ui-btn ui-btn--primary ui-btn--md ui-btn--block">
               {loading ? dictionary.working : dictionary.continueBtn}
             </button>
           </form>

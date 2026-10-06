@@ -78,7 +78,7 @@ describe('approved disposable PostgreSQL image reference', () => {
   it.each([
     ['tag only', 'postgres:16-alpine'],
     ['digest without tag', `postgres@${APPROVED_POSTGRES_INDEX_DIGEST}`],
-    ['short digest', 'postgres:16-alpine@sha256:57c72fd2'],
+    ['short digest', 'postgres:16-alpine@sha256:721873c3'],
     [
       'uppercase digest',
       `postgres:16-alpine@sha256:${APPROVED_POSTGRES_INDEX_DIGEST.slice(7).toUpperCase()}`,

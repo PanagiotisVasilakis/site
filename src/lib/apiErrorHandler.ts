@@ -1,12 +1,11 @@
 /**
  * Enterprise-grade API error handling middleware
- * Features: Structured error responses, correlation tracking, rate limiting, validation
+ * Features: Structured error responses, correlation tracking, validation
  */
 
 import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from './logger-enterprise';
-import { redactHeaders } from './redaction';
 import { z } from 'zod';
 import type { ApiErrorCode } from './apiErrorTypes';
 import { ApiErrorCode as ErrorCodes } from './apiErrorTypes';
@@ -14,27 +13,25 @@ import {
   createClientIdentityUnavailableResponse,
   isClientIdentityUnavailableError,
 } from './net/clientIdentity';
+import { getClientIp } from './net/getClientIp';
+import { logSecurityDiagnostic } from './security-monitoring';
 
-// Re-export for backward compatibility
+// Public error-code enum for route handlers
 export { ErrorCodes as ApiErrorCode };
 
 // Standard HTTP status codes
 const HttpStatusCodes = {
   OK: 200,
-  CREATED: 201,
-  ACCEPTED: 202,
-  NO_CONTENT: 204,
   BAD_REQUEST: 400,
   UNAUTHORIZED: 401,
   FORBIDDEN: 403,
   NOT_FOUND: 404,
-  METHOD_NOT_ALLOWED: 405,
   CONFLICT: 409,
   PAYLOAD_TOO_LARGE: 413,
+  UNSUPPORTED_MEDIA_TYPE: 415,
   UNPROCESSABLE_ENTITY: 422,
   TOO_MANY_REQUESTS: 429,
   INTERNAL_SERVER_ERROR: 500,
-  NOT_IMPLEMENTED: 501,
   BAD_GATEWAY: 502,
   SERVICE_UNAVAILABLE: 503,
   GATEWAY_TIMEOUT: 504,
@@ -46,18 +43,14 @@ const ERROR_STATUS_MAP: Record<ApiErrorCode, number> = {
   [ErrorCodes.UNAUTHORIZED]: HttpStatusCodes.UNAUTHORIZED,
   [ErrorCodes.FORBIDDEN]: HttpStatusCodes.FORBIDDEN,
   [ErrorCodes.NOT_FOUND]: HttpStatusCodes.NOT_FOUND,
-  [ErrorCodes.METHOD_NOT_ALLOWED]: HttpStatusCodes.METHOD_NOT_ALLOWED,
   [ErrorCodes.CONFLICT]: HttpStatusCodes.CONFLICT,
   [ErrorCodes.VALIDATION_ERROR]: HttpStatusCodes.UNPROCESSABLE_ENTITY,
   [ErrorCodes.RATE_LIMITED]: HttpStatusCodes.TOO_MANY_REQUESTS,
-  [ErrorCodes.RATE_LIMIT_EXCEEDED]: HttpStatusCodes.TOO_MANY_REQUESTS,
   [ErrorCodes.PAYLOAD_TOO_LARGE]: HttpStatusCodes.PAYLOAD_TOO_LARGE,
-  [ErrorCodes.UNSUPPORTED_MEDIA_TYPE]: 415,
+  [ErrorCodes.UNSUPPORTED_MEDIA_TYPE]: HttpStatusCodes.UNSUPPORTED_MEDIA_TYPE,
   [ErrorCodes.INTERNAL_ERROR]: HttpStatusCodes.INTERNAL_SERVER_ERROR,
-  [ErrorCodes.NOT_IMPLEMENTED]: HttpStatusCodes.NOT_IMPLEMENTED,
   [ErrorCodes.SERVICE_UNAVAILABLE]: HttpStatusCodes.SERVICE_UNAVAILABLE,
   [ErrorCodes.GATEWAY_TIMEOUT]: HttpStatusCodes.GATEWAY_TIMEOUT,
-  [ErrorCodes.DATABASE_ERROR]: HttpStatusCodes.INTERNAL_SERVER_ERROR,
   [ErrorCodes.EXTERNAL_SERVICE_ERROR]: HttpStatusCodes.BAD_GATEWAY,
 };
 
@@ -124,29 +117,6 @@ export class ValidationError extends ApiError {
   }
 }
 
-// Rate limiting error
-class RateLimitError extends ApiError {
-  constructor(
-    limit: number,
-    windowMs: number,
-    retryAfter: number,
-    correlationId?: string
-  ) {
-    const details = {
-      limit,
-      windowMs,
-      retryAfter,
-    };
-
-    super(
-      ErrorCodes.RATE_LIMITED,
-      `Rate limit exceeded. Limit: ${limit} requests per ${windowMs}ms`,
-      details,
-      correlationId
-    );
-  }
-}
-
 // Request timeout error
 class TimeoutError extends ApiError {
   constructor(timeoutMs: number, correlationId?: string) {
@@ -174,7 +144,6 @@ interface ApiResponse<T = unknown> {
     correlationId: string;
     timestamp: string;
     version: string;
-    processingTime: number;
   };
 }
 
@@ -205,27 +174,13 @@ type WrappedApiRouteHandler = (
 
 // Error handling middleware configuration
 export interface ErrorHandlerConfig {
-  enableErrorLogging?: boolean;
-  enablePerformanceLogging?: boolean;
-  enableRequestLogging?: boolean;
   maxRequestBodySize?: number;
   requestTimeoutMs?: number;
-  rateLimitConfig?: {
-    windowMs: number;
-    maxRequests: number;
-  };
 }
 
 const DEFAULT_CONFIG: Required<ErrorHandlerConfig> = {
-  enableErrorLogging: true,
-  enablePerformanceLogging: true,
-  enableRequestLogging: false,
   maxRequestBodySize: 1024 * 1024, // 1MB
   requestTimeoutMs: 30000, // 30 seconds
-  rateLimitConfig: {
-    windowMs: 60000, // 1 minute
-    maxRequests: 100,
-  },
 };
 
 /**
@@ -250,20 +205,10 @@ export function withErrorHandler(
     // Set logging context
     logger.setContext({
       correlationId,
-      requestId: correlationId,
       route: url,
     });
 
     try {
-      // Request logging
-      if (mergedConfig.enableRequestLogging) {
-        logger.info('API request started', {
-          method,
-          url,
-          headers: redactHeaders(request.headers),
-        });
-      }
-
       // Request size validation
       const contentLength = request.headers.get('content-length');
       if (contentLength && parseInt(contentLength) > mergedConfig.maxRequestBodySize) {
@@ -333,15 +278,13 @@ export function withErrorHandler(
       }
 
       // Performance logging
-      if (mergedConfig.enablePerformanceLogging) {
-        const duration = performance.now() - startTime;
-        logger.info('API request completed', {
-          method,
-          url,
-          status: response.status,
-          duration: Math.round(duration * 100) / 100,
-        });
-      }
+      const duration = performance.now() - startTime;
+      logger.info('API request completed', {
+        method,
+        url,
+        status: response.status,
+        duration: Math.round(duration * 100) / 100,
+      });
 
       return response;
 
@@ -356,26 +299,34 @@ export function withErrorHandler(
       
       // Handle known API errors
       if (error instanceof ApiError) {
-        if (mergedConfig.enableErrorLogging) {
-          // A handled 4xx is a client outcome, not an application warning. The
-          // status/code remain observable through counters and response logs.
-          logger.debug('API client error', {
-            method,
+        if (error.code === ErrorCodes.UNSUPPORTED_MEDIA_TYPE || error.code === ErrorCodes.PAYLOAD_TOO_LARGE) {
+          // Request-shape violations are logged, never persisted (O11).
+          logSecurityDiagnostic({
+            type: 'api_security_violation',
+            severity: 'medium',
+            timestamp: new Date().toISOString(),
+            ip: getClientIp(request),
             url,
-            status: error.statusCode,
-            code: error.code,
-            duration: Math.round(duration * 100) / 100,
+            details: {
+              violationType: error.code === ErrorCodes.UNSUPPORTED_MEDIA_TYPE ? 'invalid_content_type' : 'payload_too_large',
+              method,
+            },
           });
         }
+        // A handled 4xx is a client outcome, not an application warning. The
+        // status/code remain observable through counters and response logs.
+        logger.debug('API client error', {
+          method,
+          url,
+          status: error.statusCode,
+          code: error.code,
+          duration: Math.round(duration * 100) / 100,
+        });
 
         const headers: Record<string, string> = {
           'X-Correlation-ID': correlationId,
           'X-Error-Code': error.code,
         };
-        // Provide Retry-After for rate limit errors when available
-        if (error instanceof RateLimitError && typeof error.details?.retryAfter === 'number') {
-          headers['Retry-After'] = String(error.details.retryAfter);
-        }
 
         return NextResponse.json(
           error.toJSON(),
@@ -390,13 +341,11 @@ export function withErrorHandler(
       if (error instanceof z.ZodError) {
         const validationError = new ValidationError(error.issues, correlationId);
         
-        if (mergedConfig.enableErrorLogging) {
-          logger.debug('Validation error occurred', {
-            method,
-            url,
-            duration: Math.round(duration * 100) / 100,
-          });
-        }
+        logger.debug('Validation error occurred', {
+          method,
+          url,
+          duration: Math.round(duration * 100) / 100,
+        });
 
         return NextResponse.json(
           validationError.toJSON(),
@@ -418,13 +367,11 @@ export function withErrorHandler(
         correlationId
       );
 
-      if (mergedConfig.enableErrorLogging) {
-        logger.error('Unexpected API error', {
-          method,
-          url,
-          duration: Math.round(duration * 100) / 100,
-        }, error instanceof Error ? error : new Error(String(error)));
-      }
+      logger.error('Unexpected API error', {
+        method,
+        url,
+        duration: Math.round(duration * 100) / 100,
+      }, error instanceof Error ? error : new Error(String(error)));
 
       return NextResponse.json(
         internalError.toJSON(),
@@ -455,7 +402,6 @@ export function createSuccessResponse<T>(
       correlationId: correlationId || generateCorrelationId(),
       timestamp: new Date().toISOString(),
       version: '1.0',
-      processingTime: 0, // Would be calculated by middleware
     },
   };
 

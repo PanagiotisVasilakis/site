@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/featureFlags', () => ({ getFeatureFlagsAsync: async () => ({ portalEnabled: true }) }));
-vi.mock('@/lib/api-security-middleware', () => ({ createAPISecurityMiddleware: () => async () => null }));
 vi.mock('@/lib/sensitiveRateLimit', () => ({
   checkSensitiveRateLimit: mocks.checkSensitiveRateLimit,
   refundSensitiveIdentifierAttempt: mocks.refundSensitiveIdentifierAttempt,

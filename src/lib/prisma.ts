@@ -33,8 +33,7 @@ function createPrismaPgAdapter(connectionString: string): PrismaPg {
 }
 
 /**
- * Adds distributed tracing and metrics instrumentation to Prisma client.
- * Uses query events to track performance and errors.
+ * Logs slow queries and Prisma error events.
  */
 function addPrismaInstrumentation(client: PrismaClient): void {
   const clientWithEvents = client as PrismaClientWithEvents;
@@ -98,7 +97,7 @@ function createPrismaClient(): PrismaClient {
     ],
   });
 
-  // Add instrumentation for distributed tracing and metrics
+  // Log slow queries and Prisma errors
   addPrismaInstrumentation(client);
 
   return client;
@@ -145,32 +144,7 @@ function registerPrismaShutdownHooks(client: PrismaClient): void {
     return;
   }
 
-  const clientWithEvents = client as PrismaClientWithEvents;
-
-  const longRunningHints =
-    Boolean(process.env.NEXT_RUNTIME) ||
-    process.argv.some((arg) => /next|turbo|node-dev|tsx-dev|--watch/.test(arg));
-
-  // Added check for command line execution to avoid hanging processes
-  const isCommandLineExecution = process.argv.some((arg) => 
-    /tsx|-e|--eval/.test(arg)
-  ) && !longRunningHints;
-
-  const autoDisconnectEnv = process.env.PRISMA_AUTO_DISCONNECT;
-  const shouldAutoDisconnectOnIdle =
-    autoDisconnectEnv === 'true'
-      ? true
-      : autoDisconnectEnv === 'false'
-        ? false
-        : !longRunningHints;
-
-  const idleDelayMsRaw = process.env.PRISMA_IDLE_DISCONNECT_MS;
-  const parsedIdleDelay = idleDelayMsRaw ? Number.parseInt(idleDelayMsRaw, 10) : Number.NaN;
-  const idleDelayMs = Number.isFinite(parsedIdleDelay) && parsedIdleDelay >= 0 ? parsedIdleDelay : 200;
-
   let disconnecting = false;
-  let cleanupTimer: NodeJS.Timeout | undefined;
-  let observedActivity = false;
 
   const cleanup = async (trigger: string): Promise<void> => {
     if (disconnecting) return;
@@ -188,71 +162,30 @@ function registerPrismaShutdownHooks(client: PrismaClient): void {
     } catch (disconnectError) {
       logger.error('Failed to disconnect Prisma client cleanly', { trigger }, disconnectError);
     }
-
-    if (cleanupTimer) {
-      clearTimeout(cleanupTimer);
-      cleanupTimer = undefined;
-    }
   };
 
-  const scheduleIdleDisconnect = () => {
-    if (!shouldAutoDisconnectOnIdle) return;
-    if (disconnecting) return;
-
-    if (cleanupTimer) {
-      cleanupTimer.refresh?.();
-      return;
-    }
-
-    cleanupTimer = setTimeout(() => {
-      cleanupTimer = undefined;
-      void cleanup('idle');
-    }, idleDelayMs);
-
-    cleanupTimer.unref?.();
-  };
-
-  if (shouldAutoDisconnectOnIdle) {
-    const markActivity = () => {
-      if (!observedActivity) {
-        observedActivity = true;
-        logger.debug('Prisma query activity observed for auto-disconnect');
-      }
-
-      scheduleIdleDisconnect();
-    };
-
-    if (client && typeof clientWithEvents.$on === 'function') {
-      clientWithEvents.$on('query', markActivity);
-      clientWithEvents.$on('error', markActivity);
-    }
+  const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
+  if (process.platform !== 'win32') {
+    signals.push('SIGQUIT');
   }
 
-  // Only register process shutdown hooks if not in command line execution
-  if (!isCommandLineExecution) {
-    const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
-    if (process.platform !== 'win32') {
-      signals.push('SIGQUIT');
-    }
+  const exitCodes: Record<string, number> = {
+    SIGINT: 130,
+    SIGTERM: 143,
+    SIGQUIT: 131,
+  };
 
-    const exitCodes: Record<string, number> = {
-      SIGINT: 130,
-      SIGTERM: 143,
-      SIGQUIT: 131,
-    };
+  process.once('beforeExit', () => {
+    void cleanup('beforeExit');
+  });
 
-    process.once('beforeExit', () => {
-      void cleanup('beforeExit');
-    });
-
-    for (const signal of signals) {
-      process.once(signal, () => {
-        void cleanup(signal).finally(() => {
-          const exitCode = exitCodes[signal] ?? 0;
-          process.exit(exitCode);
-        });
+  for (const signal of signals) {
+    process.once(signal, () => {
+      void cleanup(signal).finally(() => {
+        const exitCode = exitCodes[signal] ?? 0;
+        process.exit(exitCode);
       });
-    }
+    });
   }
 }
 

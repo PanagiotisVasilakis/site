@@ -10,17 +10,17 @@ describe('application URL configuration', () => {
     vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'guest.example');
     vi.stubEnv('VERCEL_URL', 'legacy.example');
 
-    const { config } = await import('@/lib/config');
+    const { siteUrl } = await import('@/lib/site');
 
-    expect(config.absoluteSiteUrl()).toBe('https://guest.example');
+    expect(siteUrl).toBe('https://guest.example');
   });
 
   it('does not treat VERCEL_URL as an application origin', async () => {
     vi.stubEnv('NEXT_PUBLIC_SITE_URL', '');
     vi.stubEnv('VERCEL_URL', 'legacy.example');
 
-    const { config } = await import('@/lib/config');
+    const { siteUrl } = await import('@/lib/site');
 
-    expect(config.absoluteSiteUrl()).toBe('http://localhost:3000');
+    expect(siteUrl).toBe('http://localhost:3000');
   });
 });

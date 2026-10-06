@@ -13,7 +13,6 @@ APP_PID_FILE="$RUNTIME_DIR/app.pid"
 APP_LOG_FILE="$RUNTIME_DIR/app.log"
 MIGRATION_LOCK_FILE="$RUNTIME_DIR/migrate.lock"
 
-PROFILE="development"
 STRICT_MODE=0
 DOCKER_FALLBACK=1
 SKIP_MIGRATE=0
@@ -62,7 +61,6 @@ Options:
   --follow                                 For logs command, follow output
   --verbose                                Verbose command tracing
   --help                                   Show this help
-  (--profile development and --skip-build are accepted for compatibility and ignored.)
 
 Examples:
   scripts/system-orchestrator.sh up
@@ -125,13 +123,6 @@ parse_args() {
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --profile)
-        [[ "${2:-}" == "development" ]] || die "Only the development profile exists; production runs the Docker image" 11
-        shift 2
-        ;;
-      --skip-build)
-        shift
-        ;;
       --strict)
         STRICT_MODE=1
         shift
@@ -413,6 +404,9 @@ prepare_database() {
       DB_MODE="managed"
     fi
     log "DATABASE_URL is reachable (${DB_MODE})"
+    # Record the DB mode for every caller so `down` can stop a fallback DB
+    # (start_app later overwrites this with the app command).
+    write_state "none"
     return
   fi
 
@@ -427,6 +421,7 @@ prepare_database() {
   if ! database_reachable "$DATABASE_URL"; then
     die "Fallback database started but DATABASE_URL is still unreachable" 17
   fi
+  write_state "none"
 }
 
 ensure_dependencies() {
@@ -742,8 +737,6 @@ run_bootstrap_sequence() {
 
   if (( DB_ONLY_MODE )); then
     prepare_database
-    # Record the DB mode so `down` can stop a fallback DB started here.
-    write_state "none"
     log "DB-only bootstrap completed"
     return
   fi

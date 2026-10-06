@@ -18,7 +18,6 @@ function booking(id: string, start: string, end: string): Booking {
   return {
     id,
     source: 'EXTERNAL',
-    reference: null,
     startDate: new Date(`${start}T00:00:00Z`),
     endDate: new Date(`${end}T00:00:00Z`),
     userId: null,
@@ -66,7 +65,7 @@ describe('guest data export date handling', () => {
       booking('without-guest', '2030-07-20', '2030-07-22'),
     ]);
     guestStore.getAllUsers.mockResolvedValue([
-      { id: 'user-1', email: null, phoneE164: '+12025550100', countryOrigin: 'GR', createdAt: new Date(0), updatedAt: new Date(0) },
+      { id: 'user-1', phoneE164: '+12025550100', createdAt: new Date(0), updatedAt: new Date(0) },
     ]);
 
     const result = await guestDataExport.getAllBookings();
@@ -77,6 +76,7 @@ describe('guest data export date handling', () => {
     ]);
     expect(guestStore.findBookingById).not.toHaveBeenCalled();
     expect(guestStore.findUserById).not.toHaveBeenCalled();
+    expect(Object.keys(result[0].user ?? {}).sort()).toEqual(['createdAt', 'id', 'phone', 'updatedAt']);
   });
 
   it('counts a booking that starts today as active', async () => {

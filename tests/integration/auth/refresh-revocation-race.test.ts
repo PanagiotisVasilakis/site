@@ -107,9 +107,7 @@ async function seedBoundAuthorizationChain(
       await tx.user.create({
         data: {
           id: USER_ID,
-          email: 'revocation-race-guest@example.invalid',
           phoneE164: '+12025550201',
-          countryOrigin: 'ABROAD',
         },
       });
       await tx.booking.create({

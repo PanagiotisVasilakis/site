@@ -5,14 +5,14 @@
   "checkerVersion": "1.0.0",
   "schema": {
     "path": "prisma/schema.prisma",
-    "sha256": "0e03a796c364163aaa411566a3d1e1e5092ec4aa83a971bd31789a0a442d0a2d",
-    "bytes": 16894
+    "sha256": "ab87c1ad6d93815622839499429988f8730f06a0ac42c95518a35957b390002a",
+    "bytes": 18012
   },
   "migrations": {
     "root": "prisma/migrations",
     "treeHashAlgorithm": "sha256-prisma-migrations-v1",
-    "sha256": "83f5ff3c36f05ab36c2355b3ca5b6790f1e3ac9ad7a8e037a98ea83b4c112a6f",
-    "fileCount": 20,
+    "sha256": "14843658c70802d41ad13bd0e1d719046594205e5919131dad136af0e2dbeb8c",
+    "fileCount": 24,
     "files": [
       {
         "path": "000_init/migration.sql",
@@ -108,6 +108,26 @@
         "path": "20260924124000_drop_refresh_token_hints/migration.sql",
         "sha256": "f682ef5f8ad0a02712c905f92392f795cb841d5383524b2a4767d213c5506200",
         "bytes": 1119
+      },
+      {
+        "path": "20260928181000_add_availability_calendar/migration.sql",
+        "sha256": "7b68a3526c610507ad8d3c19d7121a30a3fb4c1297a7bed6eb136bca174f101a",
+        "bytes": 3399
+      },
+      {
+        "path": "20260928215800_remove_stay_requests/migration.sql",
+        "sha256": "b7b120fc32927aecc248eb7df8f78d646986b07d6c529724e2b6c9e858f1c7a1",
+        "bytes": 2204
+      },
+      {
+        "path": "20260929120000_drop_bookings_reference/migration.sql",
+        "sha256": "cdb87dfd097f8f3c8670b24693a77da628bdc4f7dd383ee9c48548a4c19aa5bc",
+        "bytes": 1238
+      },
+      {
+        "path": "20260930120000_minimise_user_data/migration.sql",
+        "sha256": "409bed84f20f8608059e5691ca4b5c2e1e0b05e7c7b4ca2d1c916453d8c2f557",
+        "bytes": 1951
       },
       {
         "path": "migration_lock.toml",

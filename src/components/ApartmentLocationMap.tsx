@@ -1,8 +1,7 @@
 "use client";
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import InteractiveMap from './InteractiveMap';
-import { getKalamataMarkers } from '@/lib/mapUtils';
-import type { MapContentItem } from '@/data/mapLocations';
+import { getKalamataMapLocations, type MapContentItem } from '@/data/mapLocations';
 import type { Locale } from '@/i18n/config';
 import { normalizeLocale } from '@/i18n/config';
 
@@ -12,8 +11,9 @@ interface ApartmentLocationMapProps {
   zoom?: number;
   className?: string;
   contentItems?: MapContentItem[];
-  includeLandmarks?: boolean;
-  activation?: 'viewport' | 'intent';
+  cartoBasemapsKey?: string;
+  /** Number the content items' pins 1…n in the given order (the guide's map list, identity §9.5). */
+  numbered?: boolean;
 }
 
 export default function ApartmentLocationMap({
@@ -22,13 +22,13 @@ export default function ApartmentLocationMap({
   zoom = 14,
   className = "",
   contentItems = [],
-  includeLandmarks = true,
-  activation = 'viewport'
+  cartoBasemapsKey,
+  numbered = false,
 }: ApartmentLocationMapProps) {
   const effLocale: Locale = normalizeLocale(locale);
   const markers = useMemo(
-    () => getKalamataMarkers(effLocale, contentItems, { includeLandmarks }),
-    [contentItems, effLocale, includeLandmarks]
+    () => getKalamataMapLocations(effLocale, contentItems, { numbered }),
+    [contentItems, effLocale, numbered]
   );
 
   return (
@@ -38,8 +38,7 @@ export default function ApartmentLocationMap({
       height={height}
       className={className}
       locale={effLocale}
-      activation={activation}
-      clusterMin={20}
+      cartoBasemapsKey={cartoBasemapsKey}
     />
   );
 }

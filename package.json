@@ -52,14 +52,17 @@
     "check:candidate-diff": "node scripts/check-candidate-diff.mjs",
     "check:dead-code": "knip --include files,dependencies,unlisted,binaries",
     "check:image-assets": "tsx scripts/check-image-assets.ts",
+    "design:icons": "tsx scripts/design/gen-app-icons.ts",
+    "design:hero": "tsx scripts/design/gen-hero-assets.ts",
+    "design:og": "tsx scripts/design/gen-og-images.ts",
     "lint:security": "eslint --config eslint.config.security.mjs . --max-warnings=0",
     "audit:a11y": "tsx scripts/axe-a11y.ts",
     "outbox:drain": "tsx scripts/drain-outbox.ts",
     "operations:check": "tsx scripts/run-operational-maintenance.ts",
     "reports:prune": "tsx scripts/prune-reports.ts",
     "check:browser-runtime": "tsx scripts/check-browser-runtime.ts",
-    "audit:lighthouse:matrix": "tsx scripts/lighthouse-matrix.ts",
     "audit:responsive:ux": "tsx scripts/responsive-ux-audit.ts",
+    "audit:vitals": "tsx scripts/audit-vitals.ts",
     "smoke:image": "tsx scripts/smoke-production-image.ts",
     "security:audit": "npm audit --audit-level=high",
     "security:license-check": "tsx scripts/check-licenses.ts",
@@ -87,9 +90,8 @@
     "system:check": "bash ./scripts/system-orchestrator.sh check"
   },
   "dependencies": {
-    "@hookform/resolvers": "5.4.0",
-    "@prisma/adapter-pg": "^7.0.0",
-    "@prisma/client": "^7.0.0",
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
     "bcrypt": "^6.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -97,13 +99,11 @@
     "framer-motion": "^11.15.0",
     "jsonwebtoken": "9.0.3",
     "leaflet": "^1.9.4",
-    "leaflet.markercluster": "^1.5.3",
     "next": "16.3.6",
     "pg": "8.22.0",
     "react": "19.2.7",
     "react-day-picker": "^9.14.0",
     "react-dom": "19.2.7",
-    "react-hook-form": "7.81.0",
     "zod": "4.4.3"
   },
   "devDependencies": {
@@ -114,14 +114,12 @@
     "@types/bcrypt": "^6.0.0",
     "@types/jsonwebtoken": "^9.0.6",
     "@types/leaflet": "1.9.21",
-    "@types/leaflet.markercluster": "^1.5.4",
     "@types/node": "^22.19.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@types/spdx-expression-parse": "^3.0.1",
     "@vitest/coverage-v8": "4.1.11",
     "axe-core": "^4.10.0",
-    "chrome-launcher": "^1.0.0",
     "dotenv": "^17.0.0",
     "esbuild": "0.28.1",
     "eslint": "9.39.5",
@@ -129,11 +127,9 @@
     "eslint-plugin-security": "^3.0.1",
     "jsdom": "29.1.1",
     "knip": "6.26.0",
-    "lighthouse": "^13.4.0",
     "postcss": "8.5.28",
-    "prisma": "^7.0.0",
-    "proxy-agent": "8.0.2",
-    "puppeteer": "24.43.1",
+    "prisma": "7.10.0",
+    "puppeteer": "25.12.0",
     "spdx-expression-parse": "^4.0.0",
     "tailwindcss": "4.3.2",
     "tsx": "4.23.1",
@@ -145,25 +141,18 @@
     "sharp": "0.35.4"
   },
   "overrides": {
-    "@prisma/dev": "0.24.17",
-    "@sentry/node": "^10.64.0",
     "baseline-browser-mapping": "^2.11.25",
     "deepmerge-ts": "^8.0.2",
     "fast-uri": "^3.1.8",
-    "mysql2": "^3.24.4",
-    "next@16.3.6": {
-      "postcss": "8.5.28",
-      "sharp": "$sharp"
-    }
+    "mysql2": "^3.24.4"
   },
   "allowScripts": {
-    "@prisma/engines@7.8.0": true,
+    "@prisma/engines@7.10.0": true,
     "bcrypt@6.0.0": true,
     "esbuild@0.28.1": true,
     "fsevents@2.3.3": true,
-    "sharp@0.35.4": true,
-    "prisma@7.8.0": true,
-    "puppeteer@24.43.1": true,
+    "prisma@7.10.0": true,
+    "puppeteer@25.12.0": true,
     "unrs-resolver@1.11.1": true
   }
 }

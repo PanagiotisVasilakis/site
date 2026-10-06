@@ -1,3 +1,4 @@
+import type { NextRequest } from 'next/server';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import type { PrismaClient } from '@/generated/prisma/client';
@@ -12,7 +13,6 @@ import { readDisposablePostgresRuntime } from '../support/runtime';
 
 const runtime = readDisposablePostgresRuntime();
 const managedEnvironment = [
-  'BOOKING_REQUEST_WEBHOOK_URL',
   'DATABASE_URL',
   'LOG_CONSOLE',
   'ORIGIN_PROXY_SHARED_SECRET',
@@ -30,7 +30,6 @@ interface DurableState {
   refreshFamilies: number;
   refreshTokens: number;
   sessions: number;
-  stayRequests: number;
 }
 
 const EMPTY_DURABLE_STATE: DurableState = {
@@ -41,14 +40,12 @@ const EMPTY_DURABLE_STATE: DurableState = {
   refreshFamilies: 0,
   refreshTokens: 0,
   sessions: 0,
-  stayRequests: 0,
 };
 
 function setApplicationEnvironment(databaseUrl: string): void {
   for (const name of managedEnvironment) {
     if (!originalEnvironment.has(name)) originalEnvironment.set(name, process.env[name]);
   }
-  process.env.BOOKING_REQUEST_WEBHOOK_URL = 'https://webhook.example.invalid/booking';
   process.env.DATABASE_URL = databaseUrl;
   process.env.LOG_CONSOLE = 'false';
   process.env.PRISMA_AUTO_DISCONNECT = 'false';
@@ -81,7 +78,6 @@ async function durableState(prisma: PrismaClient): Promise<DurableState> {
     refreshFamilies,
     refreshTokens,
     sessions,
-    stayRequests,
   ] = await Promise.all([
     prisma.securityAuditEvent.count(),
     prisma.outboxEvent.count(),
@@ -90,7 +86,6 @@ async function durableState(prisma: PrismaClient): Promise<DurableState> {
     prisma.refreshTokenFamily.count(),
     prisma.refreshToken.count(),
     prisma.session.count(),
-    prisma.stayRequest.count(),
   ]);
   return {
     auditEvents,
@@ -100,56 +95,77 @@ async function durableState(prisma: PrismaClient): Promise<DurableState> {
     refreshFamilies,
     refreshTokens,
     sessions,
-    stayRequests,
   };
 }
 
-function bookingPayload(sequence: number): Record<string, unknown> {
-  return {
-    propertyName: 'D1A integration property',
-    locale: 'en',
-    dateRange: {
-      from: '2030-06-01',
-      to: '2030-06-08',
+// Unauthenticated public writes: each stores a security_audit_events row only
+// after its per-address and global limiter calls.
+const PUBLIC_WRITE_ROUTES: ReadonlyArray<{
+  path: string;
+  tag: string;
+  contentType: string;
+  body: (sequence: number) => Record<string, unknown>;
+  load: () => Promise<(request: NextRequest) => Promise<Response>>;
+}> = [
+  {
+    path: '/api/errors',
+    tag: 'errors',
+    contentType: 'application/json',
+    body: (sequence) => ({
+      error: { name: 'Error', message: `d1a integration report ${sequence}` },
+      context: { url: 'http://integration.invalid/en', timestamp: new Date().toISOString() },
+    }),
+    load: async () => {
+      const { POST } = await import('@/app/api/errors/route');
+      return (request) => POST(request, { params: Promise.resolve({}) });
     },
-    guest: {
-      firstName: 'Integration',
-      lastName: 'Guest',
-      email: `d1a-${sequence}@example.invalid`,
-      phone: '+12025550999',
+  },
+  {
+    path: '/api/security/csp-report',
+    tag: 'csp',
+    contentType: 'application/csp-report',
+    body: (sequence) => ({
+      'csp-report': {
+        'document-uri': 'http://integration.invalid/en',
+        'violated-directive': 'script-src-elem',
+        'blocked-uri': `https://cdn.example.invalid/d1a-${sequence}.js`,
+      },
+    }),
+    load: async () => {
+      const { POST } = await import('@/app/api/security/csp-report/route');
+      return (request) => POST(request);
     },
-  };
-}
+  },
+];
 
 describe.sequential('D1A missing client identity with live PostgreSQL', () => {
   afterAll(() => restoreApplicationEnvironment());
 
-  it('leaves limiter and domain state untouched in three clean migrated databases', async () => {
+  it.each(PUBLIC_WRITE_ROUTES)('leaves limiter and audit state untouched for $path in three clean migrated databases', async (route) => {
     for (const sequence of [1, 2, 3]) {
-      const target = await createIsolatedDatabase(runtime, `d1a_missing_identity_${sequence}`);
+      const target = await createIsolatedDatabase(runtime, `d1a_noid_${route.tag}_${sequence}`);
       try {
         await applyMigrationsFromEmpty(target);
         setApplicationEnvironment(target.databaseUrl);
         await resetApplicationPrismaSingleton();
 
-        const [{ NextRequest }, bookingRoute] = await Promise.all([
+        const [{ NextRequest }, post] = await Promise.all([
           import('next/server'),
-          import('@/app/api/booking-requests/route'),
+          route.load(),
         ]);
 
         const before = await withTestPrismaClient(target, durableState);
         expect(before).toEqual(EMPTY_DURABLE_STATE);
 
-        const response = await bookingRoute.POST(new NextRequest(
-          'http://integration.invalid/api/booking-requests',
+        const response = await post(new NextRequest(
+          `http://integration.invalid${route.path}`,
           {
             method: 'POST',
             headers: {
-              'content-type': 'application/json',
-              'idempotency-key': `d1a-missing-identity-${sequence}`,
+              'content-type': route.contentType,
               'user-agent': 'd1a-integration-client',
             },
-            body: JSON.stringify(bookingPayload(sequence)),
+            body: JSON.stringify(route.body(sequence)),
           },
         ));
         const responseBody = await response.text();
@@ -158,7 +174,7 @@ describe.sequential('D1A missing client identity with live PostgreSQL', () => {
         expect(response.headers.get('cache-control')).toBe('no-store');
         expect(response.headers.get('retry-after')).toBeNull();
         expect(response.headers.get('set-cookie')).toBeNull();
-        expect(responseBody).not.toMatch(/CLIENT_IDENTITY_UNAVAILABLE|x-forwarded-for|cf-connecting-ip|booking-request|198\.51\.100/iu);
+        expect(responseBody).not.toMatch(/CLIENT_IDENTITY_UNAVAILABLE|x-forwarded-for|cf-connecting-ip|client-error-report|csp-report|198\.51\.100/iu);
 
         const afterUnavailable = await withTestPrismaClient(target, durableState);
         expect(afterUnavailable).toEqual(before);

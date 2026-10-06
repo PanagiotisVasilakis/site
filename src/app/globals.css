@@ -1,32 +1,22 @@
 @import "tailwindcss";
-@import "../styles/01-tokens.css";
-@import "../styles/02-layout.css";
-@import "../styles/03-home.css";
-@import "../styles/04-theme.css";
-@import "../styles/05-primitives.css";
-@import "../styles/06-semantic-surfaces.css";
-@import "../styles/07-search-listing.css";
-@import "../styles/08-vendor.css";
-@import "../styles/09-utilities.css";
-@import "../styles/10-moments.css";
-@import "../styles/11-contact.css";
-@import "../styles/12-apartment-checkin.css";
-@import "../styles/13-compatibility-admin.css";
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
-
-/* Brand palette as Tailwind colours, so `text-/bg-/ring-brand-*` utilities and their variants are generated.
-   `inline` makes them read the theme-aware `--brand-*` tokens (01-tokens.css, 04-theme.css) where used. */
-@theme inline {
-  --color-brand-50: var(--brand-50);
-  --color-brand-100: var(--brand-100);
-  --color-brand-200: var(--brand-200);
-  --color-brand-300: var(--brand-300);
-  --color-brand-400: var(--brand-400);
-  --color-brand-500: var(--brand-500);
-  --color-brand-600: var(--brand-600);
-  --color-brand-700: var(--brand-700);
-  --color-brand-800: var(--brand-800);
-  --color-brand-900: var(--brand-900);
-}
-
-/* Keep one ordered global CSS entrypoint so critical styles require one request. */
+/* Automatic source detection would also read the notes (REVIEW.md, PROGRESS.md, docs) and emit the class names
+   quoted there (R-358); no markdown file is a source of classes. */
+@source not "../../**/*.md";
+/* Keep one ordered global CSS entrypoint so critical styles require one request.
+   R3-V12b deleted the legacy sheets (01…13), the legacy `dark` variant and the brand-* palette. The component
+   sheets stay unlayered (identity §11 fallback, O38) so utilities do not start beating them; with no legacy
+   rule left, new CSS no longer has to use class selectors only, and the existing rules are kept as they are. */
+@import "../styles/tokens.css";
+@import "../styles/base.css";
+@import "../styles/motion.css";
+@import "../styles/components/ui.css";
+@import "../styles/components/shell.css";
+@import "../styles/components/hero.css";
+@import "../styles/components/apartment.css";
+@import "../styles/components/lightbox.css";
+@import "../styles/components/home.css";
+@import "../styles/components/guide.css";
+@import "../styles/components/legal.css";
+@import "../styles/components/calendar.css";
+@import "../styles/components/stay.css";
+@import "../styles/components/admin.css";

@@ -59,7 +59,6 @@ interface ClaimGraph {
     id: string;
     phoneE164: string;
     passwordHash: string | null;
-    countryOrigin: 'GR' | 'ABROAD';
   }>;
   bookings: Array<{
     id: string;
@@ -155,7 +154,6 @@ async function seedClaimLifecycle(options: SeedOptions = {}): Promise<{
           id: options.ownerId,
           phoneE164: OWNER_PHONE,
           passwordHash: ownerPasswordHash,
-          countryOrigin: 'ABROAD',
         },
       });
     }
@@ -165,7 +163,6 @@ async function seedClaimLifecycle(options: SeedOptions = {}): Promise<{
           id: EXISTING_USER_ID,
           phoneE164: CLAIMANT_PHONE,
           passwordHash: claimantPasswordHash,
-          countryOrigin: 'ABROAD',
         },
       });
     }
@@ -268,7 +265,6 @@ async function readClaimGraph(): Promise<ClaimGraph> {
             id: true,
             phoneE164: true,
             passwordHash: true,
-            countryOrigin: true,
           },
           orderBy: { id: 'asc' },
         }),
@@ -486,7 +482,6 @@ function expectSuccessfulGraph(
   expect(user.id).toBe(expectedUserId ?? user.id);
   expect(user.phoneE164).toBe(CLAIMANT_PHONE);
   expect(user.passwordHash).toBeTruthy();
-  expect(user.countryOrigin).toBe('ABROAD');
   expect(graph.bookings).toEqual([{
     id: PRIMARY_BOOKING_ID,
     userId: user.id,

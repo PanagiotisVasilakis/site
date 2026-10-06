@@ -65,6 +65,7 @@ describe('canonical client identity', () => {
 
     expect(() => requireCanonicalClientIp(request)).toThrow(expect.objectContaining({
       code: CLIENT_IDENTITY_UNAVAILABLE,
+      reason: 'attestation_rejected',
     }));
   });
 

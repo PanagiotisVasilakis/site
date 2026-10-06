@@ -1,41 +1,58 @@
 import React from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
 import clsx from 'clsx';
+import { cva, type VariantProps } from 'class-variance-authority';
 
-const buttonVariants = cva(
-  'focus:outline-none disabled:cursor-not-allowed disabled:opacity-60',
-  {
-    variants: {
-      variant: {
-        primary: 'btn-primary',
-      },
+/** identity §8 Button (styles in src/styles/components/ui.css); `variant` defaults to primary. */
+const buttonVariants = cva('ui-btn', {
+  variants: {
+    variant: {
+      primary: 'ui-btn--primary',
+      secondary: 'ui-btn--secondary',
+      ghost: 'ui-btn--ghost',
+      glass: 'ui-btn--glass',
+      'on-band': 'ui-btn--on-band',
+      'outline-on-band': 'ui-btn--outline-on-band',
+      'link-arrow': 'ui-btn--link-arrow',
     },
-    defaultVariants: {
-      variant: 'primary',
+    size: {
+      sm: 'ui-btn--sm',
+      md: 'ui-btn--md',
+      lg: 'ui-btn--lg',
     },
-  }
-);
+    block: {
+      true: 'ui-btn--block',
+    },
+  },
+  defaultVariants: {
+    variant: 'primary',
+    size: 'md',
+  },
+});
 
 type ButtonVariantProps = VariantProps<typeof buttonVariants>;
 
-type ButtonProps = ButtonVariantProps &
-  React.ButtonHTMLAttributes<HTMLButtonElement> & {
-    asChild?: false;
-  };
+type StyleProps = {
+  variant?: NonNullable<ButtonVariantProps['variant']>;
+  size?: NonNullable<ButtonVariantProps['size']>;
+  block?: boolean;
+};
 
-type ButtonAsChildProps = ButtonVariantProps &
-  Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'children'> & {
-    asChild: true;
-    children: React.ReactElement<{ className?: string }>;
-  };
+type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & StyleProps & {
+  asChild?: false;
+};
+
+type ButtonAsChildProps = Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'children'> & StyleProps & {
+  asChild: true;
+  children: React.ReactElement<{ className?: string }>;
+};
 
 export type AppButtonProps = ButtonProps | ButtonAsChildProps;
 
-export function Button({ variant, className, asChild, ...props }: AppButtonProps) {
-  const classes = buttonVariants({ variant, className });
+export function Button({ className, asChild, variant, size, block, ...props }: AppButtonProps) {
+  const classes = clsx(buttonVariants({ variant, size, block }), className);
 
   if (asChild) {
-    const { children, ...anchorProps } = props as ButtonAsChildProps;
+    const { children, ...anchorProps } = props as Omit<ButtonAsChildProps, 'asChild'>;
     if (!React.isValidElement(children)) return null;
     return React.cloneElement(children, {
       ...anchorProps,
@@ -43,5 +60,5 @@ export function Button({ variant, className, asChild, ...props }: AppButtonProps
     });
   }
 
-  return <button className={classes} {...(props as ButtonProps)} />;
+  return <button className={classes} {...(props as React.ButtonHTMLAttributes<HTMLButtonElement>)} />;
 }

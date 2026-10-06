@@ -1,0 +1,331 @@
+/* Design tokens (docs/design/identity.md §2.5, §3, §4, §5.3). Light values live in @theme; dark values
+   override the same tokens only at token level, in @layer base (§3.1). tests/unit/design-tokens.test.ts
+   checks dark-block parity and every §3.3 contrast pair against this file.
+   `static` keeps every token on :root even before a utility or rule uses it (new components, inline styles).
+   Token names avoided the legacy :root variables of 01-tokens.css (--radius-sm…xl, --shadow-sm…, --font-sans),
+   deleted in R3-V12b. */
+@theme static {
+  /* §3.2 colour */
+  --color-bg: #F6F0E6;
+  --color-surface: #FFFBF5;
+  --color-surface-sunken: #EDE4D5;
+  --color-surface-raised: #FFFFFF;
+  /* Header bar: transparent like the original site (owner decision O43, 2026-09-30). Do not make it opaque;
+     legibility over photos comes from the text halo in shell.css (.site-header--overlay). */
+  --color-glass: rgb(255 255 255 / .12);
+  /* Floating bars over content (QuoteBar): near-opaque glass, so text stays legible over any cell. */
+  --color-glass-bar: rgb(246 240 230 / .84);
+  --color-fg: #1C2528;
+  --color-fg-muted: #57524C;
+  --color-fg-on-photo: #FFF8EE;
+  --color-fg-on-photo-accent: #FFE2C0;
+  --color-primary: #A0452A;
+  --color-primary-hover: #8A3A22;
+  --color-primary-fg: #FFFFFF;
+  --color-primary-text: #8F3D24;
+  --color-primary-tint: rgb(160 69 42 / .12);
+  --color-accent: #0D5568;
+  --color-accent-hover: #0A4454;
+  --color-accent-fg: #FFFFFF;
+  --color-olive: #4F5E33;
+  --color-sun: #F0A95B;
+  --color-border: rgb(28 37 40 / .13);
+  --color-border-strong: rgb(28 37 40 / .28);
+  --color-border-control: #8A8178;
+  --color-focus: #0D5568;
+  --color-success: #2F6230;
+  --color-success-bg: #E1EBD6;
+  --color-warning: #7A4B00;
+  --color-warning-bg: #F7E4C2;
+  --color-danger: #A1232B;
+  --color-danger-bg: #F8DEDB;
+  --color-info-bg: #DCEBEE;
+  --color-band-bg: #0C3440;
+  --color-band-fg: #F6EFE4;
+  --color-band-muted: #B9CBCF;
+  --color-band-accent: #F2B27A;
+  --color-band-accent-fg: #231510;
+  --color-band-line: rgb(246 239 228 / .20);
+  --color-band-focus: #F2B27A;
+  --color-warm-1: #7A3522;
+  --color-warm-2: #3B1D14;
+  --color-warm-3: #24130E;
+  --color-warm-muted: #F0D9C8;
+  --color-cal-free-bg: var(--color-surface);
+  --color-cal-price: var(--color-fg-muted);
+  --color-cal-booked-bg: var(--color-surface-sunken);
+  --color-cal-booked-hatch: rgb(28 37 40 / .12);
+  --color-cal-booked-fg: var(--color-fg-muted);
+  --color-cal-selected-bg: var(--color-primary);
+  --color-cal-selected-fg: var(--color-primary-fg);
+  --color-cal-range-bg: var(--color-primary-tint);
+  --color-cal-best-bg: #E2E8CC;
+  --color-cal-best-fg: #3A4722;
+  --color-viewer-bg: #0E1418;
+  --color-map-sea: #0A4A5C;
+  --color-map-land: #EFE6D6;
+  --color-map-c1: #DDCDB2;
+  --color-map-c2: #CCB793;
+  --color-map-c3: #B99E76;
+  --color-map-c4: #A2865F;
+  --color-map-coast: #F2B27A;
+  --color-map-wave: rgb(170 222 232 / .38);
+  --color-map-road: #FFFFFF;
+  --color-map-street: rgb(28 37 40 / .13);
+  --color-pin-bg: #FFFBF5;
+  --color-pin-fg: #1C2528;
+  --color-pin-home-bg: #A0452A;
+  --color-pin-home-fg: #FFFFFF;
+  --color-shutter: #3C6258;
+  --color-shutter-hi: #52806F;
+  --color-shutter-lo: #294740;
+  --color-shutter-frame: #31554C;
+  --color-frame: #E4D8C4;
+
+  /* §2.3 font stacks: Greek subset first, then Latin with its metric-adjusted fallback */
+  --font-text: var(--font-text-greek), var(--font-text-latin), "Segoe UI", Roboto, "Noto Sans", system-ui, sans-serif;
+  --font-display: var(--font-display-greek), var(--font-display-latin), Georgia, "Noto Serif", serif;
+
+  /* §2.5 type scale (Greek line-height and tracking overrides are in base.css under :lang(el)) */
+  --text-hero: clamp(4rem, 1.9rem + 9.6vw, 8.75rem);
+  --text-hero--line-height: .86;
+  --text-hero--letter-spacing: -.025em;
+  --text-d1: clamp(2.75rem, 1.7rem + 4.6vw, 5.5rem);
+  --text-d1--line-height: 1.02;
+  --text-d1--letter-spacing: -.015em;
+  --text-d2: clamp(2.25rem, 1.55rem + 3vw, 4rem);
+  --text-d2--line-height: 1.02;
+  --text-d2--letter-spacing: -.015em;
+  --text-d3: clamp(1.75rem, 1.4rem + 1.6vw, 2.5rem);
+  --text-d3--line-height: 1.12;
+  --text-d3--letter-spacing: -.01em;
+  --text-h3: 1.375rem;
+  --text-h3--line-height: 1.15;
+  --text-lead: clamp(1.125rem, 1.04rem + .45vw, 1.375rem);
+  --text-lead--line-height: 1.55;
+  --text-body: clamp(1rem, .96rem + .2vw, 1.0625rem);
+  --text-body--line-height: 1.6;
+  --text-caption: .9375rem;
+  --text-caption--line-height: 1.45;
+  --text-label: .8125rem;
+  --text-label--line-height: 1.3;
+  --text-label--letter-spacing: .16em;
+  --text-micro: .75rem;
+  --text-micro--line-height: 1.2;
+  --text-fact: clamp(2.25rem, 1.8rem + 1.2vw, 3rem);
+  --text-fact--line-height: 1;
+  --text-fact--letter-spacing: -.02em;
+
+  /* §4.1 spacing: Tailwind's default --spacing (.25rem) is the scale; semantic layout tokens */
+  --space-section: clamp(56px, 9vw, 112px);
+  --gutter: clamp(16px, 5vw, 64px);
+  --container: 1240px;
+  --header-h: 56px;
+  --header-offset: 10px;
+
+  /* §4.2 radii */
+  --radius-object: 4px;
+  --radius-field: 12px;
+  --radius-tile: 14px;
+  --radius-card: 22px;
+  --radius-dialog: 32px;
+  --radius-control: 999px;
+
+  /* §4.3 elevation (dark values below) */
+  --shadow-rest: 0 1px 2px rgb(60 40 25 / .06), 0 4px 14px -6px rgb(60 40 25 / .12);
+  --shadow-raised: 0 18px 40px -18px rgb(60 40 25 / .32), 0 2px 6px rgb(60 40 25 / .06);
+  --shadow-object: 0 50px 90px -40px rgb(40 25 15 / .5), 0 14px 28px -16px rgb(40 25 15 / .25);
+  --shadow-overlay: 0 24px 64px -12px rgb(28 20 14 / .45);
+  --shadow-primary-glow: 0 14px 26px -14px rgb(160 69 42 / .55);
+
+  /* §4.4 breakpoints: Tailwind defaults (sm 640, md 768, lg 1024, xl 1280), deliberately not redefined */
+
+  /* §5.3 motion (names avoid Tailwind's --ease-in/out defaults) */
+  --dur-micro: 160ms;
+  --dur-ui: 280ms;
+  --dur-page: 420ms;
+  --dur-reveal: 850ms;
+  --dur-gl-fade: 700ms;
+  --dur-shutter: 1800ms;
+  --dur-sweep: 3400ms;
+  --ease-glide: cubic-bezier(.22, 1, .36, 1);
+  --ease-sweep: cubic-bezier(.65, 0, .35, 1);
+  /* `ease` for engines without linear(); the spring curve is set under @supports at the end of this file. */
+  --ease-shutter: ease;
+
+  /* §3.2 non-colour atmosphere */
+  --scrim: 8 22 28;
+  --hero-tint: transparent;
+  --grain: url(/design/grain-light.webp);
+  /* MapCard (§8, R3-V8): OSM raster tiles are dimmed at night at token level, not by a dark selector. */
+  --map-tile-filter: none;
+}
+
+/* Dark: the two blocks must stay identical (asserted by the unit test). No light-dark() (§3.1). */
+@layer base {
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --color-bg: #0A1A21;
+      --color-surface: #10252E;
+      --color-surface-sunken: #0D2129;
+      --color-surface-raised: #163340;
+      --color-glass: rgb(255 255 255 / .25);
+      --color-glass-bar: rgb(10 26 33 / .80);
+      --color-fg: #F2EBDF;
+      --color-fg-muted: #A9B6BA;
+      --color-fg-on-photo: #FFF8EE;
+      --color-fg-on-photo-accent: #FFE2C0;
+      --color-primary: #E8946F;
+      --color-primary-hover: #F0A585;
+      --color-primary-fg: #1B100B;
+      --color-primary-text: #F2A585;
+      --color-primary-tint: rgb(232 148 111 / .16);
+      --color-accent: #80CCDA;
+      --color-accent-hover: #A5DDE7;
+      --color-accent-fg: #0A1A21;
+      --color-olive: #BCCA8B;
+      --color-sun: #F4B878;
+      --color-border: rgb(242 235 223 / .12);
+      --color-border-strong: rgb(242 235 223 / .26);
+      --color-border-control: #6E8389;
+      --color-focus: #F4B878;
+      --color-success: #9ED49A;
+      --color-success-bg: #15301F;
+      --color-warning: #F2C27A;
+      --color-warning-bg: #33270F;
+      --color-danger: #F4A3A0;
+      --color-danger-bg: #3A1719;
+      --color-info-bg: #0E3440;
+      --color-band-bg: #0F303B;
+      --color-band-fg: #F2EBDF;
+      --color-band-muted: #A9C0C6;
+      --color-band-accent: #F4B878;
+      --color-band-accent-fg: #231510;
+      --color-band-line: rgb(242 235 223 / .20);
+      --color-band-focus: #F4B878;
+      --color-warm-1: #5E2A1B;
+      --color-warm-2: #2A1610;
+      --color-warm-3: #140B08;
+      --color-warm-muted: #F0D9C8;
+      --color-cal-booked-hatch: rgb(242 235 223 / .10);
+      --color-cal-best-bg: #2A3A22;
+      --color-cal-best-fg: #D6E2A6;
+      --color-viewer-bg: #0E1418;
+      --color-map-sea: #07303B;
+      --color-map-land: #1E3E48;
+      --color-map-c1: #28505C;
+      --color-map-c2: #33616E;
+      --color-map-c3: #427483;
+      --color-map-c4: #5A8C9A;
+      --color-map-coast: #F4B878;
+      --color-map-wave: rgb(128 204 218 / .30);
+      --color-map-road: rgb(242 235 223 / .35);
+      --color-map-street: rgb(242 235 223 / .07);
+      --color-pin-bg: #FFFBF5;
+      --color-pin-fg: #1C2528;
+      --color-pin-home-bg: #A0452A;
+      --color-pin-home-fg: #FFFFFF;
+      --color-shutter: #2B4B44;
+      --color-shutter-hi: #3B6459;
+      --color-shutter-lo: #1C332E;
+      --color-shutter-frame: #233F39;
+      --color-frame: #1A343D;
+      --shadow-rest: 0 1px 2px rgb(0 0 0 / .4), inset 0 1px 0 rgb(255 255 255 / .03);
+      --shadow-raised: 0 18px 40px -18px rgb(0 0 0 / .7), inset 0 1px 0 rgb(255 255 255 / .04);
+      --shadow-object: 0 50px 90px -40px rgb(0 0 0 / .8), 0 14px 28px -16px rgb(0 0 0 / .5);
+      --shadow-overlay: 0 24px 64px -12px rgb(0 0 0 / .85);
+      --shadow-primary-glow: 0 14px 26px -14px rgb(0 0 0 / .6);
+      --hero-tint: linear-gradient(180deg, rgb(20 50 72 / .55), rgb(10 26 33 / .35));
+      --grain: url(/design/grain-dark.webp);
+      --map-tile-filter: brightness(.78) contrast(1.05) saturate(.85);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --color-bg: #0A1A21;
+    --color-surface: #10252E;
+    --color-surface-sunken: #0D2129;
+    --color-surface-raised: #163340;
+    --color-glass: rgb(255 255 255 / .25);
+    --color-glass-bar: rgb(10 26 33 / .80);
+    --color-fg: #F2EBDF;
+    --color-fg-muted: #A9B6BA;
+    --color-fg-on-photo: #FFF8EE;
+    --color-fg-on-photo-accent: #FFE2C0;
+    --color-primary: #E8946F;
+    --color-primary-hover: #F0A585;
+    --color-primary-fg: #1B100B;
+    --color-primary-text: #F2A585;
+    --color-primary-tint: rgb(232 148 111 / .16);
+    --color-accent: #80CCDA;
+    --color-accent-hover: #A5DDE7;
+    --color-accent-fg: #0A1A21;
+    --color-olive: #BCCA8B;
+    --color-sun: #F4B878;
+    --color-border: rgb(242 235 223 / .12);
+    --color-border-strong: rgb(242 235 223 / .26);
+    --color-border-control: #6E8389;
+    --color-focus: #F4B878;
+    --color-success: #9ED49A;
+    --color-success-bg: #15301F;
+    --color-warning: #F2C27A;
+    --color-warning-bg: #33270F;
+    --color-danger: #F4A3A0;
+    --color-danger-bg: #3A1719;
+    --color-info-bg: #0E3440;
+    --color-band-bg: #0F303B;
+    --color-band-fg: #F2EBDF;
+    --color-band-muted: #A9C0C6;
+    --color-band-accent: #F4B878;
+    --color-band-accent-fg: #231510;
+    --color-band-line: rgb(242 235 223 / .20);
+    --color-band-focus: #F4B878;
+    --color-warm-1: #5E2A1B;
+    --color-warm-2: #2A1610;
+    --color-warm-3: #140B08;
+    --color-warm-muted: #F0D9C8;
+    --color-cal-booked-hatch: rgb(242 235 223 / .10);
+    --color-cal-best-bg: #2A3A22;
+    --color-cal-best-fg: #D6E2A6;
+    --color-viewer-bg: #0E1418;
+    --color-map-sea: #07303B;
+    --color-map-land: #1E3E48;
+    --color-map-c1: #28505C;
+    --color-map-c2: #33616E;
+    --color-map-c3: #427483;
+    --color-map-c4: #5A8C9A;
+    --color-map-coast: #F4B878;
+    --color-map-wave: rgb(128 204 218 / .30);
+    --color-map-road: rgb(242 235 223 / .35);
+    --color-map-street: rgb(242 235 223 / .07);
+    --color-pin-bg: #FFFBF5;
+    --color-pin-fg: #1C2528;
+    --color-pin-home-bg: #A0452A;
+    --color-pin-home-fg: #FFFFFF;
+    --color-shutter: #2B4B44;
+    --color-shutter-hi: #3B6459;
+    --color-shutter-lo: #1C332E;
+    --color-shutter-frame: #233F39;
+    --color-frame: #1A343D;
+    --shadow-rest: 0 1px 2px rgb(0 0 0 / .4), inset 0 1px 0 rgb(255 255 255 / .03);
+    --shadow-raised: 0 18px 40px -18px rgb(0 0 0 / .7), inset 0 1px 0 rgb(255 255 255 / .04);
+    --shadow-object: 0 50px 90px -40px rgb(0 0 0 / .8), 0 14px 28px -16px rgb(0 0 0 / .5);
+    --shadow-overlay: 0 24px 64px -12px rgb(0 0 0 / .85);
+    --shadow-primary-glow: 0 14px 26px -14px rgb(0 0 0 / .6);
+    --hero-tint: linear-gradient(180deg, rgb(20 50 72 / .55), rgb(10 26 33 / .35));
+    --grain: url(/design/grain-dark.webp);
+    --map-tile-filter: brightness(.78) contrast(1.05) saturate(.85);
+  }
+}
+
+/* §5.3 --ease-shutter: the spring curve only where linear() is supported, so var(--ease-shutter) is always
+   a valid timing function and older engines keep `ease`. */
+@layer base {
+  @supports (transition-timing-function: linear(0, 1)) {
+    :root {
+      --ease-shutter: linear(0, .008 1.1%, .034 2.3%, .134 4.9%, .264 7.3%, .4 9.9%, .65 16%, .78 20.4%, .88 25.4%, .946 31%, .985 37.5%, 1.004 45%, 1.012 54%, 1.008 66%, 1.001 83%, 1);
+    }
+  }
+}

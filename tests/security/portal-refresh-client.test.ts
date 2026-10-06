@@ -44,7 +44,7 @@ describe('portal refresh client state machine', () => {
     expect(fetch).toHaveBeenCalledWith('/api/portal/refresh?next=%2Fen%2Fcheck-in%3Ffrom%3Dportal', {
       method: 'POST',
       credentials: 'same-origin',
-      redirect: 'follow',
+      redirect: 'error',
       headers: { accept: 'application/json' },
       signal: undefined,
     });
@@ -63,15 +63,21 @@ describe('portal refresh client state machine', () => {
     })).resolves.toEqual({ status: 'failed' });
   });
 
-  it('accepts only same-origin, non-recursive followed redirects', async () => {
+  it('never navigates to a followed redirect URL; the destination comes only from the validated next', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(response({
       redirected: true,
       url: 'https://guest.test/el/check-in',
     }));
     await expect(refreshPortalSession({ refreshHref: '/api/portal/refresh', baseHref }))
-      .resolves.toEqual({ status: 'refreshed', href: '/el/check-in' });
-    vi.mocked(fetch).mockResolvedValueOnce(response({ redirected: true, url: 'https://evil.test/steal' }));
-    await expect(refreshPortalSession({ refreshHref: '/api/portal/refresh', baseHref }))
+      .resolves.toEqual({ status: 'failed' });
+    vi.mocked(fetch).mockResolvedValueOnce(response({ redirected: true, url: 'https://guest.test/el/check-in' }));
+    await expect(refreshPortalSession({ refreshHref: '/api/portal/refresh?next=%2Fen%2Fcheck-in', baseHref }))
+      .resolves.toEqual({ status: 'refreshed', href: '/en/check-in' });
+  });
+
+  it('fails closed when fetch rejects an unexpected redirect', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch: unexpected redirect'));
+    await expect(refreshPortalSession({ refreshHref: '/api/portal/refresh?next=%2Fen%2Fcheck-in', baseHref }))
       .resolves.toEqual({ status: 'failed' });
   });
 

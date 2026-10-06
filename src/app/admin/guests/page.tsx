@@ -2,15 +2,15 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { MotionConfig, motion } from 'framer-motion'
 import internalFetch from '@/lib/internalFetchClient'
+import { logger } from '@/lib/logger-client'
 import { Badge } from '@/components/ui'
 import { createPortalBookingEligibilityWindow, isPortalBookingTemporallyEligible } from '@/lib/portalBookingEligibility'
 
 interface BookingData {
   booking: {
     id: string
-    reference?: string
     source: string
     provider: string
     externalReference?: string
@@ -22,9 +22,7 @@ interface BookingData {
   }
   user?: {
     id: string
-    email?: string
     phone: string
-    countryOrigin: string
   }
 }
 
@@ -61,12 +59,15 @@ function isWithinClaimWindow(booking: { startDate: string; endDate: string }): b
 export default function GuestDataViewer() {
   const [bookings, setBookings] = useState<BookingData[]>([])
   const [arrivalRequests, setArrivalRequests] = useState<CheckInRequestData[]>([])
+  const [pendingArrivalCount, setPendingArrivalCount] = useState(0)
   const [stats, setStats] = useState<Statistics | null>(null)
   const [loading, setLoading] = useState(false)
+  const [actionBusy, setActionBusy] = useState(false)
   const [error, setError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [searchType, setSearchType] = useState<'reference' | 'phone' | 'date'>('reference')
   const [claimGrant, setClaimGrant] = useState<{ bookingId: string; token: string; expiresAt: string } | null>(null)
+  const [claimCopyStatus, setClaimCopyStatus] = useState<'copied' | 'failed' | null>(null)
   const [newBooking, setNewBooking] = useState({ startDate: '', endDate: '', source: 'ONSITE', externalReference: '' })
   const [createdBookingId, setCreatedBookingId] = useState('')
 
@@ -106,13 +107,14 @@ export default function GuestDataViewer() {
 
   const fetchArrivalRequests = async () => {
     try {
-      const response = await internalFetch('/api/admin/check-in-requests?status=all')
+      const response = await internalFetch('/api/admin/check-in-requests?status=all&limit=6')
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`)
       }
       const data = await response.json()
       if (data.success) {
         setArrivalRequests(data.data.requests || [])
+        setPendingArrivalCount(data.data.summary?.pending ?? 0)
       }
     } catch (error) {
       console.error('Failed to fetch arrival requests:', error)
@@ -131,7 +133,7 @@ export default function GuestDataViewer() {
       } else if (searchType === 'phone') {
         url = `/api/admin/guests?action=phone&phone=${encodeURIComponent(searchQuery)}`
       } else if (searchType === 'date') {
-        url = `/api/admin/guests?action=search&startDate=${searchQuery}`
+        url = `/api/admin/guests?action=search&startDate=${encodeURIComponent(searchQuery.trim())}`
       }
 
       const response = await internalFetch(url)
@@ -175,7 +177,7 @@ export default function GuestDataViewer() {
   }
 
   const issueClaimGrant = async (bookingId: string, channel: 'REMOTE' | 'ONSITE' = 'REMOTE') => {
-    setLoading(true)
+    setActionBusy(true)
     setError('')
     try {
       const response = await internalFetch(`/api/admin/bookings/${bookingId}/claim-grants`, {
@@ -186,16 +188,27 @@ export default function GuestDataViewer() {
       const data = await response.json()
       if (!response.ok || !data.success) throw new Error(data.error?.message || 'Claim grant failed')
       setClaimGrant({ bookingId, token: data.data.claimToken, expiresAt: data.data.expiresAt })
+      setClaimCopyStatus(null)
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Claim grant failed')
     } finally {
-      setLoading(false)
+      setActionBusy(false)
+    }
+  }
+
+  const copyClaimToken = async (token: string) => {
+    try {
+      await navigator.clipboard.writeText(token)
+      setClaimCopyStatus('copied')
+    } catch (err) {
+      logger.warn('Clipboard copy failed', err instanceof Error ? err : { error: String(err) })
+      setClaimCopyStatus('failed')
     }
   }
 
   const createBooking = async (event: React.FormEvent) => {
     event.preventDefault()
-    setLoading(true)
+    setActionBusy(true)
     setError('')
     setCreatedBookingId('')
     try {
@@ -217,13 +230,13 @@ export default function GuestDataViewer() {
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Booking creation failed')
     } finally {
-      setLoading(false)
+      setActionBusy(false)
     }
   }
 
   const resetGuestAccess = async (bookingId: string, phone: string) => {
     if (!window.confirm(`Reset the password and sign-in sessions of ${phone} and issue a new claim token?`)) return
-    setLoading(true)
+    setActionBusy(true)
     setError('')
     try {
       const response = await internalFetch(`/api/admin/bookings/${bookingId}/access-reset`, {
@@ -234,10 +247,11 @@ export default function GuestDataViewer() {
       const data = await response.json()
       if (!response.ok || !data.success) throw new Error(data.error?.message || 'Access reset failed')
       setClaimGrant({ bookingId, token: data.data.claimToken, expiresAt: data.data.expiresAt })
+      setClaimCopyStatus(null)
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Access reset failed')
     } finally {
-      setLoading(false)
+      setActionBusy(false)
     }
   }
 
@@ -245,7 +259,7 @@ export default function GuestDataViewer() {
     if (!window.confirm(`Erase all personal data of the guest ${phone}? This cannot be undone.`)) return
     const auditNote = window.prompt('Reason and requester (kept in the privacy audit record):')?.trim() ?? ''
     if (auditNote.length < 3) return
-    setLoading(true)
+    setActionBusy(true)
     setError('')
     try {
       const response = await internalFetch(`/api/admin/guests/${userId}/erase`, {
@@ -259,7 +273,7 @@ export default function GuestDataViewer() {
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Erasure failed')
     } finally {
-      setLoading(false)
+      setActionBusy(false)
     }
   }
 
@@ -269,20 +283,19 @@ export default function GuestDataViewer() {
     fetchArrivalRequests()
   }, [])
 
-  const pendingArrivalRequests = arrivalRequests.filter((request) => request.status === 'pending')
-
   return (
-    <main className="admin-page-shell min-h-screen p-6">
+    <MotionConfig reducedMotion="user">
+    <main className="p-6">
       <div className="max-w-7xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="surface-card rounded-xl shadow-lg p-6 mb-6"
+          className="admin-card rounded-card shadow-lg p-6 mb-6"
         >
-          <h1 className="text-3xl font-serif italic font-bold page-title mb-2">
+          <h1 className="text-3xl font-display italic font-bold admin-title mb-2">
             🏠 Guest Data Viewer
           </h1>
-          <p className="text-body">
+          <p className="admin-muted">
             View and manage guest bookings and check-in information
           </p>
         </motion.div>
@@ -295,17 +308,17 @@ export default function GuestDataViewer() {
             transition={{ delay: 0.1 }}
             className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center"
           >
-            <div className="surface-card p-4 rounded-lg shadow">
-              <div className="text-2xl font-bold text-blue-600">{stats.totalBookings}</div>
-              <div className="text-sm text-subtle">Total Bookings</div>
+            <div className="admin-card p-4 rounded-tile shadow">
+              <div className="text-2xl font-bold admin-info-text">{stats.totalBookings}</div>
+              <div className="text-sm admin-muted">Total Bookings</div>
             </div>
-            <div className="surface-card p-4 rounded-lg shadow">
-              <div className="text-2xl font-bold text-green-600">{stats.totalUsers}</div>
-              <div className="text-sm text-subtle">Total Users</div>
+            <div className="admin-card p-4 rounded-tile shadow">
+              <div className="text-2xl font-bold admin-success-text">{stats.totalUsers}</div>
+              <div className="text-sm admin-muted">Total Users</div>
             </div>
-            <div className="surface-card p-4 rounded-lg shadow">
-              <div className="text-2xl font-bold text-purple-600">{stats.totalClaimedBookings}</div>
-              <div className="text-sm text-subtle">Claimed Bookings</div>
+            <div className="admin-card p-4 rounded-tile shadow">
+              <div className="text-2xl font-bold admin-olive-text">{stats.totalClaimedBookings}</div>
+              <div className="text-sm admin-muted">Claimed Bookings</div>
             </div>
           </motion.div>
         )}
@@ -315,25 +328,25 @@ export default function GuestDataViewer() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            className="surface-card rounded-lg shadow p-6 mb-6"
+            className="admin-card rounded-tile shadow p-6 mb-6"
           >
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
               <div>
-                <h2 className="text-xl font-serif italic font-bold section-title">Arrival Time Requests</h2>
-                <p className="text-body text-sm">
-                  {pendingArrivalRequests.length} pending request{pendingArrivalRequests.length === 1 ? '' : 's'}
+                <h2 className="text-xl font-display italic font-bold admin-title">Arrival Time Requests</h2>
+                <p className="admin-muted text-sm">
+                  {pendingArrivalCount} pending request{pendingArrivalCount === 1 ? '' : 's'}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Link
                   href="/admin/requests"
-                  className="px-4 py-2 rounded-full text-sm font-semibold surface-interactive"
+                  className="admin-action-outline shell-link"
                 >
                   Open inbox
                 </Link>
                 <button
                   onClick={fetchArrivalRequests}
-                  className="px-4 py-2 rounded-full text-sm font-semibold surface-interactive"
+                  className="admin-action-outline"
                 >
                   Refresh
                 </button>
@@ -341,25 +354,25 @@ export default function GuestDataViewer() {
             </div>
             <div className="grid gap-3">
               {arrivalRequests.slice(0, 6).map((request) => (
-                <div key={request.id} className="surface-panel rounded-lg p-4">
+                <div key={request.id} className="admin-panel rounded-tile p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-semibold text-text-accent">
+                        <h3 className="font-semibold admin-accent">
                           Requested arrival: {request.requestedTime}
                         </h3>
                         <Badge variant={request.status}>
                           {request.status}
                         </Badge>
                       </div>
-                      <p className="text-sm text-body mt-1">
+                      <p className="text-sm admin-muted mt-1">
                         {request.guestEmail || request.guestPhone || request.userId || 'Guest details unavailable'}
                       </p>
                       {request.message && (
-                        <p className="text-sm text-body mt-2">{request.message}</p>
+                        <p className="text-sm admin-muted mt-2">{request.message}</p>
                       )}
                     </div>
-                    <div className="text-xs text-subtle sm:text-right">
+                    <div className="text-xs admin-muted sm:text-right">
                       <div>{new Date(request.createdAt).toLocaleString()}</div>
                       {request.bookingId && <div>Booking: {request.bookingId}</div>}
                     </div>
@@ -375,22 +388,22 @@ export default function GuestDataViewer() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.18 }}
-          className="surface-card rounded-lg shadow p-6 mb-6"
+          className="admin-card rounded-tile shadow p-6 mb-6"
         >
-          <h2 className="text-xl font-serif italic font-bold section-title mb-1">Create Booking</h2>
-          <p className="text-body text-sm mb-4">Add a confirmed stay, then issue a claim token for the guest.</p>
+          <h2 className="text-xl font-display italic font-bold admin-title mb-1">Create Booking</h2>
+          <p className="admin-muted text-sm mb-4">Add a confirmed stay, then issue a claim token for the guest.</p>
           <form onSubmit={createBooking} className="grid grid-cols-1 sm:grid-cols-5 gap-4 items-end">
-            <label className="text-sm text-body flex flex-col gap-1">
+            <label className="text-sm admin-muted flex flex-col gap-1">
               Check-in
               <input
                 type="date"
                 required
                 value={newBooking.startDate}
                 onChange={(e) => setNewBooking((current) => ({ ...current, startDate: e.target.value }))}
-                className="px-4 py-2 border border-soft rounded-lg surface-interactive"
+                className="admin-input px-4 py-2 rounded-tile"
               />
             </label>
-            <label className="text-sm text-body flex flex-col gap-1">
+            <label className="text-sm admin-muted flex flex-col gap-1">
               Check-out
               <input
                 type="date"
@@ -398,21 +411,21 @@ export default function GuestDataViewer() {
                 min={newBooking.startDate || undefined}
                 value={newBooking.endDate}
                 onChange={(e) => setNewBooking((current) => ({ ...current, endDate: e.target.value }))}
-                className="px-4 py-2 border border-soft rounded-lg surface-interactive"
+                className="admin-input px-4 py-2 rounded-tile"
               />
             </label>
-            <label className="text-sm text-body flex flex-col gap-1">
+            <label className="text-sm admin-muted flex flex-col gap-1">
               Source
               <select
                 value={newBooking.source}
                 onChange={(e) => setNewBooking((current) => ({ ...current, source: e.target.value }))}
-                className="px-4 py-2 border border-soft rounded-lg surface-interactive"
+                className="admin-input px-4 py-2 rounded-tile"
               >
                 <option value="ONSITE">Direct / on-site</option>
                 <option value="EXTERNAL">External platform</option>
               </select>
             </label>
-            <label className="text-sm text-body flex flex-col gap-1">
+            <label className="text-sm admin-muted flex flex-col gap-1">
               Reference (optional)
               <input
                 type="text"
@@ -420,19 +433,19 @@ export default function GuestDataViewer() {
                 value={newBooking.externalReference}
                 onChange={(e) => setNewBooking((current) => ({ ...current, externalReference: e.target.value }))}
                 placeholder="HMABC123"
-                className="px-4 py-2 border border-soft rounded-lg surface-interactive"
+                className="admin-input px-4 py-2 rounded-tile"
               />
             </label>
             <button
               type="submit"
-              disabled={loading}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              disabled={actionBusy}
+              className="admin-tone admin-tone--primary px-6 py-2 rounded-tile disabled:opacity-50"
             >
               Create booking
             </button>
           </form>
           {createdBookingId && (
-            <p className="text-sm text-body mt-3" role="status">Booking {createdBookingId} created.</p>
+            <p className="text-sm admin-muted mt-3" role="status">Booking {createdBookingId} created.</p>
           )}
         </motion.div>
 
@@ -441,21 +454,21 @@ export default function GuestDataViewer() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="surface-card rounded-lg shadow p-6 mb-6"
+          className="admin-card rounded-tile shadow p-6 mb-6"
         >
-          <h2 className="text-xl font-serif italic font-bold section-title mb-4">Search Bookings</h2>
+          <h2 className="text-xl font-display italic font-bold admin-title mb-4">Search Bookings</h2>
           <div className="flex flex-col sm:flex-row gap-4">
             <select
               value={searchType}
               onChange={(e) => setSearchType(e.target.value as 'reference' | 'phone' | 'date')}
-              className="px-4 py-2 border border-soft rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent surface-interactive"
+              className="admin-input px-4 py-2 rounded-tile"
             >
               <option value="reference">Booking Reference</option>
               <option value="phone">Phone Number</option>
               <option value="date">Date (YYYY-MM-DD)</option>
             </select>
             <input
-              type="text"
+              type={searchType === 'date' ? 'date' : 'text'}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={
@@ -463,19 +476,19 @@ export default function GuestDataViewer() {
                   searchType === 'phone' ? '+306912345678' :
                     '2024-12-25'
               }
-              className="flex-1 px-4 py-2 border border-soft rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent surface-interactive"
+              className="admin-input flex-1 px-4 py-2 rounded-tile"
             />
             <button
               onClick={handleSearch}
               disabled={loading}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="admin-tone admin-tone--primary px-6 py-2 rounded-tile disabled:opacity-50"
             >
               {loading ? 'Searching...' : 'Search'}
             </button>
             <button
               onClick={fetchAllBookings}
               disabled={loading}
-              className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
+              className="admin-tone admin-tone--neutral px-6 py-2 rounded-tile disabled:opacity-50"
             >
               Show All
             </button>
@@ -487,21 +500,24 @@ export default function GuestDataViewer() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded mb-6 dark:bg-red-900/40 dark:text-red-300 dark:border-red-900"
+            className="feedback-error px-4 py-3 rounded mb-6"
           >
             {error}
           </motion.div>
         )}
 
         {claimGrant && (
-          <div className="surface-card mb-6 rounded-lg border border-soft p-4" role="status">
+          <div className="admin-card mb-6 rounded-tile border p-4" role="status">
             <h2 className="font-semibold">One-time claim token</h2>
-            <p className="mt-1 text-sm text-subtle">Booking {claimGrant.bookingId} · expires {new Date(claimGrant.expiresAt).toLocaleString()}</p>
+            <p className="mt-1 text-sm admin-muted">Booking {claimGrant.bookingId} · expires {new Date(claimGrant.expiresAt).toLocaleString()}</p>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-              <code className="min-w-0 flex-1 overflow-x-auto rounded bg-black/10 p-3 text-sm">{claimGrant.token}</code>
-              <button type="button" className="btn btn-primary" onClick={() => navigator.clipboard.writeText(claimGrant.token)}>Copy</button>
+              <code className="min-w-0 flex-1 overflow-x-auto admin-code rounded p-3 text-sm">{claimGrant.token}</code>
+              <button type="button" className="admin-action-primary" onClick={() => copyClaimToken(claimGrant.token)}>Copy</button>
             </div>
-            <p className="mt-2 text-xs text-subtle">The token is shown once. Send it only through the intended guest channel.</p>
+            {claimCopyStatus && (
+              <p className="mt-2 text-sm admin-muted">{claimCopyStatus === 'copied' ? 'Copied' : 'Copy failed, select the token'}</p>
+            )}
+            <p className="mt-2 text-xs admin-muted">The token is shown once. Send it only through the intended guest channel.</p>
           </div>
         )}
 
@@ -514,14 +530,14 @@ export default function GuestDataViewer() {
         >
           {loading ? (
             <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="mt-4 text-body">Loading bookings...</p>
+              <div className="admin-spinner animate-spin rounded-full h-12 w-12 border-b-2 mx-auto"></div>
+              <p className="mt-4 admin-muted">Loading bookings...</p>
             </div>
           ) : bookings.length === 0 ? (
-            <div className="surface-card rounded-lg shadow p-8 text-center">
+            <div className="admin-card rounded-tile shadow p-8 text-center">
               <div className="text-6xl mb-4">📭</div>
-              <h3 className="text-xl font-serif italic font-bold section-title mb-2">No Bookings Found</h3>
-              <p className="text-body">
+              <h3 className="text-xl font-display italic font-bold admin-title mb-2">No Bookings Found</h3>
+              <p className="admin-muted">
                 Bookings will appear here after guests complete the check-in process.
               </p>
             </div>
@@ -533,14 +549,14 @@ export default function GuestDataViewer() {
                 animate={{ opacity: 1, x: 0 }}
                 // Only the first few cards are staggered; the rest appear at once.
                 transition={{ delay: Math.min(index, 5) * 0.1 }}
-                className="surface-panel rounded-lg shadow p-6"
+                className="admin-card rounded-tile shadow p-6"
               >
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h3 className="text-xl font-serif italic font-bold section-title">
-                      Booking {booking.booking.reference || booking.booking.id}
+                    <h3 className="text-xl font-display italic font-bold admin-title">
+                      Booking {booking.booking.externalReference || booking.booking.id}
                     </h3>
-                    <p className="text-body">
+                    <p className="admin-muted">
                       {new Date(booking.booking.startDate).toLocaleDateString(undefined, { timeZone: 'UTC' })} to {new Date(booking.booking.endDate).toLocaleDateString(undefined, { timeZone: 'UTC' })}
                     </p>
                   </div>
@@ -552,16 +568,16 @@ export default function GuestDataViewer() {
                       <button
                         type="button"
                         onClick={() => issueClaimGrant(booking.booking.id)}
-                        disabled={!isWithinClaimWindow(booking.booking)}
-                        title={isWithinClaimWindow(booking.booking) ? undefined : 'Claim tokens can be issued from 7 days before check-in until the check-out date'}
-                        className="rounded-full bg-emerald-100 px-3 py-1 text-sm text-emerald-900 hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={actionBusy || !isWithinClaimWindow(booking.booking)}
+                        title={isWithinClaimWindow(booking.booking) ? undefined : 'Claim tokens can be issued from 7 days before check-in until the check-out date (UTC calendar dates)'}
+                        className="admin-tone admin-tone--success rounded-full px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         Issue claim
                       </button>
                     )}
                     <button
                       onClick={() => exportBooking(booking.booking.id)}
-                      className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-300"
+                      className="admin-tone admin-tone--info px-3 py-1 rounded-full text-sm"
                     >
                       Export
                     </button>
@@ -569,9 +585,9 @@ export default function GuestDataViewer() {
                       <button
                         type="button"
                         onClick={() => resetGuestAccess(booking.booking.id, booking.user!.phone)}
-                        disabled={!isWithinClaimWindow(booking.booking)}
+                        disabled={actionBusy || !isWithinClaimWindow(booking.booking)}
                         title="Clears the guest's password and sessions and issues a new claim token"
-                        className="px-3 py-1 bg-amber-100 text-amber-900 rounded-full text-sm hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="admin-tone admin-tone--warning px-3 py-1 rounded-full text-sm disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         Reset access
                       </button>
@@ -579,7 +595,8 @@ export default function GuestDataViewer() {
                     {booking.user && (
                       <button
                         onClick={() => eraseGuest(booking.user!.id, booking.user!.phone)}
-                        className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm hover:bg-red-200 dark:bg-red-900/40 dark:text-red-300"
+                        disabled={actionBusy}
+                        className="admin-tone admin-tone--danger px-3 py-1 rounded-full text-sm disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         Erase guest
                       </button>
@@ -590,22 +607,20 @@ export default function GuestDataViewer() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {booking.user ? (
                     <div>
-                      <h4 className="font-medium text-text-accent">Guest Info</h4>
-                      <p className="text-sm text-body">📱 {booking.user.phone}</p>
-                      <p className="text-sm text-body">📧 {booking.user.email || 'Not provided'}</p>
-                      <p className="text-sm text-body">🌍 {booking.user.countryOrigin}</p>
+                      <h4 className="font-medium admin-accent">Guest Info</h4>
+                      <p className="text-sm admin-muted">📱 {booking.user.phone}</p>
                     </div>
                   ) : (
                     <div>
-                      <h4 className="font-medium text-text-accent">Guest Info</h4>
-                      <p className="text-sm text-body">No guest account linked yet.</p>
+                      <h4 className="font-medium admin-accent">Guest Info</h4>
+                      <p className="text-sm admin-muted">No guest account linked yet.</p>
                     </div>
                   )}
                   <div>
-                    <h4 className="font-medium text-text-accent">Booking Details</h4>
-                    <p className="text-sm text-body">📄 Source: {booking.booking.source}</p>
-                    <p className="text-sm text-body">🔗 Provider: {booking.booking.provider}</p>
-                    <p className="text-sm text-body">📝 Created: {new Date(booking.booking.createdAt).toLocaleDateString()}</p>
+                    <h4 className="font-medium admin-accent">Booking Details</h4>
+                    <p className="text-sm admin-muted">📄 Source: {booking.booking.source}</p>
+                    <p className="text-sm admin-muted">🔗 Provider: {booking.booking.provider}</p>
+                    <p className="text-sm admin-muted">📝 Created: {new Date(booking.booking.createdAt).toLocaleDateString()}</p>
                   </div>
                 </div>
 
@@ -615,5 +630,6 @@ export default function GuestDataViewer() {
         </motion.div>
       </div>
     </main>
+    </MotionConfig>
   )
 }

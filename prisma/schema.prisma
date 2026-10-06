@@ -9,10 +9,8 @@ datasource db {
 
 model User {
   id               String               @id @db.Uuid
-  email            String?              @unique
   phoneE164        String               @unique(map: "users_phone_e164_key") @map("phone_e164") @db.VarChar(32)
   passwordHash     String?              @map("password_hash")
-  countryOrigin    CountryOrigin        @map("country_origin")
   createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
   bookings         Booking[]
@@ -23,7 +21,6 @@ model User {
   termsAcceptances TermsAcceptance[]
   privacyRequests  PrivacyRequest[]
 
-  @@index([countryOrigin], map: "idx_users_country_origin")
   @@index([createdAt], map: "idx_users_created_at")
   @@index([updatedAt], map: "idx_users_updated_at")
   @@map("users")
@@ -32,7 +29,6 @@ model User {
 model Booking {
   id                String              @id @db.Uuid
   source            BookingSource
-  reference         String?
   startDate         DateTime            @map("start_date") @db.Date
   endDate           DateTime            @map("end_date") @db.Date
   userId            String?             @map("user_id") @db.Uuid
@@ -50,7 +46,6 @@ model Booking {
   privacyRequests   PrivacyRequest[]
 
   @@unique([provider, externalReference], map: "bookings_provider_external_reference_key")
-  @@index([reference], map: "idx_bookings_reference")
   @@index([startDate, endDate], map: "idx_bookings_dates")
   @@index([userId, startDate, endDate], map: "idx_bookings_user_dates")
   @@index([source, createdAt], map: "idx_bookings_source_created")
@@ -116,29 +111,6 @@ model BookingClaimGrant {
   @@map("booking_claim_grants")
 }
 
-model StayRequest {
-  id              String            @id @db.Uuid
-  propertyName    String            @map("property_name")
-  locale          String            @db.VarChar(8)
-  startDate       DateTime          @map("start_date") @db.Date
-  endDate         DateTime          @map("end_date") @db.Date
-  firstName       String            @map("first_name")
-  lastName        String            @map("last_name")
-  email           String
-  phone           String            @db.VarChar(32)
-  arrivalTime     String?           @map("arrival_time")
-  specialRequests String?           @map("special_requests")
-  idempotencyKey  String            @unique(map: "stay_requests_idempotency_key") @map("idempotency_key")
-  status          StayRequestStatus @default(PENDING)
-  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  outboxEvents    OutboxEvent[]
-
-  @@index([status, createdAt], map: "idx_stay_requests_status_created")
-  @@index([email], map: "idx_stay_requests_email")
-  @@map("stay_requests")
-}
-
 model OutboxEvent {
   id               String          @id(map: "webhook_outbox_pkey") @db.Uuid
   eventType        String          @map("event_type") @db.VarChar(96)
@@ -156,8 +128,6 @@ model OutboxEvent {
   deliveredAt      DateTime?       @map("delivered_at") @db.Timestamptz(6)
   createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  stayRequestId    String?         @map("stay_request_id") @db.Uuid
-  stayRequest      StayRequest?    @relation(fields: [stayRequestId], references: [id], onDelete: SetNull)
   checkInRequestId String?         @map("check_in_request_id") @db.Uuid
   checkInRequest   CheckInRequest? @relation(fields: [checkInRequestId], references: [id], onDelete: SetNull)
 
@@ -165,7 +135,6 @@ model OutboxEvent {
   @@index([leaseExpiresAt], map: "idx_outbox_events_lease")
   @@index([aggregateType, aggregateId], map: "idx_outbox_events_aggregate")
   @@index([checkInRequestId], map: "idx_outbox_events_check_in_request")
-  @@index([stayRequestId], map: "idx_outbox_events_stay_request")
   @@map("outbox_events")
 }
 
@@ -325,9 +294,52 @@ model RateLimit {
   @@map("rate_limits")
 }
 
-enum CountryOrigin {
-  GR
-  ABROAD
+/// Seasonal nightly price for the nights [startDate, endDate): endDate is
+/// exclusive (the check-out day). Raw-SQL constraints in the migration
+/// add_availability_calendar: rate_periods_dates_check (end > start),
+/// rate_periods_length_check (at most 366 nights), rate_periods_price_check
+/// (100..1,000,000 cents), rate_periods_minimum_nights_check (1..60) and
+/// rate_periods_no_overlap (EXCLUDE USING gist on daterange(start, end, '[)'):
+/// an overlapping write fails with SQLSTATE 23P01, which Prisma reports as P2039).
+model RatePeriod {
+  id                String   @id @db.Uuid
+  startDate         DateTime @map("start_date") @db.Date
+  endDate           DateTime @map("end_date") @db.Date
+  nightlyPriceCents Int      @map("nightly_price_cents")
+  minimumNights     Int      @default(1) @map("minimum_nights") @db.SmallInt
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("rate_periods")
+}
+
+/// Result and lease of the Airbnb iCal sync: one row, id 'airbnb', seeded by the
+/// migration (update it, never create it). blockedNights holds the blocked nights
+/// (dates only) and is replaced wholesale on each successful sync. Raw-SQL
+/// constraints in the migration add_availability_calendar:
+/// calendar_sync_state_singleton_check (id = 'airbnb'), _blocked_nights_check
+/// (at most 400), _horizon_check (both null, or both set with end > start),
+/// _last_error_code_check (^[a-z_]{1,32}$), _last_http_status_check (100..599),
+/// _consecutive_failures_check (>= 0), _lease_check (owner and expiry both
+/// null or both set).
+model CalendarSyncState {
+  id                  String     @id @db.VarChar(16)
+  blockedNights       DateTime[] @default([]) @map("blocked_nights") @db.Date
+  horizonStart        DateTime?  @map("horizon_start") @db.Date
+  horizonEnd          DateTime?  @map("horizon_end") @db.Date
+  lastSuccessAt       DateTime?  @map("last_success_at") @db.Timestamptz(6)
+  lastAttemptAt       DateTime?  @map("last_attempt_at") @db.Timestamptz(6)
+  nextAttemptAt       DateTime   @default(now()) @map("next_attempt_at") @db.Timestamptz(6)
+  lastFailureAt       DateTime?  @map("last_failure_at") @db.Timestamptz(6)
+  lastErrorCode       String?    @map("last_error_code") @db.VarChar(32)
+  lastHttpStatus      Int?       @map("last_http_status") @db.SmallInt
+  consecutiveFailures Int        @default(0) @map("consecutive_failures")
+  leaseOwner          String?    @map("lease_owner") @db.VarChar(128)
+  leaseExpiresAt      DateTime?  @map("lease_expires_at") @db.Timestamptz(6)
+  createdAt           DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("calendar_sync_state")
 }
 
 enum BookingSource {
@@ -349,13 +361,6 @@ enum CheckInRequestStatus {
   PENDING
   APPROVED
   REJECTED
-}
-
-enum StayRequestStatus {
-  PENDING
-  DELIVERED
-  DELIVERY_FAILED
-  CLOSED
 }
 
 enum OutboxStatus {

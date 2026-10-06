@@ -2,7 +2,6 @@ import crypto from 'node:crypto';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
-import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import {
   ApiError,
   ApiErrorCode,
@@ -32,15 +31,11 @@ const schema = z.object({
   message: 'Check-out must be after check-in',
 });
 
-const guard = createAPISecurityMiddleware();
-
 function toUtcDate(value: string): Date {
   return new Date(`${value}T00:00:00.000Z`);
 }
 
 export const POST = withErrorHandler(async (request: NextRequest) => {
-  const early = await guard(request);
-  if (early) return early;
   if (!(await isAdminRequest(request))) {
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
   }

@@ -112,14 +112,14 @@ export default function AdminSessionManager({ expiresAt }: { expiresAt: string |
   if (!active) return null;
   return (
     <>
-      <div className="fixed top-2 right-2 z-50 flex gap-2 items-center text-xs px-2 py-1 rounded shadow" style={{background:'var(--brand-700)', color:'var(--fg-inverse)'}}>
+      <div className="admin-session fixed top-2 right-2 z-50 flex gap-2 items-center text-xs px-2 py-1 rounded shadow">
         <span>Session: {status}</span>
-        <button type="button" onClick={logout} disabled={status === 'refreshing'} className="bg-white/20 hover:bg-white/30 px-1 rounded disabled:opacity-60">Logout</button>
+        <button type="button" onClick={logout} disabled={status === 'refreshing'} className="admin-session__button px-1 rounded disabled:opacity-60">Logout</button>
       </div>
       {status === 'error' && (
-        <div className="fixed top-12 right-2 z-50 max-w-xs bg-red-600 text-white text-xs px-3 py-2 rounded shadow animate-pulse">
+        <div className="admin-session-error fixed top-12 right-2 z-50 max-w-xs text-xs px-3 py-2 rounded shadow animate-pulse">
           Token refresh failed. You may need to re-login.<br />
-          <button type="button" onClick={() => retryRef.current()} className="underline mt-1 inline-block">Retry now</button>
+          <button type="button" onClick={() => retryRef.current()} className="admin-session__retry underline mt-1 inline-block">Retry now</button>
         </div>
       )}
     </>

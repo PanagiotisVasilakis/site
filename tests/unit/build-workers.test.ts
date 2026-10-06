@@ -33,7 +33,7 @@ describe('worker bundles for the production image', () => {
       });
       expect(run.status).toBe(1);
       const events = run.stderr.trim().split('\n').map((line) => JSON.parse(line) as { worker: string; status: string; error: string });
-      expect(events).toContainEqual({ worker, status: 'failed', error: expect.stringContaining('DATABASE_URL') });
+      expect(events).toEqual([{ worker, status: 'failed', error: expect.stringContaining('DATABASE_URL') }]);
     }
   }, 60_000);
 });

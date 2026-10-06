@@ -2,14 +2,12 @@ import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { CheckInRequestStatus } from '@/generated/prisma/client';
 import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
-import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import { isAdminRequest } from '@/lib/rbac';
 import { adminListPageQuerySchema } from '@/lib/adminListPage';
 import { checkInRequestRepository, type CheckInRequestRecord } from '@/lib/prisma-repositories/checkInRequestRepository';
 
 export const dynamic = 'force-dynamic';
 
-const guard = createAPISecurityMiddleware();
 const statusFilterSchema = z.enum(['pending', 'approved', 'rejected', 'all']);
 
 type RequestStatusFilter = z.infer<typeof statusFilterSchema>;
@@ -38,9 +36,6 @@ function serializeRequest(request: CheckInRequestRecord) {
 }
 
 export const GET = withErrorHandler(async (request: NextRequest) => {
-  const earlyResponse = await guard(request);
-  if (earlyResponse) return earlyResponse;
-
   if (!(await isAdminRequest(request))) {
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
   }

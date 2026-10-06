@@ -94,7 +94,7 @@ async function seed(): Promise<void> {
       },
     });
     await prisma.user.create({
-      data: { id: OWNER_ID, phoneE164: OWNER_PHONE, passwordHash: ownerHash, countryOrigin: 'ABROAD' },
+      data: { id: OWNER_ID, phoneE164: OWNER_PHONE, passwordHash: ownerHash },
     });
     await prisma.booking.createMany({
       data: [

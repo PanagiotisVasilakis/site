@@ -1,22 +1,17 @@
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger-enterprise';
-import type { CountryOrigin } from '@/generated/prisma/client';
 
-// No password hash: the admin read model and its cache never need it.
+// No password hash: the admin read model never needs it.
 const userSelect = {
   id: true,
-  email: true,
   phoneE164: true,
-  countryOrigin: true,
   createdAt: true,
   updatedAt: true,
 } as const;
 
 export type UserRecord = {
   id: string;
-  email: string | null;
   phoneE164: string;
-  countryOrigin: CountryOrigin;
   createdAt: Date;
   updatedAt: Date;
 };

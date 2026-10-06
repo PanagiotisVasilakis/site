@@ -5,7 +5,11 @@
 
 export * from './common';
 export * from './house';
-export * from './booking';
 export * from './checkin';
 export * from './portal';
-export * from './about';
+export * from './availability';
+export * from './shell';
+export * from './home';
+export * from './legal';
+export * from './guide';
+export * from './stay';

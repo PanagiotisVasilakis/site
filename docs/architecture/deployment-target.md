@@ -156,7 +156,7 @@ centrally enforced pre-merge protection.
 ## Current implementation gaps
 
 Acceptance of this ADR is not evidence that the target is deployable. These
-blockers were re-checked against the repository on 2026-09-24 and remain open:
+blockers were re-checked against the repository on 2026-09-29 and remain open:
 
 - the Compose worker schedule (`scripts/README.md`, "Worker schedule") is a
   documented host-timer example; the installed timers, their single-flight
@@ -166,6 +166,10 @@ blockers were re-checked against the repository on 2026-09-24 and remain open:
   still required;
 - no automated encrypted off-site backup or restore-verification artifact
   exists;
+- two-role migration/app setup untested: `scripts/README.md` ("Host layout")
+  documents distinct migration and application roles, but the production-image
+  smoke uses one role for both, so no run has exercised the application role
+  against tables owned by the migration role;
 - the generated version file embeds a wall-clock timestamp
   (`scripts/generate-version.ts`), so the repository must not claim
   reproducible images;
@@ -175,6 +179,19 @@ blockers were re-checked against the repository on 2026-09-24 and remain open:
   staging/load qualification;
 - the canonical production hostname, backup target, RPO/RTO, origin firewall
   policy, and exact reverse-proxy configuration still require recorded evidence.
+  The application sends HSTS `max-age=63072000; includeSubDomains` without
+  `preload`, because the preload list is hard to leave and commits every
+  subdomain of the registrable domain to HTTPS. `includeSubDomains` is kept
+  (decided 2026-09-28): the site gets a dedicated domain, and every web-facing
+  DNS record of that domain must be Cloudflare-proxied or serve valid HTTPS
+  itself. Cloudflare Universal SSL covers only the apex and first-level
+  subdomains, so no web host may live on a deeper subdomain without its own
+  certificate (see the origin ingress runbook preconditions);
+- owner-supplied release inputs (recorded 2026-10-06) are still open: the legal
+  identity (registration number, legal name, address) and the public Airbnb
+  listing URL (task R3-L1), and the accountant-confirmed climate resilience
+  fee, cancellation and withdrawal texts and tax retention period
+  (R3-L6/L7); see "Open owner inputs" in the [README](../../README.md).
 
 Until every relevant gap is closed and verified, the selected architecture is
 **accepted but not production-ready**.

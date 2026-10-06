@@ -48,6 +48,12 @@ describe('runtime environment fail-closed policy', () => {
     expect(result).not.toHaveProperty('ADMIN_DASH_SECRET');
   });
 
+  it('treats an empty NEXT_PUBLIC_SITE_URL line in development as unset', () => {
+    const result = runtimeEnvSchema.safeParse({ ...requiredEnv, NEXT_PUBLIC_SITE_URL: '' });
+    expect(result.success).toBe(true);
+    expect(result.data?.NEXT_PUBLIC_SITE_URL).toBeUndefined();
+  });
+
   it('accepts a complete HTTPS production environment without external limiter variables', () => {
     expect(runtimeEnvSchema.safeParse(productionEnv()).success).toBe(true);
   });
@@ -104,14 +110,22 @@ describe('runtime environment fail-closed policy', () => {
   it('requires webhook tokens and HTTPS endpoints in production', () => {
     const missingToken = runtimeEnvSchema.safeParse({
       ...requiredEnv,
-      BOOKING_REQUEST_WEBHOOK_URL: 'https://hooks.example/booking',
+      CHECKIN_REQUEST_WEBHOOK_URL: 'https://hooks.example/check-in',
     });
     expect(missingToken.success).toBe(false);
     const insecure = runtimeEnvSchema.safeParse(productionEnv({
-      BOOKING_REQUEST_WEBHOOK_URL: 'http://hooks.example/booking',
-      BOOKING_REQUEST_WEBHOOK_TOKEN: 't'.repeat(20),
+      CHECKIN_REQUEST_WEBHOOK_URL: 'http://hooks.example/check-in',
+      CHECKIN_REQUEST_WEBHOOK_TOKEN: 't'.repeat(20),
     }));
     expect(insecure.success).toBe(false);
+  });
+
+  it('ignores a leftover webhook variable of the removed booking-request form', () => {
+    const result = runtimeEnvSchema.safeParse(productionEnv({
+      BOOKING_REQUEST_WEBHOOK_URL: 'http://hooks.example/booking',
+    }));
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data).not.toHaveProperty('BOOKING_REQUEST_WEBHOOK_URL');
   });
 
   it.each([
@@ -175,6 +189,74 @@ describe('runtime environment fail-closed policy', () => {
 
   it('validates production CORS origins', () => {
     expect(runtimeEnvSchema.safeParse(productionEnv({ ALLOWED_ORIGINS: 'http://guest.example' })).success).toBe(false);
+  });
+
+  it.each([
+    ['plain http', 'http://www.airbnb.com/calendar/ical/12345678.ics?s=fixture'],
+    ['a non-Airbnb host', 'https://calendar.example/calendar/ical/12345678.ics?s=fixture'],
+    ['a look-alike Airbnb host', 'https://www.airbnb.com.evil.example/calendar/ical/12345678.ics?s=fixture'],
+    ['userinfo', 'https://user:pass@www.airbnb.com/calendar/ical/12345678.ics?s=fixture'],
+    ['a non-default port', 'https://www.airbnb.com:8443/calendar/ical/12345678.ics?s=fixture'],
+    ['a non-export path', 'https://www.airbnb.com/calendar/ical/12345678.ics/extra?s=fixture'],
+    ['a non-numeric listing', 'https://www.airbnb.com/calendar/ical/listing.ics?s=fixture'],
+    ['an unparsable value', 'airbnb calendar s=fixture'],
+  ])('rejects an AIRBNB_ICAL_URL with %s without echoing it', (_label, value) => {
+    const result = runtimeEnvSchema.safeParse(productionEnv({ AIRBNB_ICAL_URL: value }));
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map(({ path }) => path[0])).toEqual(['AIRBNB_ICAL_URL']);
+      expect(JSON.stringify(result.error.issues)).not.toContain('s=fixture');
+    }
+  });
+
+  it.each([
+    'https://www.airbnb.com/calendar/ical/12345678.ics?s=fixture',
+    'https://airbnb.com/calendar/ical/12345678.ics',
+    'https://www.airbnb.gr/calendar/ical/12345678.ics?s=fixture',
+    'https://airbnb.gr:443/calendar/ical/12345678.ics?s=fixture',
+  ])('accepts the Airbnb calendar export URL %s', (value) => {
+    const result = runtimeEnvSchema.safeParse(productionEnv({ AIRBNB_ICAL_URL: value }));
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.AIRBNB_ICAL_URL).toBe(value);
+  });
+
+  it.each([
+    ['empty', ''],
+    ['unset', undefined],
+  ])('treats an %s AIRBNB_ICAL_URL as not configured', (_label, value) => {
+    const result = runtimeEnvSchema.safeParse(productionEnv({ AIRBNB_ICAL_URL: value }));
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.AIRBNB_ICAL_URL).toBeUndefined();
+  });
+
+  it.each(['fixtureCartoKey_0123', 'abcd-EFGH', 'a'.repeat(128)])('accepts the CARTO basemaps key format %#', (value) => {
+    const result = runtimeEnvSchema.safeParse(productionEnv({ CARTO_BASEMAPS_KEY: value }));
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.CARTO_BASEMAPS_KEY).toBe(value);
+  });
+
+  it.each([
+    ['URL-significant characters', 'fixtureKey&x=secret'],
+    ['whitespace', 'fixture Key secret'],
+    ['a template brace', 'fixture{s}secret'],
+    ['too short a value', 'secret7'],
+    ['too long a value', `secret${'a'.repeat(123)}`],
+  ])('rejects a CARTO_BASEMAPS_KEY with %s without echoing it', (_label, value) => {
+    const result = runtimeEnvSchema.safeParse(productionEnv({ CARTO_BASEMAPS_KEY: value }));
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map(({ path }) => path[0])).toEqual(['CARTO_BASEMAPS_KEY']);
+      expect(JSON.stringify(result.error.issues)).not.toContain('secret');
+    }
+  });
+
+  it.each([
+    ['empty', ''],
+    ['unset', undefined],
+  ])('treats an %s CARTO_BASEMAPS_KEY as not configured', (_label, value) => {
+    const result = runtimeEnvSchema.safeParse(productionEnv({ CARTO_BASEMAPS_KEY: value }));
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.CARTO_BASEMAPS_KEY).toBeUndefined();
   });
 });
 

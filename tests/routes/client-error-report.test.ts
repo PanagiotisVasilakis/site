@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 
 import { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -20,6 +21,17 @@ import { privacyHmac } from '@/lib/privacyHash';
 afterEach(() => {
   vi.unstubAllGlobals();
 });
+
+function validReportRequest(): NextRequest {
+  return new NextRequest('https://guest-guide.test/api/errors', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      error: { name: 'Error', message: 'boom' },
+      context: { url: 'https://guest-guide.test/en', timestamp: new Date().toISOString() },
+    }),
+  });
+}
 
 describe('client error report contract', () => {
   it('stores a report whose stack exceeds the server stack limit', async () => {
@@ -51,6 +63,74 @@ describe('client error report contract', () => {
 
     expect(response.status).toBeLessThan(300);
     expect(mocks.securityAuditEventCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('stores the inlined bundle build version with the report', async () => {
+    mocks.checkSensitiveRateLimit.mockResolvedValue({ allowed: true });
+    mocks.securityAuditEventCreate.mockResolvedValue({});
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('NEXT_PUBLIC_BUILD_VERSION', '0123456789abcdef0123456789abcdef01234567');
+    let sentBody = '';
+    vi.stubGlobal('window', { location: { href: 'https://guest-guide.test/en' } });
+    vi.stubGlobal('fetch', vi.fn(async (_input: unknown, init?: RequestInit) => {
+      sentBody = String(init?.body);
+      return new Response(null, { status: 201 });
+    }));
+
+    await expect(errorReporter.reportError(new Error('boom'), { category: 'globalError' })).resolves.toBe(true);
+    expect(JSON.parse(sentBody).context).not.toHaveProperty('environment');
+    const response = await POST(new NextRequest('https://guest-guide.test/api/errors', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: sentBody,
+    }), { params: Promise.resolve({}) });
+
+    expect(response.status).toBeLessThan(300);
+    const data = mocks.securityAuditEventCreate.mock.calls[0][0].data as { details: { buildVersion?: string } };
+    expect(data.details.buildVersion).toBe('0123456789abcdef0123456789abcdef01234567');
+  });
+
+  it('inlines the release commit as the build version in the image build', () => {
+    const builderStage = readFileSync('docker/Dockerfile.security', 'utf8').split(/^FROM /mu)[1];
+    const lines = builderStage.split('\n');
+    const envIndex = lines.indexOf('ENV NEXT_PUBLIC_BUILD_VERSION=${GIT_COMMIT}');
+    expect(envIndex).toBeGreaterThan(lines.indexOf('ARG GIT_COMMIT'));
+    expect(envIndex).toBeLessThan(lines.indexOf('RUN npm run build'));
+  });
+
+  it('checks the per-address limit first and then a limit shared by all clients', async () => {
+    mocks.checkSensitiveRateLimit.mockResolvedValue({ allowed: true });
+    mocks.securityAuditEventCreate.mockResolvedValue({});
+
+    const response = await POST(validReportRequest(), { params: Promise.resolve({}) });
+
+    expect(response.status).toBeLessThan(300);
+    expect(mocks.checkSensitiveRateLimit).toHaveBeenCalledTimes(2);
+    expect(mocks.checkSensitiveRateLimit.mock.calls[0][1]).toEqual({ scope: 'client-error-report', limit: 10, windowMs: 60_000 });
+    expect(mocks.checkSensitiveRateLimit.mock.calls[1][1]).toEqual({
+      scope: 'client-error-report-global', identifier: 'global', limit: 500, windowMs: 3_600_000,
+    });
+  });
+
+  it('answers 429 without storing when the shared limit is exhausted', async () => {
+    mocks.checkSensitiveRateLimit
+      .mockResolvedValueOnce({ allowed: true })
+      .mockResolvedValueOnce({ allowed: false });
+
+    const response = await POST(validReportRequest(), { params: Promise.resolve({}) });
+
+    expect(response.status).toBe(429);
+    expect(mocks.securityAuditEventCreate).not.toHaveBeenCalled();
+  });
+
+  it('does not count a report against the shared limit when the per-address limit denies it', async () => {
+    mocks.checkSensitiveRateLimit.mockResolvedValueOnce({ allowed: false });
+
+    const response = await POST(validReportRequest(), { params: Promise.resolve({}) });
+
+    expect(response.status).toBe(429);
+    expect(mocks.checkSensitiveRateLimit).toHaveBeenCalledTimes(1);
+    expect(mocks.securityAuditEventCreate).not.toHaveBeenCalled();
   });
 
   it('stores the client IP only as the keyed security-event hash', async () => {

@@ -239,22 +239,22 @@ export default function AdminRequestsClient() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <Surface padding="lg" radius="lg" shadow="lg" border="none">
+      <Surface padding="lg" radius="lg" shadow="lg">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-accent-subtle">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] admin-eyebrow">
               Admin inbox
             </p>
-            <h1 className="mt-2 font-serif text-4xl font-semibold italic page-title">
+            <h1 className="mt-2 font-display text-4xl font-semibold italic admin-title">
               Requests
             </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-body">
+            <p className="mt-3 max-w-2xl text-sm leading-6 admin-muted">
               Review guest arrival-time requests without using guest sessions or credentials.
             </p>
           </div>
           <Link
             href="/admin"
-            className="admin-action-outline min-h-11 px-5"
+            className="admin-action-outline shell-link min-h-11 px-5"
           >
             Back to operations
           </Link>
@@ -267,7 +267,7 @@ export default function AdminRequestsClient() {
         ))}
       </section>
 
-      <div className="mt-6 surface-card rounded-lg border border-soft p-4 shadow-sm">
+      <div className="admin-card mt-6 rounded-tile border p-4 shadow-sm">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-wrap gap-2" role="group" aria-label="Request filters">
             {filters.map((item) => {
@@ -297,7 +297,7 @@ export default function AdminRequestsClient() {
 
         {feedback && (
           <div
-            className={`mt-4 rounded-lg px-4 py-3 text-sm ${feedback.type === 'success' ? 'feedback-success' : 'feedback-error'}`}
+            className={`mt-4 rounded-tile px-4 py-3 text-sm ${feedback.type === 'success' ? 'feedback-success' : 'feedback-error'}`}
             role={feedback.type === 'error' ? 'alert' : 'status'}
           >
             {feedback.message}
@@ -317,7 +317,7 @@ export default function AdminRequestsClient() {
             const isActing = actionId === request.id;
 
             return (
-              <article key={request.id} className="surface-card rounded-lg border border-soft p-5 shadow-sm">
+              <article key={request.id} className="admin-card rounded-tile border p-5 shadow-sm">
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                   <div className="flex min-w-0 gap-4">
                     <div className="admin-avatar">
@@ -325,7 +325,7 @@ export default function AdminRequestsClient() {
                     </div>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="break-words font-serif text-2xl font-semibold italic section-title">
+                        <h2 className="break-words font-display text-2xl font-semibold italic admin-title">
                           {guest}
                         </h2>
                         <Badge variant={request.status}>
@@ -337,37 +337,37 @@ export default function AdminRequestsClient() {
                       </div>
                       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
                         <div>
-                          <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-subtle">Requested arrival</dt>
-                          <dd className="mt-1 font-semibold text-text-accent">{request.requestedTime}</dd>
+                          <dt className="text-xs font-semibold uppercase tracking-[0.12em] admin-muted">Requested arrival</dt>
+                          <dd className="mt-1 font-semibold admin-accent">{request.requestedTime}</dd>
                         </div>
                         <div>
-                          <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-subtle">Standard check-in</dt>
-                          <dd className="mt-1 text-body">15:00</dd>
+                          <dt className="text-xs font-semibold uppercase tracking-[0.12em] admin-muted">Standard check-in</dt>
+                          <dd className="mt-1 admin-muted">15:00</dd>
                         </div>
                         <div>
-                          <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-subtle">Submitted</dt>
-                          <dd className="mt-1 text-body">{formatDateTime(request.createdAt)}</dd>
+                          <dt className="text-xs font-semibold uppercase tracking-[0.12em] admin-muted">Submitted</dt>
+                          <dd className="mt-1 admin-muted">{formatDateTime(request.createdAt)}</dd>
                         </div>
                         <div>
-                          <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-subtle">Updated</dt>
-                          <dd className="mt-1 text-body">{formatDateTime(request.updatedAt)}</dd>
+                          <dt className="text-xs font-semibold uppercase tracking-[0.12em] admin-muted">Updated</dt>
+                          <dd className="mt-1 admin-muted">{formatDateTime(request.updatedAt)}</dd>
                         </div>
                         <div>
-                          <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-subtle">Booking</dt>
-                          <dd className="mt-1 break-all text-body">{request.bookingId || 'Unavailable'}</dd>
+                          <dt className="text-xs font-semibold uppercase tracking-[0.12em] admin-muted">Booking</dt>
+                          <dd className="mt-1 break-all admin-muted">{request.bookingId || 'Unavailable'}</dd>
                         </div>
                         <div>
-                          <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-subtle">Contact</dt>
-                          <dd className="mt-1 break-words text-body">
+                          <dt className="text-xs font-semibold uppercase tracking-[0.12em] admin-muted">Contact</dt>
+                          <dd className="mt-1 break-words admin-muted">
                             {request.guestEmail || request.guestPhone || 'Unavailable'}
                           </dd>
                         </div>
                       </dl>
                       {request.guestEmail && request.guestPhone && (
-                        <p className="mt-3 text-sm text-body">{request.guestPhone}</p>
+                        <p className="mt-3 text-sm admin-muted">{request.guestPhone}</p>
                       )}
                       {request.message && (
-                        <div className="admin-note-panel mt-4 text-body">
+                        <div className="admin-note-panel mt-4">
                           {request.message}
                         </div>
                       )}
@@ -414,7 +414,7 @@ export default function AdminRequestsClient() {
 
       {!loading && requests.length > 0 && (
         <div className="mt-6 flex flex-col items-center gap-3">
-          <p className="text-sm text-body" role="status">Showing {requests.length} of {total}</p>
+          <p className="text-sm admin-muted" role="status">Showing {requests.length} of {total}</p>
           {nextCursor && (
             <button type="button" onClick={() => void loadMore()} disabled={loadingMore} className="admin-action-outline">
               {loadingMore ? 'Loading...' : 'Load more'}

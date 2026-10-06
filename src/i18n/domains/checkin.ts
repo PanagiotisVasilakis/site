@@ -11,7 +11,6 @@ import type { Locale } from '../config';
 
 export interface CheckinDictionary {
     navLabel: string;
-    navInfoLabel: string;
     saving: string;
 }
 
@@ -76,6 +75,7 @@ export interface CheckinInfoDictionary {
         sendRequest: string;
         requestSent: string;
         requestError: string;
+        requestClosed: string;
         requestRequired: string;
         latestRequest: string;
         statusPending: string;
@@ -101,12 +101,10 @@ export interface CheckinInfoDictionary {
 export const checkinTranslations: Record<Locale, CheckinDictionary> = {
     en: {
         navLabel: "Check-in",
-        navInfoLabel: "Check-In Info",
         saving: "Saving…",
     },
     el: {
         navLabel: "Άφιξη",
-        navInfoLabel: "Πληροφορίες άφιξης",
         saving: "Γίνεται αποθήκευση…",
     },
 };
@@ -136,9 +134,9 @@ export const checkinInfoTranslations: Record<Locale, CheckinInfoDictionary> = {
         parking: "Free Parking",
         parkingDetail: "Free private outdoor parking at the property.",
         tipsTitle: "Local Tips",
-        tip1: "The nearest beach is 1 km away, a 5-minute drive",
+        tip1: "The nearest beach is 5 minutes away by car",
         tip2: "Supermarket \"AB Vassilopoulos\" is 300m away, open 8:00-21:00",
-        tip3: "Check our restaurant recommendations in the main menu",
+        tip3: "Museums and places nearby are in the Kalamata guide",
         tip4: "Need a taxi? Call {taxiPhone} or use the Taxi app",
         additionalTitle: "Good to Know",
         keysInfo: "Keys:",
@@ -171,6 +169,7 @@ export const checkinInfoTranslations: Record<Locale, CheckinInfoDictionary> = {
             sendRequest: "Send request",
             requestSent: "Your request has been sent. We'll confirm availability as soon as possible.",
             requestError: "Unable to send the request. Please try again.",
+            requestClosed: "Your check-in date has passed, so a new arrival time can no longer be requested. For any change, please contact your host.",
             requestRequired: "Choose a preferred arrival time.",
             latestRequest: "Latest request",
             statusPending: "Pending",
@@ -178,7 +177,7 @@ export const checkinInfoTranslations: Record<Locale, CheckinInfoDictionary> = {
             statusRejected: "Unavailable",
             statusPendingCopy: "Your request has been received and is awaiting confirmation.",
             statusApprovedCopy: "Your requested arrival time has been confirmed.",
-            statusRejectedCopy: "Your requested arrival time could not be confirmed. The standard check-in time still applies.",
+            statusRejectedCopy: "Your requested arrival time could not be confirmed. Any arrival time confirmed earlier, otherwise the standard check-in time, still applies.",
             editTimesHostOnly: "Edit times (host only)",
             networkCopyLabel: "Copy Wi-Fi network name",
             passwordCopyLabel: "Copy Wi-Fi password",
@@ -200,7 +199,7 @@ export const checkinInfoTranslations: Record<Locale, CheckinInfoDictionary> = {
         copy: "Αντιγραφή",
         copied: "Αντιγράφηκε",
         emergencyTitle: "Επαφές Έκτακτης Ανάγκης",
-        hostContact: "Ο Οικοδεσπότης σας (24/7)",
+        hostContact: "Η οικοδέσποινά σας (24/7)",
         houseRulesTitle: "Κανόνες Οικίας",
         rule1: "Ώρες ησυχίας: 23:00 - 08:00",
         rule2: "Απαγορεύεται το κάπνισμα μέσα στο ακίνητο",
@@ -212,9 +211,9 @@ export const checkinInfoTranslations: Record<Locale, CheckinInfoDictionary> = {
         parking: "Δωρεάν Πάρκινγκ",
         parkingDetail: "Δωρεάν εξωτερικό ιδιωτικό πάρκινγκ στο κατάλυμα.",
         tipsTitle: "Τοπικές Συμβουλές",
-        tip1: "Η πλησιέστερη παραλία απέχει 1 χλμ, 5' με αυτοκίνητο",
+        tip1: "Η κοντινότερη παραλία είναι 5 λεπτά με το αυτοκίνητο",
         tip2: "Το σούπερ μάρκετ \"AB Βασιλόπουλος\" απέχει 300μ, ανοιχτό 8:00-21:00",
-        tip3: "Δείτε τις προτάσεις μας για εστιατόρια στο κύριο μενού",
+        tip3: "Μουσεία και μέρη κοντά θα βρείτε στον οδηγό Καλαμάτας",
         tip4: "Χρειάζεστε ταξί; Καλέστε {taxiPhone} ή χρησιμοποιήστε την εφαρμογή Taxi",
         additionalTitle: "Καλό να Γνωρίζετε",
         keysInfo: "Κλειδιά:",
@@ -247,6 +246,7 @@ export const checkinInfoTranslations: Record<Locale, CheckinInfoDictionary> = {
             sendRequest: "Αποστολή αιτήματος",
             requestSent: "Το αίτημά σας στάλθηκε. Θα επιβεβαιώσουμε τη διαθεσιμότητα το συντομότερο δυνατό.",
             requestError: "Δεν ήταν δυνατή η αποστολή του αιτήματος. Παρακαλούμε δοκιμάστε ξανά.",
+            requestClosed: "Η ημερομηνία άφιξής σας έχει περάσει, οπότε δεν μπορείτε πλέον να ζητήσετε νέα ώρα άφιξης. Για οποιαδήποτε αλλαγή, επικοινωνήστε με την οικοδέσποινα.",
             requestRequired: "Επιλέξτε προτιμώμενη ώρα άφιξης.",
             latestRequest: "Τελευταίο αίτημα",
             statusPending: "Σε εκκρεμότητα",
@@ -254,14 +254,14 @@ export const checkinInfoTranslations: Record<Locale, CheckinInfoDictionary> = {
             statusRejected: "Δεν είναι διαθέσιμο",
             statusPendingCopy: "Το αίτημά σας έχει ληφθεί και αναμένει επιβεβαίωση.",
             statusApprovedCopy: "Η ώρα άφιξης που ζητήσατε έχει επιβεβαιωθεί.",
-            statusRejectedCopy: "Η ώρα άφιξης που ζητήσατε δεν μπόρεσε να επιβεβαιωθεί. Ισχύει η κανονική ώρα άφιξης.",
-            editTimesHostOnly: "Επεξεργασία ωρών (μόνο οικοδεσπότης)",
+            statusRejectedCopy: "Η ώρα άφιξης που ζητήσατε δεν μπόρεσε να επιβεβαιωθεί. Ισχύει όποια ώρα σας είχε επιβεβαιωθεί νωρίτερα, αλλιώς η κανονική ώρα άφιξης.",
+            editTimesHostOnly: "Επεξεργασία ωρών (μόνο οικοδέσποινα)",
             networkCopyLabel: "Αντιγραφή ονόματος δικτύου Wi-Fi",
             passwordCopyLabel: "Αντιγραφή κωδικού Wi-Fi",
             unknownError: "Άγνωστο σφάλμα",
             saveFailed: "Αποτυχία αποθήκευσης",
             saveFailedRetry: "Αποτυχία αποθήκευσης προτιμήσεων. Παρακαλώ δοκιμάστε ξανά.",
-            requestAlreadyPending: "Έχετε ήδη αίτημα που περιμένει επιβεβαίωση, οπότε η νέα ώρα δεν στάλθηκε. Μπορείτε να ζητήσετε άλλη ώρα όταν απαντήσει ο οικοδεσπότης.",
+            requestAlreadyPending: "Έχετε ήδη αίτημα που περιμένει επιβεβαίωση, οπότε η νέα ώρα δεν στάλθηκε. Μπορείτε να ζητήσετε άλλη ώρα όταν απαντήσει η οικοδέσποινα.",
         }
     },
 };

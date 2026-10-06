@@ -35,4 +35,16 @@ describe('dictionary parity', () => {
 
     expect(empty).toEqual([]);
   });
+
+  it('has only NFC-normalized strings (the Greek font subset has no combining tonos)', () => {
+    const denormalized: string[] = [];
+    const walk = (value: unknown, path: string) => {
+      if (typeof value === 'string' && value !== value.normalize('NFC')) denormalized.push(path);
+      else if (value && typeof value === 'object') for (const [key, entry] of Object.entries(value)) walk(entry, `${path}.${key}`);
+    };
+    walk(getDictionary('en'), 'en');
+    walk(getDictionary('el'), 'el');
+
+    expect(denormalized).toEqual([]);
+  });
 });

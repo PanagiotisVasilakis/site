@@ -18,7 +18,16 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-docker image inspect "$IMAGE" >/dev/null
+if ! INSPECT_ERR="$(docker image inspect "$IMAGE" 2>&1 >/dev/null)"; then
+  if [[ "$INSPECT_ERR" == *"No such image"* ]]; then
+    echo "Pinned Nginx image is not in the local Docker image store (this gate does not pull): $IMAGE" >&2
+    echo "Pull it once while online: docker pull $IMAGE" >&2
+  else
+    echo "$INSPECT_ERR" >&2
+    echo "docker image inspect failed for the pinned Nginx image (check that the Docker daemon is running): $IMAGE" >&2
+  fi
+  exit 1
+fi
 docker network create --subnet 172.30.240.0/24 "$TRUSTED_NET" >/dev/null
 docker network create --subnet 172.30.241.0/24 "$UNTRUSTED_NET" >/dev/null
 
@@ -105,9 +114,15 @@ trusted_headers="$(docker run --rm --network "$TRUSTED_NET" "$IMAGE" /bin/sh -eu
 
 for header in 'Seen-Verified-IP: 203.0.113.77' 'Seen-CF-IP: 203.0.113.77' \
   'Seen-Real-IP: 203.0.113.77' 'Seen-XFF: 203.0.113.77'; do
-  grep -Fq "$header" <<<"$trusted_headers"
+  if ! grep -Fq "$header" <<<"$trusted_headers"; then
+    echo "Missing or wrong upstream header: ${header%%:*}" >&2
+    exit 1
+  fi
 done
-grep -Fq "Seen-Attestation: $SECRET" <<<"$trusted_headers"
+if ! grep -Fq "Seen-Attestation: $SECRET" <<<"$trusted_headers"; then
+  echo 'Attestation header was not forwarded with the configured secret.' >&2
+  exit 1
+fi
 if grep -Fq 'Seen-Forwarded:' <<<"$trusted_headers"; then
   echo 'Forwarded header was not removed.' >&2
   exit 1

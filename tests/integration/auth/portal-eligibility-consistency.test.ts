@@ -153,7 +153,6 @@ async function seedBoundary(
         id: AUTH_USER_ID,
         phoneE164: AUTH_PHONE,
         passwordHash,
-        countryOrigin: 'ABROAD',
       },
     });
     await prisma.booking.createMany({

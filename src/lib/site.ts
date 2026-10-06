@@ -1,5 +1,5 @@
-import { config } from '@/lib/config';
-export const siteUrl = config.absoluteSiteUrl().replace(/\/$/, '');
+const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+export const siteUrl = (configuredSiteUrl.startsWith('http') ? configuredSiteUrl : `https://${configuredSiteUrl}`).replace(/\/$/, '');
 
 // Build absolute URL from a path
 export function absUrl(path: string) {

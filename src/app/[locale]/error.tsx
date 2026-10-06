@@ -4,7 +4,10 @@ import { usePathname } from 'next/navigation';
 import { logger } from '@/lib/logger-client';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
+import { Button } from '@/components/ui/Button';
+import { StatusLinks, StatusPage } from '@/components/stay/StatusPage';
 
+// identity §9.10: the 404 layout with "Try again" (reset) and a Home link; no technical details.
 export default function LocaleError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const pathname = usePathname();
   const locale: Locale = pathname?.startsWith('/el') ? 'el' : 'en';
@@ -13,14 +16,9 @@ export default function LocaleError({ error, reset }: { error: Error & { digest?
     logger.error('Unhandled UI error (locale segment)', { message: error.message, stack: error.stack, digest: error.digest });
   }, [error]);
   return (
-    <div className="min-h-svh flex items-center justify-center p-6">
-      <div className="max-w-md text-center space-y-4">
-        <h1 className="text-xl font-serif italic font-bold">{t.errors.somethingWentWrong}</h1>
-        <p className="text-sm opacity-80">{t.errors.unexpectedError}</p>
-        <button className="btn-tint" onClick={() => reset()}>{t.errors.tryAgain}</button>
-      </div>
-    </div>
+    <StatusPage title={t.errors.somethingWentWrong} lead={t.errors.unexpectedError}>
+      <Button variant="primary" className="status-page__action" onClick={() => reset()}>{t.errors.tryAgain}</Button>
+      <StatusLinks links={[{ href: `/${locale}`, label: t.cta.home }]} />
+    </StatusPage>
   );
 }
-
-

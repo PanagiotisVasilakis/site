@@ -23,3 +23,10 @@ description = "PEM private-key material"
 regex = '''-----BEGIN(?: [A-Z0-9]+)? PRIVATE KEY-----'''
 secretGroup = 0
 keywords = ["PRIVATE KEY"]
+
+[[rules]]
+id = "airbnb-calendar-export-token"
+description = "Airbnb calendar export URL with its s= access token"
+regex = '''(?i)\bairbnb\.(?:com|gr)/calendar/ical/[0-9]+\.ics\?(?:[^\s"'`#&]*&)*s=([A-Za-z0-9_-]{16,})'''
+secretGroup = 1
+keywords = ["calendar/ical"]

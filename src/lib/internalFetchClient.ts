@@ -3,14 +3,8 @@
 import { logger } from '@/lib/logger-client';
 
 async function internalFetch(input: string, init?: RequestInit) {
-  const finalInit: RequestInit = { ...init };
-
-  if (typeof window !== 'undefined') {
-    finalInit.credentials = finalInit.credentials ?? 'same-origin';
-  }
-
   try {
-    const res = await fetch(input, finalInit);
+    const res = await fetch(input, init);
     if (!res.ok) {
       // Treat common auth failures as debug to prevent log spam (they are often expected from unauthenticated clients)
       if (res.status === 401) {

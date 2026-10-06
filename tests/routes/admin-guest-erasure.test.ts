@@ -56,6 +56,7 @@ describe('admin guest erasure route', () => {
   it.each([
     ['ERASURE_BLOCKED_BY_ACTIVE_DELIVERY', 409],
     ['ERASURE_SUBJECT_NOT_FOUND', 404],
+    ['ERASURE_REQUEST_NOT_VERIFIED', 409],
   ])('maps %s to %i', async (code, status) => {
     mocks.eraseGuestByAdmin.mockRejectedValue(new Error(code));
 

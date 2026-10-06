@@ -19,10 +19,9 @@ const errorReportSchema = z.object({
     columnNumber: z.number().int().nonnegative().optional(),
   }).strict(),
   context: z.object({
-    url: z.string().url().max(500),
-    timestamp: z.string().datetime(),
+    url: z.url().max(500),
+    timestamp: z.iso.datetime(),
     buildVersion: z.string().max(50).optional(),
-    environment: z.enum(['development', 'staging', 'production']).optional(),
   }).strict(),
   category: z.string().regex(/^[a-zA-Z0-9_-]{1,50}$/).optional(),
 }).strict();
@@ -39,6 +38,16 @@ export const POST = withErrorHandler(async (request: NextRequest, { signal }) =>
   });
   signal.throwIfAborted();
   if (!decision.allowed) throw new ApiError(ApiErrorCode.RATE_LIMITED, 'Too many error reports');
+  // The limit above is per client address. This one is shared by all clients,
+  // so many attested addresses together cannot grow the audit table unbounded.
+  const globalDecision = await checkSensitiveRateLimit(request, {
+    scope: 'client-error-report-global',
+    identifier: 'global',
+    limit: 500,
+    windowMs: 3_600_000,
+  });
+  signal.throwIfAborted();
+  if (!globalDecision.allowed) throw new ApiError(ApiErrorCode.RATE_LIMITED, 'Too many error reports');
 
   const report = await validateRequestBody(errorReportSchema, 16 * 1_024)(request);
   signal.throwIfAborted();
@@ -76,7 +85,6 @@ export const POST = withErrorHandler(async (request: NextRequest, { signal }) =>
   logger.warn('Client error report stored', { path, category: report.category, correlationId });
   return createSuccessResponse({ received: true, correlationId }, 201, correlationId);
 }, {
-  enableRequestLogging: false,
   maxRequestBodySize: 16 * 1_024,
   requestTimeoutMs: 10_000,
 });

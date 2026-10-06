@@ -70,7 +70,7 @@ function printSection(title: string) {
 }
 
 async function main() {
-  console.log('Browser runtime preflight for Lighthouse and responsive UX audits');
+  console.log('Browser runtime preflight for browser audits');
 
   const envCandidates: Candidate[] = [];
   const responsivePath = process.env.RESPONSIVE_CHROME_PATH;

@@ -19,8 +19,8 @@ function readEnvFile(p) {
 
 const envFile = readEnvFile(envPath);
 const inEnvFile = {
-  SECURITY_PEPPER: /^\s*SECURITY_PEPPER\s*=\s*\S/m,
-  CLAIM_TOKEN_PEPPER: /^\s*CLAIM_TOKEN_PEPPER\s*=\s*\S/m,
+  SECURITY_PEPPER: /^[^\S\n]*SECURITY_PEPPER[^\S\n]*=[^\S\n]*\S/m,
+  CLAIM_TOKEN_PEPPER: /^[^\S\n]*CLAIM_TOKEN_PEPPER[^\S\n]*=[^\S\n]*\S/m,
 };
 const missing = Object.keys(inEnvFile).filter((name) => !process.env[name] && !inEnvFile[name].test(envFile));
 

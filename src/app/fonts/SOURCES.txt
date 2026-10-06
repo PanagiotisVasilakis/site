@@ -1,0 +1,27 @@
+Self-hosted font files (docs/design/identity.md §2.1-2.3)
+
+Pre-subset woff2 builds taken unmodified from the npm packages below
+(fetched with `npm pack`, not installed; nothing added to package.json).
+latin-ext and all other subsets are deliberately not shipped.
+
+Package: @fontsource-variable/commissioner
+Version: 5.3.0
+Tarball integrity: sha512-0IEvi8SO1slc5Pc9tA4OtA01I8UiCcEq/uh12oNjfHuABU9Lnz61l2V8o2cMPUUo3BAo5MbISVK2I/DSpBRw7Q==
+Licence: SIL Open Font License 1.1 (package LICENSE saved as OFL-Commissioner.txt)
+Files (SHA-256):
+  e3d539b926881fbb3592788297eee24d6d179c1c06dbad36805fc722775247ce  commissioner-latin-wght-normal.woff2  (files/commissioner-latin-wght-normal.woff2, 36700 B)
+  75d4734b1d207892feee610186e34fe02912d604025906fdeca5c7b8c295a622  commissioner-greek-wght-normal.woff2  (files/commissioner-greek-wght-normal.woff2, 15380 B)
+  f4bab37ac72f638eeaec7a38cf8f5cc4e91299d763e6befc38e224044730ed8a  OFL-Commissioner.txt  (LICENSE)
+
+Package: @fontsource-variable/noto-serif-display
+Version: 5.3.0
+Tarball integrity: sha512-xjCag3o0sBWYB+76irp7cHMIa3MvWqYdGSgFXDePAmezplEJeTbR8FHvf2tSNNqA09KeO9W3N+HDaehQxzg8yg==
+Licence: SIL Open Font License 1.1 (package LICENSE saved as OFL-NotoSerifDisplay.txt)
+Files (SHA-256):
+  5343443b8fd91607b1b610a5a5a68ed74b682c28825d2c19a9f0ee6f04b36a60  noto-serif-display-latin-wght-normal.woff2  (files/noto-serif-display-latin-wght-normal.woff2, 41232 B)
+  77309ca264d577cdeb54d1aa60d2670f669e91b6ab000175207d8d1190368eaf  noto-serif-display-latin-wght-italic.woff2  (files/noto-serif-display-latin-wght-italic.woff2, 49264 B)
+  0c19f35e296293706c3ef2437539ff1da9be689c0c8556784acf14f7ba7c7163  noto-serif-display-greek-wght-normal.woff2  (files/noto-serif-display-greek-wght-normal.woff2, 30004 B)
+  fe815de21dc3e5ed943c837f723cfec8f0036962e33d12d5c07cd2574272391b  noto-serif-display-greek-wght-italic.woff2  (files/noto-serif-display-greek-wght-italic.woff2, 33808 B)
+  db8996c5a848ed595b67a61f65ba528f2c9220da9f21488031702221c7d0c857  OFL-NotoSerifDisplay.txt  (LICENSE)
+
+Verify: cd src/app/fonts && shasum -a 256 *.woff2 OFL-*.txt

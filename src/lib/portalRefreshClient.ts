@@ -78,7 +78,7 @@ export async function refreshPortalSession(input: {
       const response = await fetch(safeRefreshHref, {
         method: 'POST',
         credentials: 'same-origin',
-        redirect: 'follow',
+        redirect: 'error',
         headers: { accept: 'application/json' },
         signal: input.signal,
       });
@@ -88,10 +88,6 @@ export async function refreshPortalSession(input: {
         continue;
       }
       if (!response.ok) return { status: 'failed' };
-      if (response.redirected) {
-        const followedRedirect = safeRefreshDestination(response.url, input.baseHref);
-        return followedRedirect ? { status: 'refreshed', href: followedRedirect } : { status: 'failed' };
-      }
       return safeNextHref ? { status: 'refreshed', href: safeNextHref } : { status: 'failed' };
     } catch (error) {
       if (isAbort(error, input.signal)) return { status: 'aborted' };

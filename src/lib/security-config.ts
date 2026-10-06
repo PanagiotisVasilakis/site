@@ -34,7 +34,7 @@ export interface SecurityConfig {
       includeSubDomains: boolean;
       preload: boolean;
     };
-    frameOptions: 'DENY' | 'SAMEORIGIN' | 'ALLOW-FROM';
+    frameOptions: 'DENY' | 'SAMEORIGIN';
     contentTypeOptions: boolean;
     referrerPolicy:
       | 'no-referrer'
@@ -66,17 +66,7 @@ export interface SecurityConfig {
     credentials: boolean;
     maxAge: number;
   };
-  apiSecurity: {
-    inputValidation: {
-      maxPayloadSize: number;
-      allowedContentTypes: string[];
-    };
-  };
 }
-
-// The map's routing client (LeafletMap) calls NEXT_PUBLIC_OSRM_BASE_URL with the
-// same default; the environment schema rejects a malformed value at startup.
-const osrmOrigin = new URL(process.env.NEXT_PUBLIC_OSRM_BASE_URL || 'https://router.project-osrm.org').origin;
 
 // Environment-specific configurations
 const developmentConfig: SecurityConfig = {
@@ -85,10 +75,10 @@ const developmentConfig: SecurityConfig = {
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
-      fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
-      connectSrc: ["'self'", osrmOrigin, "wss:", "ws:"],
+      fontSrc: ["'self'", "data:"],
+      connectSrc: ["'self'", "wss:", "ws:"],
       frameSrc: ["'self'"],
       manifestSrc: ["'self'"],
       workerSrc: ["'self'", "blob:"],
@@ -125,16 +115,10 @@ const developmentConfig: SecurityConfig = {
   },
   cors: {
     origins: ['http://localhost:3000', 'http://127.0.0.1:3000'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type'],
     credentials: true,
     maxAge: 86400,
-  },
-  apiSecurity: {
-    inputValidation: {
-      maxPayloadSize: 1024 * 1024, // 1MB
-      allowedContentTypes: ['application/json'],
-    },
   },
 };
 
@@ -143,13 +127,11 @@ const productionConfig: SecurityConfig = {
     reportOnly: false, // Enforce in production
     directives: {
       defaultSrc: ["'self'"],
-      // unsafe-inline remains as fallback for static localized pages that cannot
-      // receive a per-request nonce. Nonce-enabled routes strip it in buildCSPDirective.
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "https:", "blob:"],
-      fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
-      connectSrc: ["'self'", osrmOrigin],
+      fontSrc: ["'self'", "data:"],
+      connectSrc: ["'self'"],
       frameSrc: ["'none'"],
       manifestSrc: ["'self'"],
       workerSrc: ["'self'", "blob:"],
@@ -165,7 +147,9 @@ const productionConfig: SecurityConfig = {
       enabled: true,
       maxAge: 63072000, // 2 years
       includeSubDomains: true,
-      preload: true,
+      // Off by owner decision (R-227): the preload list is hard to leave and
+      // commits every subdomain of the registrable domain to HTTPS.
+      preload: false,
     },
     frameOptions: 'DENY',
     contentTypeOptions: true,
@@ -188,15 +172,9 @@ const productionConfig: SecurityConfig = {
   cors: {
     origins: process.env.ALLOWED_ORIGINS?.split(',').map((origin) => origin.trim()).filter(Boolean) || [],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'X-API-Key'],
+    allowedHeaders: ['Content-Type'],
     credentials: true,
     maxAge: 86400,
-  },
-  apiSecurity: {
-    inputValidation: {
-      maxPayloadSize: 512 * 1024, // 512KB in production (more restrictive)
-      allowedContentTypes: ['application/json'],
-    },
   },
 };
 
@@ -276,7 +254,6 @@ export interface SecurityEvent {
   severity: 'low' | 'medium' | 'high' | 'critical';
   timestamp: string;
   ip: string;
-  userAgent?: string;
   url: string;
   details: Record<string, unknown>;
 }

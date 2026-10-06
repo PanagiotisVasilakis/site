@@ -7,7 +7,6 @@ interface ErrorContext {
   url: string;
   timestamp: string;
   buildVersion?: string;
-  environment?: 'development' | 'staging' | 'production';
 }
 
 interface ErrorReport {
@@ -68,7 +67,6 @@ class ErrorReporter {
       url: window.location.href,
       timestamp: new Date().toISOString(),
       buildVersion: process.env.NEXT_PUBLIC_BUILD_VERSION,
-      environment: process.env.NODE_ENV as 'development' | 'staging' | 'production',
     };
   }
 

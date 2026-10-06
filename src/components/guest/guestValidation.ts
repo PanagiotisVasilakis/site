@@ -1,6 +1,12 @@
 export type GuestMode = 'signin' | 'signup';
 export type GuestOrigin = 'GR' | 'ABROAD' | '';
 
+/**
+ * Legacy query names that once carried a claim token (docs/security/claim-token-transport.md). No value
+ * is accepted from them; the guest client removes them from history and links never carry them forward.
+ */
+export const LEGACY_CLAIM_QUERY_PARAMS = ['claim', 'claimToken'] as const;
+
 export function isGuestFormValid(
   mode: GuestMode,
   values: {

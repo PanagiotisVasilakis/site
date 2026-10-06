@@ -1,0 +1,510 @@
+/* UI primitives (docs/design/identity.md §8): Button, IconButton, Segmented, Chip, Section.
+   Unlayered (O38); the two-class colour rules (0,2,0) date from the legacy cascade that R3-V12b deleted, and
+   are kept as they are. Motion is gated (§5.2). */
+
+/* Focus ring (§8): 3 px `focus`, 3 px offset. Declared before the variants so the primary glow survives. */
+.ui-btn:focus-visible,
+.ui-icon-btn:focus-visible,
+.ui-seg__item:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+  box-shadow: none;
+}
+
+/* Button */
+.ui-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5em;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  font-family: var(--font-text);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: .005em;
+  text-decoration: none;
+  text-transform: none;
+  white-space: nowrap;
+  cursor: pointer;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.ui-btn.ui-btn--sm { min-height: 40px; padding: 0 16px; font-size: .9375rem; }
+.ui-btn.ui-btn--md { min-height: 48px; padding: 0 22px; font-size: 1rem; }
+.ui-btn.ui-btn--lg { min-height: 56px; padding: 0 28px; font-size: 1.0625rem; }
+.ui-btn.ui-btn--block { width: 100%; }
+
+.ui-btn.ui-btn--primary {
+  background: var(--color-primary);
+  color: var(--color-primary-fg);
+  box-shadow: var(--shadow-primary-glow);
+}
+.ui-btn.ui-btn--secondary {
+  background: var(--color-surface);
+  color: var(--color-accent);
+  border-color: var(--color-border-strong);
+}
+.ui-btn.ui-btn--ghost {
+  background: transparent;
+  color: var(--color-fg);
+}
+.ui-btn.ui-btn--glass {
+  background: rgb(255 248 238 / .12);
+  color: var(--color-fg-on-photo);
+  border-color: rgb(255 248 238 / .5);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.ui-btn.ui-btn--on-band {
+  background: var(--color-band-accent);
+  color: var(--color-band-accent-fg);
+}
+.ui-btn.ui-btn--outline-on-band {
+  background: transparent;
+  color: var(--color-band-fg);
+  border-color: rgb(246 239 228 / .45);
+}
+.ui-btn.ui-btn--link-arrow {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: .28em;
+  overflow: visible;
+}
+.ui-btn.ui-btn--glass:focus-visible,
+.ui-btn.ui-btn--on-band:focus-visible,
+.ui-btn.ui-btn--outline-on-band:focus-visible {
+  outline-color: var(--color-band-focus);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ui-btn.ui-btn--primary:hover { background: var(--color-primary-hover); }
+  .ui-btn.ui-btn--secondary:hover { background: var(--color-bg); color: var(--color-accent-hover); }
+  .ui-btn.ui-btn--ghost:hover { text-decoration: underline; text-underline-offset: .28em; }
+  .ui-btn.ui-btn--glass:hover { background: rgb(255 248 238 / .22); }
+  .ui-btn.ui-btn--outline-on-band:hover { background: rgb(246 239 228 / .1); }
+  .ui-btn.ui-btn--link-arrow:hover { color: var(--color-accent-hover); }
+}
+
+.ui-btn:disabled,
+.ui-btn[aria-disabled="true"] {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+/* IconButton: 44 px circle, 1 px border */
+.ui-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+.ui-icon-btn.ui-icon-btn { color: var(--color-fg); }
+.ui-icon-btn.ui-icon-btn--on-photo {
+  background: rgb(255 248 238 / .12);
+  color: var(--color-fg-on-photo);
+  border-color: rgb(255 248 238 / .5);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.ui-icon-btn.ui-icon-btn--on-photo:focus-visible { outline-color: var(--color-band-focus); }
+.ui-icon-btn:disabled { opacity: .55; cursor: default; }
+@media (hover: hover) and (pointer: fine) {
+  .ui-icon-btn.ui-icon-btn:hover:not(:disabled):not(.ui-icon-btn--on-photo) { background: var(--color-surface-sunken); }
+}
+
+/* Segmented: pill container, items ≥ 36 px; selected = surface + fg + shadow-rest */
+.ui-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-sunken);
+}
+.ui-seg .ui-seg__item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  min-width: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-fg-muted);
+  font-family: var(--font-text);
+  font-size: .8125rem;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+}
+.ui-seg .ui-seg__item[aria-pressed="true"],
+.ui-seg .ui-seg__item[aria-current="true"] {
+  background: var(--color-surface);
+  color: var(--color-fg);
+  box-shadow: var(--shadow-rest);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ui-seg .ui-seg__item:hover { color: var(--color-fg); }
+}
+
+/* Chip (§8): 40 px pill toggle; pressed = fg fill with bg text. */
+.ui-chip:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+}
+.ui-chip.ui-chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-fg);
+  font-family: var(--font-text);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ui-chip.ui-chip[aria-pressed="true"] {
+  border-color: var(--color-fg);
+  background: var(--color-fg);
+  color: var(--color-bg);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ui-chip.ui-chip:hover:not([aria-pressed="true"]) { background: var(--color-surface-sunken); }
+}
+
+/* Section (§8), default variant: head = Eyebrow + Title (d2) + Lead. */
+.ui-section {
+  position: relative;
+  max-width: calc(var(--container) + 2 * var(--gutter));
+  margin: 0 auto;
+  padding: var(--space-section) var(--gutter);
+}
+.ui-section__head {
+  max-width: 900px;
+  margin-bottom: 40px;
+}
+.ui-section .ui-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: .7em;
+  margin: 0 0 16px;
+  font-family: var(--font-text);
+  font-size: var(--text-label);
+  font-weight: 600;
+  line-height: var(--text-label--line-height);
+  letter-spacing: var(--text-label--letter-spacing);
+  text-transform: uppercase;
+  color: var(--color-primary-text);
+}
+.ui-section .ui-eyebrow::before {
+  content: "";
+  width: 28px;
+  height: 1px;
+  background: currentColor;
+  opacity: .7;
+}
+/* §2.6: Greek labels stay in sentence case, 14 px (tracking comes from base.css). */
+.ui-section .ui-eyebrow:lang(el) {
+  font-size: .875rem;
+  text-transform: none;
+}
+.ui-section .ui-section__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-d2);
+  font-weight: 400;
+  line-height: var(--text-d2--line-height);
+  letter-spacing: var(--text-d2--letter-spacing);
+  color: var(--color-fg);
+  text-wrap: balance;
+}
+.ui-section .ui-section__em {
+  font-style: italic;
+  color: var(--color-primary-text);
+}
+.ui-section .ui-section__lead {
+  max-width: 38em;
+  margin: 20px 0 0;
+  font-size: var(--text-lead);
+  line-height: var(--text-lead--line-height);
+  color: var(--color-fg-muted);
+  text-wrap: pretty;
+}
+
+/* Section `band` and `warm` variants: full-bleed backgrounds, content kept to the container by padding. */
+.ui-section.ui-section--band,
+.ui-section.ui-section--warm {
+  max-width: none;
+  padding-inline: max(var(--gutter), calc((100% - var(--container)) / 2));
+  color: var(--color-band-fg);
+}
+.ui-section.ui-section--band { background: var(--color-band-bg); }
+.ui-section.ui-section--warm {
+  background: radial-gradient(120% 140% at 85% 0%, var(--color-warm-1) 0%, var(--color-warm-2) 55%, var(--color-warm-3) 100%);
+}
+.ui-section--band .ui-section__head .ui-eyebrow,
+.ui-section--band .ui-section__head .ui-section__em,
+.ui-section--warm .ui-section__head .ui-section__em { color: var(--color-band-accent); }
+.ui-section--warm .ui-section__head .ui-eyebrow { color: var(--color-warm-muted); }
+.ui-section--band .ui-section__head .ui-section__title,
+.ui-section--warm .ui-section__head .ui-section__title { color: var(--color-band-fg); }
+.ui-section--band .ui-section__head .ui-section__lead { color: var(--color-band-muted); }
+.ui-section--warm .ui-section__head .ui-section__lead { color: var(--color-warm-muted); }
+
+/* Section `plain` variant (§9.3 information blocks, from R3-V7): d3 title, fg-muted body, 65ch, no page
+   padding (it sits inside the page layout). Two classes (0,2,0) so it overrides the default rules above. */
+.ui-section.ui-section--plain {
+  display: grid;
+  gap: 12px;
+  max-width: 65ch;
+  margin: 0;
+  padding: 0;
+}
+.ui-section.ui-section--plain .ui-section__head { max-width: none; margin-bottom: 0; }
+.ui-section.ui-section--plain .ui-section__title {
+  font-size: var(--text-d3);
+  line-height: var(--text-d3--line-height);
+  letter-spacing: var(--text-d3--letter-spacing);
+}
+.ui-section.ui-section--plain .ui-section__body {
+  display: grid;
+  gap: 10px;
+  color: var(--color-fg-muted);
+  font-family: var(--font-text);
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
+  text-wrap: pretty;
+}
+/* Paragraph leading the legacy `p` rule gave (R3-V12a), at its specificity (0,0,1). */
+:where(.ui-section--plain .ui-section__body) p { line-height: 1.5; }
+.ui-section.ui-section--plain .ui-section__list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+.ui-section.ui-section--plain .ui-section__list--plain { padding-left: 0; list-style: none; }
+.ui-section.ui-section--plain .ui-section__link {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: .2em;
+}
+@media (hover: hover) and (pointer: fine) {
+  .ui-section.ui-section--plain .ui-section__link:hover { color: var(--color-accent-hover); }
+}
+
+/* Callout (§8): icon + note on the info / warning tokens, radius-tile, padding 12/14 */
+.ui-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-tile);
+  font-family: var(--font-text);
+  font-size: .9375rem;
+  line-height: 1.45;
+}
+.ui-callout.ui-callout--info { background: var(--color-info-bg); color: var(--color-accent); }
+.ui-callout.ui-callout--warning { background: var(--color-warning-bg); color: var(--color-warning); }
+.ui-callout.ui-callout--success { background: var(--color-success-bg); color: var(--color-success); }
+.ui-callout.ui-callout--danger { background: var(--color-danger-bg); color: var(--color-danger); }
+.ui-callout__icon { flex: none; margin-top: 1px; }
+.ui-callout__body { display: grid; gap: 4px; min-width: 0; }
+.ui-callout .ui-callout__text { margin: 0; line-height: 1.5; }
+
+/* Field (§8, from R3-V9): label 15 px 600 above; input 48 px, radius-field, surface, 1 px border-control;
+   hint 13 px fg-muted. The input rules use two classes (0,2,0) to beat legacy element rules. */
+.ui-field { display: grid; gap: 6px; min-width: 0; }
+.ui-field .ui-field__label {
+  font-family: var(--font-text);
+  font-size: .9375rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--color-fg);
+}
+.ui-field__input.ui-field__input {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border-control);
+  border-radius: var(--radius-field);
+  background: var(--color-surface);
+  color: var(--color-fg);
+  font-family: var(--font-text);
+  font-size: 1rem;
+  line-height: 1.4;
+}
+.ui-field__input.ui-field__input:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+  box-shadow: none;
+}
+.ui-field__input.ui-field__input[aria-invalid="true"] { border: 2px solid var(--color-danger); }
+/* §3.2: placeholders in fg-muted (replaces the legacy slate placeholder colour, R3-V12a). */
+.ui-field__input.ui-field__input::placeholder { color: var(--color-fg-muted); opacity: 1; }
+.ui-field .ui-field__hint {
+  margin: 0;
+  font-size: .8125rem;
+  line-height: 1.4;
+  color: var(--color-fg-muted);
+}
+
+/* M18 buttons (motion-gated): lift and a warm glint on primary for fine pointers; press scale. */
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-motion="full"] .ui-btn {
+    transition: background-color var(--dur-ui) var(--ease-glide), color var(--dur-ui), transform var(--dur-micro) var(--ease-glide), translate 600ms var(--ease-shutter);
+  }
+  :root[data-motion="full"] .ui-btn:active:not(:disabled) { transform: scale(.98); }
+  :root[data-motion="full"] .ui-btn.ui-btn--primary::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(100deg, transparent 30%, rgb(255 236 210 / .35) 50%, transparent 70%);
+    transform: translateX(-120%);
+    transition: transform 700ms var(--ease-glide);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    :root[data-motion="full"] .ui-btn:not(.ui-btn--link-arrow):hover:not(:disabled) { transform: translateY(-2px); }
+    :root[data-motion="full"] .ui-btn.ui-btn--primary:hover::after { transform: translateX(120%); }
+    /* M30 magnetic primary (R3-V14): pointerEffectsRuntime.ts writes --pull-x/--pull-y (≤ 6 px) while the pointer is
+       on the button; the individual `translate` composes with the lift and press transforms, and springs back. */
+    :root[data-motion="full"] .ui-btn.ui-btn--primary[data-magnet-active] {
+      translate: var(--pull-x, 0px) var(--pull-y, 0px);
+      transition: background-color var(--dur-ui) var(--ease-glide), color var(--dur-ui), transform var(--dur-micro) var(--ease-glide), translate 140ms var(--ease-glide);
+    }
+    /* link-arrow (§8): the arrow nudges 4 px. */
+    :root[data-motion="full"] .ui-btn--link-arrow .ui-btn__arrow { transition: transform var(--dur-micro) var(--ease-glide); }
+    :root[data-motion="full"] .ui-btn--link-arrow:hover .ui-btn__arrow { transform: translateX(4px); }
+  }
+  :root[data-motion="full"] .ui-seg .ui-seg__item,
+  :root[data-motion="full"] .ui-chip {
+    transition: background-color var(--dur-ui) var(--ease-glide), color var(--dur-ui), border-color var(--dur-ui);
+  }
+}
+
+/* Chip count (§8): tabular, fg-muted; 80 % opacity on the pressed chip. */
+.ui-chip .ui-chip__count.ui-chip__count {
+  margin-left: 2px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-fg-muted);
+}
+.ui-chip[aria-pressed="true"] .ui-chip__count.ui-chip__count {
+  color: inherit;
+  opacity: .8;
+}
+
+/* EmptyPanel, `panel` variant (§8): icon, title, text, one action. */
+.ui-empty {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 44px 24px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  text-align: center;
+}
+.ui-empty .ui-empty__icon.ui-empty__icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 4px;
+  border-radius: 50%;
+  background: var(--color-primary-tint);
+  color: var(--color-primary-text);
+}
+.ui-empty .ui-empty__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-d3);
+  font-weight: 400;
+  line-height: var(--text-d3--line-height);
+  color: var(--color-fg);
+}
+.ui-empty .ui-empty__text {
+  max-width: 34em;
+  margin: 0;
+  color: var(--color-fg-muted);
+}
+.ui-empty .ui-empty__action { margin-top: 10px; }
+
+/* Toast (§8): bottom centre, surface-raised, shadow-overlay, radius-tile; role="status". */
+.ui-toasts {
+  position: fixed;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  left: 50%;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  pointer-events: none;
+  translate: -50% 0;
+}
+.ui-toasts .ui-toast {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 6px 6px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-tile);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-overlay);
+  color: var(--color-fg);
+  font-family: var(--font-text);
+  font-size: var(--text-caption);
+  pointer-events: auto;
+}
+.ui-toasts .ui-toast__close {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  min-width: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+}
+.ui-toasts .ui-toast__close:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 0;
+  box-shadow: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .ui-toasts .ui-toast__close:hover { background: var(--color-surface-sunken); color: var(--color-fg); }
+}

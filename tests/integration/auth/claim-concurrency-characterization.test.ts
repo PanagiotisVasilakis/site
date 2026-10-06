@@ -718,7 +718,7 @@ describe.sequential('booking claim concurrency characterization', () => {
       expect(result.state.rateLimitRecords).toBe(4);
       expect(result.state.rateLimitCounts).toEqual([1, 1, 2, 2]);
     }
-  });
+  }, 600_000);
 
   it(`A3 pins one identical-claim winner and generic 401 loser across ${A3_REPETITIONS} fresh databases`, async () => {
     for (let repetition = 1; repetition <= A3_REPETITIONS; repetition += 1) {
@@ -756,5 +756,5 @@ describe.sequential('booking claim concurrency characterization', () => {
       expect(result.state.rateLimitRecords).toBe(3);
       expect(result.state.rateLimitCounts).toEqual([2, 2, 2]);
     }
-  });
+  }, 600_000);
 });

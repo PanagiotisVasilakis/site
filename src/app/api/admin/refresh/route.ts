@@ -20,7 +20,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   
   const loginAt = payload.login_at;
   const sessionId = payload.session_id;
-  if (!loginAt || !sessionId || Date.now() / 1000 - loginAt > 86400) {
+  if (!loginAt || !sessionId) {
     return NextResponse.json({ error: 'Token too old' }, { status: 401 });
   }
 

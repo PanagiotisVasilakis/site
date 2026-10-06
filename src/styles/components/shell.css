@@ -1,0 +1,563 @@
+/* Site shell (docs/design/identity.md §4.5, §8): body, SiteHeader, MobileMenu, SiteFooter, MotionSwitch.
+   Unlayered (O38); the two-class colour rules (0,2,0) date from the legacy cascade that R3-V12b deleted, and
+   are kept as they are. */
+
+/* §4.5: tokens and paper grain on <body> (a class, not an element selector) */
+.site-body {
+  background: var(--grain) 0 0 / 160px repeat, var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-text);
+  /* No faux bold or italic (Greek in particular, §2.4); inherited by every element. Moved from the legacy
+     html/body rules (R3-V12a) together with the text rendering hint. */
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  transition: none;
+}
+.site-main { padding-bottom: env(safe-area-inset-bottom); }
+
+/* Skip link (§9): first focus stop of every public page, visible only while focused. */
+.skip-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  padding: 12px 16px;
+  border-radius: 0 0 var(--radius-field) var(--radius-field);
+  background: var(--color-accent);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+.skip-link.skip-link { color: var(--color-accent-fg); }
+.skip-link:focus-visible {
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip-path: none;
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+  box-shadow: none;
+}
+
+/* PWA update banner and iOS add-to-home tip ([locale]/layout.tsx): a toast-like pill at the bottom centre.
+   No `display` here: the `hidden` utility hides it until PwaManager sets an inline `display: flex`. */
+.pwa-banner {
+  position: fixed;
+  bottom: calc(8px + env(safe-area-inset-bottom));
+  left: 50%;
+  z-index: 50;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+  padding: 6px 6px 6px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-overlay);
+  font-family: var(--font-text);
+  font-size: var(--text-caption);
+  translate: -50% 0;
+}
+.pwa-banner.pwa-banner { color: var(--color-fg); }
+.pwa-banner .pwa-banner__actions { display: flex; align-items: center; gap: 4px; }
+
+.shell-link:focus-visible,
+.motion-switch__button:focus-visible,
+.mobile-menu__account-link:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+  box-shadow: none;
+}
+
+/* SiteHeader: sticky glass pill, 56 px, 10 px from the top and the gutters */
+.site-header {
+  position: sticky;
+  top: var(--header-offset);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: var(--header-h);
+  margin: var(--header-offset) var(--gutter) 0;
+  padding: 0 5px 0 10px;
+  /* Transparent bar like the original site (O43): a light tint + blur, the border appears only after scrolling. */
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: var(--color-glass);
+  box-shadow: var(--shadow-rest);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.site-header.site-header { color: var(--color-fg); }
+/* Home starts with a full-bleed photo: the header floats over it (shellLinks HERO_ROUTES). */
+.site-header.site-header--overlay { margin-bottom: calc(-1 * (var(--header-h) + var(--header-offset))); }
+.site-header.is-scrolled { border-color: var(--color-border); box-shadow: var(--shadow-raised); }
+/* Over a photo the transparent bar cannot guarantee contrast (dark foliage behind dark text measures 2.3:1),
+   so text and icons get a soft halo in the page background colour (light halo in day, dark halo at night). */
+.site-header.site-header--overlay .site-brand,
+.site-header.site-header--overlay .site-nav__link {
+  text-shadow: 0 0 2px var(--color-bg), 0 0 5px var(--color-bg);
+}
+/* The wordmark box clips overflow (ellipsis); room for the halo inside the clip, same outer size. */
+.site-header.site-header--overlay .site-brand__text { padding: 3px 6px; margin: -3px -6px; }
+.site-header.site-header--overlay .site-brand svg,
+.site-header.site-header--overlay .ui-icon-btn svg {
+  filter: drop-shadow(0 0 2px var(--color-bg));
+}
+/* fg-muted on the transparent bar is 3.81:1 at night; the place line uses fg in the header. */
+.site-header .site-brand .site-brand__place { color: var(--color-fg); }
+/* M31 scroll-progress hairline (marketing header only): decorative, shown only by the motion gate below. */
+.site-header .site-header__progress { display: none; }
+
+.site-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-right: auto;
+  text-decoration: none;
+}
+.site-header .site-brand { color: var(--color-fg); }
+.site-brand__mark {
+  flex: none;
+  width: 35px;
+  height: 22px;
+}
+.site-brand__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.05;
+}
+.site-brand .site-brand__name,
+.site-footer .site-brand__name {
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 1.1875rem;
+  font-style: italic;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: inherit;
+}
+.site-brand .site-brand__place {
+  color: var(--color-fg-muted);
+  font-size: .75rem;
+  font-weight: 600;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+/* §2.6: no uppercase in Greek; sentence case with .04em tracking */
+.site-brand .site-brand__place:lang(el) {
+  letter-spacing: .04em;
+  text-transform: none;
+}
+
+.site-nav {
+  display: none;
+  align-items: center;
+  gap: 16px;
+}
+.site-nav .site-nav__link {
+  padding: 6px 2px;
+  border-bottom: 1.5px solid transparent;
+  color: var(--color-fg);
+  font-size: .9375rem;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.site-nav .site-nav__link[aria-current="page"] { border-bottom-color: var(--color-primary); }
+@media (hover: hover) and (pointer: fine) {
+  .site-nav .site-nav__link:hover { border-bottom-color: var(--color-primary); }
+}
+
+.site-header__tools {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+.site-header .site-header__lang,
+.site-header .site-header__cta,
+.site-header .site-header__account { display: none; }
+
+/* CTA at ≥ sm (§4.4); the header LanguageSwitch from md, below that it is in the menu (room for the wordmark). */
+@media (min-width: 640px) {
+  .site-header .site-header__cta { display: inline-flex; }
+}
+@media (min-width: 768px) {
+  .site-header .site-header__lang { display: inline-flex; }
+}
+/* §4.4 puts the nav at lg; it moves to xl because the Greek marketing nav plus the tools does not fit the
+   pill at 1024 px (the wordmark was cut by 99 px). Until xl the menu button carries the nav. */
+@media (min-width: 1024px) {
+  .site-header { padding: 0 6px 0 16px; }
+}
+@media (min-width: 1280px) {
+  .site-nav { display: flex; gap: 24px; }
+  .site-header .site-header__account { display: inline-flex; }
+  .site-header .site-header__menu-btn { display: none; }
+}
+
+/* MobileMenu: modal <dialog>, a sheet from the right */
+.mobile-menu {
+  position: fixed;
+  inset: 0 0 0 auto;
+  width: min(88vw, 380px);
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 0;
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-overlay);
+}
+.mobile-menu.mobile-menu { color: var(--color-fg); }
+.mobile-menu::backdrop { background: rgb(var(--scrim) / .45); }
+:root:has(.mobile-menu[open]) { overflow: hidden; }
+
+.mobile-menu__sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-height: 100%;
+  padding: 10px 20px calc(24px + env(safe-area-inset-bottom));
+}
+.mobile-menu__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--header-h);
+}
+.mobile-menu .mobile-menu__title {
+  margin: 0;
+  color: var(--color-fg-muted);
+  font-size: .8125rem;
+  font-weight: 600;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.mobile-menu .mobile-menu__title:lang(el) {
+  font-size: .875rem;
+  letter-spacing: .04em;
+  text-transform: none;
+}
+.mobile-menu__nav {
+  display: flex;
+  flex-direction: column;
+}
+.mobile-menu .mobile-menu__link {
+  display: block;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-fg);
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  font-weight: 400;
+  line-height: 1.2;
+  text-decoration: none;
+}
+.mobile-menu .mobile-menu__link[aria-current="page"] {
+  text-decoration: underline;
+  text-decoration-color: var(--color-primary);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 6px;
+}
+.mobile-menu__contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.mobile-menu__account {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.mobile-menu .mobile-menu__account-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-fg);
+  font-family: var(--font-text);
+  font-size: 1rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+}
+.mobile-menu__prefs {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+/* SiteFooter */
+.site-footer {
+  position: relative;
+  margin-top: var(--space-section);
+  padding: 0 0 calc(48px + env(safe-area-inset-bottom));
+}
+.site-footer.site-footer { color: var(--color-fg); }
+.site-footer__waves {
+  display: block;
+  width: 100%;
+  height: 40px;
+  margin-bottom: 32px;
+  fill: none;
+  stroke: var(--color-border-strong);
+  stroke-width: 1.4;
+}
+.site-footer__inner {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  align-items: start;
+  gap: 28px 48px;
+  width: min(100% - 2 * var(--gutter), var(--container));
+  margin-inline: auto;
+}
+.site-footer .site-footer__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+.site-footer__nav,
+.site-footer__list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.site-footer .site-footer__heading {
+  margin: 0 0 8px;
+  color: var(--color-fg-muted);
+  font-size: .8125rem;
+  font-weight: 600;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.site-footer .site-footer__heading:lang(el) {
+  font-size: .875rem;
+  letter-spacing: .04em;
+  text-transform: none;
+}
+.site-footer .site-footer__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  color: var(--color-fg);
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+.site-footer .site-footer__stay {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: start;
+  color: var(--color-accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: .28em;
+}
+/* 44 px targets on phones and touch screens (identity §4.4), as the legacy global rule gave them (R3-V12a). */
+@media (max-width: 640px), (hover: none), (pointer: coarse) {
+  .site-footer .site-footer__stay { min-height: 44px; }
+}
+@media (hover: none), (pointer: coarse) {
+  .site-header .site-brand { min-height: 44px; }
+}
+@media (hover: hover) and (pointer: fine) {
+  .site-footer .site-footer__link:hover { text-decoration: underline; text-underline-offset: .28em; }
+  .site-footer .site-footer__stay:hover { color: var(--color-accent-hover); }
+}
+.site-footer__prefs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+}
+.site-footer .site-footer__legal {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 24px;
+  margin: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+  font-size: .9375rem;
+}
+@media (min-width: 1024px) {
+  .site-footer--marketing .site-footer__inner { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .site-footer--marketing .site-footer__stay { grid-column: span 2; align-self: start; }
+  .site-footer__prefs { justify-content: flex-end; }
+  .site-footer--stay .site-footer__inner { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: center; }
+}
+
+/* MotionSwitch (footer and menu) */
+.motion-switch {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.motion-switch .motion-switch__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-fg);
+  font-family: var(--font-text);
+  font-size: .9375rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.motion-switch .motion-switch__button[aria-pressed="true"] {
+  border-color: var(--color-fg);
+  background: var(--color-fg);
+  color: var(--color-bg);
+}
+.motion-switch .motion-switch__button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+.motion-switch .motion-switch__note {
+  color: var(--color-fg-muted);
+  font-size: .8125rem;
+}
+@media (hover: hover) and (pointer: fine) {
+  .motion-switch .motion-switch__button:hover:not(:disabled):not([aria-pressed="true"]) { background: var(--color-surface-sunken); }
+}
+
+/* BookBar (§8): a fixed pill below lg; BookBar.tsx adds `is-shown`. Near-opaque so the text keeps its
+   contrast over any photo it floats above (design-tokens test, "bookbar" rows). */
+.bookbar {
+  position: fixed;
+  z-index: 60;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  left: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 8px 8px 18px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--color-surface-raised) 90%, transparent);
+  box-shadow: var(--shadow-raised);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  backdrop-filter: blur(16px) saturate(1.2);
+  visibility: hidden;
+}
+.bookbar.is-shown { visibility: visible; }
+@media (min-width: 1024px) {
+  .bookbar { display: none; }
+}
+.bookbar .bookbar__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-caption);
+  line-height: 1.2;
+  color: var(--color-fg-muted);
+}
+.bookbar .bookbar__value {
+  margin: 0 .1em;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-fg);
+}
+.bookbar .bookbar__note { font-size: .8125rem; color: var(--color-fg-muted); }
+/* The footer clears the bar (§8 SiteFooter). */
+@media (max-width: 1023.98px) {
+  :root:has(.bookbar) .site-footer.site-footer { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  /* Keyboard focus scrolls a control above the shown bar, not under it (WCAG 2.4.11; R3-V13 keyboard pass
+     found the footer controls fully covered on home and apartment). */
+  :root:has(.bookbar.is-shown) { scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+}
+
+/* Motion (gated, §5.2): header shadow, M23 menu sheet entry via @starting-style, M22 BookBar slide */
+@media (prefers-reduced-motion: no-preference) {
+  :root[data-motion="full"] .bookbar {
+    transform: translateY(160%);
+    transition: transform var(--dur-ui) var(--ease-glide), visibility 0s linear var(--dur-ui);
+  }
+  :root[data-motion="full"] .bookbar.is-shown {
+    transform: none;
+    transition: transform var(--dur-ui) var(--ease-glide), visibility 0s;
+  }
+  :root[data-motion="full"] .site-header { transition: box-shadow var(--dur-ui) var(--ease-glide); }
+  :root[data-motion="full"] .mobile-menu[open] { transition: translate var(--dur-ui) var(--ease-glide); }
+  :root[data-motion="full"] .mobile-menu[open]::backdrop { transition: opacity var(--dur-ui) var(--ease-glide); }
+  @starting-style {
+    :root[data-motion="full"] .mobile-menu[open] { translate: 100% 0; }
+    :root[data-motion="full"] .mobile-menu[open]::backdrop { opacity: 0; }
+  }
+
+  @supports (animation-timeline: scroll()) {
+    /* M31: a 2 px primary hairline along the bottom of the pill grows with the page scroll (transform only). */
+    :root[data-motion="full"] .site-header .site-header__progress {
+      position: absolute;
+      right: 16px;
+      bottom: -1px;
+      left: 16px;
+      display: block;
+      height: 2px;
+      border-radius: 1px;
+      background: var(--color-primary);
+      transform-origin: 0 50%;
+      pointer-events: none;
+      animation: header-progress linear both;
+      animation-timeline: scroll(root block);
+    }
+  }
+
+  @supports (animation-timeline: view()) {
+    /* M32: the marketing footer's waves drift sideways as the footer scrolls in (the path runs one period past
+       the viewBox, so the drift never shows its end). The calm stay footer keeps them still. */
+    :root[data-motion="full"] .site-footer--marketing { view-timeline: --site-footer block; }
+    :root[data-motion="full"] .site-footer--marketing .site-footer__waves path {
+      animation: footer-waves linear both;
+      animation-timeline: --site-footer;
+      animation-range: entry 0% entry 100%;
+    }
+  }
+}
+
+@keyframes header-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes footer-waves {
+  from { transform: translateX(-160px); }
+  to { transform: translateX(0); }
+}

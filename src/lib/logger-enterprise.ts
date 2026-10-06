@@ -1,6 +1,6 @@
 /**
  * Enterprise-grade structured logging system
- * Features: Correlation IDs, Performance monitoring, Error context, Sanitization
+ * Features: Correlation IDs, Error context, Sanitization
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -12,7 +12,6 @@ const asyncLocalStorage = new AsyncLocalStorage<Partial<LogContext>>();
 
 interface LogContext {
   correlationId: string;
-  requestId?: string;
   route?: string;
 }
 
@@ -33,25 +32,31 @@ interface LogEntry {
     code?: string | number;
     cause?: unknown;
   };
-  performance?: {
-    duration?: number;
-    memory?: {
-      used: number;
-      total: number;
-    };
-    cpu?: number;
-  };
 }
 
 interface LoggerConfig {
   level: LogLevel;
   enableConsole: boolean;
   enableStructured: boolean;
-  enablePerformanceMetrics: boolean;
   maxMetadataSize: number;
-  sensitiveFields: string[];
-  redactionPlaceholder: string;
 }
+
+const SENSITIVE_FIELDS = [
+  'password',
+  'token',
+  'secret',
+  'key',
+  'authorization',
+  'cookie',
+  'session',
+  'attestation',
+  'forwarded',
+  'connecting-ip',
+  'real-ip',
+  'verified-client-ip',
+];
+
+const REDACTION_PLACEHOLDER = '[REDACTED]';
 
 const LOG_LEVELS: Record<LogLevel, number> = {
   trace: 0,
@@ -64,31 +69,13 @@ const LOG_LEVELS: Record<LogLevel, number> = {
 
 class EnterpriseLogger {
   private config: LoggerConfig;
-  private startTime: number = Date.now();
 
-  constructor(config?: Partial<LoggerConfig>) {
+  constructor() {
     this.config = {
       level: (process.env.LOG_LEVEL as LogLevel) || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
       enableConsole: process.env.LOG_CONSOLE !== 'false',
       enableStructured: process.env.LOG_STRUCTURED === 'true',
-      enablePerformanceMetrics: process.env.LOG_PERFORMANCE === 'true',
       maxMetadataSize: parseInt(process.env.LOG_MAX_METADATA_SIZE || '1000', 10),
-      sensitiveFields: [
-        'password',
-        'token',
-        'secret',
-        'key',
-        'authorization',
-        'cookie',
-        'session',
-        'attestation',
-        'forwarded',
-        'connecting-ip',
-        'real-ip',
-        'verified-client-ip',
-      ],
-      redactionPlaceholder: '[REDACTED]',
-      ...config,
     };
   }
 
@@ -132,8 +119,8 @@ class EnterpriseLogger {
     const seen = new WeakSet<object>();
     const redactRecursively = (value: unknown, key = ''): unknown => {
       const lowerKey = key.toLowerCase();
-      const isSensitive = this.config.sensitiveFields.some((field) => lowerKey.includes(field.toLowerCase()));
-      if (isSensitive) return this.config.redactionPlaceholder;
+      const isSensitive = SENSITIVE_FIELDS.some((field) => lowerKey.includes(field.toLowerCase()));
+      if (isSensitive) return REDACTION_PLACEHOLDER;
       if (value instanceof Error) return { name: value.name, message: value.message };
       if (!value || typeof value !== 'object') return value;
       if (seen.has(value)) return '[CIRCULAR]';
@@ -161,31 +148,6 @@ class EnterpriseLogger {
     }
 
     return redacted;
-  }
-
-  /**
-   * Get performance metrics
-   */
-  private getPerformanceMetrics(): LogEntry['performance'] | undefined {
-    if (!this.config.enablePerformanceMetrics) return undefined;
-
-    try {
-      // Check if we're in Node.js environment with memory monitoring
-      if (typeof process !== 'undefined' && process.env?.NODE_ENV !== undefined && 
-          typeof globalThis.process?.memoryUsage === 'function') {
-        const memUsage = globalThis.process.memoryUsage();
-        return {
-          memory: {
-            used: memUsage.heapUsed,
-            total: memUsage.heapTotal,
-          },
-          duration: Date.now() - this.startTime,
-        };
-      }
-      return undefined;
-    } catch {
-      return undefined;
-    }
   }
 
   /**
@@ -233,7 +195,6 @@ class EnterpriseLogger {
       context: this.getContext(),
       metadata: metadata ? this.sanitizeMetadata(metadata) : undefined,
       error: this.formatError(error),
-      performance: this.getPerformanceMetrics(),
     };
   }
 
@@ -264,11 +225,6 @@ class EnterpriseLogger {
         method.apply(console, args as []);
       }
     }
-
-    // Here you could add integrations with external logging services:
-    // - Datadog, New Relic, Sentry, etc.
-    // - Custom log aggregation endpoints
-    // - File-based logging for server environments
   }
 
   // Public logging methods (the level check runs before any entry is built)
@@ -282,7 +238,7 @@ class EnterpriseLogger {
     this.output(this.createLogEntry('info', message, metadata));
   }
 
-  // Overloads for backward compatibility with old logger
+  // Supported forms: (message), (message, error) and (message, metadata, error?)
   warn(message: string): void;
   warn(message: string, error: unknown): void;
   warn(message: string, metadata: Record<string, unknown>, error?: unknown): void;
@@ -302,7 +258,7 @@ class EnterpriseLogger {
     }
   }
 
-  // Overloads for backward compatibility with old logger
+  // Supported forms: (message), (message, error) and (message, metadata, error?)
   error(message: string): void;
   error(message: string, error: unknown): void;
   error(message: string, metadata: Record<string, unknown>, error?: unknown): void;

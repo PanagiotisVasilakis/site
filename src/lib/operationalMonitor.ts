@@ -1,6 +1,9 @@
 import crypto from 'node:crypto';
 
+import { CALENDAR_STALE_ALERT_MINUTES, GUEST_DATA_RETENTION_MONTHS } from '@/data/stayPolicy';
+import { CALENDAR_SYNC_STATE_ID } from '@/lib/availability/calendarSync';
 import { prisma } from '@/lib/prisma';
+import { eraseGuestForRetention } from '@/lib/privacyService';
 
 type RuleDefinition = {
   name: string;
@@ -16,6 +19,8 @@ type RuleDefinition = {
 // A privacy erasure cancels undelivered events by marking them DEAD with the
 // payload replaced by { redacted: true }; those are not delivery failures.
 const ERASURE_CANCELLED_OUTBOX = { status: 'DEAD' as const, payload: { path: ['redacted'], equals: true } };
+
+const ONE_YEAR_MINUTES = 525_600;
 
 const RULES: RuleDefinition[] = [
   {
@@ -66,6 +71,26 @@ const RULES: RuleDefinition[] = [
       },
     }),
   },
+  {
+    name: 'Stale availability calendar',
+    description: 'The Airbnb calendar has not synced successfully for more than three hours.',
+    metricName: 'availability.calendar.stale_minutes',
+    comparison: 'gt',
+    threshold: CALENDAR_STALE_ALERT_MINUTES,
+    windowMinutes: 5,
+    severity: 'high',
+    // 0 while no calendar is configured; a missing state row reads as the cap.
+    read: async () => {
+      if (!process.env.AIRBNB_ICAL_URL) return 0;
+      const state = await prisma.calendarSyncState.findUnique({
+        where: { id: CALENDAR_SYNC_STATE_ID },
+        select: { lastSuccessAt: true, createdAt: true },
+      });
+      if (!state) return ONE_YEAR_MINUTES;
+      const since = state.lastSuccessAt ?? state.createdAt;
+      return Math.min(ONE_YEAR_MINUTES, Math.max(0, (Date.now() - since.getTime()) / 60_000));
+    },
+  },
 ];
 
 function breached(value: number, comparison: RuleDefinition['comparison'], threshold: number): boolean {
@@ -76,6 +101,7 @@ function breached(value: number, comparison: RuleDefinition['comparison'], thres
 }
 
 async function notifyAlert(input: {
+  url: string;
   id: string;
   rule: {
     name: string;
@@ -87,16 +113,9 @@ async function notifyAlert(input: {
   value: number;
   openedAt: Date;
 }): Promise<void> {
-  const url = process.env.ALERT_WEBHOOK_URL;
-  if (!url) {
-    if (process.env.ALERT_WEBHOOK_REQUIRED === '1') {
-      throw new Error('ALERT_WEBHOOK_URL is required but not configured');
-    }
-    return;
-  }
   const headers: HeadersInit = { 'content-type': 'application/json' };
   if (process.env.ALERT_WEBHOOK_TOKEN) headers.authorization = `Bearer ${process.env.ALERT_WEBHOOK_TOKEN}`;
-  const response = await fetch(url, {
+  const response = await fetch(input.url, {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -112,6 +131,7 @@ async function notifyAlert(input: {
         openedAt: input.openedAt.toISOString(),
       },
     }),
+    redirect: 'error',
     signal: AbortSignal.timeout(5_000),
   });
   if (!response.ok) throw new Error(`Alert webhook responded with ${response.status}`);
@@ -121,6 +141,7 @@ export async function evaluateOperationalAlerts(): Promise<{ opened: number; res
   let opened = 0;
   let resolved = 0;
   const notificationFailures: Error[] = [];
+  const webhookUrl = process.env.ALERT_WEBHOOK_URL;
 
   for (const definition of RULES) {
     const rule = await prisma.alertRule.upsert({
@@ -155,9 +176,9 @@ export async function evaluateOperationalAlerts(): Promise<{ opened: number; res
       if (!current) {
         opened += 1;
       }
-      if (!alert.notificationDeliveredAt && process.env.ALERT_WEBHOOK_URL) {
+      if (!alert.notificationDeliveredAt && webhookUrl) {
         try {
-          await notifyAlert({ id: alert.id, rule, value, openedAt: alert.openedAt });
+          await notifyAlert({ url: webhookUrl, id: alert.id, rule, value, openedAt: alert.openedAt });
           await prisma.alert.update({
             where: { id: alert.id },
             data: {
@@ -198,30 +219,78 @@ export async function evaluateOperationalAlerts(): Promise<{ opened: number; res
   return { opened, resolved, evaluated: RULES.length };
 }
 
+// Guests erased per operations run (every 5 minutes), so one run stays short.
+const RETENTION_ERASURE_BATCH = 25;
+const RETENTION_ERASURE_NOTE =
+  `Automatic retention: every booking of this guest ended more than ${GUEST_DATA_RETENTION_MONTHS} months ago.`;
+
 export async function runRetention(): Promise<Record<string, number>> {
   const now = Date.now();
   const days = (value: number) => new Date(now - value * 86_400_000);
-  const [rateLimits, sessions, tokens, families, grants, securityEvents, outbox, deadOutbox, adminSessions] = await prisma.$transaction([
+  const guestDataCutoff = new Date(now);
+  guestDataCutoff.setUTCMonth(guestDataCutoff.getUTCMonth() - GUEST_DATA_RETENTION_MONTHS);
+  const [
+    rateLimits, sessions, tokens, families, grants, securityEvents, outbox, deadOutbox, adminSessions,
+    checkInRequestsRedacted,
+  ] = await prisma.$transaction([
     prisma.rateLimit.deleteMany({ where: { resetTime: { lt: new Date() } } }),
     prisma.session.deleteMany({ where: { expiresAt: { lt: days(7) } } }),
     prisma.refreshToken.deleteMany({ where: { expiresAt: { lt: days(30) } } }),
     prisma.refreshTokenFamily.deleteMany({ where: { absoluteExpiresAt: { lt: days(30) } } }),
-    prisma.bookingClaimGrant.deleteMany({
-      where: {
-        expiresAt: { lt: days(30) },
-        OR: [{ consumedAt: { not: null } }, { revokedAt: { not: null } }],
-      },
-    }),
+    prisma.bookingClaimGrant.deleteMany({ where: { expiresAt: { lt: days(30) } } }),
     prisma.securityAuditEvent.deleteMany({ where: { occurredAt: { lt: days(90) } } }),
     prisma.outboxEvent.deleteMany({ where: { status: 'DELIVERED', deliveredAt: { lt: days(30) } } }),
     // Erasure-cancelled events at once; failed deliveries after 30 days (until
-    // then the admin can retry them, or close the stay request).
+    // then the admin can retry them).
     prisma.outboxEvent.deleteMany({
       where: { OR: [ERASURE_CANCELLED_OUTBOX, { status: 'DEAD', updatedAt: { lt: days(30) } }] },
     }),
     // Longer than claim-grant retention, so issued grants keep their admin-session link while they exist.
     prisma.adminSession.deleteMany({ where: { absoluteExpiresAt: { lt: days(90) } } }),
+    // Same fields as a guest erasure clears; rows already redacted are not rewritten.
+    prisma.checkInRequest.updateMany({
+      where: {
+        booking: { endDate: { lt: guestDataCutoff } },
+        OR: [
+          { guestName: { not: null } },
+          { guestEmail: { not: null } },
+          { guestPhone: { not: null } },
+          { message: { not: null } },
+        ],
+      },
+      data: { guestName: null, guestEmail: null, guestPhone: null, message: null },
+    }),
   ]);
+
+  // Accounts go through the same audited erasure as a manual one (privacy request,
+  // audit event, outbox cancellation, booking unlink). `some` keeps accounts without
+  // bookings out: `every` alone is true for them.
+  const expiredGuests = await prisma.user.findMany({
+    where: { bookings: { some: {}, every: { endDate: { lt: guestDataCutoff } } } },
+    select: { id: true },
+    orderBy: { createdAt: 'asc' },
+    take: RETENTION_ERASURE_BATCH,
+  });
+  let guestsErased = 0;
+  let guestErasuresSkipped = 0;
+  const erasureFailures: Error[] = [];
+  for (const guest of expiredGuests) {
+    try {
+      // The erasure re-checks the cutoff in its transaction: a guest who claimed a new
+      // booking after this findMany is skipped, not erased.
+      if (await eraseGuestForRetention(guest.id, RETENTION_ERASURE_NOTE, guestDataCutoff)) guestsErased += 1;
+      else guestErasuresSkipped += 1;
+    } catch (error) {
+      erasureFailures.push(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+  if (erasureFailures.length > 0) {
+    throw new AggregateError(
+      erasureFailures,
+      `${erasureFailures.length} retention guest erasure(s) failed: ${erasureFailures.map((error) => error.message).join('; ')}`,
+    );
+  }
+
   return {
     rateLimits: rateLimits.count,
     sessions: sessions.count,
@@ -232,5 +301,8 @@ export async function runRetention(): Promise<Record<string, number>> {
     outbox: outbox.count,
     deadOutbox: deadOutbox.count,
     adminSessions: adminSessions.count,
+    checkInRequestsRedacted: checkInRequestsRedacted.count,
+    guestsErased,
+    guestErasuresSkipped,
   };
 }

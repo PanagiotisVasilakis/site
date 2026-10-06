@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
-import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import {
   ApiError,
   ApiErrorCode,
@@ -21,8 +20,6 @@ const schema = z.object({
   auditNote: z.string().trim().min(3).max(1_024),
 }).strict();
 
-const guard = createAPISecurityMiddleware();
-
 // Right-to-erasure requests reach the host out of band; the host verifies the
 // guest and executes the erasure here. The audit note is kept on the
 // privacy request and the audit event records only a subject digest.
@@ -30,8 +27,6 @@ export const POST = withErrorHandler(async (
   request: NextRequest,
   context: { params: Promise<Record<string, string>> },
 ) => {
-  const early = await guard(request);
-  if (early) return early;
   if (!(await isAdminRequest(request))) {
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
   }
@@ -40,7 +35,7 @@ export const POST = withErrorHandler(async (
     throw new ApiError(ApiErrorCode.FORBIDDEN, 'Cross-origin admin mutation rejected');
   }
   const { userId } = await context.params;
-  if (!z.string().uuid().safeParse(userId).success) {
+  if (!z.uuid().safeParse(userId).success) {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Guest not found');
   }
   const parsed = schema.safeParse(await readJsonBody(request, 4 * 1_024));
@@ -53,6 +48,9 @@ export const POST = withErrorHandler(async (
     const code = error instanceof Error ? error.message : '';
     if (code === 'ERASURE_BLOCKED_BY_ACTIVE_DELIVERY') {
       throw new ApiError(ApiErrorCode.CONFLICT, 'Erasure is blocked while a related webhook delivery is active; retry shortly');
+    }
+    if (code === 'ERASURE_REQUEST_NOT_VERIFIED') {
+      throw new ApiError(ApiErrorCode.CONFLICT, 'The erasure request is not verified');
     }
     if (code === 'ERASURE_SUBJECT_NOT_FOUND' || code === 'ERASURE_REQUEST_NOT_FOUND') {
       throw new ApiError(ApiErrorCode.NOT_FOUND, 'Guest not found');

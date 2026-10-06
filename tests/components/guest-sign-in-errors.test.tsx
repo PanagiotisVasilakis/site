@@ -32,7 +32,7 @@ describe('guest sign-in errors', () => {
   it('names both causes of a refused sign-in: credentials or the access window', async () => {
     signIn(401, 'UNAUTHORIZED');
 
-    expect(await screen.findByText(/Check your phone number and password\. Access opens 7 days before check-in/u)).toBeInTheDocument();
+    expect(await screen.findByText(/Check your phone number and password\. Access opens about 7 days before check-in and closes shortly after the check-out date\./u)).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/api/portal/sessions', expect.objectContaining({ method: 'POST' }));
   });
 

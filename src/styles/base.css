@@ -1,0 +1,41 @@
+/* Base rules (docs/design/identity.md §2.4, §2.6, §8, §11). The legacy CSS (src/styles/01…13) that beat this
+   layer was deleted in R3-V12b; the component sheets are unlayered and still beat it (globals.css).
+
+   The body switch (§4.5 grain, bg, fg, font-text, font-synthesis) is the `.site-body` class in
+   components/shell.css (R3-V4, R3-V12a). Still deferred, because each would change today's pages:
+   - html: hyphens: manual;
+   - headings: font-family var(--font-display), text-wrap: balance; paragraphs: text-wrap: pretty;
+   - links: color var(--color-accent), hover var(--color-accent-hover);
+   - ::selection in token colours;
+   - Greek: no text-transform: uppercase under :lang(el), tracking .04em (§2.6). It must beat the
+     `uppercase` utility, so the V4 shell components carry it rather than this layer. */
+@layer base {
+  /* §2.5/§2.6 Greek display line-heights and label tracking */
+  :lang(el) {
+    --lh-display-extra: .06;
+    --text-d1--line-height: 1.08;
+    --text-d2--line-height: 1.08;
+    --text-d3--line-height: 1.15;
+    --text-label--letter-spacing: .04em;
+  }
+
+  /* §8 focus ring for any focusable without its own (components set theirs, often band-focus on bands and
+     photos). Replaces the legacy blue ring of 05-primitives.css (R3-V12a). */
+  :focus-visible {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 3px;
+  }
+
+  /* Scrollbars (WebKit/Blink): the legacy 10 px shape, thumb in the control-border token instead of the legacy
+     teal (R3-V12a). Other engines keep their native scrollbars, coloured by `color-scheme`. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 6px;
+    background: var(--color-border-control) padding-box;
+  }
+}

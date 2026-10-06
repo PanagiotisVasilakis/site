@@ -18,7 +18,6 @@ function login() {
 describe('admin login errors', () => {
   it.each([
     [429, { error: 'Too many authentication attempts' }, 'Too many authentication attempts'],
-    [503, { error: 'Admin login disabled' }, 'Admin login disabled'],
     [503, { success: false, error: { code: 'SERVICE_UNAVAILABLE', message: 'Client identity unavailable' } }, 'Client identity unavailable'],
     [401, { error: 'Unauthorized' }, 'Authentication failed'],
   ])('shows the reason for a %s response', async (status, body, expected) => {

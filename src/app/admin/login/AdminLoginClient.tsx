@@ -39,7 +39,7 @@ export default function AdminLoginClient() {
 
   return (
     <main className="mx-auto max-w-sm p-6 space-y-4">
-      <h1 className="text-xl font-serif italic font-bold">Admin Login</h1>
+      <h1 className="text-xl font-display italic font-bold">Admin Login</h1>
       <form onSubmit={submit} className="space-y-3">
         <div>
           <label htmlFor="admin-secret" className="block text-sm font-medium mb-1">Admin Secret</label>
@@ -50,15 +50,15 @@ export default function AdminLoginClient() {
             type="password"
             autoComplete="current-password"
             required
-            className="w-full border rounded px-2 py-1"
+            className="admin-input w-full rounded px-2 py-1"
             placeholder="Enter secret"
             aria-invalid={status === 'error'}
             aria-describedby={status === 'error' ? 'admin-login-error' : undefined}
           />
         </div>
-        <button type="submit" className="btn-primary btn-sm">Login</button>
+        <button type="submit" className="admin-action-primary">Login</button>
         <div aria-live="polite">
-          {status === 'error' && <p id="admin-login-error" className="text-sm text-red-600">{message}</p>}
+          {status === 'error' && <p id="admin-login-error" className="admin-error-text text-sm">{message}</p>}
         </div>
       </form>
     </main>

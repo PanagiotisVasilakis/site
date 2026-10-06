@@ -14,7 +14,12 @@ const prismaMock = vi.hoisted(() => {
   return { tx, $transaction: vi.fn() };
 });
 
+// Real bcrypt at cost 12 takes about 0.25 s per hash; the integration suite
+// (tests/integration/auth/guest-access-reset.test.ts) keeps the real one.
+const bcryptMock = vi.hoisted(() => ({ hash: vi.fn(), compare: vi.fn() }));
+
 vi.mock('@/lib/prisma', () => ({ prisma: prismaMock }));
+vi.mock('bcrypt', () => ({ default: { hash: bcryptMock.hash, compare: bcryptMock.compare } }));
 
 import { consumeBookingClaimGrant, PortalAuthError, resetGuestAccess } from '@/lib/portalAuthService';
 
@@ -133,6 +138,8 @@ describe('claiming with a password-less account', () => {
     vi.setSystemTime(NOW);
     prismaMock.$transaction.mockImplementation(async (callback: (client: typeof prismaMock.tx) => unknown) => callback(prismaMock.tx));
     prismaMock.tx.user.findUnique.mockResolvedValue({ id: USER_ID, phoneE164: PHONE, passwordHash: null });
+    // A bcrypt-shaped hash that carries the cost factor it was asked for.
+    bcryptMock.hash.mockImplementation(async (_password: string, rounds: number) => `$2b$${rounds}$${'x'.repeat(53)}`);
     prismaMock.tx.bookingClaimGrant.updateMany.mockResolvedValue({ count: 1 });
     prismaMock.tx.booking.updateMany.mockResolvedValue({ count: 1 });
   });
@@ -144,7 +151,20 @@ describe('claiming with a password-less account', () => {
     await expect(claim()).resolves.toEqual({ userId: USER_ID, bookingId: BOOKING_ID });
     expect(prismaMock.tx.user.update).toHaveBeenCalledWith({
       where: { id: USER_ID },
-      data: { passwordHash: expect.stringMatching(/^\$2[aby]\$12\$/u), countryOrigin: 'ABROAD' },
+      data: { passwordHash: expect.stringMatching(/^\$2[aby]\$12\$/u) },
+    });
+    expect(bcryptMock.hash).toHaveBeenCalledWith('a-new-password-1234', 12);
+  });
+
+  it('uses the sign-up origin only to normalise the phone of a new account and does not store it', async () => {
+    prismaMock.tx.bookingClaimGrant.findUnique.mockResolvedValue(grantFor(null));
+    prismaMock.tx.user.findUnique.mockResolvedValue(null);
+
+    await consumeBookingClaimGrant({ tokenDigest: TOKEN_DIGEST, phone: '6912345678', origin: 'GR', password: 'a-new-password-1234' });
+
+    expect(prismaMock.tx.user.findUnique).toHaveBeenCalledWith({ where: { phoneE164: '+306912345678' } });
+    expect(prismaMock.tx.user.create).toHaveBeenCalledWith({
+      data: { id: expect.any(String), phoneE164: '+306912345678', passwordHash: expect.stringMatching(/^\$2[aby]\$12\$/u) },
     });
   });
 

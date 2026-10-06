@@ -15,7 +15,6 @@ import test from 'node:test';
 
 import {
   enumerateArtifactPathForTest,
-  evaluateHistoricalFindings,
   findForbiddenEnvironmentArtifact,
   formatFinding,
   scanPathForTest,
@@ -127,21 +126,26 @@ test('credential-bearing database URL fails', async () => {
   );
 });
 
-test('historical baseline suppresses only its six exact redacted fingerprints', () => {
-  const baseline = Array.from({ length: 6 }, (_, index) => ({
-    classification: `retired-${index}`,
-    fingerprint: `immutable:redacted:${index}`,
-  }));
-  const exact = baseline.map(({ fingerprint }) => ({ fingerprint }));
-  assert.deepEqual(evaluateHistoricalFindings(exact, baseline), {
-    unexpected: [],
-    missing: [],
-  });
-  const additional = [...exact, { fingerprint: 'new:unreviewed:finding' }];
-  assert.deepEqual(
-    evaluateHistoricalFindings(additional, baseline).unexpected,
-    [{ fingerprint: 'new:unreviewed:finding' }],
-  );
+test('Airbnb calendar export URL with a token fails', async () => {
+  const token = ['Synthetic9Airbnb', '7Calendar3Only'].join('');
+  const urls = [
+    ['https://www.airbnb', '.com/calendar/ical/', '12345678', '.ics?s=', token].join(''),
+    ['https://airbnb', '.gr/calendar/ical/', '12345678', '.ics?t=1&s=', token].join(''),
+  ];
+  const result = await scanFixture(urls.map((url) => `AIRBNB_ICAL_URL=${url}\n`).join(''));
+  const matches = result.unexpected.filter((finding) => finding.rule === 'airbnb-calendar-export-token');
+  assert.equal(matches.length, 2);
+  assert.ok(matches.every((finding) => finding.valueSha256 === createHash('sha256').update(token).digest('hex')));
+});
+
+test('Airbnb calendar URL placeholders and short test tokens pass', async () => {
+  const prefix = ['https://www.airbnb', '.com/calendar/ical/'].join('');
+  const result = await scanFixture([
+    `${prefix}<listing id>.ics?s=<token>`,
+    `${prefix}12345678.ics?s=fixture`,
+    '',
+  ].join('\n'));
+  assert.deepEqual(result.unexpected, []);
 });
 
 test('ignored environment files are rejected from release artifacts', () => {
@@ -453,7 +457,7 @@ async function withGeneratedArtifactPolicy(options, callback) {
     const previewModeEncryptionKey = options.previewModeEncryptionKey ?? '7'.repeat(64);
     const actionId = options.actionId === false ? null : ACTION_IDENTIFIER;
     const buildId = options.buildId ?? BUILD_IDENTIFIER;
-    const nextVersion = options.nextVersion ?? '16.3.6';
+    const nextVersion = options.nextVersion ?? GENERATED_ARTIFACT_CLASSIFICATIONS.SUPPORTED_NEXT_VERSION;
     const serverReference = {
       node: actionId ? { [actionId]: { workers: {}, layer: {} } } : {},
       edge: {},

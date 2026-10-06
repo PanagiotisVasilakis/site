@@ -36,6 +36,18 @@ export function normalizePhone(input: string, origin?: Origin): { e164: string }
   return null;
 }
 
+/** E.164 numbers to try, in order, when resolving an account from a typed phone:
+ * the international reading first, then the Greek local 10-digit form that
+ * GR-origin claims store with +30. Empty when the international reading is
+ * invalid, so every lookup rejects the same inputs.
+ */
+export function phoneLookupCandidates(input: string): string[] {
+  const primary = normalizePhone(input);
+  if (!primary) return [];
+  const greekLocal = normalizePhone(input, 'GR');
+  return greekLocal && greekLocal.e164 !== primary.e164 ? [primary.e164, greekLocal.e164] : [primary.e164];
+}
+
 function isE164(v: string): boolean {
   // E.164: + followed by 8 to 15 digits total
   return /^\+[1-9]\d{7,14}$/.test(v);

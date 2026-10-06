@@ -42,14 +42,13 @@ yarn-error.log*
 .vercel
 
 # generated reports and browser audit artifacts
-/reports/lighthouse-matrix/
 /reports/responsive-ux/
 /reports/jscpd-report/
 /reports/**/screenshots-*/
-/lighthouse.*
-/.lighthouse*/
 /axe-a11y-report*.json
 /src/generated/prisma/
+# worker bundle output of tests/unit/build-workers.test.ts (left behind only by an aborted run)
+/tmp-build-workers-*/
 
 # generated local runtime data
 /analytics-data.json

@@ -44,6 +44,12 @@ export async function POST(request: NextRequest) {
       scope: 'csp-report', limit: 30, windowMs: 60_000,
     });
     if (!decision.allowed) return NextResponse.json({ error: 'Too many reports' }, { status: 429 });
+    // The limit above is per client address. This one is shared by all clients,
+    // so many attested addresses together cannot grow the audit table unbounded.
+    const globalDecision = await checkSensitiveRateLimit(request, {
+      scope: 'csp-report-global', identifier: 'global', limit: 500, windowMs: 3_600_000,
+    });
+    if (!globalDecision.allowed) return NextResponse.json({ error: 'Too many reports' }, { status: 429 });
 
     const raw = await readJsonBody(
       request,

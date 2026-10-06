@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import {
   getApartmentMapLocation,
@@ -13,12 +13,15 @@ import type { Locale } from '@/i18n/config';
 import { normalizeLocale } from '@/i18n/config';
 import { telHref } from '@/lib/contactLinks';
 import internalFetch from '@/lib/internalFetchClient';
+import { logger } from '@/lib/logger-client';
 import { timePattern } from '@/lib/propertyTime';
 import MapLoadingSkeleton from '@/components/MapLoadingSkeleton';
 import { MAP_DEFAULTS } from '@/lib/mapConstants';
 import WifiAccessCard from '@/components/checkin/WifiAccessCard';
+import { Icon as LineIcon, type IconName as LineIconName } from '@/components/icons/Icon';
+import { useToast } from '@/components/Toast';
 
-type LocationHighlight = { title: string; description: string };
+type LocationHighlight = { icon: LineIconName; title: string; description: string };
 
 type NearbyCategoryItem = CategoryMapItem;
 
@@ -58,6 +61,9 @@ type ArrivalRequest = {
   updatedAt: string;
 };
 
+/** The 112 content entry: the emergency list's first row is the fixed tel:112 entry instead. */
+const EMERGENCY_112_ID = 'emergency-112';
+
 const MAP_HEIGHT = 'clamp(240px, 35vw, 420px)';
 const DynamicApartmentLocationMap = dynamic(() => import('@/components/ApartmentLocationMap'), {
   ssr: false,
@@ -68,6 +74,7 @@ interface CheckInInfoProps {
   locale: string;
   nearbyRestaurants?: NearbyCategoryItem[];
   nearbyServices?: NearbyCategoryItem[];
+  cartoBasemapsKey?: string;
 }
 
 function Icon({ name, className = 'h-5 w-5' }: { name: IconName; className?: string }) {
@@ -273,17 +280,17 @@ function SectionTitle({
   icon: IconName;
 }) {
   return (
-    <div className="mb-5 flex items-start gap-3">
-      <span className="checkin-icon-bubble mt-0.5 h-10 w-10 shrink-0">
-        <Icon name={icon} className="h-5 w-5" />
+    <div className="checkin-section-head">
+      <span className="checkin-icon-bubble">
+        <Icon name={icon} className="checkin-icon-bubble__svg" />
       </span>
       <div>
         {eyebrow && (
-          <p className="checkin-label text-[0.68rem] font-semibold uppercase tracking-[0.18em]">
+          <p className="checkin-label">
             {eyebrow}
           </p>
         )}
-        <h2 id={id} className="checkin-title font-serif text-2xl font-semibold italic">
+        <h2 id={id} className="checkin-section-title">
           {title}
         </h2>
       </div>
@@ -295,9 +302,11 @@ export default function CheckInInfo({
   locale,
   nearbyRestaurants = [],
   nearbyServices = [],
+  cartoBasemapsKey,
 }: CheckInInfoProps) {
   const effLocale: Locale = normalizeLocale(locale);
   const t = getDictionary(effLocale);
+  const toast = useToast();
   const apartmentLocation = getApartmentMapLocation(effLocale);
   const mapContentItems = useMemo<MapContentItem[]>(
     () => [
@@ -308,7 +317,8 @@ export default function CheckInInfo({
   );
   const isGreek = effLocale === 'el';
 
-  const locationHighlights: LocationHighlight[] = t.locationPanel.highlights.map(({ title, description }) => ({
+  const locationHighlights: LocationHighlight[] = t.locationPanel.highlights.map(({ icon, title, description }) => ({
+    icon,
     title,
     description,
   }));
@@ -350,6 +360,7 @@ export default function CheckInInfo({
     sendRequest: panel.sendRequest,
     requestSent: panel.requestSent,
     requestError: panel.requestError,
+    requestClosed: panel.requestClosed,
     requestRequired: panel.requestRequired,
     requestAlreadyPending: panel.requestAlreadyPending,
     latestRequest: panel.latestRequest,
@@ -405,13 +416,19 @@ export default function CheckInInfo({
     },
   ];
 
+  // 112 first (identity §9.8), then the host and the phones tagged `emergency` (R3-L10).
   const emergencyItems = [
+    {
+      label: t.stay.checkin.emergency112,
+      value: '112',
+      href: 'tel:112',
+    },
     {
       label: ui.host,
       value: apartmentLocation.phone,
       href: telHref(apartmentLocation.phone),
     },
-    ...nearbyServices.slice(0, 2).map((item) => ({
+    ...nearbyServices.filter((item) => item.tags?.includes('emergency') && item.id !== EMERGENCY_112_ID).map((item) => ({
       label: item.name,
       value: item.phone || item.phones?.[0] || item.summary || '',
       href: telHref(item.phone || item.phones?.[0]),
@@ -438,6 +455,7 @@ export default function CheckInInfo({
   const [arrivalRequestSubmitting, setArrivalRequestSubmitting] = useState(false);
   const [arrivalRequestSuccess, setArrivalRequestSuccess] = useState('');
   const [arrivalRequestError, setArrivalRequestError] = useState('');
+  const sessionRefreshStarted = useRef(false);
 
   useEffect(() => {
     const loadPreferences = async () => {
@@ -479,12 +497,18 @@ export default function CheckInInfo({
     loadArrivalRequest();
   }, []);
 
-  const copyToClipboard = (text: string, target: CopyTarget) => {
-    if (!navigator.clipboard) return;
-    navigator.clipboard.writeText(text).then(() => {
+  const copyToClipboard = async (text: string, target: CopyTarget) => {
+    try {
+      await navigator.clipboard.writeText(text);
       setCopiedTarget(target);
+      // identity §9.8: the Wi-Fi copy confirms with a toast as well as the button label.
+      toast.push(t.stay.checkin.wifiCopied);
       setTimeout(() => setCopiedTarget(null), 2000);
-    });
+    } catch (err) {
+      logger.warn('Clipboard copy failed', err instanceof Error ? err : { error: String(err) });
+      // R-363 (the R-303 pattern): tell the guest the copy failed and to select the details instead.
+      toast.push(t.stay.checkin.wifiCopyFailed);
+    }
   };
 
   const handleEditTimes = () => {
@@ -563,8 +587,20 @@ export default function CheckInInfo({
       });
       const data = await res.json().catch(() => null);
 
+      if (res.status === 401) {
+        // The guest session expired while this page was open. The refresh page renews it
+        // from the refresh cookie or sends the guest to sign in again; replace() keeps the
+        // stale page out of the history, as the refresh page itself does.
+        if (!sessionRefreshStarted.current) {
+          sessionRefreshStarted.current = true;
+          window.location.replace(`/${effLocale}/portal/refresh?next=${encodeURIComponent(`/${effLocale}/check-in`)}`);
+        }
+        return;
+      }
       if (!res.ok) {
-        setArrivalRequestError(res.status < 500 && data?.error?.message ? data.error.message : ui.requestError);
+        // Server messages are English-only; always show the localized text.
+        // 409: the check-in date has passed, so the route no longer accepts requests.
+        setArrivalRequestError(res.status === 409 ? ui.requestClosed : ui.requestError);
         return;
       }
 
@@ -602,464 +638,441 @@ export default function CheckInInfo({
   // (24 h before check-in); shown in the guest's own time zone.
   const wifiRevealAt = wifiAvailableAt ? new Date(wifiAvailableAt) : null;
   const wifiNotice = !wifiNetwork && wifiRevealAt && wifiRevealAt.getTime() > Date.now()
-    ? `${ui.wifiAvailableFrom} ${new Intl.DateTimeFormat(isGreek ? 'el-GR' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' }).format(wifiRevealAt)}`
+    ? `${ui.wifiAvailableFrom} ${new Intl.DateTimeFormat(isGreek ? 'el-GR' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }).format(wifiRevealAt)}`
     : null;
-  const panelClass = 'checkin-panel';
+  // identity §9.8 (calm, cards on tokens; styles in components/stay.css). The section ids are the stay hub's
+  // anchors: #wifi, #check-out, #house-rules (plus #arrival and #emergency).
   const rowClass = 'checkin-row';
-  const smallLabelClass = 'checkin-label text-[0.68rem] font-semibold uppercase tracking-[0.14em]';
   const titleClass = 'checkin-title';
   const valueClass = 'checkin-value';
   const bodyTextClass = 'checkin-copy';
   const mutedTextClass = 'checkin-muted-text';
-  const iconClass = 'checkin-icon-token mt-0.5 h-5 w-5 shrink-0';
-  const accentIconClass = 'checkin-accent-token mt-0.5 h-5 w-5 shrink-0';
+  const iconClass = 'checkin-icon-token';
+  const accentIconClass = 'checkin-accent-token';
 
   return (
     <div className="checkin-portal">
-      <section
-        className={`${panelClass} relative overflow-hidden p-[clamp(1.25rem,3vw,2.5rem)]`}
-        aria-labelledby="checkin-welcome-title"
-      >
-        <div className="checkin-hero-bg absolute inset-0" />
-        <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(280px,360px)] lg:items-end">
-          <div className="max-w-3xl">
-            <p className={smallLabelClass}>{ui.guideLabel}</p>
-            <h1
-              id="checkin-welcome-title"
-              className={`${titleClass} mt-3 max-w-3xl font-serif text-[clamp(2.35rem,5vw,4.7rem)] font-semibold italic leading-[0.98]`}
+      <header className="checkin-head" aria-labelledby="checkin-welcome-title">
+        <p className="checkin-label">{ui.guideLabel}</p>
+        <h1 id="checkin-welcome-title" className="checkin-head__title">
+          {t.ui.yourStay}
+        </h1>
+        <p className="checkin-head__lead">
+          {t.checkinInfo.welcomeMessage}
+        </p>
+        <div className="checkin-actions" aria-label={ui.quickActions}>
+          <button
+            type="button"
+            onClick={() => copyToClipboard(wifiText, 'wifi')}
+            disabled={!wifiNetwork || !wifiPassword}
+            className="ui-btn ui-btn--primary ui-btn--sm"
+          >
+            <Icon name={copiedTarget === 'wifi' ? 'check' : 'copy'} className="checkin-action-icon" />
+            {copiedTarget === 'wifi' ? ui.copied : ui.copyWifi}
+          </button>
+          {apartmentLocation.directionsUrl && (
+            <a
+              href={apartmentLocation.directionsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ui-btn ui-btn--secondary ui-btn--sm"
             >
-              {ui.heroTitle}
-            </h1>
-            <p className={`${bodyTextClass} mt-5 max-w-2xl text-base leading-7 sm:text-lg`}>
-              {t.checkinInfo.welcomeMessage}
-            </p>
-
-            <div className="mt-7 flex flex-wrap gap-3" aria-label={ui.quickActions}>
-              <button
-                type="button"
-                onClick={() => copyToClipboard(wifiText, 'wifi')}
-                disabled={!wifiNetwork || !wifiPassword}
-                className="checkin-primary-action min-h-11 px-4 shadow-sm hover:-translate-y-0.5"
-              >
-                <Icon name={copiedTarget === 'wifi' ? 'check' : 'copy'} className="h-4 w-4" />
-                {copiedTarget === 'wifi' ? ui.copied : ui.copyWifi}
-              </button>
-              {apartmentLocation.directionsUrl && (
-                <a
-                  href={apartmentLocation.directionsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="checkin-secondary-action checkin-outline-action min-h-11 px-4 hover:-translate-y-0.5"
-                >
-                  <Icon name="external" className="h-4 w-4" />
-                  {ui.openMaps}
-                </a>
-              )}
-              <a
-                href="#house-rules"
-                className="checkin-secondary-action checkin-outline-action min-h-11 px-4 hover:-translate-y-0.5"
-              >
-                <Icon name="shield" className="h-4 w-4" />
-                {ui.viewRules}
-              </a>
-            </div>
-          </div>
-
-          <div className="checkin-card checkin-card--strong p-4">
-            <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-              <div>
-                <dt className={smallLabelClass}>{ui.address}</dt>
-                <dd className={`${valueClass} mt-1 text-sm font-medium leading-6`}>
-                  {apartmentLocation.address}
-                </dd>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <dt className={smallLabelClass}>{t.checkinInfo.checkInTime}</dt>
-                  <dd className={`${valueClass} mt-1 font-serif text-2xl font-semibold italic`}>
-                    {checkInTime}
-                  </dd>
-                </div>
-                <div>
-                  <dt className={smallLabelClass}>{t.checkinInfo.checkOutTime}</dt>
-                  <dd className={`${valueClass} mt-1 font-serif text-2xl font-semibold italic`}>
-                    {checkOutTime}
-                  </dd>
-                </div>
-              </div>
-              <div>
-                <dt className={smallLabelClass}>{t.checkinInfo.wifiTitle}</dt>
-                <dd className={`${valueClass} mt-1 font-mono text-sm font-semibold`}>
-                  {wifiNetwork || wifiNotice || ui.unavailable}
-                </dd>
-              </div>
-            </dl>
-          </div>
+              <Icon name="external" className="checkin-action-icon" />
+              {ui.openMaps}
+            </a>
+          )}
+          <a href="#house-rules" className="ui-btn ui-btn--secondary ui-btn--sm">
+            <Icon name="shield" className="checkin-action-icon" />
+            {ui.viewRules}
+          </a>
         </div>
-      </section>
+      </header>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(340px,420px)] lg:items-start">
-        <aside className="space-y-5 lg:order-2 lg:sticky lg:top-24">
-          <section className={`${panelClass} p-5`} aria-labelledby="guest-essentials-title">
-            <SectionTitle id="guest-essentials-title" title={ui.guestEssentials} icon="home" />
-            <div className="space-y-0">
-              <div className={rowClass}>
-                <Icon name="clock" className={iconClass} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className={`${titleClass} text-sm font-semibold`}>
-                      {ui.schedule}
-                    </h3>
-                    {!isEditingTimes && canEditTimes && (
-                      <button
-                        type="button"
-                        onClick={handleEditTimes}
-                        className="checkin-outline-action min-h-9 px-3 py-1 text-xs"
-                        title={panel.editTimesHostOnly}
-                      >
-                        {ui.edit}
-                      </button>
-                    )}
-                  </div>
+      <div className="checkin-grid">
+        <section id="arrival" className="checkin-panel" aria-labelledby="arrival-title">
+          <SectionTitle id="arrival-title" title={ui.guestEssentials} icon="home" />
+          <dl className="checkin-summary">
+            <div className="checkin-summary__item checkin-summary__item--wide">
+              <dt className="checkin-label">{ui.address}</dt>
+              <dd className={valueClass}>{apartmentLocation.address}</dd>
+            </div>
+            <div className="checkin-summary__item">
+              <dt className="checkin-label">{t.checkinInfo.checkInTime}</dt>
+              <dd className="checkin-time">{checkInTime}</dd>
+            </div>
+            <div className="checkin-summary__item">
+              <dt className="checkin-label">{t.checkinInfo.checkOutTime}</dt>
+              <dd className="checkin-time">{checkOutTime}</dd>
+            </div>
+            <div className="checkin-summary__item checkin-summary__item--wide">
+              <dt className="checkin-label">{t.checkinInfo.wifiTitle}</dt>
+              <dd className="checkin-mono">{wifiNetwork || wifiNotice || ui.unavailable}</dd>
+            </div>
+          </dl>
 
-                  {timesSaved && (
-                    <p className="mt-2 rounded-md checkin-status-success px-3 py-2 text-sm" role="status">
-                      {ui.saved}
-                    </p>
+          <div className={rowClass}>
+            <Icon name="clock" className={iconClass} />
+            <div className="checkin-row__body">
+              <div className="checkin-row__head">
+                <h3 className={titleClass}>
+                  {ui.schedule}
+                </h3>
+                {!isEditingTimes && canEditTimes && (
+                  <button
+                    type="button"
+                    onClick={handleEditTimes}
+                    className="ui-btn ui-btn--secondary ui-btn--sm"
+                    title={panel.editTimesHostOnly}
+                  >
+                    {ui.edit}
+                  </button>
+                )}
+              </div>
+
+              {timesSaved && (
+                <p className="ui-callout ui-callout--success checkin-note" role="status">
+                  {ui.saved}
+                </p>
+              )}
+              {timesSaveError && (
+                <p role="alert" className="ui-callout ui-callout--danger checkin-note">
+                  {timesSaveError}
+                </p>
+              )}
+
+              <div className="checkin-times">
+                <label className="checkin-times__field">
+                  <span className={mutedTextClass}>
+                    {ui.standardCheckIn}
+                  </span>
+                  {isEditingTimes ? (
+                    <input
+                      type="time"
+                      value={tempCheckInTime}
+                      onChange={(e) => setTempCheckInTime(e.target.value)}
+                      className="ui-field__input"
+                    />
+                  ) : (
+                    <span className="checkin-time">
+                      {checkInTime}
+                    </span>
                   )}
-                  {timesSaveError && (
-                    <p role="alert" className="mt-2 text-sm text-red-600 dark:text-red-400">
-                      {timesSaveError}
-                    </p>
+                </label>
+                <label className="checkin-times__field">
+                  <span className={mutedTextClass}>
+                    {t.checkinInfo.checkOutTime}
+                  </span>
+                  {isEditingTimes ? (
+                    <input
+                      type="time"
+                      value={tempCheckOutTime}
+                      onChange={(e) => setTempCheckOutTime(e.target.value)}
+                      className="ui-field__input"
+                    />
+                  ) : (
+                    <span className="checkin-time">
+                      {checkOutTime}
+                    </span>
                   )}
+                </label>
+              </div>
 
-                  <div className="mt-3 grid grid-cols-2 gap-3">
-                    <label className="block">
-                      <span className={`${mutedTextClass} text-xs font-medium`}>
-                        {ui.standardCheckIn}
-                      </span>
-                      {isEditingTimes ? (
-                        <input
-                          type="time"
-                          value={tempCheckInTime}
-                          onChange={(e) => setTempCheckInTime(e.target.value)}
-                          className="checkin-field mt-1 px-2 py-2 text-base"
-                        />
-                      ) : (
-                        <span className={`${valueClass} mt-1 block font-serif text-2xl font-semibold italic`}>
-                          {checkInTime}
-                        </span>
-                      )}
-                    </label>
-                    <label className="block">
-                      <span className={`${mutedTextClass} text-xs font-medium`}>
-                        {t.checkinInfo.checkOutTime}
-                      </span>
-                      {isEditingTimes ? (
-                        <input
-                          type="time"
-                          value={tempCheckOutTime}
-                          onChange={(e) => setTempCheckOutTime(e.target.value)}
-                          className="checkin-field mt-1 px-2 py-2 text-base"
-                        />
-                      ) : (
-                        <span className={`${valueClass} mt-1 block font-serif text-2xl font-semibold italic`}>
-                          {checkOutTime}
-                        </span>
-                      )}
-                    </label>
-                  </div>
+              {isEditingTimes && (
+                <div className="checkin-button-pair">
+                  <button
+                    type="button"
+                    onClick={handleSaveTimes}
+                    disabled={savingTimes}
+                    className="ui-btn ui-btn--primary ui-btn--sm"
+                  >
+                    {savingTimes ? ui.saving : ui.save}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    disabled={savingTimes}
+                    className="ui-btn ui-btn--secondary ui-btn--sm"
+                  >
+                    {ui.cancel}
+                  </button>
+                </div>
+              )}
 
-                  {isEditingTimes && (
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={handleSaveTimes}
-                        disabled={savingTimes}
-                        className="checkin-primary-action"
-                      >
-                        {savingTimes ? ui.saving : ui.save}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleCancelEdit}
-                        disabled={savingTimes}
-                        className="checkin-outline-action"
-                      >
-                        {ui.cancel}
-                      </button>
+              {!isEditingTimes && (
+                <div className="checkin-stack">
+                  {arrivalRequest && (
+                    <div className="checkin-card">
+                      <div className="checkin-row__head">
+                        <p className="checkin-label">
+                          {ui.latestRequest}
+                        </p>
+                        <span className={`checkin-status-pill checkin-status-${arrivalRequest.status}`}>
+                          {requestStatusLabel(arrivalRequest.status)}
+                        </span>
+                      </div>
+                      <p className={bodyTextClass}>
+                        {ui.preferredArrivalTime}: <strong className={valueClass}>{arrivalRequest.requestedTime}</strong>
+                      </p>
+                      <p className={bodyTextClass}>
+                        {requestStatusDescription(arrivalRequest.status)}
+                      </p>
                     </div>
                   )}
 
-                  {!isEditingTimes && (
-                    <div className="mt-4 space-y-3">
-                      {arrivalRequest && (
-                        <div className="checkin-card p-3">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="checkin-label text-xs font-semibold uppercase tracking-[0.14em]">
-                              {ui.latestRequest}
-                            </p>
-                            <span className={`checkin-status-pill checkin-status-${arrivalRequest.status}`}>
-                              {requestStatusLabel(arrivalRequest.status)}
-                            </span>
-                          </div>
-                          <p className={`${bodyTextClass} mt-2 text-sm leading-6`}>
-                            {ui.preferredArrivalTime}: <strong className={`${valueClass} font-semibold`}>{arrivalRequest.requestedTime}</strong>
-                          </p>
-                          <p className={`${bodyTextClass} mt-2 text-sm leading-6`}>
-                            {requestStatusDescription(arrivalRequest.status)}
-                          </p>
-                        </div>
-                      )}
+                  {!isRequestingArrival && arrivalRequest?.status !== 'pending' && (
+                    <button
+                      type="button"
+                      onClick={handleOpenArrivalRequest}
+                      className="ui-btn ui-btn--secondary ui-btn--sm ui-btn--block"
+                    >
+                      {ui.requestDifferentArrival}
+                    </button>
+                  )}
 
-                      {!isRequestingArrival && arrivalRequest?.status !== 'pending' && (
-                        <button
-                          type="button"
-                          onClick={handleOpenArrivalRequest}
-                          className="checkin-outline-action w-full"
-                        >
-                          {ui.requestDifferentArrival}
-                        </button>
-                      )}
-
-                      {isRequestingArrival && (
-                        <div className="checkin-card checkin-card--strong p-3">
-                          <label className="block">
-                            <span className={`${mutedTextClass} text-xs font-semibold`}>
-                              {ui.preferredArrivalTime}
-                            </span>
-                            <input
-                              type="time"
-                              value={requestedArrivalTime}
-                              onChange={(event) => setRequestedArrivalTime(event.target.value)}
-                              className="checkin-field mt-1 px-3 py-2 text-base"
-                              aria-invalid={Boolean(arrivalRequestError)}
-                            />
-                          </label>
-                          <label className="mt-3 block">
-                            <span className={`${mutedTextClass} text-xs font-semibold`}>
-                              {ui.arrivalNote}
-                            </span>
-                            <textarea
-                              value={arrivalRequestMessage}
-                              onChange={(event) => setArrivalRequestMessage(event.target.value)}
-                              maxLength={500}
-                              rows={3}
-                              placeholder={ui.arrivalNotePlaceholder}
-                              className="checkin-field checkin-textarea mt-1 px-3 py-2"
-                            />
-                          </label>
-                          {arrivalRequestError && (
-                            <p className="mt-2 text-sm checkin-status-error" role="alert">
-                              {arrivalRequestError}
-                            </p>
-                          )}
-                          <div className="mt-3 grid grid-cols-2 gap-2">
-                            <button
-                              type="button"
-                              onClick={handleSubmitArrivalRequest}
-                              disabled={arrivalRequestSubmitting}
-                              className="checkin-primary-action"
-                            >
-                              {arrivalRequestSubmitting ? ui.saving : ui.sendRequest}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setIsRequestingArrival(false);
-                                setArrivalRequestError('');
-                              }}
-                              disabled={arrivalRequestSubmitting}
-                              className="checkin-outline-action"
-                            >
-                              {ui.cancel}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {arrivalRequestSuccess && (
-                        <p className="rounded-lg checkin-status-success px-3 py-2 text-sm leading-6" role="status">
-                          {arrivalRequestSuccess}
-                        </p>
-                      )}
-                      {arrivalRequestError && !isRequestingArrival && (
-                        <p className="rounded-lg checkin-status-error px-3 py-2 text-sm leading-6" role="alert">
+                  {isRequestingArrival && (
+                    <div className="checkin-card checkin-card--strong">
+                      <label className="ui-field">
+                        <span className="ui-field__label">
+                          {ui.preferredArrivalTime}
+                        </span>
+                        <input
+                          type="time"
+                          value={requestedArrivalTime}
+                          onChange={(event) => setRequestedArrivalTime(event.target.value)}
+                          className="ui-field__input"
+                          aria-invalid={Boolean(arrivalRequestError)}
+                        />
+                      </label>
+                      <label className="ui-field">
+                        <span className="ui-field__label">
+                          {ui.arrivalNote}
+                        </span>
+                        <textarea
+                          value={arrivalRequestMessage}
+                          onChange={(event) => setArrivalRequestMessage(event.target.value)}
+                          maxLength={500}
+                          rows={3}
+                          placeholder={ui.arrivalNotePlaceholder}
+                          className="ui-field__input checkin-textarea"
+                        />
+                      </label>
+                      {arrivalRequestError && (
+                        <p className="ui-callout ui-callout--danger checkin-note" role="alert">
                           {arrivalRequestError}
                         </p>
                       )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className={rowClass}>
-                <Icon name="wifi" className={iconClass} />
-                <WifiAccessCard
-                  title={t.checkinInfo.wifiTitle}
-                  networkLabel={ui.network}
-                  passwordLabel={ui.password}
-                  network={wifiNetwork}
-                  password={wifiPassword}
-                  unavailableLabel={ui.unavailable}
-                  notice={wifiNotice}
-                  copyLabel={ui.copy}
-                  copiedLabel={ui.copied}
-                  copiedTarget={copiedTarget === 'network' || copiedTarget === 'password' ? copiedTarget : null}
-                  onCopy={copyToClipboard}
-                  networkCopyLabel={panel.networkCopyLabel}
-                  passwordCopyLabel={panel.passwordCopyLabel}
-                />
-              </div>
-
-              <div className={rowClass}>
-                <Icon name="key" className={iconClass} />
-                <div>
-                  <h3 className={`${titleClass} text-sm font-semibold`}>{ui.keys}</h3>
-                  <p className={`${bodyTextClass} mt-1 text-sm leading-6`}>
-                    {t.checkinInfo.keysDetail}
-                  </p>
-                </div>
-              </div>
-
-              <div className={rowClass}>
-                <Icon name="car" className={iconClass} />
-                <div>
-                  <h3 className={`${titleClass} text-sm font-semibold`}>{ui.parking}</h3>
-                  <p className={`${bodyTextClass} mt-1 text-sm leading-6`}>
-                    {t.checkinInfo.parkingDetail}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className={`${panelClass} p-5`} aria-labelledby="emergency-title">
-            <SectionTitle id="emergency-title" title={ui.emergency} icon="phone" />
-            <div className="checkin-divided">
-              {emergencyItems.map((item) => (
-                <div key={`${item.label}-${item.value}`} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">
-                  <div className="min-w-0">
-                    <h3 className={`${titleClass} truncate text-sm font-semibold`}>{item.label}</h3>
-                    <p className={`${bodyTextClass} mt-0.5 truncate text-sm`}>{item.value}</p>
-                  </div>
-                  {item.href && (
-                    <a
-                      href={item.href}
-                      className="checkin-icon-action checkin-copy-action h-10 w-10 justify-center px-0"
-                      aria-label={`${ui.emergency}: ${item.label}`}
-                    >
-                      <Icon name="phone" className="h-4 w-4" />
-                    </a>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className={`${panelClass} p-5`} aria-labelledby="good-to-know-title">
-            <SectionTitle id="good-to-know-title" title={ui.goodToKnow} icon="info" />
-            <div className="space-y-4">
-              {goodToKnowItems.map((item) => (
-                <div key={item.label} className="flex gap-3">
-                  <Icon name={item.icon} className={iconClass} />
-                  <p className={`${bodyTextClass} text-sm leading-6`}>
-                    <strong className={`${titleClass} font-semibold`}>{item.label}:</strong>{' '}
-                    {item.detail}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-        </aside>
-
-        <div className="space-y-6 lg:order-1">
-          <section id="house-rules" className={`${panelClass} scroll-mt-24 p-5 sm:p-6`} aria-labelledby="house-rules-title">
-            <SectionTitle id="house-rules-title" title={t.checkinInfo.houseRulesTitle} icon="shield" />
-            <ul className="grid gap-3 sm:grid-cols-2">
-              {ruleItems.map((rule) => (
-                <li key={rule} className="checkin-rule-item">
-                  <span className="checkin-rule-icon mt-0.5 h-6 w-6">
-                    <Icon name="check" className="h-3.5 w-3.5" />
-                  </span>
-                  <span>{rule}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section className={`${panelClass} p-5 sm:p-6`} aria-labelledby="amenities-title">
-            <SectionTitle id="amenities-title" title={t.checkinInfo.amenitiesTitle} icon="sun" />
-            <div className="grid gap-4 md:grid-cols-2">
-              {amenityGroups.map((group) => (
-                <div
-                  key={group.title}
-                  className="checkin-card checkin-card--interactive p-4"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="checkin-amenity-icon h-9 w-9">
-                      <Icon name={group.icon} className="h-[1.125rem] w-[1.125rem]" />
-                    </span>
-                    <h3 className={`${titleClass} text-sm font-semibold`}>{group.title}</h3>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {group.items.map((item) => (
-                      <span key={item} className="checkin-chip">
-                        {item}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className={`${panelClass} p-5 sm:p-6`} aria-labelledby="tips-title">
-            <SectionTitle id="tips-title" title={t.checkinInfo.tipsTitle} icon="mapPin" />
-            <div className="checkin-divided">
-              {tipItems.map((tip) => (
-                <div key={tip.text} className="flex gap-3 py-4 first:pt-0 last:pb-0">
-                  <Icon name={tip.icon} className={accentIconClass} />
-                  <p className={`${bodyTextClass} text-sm leading-6`}>{tip.text}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className={`${panelClass} p-5 sm:p-6`} aria-labelledby="neighborhood-title">
-            <SectionTitle id="neighborhood-title" eyebrow={ui.nearby} title={ui.neighborhood} icon="map" />
-            <p className={`${bodyTextClass} max-w-2xl text-sm leading-6`}>
-              {t.locationPanel.locationDescription}
-            </p>
-            <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(260px,0.65fr)]">
-              <div className="checkin-map-shell">
-                <DynamicApartmentLocationMap
-                  locale={locale}
-                  height={MAP_HEIGHT}
-                  zoom={12}
-                  className="min-h-[240px]"
-                  contentItems={mapContentItems}
-                />
-              </div>
-              {locationHighlights.length > 0 && (
-                <div className="grid content-start gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                  {locationHighlights.map(({ title, description }) => (
-                    <div
-                      key={`${title}-${description}`}
-                      className="checkin-card flex gap-3 p-3"
-                    >
-                      <Icon name="mapPin" className={accentIconClass} />
-                      <div>
-                        <h3 className={`${titleClass} text-sm font-semibold`}>{title}</h3>
-                        <p className={`${bodyTextClass} mt-1 text-xs leading-5`}>{description}</p>
+                      <div className="checkin-button-pair">
+                        <button
+                          type="button"
+                          onClick={handleSubmitArrivalRequest}
+                          disabled={arrivalRequestSubmitting}
+                          className="ui-btn ui-btn--primary ui-btn--sm"
+                        >
+                          {arrivalRequestSubmitting ? ui.saving : ui.sendRequest}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsRequestingArrival(false);
+                            setArrivalRequestError('');
+                          }}
+                          disabled={arrivalRequestSubmitting}
+                          className="ui-btn ui-btn--secondary ui-btn--sm"
+                        >
+                          {ui.cancel}
+                        </button>
                       </div>
                     </div>
-                  ))}
+                  )}
+
+                  {arrivalRequestSuccess && (
+                    <p className="ui-callout ui-callout--success checkin-note" role="status">
+                      {arrivalRequestSuccess}
+                    </p>
+                  )}
+                  {arrivalRequestError && !isRequestingArrival && (
+                    <p className="ui-callout ui-callout--danger checkin-note" role="alert">
+                      {arrivalRequestError}
+                    </p>
+                  )}
                 </div>
               )}
             </div>
-          </section>
-        </div>
+          </div>
+
+          <div className={rowClass}>
+            <Icon name="car" className={iconClass} />
+            <div className="checkin-row__body">
+              <h3 className={titleClass}>{ui.parking}</h3>
+              <p className={bodyTextClass}>
+                {t.checkinInfo.parkingDetail}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section id="wifi" className="checkin-panel" aria-labelledby="wifi-title">
+          <SectionTitle id="wifi-title" title={t.checkinInfo.wifiTitle} icon="wifi" />
+          <WifiAccessCard
+            networkLabel={ui.network}
+            passwordLabel={ui.password}
+            network={wifiNetwork}
+            password={wifiPassword}
+            unavailableLabel={ui.unavailable}
+            notice={wifiNotice}
+            copyLabel={ui.copy}
+            copiedLabel={ui.copied}
+            copiedTarget={copiedTarget === 'network' || copiedTarget === 'password' ? copiedTarget : null}
+            onCopy={copyToClipboard}
+            networkCopyLabel={panel.networkCopyLabel}
+            passwordCopyLabel={panel.passwordCopyLabel}
+          />
+        </section>
+
+        <section id="house-rules" className="checkin-panel" aria-labelledby="house-rules-title">
+          <SectionTitle id="house-rules-title" title={t.checkinInfo.houseRulesTitle} icon="shield" />
+          <ul className="checkin-rules">
+            {ruleItems.map((rule) => (
+              <li key={rule} className="checkin-rule-item">
+                <span className="checkin-rule-icon">
+                  <Icon name="check" className="checkin-rule-icon__svg" />
+                </span>
+                <span>{rule}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section id="check-out" className="checkin-panel" aria-labelledby="check-out-title">
+          <SectionTitle id="check-out-title" title={t.stay.hub.checkoutTitle} icon="clock" />
+          <p className="checkin-time checkin-time--large">{checkOutTime}</p>
+          <p className={bodyTextClass}>{t.stay.checkin.checkoutBy.replace('{time}', checkOutTime)}</p>
+          <div className={rowClass}>
+            <Icon name="key" className={iconClass} />
+            <div className="checkin-row__body">
+              <h3 className={titleClass}>{ui.keys}</h3>
+              <p className={bodyTextClass}>
+                {t.checkinInfo.keysDetail}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section id="emergency" className="checkin-panel" aria-labelledby="emergency-title">
+          <SectionTitle id="emergency-title" title={ui.emergency} icon="phone" />
+          <div className="checkin-divided">
+            {emergencyItems.map((item) => (
+              <div key={`${item.label}-${item.value}`} className="checkin-contact">
+                <div className="checkin-contact__text">
+                  <h3 className={titleClass}>{item.label}</h3>
+                  <p className={bodyTextClass}>{item.value}</p>
+                </div>
+                {item.href && (
+                  <a
+                    href={item.href}
+                    className="ui-icon-btn checkin-call shell-link"
+                    aria-label={`${ui.emergency}: ${item.label}`}
+                  >
+                    <Icon name="phone" className="checkin-action-icon" />
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="checkin-panel" aria-labelledby="good-to-know-title">
+          <SectionTitle id="good-to-know-title" title={ui.goodToKnow} icon="info" />
+          <div className="checkin-stack">
+            {goodToKnowItems.map((item) => (
+              <div key={item.label} className="checkin-line">
+                <Icon name={item.icon} className={iconClass} />
+                <p className={bodyTextClass}>
+                  <strong className={titleClass}>{item.label}:</strong>{' '}
+                  {item.detail}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="checkin-panel checkin-panel--wide" aria-labelledby="amenities-title">
+          <SectionTitle id="amenities-title" title={t.checkinInfo.amenitiesTitle} icon="sun" />
+          <div className="checkin-amenities">
+            {amenityGroups.map((group) => (
+              <div key={group.title} className="checkin-card">
+                <div className="checkin-row__head checkin-row__head--start">
+                  <span className="checkin-amenity-icon">
+                    <Icon name={group.icon} className="checkin-amenity-icon__svg" />
+                  </span>
+                  <h3 className={titleClass}>{group.title}</h3>
+                </div>
+                <div className="checkin-chips">
+                  {group.items.map((item) => (
+                    <span key={item} className="checkin-chip">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="checkin-panel" aria-labelledby="tips-title">
+          <SectionTitle id="tips-title" title={t.checkinInfo.tipsTitle} icon="mapPin" />
+          <div className="checkin-divided">
+            {tipItems.map((tip) => (
+              <div key={tip.text} className="checkin-line">
+                <Icon name={tip.icon} className={accentIconClass} />
+                <p className={bodyTextClass}>{tip.text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="checkin-panel checkin-panel--guide" aria-labelledby="checkin-guide-title">
+          <SectionTitle id="checkin-guide-title" title={t.shell.navGuide} icon="map" />
+          <p className={bodyTextClass}>{t.stay.checkin.guideText}</p>
+          <a href={`/${effLocale}/moments`} className="ui-btn ui-btn--link-arrow checkin-guide-link">
+            {t.stay.checkin.guideCta}
+          </a>
+        </section>
+
+        <section className="checkin-panel checkin-panel--wide" aria-labelledby="neighborhood-title">
+          <SectionTitle id="neighborhood-title" eyebrow={ui.nearby} title={ui.neighborhood} icon="map" />
+          <p className={bodyTextClass}>
+            {t.locationPanel.locationDescription}
+          </p>
+          <div className="checkin-map-layout">
+            <div className="checkin-map-shell">
+              <DynamicApartmentLocationMap
+                locale={locale}
+                height={MAP_HEIGHT}
+                zoom={12}
+                className="checkin-map"
+                contentItems={mapContentItems}
+                cartoBasemapsKey={cartoBasemapsKey}
+              />
+            </div>
+            {locationHighlights.length > 0 && (
+              <div className="checkin-highlights">
+                {locationHighlights.map(({ icon, title, description }) => (
+                  <div
+                    key={`${title}-${description}`}
+                    className="checkin-card checkin-line"
+                  >
+                    <LineIcon name={icon} className={accentIconClass} />
+                    <div>
+                      <h3 className={titleClass}>{title}</h3>
+                      <p className={`${bodyTextClass} checkin-copy--small`}>{description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );

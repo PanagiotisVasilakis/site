@@ -5,23 +5,19 @@ const mocks = vi.hoisted(() => ({
   isAdminRequest: vi.fn(),
   list: vi.fn(),
   getStatusCounts: vi.fn(),
-  findMany: vi.fn(),
-  count: vi.fn(),
 }));
 
 vi.mock('@/lib/rbac', () => ({ isAdminRequest: mocks.isAdminRequest }));
 vi.mock('@/lib/prisma-repositories/checkInRequestRepository', () => ({
   checkInRequestRepository: { list: mocks.list, getStatusCounts: mocks.getStatusCounts },
 }));
-vi.mock('@/lib/prisma', () => ({ prisma: { stayRequest: { findMany: mocks.findMany, count: mocks.count } } }));
 
 import { GET as listCheckInRequests } from '@/app/api/admin/check-in-requests/route';
-import { GET as listStayRequests } from '@/app/api/admin/stay-requests/route';
 import { toAdminListPage } from '@/lib/adminListPage';
 
 const id = (n: number) => `72000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
-function get(handler: typeof listStayRequests, path: string) {
+function get(handler: typeof listCheckInRequests, path: string) {
   return handler(new NextRequest(`http://localhost:3000${path}`), { params: Promise.resolve({}) });
 }
 
@@ -74,52 +70,5 @@ describe('admin check-in request list', () => {
 
     expect(response.status).toBe(422);
     expect(mocks.list).not.toHaveBeenCalled();
-  });
-});
-
-describe('admin stay request list', () => {
-  beforeEach(() => {
-    mocks.isAdminRequest.mockResolvedValue(true);
-    mocks.count.mockResolvedValue(42);
-  });
-
-  it('pages with a keyset cursor, drops the cursor row and reports the filtered total', async () => {
-    mocks.findMany.mockResolvedValue([{ id: id(2) }, { id: id(3) }, { id: id(4) }, { id: id(5) }]);
-
-    const response = await get(listStayRequests, `/api/admin/stay-requests?status=delivery_failed&limit=2&cursor=${id(2)}`);
-
-    expect(response.status).toBe(200);
-    expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { status: 'DELIVERY_FAILED' },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: 4,
-      cursor: { id: id(2) },
-    }));
-    expect(mocks.findMany.mock.calls[0][0]).not.toHaveProperty('skip');
-    expect(mocks.count).toHaveBeenCalledWith({ where: { status: 'DELIVERY_FAILED' } });
-    expect((await response.json()).data).toEqual({ requests: [{ id: id(3) }, { id: id(4) }], total: 42, nextCursor: id(4) });
-  });
-
-  it('keeps the default page of 200 without parameters', async () => {
-    mocks.findMany.mockResolvedValue([{ id: id(1) }]);
-
-    const response = await get(listStayRequests, '/api/admin/stay-requests');
-
-    expect(mocks.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: undefined, take: 202 }));
-    expect((await response.json()).data).toEqual({ requests: [{ id: id(1) }], total: 42, nextCursor: null });
-  });
-
-  it('rejects an invalid cursor with 422', async () => {
-    const response = await get(listStayRequests, '/api/admin/stay-requests?cursor=1%20OR%201');
-
-    expect(response.status).toBe(422);
-    expect(mocks.findMany).not.toHaveBeenCalled();
-  });
-
-  it('requires an admin session', async () => {
-    mocks.isAdminRequest.mockResolvedValue(false);
-
-    expect((await get(listStayRequests, '/api/admin/stay-requests')).status).toBe(401);
-    expect(mocks.findMany).not.toHaveBeenCalled();
   });
 });

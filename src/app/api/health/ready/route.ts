@@ -3,9 +3,10 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-// This must be updated whenever a schema migration is added. Readiness is not
-// merely a TCP/SELECT probe: the running binary and database schema must agree.
-const EXPECTED_MIGRATION = '20260715110000_remove_unused_legacy_models';
+// This must name the newest schema migration (tests/unit/readiness-migration.test.ts
+// enforces it). Readiness is not merely a TCP/SELECT probe: the running binary
+// and database schema must agree.
+const EXPECTED_MIGRATION = '20260930120000_minimise_user_data';
 const READINESS_CACHE_MS = 2_000;
 let cachedReadiness: { ready: boolean; expiresAt: number } | null = null;
 let readinessInFlight: Promise<boolean> | null = null;

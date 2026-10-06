@@ -4,8 +4,8 @@
     "categoryId": "moments",
     "name": "Viktoria Karelia Greek Costumes Collection",
     "name_el": "Συλλογή Ελληνικών Ενδυμασιών \"Βικτώρια Καρέλια\"",
-    "summary_en": "A refined collection of Greek regional costumes in central Kalamata.",
-    "summary_el": "Μια προσεγμένη συλλογή ελληνικών τοπικών ενδυμασιών στο κέντρο της Καλαμάτας.",
+    "summary_en": "A collection of Greek regional costumes in central Kalamata.",
+    "summary_el": "Συλλογή ελληνικών τοπικών ενδυμασιών στο κέντρο της Καλαμάτας.",
     "image": "/moments/viktoria-karelia.jpg",
     "heroImage": "/moments/viktoria-karelia-hero.jpg",
     "location": {
@@ -24,15 +24,14 @@
     "sourceUrls": [
       "https://www.vgkareliascollection.com/en/"
     ],
-    "descriptionTitle_en": "A charming journey into history and aesthetics.",
-    "descriptionTitle_el": "Ένα γοητευτικό ταξίδι στην ιστορία και την αισθητική.",
-    "description_en": "More than just an exhibition, an experiential journey into culture. Hosting one of the most complete collections of Greek regional costumes, we have created a space where history meets high aesthetics through an inventive and modern perspective.",
-    "description_el": "Περισσότερο από μια έκθεση, ένα βιωματικό ταξίδι στον πολιτισμό. Φιλοξενώντας μία από τις πληρέστερες συλλογές ελληνικών τοπικών ενδυμασιών, δημιουργήσαμε έναν χώρο όπου η ιστορία συναντά την υψηλή αισθητική μέσα από μια ευρηματική και σύγχρονη ματιά.",
+    "descriptionTitle_en": "Greek regional costumes, seen in a modern way.",
+    "descriptionTitle_el": "Ελληνικές τοπικές ενδυμασίες με σύγχρονη ματιά.",
+    "description_en": "The collection presents Greek regional costumes in a modern, carefully designed exhibition.",
+    "description_el": "Η συλλογή παρουσιάζει ελληνικές τοπικές ενδυμασίες σε μια σύγχρονη, προσεγμένη έκθεση.",
     "tags": [
       "museum",
       "culture"
-    ],
-    "featured": true
+    ]
   },
   {
     "id": "historical-folklore-museum",
@@ -55,22 +54,21 @@
     "sourceUrls": [
       "https://www.kalamata.gr/el/katoikoi/politismos/mouseia/istoriko-kai-laografiko-mouseio-kalamatas"
     ],
-    "descriptionTitle_en": "A living testament to local heritage.",
-    "descriptionTitle_el": "Μια ζωντανή μαρτυρία της τοπικής κληρονομιάς.",
-    "description_en": "Discover the rich history and traditions of Kalamata through authentic artifacts, traditional costumes, and everyday objects that tell the story of life in Messinia through the centuries.",
-    "description_el": "Ανακαλύψτε την πλούσια ιστορία και τις παραδόσεις της Καλαμάτας μέσα από αυθεντικά αντικείμενα, παραδοσιακές ενδυμασίες και καθημερινά αντικείμενα που αφηγούνται την ιστορία της ζωής στη Μεσσηνία ανά τους αιώνες.",
+    "descriptionTitle_en": "Everyday life in old Messinia.",
+    "descriptionTitle_el": "Η καθημερινή ζωή της παλιάς Μεσσηνίας.",
+    "description_en": "Artefacts, traditional costumes and everyday objects that tell the story of life in Messinia over the centuries.",
+    "description_el": "Αντικείμενα, παραδοσιακές ενδυμασίες και είδη καθημερινής χρήσης που αφηγούνται τη ζωή στη Μεσσηνία μέσα στους αιώνες.",
     "tags": [
       "museum",
       "culture",
       "history"
-    ],
-    "featured": true
+    ]
   },
   {
     "id": "archaeological-museum-messinia",
     "categoryId": "moments",
-    "name": "Archaeological Museum of Messinia",
-    "name_el": "Αρχαιολογικό Μουσείο Μεσσηνίας",
+    "name": "Archaeological Museum of Messenia (Benakeion)",
+    "name_el": "Μπενάκειο Αρχαιολογικό Μουσείο Μεσσηνίας",
     "summary_en": "Archaeological finds from Messinia, from prehistory through Byzantine times.",
     "summary_el": "Αρχαιολογικά ευρήματα της Μεσσηνίας, από την προϊστορία έως τα βυζαντινά χρόνια.",
     "image": "/moments/archaeological-museum.jpg",
@@ -88,16 +86,15 @@
     "sourceUrls": [
       "https://archaeologicalmuseums.culture.gov.gr/en/museum/5df34af3deca5e2d79e8c1d4/archaeological-museum-of-messinia"
     ],
-    "descriptionTitle_en": "A journey through 7,000 years of history.",
-    "descriptionTitle_el": "Ένα ταξίδι μέσα σε 7.000 χρόνια ιστορίας.",
+    "descriptionTitle_en": "From the 5th millennium BC to 1453.",
+    "descriptionTitle_el": "Από την 5η χιλιετία π.Χ. έως το 1453.",
     "description_en": "Housed in the renovated Old Municipal Market, the museum presents representative findings depicting the cultural journey of Messinia from the 5th millennium BC to 1453, organized into geographic sections: Kalamata, Messene, Trifylia, and Pylos.",
     "description_el": "Στεγασμένο στην ανακατασκευασμένη Παλαιά Δημοτική Αγορά, το μουσείο παρουσιάζει αντιπροσωπευτικά ευρήματα που απεικονίζουν την πολιτισμική διαδρομή της Μεσσηνίας από την 5η χιλιετία π.Χ. έως το 1453, οργανωμένα σε γεωγραφικές ενότητες: Καλαμάτα, Μεσσήνη, Τριφυλία και Πύλος.",
     "tags": [
       "museum",
       "archaeology",
       "history"
-    ],
-    "featured": true
+    ]
   },
   {
     "id": "war-museum-kalamata",
@@ -129,8 +126,7 @@
       "museum",
       "military",
       "history"
-    ],
-    "featured": true
+    ]
   },
   {
     "id": "railway-park-kalamata",
@@ -160,13 +156,289 @@
     ],
     "descriptionTitle_en": "A tribute to Greek railway heritage.",
     "descriptionTitle_el": "Ένας φόρος τιμής στην ελληνική σιδηροδρομική κληρονομιά.",
-    "description_en": "An open-air museum showcasing historic locomotives, carriages, and railway equipment. A unique destination for families and railway enthusiasts, preserving the memory of Peloponnese's narrow-gauge railway network.",
-    "description_el": "Ένα υπαίθριο μουσείο που παρουσιάζει ιστορικές ατμομηχανές, βαγόνια και σιδηροδρομικό εξοπλισμό. Ένας μοναδικός προορισμός για οικογένειες και λάτρεις των τρένων, διατηρώντας τη μνήμη του δικτύου στενών γραμμών της Πελοποννήσου.",
+    "description_en": "An open-air museum with historic locomotives, carriages and railway equipment, keeping the memory of the Peloponnese narrow-gauge network. Good for families.",
+    "description_el": "Υπαίθριο μουσείο με ιστορικές ατμομηχανές, βαγόνια και σιδηροδρομικό εξοπλισμό, που κρατά ζωντανή τη μνήμη του δικτύου στενής γραμμής της Πελοποννήσου. Καλή επιλογή για οικογένειες.",
     "tags": [
       "museum",
       "railway",
       "outdoor"
+    ]
+  },
+  {
+    "id": "kalamata-city-beach",
+    "categoryId": "moments",
+    "name": "Kalamata City Beach (Navarinou Avenue)",
+    "name_el": "Παραλία Καλαμάτας (λεωφόρος Ναυαρίνου)",
+    "summary_en": "A 2.5 km organised beach with calm, clear water, along the city's seafront.",
+    "summary_el": "Οργανωμένη παραλία 2,5 χλμ. με ήσυχα, πεντακάθαρα νερά, στο παραλιακό μέτωπο της πόλης.",
+    "address": "Navarinou Avenue, Kalamata",
+    "address_el": "Λεωφόρος Ναυαρίνου, Καλαμάτα",
+    "sourceUrls": [
+      "https://www.visitgreece.gr/en/mainland/peloponnese/kalamata",
+      "https://www.visitgreece.gr/el/mainland/peloponnese/kalamata"
     ],
-    "featured": true
+    "description_en": "The city's organised beach is 2.5 km long, with calm, clear water. The seafront runs along Navarinou Avenue, and you can walk, cycle or swim along it. On the west side of the seafront you will find the marina and the city port, with cafés and restaurants.",
+    "description_el": "Η οργανωμένη παραλία της πόλης έχει μήκος 2,5 χλμ., με ήσυχα, πεντακάθαρα νερά. Το παραλιακό μέτωπο εκτείνεται κατά μήκος της λεωφόρου Ναυαρίνου. Εδώ μπορείτε να κάνετε βόλτα, ποδήλατο ή μια δροσερή βουτιά. Στη δυτική παραλία θα βρείτε τη μαρίνα και το λιμάνι της πόλης, με καφέ και εστιατόρια.",
+    "tags": [
+      "beach",
+      "swimming",
+      "seafront"
+    ]
+  },
+  {
+    "id": "kalamata-central-market",
+    "categoryId": "moments",
+    "name": "Kalamata Central Market",
+    "name_el": "Κεντρική Αγορά Καλαμάτας",
+    "summary_en": "Taste Kalamata olives, buy Messinian olive oil and shop like a local.",
+    "summary_el": "Δοκιμάστε ελιές Καλαμών, προμηθευτείτε μεσσηνιακό ελαιόλαδο και ψωνίστε όπως οι ντόπιοι.",
+    "sourceUrls": [
+      "https://www.visitgreece.gr/en/routes/the-golden-route-of-the-olive",
+      "https://www.visitgreece.gr/el/routes/the-golden-route-of-the-olive"
+    ],
+    "description_en": "According to Visit Greece, the gastronomic pulse of Kalamata beats at the Central Market. Here you can taste the famous Kalamata olives, buy high-quality Messinian olive oil and shop the way locals do. Every Wednesday and Saturday the laiki, the outdoor market, takes place outside the Central Market building, with fresh products from all over Messinia.",
+    "description_el": "Σύμφωνα με το Visit Greece, ο γαστρονομικός παλμός της Καλαμάτας χτυπά στην Κεντρική Αγορά. Εδώ μπορείτε να δοκιμάσετε τις περίφημες ελιές Καλαμών, να προμηθευτείτε μεσσηνιακό ελαιόλαδο υψηλής ποιότητας και να ψωνίσετε όπως οι ντόπιοι. Κάθε Τετάρτη και Σάββατο, έξω από το κτίριο της Κεντρικής Αγοράς στήνεται η λαϊκή αγορά, με φρέσκα προϊόντα από όλη τη Μεσσηνία.",
+    "tags": [
+      "food"
+    ]
+  },
+  {
+    "id": "kalamata-olives-olive-oil",
+    "categoryId": "moments",
+    "name": "Kalamata Olives and Messinian Olive Oil",
+    "name_el": "Ελιές Καλαμών και μεσσηνιακό ελαιόλαδο",
+    "summary_en": "Messinia's olive grove is one of the oldest traditional groves in Greece and the largest, with more than 15 million olive trees.",
+    "summary_el": "Ο ελαιώνας της Μεσσηνίας είναι από τους παλαιότερους παραδοσιακούς ελαιώνες της Ελλάδας και ο μεγαλύτερος, με περισσότερα από 15 εκατομμύρια ελαιόδεντρα.",
+    "sourceUrls": [
+      "https://visitgreece.gr/en/routes/the-golden-route-of-the-olive",
+      "https://www.visitgreece.gr/el/routes/the-golden-route-of-the-olive",
+      "https://www.visitgreece.gr/mainland/peloponnese/kalamata/",
+      "https://www.visitgreece.gr/el/mainland/peloponnese/kalamata/"
+    ],
+    "description_en": "Messinia is one of the oldest traditional olive groves in Greece and also the largest, with more than 15 million olive trees, mostly of the small-fruited Koroneiki variety. After liberation from the Turks, Kalamata grew into a wealthy urban centre and an important port, thanks to the produce of the fertile Messinian land, such as olive oil, raisins and figs. The city's food life centres on the Central Market, where you can taste Kalamata olives and buy Messinian olive oil. Every Wednesday and Saturday the laiki, Kalamata's open-air market, sets up outside the Central Market building with fresh products from all over Messinia. Around the city, many estates and olive mills offer olive-tourism experiences, including visits to the olive groves, an introduction to how olive oil is made, and tastings.",
+    "description_el": "Η Μεσσηνία είναι ένας από τους παλαιότερους παραδοσιακούς ελαιώνες της Ελλάδας και ο μεγαλύτερος, με περισσότερα από 15 εκατομμύρια ελαιόδεντρα, κυρίως της μικρόκαρπης κορωνέικης ποικιλίας. Μετά την απελευθέρωση από τους Τούρκους, η Καλαμάτα εξελίχθηκε σε πλούσιο αστικό κέντρο και σημαντικό λιμάνι, χάρη στα προϊόντα της εύφορης μεσσηνιακής γης, όπως το λάδι, οι σταφίδες και τα σύκα. Η γαστρονομική καρδιά της πόλης είναι η Κεντρική Αγορά: εκεί μπορείτε να δοκιμάσετε ελιές Καλαμών και να αγοράσετε μεσσηνιακό ελαιόλαδο. Κάθε Τετάρτη και Σάββατο, έξω από το κτίριο της Κεντρικής Αγοράς, γίνεται η λαϊκή αγορά της Καλαμάτας, με φρέσκα προϊόντα από όλη τη Μεσσηνία. Γύρω από την πόλη, πολλά κτήματα και ελαιοτριβεία προσφέρουν εμπειρίες ελαιοτουρισμού, όπως επίσκεψη στους ελαιώνες, γνωριμία με την παραγωγή του ελαιολάδου και γευστικές δοκιμές.",
+    "tags": [
+      "food",
+      "local-products",
+      "olive-oil"
+    ]
+  },
+  {
+    "id": "lalagia",
+    "categoryId": "moments",
+    "name": "Lalagia",
+    "name_el": "Λαλάγια",
+    "summary_en": "Crisp ribbons of dough fried in olive oil, a festive treat in Messinia and Laconia.",
+    "summary_el": "Τραγανά «κορδόνια» ζύμης τηγανισμένα σε ελαιόλαδο, που δεν λείπουν από τα γιορτινά τραπέζια της Μεσσηνίας και της Λακωνίας.",
+    "sourceUrls": [
+      "https://www.visitgreece.gr/en/routes/the-golden-route-of-the-olive",
+      "https://www.visitgreece.gr/el/routes/the-golden-route-of-the-olive",
+      "https://www.visitgreece.gr/mainland/peloponnese/"
+    ],
+    "description_en": "Lalagia (Visit Greece also spells them lalangia) are a festive treat in Messinia and Laconia and are always on holiday tables. Ribbons of dough are fried in olive oil until crisp. You eat them plain, or with graviera cheese and honey.",
+    "description_el": "Τα λαλάγια είναι κέρασμα των γιορτών στη Μεσσηνία και τη Λακωνία και δεν λείπουν ποτέ από το γιορτινό τραπέζι. «Κορδόνια» ζύμης τηγανίζονται σε ελαιόλαδο μέχρι να γίνουν τραγανά. Τα δοκιμάζετε σκέτα ή με γραβιέρα και μέλι.",
+    "tags": [
+      "food",
+      "local-products"
+    ]
+  },
+  {
+    "id": "kalamata-castle-old-town",
+    "categoryId": "moments",
+    "name": "Kalamata Castle and Old Town",
+    "name_el": "Κάστρο και Παλιά Πόλη Καλαμάτας",
+    "summary_en": "The legendary 'Castle of Isabeau' and the Old Town around it.",
+    "summary_el": "Το «κάστρο της Ιζαμπώ» και η παλιά πόλη γύρω του.",
+    "sourceUrls": [
+      "https://www.visitgreece.gr/mainland/peloponnese/kalamata/",
+      "https://www.visitgreece.gr/el/mainland/peloponnese/kalamata/",
+      "https://www.visitgreece.gr/en/inspirations/castles"
+    ],
+    "description_en": "The 'Castle of Isabeau' is Kalamata's landmark. Every summer the Kalamata International Dance Festival brings it to life. The Old Town spreads out around it: a favourite meeting place for young people, and home to much of the city's nightlife.",
+    "description_el": "Το «κάστρο της Ιζαμπώ» είναι το σημείο αναφοράς της Καλαμάτας. Κάθε καλοκαίρι ζωντανεύει με το Διεθνές Φεστιβάλ Χορού Καλαμάτας. Γύρω του απλώνεται η παλιά πόλη, αγαπημένο στέκι των νέων, με μεγάλο μέρος της νυχτερινής ζωής της πόλης.",
+    "tags": [
+      "castle",
+      "history",
+      "old-town",
+      "culture"
+    ]
+  },
+  {
+    "id": "ancient-messene",
+    "categoryId": "moments",
+    "name": "Ancient Messene",
+    "name_el": "Αρχαία Μεσσήνη",
+    "summary_en": "One of the best-preserved ancient cities in Greece, about 32 km by road from Kalamata.",
+    "summary_el": "Μία από τις καλύτερα διατηρημένες αρχαίες πόλεις της Ελλάδας, περίπου 32 χλμ. οδικώς από την Καλαμάτα.",
+    "phone": "+30 27210 63100",
+    "phones": [
+      "+30 27210 63100",
+      "+30 27210 26410"
+    ],
+    "address": "Ancient Messene, Messene 24002",
+    "address_el": "Αρχαία Μεσσήνη, Μεσσήνη 24002",
+    "sourceUrls": [
+      "https://www.visitgreece.gr/en/experiences/culture/archaeological-sites-monuments/ancient-messene",
+      "https://www.visitgreece.gr/el/experiences/culture/archaeological-sites-monuments/ancient-messene"
+    ],
+    "description_en": "Built at the foot of Mount Ithome, among olive groves and vineyards. It was founded in 369 BC by the Theban general Epaminondas, after the Messenians were freed from Spartan rule, and was planned from the start as an organised city, with public buildings, sanctuaries and an extensive fortification system. Its wall, about 9 km long, encircles the city; the Arcadian Gate is the most prominent of its monumental gates, and the wall offers panoramic views over the Messenian plain. By car it is about 32 km from Kalamata, roughly a 45-minute drive.",
+    "description_el": "Χτισμένη στους πρόποδες του όρους Ιθώμη, ανάμεσα σε λιόδεντρα και αμπέλια. Ιδρύθηκε το 369 π.Χ. από τον Θηβαίο στρατηγό Επαμεινώνδα, μετά την απελευθέρωση των Μεσσηνίων από τους Σπαρτιάτες, και σχεδιάστηκε εξαρχής ως οργανωμένη πόλη, με δημόσια κτίρια, ιερά και εκτεταμένο οχυρωματικό σύστημα. Το τείχος της, μήκους περίπου 9 χλμ., περικλείει την πόλη με μνημειακές πύλες, από τις οποίες ξεχωρίζει η Αρκαδική, και προσφέρει πανοραμική θέα στον μεσσηνιακό κάμπο. Με το αυτοκίνητο απέχει περίπου 32 χλμ. από την Καλαμάτα, γύρω στα 45 λεπτά.",
+    "tags": [
+      "archaeology",
+      "history",
+      "day-trip",
+      "outdoor"
+    ]
+  },
+  {
+    "id": "polylimnio-gorge",
+    "categoryId": "moments",
+    "name": "Polylimnio, Messenia",
+    "name_el": "Πολυλίμνιο Μεσσηνίας",
+    "summary_en": "A green gorge of about 15–17 natural lakes and small waterfalls, about 33 km by road from Kalamata.",
+    "summary_el": "Καταπράσινο φαράγγι με περίπου 15–17 φυσικές λίμνες και μικρούς καταρράκτες, περίπου 33 χλμ. οδικώς από την Καλαμάτα.",
+    "address": "Near Charavgi, off the Kalamata–Pylos road",
+    "address_el": "Κοντά στο χωριό Χαραυγή, λίγο έξω από τον δρόμο Καλαμάτας–Πύλου",
+    "sourceUrls": [
+      "https://www.visitgreece.gr/en/experiences/nature/gorges/polylimnio-messenia",
+      "https://www.visitgreece.gr/el/experiences/nature/gorges/polylimnio-messenia"
+    ],
+    "description_en": "Polylimnio lies just off the Kalamata–Pylos road, near the village of Charavgi. About 15–17 natural lakes are linked by a winding stream and small cascades, which form natural pools of turquoise water. The signposted route follows the water for about 3 km and takes roughly 2 hours, not counting stops. Look for the Kadoula waterfall, about 25 m high, and the large Lake Kadi, the most popular spot for a rest and, when conditions allow, a swim. The trail is rated easy to moderate and needs a good basic level of fitness. Wear closed, non-slip shoes, and avoid winter and early spring, when the water can run strong and the rocks get slippery. From Kalamata it is about 33 km, around 50 minutes by car.",
+    "description_el": "Το Πολυλίμνιο βρίσκεται λίγο έξω από τον δρόμο Καλαμάτας–Πύλου, κοντά στο χωριό Χαραυγή. Περίπου 15–17 φυσικές λίμνες συνδέονται μεταξύ τους με ένα ρέμα και μικρούς καταρράκτες, που σχηματίζουν «πισίνες» με γαλαζοπράσινα νερά. Η σηματοδοτημένη διαδρομή ακολουθεί το νερό για περίπου 3 χλμ. και θα χρειαστείτε γύρω στις 2 ώρες χωρίς τις στάσεις. Αξίζει να δείτε τον καταρράκτη Καδούλα, ύψους περίπου 25 μ., και τη μεγάλη λίμνη Κάδη, το πιο δημοφιλές σημείο για στάση και, όταν το επιτρέπουν οι συνθήκες, για μια βουτιά. Το μονοπάτι θεωρείται εύκολο έως μέτριο και θέλει καλή βασική φυσική κατάσταση. Φορέστε κλειστά, αντιολισθητικά παπούτσια και αποφύγετε τον χειμώνα και τις αρχές της άνοιξης, όταν τα νερά μπορεί να είναι ορμητικά και τα βράχια γλιστερά. Από την Καλαμάτα απέχει περίπου 33 χλμ., γύρω στα 50 λεπτά με το αυτοκίνητο.",
+    "tags": [
+      "nature",
+      "outdoor",
+      "day-trip"
+    ]
+  },
+  {
+    "id": "niokastro-pylos-castle",
+    "categoryId": "moments",
+    "name": "Niokastro (Pylos Castle)",
+    "name_el": "Νιόκαστρο (Κάστρο Πύλου)",
+    "summary_en": "The Ottoman-built fortress above Navarino Bay, home to the Archaeological Museum of Pylos.",
+    "summary_el": "Το φρούριο που έχτισαν οι Οθωμανοί πάνω από τον κόλπο του Ναυαρίνου, όπου στεγάζεται το Αρχαιολογικό Μουσείο Πύλου.",
+    "address": "Pylos",
+    "address_el": "Πύλος",
+    "sourceUrls": [
+      "https://www.visitgreece.gr/en/experiences/culture/fortifications/niokastro",
+      "https://www.visitgreece.gr/el/experiences/culture/fortifications/niokastro"
+    ],
+    "description_en": "It stands over Navarino Bay. The Ottomans built it in 1573, after the Battle of Lepanto, for the age of gunpowder: low, thick walls, geometrically precise bastions and a citadel reinforced by a dry moat. Inside you will find the Church of the Transfiguration of the Saviour, a former Ottoman mosque, as well as the Archaeological Museum of Pylos and exhibitions of underwater antiquities. It is about 700 m by road from the central square of Pylos.",
+    "description_el": "Δεσπόζει πάνω από τον κόλπο του Ναυαρίνου. Χτίστηκε το 1573 από τους Οθωμανούς, μετά τη Ναυμαχία της Ναυπάκτου, για την εποχή των πυροβόλων: χαμηλά, παχιά τείχη, προμαχώνες με γεωμετρική ακρίβεια και ακρόπολη ενισχυμένη με άνυδρη τάφρο. Στο εσωτερικό του θα βρείτε τον ναό της Μεταμόρφωσης του Σωτήρος, πρώην οθωμανικό τέμενος, καθώς και το Αρχαιολογικό Μουσείο Πύλου και εκθέσεις εναλίων αρχαιοτήτων. Απέχει οδικώς περίπου 700 μ. από την κεντρική πλατεία της Πύλου.",
+    "tags": [
+      "castle",
+      "history",
+      "museum",
+      "day-trip"
+    ]
+  },
+  {
+    "id": "methoni-castle",
+    "categoryId": "moments",
+    "name": "Methoni Castle",
+    "name_el": "Κάστρο της Μεθώνης",
+    "summary_en": "A Venetian castle that fills a whole promontory, with the sea on three sides.",
+    "summary_el": "Ενετικό κάστρο που απλώνεται σε ολόκληρο το ακρωτήριο, με θάλασσα από τρεις πλευρές.",
+    "phone": "+30 27230 28758",
+    "address": "Methoni, Messenia 24006",
+    "address_el": "Μεθώνη, Μεσσηνία 24006",
+    "sourceUrls": [
+      "https://www.visitgreece.gr/en/experiences/culture/fortifications/the-castle-of-methoni"
+    ],
+    "description_en": "Built by the Venetians in the early 13th century on the western coast of Messinia, it is one of the most important fortified complexes in the Mediterranean. You cross a stone bridge with 14 arches and enter through a gate with the lion of Saint Mark. Inside are the ruins of Venetian mansions and Ottoman baths, the Loredan and Bembo bastions, and the Church of the Transfiguration of the Saviour, built in 1830. A paved road from the Sea Gate leads to the Bourzi, the fortified islet at the southern edge, with its octagonal tower.",
+    "description_el": "Χτίστηκε από τους Ενετούς στις αρχές του 13ου αιώνα στη δυτική ακτή της Μεσσηνίας και είναι από τα σημαντικότερα οχυρωματικά συγκροτήματα της Μεσογείου. Περνάτε μια πέτρινη γέφυρα με 14 καμάρες και μπαίνετε από την πύλη με το λιοντάρι του Αγίου Μάρκου. Μέσα θα δείτε ερείπια ενετικών αρχοντικών και οθωμανικών λουτρών, τους προμαχώνες Λορεντάν και Μπέμπο και τον ναό της Μεταμόρφωσης του Σωτήρος, που χτίστηκε το 1830. Από την Πύλη της Θάλασσας ένας πλακόστρωτος δρόμος οδηγεί στο Μπούρτζι, το οχυρωμένο νησάκι στη νότια άκρη, με τον οκταγωνικό του πύργο.",
+    "tags": [
+      "castle",
+      "history",
+      "day-trip"
+    ]
+  },
+  {
+    "id": "koroni-castle",
+    "categoryId": "moments",
+    "name": "Koroni Castle",
+    "name_el": "Κάστρο Κορώνης",
+    "summary_en": "A Venetian castle that still has homes and churches inside its walls.",
+    "summary_el": "Βενετσιάνικο κάστρο που έχει ακόμη σπίτια και εκκλησίες μέσα στα τείχη του.",
+    "address": "Koroni",
+    "address_el": "Κορώνη",
+    "sourceUrls": [
+      "https://www.visitgreece.gr/en/experiences/culture/fortifications/the-castle-of-koroni",
+      "https://www.visitgreece.gr/el/experiences/culture/fortifications/the-castle-of-koroni"
+    ],
+    "description_en": "It stands on the Akritas promontory, at the southern end of the Messinian Gulf. The Venetians built it in the 13th century on the ruins of Byzantine and ancient fortifications, and the Ottomans reinforced it in the 16th. An uphill path from the pier leads through narrow lanes to the main gate on the north side. Inside: carved tombs, underground vaulted rainwater cisterns, an octagonal Ottoman tower, the 12th-century Church of Saint Sophia, the Church of Saint Charalambos (once a mosque) and the Monastery of Ioannis Prodromos. From the castle plateau you see the Messinian Gulf and the peaks of Taygetus. For a swim: Zaga and Peroulia beaches.",
+    "description_el": "Δεσπόζει στο ακρωτήριο Ακρίτας, στο νότιο άκρο του Μεσσηνιακού κόλπου. Χτίστηκε από τους Ενετούς τον 13ο αιώνα πάνω στα ερείπια βυζαντινής και αρχαίας οχύρωσης και ενισχύθηκε από τους Οθωμανούς τον 16ο. Η ανηφορική διαδρομή από τον μόλο σας οδηγεί μέσα από στενά καλντερίμια στην κεντρική πύλη, στη βόρεια πλευρά. Μέσα θα δείτε λαξευμένους τάφους, υπόγειες θολωτές δεξαμενές για το νερό της βροχής, έναν οκταγωνικό οθωμανικό πύργο, τους ναούς της Αγίας Σοφίας του 12ου αιώνα και του Αγίου Χαραλάμπους, που παλιότερα ήταν τζαμί, και το μοναστήρι του Ιωάννη Προδρόμου. Από το πλάτωμα του κάστρου η θέα ανοίγει στον Μεσσηνιακό κόλπο και στις κορυφές του Ταΰγετου. Για μπάνιο: οι παραλίες Ζάγγα και Περούλια.",
+    "tags": [
+      "castle",
+      "history",
+      "day-trip"
+    ]
+  },
+  {
+    "id": "gialova-lagoon-voidokilia",
+    "categoryId": "moments",
+    "name": "Gialova Lagoon and Voidokilia Beach",
+    "name_el": "Λιμνοθάλασσα Γιάλοβας και παραλία Βοϊδοκοιλιάς",
+    "summary_en": "A Natura 2000 wetland outside Pylos, with more than 270 bird species, and Voidokilia, a near-semicircle of fine sand.",
+    "summary_el": "Υγρότοπος Natura 2000 λίγο έξω από την Πύλο, με περισσότερα από 270 είδη πουλιών, και η Βοϊδοκοιλιά, ένα σχεδόν τέλειο ημικύκλιο από ψιλή άμμο.",
+    "address": "Western Messinia, just outside Pylos",
+    "address_el": "Δυτική Μεσσηνία, λίγο έξω από την Πύλο",
+    "sourceUrls": [
+      "https://www.visitgreece.gr/en/experiences/nature/lakes-lagoons/gialova-lagoon-and-voidokilia-beach",
+      "https://www.visitgreece.gr/el/experiences/nature/lakes-lagoons/gialova-lagoon-and-voidokilia-beach"
+    ],
+    "description_en": "In western Messinia, just outside Pylos. The Gialova Lagoon is one of the most important wetlands in the Peloponnese and part of the Natura 2000 network. It hosts more than 270 bird species, including herons, flamingos and raptors, and is a stopover for birds travelling between Europe and Africa. The trails around the lagoon suit gentle walks and nature watching. Voidokilia beach forms a near-perfect semicircle of fine, pale sand and turquoise water. Start with a walk around the lagoon and finish with a swim at Voidokilia.",
+    "description_el": "Στη δυτική Μεσσηνία, λίγο έξω από την Πύλο. Η λιμνοθάλασσα της Γιάλοβας είναι από τους σημαντικότερους υγροτόπους της Πελοποννήσου και ανήκει στο δίκτυο Natura 2000. Φιλοξενεί περισσότερα από 270 είδη πουλιών, ανάμεσά τους ερωδιούς, φλαμίνγκο και αρπακτικά, και είναι σταθμός για τα πουλιά που ταξιδεύουν ανάμεσα στην Ευρώπη και την Αφρική. Τα μονοπάτια γύρω από τη λιμνοθάλασσα είναι ιδανικά για ήπιους περιπάτους και παρατήρηση της φύσης. Η παραλία της Βοϊδοκοιλιάς σχηματίζει ένα σχεδόν τέλειο ημικύκλιο με ψιλή, ανοιχτόχρωμη άμμο και γαλαζοπράσινα νερά. Ξεκινήστε με έναν περίπατο γύρω από τη λιμνοθάλασσα και κλείστε με μια βουτιά στη Βοϊδοκοιλιά.",
+    "tags": [
+      "nature",
+      "beach",
+      "birdwatching",
+      "day-trip",
+      "outdoor"
+    ]
+  },
+  {
+    "id": "palace-of-nestor",
+    "categoryId": "moments",
+    "name": "Palace of Nestor",
+    "name_el": "Ανάκτορο του Νέστορα",
+    "summary_en": "A Mycenaean palace from the 13th century BC, identified as the seat of the mythical King Nestor.",
+    "summary_el": "Μυκηναϊκό ανάκτορο του 13ου αιώνα π.Χ., που ταυτίζεται με την έδρα του μυθικού βασιλιά Νέστορα.",
+    "phone": "+30 27630 31437",
+    "address": "Ano Englianos, Messinia 24600",
+    "sourceUrls": [
+      "https://www.visitgreece.gr/en/experiences/culture/archaeological-sites-monuments/palace-of-nestor"
+    ],
+    "description_en": "Built in the 13th century BC, it was one of the most important administrative centres of its era and is identified as the seat of the mythical King Nestor. The Linear B tablets found here are considered among the most significant administrative archives of Mycenaean Greece. It is about 18.5 km from Pylos, roughly a 25-minute drive.",
+    "description_el": "Χτίστηκε τον 13ο αιώνα π.Χ. και ήταν από τα σημαντικότερα διοικητικά κέντρα της εποχής του. Ταυτίζεται με την έδρα του μυθικού βασιλιά Νέστορα. Οι πινακίδες της Γραμμικής Β που βρέθηκαν εδώ θεωρούνται από τα σημαντικότερα διοικητικά αρχεία της μυκηναϊκής Ελλάδας. Απέχει περίπου 18,5 χλμ. από την Πύλο, περίπου 25 λεπτά με το αυτοκίνητο.",
+    "tags": [
+      "archaeology",
+      "history",
+      "day-trip"
+    ]
+  },
+  {
+    "id": "mount-taygetos",
+    "categoryId": "moments",
+    "name": "Mount Taygetos",
+    "name_el": "Ταΰγετος",
+    "summary_en": "Kalamata lies in the shadow of Taygetos, whose 2,407 m summit is the highest peak in the Peloponnese.",
+    "summary_el": "Η Καλαμάτα απλώνεται στον ίσκιο του Ταΰγετου, με την ψηλότερη κορυφή της Πελοποννήσου (2.407 μ.).",
+    "sourceUrls": [
+      "https://visitgreece.gr/en/mainland/peloponnese/kalamata",
+      "https://visitgreece.gr/el/mainland/peloponnese/kalamata",
+      "https://visitgreece.gr/en/mainland/peloponnese",
+      "https://visitgreece.gr/el/mainland/peloponnese",
+      "https://visitgreece.gr/en/mainland/peloponnese/sparta",
+      "https://visitgreece.gr/el/mainland/peloponnese/sparta"
+    ],
+    "description_en": "Steep peaks and wild beauty. Sparta, north-east of the mountain, is a gateway to Taygetos, with mountain landscapes and hiking trails.",
+    "description_el": "Απόκρημνες κορυφές και άγρια ομορφιά. Η Σπάρτη, βορειοανατολικά του βουνού, είναι πύλη προς τον Ταΰγετο, με ορεινά τοπία και πεζοπορικά μονοπάτια.",
+    "tags": [
+      "taygetos",
+      "mountain",
+      "outdoor"
+    ]
   }
 ]

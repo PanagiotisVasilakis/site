@@ -28,7 +28,7 @@ export const POST = withErrorHandler(async (
   const parsed = schema.safeParse(await readJsonBody(request, 8 * 1_024));
   if (!parsed.success) throw new ValidationError(parsed.error.issues);
   const { id } = await context.params;
-  if (!z.string().uuid().safeParse(id).success) throw new ApiError(ApiErrorCode.NOT_FOUND, 'Booking not found');
+  if (!z.uuid().safeParse(id).success) throw new ApiError(ApiErrorCode.NOT_FOUND, 'Booking not found');
 
   try {
     const grant = await issueBookingClaimGrant({
@@ -53,7 +53,7 @@ export const POST = withErrorHandler(async (
       if (error.code === 'BOOKING_NOT_IN_ACCESS_WINDOW') {
         throw new ApiError(
           ApiErrorCode.CONFLICT,
-          'Claim tokens can be issued from 7 days before check-in until the check-out date',
+          'Claim tokens can be issued from 7 days before check-in until the check-out date (UTC calendar dates)',
         );
       }
       throw new ApiError(ApiErrorCode.NOT_FOUND, 'Booking not found');

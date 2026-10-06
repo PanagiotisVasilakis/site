@@ -10,12 +10,19 @@ import {
   validateRequestBody,
   withErrorHandler,
 } from '@/lib/apiErrorHandler';
+import { logger } from '@/lib/logger-enterprise';
 import {
   buildCSPDirective,
   buildPermissionsPolicy,
   generateNonce,
   getSecurityConfig,
 } from '@/lib/security-config';
+
+function silenceLogger() {
+  vi.spyOn(logger, 'info').mockImplementation(() => {});
+  vi.spyOn(logger, 'debug').mockImplementation(() => {});
+  vi.spyOn(logger, 'error').mockImplementation(() => {});
+}
 
 function jsonRequest(body: BodyInit, contentType = 'application/json') {
   return new NextRequest('https://guest.test/api/example', {
@@ -89,17 +96,20 @@ describe('API response and deadline middleware', () => {
     const response = createSuccessResponse({ accepted: true }, 201, 'correlation-1');
     expect(response.status).toBe(201);
     expect(response.headers.get('x-correlation-id')).toBe('correlation-1');
-    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+    const body = await response.json();
+    expect(body).toEqual(expect.objectContaining({
       success: true,
       data: { accepted: true },
       meta: expect.objectContaining({ correlationId: 'correlation-1', version: '1.0' }),
     }));
+    expect(body.meta).not.toHaveProperty('processingTime');
   });
 
   it('maps known API errors to stable status, code and correlation headers', async () => {
+    silenceLogger();
     const wrapped = withErrorHandler(async () => {
       throw new ApiError(ApiErrorCode.FORBIDDEN, 'Denied');
-    }, { enableErrorLogging: false, enablePerformanceLogging: false });
+    });
     const response = await wrapped(new NextRequest('https://guest.test/api/example'), { params: Promise.resolve({}) });
     expect(response.status).toBe(403);
     expect(response.headers.get('x-error-code')).toBe(ApiErrorCode.FORBIDDEN);
@@ -107,9 +117,10 @@ describe('API response and deadline middleware', () => {
   });
 
   it('converts unexpected exceptions into a non-leaking internal error', async () => {
+    silenceLogger();
     const wrapped = withErrorHandler(async () => {
       throw new Error('database password leaked here');
-    }, { enableErrorLogging: false, enablePerformanceLogging: false });
+    });
     const response = await wrapped(new NextRequest('https://guest.test/api/example'), { params: Promise.resolve({}) });
     expect(response.status).toBe(500);
     const text = await response.text();
@@ -118,6 +129,7 @@ describe('API response and deadline middleware', () => {
   });
 
   it('aborts cooperative reads at the configured deadline', async () => {
+    silenceLogger();
     vi.useFakeTimers();
     let aborted = false;
     const wrapped = withErrorHandler(async (_request, { signal }) => {
@@ -128,7 +140,7 @@ describe('API response and deadline middleware', () => {
         }, { once: true });
       });
       return NextResponse.json({ unreachable: true });
-    }, { enableErrorLogging: false, enablePerformanceLogging: false, requestTimeoutMs: 25 });
+    }, { requestTimeoutMs: 25 });
     const pending = wrapped(new NextRequest('https://guest.test/api/example'), { params: Promise.resolve({}) });
     await vi.advanceTimersByTimeAsync(25);
     const response = await pending;
@@ -138,12 +150,13 @@ describe('API response and deadline middleware', () => {
   });
 
   it('waits for a non-cooperative mutation to settle before returning its real result', async () => {
+    silenceLogger();
     vi.useFakeTimers();
     let settled = false;
     const wrapped = withErrorHandler(async () => {
       await new Promise<void>((resolve) => setTimeout(() => { settled = true; resolve(); }, 100));
       return NextResponse.json({ committed: true });
-    }, { enableErrorLogging: false, enablePerformanceLogging: false, requestTimeoutMs: 25 });
+    }, { requestTimeoutMs: 25 });
     let responseSettled = false;
     const pending = wrapped(new NextRequest('https://guest.test/api/example', { method: 'PATCH' }), {
       params: Promise.resolve({}),
@@ -172,6 +185,30 @@ describe('security header builders', () => {
     expect(getSecurityConfig().headers.hsts.enabled).toBe(true);
   });
 
+  it('allows no third-party connect-src origin (the map calls no routing service)', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    expect(getSecurityConfig().csp.directives.connectSrc).toEqual(["'self'"]);
+    vi.stubEnv('NODE_ENV', 'development');
+    expect(getSecurityConfig().csp.directives.connectSrc).toEqual(["'self'", 'wss:', 'ws:']);
+  });
+
+  it.each(['production', 'development'])('serves fonts and styles only from the own origin in %s', (nodeEnv) => {
+    vi.stubEnv('NODE_ENV', nodeEnv);
+    const { directives } = getSecurityConfig().csp;
+    // Fonts are self-hosted via next/font/local (identity §2.3); no Google Fonts origin remains.
+    expect(directives.styleSrc).toEqual(["'self'", "'unsafe-inline'"]);
+    expect(directives.fontSrc).toEqual(["'self'", 'data:']);
+    expect(buildCSPDirective(directives)).not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
+  });
+
+  it('lists no unsafe-inline script source in production (nonces cover inline scripts)', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const { csp } = getSecurityConfig();
+    expect(csp.useNonce).toBe(true);
+    expect(csp.directives.scriptSrc).toEqual(["'self'"]);
+    expect(buildCSPDirective(csp.directives, 'abc123')).toContain("script-src 'self' 'nonce-abc123';");
+  });
+
   it('does not require CORP from cross-origin map tiles in production', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     const { createSecurityMiddleware } = await import('@/lib/security-middleware-edge');
@@ -182,6 +219,34 @@ describe('security header builders', () => {
     expect(response.headers.get('cross-origin-embedder-policy')).toBe('unsafe-none');
     expect(response.headers.get('cross-origin-opener-policy')).toBe('same-origin');
   });
+
+  it('sends production HSTS without the preload directive', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    const { createSecurityMiddleware } = await import('@/lib/security-middleware-edge');
+
+    const response = await createSecurityMiddleware()(new NextRequest('https://guide.example/en'));
+    const hsts = response.headers.get('strict-transport-security') ?? '';
+
+    // Preload list inclusion is hard to reverse; includeSubDomains awaits the hostname layout (R-227).
+    expect(hsts.split(';').map((directive) => directive.trim().toLowerCase())).not.toContain('preload');
+    expect(hsts).toBe('max-age=63072000; includeSubDomains');
+  });
+
+  it.each(['production', 'development'])(
+    'advertises only the request headers and methods the API uses in %s preflights',
+    async (nodeEnv) => {
+      vi.stubEnv('NODE_ENV', nodeEnv);
+      const { createSecurityMiddleware } = await import('@/lib/security-middleware-edge');
+
+      const response = await createSecurityMiddleware()(
+        new NextRequest('https://guide.example/api/admin/rate-periods/1', { method: 'OPTIONS' }),
+      );
+
+      // Cookie auth only (no API keys); route handlers export GET, POST, PUT, PATCH, DELETE (R-226, R-228).
+      expect(response.headers.get('access-control-allow-headers')).toBe('Content-Type');
+      expect(response.headers.get('access-control-allow-methods')).toBe('GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    },
+  );
 
   it('adds a nonce while removing unsafe-inline from script-src', () => {
     const directives = getSecurityConfig().csp.directives;

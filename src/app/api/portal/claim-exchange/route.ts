@@ -9,7 +9,6 @@ import {
   ValidationError,
   withErrorHandler,
 } from '@/lib/apiErrorHandler';
-import { createAPISecurityMiddleware } from '@/lib/api-security-middleware';
 import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 import {
   clearPresentedPortalClaimExchange,
@@ -32,9 +31,6 @@ const exchange = withErrorHandler(async (request: NextRequest) => {
   if (!(await getFeatureFlagsAsync()).portalEnabled) {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }
-  const early = await createAPISecurityMiddleware()(request);
-  if (early) return early;
-
   const parsed = schema.safeParse(await readJsonBody(request, 4 * 1_024));
   if (!parsed.success) throw new ValidationError(parsed.error.issues);
   const rateLimit = await checkSensitiveRateLimit(request, {

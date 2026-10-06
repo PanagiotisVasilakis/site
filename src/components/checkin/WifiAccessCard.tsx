@@ -1,7 +1,8 @@
 type WifiCopyTarget = 'network' | 'password';
 
 interface WifiAccessCardProps {
-  title: string;
+  /** Omitted when the card sits under its own section heading (check-in page, identity §9.8). */
+  title?: string;
   networkLabel: string;
   passwordLabel: string;
   network: string;
@@ -62,14 +63,14 @@ export default function WifiAccessCard({
   ];
 
   return (
-    <div className="min-w-0 flex-1">
-      <h3 className="checkin-title text-sm font-semibold">{title}</h3>
-      <dl className="checkin-card checkin-divided mt-3">
+    <div className="wifi-card">
+      {title ? <h3 className="checkin-title">{title}</h3> : null}
+      <dl className="checkin-card checkin-divided wifi-card__list">
         {items.map((item) => (
-          <div key={item.target} className="grid gap-2 p-3 sm:grid-cols-[5.75rem_minmax(0,1fr)] sm:items-center">
-            <dt className="checkin-muted-text text-xs font-medium">{item.label}</dt>
-            <dd className="flex min-w-0 flex-wrap items-center gap-2">
-              <span className="checkin-value min-w-0 flex-1 whitespace-nowrap font-mono text-[0.8125rem] font-semibold">
+          <div key={item.target} className="wifi-card__row">
+            <dt className="checkin-muted-text">{item.label}</dt>
+            <dd className="wifi-card__value">
+              <span className="checkin-value checkin-mono wifi-card__text break-all">
                 {item.value}
               </span>
               <button
@@ -79,14 +80,14 @@ export default function WifiAccessCard({
                 className="checkin-copy-action"
                 aria-label={item.ariaLabel}
               >
-                <span className="h-3.5 w-3.5"><CopyIcon copied={copiedTarget === item.target} /></span>
+                <span className="checkin-copy-action__icon"><CopyIcon copied={copiedTarget === item.target} /></span>
                 {copiedTarget === item.target ? copiedLabel : copyLabel}
               </button>
             </dd>
           </div>
         ))}
       </dl>
-      {notice && <p className="checkin-muted-text mt-2 text-sm" role="status">{notice}</p>}
+      {notice && <p className="checkin-muted-text wifi-card__notice" role="status">{notice}</p>}
     </div>
   );
 }

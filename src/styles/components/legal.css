@@ -1,0 +1,107 @@
+/* Legal pages (/[locale]/privacy, R3-L2). Class selectors only (O38). Paragraph and sub-heading leading and the
+   sub-heading face keep what the legacy element rules gave them (R3-V12a). */
+
+.legal-page {
+  width: min(100% - 2 * var(--gutter), 46rem);
+  margin-inline: auto;
+  padding-block: 32px var(--space-section);
+  font-family: var(--font-text);
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
+}
+.legal-page.legal-page { color: var(--color-fg); }
+
+.legal-page .legal-page__header {
+  margin-bottom: 40px;
+}
+.legal-page .legal-page__title {
+  margin: 0 0 16px;
+  font-family: var(--font-display);
+  font-size: var(--text-d3);
+  line-height: var(--text-d3--line-height);
+  letter-spacing: var(--text-d3--letter-spacing);
+  font-weight: 600;
+  color: var(--color-fg);
+}
+.legal-page .legal-page__lead {
+  margin: 0;
+  font-size: var(--text-lead);
+  line-height: var(--text-lead--line-height);
+  color: var(--color-fg-muted);
+}
+
+.legal-page .legal-page__section {
+  padding-block: 28px;
+  border-top: 1px solid var(--color-border);
+  scroll-margin-top: var(--header-offset);
+}
+.legal-page .legal-page__section p {
+  margin: 0 0 12px;
+}
+/* Same specificity (0,0,1) as the removed legacy `p` rule, so classed paragraphs keep their own leading. */
+:where(.legal-page__section) p { line-height: 1.5; }
+.legal-page .legal-page__heading {
+  margin: 0 0 16px;
+  font-family: var(--font-display);
+  font-size: var(--text-h3);
+  line-height: var(--text-h3--line-height);
+  font-weight: 600;
+  color: var(--color-fg);
+}
+.legal-page .legal-page__subheading {
+  margin: 20px 0 8px;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  line-height: 1.15;
+  font-weight: 600;
+  color: var(--color-fg);
+}
+.legal-page .legal-page__item + .legal-page__item {
+  margin-top: 8px;
+}
+.legal-page .legal-page__basis {
+  font-size: var(--text-caption);
+  line-height: var(--text-caption--line-height);
+  color: var(--color-fg-muted);
+}
+
+.legal-page .legal-page__list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 1.25em;
+  list-style: disc;
+}
+
+.legal-page .legal-page__terms {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 12px;
+}
+.legal-page .legal-page__term {
+  display: grid;
+  gap: 2px 16px;
+  color: inherit;
+}
+.legal-page .legal-page__term dt {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.legal-page .legal-page__term dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.legal-page .legal-page__term code {
+  font-size: .9375em;
+}
+@media (min-width: 640px) {
+  .legal-page .legal-page__term {
+    grid-template-columns: minmax(10rem, 14rem) minmax(0, 1fr);
+  }
+}
+
+.legal-page .legal-page__link {
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-underline-offset: .2em;
+}

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ICON_NAMES } from "@/components/icons/iconNames";
 
 export const CategorySchema = z.object({
   id: z.string(),
@@ -9,7 +10,7 @@ export const CategorySchema = z.object({
   description: z.string().optional(),
   description_en: z.string().optional(),
   description_el: z.string().optional(),
-  icon: z.string().optional(),
+  icon: z.enum(ICON_NAMES).optional(),
   order: z.number().optional(),
 });
 
@@ -38,19 +39,14 @@ export const ItemSchema = z.object({
   location: z
     .object({ lat: z.number(), lng: z.number() })
     .optional(),
-  website: z.string().url().optional(),
-  directionsUrl: z.string().url().optional(),
-  reservationUrl: z.string().url().optional(),
-  sourceUrls: z.array(z.string().url()).optional(),
-  rating: z.number().min(0).max(5).optional(),
+  website: z.url().optional(),
+  directionsUrl: z.url().optional(),
+  sourceUrls: z.array(z.url()).optional(),
   tags: z.array(z.string()).optional(),
-  icon: z.string().optional(),
   image: z.string().optional(),
   heroImage: z.string().optional(),
   heroImagePosition: z.string().optional(),
-  featured: z.boolean().optional(),
   slug: z.string().optional(),
-  updatedAt: z.string().datetime().optional(),
 });
 
 export type Item = z.infer<typeof ItemSchema>;

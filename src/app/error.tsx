@@ -1,53 +1,24 @@
 "use client";
 
-import React, { useEffect } from 'react';
-import Link from 'next/link';
+import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { errorReporter } from '@/lib/errorReporting';
-import { HOST_CONTACT } from '@/data/contact';
+import { getDictionary } from '@/i18n/dictionaries';
+import type { Locale } from '@/i18n/config';
+import { Button } from '@/components/ui/Button';
+import { StatusLinks, StatusPage } from '@/components/stay/StatusPage';
 
 interface GlobalErrorProps {
   error: Error & { digest?: string };
   reset: () => void;
 }
 
-const copy = {
-  en: {
-    title: 'Oops! Something went wrong',
-    body: 'We encountered an unexpected error. Our team has been notified and is working on a fix.',
-    errorId: 'Error ID:',
-    tryAgain: 'Try Again',
-    reload: 'Reload Page',
-    goHome: 'Go to Homepage',
-    detailsSummary: 'Error Details (Development)',
-    name: 'Name:',
-    message: 'Message:',
-    digest: 'Digest:',
-    stack: 'Stack Trace:',
-    needHelp: 'Need help? Contact our',
-    supportTeam: 'support team',
-    includeId: 'and include error ID:',
-  },
-  el: {
-    title: 'Ουπς! Κάτι πήγε στραβά',
-    body: 'Παρουσιάστηκε ένα απροσδόκητο σφάλμα. Η ομάδα μας ειδοποιήθηκε και εργάζεται για τη διόρθωσή του.',
-    errorId: 'Κωδικός σφάλματος:',
-    tryAgain: 'Δοκιμάστε ξανά',
-    reload: 'Επαναφόρτωση σελίδας',
-    goHome: 'Μετάβαση στην αρχική',
-    detailsSummary: 'Λεπτομέρειες σφάλματος (Ανάπτυξη)',
-    name: 'Όνομα:',
-    message: 'Μήνυμα:',
-    digest: 'Digest:',
-    stack: 'Ίχνος στοίβας:',
-    needHelp: 'Χρειάζεστε βοήθεια; Επικοινωνήστε με την',
-    supportTeam: 'ομάδα υποστήριξης',
-    includeId: 'και συμπεριλάβετε τον κωδικό σφάλματος:',
-  },
-} as const;
-
+// identity §9.10: the same calm layout as the 404, "Try again" (reset) and a Home link; no technical
+// details on the page (the error is reported to the server-side error log).
 export default function GlobalError({ error, reset }: GlobalErrorProps) {
-  const isGreek = typeof window !== 'undefined' && window.location.pathname.startsWith('/el');
-  const t = isGreek ? copy.el : copy.en;
+  const pathname = usePathname();
+  const locale: Locale = pathname?.startsWith('/el') ? 'el' : 'en';
+  const t = getDictionary(locale);
 
   useEffect(() => {
     // Report error with full context
@@ -67,127 +38,12 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
     void errorReporter.reportError(error, { category: 'globalError' });
   }, [error]);
 
-  const handleReset = () => {
-    console.info('Global error recovery attempted', {
-      errorDigest: error.digest,
-      context: 'global-error-boundary',
-    });
-    reset();
-  };
-
-  const handleReload = () => {
-    console.info('Page reload requested from global error', {
-      errorDigest: error.digest,
-      context: 'global-error-boundary',
-    });
-    window.location.reload();
-  };
-
-  const handleGoHome = () => {
-    console.info('Homepage navigation from global error', {
-      errorDigest: error.digest,
-      context: 'global-error-boundary',
-    });
-  };
-
   return (
-    <main
-      className="page-bg min-h-screen flex items-center justify-center p-6"
-      role="alert"
-      aria-labelledby="global-error-title"
-    >
-          <div className="max-w-md w-full text-center space-y-6 surface-card rounded-lg shadow-lg p-8">
-            {/* Error Icon */}
-            <div className="text-red-500 mb-4">
-              <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-                />
-              </svg>
-            </div>
-
-            {/* Error Message */}
-            <div className="space-y-2">
-              <h1 id="global-error-title" className="text-2xl font-serif italic font-bold page-title">{t.title}</h1>
-              <p className="text-body">
-                {t.body}
-              </p>
-              {error.digest && (
-                <p className="text-xs text-subtle font-mono surface-subtle p-2 rounded">
-                  {t.errorId} {error.digest}
-                </p>
-              )}
-            </div>
-
-            {/* Recovery Actions */}
-            <div className="space-y-3">
-              <button
-                onClick={handleReset}
-                className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-              >
-                {t.tryAgain}
-              </button>
-
-              <button
-                onClick={handleReload}
-                className="w-full px-6 py-3 border border-soft text-body surface-interactive rounded-lg transition-colors"
-              >
-                {t.reload}
-              </button>
-
-              <Link
-                href="/"
-                onClick={handleGoHome}
-                className="block w-full text-center px-6 py-3 border border-soft text-body surface-interactive rounded-lg transition-colors"
-              >
-                {t.goHome}
-              </Link>
-            </div>
-
-            {/* Development Error Details */}
-            {process.env.NODE_ENV === 'development' && (
-              <details className="text-left text-xs text-subtle surface-subtle p-3 rounded">
-                <summary className="cursor-pointer font-medium mb-2">{t.detailsSummary}</summary>
-                <div className="space-y-2">
-                  <div>
-                    <strong>{t.name}</strong> {error.name}
-                  </div>
-                  <div>
-                    <strong>{t.message}</strong> {error.message}
-                  </div>
-                  {error.digest && (
-                    <div>
-                      <strong>{t.digest}</strong> {error.digest}
-                    </div>
-                  )}
-                  {error.stack && (
-                    <div>
-                      <strong>{t.stack}</strong>
-                      <pre className="mt-1 whitespace-pre-wrap text-xs bg-white p-2 rounded border overflow-auto max-h-40">
-                        {error.stack}
-                      </pre>
-                    </div>
-                  )}
-                </div>
-              </details>
-            )}
-
-            {/* Contact Support */}
-            <div className="pt-4 border-t border-gray-200">
-              <p className="text-sm text-subtle">
-                {t.needHelp}{' '}
-                <a href={`mailto:${HOST_CONTACT.email}`} className="text-blue-600 hover:underline">
-                  {t.supportTeam}
-                </a>
-                {error.digest && (
-                  <span> {t.includeId} <code className="font-mono">{error.digest}</code></span>
-                )}
-              </p>
-            </div>
-          </div>
+    <main id="main-content" className="status-main" role="main">
+      <StatusPage title={t.errors.somethingWentWrong} lead={t.errors.unexpectedError}>
+        <Button variant="primary" className="status-page__action" onClick={() => reset()}>{t.errors.tryAgain}</Button>
+        <StatusLinks links={[{ href: `/${locale}`, label: t.cta.home }]} />
+      </StatusPage>
     </main>
   );
 }

@@ -1,0 +1,821 @@
+/* Home sections after the hero (docs/design/identity.md §8, §9.1 items 2-12): FactStrip, KineticBand,
+   Intro + Highlights, BalconyWindow, RoomsShowcase, NightsTeaser, Location, HostLetter, FAQ, ContactBand. Unlayered (O38); the two-class
+   colour rules (0,2,0) date from the legacy cascade that R3-V12b deleted, and are kept as they are.
+   Static by construction (§5.1): these are the final states. Motion M6-M15, M24 is in motion.css. */
+
+/* FactStrip (§8): a raised card that overlaps the hero by 26 px (72 px at lg); 2 columns, one row at lg. */
+.facts {
+  position: relative;
+  z-index: 2;
+  margin: -26px var(--gutter) 0;
+  padding: 24px 24px 20px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-raised);
+  perspective: 900px;
+}
+.facts .facts__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.facts .fact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transform-origin: 50% 0;
+}
+.facts .fact__num {
+  font-family: var(--font-display);
+  font-size: var(--text-fact);
+  font-weight: 400;
+  line-height: var(--text-fact--line-height);
+  letter-spacing: var(--text-fact--letter-spacing);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--color-fg);
+}
+/* The parking fact is drawn as a road sign. */
+.facts .fact__num--sign {
+  display: inline-grid;
+  place-items: center;
+  width: 1.5em;
+  height: 1.5em;
+  border: 2px solid currentColor;
+  border-radius: .3em;
+  font-family: var(--font-text);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.facts .fact__unit {
+  margin-left: .15em;
+  font-family: var(--font-text);
+  font-size: .45em;
+  letter-spacing: 0;
+  vertical-align: .9em;
+}
+.facts .fact__label {
+  font-size: var(--text-caption);
+  line-height: 1.3;
+  color: var(--color-fg-muted);
+}
+.facts .facts__more {
+  margin: 20px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+  transform-origin: 50% 0;
+}
+.facts .facts__more .ui-btn { white-space: normal; text-align: left; }
+
+@media (min-width: 1024px) {
+  .facts {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 40px;
+    width: calc(100% - 2 * var(--gutter));
+    max-width: var(--container);
+    margin: -72px auto 0;
+    padding: 32px 40px;
+  }
+  .facts .facts__list {
+    grid-template-columns: repeat(6, auto);
+    justify-content: space-between;
+    gap: 24px;
+  }
+  .facts .fact__num--sign { font-size: 2rem; }
+  .facts .facts__more {
+    max-width: 13em;
+    margin: 0;
+    padding: 0 0 0 40px;
+    border-top: 0;
+    border-left: 1px solid var(--color-border);
+  }
+}
+
+/* KineticBand (§8, graft 2): decoration only. Static offsets are the reduced/unsupported state of M7. */
+.kinetic {
+  overflow: clip;
+  padding-top: clamp(48px, 9vw, 120px);
+  pointer-events: none;
+  user-select: none;
+}
+.kinetic .kinetic__row {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(3.2rem, 11vw, 9.5rem);
+  font-weight: 400;
+  line-height: 1.02;
+  letter-spacing: -.02em;
+  white-space: nowrap;
+}
+.kinetic .kinetic__text { display: inline-block; }
+.kinetic .kinetic__row--a .kinetic__text {
+  color: transparent;
+  -webkit-text-stroke: 1px color-mix(in srgb, var(--color-fg) 45%, transparent);
+  transform: translateX(-10%);
+}
+.kinetic .kinetic__row--a .kinetic__star { color: color-mix(in srgb, var(--color-fg) 45%, transparent); }
+.kinetic .kinetic__row--b .kinetic__text {
+  font-style: italic;
+  color: var(--color-primary-text);
+  transform: translateX(-20%);
+}
+.kinetic .kinetic__star {
+  display: inline-block;
+  width: .42em;
+  height: .42em;
+  margin: 0 .12em;
+  vertical-align: .08em;
+  stroke-width: 1.25;
+}
+
+/* Intro + Highlights (§8 SeasonSwitch + Highlights): 1 column, 2 at sm, 4 at lg. */
+.intro .highlights-block {
+  display: grid;
+  justify-items: start;
+  gap: 24px;
+}
+.intro .highlights-stage { width: 100%; }
+.intro .highlights {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  perspective: 1000px;
+}
+@media (min-width: 640px) {
+  .intro .highlights { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .intro .highlights { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.intro .hl {
+  position: relative;
+  padding: 24px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-rest);
+}
+.hl .hl__icon {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 16px;
+  border-radius: 50%;
+  background: var(--color-primary-tint);
+  color: var(--color-primary-text);
+}
+.hl .hl__title {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: var(--text-h3);
+  font-weight: 400;
+  line-height: var(--text-h3--line-height);
+  color: var(--color-fg);
+}
+.hl .hl__text {
+  margin: 0;
+  font-size: var(--text-caption);
+  line-height: var(--text-caption--line-height);
+  color: var(--color-fg-muted);
+}
+.intro .highlights__more { margin: 0; }
+
+/* BalconyWindow (§8): frame 10 px (14 px from 700 px), 4:5 then 16:10. The shutters exist only under
+   motion (motion.css); open, they swing past the frame, hence the horizontal clip of this section. */
+.balcony { overflow-x: clip; }
+.balcony .ui-section__head {
+  margin-inline: auto;
+  text-align: center;
+}
+.balcony .window {
+  position: relative;
+  max-width: 1080px;
+  margin: 0 auto;
+  aspect-ratio: 4 / 5;
+  border: 10px solid var(--color-frame);
+  border-radius: var(--radius-object);
+  background: var(--color-shutter-lo);
+  box-shadow: var(--shadow-object);
+  perspective: 1500px;
+  perspective-origin: 50% 40%;
+}
+@media (min-width: 700px) {
+  .balcony .window {
+    aspect-ratio: 16 / 10;
+    border-width: 14px;
+  }
+}
+.window .window__view {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.window .window__img {
+  object-fit: cover;
+  object-position: 60% 50%;
+  transform-origin: 55% 60%;
+}
+.window .window__light {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  background: radial-gradient(90% 80% at 50% 35%, rgb(255 214 150 / .95), rgb(255 170 90 / .35) 45%, transparent 75%);
+}
+.window .shutter { display: none; }
+.balcony .balcony__quote {
+  max-width: 760px;
+  margin: 40px auto 0;
+  padding: 0;
+  text-align: center;
+}
+.balcony .balcony__quote-text {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-d3);
+  font-style: italic;
+  font-weight: 400;
+  line-height: var(--text-d3--line-height);
+  color: var(--color-fg);
+  text-wrap: balance;
+}
+
+/* RoomsShowcase (§8). Below lg: a native scroll-snap row (coverflow under motion, M11). From lg: a fanned
+   deck, static unless motion is on (M12). Captions show on the active card only once the script runs. */
+.rooms .rooms__chips {
+  display: flex;
+  gap: 8px;
+  margin: 0 calc(-1 * var(--gutter));
+  padding: 8px var(--gutter);
+  overflow-x: auto;
+  scroll-padding-inline: var(--gutter);
+  scrollbar-width: none;
+}
+.rooms .rooms-deck { position: relative; }
+.rooms .rooms-track {
+  --card-w: min(68vw, 300px);
+  /* The offsetParent of the cards, so RoomsShowcase measures them in the row's own scroll coordinates. */
+  position: relative;
+  display: flex;
+  gap: 16px;
+  margin: 0 calc(-1 * var(--gutter));
+  /* The track is 2 gutters wider than its containing block, so 50% + 1 gutter is its own middle. */
+  padding: 24px calc(50% + var(--gutter) - var(--card-w) / 2) 32px;
+  list-style: none;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.rooms .room-card {
+  position: relative;
+  flex: 0 0 var(--card-w);
+  scroll-snap-align: center;
+}
+.rooms .room-card__link {
+  display: block;
+  border-radius: var(--radius-card);
+  color: var(--color-fg-on-photo);
+  text-decoration: none;
+}
+.rooms .room-card__link:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+}
+.rooms .room-card__3d {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: var(--color-surface-sunken);
+  box-shadow: var(--shadow-raised);
+}
+.rooms .room-card__img { object-fit: cover; }
+/* Caption scrim (§7.1): transparent 35 % → .62 at 62 % → .88. */
+.rooms .room-card__3d::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent 35%, rgb(var(--scrim) / .62) 62%, rgb(var(--scrim) / .88) 100%);
+}
+.rooms .room-card__cap {
+  position: absolute;
+  z-index: 1;
+  inset: auto 0 0;
+  display: grid;
+  gap: 2px;
+  padding: 20px;
+}
+.room-card .room-card__n {
+  font-size: .8125rem;
+  font-weight: 600;
+  letter-spacing: .2em;
+  color: var(--color-fg-on-photo-accent);
+}
+.room-card .room-card__name {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  line-height: 1.1;
+  color: var(--color-fg-on-photo);
+}
+.room-card .room-card__line {
+  font-size: var(--text-caption);
+  line-height: 1.35;
+  color: var(--color-fg-on-photo);
+}
+/* Opacity keeps the caption in the link's accessible name. */
+.rooms .rooms-deck[data-live] .room-card:not(.is-active) .room-card__cap { opacity: 0; }
+.rooms .rooms__more {
+  margin: 8px 0 0;
+  text-align: center;
+}
+
+@media (min-width: 1024px) {
+  /* The deck's perspective serves the stage tilt; the track's own perspective serves the cards. The
+     track stays flat (no preserve-3d), so the cards stack by z-index instead of cutting through each
+     other. */
+  .rooms .rooms-deck {
+    height: 600px;
+    perspective: 1700px;
+    perspective-origin: 50% 30%;
+  }
+  /* --pos (−2.5…2.5), --apos (|pos|) and --z come from the component; the spread shrinks with the
+     viewport so the fan stays inside it at 1024 px. */
+  .rooms .rooms-track {
+    --spread: clamp(100px, 12vw, 175px);
+    position: absolute;
+    inset: 0;
+    display: block;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    perspective: 1700px;
+    perspective-origin: 50% 30%;
+  }
+  .rooms .room-card {
+    --lift: 0;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: var(--z);
+    width: 330px;
+    height: 420px;
+    margin: -210px 0 0 -165px;
+    transform:
+      translate3d(calc(var(--pos) * var(--spread)), calc(var(--apos) * 18px - var(--lift) * 34px), calc(var(--apos) * -70px + var(--lift) * 140px))
+      rotateZ(calc(var(--pos) * 5deg * (1 - var(--lift))))
+      rotateY(calc(var(--pos) * -7deg * (1 - var(--lift))));
+  }
+  .rooms .room-card.is-active {
+    --lift: 1;
+    z-index: 20;
+  }
+  .rooms .room-card__link,
+  .rooms .room-card__3d {
+    height: 100%;
+    aspect-ratio: auto;
+  }
+  .rooms .room-card.is-active .room-card__3d { box-shadow: var(--shadow-object); }
+  .rooms .rooms-deck[data-live] .room-card:not(.is-active) .room-card__3d { filter: saturate(.75) brightness(.8); }
+}
+
+/* NightsTeaser (§8): 7 columns (two rows) on mobile, 14 at lg; calendar tokens as on the availability page. */
+.teaser .teaser__price {
+  margin: 0 0 8px;
+  font-size: var(--text-lead);
+  line-height: 1.3;
+  color: var(--color-fg-muted);
+}
+.teaser .teaser__price-value {
+  margin: 0 .12em;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 400;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-primary-text);
+}
+.teaser .teaser__price-note {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--text-caption);
+  color: var(--color-fg-muted);
+}
+.teaser .teaser__stale {
+  margin: 12px 0 0;
+  font-size: var(--text-caption);
+  line-height: var(--text-caption--line-height);
+  color: var(--color-fg-muted);
+}
+.teaser .nights {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
+  perspective: 800px;
+}
+@media (min-width: 1024px) {
+  .teaser .nights { grid-template-columns: repeat(14, minmax(0, 1fr)); }
+}
+.teaser .night {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 10px 2px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-tile);
+  background: var(--color-cal-free-bg);
+  text-align: center;
+}
+.night .night__dow {
+  font-size: var(--text-micro);
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--color-fg-muted);
+}
+.night .night__dow:lang(el) { letter-spacing: .02em; text-transform: none; }
+.night .night__d {
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-fg);
+}
+.night .night__p {
+  padding: 1px 5px;
+  border-radius: var(--radius-control);
+  font-size: var(--text-micro);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--color-cal-price);
+}
+.night.night--best .night__p {
+  background: var(--color-cal-best-bg);
+  color: var(--color-cal-best-fg);
+}
+.teaser .night.night--booked {
+  background: repeating-linear-gradient(135deg, var(--color-cal-booked-hatch) 0 1.5px, transparent 1.5px 7px), var(--color-cal-booked-bg);
+}
+.night.night--booked .night__d {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  color: var(--color-cal-booked-fg);
+}
+.night.night--booked .night__p { font-weight: 500; color: var(--color-cal-booked-fg); }
+.teaser .teaser__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 24px;
+  margin-top: 24px;
+}
+.teaser .teaser__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--color-fg-muted);
+}
+.teaser .teaser__legend-item { display: inline-flex; align-items: center; gap: 8px; }
+.teaser .teaser__swatch {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 5px;
+}
+.teaser .teaser__swatch--best { border-color: transparent; background: var(--color-cal-best-bg); }
+.teaser .teaser__swatch--booked {
+  background: repeating-linear-gradient(135deg, var(--color-cal-booked-hatch) 0 1.5px, transparent 1.5px 5px), var(--color-cal-booked-bg);
+}
+
+/* Location band (§8 LocationRelief + DistanceList). From 1000 px: text and list left, relief right. */
+.location.location { overflow-x: clip; }
+.location .location__grid { display: grid; gap: 40px; }
+.location .distances {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-variant-numeric: tabular-nums;
+}
+.location .distance {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  column-gap: 12px;
+  align-items: baseline;
+  padding: 12px 0;
+  border-top: 1px solid var(--color-band-line);
+}
+.location .distance:last-child { border-bottom: 1px solid var(--color-band-line); }
+.distance .distance__n {
+  display: inline-grid;
+  grid-row: span 2;
+  align-self: center;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--color-band-accent);
+  border-radius: 50%;
+  font-size: var(--text-micro);
+  font-weight: 700;
+  color: var(--color-band-accent);
+}
+.distance .distance__name { font-weight: 600; color: var(--color-band-fg); }
+.distance .distance__val {
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  line-height: 1.1;
+  text-align: right;
+  white-space: nowrap;
+  color: var(--color-band-fg);
+}
+.distance .distance__how {
+  grid-column: 2 / -1;
+  font-size: var(--text-caption);
+  color: var(--color-band-muted);
+}
+.location .relief-wrap {
+  margin: 0;
+  perspective: 1300px;
+  perspective-origin: 50% 20%;
+}
+.location .relief {
+  --rx0: 0deg;
+  --rz0: 0deg;
+  position: relative;
+  aspect-ratio: 1000 / 788;
+  border-radius: 18px;
+  transform-style: preserve-3d;
+}
+.relief .relief__layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.relief .relief__sea {
+  overflow: hidden;
+  border-radius: 18px;
+  color: var(--color-map-wave);
+}
+.relief .relief__sea-fill { fill: var(--color-map-sea); }
+.relief .relief__gulf {
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-style: italic;
+  letter-spacing: .04em;
+  fill: #DDF1F5;
+}
+.relief .relief__land { filter: drop-shadow(0 6px 8px rgb(0 0 0 / .25)); }
+.relief .relief__land-fill { fill: var(--color-map-land); }
+.relief .relief__oldtown { fill: var(--color-map-c1); opacity: .55; }
+.relief .relief__streets { color: var(--color-map-street); }
+.relief .relief__coast { stroke: var(--color-map-coast); stroke-width: 4; }
+.relief .relief__road { stroke: var(--color-map-road); stroke-width: 5; stroke-linecap: round; opacity: .9; }
+.relief .relief__contour { filter: drop-shadow(-4px 6px 6px rgb(0 0 0 / .18)); }
+.relief .relief__contour--1 { fill: var(--color-map-c1); }
+.relief .relief__contour--2 { fill: var(--color-map-c2); }
+.relief .relief__contour--3 { fill: var(--color-map-c3); }
+.relief .relief__contour--4 { fill: var(--color-map-c4); }
+.relief .relief__pins { transform-style: preserve-3d; }
+/* Pins are paper labels standing on their point (the stem); identical in both themes. */
+.relief .pin {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: -14px;
+  padding: 4px 10px 4px 4px;
+  border-radius: var(--radius-control);
+  background: var(--color-pin-bg);
+  box-shadow: 0 10px 18px -8px rgb(0 0 0 / .45);
+  font-size: .8125rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--color-pin-fg);
+  transform: translate(-50%, -100%);
+  transform-origin: 50% 100%;
+}
+.relief .pin::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 2px;
+  height: 14px;
+  background: inherit;
+  transform: translateX(-50%);
+}
+.pin .pin__n {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-pin-fg);
+  font-size: var(--text-micro);
+  color: var(--color-pin-bg);
+}
+.relief .pin.pin--home {
+  padding: 6px 12px 6px 6px;
+  background: var(--color-pin-home-bg);
+  font-size: .875rem;
+  color: var(--color-pin-home-fg);
+}
+.pin.pin--home .pin__n { background: var(--color-pin-home-fg); color: var(--color-pin-home-bg); }
+@media (max-width: 699.98px) {
+  .relief .pin:not(.pin--home):not(.pin--peak) { padding: 3px; }
+  .relief .pin:not(.pin--home):not(.pin--peak) .pin__label { display: none; }
+  .relief .pin { font-size: .75rem; }
+}
+.location .relief__note {
+  margin: 20px 0 0;
+  font-size: var(--text-micro);
+  line-height: 1.4;
+  text-align: center;
+  color: var(--color-band-muted);
+}
+@media (min-width: 1000px) {
+  .location.ui-section {
+    display: grid;
+    grid-template-columns: 5fr 7fr;
+    column-gap: 56px;
+    align-items: center;
+  }
+  .location .ui-section__head { grid-column: 1; grid-row: 1; margin-bottom: 32px; }
+  .location .location__grid { display: contents; }
+  .location .distances { grid-column: 1; grid-row: 2; align-self: start; }
+  .location .relief-wrap { grid-column: 2; grid-row: 1 / span 2; }
+}
+
+/* HostLetter (§8): a paper card, rotated −.8°, with grain and a drop cap. */
+.host.host {
+  display: grid;
+  place-items: center;
+  padding: var(--space-section) var(--gutter);
+}
+.host .letter {
+  position: relative;
+  max-width: 760px;
+  padding: 40px 28px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-object);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-object);
+  transform: rotate(-.8deg);
+}
+.host .letter::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--grain) 0 0 / 160px repeat;
+  pointer-events: none;
+}
+@media (min-width: 800px) {
+  .host .letter { padding: 64px 64px 56px; }
+}
+.letter .letter__eyebrow {
+  margin: 0 0 16px;
+  font-size: var(--text-label);
+  font-weight: 600;
+  letter-spacing: var(--text-label--letter-spacing);
+  text-transform: uppercase;
+  color: var(--color-primary-text);
+}
+.letter .letter__eyebrow:lang(el) { font-size: .875rem; letter-spacing: .04em; text-transform: none; }
+.letter .letter__title {
+  margin: 0 0 24px;
+  font-family: var(--font-display);
+  font-size: var(--text-d3);
+  font-style: italic;
+  font-weight: 400;
+  line-height: var(--text-d3--line-height);
+  color: var(--color-fg);
+  text-wrap: balance;
+}
+.letter .letter__p {
+  max-width: 60ch;
+  margin: 0 0 16px;
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  color: var(--color-fg);
+}
+.letter .letter__p:first-child::first-letter {
+  float: left;
+  padding: .06em .08em 0 0;
+  font-family: var(--font-display);
+  font-size: 3.6em;
+  line-height: .82;
+  color: var(--color-primary-text);
+}
+.letter .letter__sig {
+  margin: 24px 0 0;
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  font-style: italic;
+  color: var(--color-fg);
+}
+.letter .letter__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 48px;
+  margin: 24px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+.letter .letter__meta-label { font-size: var(--text-micro); letter-spacing: .06em; color: var(--color-fg-muted); }
+.letter .letter__meta-value { margin: 0; font-weight: 600; color: var(--color-fg); }
+
+/* FAQ (§8 FAQAccordion): an exclusive <details name="faq"> list; "+" turns 45° when open. */
+.faq.ui-section { max-width: calc(900px + 2 * var(--gutter)); }
+.faq .faq__item { border-top: 1px solid var(--color-border-strong); }
+.faq .faq__item:last-child { border-bottom: 1px solid var(--color-border-strong); }
+.faq .faq__q {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 48px;
+  padding: 18px 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.35;
+  list-style: none;
+  color: var(--color-fg);
+  cursor: pointer;
+}
+.faq .faq__q::-webkit-details-marker { display: none; }
+.faq .faq__q::after {
+  content: "+";
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 300;
+  line-height: 1;
+  color: var(--color-primary-text);
+}
+.faq .faq__item[open] > .faq__q::after { transform: rotate(45deg); }
+.faq .faq__q:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+}
+.faq .faq__a {
+  max-width: 60ch;
+  padding: 0 0 20px;
+  color: var(--color-fg-muted);
+}
+.faq .faq__p { margin: 0 0 12px; line-height: 1.6; }
+.faq .faq__list { margin: 0 0 12px; padding-left: 1.25em; list-style: disc; line-height: 1.6; }
+
+/* ContactBand (§8): warm band, d1 title, actions and the e-mail / Instagram links. */
+.contact.ui-section { padding-block: clamp(72px, 12vw, 160px) clamp(56px, 9vw, 112px); }
+.contact.ui-section .ui-section__title {
+  max-width: 12em;
+  font-size: var(--text-d1);
+  line-height: var(--text-d1--line-height);
+  letter-spacing: var(--text-d1--letter-spacing);
+}
+.contact .contact__actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.contact .contact__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 32px;
+  margin: 32px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.contact .contact__link {
+  display: inline-flex;
+  align-items: center;
+  gap: .5em;
+  min-height: 44px;
+  font-size: var(--text-caption);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: .28em;
+  color: var(--color-band-fg);
+}
+.contact .contact__link:focus-visible { outline-color: var(--color-band-focus); }

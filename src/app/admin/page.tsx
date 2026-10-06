@@ -14,7 +14,7 @@ export default async function AdminPage() {
   await requireAdminPageSession();
 
   return (
-    <main className="admin-page-shell min-h-screen">
+    <main>
       <AdminHomeClient />
     </main>
   );

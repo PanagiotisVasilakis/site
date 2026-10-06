@@ -1,8 +1,8 @@
 {
   "repository": "docker.io/library/nginx",
-  "tag": "1.28.3-alpine",
-  "digest": "sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236",
+  "tag": "1.30.5-alpine",
+  "digest": "sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94",
   "mediaType": "application/vnd.oci.image.index.v1+json",
-  "verifiedAt": "2026-07-18",
+  "verifiedAt": "2026-09-28",
   "source": "https://hub.docker.com/_/nginx"
 }
