@@ -48,6 +48,10 @@ export async function deliverOutboxEvent(eventId: string): Promise<boolean> {
     });
     if (!event || event.status !== 'LEASED' || event.leaseOwner !== leaseOwner) return false;
     if (!config.url) throw new Error('Webhook destination is not configured');
+    // The workers never run the environment schema, so the production HTTPS rule is enforced here, before the bearer token is attached.
+    if (process.env.NODE_ENV === 'production' && new URL(config.url).protocol !== 'https:') {
+      throw new Error('Webhook destination must use HTTPS in production');
+    }
 
     const payload = payloadRecord(event.payload);
     const body = event.checkInRequest
@@ -119,15 +123,22 @@ export async function deliverOutboxEvent(eventId: string): Promise<boolean> {
 
 async function deliverWithConcurrency(eventIds: readonly string[], concurrency: number): Promise<boolean[]> {
   const results = new Array<boolean>(eventIds.length);
+  const failures: unknown[] = [];
   let index = 0;
   const worker = async () => {
     while (index < eventIds.length) {
       const current = index;
       index += 1;
-      results[current] = await deliverOutboxEvent(eventIds[current]);
+      try {
+        results[current] = await deliverOutboxEvent(eventIds[current]);
+      } catch (error) {
+        failures.push(error);
+      }
     }
   };
   await Promise.all(new Array(Math.min(concurrency, eventIds.length)).fill(null).map(() => worker()));
+  // Fail only after every delivery has settled, so the worker script's disconnect never races a delivery still running.
+  if (failures.length > 0) throw new AggregateError(failures, `${failures.length} outbox deliveries failed: ${failures.map((failure) => (failure instanceof Error ? failure.message : String(failure)).slice(0, 500)).join('; ')}`);
   return results;
 }
 

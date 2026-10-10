@@ -185,6 +185,39 @@ describe('syncAirbnbCalendar: success', () => {
     });
   });
 
+  // Decision O47: only the admin's 'Sync now' may replace stored future nights with an empty calendar.
+  it('stores an empty calendar on a manual run although the snapshot holds future nights', async () => {
+    mocks.fetch.mockResolvedValue(new Response(calendar(), { status: 200 }));
+    mocks.findUnique.mockResolvedValue({ blockedNights: [utcMidnight('2026-12-24')] });
+
+    await expect(sync('manual')).resolves.toEqual({ status: 'synced', blockedNights: 0 });
+
+    expect(mocks.findUnique).not.toHaveBeenCalled();
+    expect(mocks.updateMany).toHaveBeenCalledTimes(2);
+    expect(mocks.updateMany.mock.calls[1][0].data).toMatchObject({ blockedNights: [], lastSuccessAt: NOW, lastErrorCode: null });
+  });
+
+  // 24 October is already past at the property (01:30 on 25 October in Athens), although it is still the UTC date.
+  it.each<[string, string[]]>([
+    ['only past nights', ['2026-10-23', '2026-10-24']],
+    ['no nights', []],
+  ])('stores an empty calendar on a scheduled run when the snapshot holds %s', async (_label, stored) => {
+    mocks.fetch.mockResolvedValue(new Response(calendar(), { status: 200 }));
+    mocks.findUnique.mockResolvedValue({ blockedNights: stored.map(utcMidnight) });
+
+    await expect(sync('scheduled')).resolves.toEqual({ status: 'synced', blockedNights: 0 });
+
+    expect(mocks.findUnique).toHaveBeenCalledExactlyOnceWith({ where: { id: 'airbnb' }, select: { blockedNights: true } });
+    expect(mocks.updateMany).toHaveBeenCalledTimes(2);
+    expect(mocks.updateMany.mock.calls[1][0].data).toMatchObject({
+      blockedNights: [],
+      lastSuccessAt: NOW,
+      consecutiveFailures: 0,
+      lastErrorCode: null,
+    });
+    expect(mocks.logger.warn).not.toHaveBeenCalled();
+  });
+
   it('uses a new lease owner for every run', async () => {
     mocks.fetch.mockImplementation(async () => new Response(calendar(), { status: 200 }));
 
@@ -267,6 +300,20 @@ describe('syncAirbnbCalendar: failures', () => {
     };
   }
 
+  // Decision O64: a failed manual run records the error and leaves the backoff alone.
+  function manualFailureWrite(code: string, httpStatus: number | null) {
+    return {
+      where: { id: 'airbnb', leaseOwner: leaseOwner() },
+      data: {
+        lastFailureAt: NOW,
+        lastErrorCode: code,
+        lastHttpStatus: httpStatus,
+        leaseOwner: null,
+        leaseExpiresAt: null,
+      },
+    };
+  }
+
   it('records an HTTP failure, keeps the stored nights and backs off', async () => {
     mocks.fetch.mockResolvedValue(new Response('unavailable', { status: 503 }));
     mocks.findUnique.mockResolvedValue({ consecutiveFailures: 2 });
@@ -275,7 +322,8 @@ describe('syncAirbnbCalendar: failures', () => {
 
     expect(mocks.updateMany).toHaveBeenCalledTimes(2);
     expect(mocks.findUnique).toHaveBeenCalledWith({ where: { id: 'airbnb' }, select: { consecutiveFailures: true } });
-    expect(mocks.updateMany.mock.calls[1][0]).toEqual(failureWrite('http_status', 503, 120));
+    // Two earlier failures: doubling would give 120 minutes; the cap keeps it at 45.
+    expect(mocks.updateMany.mock.calls[1][0]).toEqual(failureWrite('http_status', 503, 45));
     expect(mocks.logger.warn).toHaveBeenCalledWith(expect.any(String), {
       status: 'failed',
       code: 'http_status',
@@ -305,9 +353,32 @@ describe('syncAirbnbCalendar: failures', () => {
     mocks.fetch.mockRejectedValue(new TypeError(`fetch failed for ${FEED_URL}`));
     mocks.findUnique.mockResolvedValue({ consecutiveFailures: 0 });
 
-    await expect(sync('manual')).resolves.toEqual({ status: 'failed', code: 'network' });
+    await expect(sync('scheduled')).resolves.toEqual({ status: 'failed', code: 'network' });
 
     expect(mocks.updateMany.mock.calls[1][0]).toEqual(failureWrite('network', null, 30));
+  });
+
+  // Decision O64: only scheduled runs feed the backoff, so a few failed 'Sync now' clicks cannot park
+  // the automatic sync for hours.
+  it('records a failed manual run without moving consecutiveFailures or nextAttemptAt', async () => {
+    mocks.fetch.mockResolvedValue(new Response('unavailable', { status: 503 }));
+    mocks.findUnique.mockResolvedValue({ consecutiveFailures: 2 });
+
+    await expect(sync('manual')).resolves.toEqual({ status: 'failed', code: 'http_status', httpStatus: 503 });
+
+    expect(mocks.updateMany).toHaveBeenCalledTimes(2);
+    expect(mocks.updateMany.mock.calls[0][0]).toEqual(claimCall('manual'));
+    const write = mocks.updateMany.mock.calls[1][0];
+    expect(write).toEqual(manualFailureWrite('http_status', 503));
+    expect(write.data).not.toHaveProperty('consecutiveFailures');
+    expect(write.data).not.toHaveProperty('nextAttemptAt');
+    // The log line does not claim an increment: the count stays at the stored 2.
+    expect(mocks.logger.warn).toHaveBeenCalledWith(expect.any(String), {
+      status: 'failed',
+      code: 'http_status',
+      httpStatus: 503,
+      consecutiveFailures: 2,
+    });
   });
 
   it('records a parse failure and keeps the stored nights', async () => {
@@ -317,15 +388,58 @@ describe('syncAirbnbCalendar: failures', () => {
 
     await expect(sync('scheduled')).resolves.toEqual({ status: 'failed', code: 'unsupported_value' });
 
-    expect(mocks.updateMany.mock.calls[1][0]).toEqual(failureWrite('unsupported_value', null, 60));
+    expect(mocks.updateMany.mock.calls[1][0]).toEqual(failureWrite('unsupported_value', null, 45));
   });
 
-  // 0, 1 and 2 earlier failures (30, 60, 120 minutes) are asserted by the network,
-  // parse and HTTP 503 tests above.
+  // The parser's line number is not feed content; it is the only pointer to what it rejected.
+  it.each<[string, string[], string, number | null]>([
+    ['a rejected property', [...HEADER, 'BEGIN:VEVENT', 'DTSTART:20261101T120000Z', 'END:VEVENT', 'END:VCALENDAR'], 'unsupported_value', 6],
+    ['a calendar that is never closed (no line)', [...HEADER], 'unbalanced', null],
+  ])('logs the parser code and line for %s', async (_label, lines, code, line) => {
+    mocks.fetch.mockResolvedValue(new Response(lines.join(CRLF), { status: 200 }));
+    mocks.findUnique.mockResolvedValue({ consecutiveFailures: 0 });
+
+    await expect(sync('scheduled')).resolves.toEqual({ status: 'failed', code });
+
+    expect(mocks.logger.warn).toHaveBeenCalledWith(expect.any(String), { code, line });
+  });
+
+  // Decision O47: a scheduled run never replaces stored future nights with an empty calendar.
+  it.each<[string, string[]]>([
+    ['a night today', ['2026-10-25']],
+    ['past and later nights', ['2026-10-24', '2026-12-24']],
+  ])('records empty_feed for an empty calendar on a scheduled run and keeps a snapshot with %s', async (_label, stored) => {
+    mocks.fetch.mockResolvedValue(new Response(calendar(), { status: 200 }));
+    // The guard reads the stored nights first, then recordFailure reads the failure count.
+    mocks.findUnique
+      .mockResolvedValueOnce({ blockedNights: stored.map(utcMidnight) })
+      .mockResolvedValueOnce({ consecutiveFailures: 1 });
+
+    await expect(sync('scheduled')).resolves.toEqual({ status: 'failed', code: 'empty_feed' });
+
+    expect(mocks.findUnique.mock.calls).toEqual([
+      [{ where: { id: 'airbnb' }, select: { blockedNights: true } }],
+      [{ where: { id: 'airbnb' }, select: { consecutiveFailures: true } }],
+    ]);
+    expect(mocks.updateMany).toHaveBeenCalledTimes(2);
+    expect(mocks.updateMany.mock.calls[1][0]).toEqual(failureWrite('empty_feed', null, 45));
+    expect(mocks.logger.warn).toHaveBeenCalledWith(expect.any(String), {
+      status: 'failed',
+      code: 'empty_feed',
+      httpStatus: null,
+      consecutiveFailures: 2,
+    });
+    expect(mocks.logger.info).not.toHaveBeenCalled();
+  });
+
+  // 0, 1 and 2 earlier failures (30, 45, 45 minutes) are asserted by the network, parse and
+  // HTTP 503 tests above. The cap retries a failing feed at +30, +60, +105 and +150 minutes after
+  // the last success, so a recovered feed is picked up before the 180-minute stale alert opens
+  // (decision O63).
   it.each([
-    [3, 240],
-    [4, 240],
-    [2_147_483_647, 240],
+    [3, 45],
+    [4, 45],
+    [2_147_483_647, 45],
   ])('after %i earlier consecutive failures the next attempt is %i minutes later', async (earlier, minutes) => {
     mocks.fetch.mockResolvedValue(new Response(null, { status: 500 }));
     mocks.findUnique.mockResolvedValue({ consecutiveFailures: earlier });

@@ -92,9 +92,9 @@ be diagnosed without the orchestrator printing environment values.
 
 `package.json` `overrides` and their reasons:
 
-- No `next`-scoped override. `next@16.3.6` pins `postcss` 8.5.23 exactly (a
+- No `next`-scoped override. `next@16.3.8` pins `postcss` 8.5.23 exactly (a
   nested copy; GHSA-fxqj-rqcc-2cmp affects `<= 8.5.22`) and `sharp` `^0.35.4`
-  (dedupes to the root 0.35.4; GHSA-rgj7-g3m4-5g8c is fixed in 0.35.4). A
+  (dedupes to the root 0.35.5; GHSA-wq5f-xc86-pv6w is fixed in 0.35.5). A
   version-keyed override would only dedupe `postcss` and would silently stop
   applying on the next `next` bump. Whenever `next` is bumped, re-check with
   `npm ls postcss sharp` and `npm audit --omit=dev` (must report 0).
@@ -246,7 +246,7 @@ when no scanner is available. `DOCKER_SCAN_SCANNER` selects the scanner:
 
 | Value | Scanner |
 | --- | --- |
-| `auto` (default) | a host `trivy` binary if installed, else the pinned Trivy container if a Docker engine is reachable, else Docker Scout |
+| `auto` (default) | the pinned Trivy container if a Docker engine is reachable, else a host `trivy` binary if installed, else Docker Scout |
 | `trivy` | the host `trivy` binary |
 | `trivy-container` | the pinned Trivy container (below) |
 | `scout` | the Docker Scout CLI plugin |

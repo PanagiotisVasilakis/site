@@ -41,9 +41,13 @@ value (`valueSha256`, never the value itself), one entry per occurrence. Editing
 a file around a fixture keeps it accepted; a different value at the same place
 is reported. Adding or removing a fixture, or changing its value, requires an
 explicit reviewed allowlist diff (the same entries are pinned in
-`scripts/lib/release-policy.mjs`); any other finding fails closed. Scanner reports exist only in a
-mode-`0700` operating-system temporary directory, are mode `0600`, and are
-deleted after redacted evaluation.
+`scripts/lib/release-policy.mjs`); any other finding fails closed. A scan also
+fails when the scanner writes no valid report (for example because its
+configuration cannot be loaded) and when any scanned file contains the scanner's
+inline allow comment, so a finding can be accepted only through that allowlist.
+Scanner reports exist only in a mode-`0700` operating-system temporary directory,
+which is what protects them (the scanner writes the report file itself, so the
+file mode is not relied on), and are deleted after redacted evaluation.
 
 The automated current/artifact gate does not repeat the restricted all-ref
 incident investigation. A future history investigation must use protected

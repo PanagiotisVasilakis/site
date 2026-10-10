@@ -16,6 +16,7 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { stripVTControlCharacters } from 'node:util';
 
 import {
   enumerateArtifactFiles,
@@ -34,6 +35,8 @@ const TOOL_LOCK_PATH = path.join(CONFIG_ROOT, 'tool.lock.json');
 const CURRENT_ALLOWLIST_PATH = path.join(CONFIG_ROOT, 'current-fixture-allowlist.json');
 const HISTORICAL_BASELINE_PATH = path.join(CONFIG_ROOT, 'historical-incident-baseline.json');
 const ENV_FILE_PATTERN = /(^|\/)\.env(?:\.|$)/u;
+// Built at runtime so that this file never contains the marker it rejects.
+const INLINE_ALLOW = ['gitleaks', ':allow'].join('');
 const ARTIFACT_ROOTS = Object.freeze([
   '.next/standalone',
   '.next/server',
@@ -101,6 +104,17 @@ async function trackedCandidateFiles() {
   return result.stdout.split('\0').filter(Boolean).sort();
 }
 
+// Gitleaks drops every finding on a line that carries its inline allow comment,
+// which would bypass the reviewed value-exact allowlist. The copy is checked
+// because it is exactly what the scanner reads.
+async function rejectInlineSuppression(candidate, relative) {
+  if ((await readFile(candidate)).includes(INLINE_ALLOW)) {
+    throw new Error(
+      `Inline scanner suppression is forbidden: ${safeArtifactDiagnosticPath(relative)}`,
+    );
+  }
+}
+
 async function copyCandidateFiles(files, destination) {
   for (const relative of files) {
     if (path.isAbsolute(relative) || relative.split('/').includes('..')) {
@@ -121,6 +135,7 @@ async function copyCandidateFiles(files, destination) {
     await mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
     await copyFile(source, target);
     await chmod(target, 0o600);
+    await rejectInlineSuppression(target, relative);
   }
 }
 
@@ -162,6 +177,7 @@ async function copyResolvedCandidateFiles(files, destination) {
     await mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
     await copyFile(source, target);
     await chmod(target, 0o600);
+    await rejectInlineSuppression(target, relative);
   }
 }
 
@@ -280,7 +296,14 @@ async function runGitleaks(binaryPath, scanRoot, reportPath, dispositionContext)
   try {
     report = JSON.parse(await readFile(reportPath, 'utf8'));
   } catch {
-    throw new Error('The maintained secret scanner did not produce valid JSON evidence.');
+    // Gitleaks exits 1 for findings and for fatal errors alike, and the report is
+    // seeded empty, so a report it never wrote ends here. At --log-level error its
+    // stderr names the cause (for example an unloadable config), not finding content.
+    const diagnostics = stripVTControlCharacters(result.stderr).replace(/\s+/gu, ' ').trim();
+    throw new Error(
+      'The maintained secret scanner did not produce valid JSON evidence.'
+        + (diagnostics ? ` Scanner stderr: ${diagnostics.slice(0, 500)}` : ''),
+    );
   } finally {
     await rm(reportPath, { force: true });
   }
@@ -336,7 +359,9 @@ async function isolatedScan(
     }
     if (resolvedSources) await copyResolvedCandidateFiles(files, scanRoot);
     else await copyCandidateFiles(files, scanRoot);
-    await writeFile(reportPath, '[]\n', { encoding: 'utf8', mode: 0o600 });
+    // Empty on purpose: a report the scanner never wrote must fail the JSON parse.
+    // Gitleaks replaces this file, so the 0700 temporary directory is what protects it.
+    await writeFile(reportPath, '', { encoding: 'utf8', mode: 0o600 });
     const binaryPath = scannerBinary();
     await verifyScanner(binaryPath);
     const findings = await runGitleaks(

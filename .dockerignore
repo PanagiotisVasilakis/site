@@ -28,6 +28,10 @@ next-env.d.ts
 .DS_Store
 .env
 .env.*
+# Any depth (docker/.env, nested keys). The root-only lines above stay: release-policy.mjs requires them.
+**/.env
+**/.env.*
+**/*.pem
 !.env.example
 data/secure
 data/*.db

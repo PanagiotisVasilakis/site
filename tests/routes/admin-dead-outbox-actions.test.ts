@@ -6,10 +6,12 @@ const mocks = vi.hoisted(() => ({
   findById: vi.fn(),
   retryFailedNotifications: vi.fn(),
   updateStatus: vi.fn(),
+  deliverOutboxEvent: vi.fn(),
 }));
 
 vi.mock('@/lib/rbac', () => ({ isAdminRequest: mocks.isAdminRequest }));
 vi.mock('@/lib/prisma', () => ({ prisma: {} }));
+vi.mock('@/lib/bookingOutbox', () => ({ deliverOutboxEvent: mocks.deliverOutboxEvent }));
 vi.mock('@/lib/prisma-repositories/checkInRequestRepository', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/prisma-repositories/checkInRequestRepository')>()),
   checkInRequestRepository: {
@@ -20,6 +22,7 @@ vi.mock('@/lib/prisma-repositories/checkInRequestRepository', async (importOrigi
 }));
 
 import { PATCH as patchCheckInRequest } from '@/app/api/admin/check-in-requests/[id]/route';
+import { logger } from '@/lib/logger-enterprise';
 
 const CHECK_IN_ID = '75000000-0000-4000-8000-000000000002';
 
@@ -91,5 +94,43 @@ describe('retrying a failed check-in request notification', () => {
 
     expect(response.status).toBe(409);
     expect(JSON.stringify(await response.json())).toContain('Only pending requests');
+  });
+});
+
+describe('deciding a check-in request', () => {
+  it('answers 200 with a queued notification when the immediate delivery fails', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    mocks.findById.mockResolvedValue({ id: CHECK_IN_ID, status: 'PENDING' });
+    mocks.updateStatus.mockResolvedValue({ request: { id: CHECK_IN_ID, status: 'APPROVED' }, notificationEventId: 'event-1', changed: true });
+    mocks.deliverOutboxEvent.mockRejectedValue(new Error('connection terminated'));
+
+    const response = await patch(patchCheckInRequest, `/api/admin/check-in-requests/${CHECK_IN_ID}`, CHECK_IN_ID, { status: 'approved' });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).data).toEqual({ request: { id: CHECK_IN_ID, status: 'approved' }, notification: { status: 'queued' } });
+    expect(mocks.deliverOutboxEvent).toHaveBeenCalledWith('event-1');
+    expect(warn).toHaveBeenCalledWith('Immediate outbox delivery failed', { eventId: 'event-1', error: 'connection terminated' });
+  });
+});
+
+describe('addressing a check-in request', () => {
+  it.each(['not-a-uuid', '75000000-0000-4000-8000-00000000000g'])('answers 404 for the malformed id %j before reading anything', async (id) => {
+    const response = await patch(patchCheckInRequest, `/api/admin/check-in-requests/${id}`, id, { status: 'approved' });
+
+    expect(response.status).toBe(404);
+    expect((await response.json()).error.code).toBe('NOT_FOUND');
+    expect(mocks.findById).not.toHaveBeenCalled();
+    expect(mocks.updateStatus).not.toHaveBeenCalled();
+    expect(mocks.retryFailedNotifications).not.toHaveBeenCalled();
+  });
+
+  it('answers 401 before looking at the id when the admin session is missing', async () => {
+    mocks.isAdminRequest.mockResolvedValue(false);
+
+    const response = await patch(patchCheckInRequest, '/api/admin/check-in-requests/not-a-uuid', 'not-a-uuid', { status: 'approved' });
+
+    expect(response.status).toBe(401);
+    expect(mocks.findById).not.toHaveBeenCalled();
+    expect(mocks.updateStatus).not.toHaveBeenCalled();
   });
 });

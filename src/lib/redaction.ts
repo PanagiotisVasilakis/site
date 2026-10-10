@@ -38,6 +38,8 @@ function redactPhoneSequences(value: string): string {
 function looksLikeEmail(token: string): boolean {
   const at = token.indexOf('@');
   if (at < 1 || at !== token.lastIndexOf('@')) return false;
+  // WebKit and Gecko stack frames are `function@https://host/file.js:line:col`, not addresses.
+  if (token.includes('://', at)) return false;
   const dot = token.indexOf('.', at + 2);
   return dot > at + 1 && dot < token.length - 1;
 }
@@ -74,9 +76,18 @@ export function redactSensitiveText(value: string, maxLength = 500): string {
     let end = index + 1;
     while (end < phoneSafe.length && !isWhitespace(phoneSafe[end])) end += 1;
     const token = phoneSafe.slice(index, end);
-    output += looksLikeEmail(token)
+    // Test each maximal run of token characters too: `name=<jwt>;`, quotes and compact JSON glue
+    // a secret or an address to other characters. One negated class: linear, no backtracking.
+    const runs = token.split(/[^A-Za-z0-9_.@+-]+/u);
+    // An address may hold non-ASCII letters or digits (an internationalised local part or domain); tokens stay ASCII.
+    const addressRuns = token.split(/[^\p{L}\p{N}_.@+-]+/u);
+    // Letters may also carry combining marks (a decomposed accent, an Indic vowel sign). A second split, not a wider
+    // class above: a run joined at a mark can hold two @ and lose a match that the split above finds.
+    const markedAddressRuns = token.split(/[^\p{L}\p{M}\p{N}_.@+-]+/u);
+    output += looksLikeEmail(token) || runs.some(looksLikeEmail) || addressRuns.some(looksLikeEmail)
+      || markedAddressRuns.some(looksLikeEmail)
       ? '[REDACTED_EMAIL]'
-      : looksLikeLongToken(token) || containsClaimToken(token)
+      : looksLikeLongToken(token) || runs.some(looksLikeLongToken) || containsClaimToken(token)
         ? '[REDACTED_TOKEN]'
         : token;
     index = end;

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { MAX_STAY_NIGHTS, PROPERTY_TIME_ZONE } from '@/data/stayPolicy';
+import { CALENDAR_STALE_ALERT_MINUTES, MAX_STAY_NIGHTS, PROPERTY_TIME_ZONE } from '@/data/stayPolicy';
 import { addDays, parseIsoDate } from '@/lib/availability/calendarDate';
 import { formatCents, parseEuroInputToCents } from '@/lib/availability/money';
 import internalFetch from '@/lib/internalFetchClient';
@@ -299,7 +299,7 @@ export default function AdminAvailabilityClient() {
             )}
             {sync.stale && (
               <p className="feedback-error mt-3 rounded-tile p-3 text-sm">
-                The calendar has not synced successfully in the last 12 hours.
+                The calendar has not synced successfully in the last {CALENDAR_STALE_ALERT_MINUTES / 60} hours.
               </p>
             )}
             <p className="mt-3 text-sm admin-muted">Times are in Athens time (Europe/Athens).</p>

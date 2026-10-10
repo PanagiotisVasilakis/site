@@ -177,3 +177,67 @@ describe('claiming with a password-less account', () => {
     expect(prismaMock.tx.booking.updateMany).not.toHaveBeenCalled();
   });
 });
+
+describe("claiming a reset grant with another guest's phone", () => {
+  const TOKEN_DIGEST = 'a'.repeat(64);
+  const OTHER_USER_ID = '3c9b8a7d-6e5f-4a3b-9c2d-1e0f9a8b7c6d';
+  const OTHER_PHONE = '+12025550402';
+  const STORED_HASH = `$2b$12$${'o'.repeat(53)}`;
+
+  function claimWith(phone: string) {
+    return consumeBookingClaimGrant({ tokenDigest: TOKEN_DIGEST, phone, origin: 'ABROAD', password: 'a-guessed-password-1' });
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
+    prismaMock.$transaction.mockImplementation(async (callback: (client: typeof prismaMock.tx) => unknown) => callback(prismaMock.tx));
+    // The reset grant of a booking that USER_ID owns.
+    prismaMock.tx.bookingClaimGrant.findUnique.mockResolvedValue({
+      id: 'grant-1',
+      bookingId: BOOKING_ID,
+      channel: 'REMOTE',
+      consumedAt: null,
+      revokedAt: null,
+      expiresAt: new Date(NOW.getTime() + 30 * 60_000),
+      booking: claimedBooking(),
+    });
+    bcryptMock.hash.mockImplementation(async (_password: string, rounds: number) => `$2b$${rounds}$${'x'.repeat(53)}`);
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it.each([
+    ['a wrong', false],
+    ['the right', true],
+  ] as const)('answers BOOKING_ALREADY_CLAIMED for %s password of an account with a password, without comparing it', async (_label, passwordMatches) => {
+    prismaMock.tx.user.findUnique.mockResolvedValue({ id: OTHER_USER_ID, phoneE164: OTHER_PHONE, passwordHash: STORED_HASH });
+    bcryptMock.compare.mockResolvedValue(passwordMatches);
+
+    await expect(claimWith(OTHER_PHONE)).rejects.toEqual(new PortalAuthError('BOOKING_ALREADY_CLAIMED'));
+
+    expect(bcryptMock.compare).not.toHaveBeenCalled();
+    expect(prismaMock.tx.bookingClaimGrant.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.tx.booking.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.tx.user.update).not.toHaveBeenCalled();
+  });
+
+  it('refuses a phone without an account without creating one', async () => {
+    prismaMock.tx.user.findUnique.mockResolvedValue(null);
+
+    await expect(claimWith(OTHER_PHONE)).rejects.toEqual(new PortalAuthError('BOOKING_ALREADY_CLAIMED'));
+
+    expect(prismaMock.tx.user.create).not.toHaveBeenCalled();
+    expect(prismaMock.tx.bookingClaimGrant.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('still checks the password of the owner of the booking', async () => {
+    prismaMock.tx.user.findUnique.mockResolvedValue({ id: USER_ID, phoneE164: PHONE, passwordHash: STORED_HASH });
+    bcryptMock.compare.mockResolvedValue(false);
+
+    await expect(claimWith(PHONE)).rejects.toEqual(new PortalAuthError('INVALID_CREDENTIALS'));
+
+    expect(bcryptMock.compare).toHaveBeenCalledTimes(1);
+    expect(bcryptMock.compare).toHaveBeenCalledWith('a-guessed-password-1', STORED_HASH);
+    expect(prismaMock.tx.bookingClaimGrant.updateMany).not.toHaveBeenCalled();
+  });
+});

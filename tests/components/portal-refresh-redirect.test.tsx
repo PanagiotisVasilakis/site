@@ -8,6 +8,14 @@ const refreshPortalSession = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/portalRefreshClient', () => ({ refreshPortalSession }));
 
 import PortalRefreshRedirect from '@/components/PortalRefreshRedirect';
+import type { PortalRefreshResult } from '@/lib/portalRefreshClient';
+
+// The page leaves through location.replace; unstubGlobals in vitest.config.ts restores location after each test.
+function stubLocationReplace() {
+  const replace = vi.fn<(destination: string) => void>();
+  vi.stubGlobal('location', { ...window.location, replace });
+  return replace;
+}
 
 describe('portal refresh redirect shell', () => {
   beforeEach(() => {
@@ -94,5 +102,70 @@ describe('portal refresh redirect shell', () => {
     await waitFor(() => expect(signal).toBeDefined());
     unmount();
     expect(signal?.aborted).toBe(true);
+  });
+
+  it('sends the guest on to the refreshed destination, once', async () => {
+    const replace = stubLocationReplace();
+    refreshPortalSession.mockResolvedValue({ status: 'refreshed', href: '/en/check-in' });
+    render(<PortalRefreshRedirect
+      locale="en"
+      refreshHref="/api/portal/refresh?next=%2Fen%2Fcheck-in"
+      failureHref="/en/guest?mode=signin"
+    />);
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/en/check-in'));
+    expect(replace).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    { name: 'the sign-in page', failureHref: '/en/guest?mode=signin', destination: '/en/guest?mode=signin' },
+    { name: 'the root for an off-site link', failureHref: 'https://evil.test/steal', destination: '/' },
+    { name: 'the root for a script link', failureHref: 'javascript:alert(1)', destination: '/' },
+  ])('sends a failed refresh to $name', async ({ failureHref, destination }) => {
+    const replace = stubLocationReplace();
+    refreshPortalSession.mockResolvedValue({ status: 'failed' });
+    render(<PortalRefreshRedirect locale="en" refreshHref="/api/portal/refresh" failureHref={failureHref} />);
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith(destination));
+    expect(replace).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not navigate when the refresh finishes after the guest has left the page', async () => {
+    const replace = stubLocationReplace();
+    let finish: (result: PortalRefreshResult) => void = () => undefined;
+    const pending = new Promise<PortalRefreshResult>((resolve) => { finish = resolve; });
+    refreshPortalSession.mockReturnValue(pending);
+    const { unmount } = render(<PortalRefreshRedirect
+      locale="en"
+      refreshHref="/api/portal/refresh?next=%2Fen%2Fcheck-in"
+      failureHref="/en/guest?mode=signin"
+    />);
+    await waitFor(() => expect(refreshPortalSession).toHaveBeenCalledTimes(1));
+
+    unmount();
+    finish({ status: 'refreshed', href: '/en/check-in' });
+    await pending; // the component attached its own then() first, so it has already run when this resumes
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('navigates only once when the refresh restarts after it has already navigated', async () => {
+    const replace = stubLocationReplace();
+    refreshPortalSession.mockResolvedValue({ status: 'refreshed', href: '/en/check-in' });
+    const { rerender } = render(<PortalRefreshRedirect
+      locale="en"
+      refreshHref="/api/portal/refresh?next=%2Fen%2Fcheck-in"
+      failureHref="/en/guest?mode=signin"
+    />);
+    await waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
+
+    // A changed refreshHref restarts the effect; the answer to the second refresh must not navigate again.
+    rerender(<PortalRefreshRedirect
+      locale="en"
+      refreshHref="/api/portal/refresh?next=%2Fen%2Fstay"
+      failureHref="/en/guest?mode=signin"
+    />);
+    await waitFor(() => expect(refreshPortalSession).toHaveBeenCalledTimes(2));
+    await act(async () => {});
+    expect(replace).toHaveBeenCalledTimes(1);
   });
 });

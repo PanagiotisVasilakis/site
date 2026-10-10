@@ -7,6 +7,7 @@ import internalFetch from '@/lib/internalFetchClient'
 import { logger } from '@/lib/logger-client'
 import { Badge } from '@/components/ui'
 import { createPortalBookingEligibilityWindow, isPortalBookingTemporallyEligible } from '@/lib/portalBookingEligibility'
+import { addDays, parseIsoDate } from '@/lib/availability/calendarDate'
 
 interface BookingData {
   booking: {
@@ -54,6 +55,13 @@ function isWithinClaimWindow(booking: { startDate: string; endDate: string }): b
     { startDate: new Date(booking.startDate), endDate: new Date(booking.endDate) },
     createPortalBookingEligibilityWindow(new Date()),
   )
+}
+
+// The first valid check-out is the day after check-in. addDays throws past 9999-12-31.
+function earliestCheckOut(checkIn: string): string | undefined {
+  const start = parseIsoDate(checkIn)
+  if (start === null || checkIn === '9999-12-31') return undefined
+  return addDays(start, 1)
 }
 
 export default function GuestDataViewer() {
@@ -223,7 +231,7 @@ export default function GuestDataViewer() {
         }),
       })
       const data = await response.json()
-      if (!response.ok || !data.success) throw new Error(data.error?.message || 'Booking creation failed')
+      if (!response.ok || !data.success) throw new Error(data.error?.details?.validationErrors?.[0]?.message || data.error?.message || 'Booking creation failed')
       setCreatedBookingId(data.data.booking.id)
       setNewBooking({ startDate: '', endDate: '', source: 'ONSITE', externalReference: '' })
       await Promise.all([fetchAllBookings(), fetchStatistics()])
@@ -257,7 +265,7 @@ export default function GuestDataViewer() {
 
   const eraseGuest = async (userId: string, phone: string) => {
     if (!window.confirm(`Erase all personal data of the guest ${phone}? This cannot be undone.`)) return
-    const auditNote = window.prompt('Reason and requester (kept in the privacy audit record):')?.trim() ?? ''
+    const auditNote = window.prompt('Reason and how the request was verified, without names, phone numbers or e-mail addresses (kept in the privacy audit record):')?.trim() ?? ''
     if (auditNote.length < 3) return
     setActionBusy(true)
     setError('')
@@ -408,7 +416,7 @@ export default function GuestDataViewer() {
               <input
                 type="date"
                 required
-                min={newBooking.startDate || undefined}
+                min={earliestCheckOut(newBooking.startDate)}
                 value={newBooking.endDate}
                 onChange={(e) => setNewBooking((current) => ({ ...current, endDate: e.target.value }))}
                 className="admin-input px-4 py-2 rounded-tile"

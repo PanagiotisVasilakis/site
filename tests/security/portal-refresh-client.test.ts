@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { refreshPortalSession } from '@/lib/portalRefreshClient';
 
@@ -24,6 +24,9 @@ function response(input: {
 
 describe('portal refresh client state machine', () => {
   beforeEach(() => vi.stubGlobal('fetch', vi.fn()));
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it.each([
     ['https://evil.test/api/portal/refresh'],
@@ -147,5 +150,49 @@ describe('portal refresh client state machine', () => {
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     controller.abort();
     await expect(pending).resolves.toEqual({ status: 'aborted' });
+  });
+
+  it('clears the retry timer when the caller aborts during the wait', async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetch).mockResolvedValue(response({
+      status: 409,
+      headers: { 'retry-after': '5' },
+      json: { code: 'REFRESH_IN_PROGRESS' },
+    }));
+    const controller = new AbortController();
+    const pending = refreshPortalSession({
+      refreshHref: '/api/portal/refresh?next=%2Fen%2Fcheck-in',
+      baseHref,
+      signal: controller.signal,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.getTimerCount()).toBe(1);
+
+    controller.abort();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.getTimerCount()).toBe(0);
+    await expect(pending).resolves.toEqual({ status: 'aborted' });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits at most 5 s when the server asks for 120 s', async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(response({
+        status: 409,
+        headers: { 'retry-after': '120' },
+        json: { code: 'REFRESH_IN_PROGRESS' },
+      }))
+      .mockResolvedValueOnce(response());
+    const pending = refreshPortalSession({
+      refreshHref: '/api/portal/refresh?next=%2Fen%2Fcheck-in',
+      baseHref,
+    });
+
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    await expect(pending).resolves.toEqual({ status: 'refreshed', href: '/en/check-in' });
   });
 });

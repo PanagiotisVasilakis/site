@@ -1,10 +1,11 @@
 /* Minimal service worker: offline fallback pages, immutable build assets and images.
  *
  * HTML is network-first. Nothing is precached except the offline pages, icons,
- * and the global CSS and self-hosted fonts the offline pages use (identity
- * §9.11), so a redirect (e.g. `/` → `/en`) is never replayed from the cache and
- * online visitors always get the current deploy. Visited public pages are kept
- * for offline reading, except the live availability pages. PwaManager
+ * and the global CSS, self-hosted fonts and build scripts the offline pages use
+ * (identity §9.11), so a redirect (e.g. `/` → `/en`) is never replayed from the
+ * cache and online visitors always get the current deploy. Visited public pages
+ * are kept for offline reading and stand in for a 5xx answer of the origin,
+ * except the live pages (home, apartment, availability). PwaManager
  * registers `/sw.js?v=<version>&build=<build>` from /version.json, so every
  * build installs a new worker and a new cache.
  */
@@ -34,8 +35,13 @@ const PRIVATE_PAGE_PREFIXES = [
 ];
 
 // Never stored either: live pages (force-dynamic) that must not be shown stale
-// offline, such as the availability calendar (R-312).
-const LIVE_PAGE_PATHS = ['/en/availability', '/el/availability'];
+// offline: the availability calendar (R-312), and home and apartment (R-460), which
+// carry the same live data (from-price, "Free tonight", the 14-night open/booked strip).
+const LIVE_PAGE_PATHS = [
+  '/en', '/el',
+  '/en/apartment', '/el/apartment',
+  '/en/availability', '/el/availability',
+];
 
 // Internal fetch helper (keeps the internal-fetch lint rule satisfied).
 function fetchInternal(input, init) { return fetch(input, init); }
@@ -71,6 +77,11 @@ function linkHrefs(html, extension) {
     .filter((href) => href.split('?')[0].endsWith(extension));
 }
 
+/** `<script src="…">` values of an HTML page. */
+function scriptSrcs(html) {
+  return [...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/gu)].map((match) => match[1]);
+}
+
 /** `url(…)` values of a stylesheet that end in `.woff2`. */
 function woff2Urls(css) {
   return css.split('url(').slice(1)
@@ -83,9 +94,10 @@ async function cachedText(cache, url) {
   return response ? response.text() : '';
 }
 
-// The offline pages must render in the brand fonts and tokens (identity §9.11). The global CSS and the
-// next/font files have content-hashed URLs, so they are read from the precached offline pages: their
-// stylesheets, then every woff2 those stylesheets reference. Build assets are served cache-first below.
+// The offline pages must render in the brand fonts and tokens (identity §9.11) and hydrate (Retry). The global
+// CSS, the next/font files and the build scripts have content-hashed URLs, so they are read from the precached
+// offline pages: their stylesheets, then every woff2 those stylesheets reference, and their `<script src>`
+// files. Build assets are served cache-first below.
 async function precacheOfflineSubresources(cache) {
   const pages = await Promise.all(OFFLINE_PAGES.map((url) => cachedText(cache, url)));
   const origin = self.location.origin;
@@ -98,12 +110,15 @@ async function precacheOfflineSubresources(cache) {
     ...sheets.flatMap(({ url, css }) => buildAssetUrls(woff2Urls(css), url)),
   ]);
   await Promise.allSettled([...fonts].map((url) => cache.add(url)));
+  const scripts = [...new Set(pages.flatMap((html) => buildAssetUrls(scriptSrcs(html), origin)))];
+  await Promise.allSettled(scripts.map((url) => cache.add(url)));
 }
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
-    await Promise.allSettled(OFFLINE_ASSETS.map((url) => cache.add(url)));
+    // No cookies: /en/offline and /el/offline must not rewrite the visitor's `lang` cookie (src/proxy.ts).
+    await Promise.allSettled(OFFLINE_ASSETS.map((url) => cache.add(new Request(url, { credentials: 'omit' }))));
     await precacheOfflineSubresources(cache).catch(() => {});
   })());
 });
@@ -134,6 +149,11 @@ async function networkFirstPage(request, pathname) {
     const response = await fetchInternal(request);
     if (isStorable(response) && !isNetworkOnlyPage(pathname)) {
       cache.put(request, response.clone()).catch(() => {});
+    }
+    // Origin outage (Nginx 502, Cloudflare 52x) resolves the fetch: a visited copy beats the error page.
+    if (response.status >= 500 && !isNetworkOnlyPage(pathname)) {
+      const cached = await cache.match(request);
+      if (cached) return cached;
     }
     return response;
   } catch {
@@ -183,7 +203,8 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(cacheFirst(request));
     return;
   }
-  if (/\.(?:png|jpe?g|webp|avif|svg|ico)$/u.test(url.pathname)) {
+  // Photos: the raw files and the next/image optimizer (`/_next/image?url=…&w=…&q=…`, no extension).
+  if (url.pathname === '/_next/image' || /\.(?:png|jpe?g|webp|avif|svg|ico)$/u.test(url.pathname)) {
     event.respondWith(staleWhileRevalidate(request));
   }
 });

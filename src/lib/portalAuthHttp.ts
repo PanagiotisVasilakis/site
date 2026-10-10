@@ -35,11 +35,15 @@ export async function attachPortalAuthCookies(
   // observes the same fail-closed identity contract.
   const context = requestAuthContext(request);
 
+  // A new sign-in ends the refresh family this browser presented, with or
+  // without remember-me, so a copied refresh cookie stops working. This runs
+  // before the new session is issued.
+  const presentedRefreshToken = request.cookies.get(GUEST_REFRESH_COOKIE)?.value;
+  if (presentedRefreshToken) {
+    await guestStore.revokeRefreshFamily(presentedRefreshToken);
+  }
+
   if (!input.remember) {
-    const presentedRefreshToken = request.cookies.get(GUEST_REFRESH_COOKIE)?.value;
-    if (presentedRefreshToken) {
-      await guestStore.revokeRefreshFamily(presentedRefreshToken);
-    }
     const refreshCookie = clearRefreshCookie();
     response.cookies.set(refreshCookie.name, refreshCookie.value, refreshCookie.options);
   }

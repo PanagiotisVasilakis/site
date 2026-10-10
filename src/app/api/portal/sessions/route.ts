@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { ApiError, ApiErrorCode, createSuccessResponse, readJsonBody, ValidationError, withErrorHandler } from '@/lib/apiErrorHandler';
 import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 import { normalizeLocale } from '@/i18n/config';
+import { STAY_HUB_PATH } from '@/components/shell/shellLinks';
 import { PortalAuthError, authenticatePortalUser } from '@/lib/portalAuthService';
 import { attachPortalAuthCookies } from '@/lib/portalAuthHttp';
 import { checkSensitiveRateLimit, refundSensitiveIdentifierAttempt } from '@/lib/sensitiveRateLimit';
@@ -16,21 +17,24 @@ const schema = z.object({
   phone: z.string().trim().min(8).max(32),
   password: z.string().min(8).max(128),
   remember: z.boolean().optional().default(false),
-});
+}).strict();
 
 export const GET = withErrorHandler(async (request: NextRequest) => {
-  if (!(await getFeatureFlagsAsync()).portalEnabled) {
+  const flags = await getFeatureFlagsAsync();
+  if (!flags.portalEnabled) {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }
   const session = parseGuestSession(request.cookies.get(GUEST_SESSION_COOKIE)?.value);
   const access = session ? await verifyGuestSessionAccess(session) : null;
   // A status query: "signed out" is a normal answer (every public page asks), not an error.
-  if (!access) return createSuccessResponse({ authenticated: false, bookingId: null });
-  return createSuccessResponse({ authenticated: true, bookingId: access.booking?.id ?? null });
+  // The 404 above tells the shell the portal is off; checkinEnabled tells it whether the check-in page exists.
+  if (!access) return createSuccessResponse({ authenticated: false, bookingId: null, checkinEnabled: flags.checkinEnabled });
+  return createSuccessResponse({ authenticated: true, bookingId: access.booking?.id ?? null, checkinEnabled: flags.checkinEnabled });
 });
 
 export const POST = withErrorHandler(async (request: NextRequest) => {
-  if (!(await getFeatureFlagsAsync()).portalEnabled) {
+  const flags = await getFeatureFlagsAsync();
+  if (!flags.portalEnabled) {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }
   const parsed = schema.safeParse(await readJsonBody(request, 16 * 1_024));
@@ -61,7 +65,9 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   const lang = request.cookies.get('lang')?.value;
   const locale = normalizeLocale(lang);
-  const response = createSuccessResponse({ bookingId: result.bookingId, redirect: `/${locale}/check-in` });
+  // While check-in is off its page answers 404, so the guest lands on the stay hub instead.
+  const redirect = flags.checkinEnabled ? `/${locale}/check-in` : `/${locale}${STAY_HUB_PATH}`;
+  const response = createSuccessResponse({ bookingId: result.bookingId, redirect });
   await attachPortalAuthCookies(request, response, { ...result, remember: parsed.data.remember });
   return response;
 });

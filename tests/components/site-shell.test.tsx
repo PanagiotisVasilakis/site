@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const navigation = vi.hoisted(() => ({ pathname: '/en', search: '' }));
-const session = vi.hoisted(() => ({ isSignedIn: false, signOut: vi.fn() }));
+const session = vi.hoisted(() => ({ isSignedIn: false, portalEnabled: true, checkinEnabled: true, signOut: vi.fn() }));
 const pointerEffects = vi.hoisted(() => vi.fn());
 
 vi.mock('next/navigation', () => ({
@@ -14,7 +14,12 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn(), push: vi.fn() }),
 }));
 vi.mock('@/hooks/useGuestSession', () => ({
-  useGuestSession: () => ({ isSignedIn: session.isSignedIn, signOut: session.signOut }),
+  useGuestSession: () => ({
+    isSignedIn: session.isSignedIn,
+    portalEnabled: session.portalEnabled,
+    checkinEnabled: session.checkinEnabled,
+    signOut: session.signOut,
+  }),
 }));
 // The header's wiring only: the hook itself is covered in pointer-effects.test.tsx.
 vi.mock('@/lib/motion/pointerEffects', () => ({ usePointerEffects: pointerEffects }));
@@ -56,6 +61,8 @@ describe('site shell', () => {
     navigation.pathname = '/en';
     navigation.search = '';
     session.isSignedIn = false;
+    session.portalEnabled = true;
+    session.checkinEnabled = true;
     dialog = installDialog();
     installMatchMedia(false);
     window.history.replaceState(null, '', '/en');
@@ -179,6 +186,41 @@ describe('site shell', () => {
     await user.click(screen.getByRole('button', { name: 'Open menu' }));
     const menu = screen.getByRole('dialog', { name: 'Menu' });
     expect(within(menu).getByRole('link', { name: /Check-in/i })).toHaveAttribute('href', '/en/check-in');
+    await user.click(within(menu).getByRole('button', { name: 'Sign out' }));
+    expect(session.signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers no account link in the menu while the portal is off (its pages answer 404)', () => {
+    session.portalEnabled = false;
+    session.checkinEnabled = false;
+    const { container } = render(<SiteHeader locale="en" />);
+    const menu = screen.getByRole('dialog', { hidden: true });
+    expect(within(menu).queryByRole('link', { name: 'Sign in', hidden: true })).toBeNull();
+    expect(within(menu).queryByRole('link', { name: /Check-in/i, hidden: true })).toBeNull();
+    expect(within(menu).queryByRole('button', { name: 'Sign out', hidden: true })).toBeNull();
+    expect(container.querySelector('.mobile-menu__account')).toBeNull();
+    // The rest of the menu is still there.
+    expect(within(menu).getByRole('link', { name: /Call/, hidden: true })).toHaveAttribute('href', 'tel:+306955810051');
+  });
+
+  it('keeps sign-in for a signed-out visitor while only check-in is off', () => {
+    session.checkinEnabled = false;
+    render(<SiteHeader locale="en" />);
+    const menu = screen.getByRole('dialog', { hidden: true });
+    expect(within(menu).getByRole('link', { name: 'Sign in', hidden: true })).toHaveAttribute('href', '/en/guest?mode=signin');
+    expect(within(menu).queryByRole('link', { name: /Check-in/i, hidden: true })).toBeNull();
+  });
+
+  it('offers sign-out, and no check-in link, to a signed-in guest while check-in is off (its page answers 404)', async () => {
+    session.isSignedIn = true;
+    session.checkinEnabled = false;
+    session.signOut.mockResolvedValue(true);
+    const user = userEvent.setup();
+    render(<SiteHeader locale="en" />);
+    await user.click(screen.getByRole('button', { name: 'Open menu' }));
+    const menu = screen.getByRole('dialog', { name: 'Menu' });
+    expect(within(menu).queryByRole('link', { name: /Check-in/i })).toBeNull();
+    expect(within(menu).queryByRole('link', { name: 'Sign in' })).toBeNull();
     await user.click(within(menu).getByRole('button', { name: 'Sign out' }));
     expect(session.signOut).toHaveBeenCalledTimes(1);
   });

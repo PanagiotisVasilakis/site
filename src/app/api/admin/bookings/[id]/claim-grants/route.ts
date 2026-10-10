@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 const schema = z.object({
   channel: z.enum(['REMOTE', 'ONSITE']),
   ttlMinutes: z.number().int().min(5).max(1440).optional(),
-});
+}).strict();
 
 export const POST = withErrorHandler(async (
   request: NextRequest,

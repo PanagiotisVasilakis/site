@@ -113,6 +113,32 @@ describe('admin authentication', () => {
     await expect(verifyAdminSession(signAdmin({}))).resolves.toBeNull();
   });
 
+  it.each([
+    ['revoked', {
+      revokedAt: new Date('2030-01-01T11:00:00Z'),
+      expiresAt: new Date('2030-01-01T13:00:00Z'),
+      absoluteExpiresAt: new Date('2030-01-02T00:00:00Z'),
+    }],
+    ['idle-expired', {
+      revokedAt: null,
+      expiresAt: new Date('2030-01-01T11:59:59.999Z'),
+      absoluteExpiresAt: new Date('2030-01-02T00:00:00Z'),
+    }],
+    ['past its absolute limit', {
+      revokedAt: null,
+      expiresAt: new Date('2030-01-01T13:00:00Z'),
+      absoluteExpiresAt: new Date('2030-01-01T11:59:59.999Z'),
+    }],
+  ])('rejects a database session that is %s although its JWT is still valid', async (_label, record) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2030-01-01T12:00:00Z'));
+    const token = signAdmin({ session_id: 'session-1' });
+    prismaMock.adminSession.findUnique.mockResolvedValue({ id: 'session-1', ...record });
+    expect(verifyAdmin(token)).toEqual(expect.objectContaining({ session_id: 'session-1' }));
+    await expect(verifyAdminSession(token)).resolves.toBeNull();
+    expect(prismaMock.adminSession.findUnique).toHaveBeenCalledWith({ where: { id: 'session-1' } });
+  });
+
   it('refreshes only active sessions and caps expiry at the absolute deadline', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2030-01-01T12:00:00Z'));
@@ -128,6 +154,17 @@ describe('admin authentication', () => {
     });
     prismaMock.adminSession.findUnique.mockResolvedValue({ revokedAt: new Date(), absoluteExpiresAt: new Date('2030-01-02') });
     await expect(refreshAdminSession('session-1')).resolves.toBeNull();
+  });
+
+  it('does not refresh a session past its absolute deadline', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2030-01-01T12:00:00Z'));
+    prismaMock.adminSession.findUnique.mockResolvedValue({
+      revokedAt: null,
+      absoluteExpiresAt: new Date('2030-01-01T11:59:59.999Z'),
+    });
+    await expect(refreshAdminSession('session-1')).resolves.toBeNull();
+    expect(prismaMock.adminSession.update).not.toHaveBeenCalled();
   });
 
   it('revokes idempotently and skips missing session ids', async () => {

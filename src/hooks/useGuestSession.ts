@@ -5,6 +5,9 @@ import { logger } from '@/lib/logger-client';
 
 export function useGuestSession() {
     const [isSignedIn, setIsSignedIn] = useState(false);
+    // Off until the status request answers 200, so the shell offers no link that may lead to a 404.
+    const [portalEnabled, setPortalEnabled] = useState(false);
+    const [checkinEnabled, setCheckinEnabled] = useState(false);
     const checkerRef = useRef<number | null>(null);
     const inFlight = useRef<AbortController | null>(null);
     const requestVersion = useRef(0);
@@ -26,7 +29,17 @@ export function useGuestSession() {
 
             const body = res.ok ? await res.json().catch(() => null) : null;
             const signedIn = body?.data?.authenticated === true;
-            if (version === requestVersion.current) setIsSignedIn(signedIn);
+            if (version === requestVersion.current) {
+                setIsSignedIn(signedIn);
+                // 200: the portal is on. 404: it is off. Other statuses say nothing about the flags.
+                if (res.ok) {
+                    setPortalEnabled(true);
+                    setCheckinEnabled(body?.data?.checkinEnabled === true);
+                } else if (res.status === 404) {
+                    setPortalEnabled(false);
+                    setCheckinEnabled(false);
+                }
+            }
         } catch {
             // Preserve the last verified state during transient network failures.
         } finally {
@@ -90,5 +103,5 @@ export function useGuestSession() {
         };
     }, [checkSession]);
 
-    return { isSignedIn, signOut };
+    return { isSignedIn, portalEnabled, checkinEnabled, signOut };
 }

@@ -3,6 +3,11 @@ import { useEffect } from 'react';
 import internalFetch from '@/lib/internalFetchClient';
 import { logger } from '@/lib/logger-client';
 
+// A browser that blocks site data makes every storage access throw a SecurityError: treat that as "nothing stored".
+// The storage calls stay inline with their literal key: tests/unit/privacy-storage-inventory.test.ts reads the stored keys from the source.
+const readStored = (read: () => string | null): string | null => { try { return read(); } catch { return null; } };
+const writeStored = (write: () => void): void => { try { write(); } catch { /* storage blocked: the value is not remembered */ } };
+
 export default function PwaManager() {
   useEffect(() => {
       // In dev, aggressively unregister any existing SW (from prior prod build) to avoid intercepting RSC / flight data causing JSON parse errors.
@@ -41,7 +46,7 @@ export default function PwaManager() {
           const showBanner = () => {
             const b = document.getElementById('update-banner');
             if (!b) return;
-            const dismissedUpdate = localStorage.getItem('update-dismissed-version');
+            const dismissedUpdate = readStored(() => localStorage.getItem('update-dismissed-version'));
             const updateKey = b.getAttribute('data-update-key');
             if (dismissedUpdate && updateKey && dismissedUpdate === updateKey) return;
             b.style.display = 'flex';
@@ -72,12 +77,12 @@ export default function PwaManager() {
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && hasTouch);
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
     ('standalone' in window.navigator ? (window.navigator as { standalone?: boolean }).standalone === true : false);
-    const dismissed = localStorage.getItem('ios-a2hs-dismissed') === '1';
+    const dismissed = readStored(() => localStorage.getItem('ios-a2hs-dismissed')) === '1';
     if (isIOS && !isStandalone && !dismissed) {
       const tip = document.getElementById('ios-a2hs-tip'); if (tip) tip.style.display = 'flex';
     }
     const close = document.getElementById('ios-tip-close');
-    close?.addEventListener('click', () => { localStorage.setItem('ios-a2hs-dismissed','1'); const t = document.getElementById('ios-a2hs-tip'); if (t) t.style.display='none'; }, { signal });
+    close?.addEventListener('click', () => { writeStored(() => localStorage.setItem('ios-a2hs-dismissed','1')); const t = document.getElementById('ios-a2hs-tip'); if (t) t.style.display='none'; }, { signal });
     const reload = document.getElementById('update-reload-btn');
     reload?.addEventListener('click', async () => {
       try {
@@ -102,8 +107,8 @@ export default function PwaManager() {
           });
           if (!activated) throw new Error('Timed out waiting for the updated service worker to activate');
         }
-        if (newV) localStorage.setItem('app-version', newV);
-        if (newBuild) localStorage.setItem('app-build', newBuild);
+        if (newV) writeStored(() => localStorage.setItem('app-version', newV));
+        if (newBuild) writeStored(() => localStorage.setItem('app-build', newBuild));
         window.location.reload();
   } catch (err) { logger.error('Update reload handler failed', err instanceof Error ? err : { error: String(err) }); }
     }, { signal });
@@ -114,23 +119,25 @@ export default function PwaManager() {
         const updateKey = banner.getAttribute('data-update-key')
           || banner.getAttribute('data-new-version')
           || banner.getAttribute('data-old-version');
-        if (updateKey) localStorage.setItem('update-dismissed-version', updateKey);
+        if (updateKey) writeStored(() => localStorage.setItem('update-dismissed-version', updateKey));
         banner.style.display = 'none';
       }
     }, { signal });
-    // Listen for version messages from SW
-    navigator.serviceWorker?.addEventListener('message', (e: MessageEvent) => {
+    // Listen for version messages from SW. The getter throws a SecurityError when the browser denies service workers: then there is nothing to listen to.
+    let swContainer: ServiceWorkerContainer | undefined;
+    try { swContainer = navigator.serviceWorker; } catch { /* service workers denied */ }
+    swContainer?.addEventListener('message', (e: MessageEvent) => {
       if (e.data?.type === 'RUNTIME_VERSION') {
         const meta = e.data.meta || {};
         const newVersion: string | undefined = meta.version;
         const newBuild: string | undefined = meta.build;
         if (!newVersion) return;
-        const storedVersion = localStorage.getItem('app-version');
-        const storedBuild = localStorage.getItem('app-build');
+        const storedVersion = readStored(() => localStorage.getItem('app-version'));
+        const storedBuild = readStored(() => localStorage.getItem('app-build'));
         const shortNewBuild = newBuild ? newBuild.slice(0,8) : '';
         if (!storedVersion) {
-          localStorage.setItem('app-version', newVersion);
-          if (newBuild) localStorage.setItem('app-build', newBuild);
+          writeStored(() => localStorage.setItem('app-version', newVersion));
+          if (newBuild) writeStored(() => localStorage.setItem('app-build', newBuild));
           return;
         }
         const banner = document.getElementById('update-banner');
@@ -154,7 +161,7 @@ export default function PwaManager() {
           banner.setAttribute('data-update-key', updateKey);
           if (buildChanged && newBuild) banner.setAttribute('data-new-build', newBuild);
           // If user previously dismissed this same new version, keep hidden.
-          const dismissedUpdate = localStorage.getItem('update-dismissed-version');
+          const dismissedUpdate = readStored(() => localStorage.getItem('update-dismissed-version'));
           if (dismissedUpdate === updateKey) {
             banner.style.display = 'none';
           } else {

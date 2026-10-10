@@ -8,6 +8,7 @@ import {
   CheckInRequestNotFoundError,
   checkInRequestRepository,
 } from '@/lib/prisma-repositories/checkInRequestRepository';
+import { logger } from '@/lib/logger-enterprise';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +33,8 @@ export const PATCH = withErrorHandler(async (
   }
 
   const params = await context.params;
-  const id = idSchema.parse(params.id);
+  if (!idSchema.safeParse(params.id).success) throw new ApiError(ApiErrorCode.NOT_FOUND, 'Check-in request not found');
+  const id = params.id;
   const body = await validateRequestBody(bodySchema, 4 * 1_024)(request);
 
   const existing = await checkInRequestRepository.findById(id);
@@ -67,8 +69,15 @@ export const PATCH = withErrorHandler(async (
     }
     throw error;
   }
+  // The decision and its outbox event are committed: the immediate delivery is best-effort and the outbox worker retries it.
   const delivered = update.notificationEventId
-    ? await (await import('@/lib/bookingOutbox')).deliverOutboxEvent(update.notificationEventId)
+    ? await (await import('@/lib/bookingOutbox')).deliverOutboxEvent(update.notificationEventId).catch((error: unknown) => {
+        logger.warn('Immediate outbox delivery failed', {
+          eventId: update.notificationEventId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return false;
+      })
     : false;
   const notification = !update.changed
     ? { status: 'skipped' as const, reason: 'status_unchanged' }

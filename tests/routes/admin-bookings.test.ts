@@ -74,11 +74,30 @@ describe('admin booking creation', () => {
     ['instants instead of dates', { startDate: '2026-11-01T00:00:00.000Z', endDate: '2026-11-05T00:00:00.000Z' }],
     ['unknown fields', { startDate: '2026-11-01', endDate: '2026-11-05', userId: 'x' }],
     ['an unknown source', { startDate: '2026-11-01', endDate: '2026-11-05', source: 'AIRBNB' }],
+    ['a year below 0100', { startDate: '0026-11-01', endDate: '0026-11-05' }],
+    ['a stay of 181 nights', { startDate: '2026-11-01', endDate: '2027-05-01' }],
   ])('rejects %s with 422', async (_label, body) => {
     const response = await create(body);
 
     expect(response.status).toBe(422);
     expect(mocks.bookingCreate).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a year below 0100', { startDate: '0026-11-01', endDate: '0026-11-05' }, 'startDate', 'Date must be between the years 0100 and 9999'],
+    ['a stay of 181 nights', { startDate: '2026-11-01', endDate: '2027-05-01' }, 'endDate', 'A stay can be at most 180 nights'],
+  ])('names the reason for rejecting %s in the validation details', async (_label, body, path, message) => {
+    const response = await create(body);
+
+    expect(response.status).toBe(422);
+    expect((await response.json()).error.details.validationErrors[0]).toMatchObject({ path, message });
+  });
+
+  it('accepts a stay of exactly 180 nights', async () => {
+    const response = await create({ startDate: '2026-11-01', endDate: '2027-04-30' });
+
+    expect(response.status).toBe(201);
+    expect(mocks.bookingCreate).toHaveBeenCalledTimes(1);
   });
 
   it('answers 409 when the provider reference already exists', async () => {

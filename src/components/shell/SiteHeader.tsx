@@ -41,7 +41,7 @@ export default function SiteHeader({ locale }: { locale: string }) {
   const [open, setOpen] = useState(false);
   const [menuPath, setMenuPath] = useState(pathname);
   const { scrolled } = useScroll(24);
-  const { isSignedIn, signOut } = useGuestSession();
+  const { isSignedIn, portalEnabled, checkinEnabled, signOut } = useGuestSession();
   useMotionPreference();
   usePointerEffects(variant !== 'stay');
 
@@ -137,6 +137,8 @@ export default function SiteHeader({ locale }: { locale: string }) {
         variant={variant}
         t={t}
         isSignedIn={isSignedIn}
+        portalEnabled={portalEnabled}
+        checkinEnabled={checkinEnabled}
         onSignOut={() => void handleSignOut()}
       />
     </>

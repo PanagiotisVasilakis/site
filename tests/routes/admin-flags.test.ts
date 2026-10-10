@@ -48,10 +48,26 @@ describe('admin feature flags route', () => {
   it.each([
     ['an empty object', {}],
     ['a non-boolean flag', { portalEnabled: 'false' }],
+    ['a valid flag next to a misspelt one', { portalEnabled: false, checkinEnable: true }],
   ])('answers 422 for %s without writing', async (_label, body) => {
     const response = await post(body);
 
     expect(response.status).toBe(422);
+    expect(mocks.setFeatureFlags).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a non-boolean flag', { portalEnabled: 'false' }, { path: 'portalEnabled', code: 'invalid_type' }],
+    ['an empty object', {}, { path: '', code: 'custom', message: 'At least one flag must be provided' }],
+    ['a misspelt flag', { portalEnabled: false, checkinEnable: true }, { path: '', code: 'unrecognized_keys' }],
+  ])('reports %s under details.validationErrors, like every other validated route', async (_label, body, expected) => {
+    const response = await post(body);
+    const { error } = await response.json();
+
+    expect(response.status).toBe(422);
+    expect(error.code).toBe('VALIDATION_ERROR');
+    expect(error.details.validationErrors).toEqual([expect.objectContaining(expected)]);
+    expect(error.details).not.toHaveProperty('issues');
     expect(mocks.setFeatureFlags).not.toHaveBeenCalled();
   });
 

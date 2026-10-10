@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger-enterprise';
 import { adminListPageArgs, toAdminListPage } from '@/lib/adminListPage';
 import { CheckInRequestStatus, Prisma } from '@/generated/prisma/client';
-import type { CheckInRequest } from '@/generated/prisma/client';
+import type { CheckInRequest, OutboxStatus } from '@/generated/prisma/client';
 import crypto from 'node:crypto';
 
 export type CheckInRequestRecord = {
@@ -17,7 +17,12 @@ export type CheckInRequestRecord = {
   status: CheckInRequestStatus;
   created_at: number;
   updated_at: number;
-  /** Status of the latest webhook notification; set by list() only. */
+  /**
+   * Webhook notification status; set by list() only. Notifications cancelled by
+   * a privacy erasure are ignored. DEAD when any other notification failed for
+   * good, otherwise the status of the newest remaining one; unset when there is
+   * none, including when an erasure cancelled them all.
+   */
   notification_status?: 'PENDING' | 'LEASED' | 'DELIVERED' | 'DEAD';
 };
 
@@ -169,6 +174,22 @@ async function findLatestForGuest(params: { bookingId?: string; userId?: string 
   }
 }
 
+// A privacy erasure cancels undelivered events by marking them DEAD with the
+// payload replaced by { redacted: true } (privacyService.ts); those are not
+// delivery failures.
+function isErasureCancelled(payload: Prisma.JsonValue): boolean {
+  return typeof payload === 'object' && payload !== null && !Array.isArray(payload) && payload.redacted === true;
+}
+
+// Events cancelled by a privacy erasure are ignored. A failed notification must
+// stay visible, and retryable, behind a newer event (created, then decided), so
+// a real failure wins over the newest remaining status; there is no status when
+// an erasure cancelled every event. `events` are newest first.
+function notificationStatus(events: { status: OutboxStatus; payload: Prisma.JsonValue }[]): OutboxStatus | undefined {
+  const live = events.filter((event) => !(event.status === 'DEAD' && isErasureCancelled(event.payload)));
+  return live.some((event) => event.status === 'DEAD') ? 'DEAD' : live[0]?.status;
+}
+
 async function list(
   params: ListCheckInRequestParams = {},
 ): Promise<{ requests: CheckInRequestRecord[]; nextCursor: string | null }> {
@@ -177,11 +198,11 @@ async function list(
     const rows = await prisma.checkInRequest.findMany({
       where: params.status ? { status: params.status } : undefined,
       ...adminListPageArgs(limit, params.cursor),
-      include: { outboxEvents: { orderBy: { createdAt: 'desc' }, take: 1, select: { status: true } } },
+      include: { outboxEvents: { orderBy: { createdAt: 'desc' }, select: { status: true, payload: true } } },
     });
     const page = toAdminListPage(rows, limit, params.cursor);
     return {
-      requests: page.items.map((row) => ({ ...mapRequest(row), notification_status: row.outboxEvents[0]?.status })),
+      requests: page.items.map((row) => ({ ...mapRequest(row), notification_status: notificationStatus(row.outboxEvents) })),
       nextCursor: page.nextCursor,
     };
   } catch (error) {
@@ -283,10 +304,23 @@ async function getStatusCounts(): Promise<CheckInRequestStatusCounts> {
 }
 
 // Requeues the request's exhausted webhook notifications; the outbox worker
-// delivers them on its next run. Returns how many were requeued.
+// delivers them on its next run. Returns how many were requeued. Events that
+// a privacy erasure cancelled are DEAD too but must never be sent: they are
+// found with the positive filter of ERASURE_CANCELLED_OUTBOX
+// (operationalMonitor.ts) and excluded by id, because a negated JSON-path
+// filter could also drop the ordinary events, which have no `redacted` key.
+// Without cancelled events no `id` clause is sent.
 async function retryFailedNotifications(id: string): Promise<number> {
+  const cancelled = await prisma.outboxEvent.findMany({
+    where: { checkInRequestId: id, status: 'DEAD', payload: { path: ['redacted'], equals: true } },
+    select: { id: true },
+  });
   const retried = await prisma.outboxEvent.updateMany({
-    where: { checkInRequestId: id, status: 'DEAD' },
+    where: {
+      checkInRequestId: id,
+      status: 'DEAD',
+      ...(cancelled.length > 0 ? { id: { notIn: cancelled.map((event) => event.id) } } : {}),
+    },
     data: {
       status: 'PENDING',
       attemptCount: 0,

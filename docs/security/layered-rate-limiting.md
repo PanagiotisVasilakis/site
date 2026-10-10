@@ -24,8 +24,10 @@ state. They rely on the edge/proxy layers, safe caching, and bounded queries.
   to enforcement. When enforcement is enabled, Nginx uses `429` for
   request/connection rejection.
 - PostgreSQL is authoritative only for sensitive operations: administrator
-  and guest authentication, claims, security-relevant refresh context,
-  sensitive public writes, and privacy/security writes. Keys use the verified
+  and guest authentication, claims, guest session refresh (the `portal-refresh`
+  limiter: 60 requests per 15 minutes on the client-address dimension only,
+  checked only when a refresh cookie is present), sensitive public writes,
+  and privacy/security writes. Keys use the verified
   ingress identity and context-separated HMACs; raw credentials are never key
   material. The client-address dimension keys an IPv4 client (including an
   IPv4-mapped IPv6 address) by its full address and an IPv6 client by its /64
@@ -41,6 +43,15 @@ occur before domain mutation. A `Retry-After` header is emitted only where the
 layer has a deterministic reset contract. Missing or invalid client identity
 uses the zero-write `CLIENT_IDENTITY_UNAVAILABLE` path (see
 [trusted ingress](trusted-ingress.md)).
+
+Guest sign-in (`POST /api/portal/sessions`) runs one cost-12 bcrypt comparison
+for every well-formed phone number, whether or not the number has an account, so
+that the response time does not reveal which numbers do. Each comparison holds
+one thread of Node's libuv pool (four threads by default) for about 0.2 s on a
+current CPU. The PostgreSQL limiter bounds these comparisons per client address
+(five per 15 minutes for an IPv4 address or an IPv6 /64) and per phone number,
+not globally; a flood spread over many addresses is left to Cloudflare and, once
+enforcement is approved, to the Nginx `auth_operations` zone.
 
 Expired `rate_limits` rows are deleted by `runRetention` in the versioned
 operations worker. Operators must verify the timer runs and alert on cleanup

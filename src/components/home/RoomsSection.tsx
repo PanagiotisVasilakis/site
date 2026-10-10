@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Icon } from '@/components/icons/Icon';
 import { Button } from '@/components/ui/Button';
 import { Section } from '@/components/ui/Section';
-import { housePhotosByRoom } from '@/data/housePhotos';
+import { APARTMENT_PHOTOS } from '@/data/apartmentPhotos';
 import type { Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 
@@ -13,7 +13,7 @@ import RoomsShowcase from './RoomsShowcase';
 /** identity §9.1 item 6: "A slow walk through the rooms"; the head stays outside every transform. */
 export default function RoomsSection({ locale }: { locale: Locale }) {
   const t = getDictionary(locale).home.rooms;
-  const rooms = homeRoomsFrom(locale, housePhotosByRoom);
+  const rooms = homeRoomsFrom(locale, APARTMENT_PHOTOS);
   if (rooms.length === 0) return null;
 
   return (

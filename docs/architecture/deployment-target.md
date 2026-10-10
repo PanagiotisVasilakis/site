@@ -161,6 +161,9 @@ blockers were re-checked against the repository on 2026-09-29 and remain open:
 - the Compose worker schedule (`scripts/README.md`, "Worker schedule") is a
   documented host-timer example; the installed timers, their single-flight
   locks and journald visibility on the VPS still require recorded evidence;
+- no alert path covers a failed or missing operations run: alerts are evaluated
+  and sent only by the operations worker itself, and no health endpoint reads
+  worker activity; watch it from outside;
 - the versioned reverse-proxy and trusted-ingress contract exist, but live
   Netcup firewall, Cloudflare Full (strict), AOP, and certificate evidence is
   still required;

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import {
+  copyFile,
   mkdtemp,
   mkdir,
   readFile,
@@ -12,6 +13,7 @@ import os from 'node:os';
 import { createServer } from 'node:net';
 import path from 'node:path';
 import test from 'node:test';
+import { pathToFileURL } from 'node:url';
 
 import {
   enumerateArtifactPathForTest,
@@ -146,6 +148,74 @@ test('Airbnb calendar URL placeholders and short test tokens pass', async () => 
     '',
   ].join('\n'));
   assert.deepEqual(result.unexpected, []);
+});
+
+const SCANNER_FILES = [
+  'scripts/check-secrets.mjs',
+  'scripts/lib/artifact-file-walker.mjs',
+  'scripts/lib/generated-artifact-secret-disposition.mjs',
+  'config/secret-scanning/tool.lock.json',
+];
+
+// check-secrets.mjs derives its repository root from its own location, so a copy
+// under a scratch root scans with the scratch gitleaks.toml and never touches the
+// real configuration.
+async function withScratchScanner(configText, callback) {
+  const scratch = await mkdtemp(path.join(os.tmpdir(), 'secret-scanner-copy-'));
+  try {
+    for (const relative of SCANNER_FILES) {
+      const target = path.join(scratch, relative);
+      await mkdir(path.dirname(target), { recursive: true });
+      await copyFile(new URL(`../../${relative}`, import.meta.url), target);
+    }
+    await writeFile(path.join(scratch, 'config/secret-scanning/gitleaks.toml'), configText);
+    const scanner = await import(
+      pathToFileURL(path.join(scratch, 'scripts/check-secrets.mjs')).href
+    );
+    return await callback(scanner);
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
+}
+
+test('a scanner that cannot load its configuration fails closed instead of passing', async () => {
+  const url = reviewedDatabaseUrl('Synthetic9Credential7Only');
+  const realConfig = await readFile(
+    new URL('../../config/secret-scanning/gitleaks.toml', import.meta.url),
+    'utf8',
+  );
+  const scan = (scanner) => withFixture(async (root) => {
+    await writeFile(path.join(root, 'fixture.env'), `DATABASE_URL=${url}\n`, { encoding: 'utf8', mode: 0o600 });
+    return scanner.scanPathForTest(root);
+  });
+
+  const reported = await withScratchScanner(realConfig, scan);
+  assert.equal(reported.unexpected.length, 1);
+
+  await withScratchScanner(`${realConfig}\n[broken\n`, async (scanner) => {
+    await assert.rejects(
+      scan(scanner),
+      (error) => (
+        /did not produce valid JSON evidence/u.test(error.message)
+        && /unable to load gitleaks config/u.test(error.message)
+        && !error.message.includes(url)
+      ),
+    );
+  });
+});
+
+test('an inline scanner suppression comment fails the scan instead of hiding the finding', async () => {
+  const marker = ['gitleaks', ':allow'].join('');
+  const secretLine = `DATABASE_URL=${reviewedDatabaseUrl('Synthetic9Credential7Only')}`;
+  for (const contents of [
+    `${secretLine} # ${marker}\n`,
+    `# ${marker}\nPUBLIC_LABEL=not-sensitive\n`,
+  ]) {
+    await assert.rejects(
+      scanFixture(contents),
+      (error) => error.message === 'Inline scanner suppression is forbidden: nested/input.txt',
+    );
+  }
 });
 
 test('ignored environment files are rejected from release artifacts', () => {

@@ -1,7 +1,8 @@
 /** Phone normalization and validation for E.164.
  * Behavior:
  * - Strips spaces, dashes, parentheses.
- * - If origin === 'GR' and input matches 10 local digits (starting with 2,6,7,8,9 typical), prefix +30.
+ * - If origin === 'GR' and input is 10 local digits not starting with 0, prefix +30. A 10-digit input with a leading 0
+ *   falls through to the international rules below and is rejected, as it is at sign-in (phoneLookupCandidates).
  * - If input starts with +, keep as is after stripping and validate E.164 length (8..15 total digits typical ITU range).
  * - If input is purely digits and 8..15 digits, treat as missing plus: return with '+' prefixed (international).
  * - Reject otherwise.
@@ -16,8 +17,8 @@ export function normalizePhone(input: string, origin?: Origin): { e164: string }
   if (!raw) return null;
 
   // Greek local auto-prefix (+30) for 10-digit locals
-  if (origin === 'GR' && /^\d{10}$/.test(raw)) {
-    // Basic local sanity: leading 2 (landline) or 6/7/8/9 (mobiles vary); don't overfit
+  if (origin === 'GR' && /^[1-9]\d{9}$/.test(raw)) {
+    // Basic local sanity: no leading 0 (it falls through to the international rules and is rejected); don't overfit
     const prefixed = `+30${raw}`;
     return isE164(prefixed) ? { e164: prefixed } : null;
   }

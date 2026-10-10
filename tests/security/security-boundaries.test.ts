@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import type { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -7,6 +8,7 @@ import { getClientIp } from '@/lib/net/getClientIp';
 import { privacyHmac } from '@/lib/privacyHash';
 import { isSensitiveFieldName, redactSensitiveText } from '@/lib/redaction';
 import { runtimeEnvSchema } from '@/lib/runtime-env-schema.js';
+import { SYNTHETIC_PRODUCTION_ENVIRONMENT } from '../../scripts/lib/release-gates.mjs';
 
 const requiredEnv = {
   DATABASE_URL: 'postgresql://user:pass@localhost:5432/guest_guide',
@@ -29,8 +31,9 @@ function productionEnv(overrides: Record<string, string | undefined> = {}) {
     ADMIN_JWT_SECRET: syntheticCredential('admin-jwt'),
     ADMIN_DASH_SECRET: syntheticCredential('admin-dashboard'),
     GUEST_JWT_SECRET: syntheticCredential('guest-jwt'),
+    SECURITY_PEPPER: syntheticCredential('security-pepper'),
+    CLAIM_TOKEN_PEPPER: syntheticCredential('claim-token-pepper'),
     NEXT_PUBLIC_SITE_URL: 'https://guest.example',
-    CLAIM_TOKEN_PEPPER: 'c'.repeat(32),
     ORIGIN_PROXY_SHARED_SECRET: '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2',
     ...overrides,
   };
@@ -90,6 +93,7 @@ describe('runtime environment fail-closed policy', () => {
     ['missing public URL', { NEXT_PUBLIC_SITE_URL: undefined }, 'NEXT_PUBLIC_SITE_URL'],
     ['HTTP public URL', { NEXT_PUBLIC_SITE_URL: 'http://guest.example' }, 'NEXT_PUBLIC_SITE_URL'],
     ['missing claim pepper', { CLAIM_TOKEN_PEPPER: undefined }, 'CLAIM_TOKEN_PEPPER'],
+    ['empty security pepper', { SECURITY_PEPPER: '' }, 'SECURITY_PEPPER'],
     ['missing origin attestation secret', { ORIGIN_PROXY_SHARED_SECRET: undefined }, 'ORIGIN_PROXY_SHARED_SECRET'],
     ['weak origin attestation secret', { ORIGIN_PROXY_SHARED_SECRET: 'a'.repeat(64) }, 'ORIGIN_PROXY_SHARED_SECRET'],
   ])('rejects production configuration with %s', (_label, overrides, expectedPath) => {
@@ -258,6 +262,113 @@ describe('runtime environment fail-closed policy', () => {
     expect(result.success).toBe(true);
     if (result.success) expect(result.data.CARTO_BASEMAPS_KEY).toBeUndefined();
   });
+
+  it.each([
+    ['NEXT_PUBLIC_SITE_URL', 'guide.example/?token=fixture', {}],
+    [
+      'CHECKIN_REQUEST_WEBHOOK_URL',
+      'hooks.example/check-in?token=fixture',
+      { CHECKIN_REQUEST_WEBHOOK_TOKEN: 't'.repeat(20) },
+    ],
+    ['ALERT_WEBHOOK_URL', 'alerts.example/hook?token=fixture', { ALERT_WEBHOOK_TOKEN: 'a'.repeat(20) }],
+  ] as const)('reports an unparsable %s as an issue next to the others without echoing it', (key, value, extra) => {
+    const result = runtimeEnvSchema.safeParse(productionEnv({ ...extra, [key]: value, GUEST_WIFI_PASSWORD: 'short' }));
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const paths = result.error.issues.map(({ path }) => path[0]);
+      expect(paths).toContain(key);
+      expect(paths).toContain('GUEST_WIFI_PASSWORD');
+      expect(JSON.stringify(result.error.issues)).not.toContain('token=fixture');
+    }
+  });
+
+  it('keeps the token and HTTPS messages of an insecure check-in webhook', () => {
+    const result = runtimeEnvSchema.safeParse(productionEnv({
+      CHECKIN_REQUEST_WEBHOOK_URL: 'http://hooks.example/check-in',
+    }));
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map(({ path, message }) => [path[0], message])).toEqual([
+        [
+          'CHECKIN_REQUEST_WEBHOOK_TOKEN',
+          'CHECKIN_REQUEST_WEBHOOK_TOKEN is required when CHECKIN_REQUEST_WEBHOOK_URL is configured',
+        ],
+        ['CHECKIN_REQUEST_WEBHOOK_URL', 'CHECKIN_REQUEST_WEBHOOK_URL must use HTTPS in production'],
+      ]);
+    }
+  });
+
+  it.each(['SECURITY_PEPPER', 'CLAIM_TOKEN_PEPPER'])(
+    'rejects the .env.example value of %s in production without echoing it',
+    (name) => {
+      const example = readFileSync('.env.example', 'utf8')
+        .split('\n')
+        .find((line) => line.startsWith(`${name}=`))
+        ?.slice(name.length + 1) ?? '';
+      expect(example).not.toBe('');
+      const result = runtimeEnvSchema.safeParse(productionEnv({ [name]: example }));
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues.map(({ path }) => path[0])).toEqual([name]);
+        expect(JSON.stringify(result.error.issues)).not.toContain(example);
+      }
+    },
+  );
+
+  const pepperSuffix = syntheticCredential('pepper-suffix');
+
+  it.each([
+    ['a repeated character', 'a'.repeat(32)],
+    ['a repeated block', 'k3Zq9xTv'.repeat(4)],
+    ['the word replace', `replace-${pepperSuffix}`],
+    ['the word changeme', `ChangeMe-${pepperSuffix}`],
+    ['the word placeholder', `${pepperSuffix}-placeholder`],
+    ['the word example', `${pepperSuffix}.EXAMPLE`],
+  ])('rejects a production pepper with %s without echoing it', (_label, value) => {
+    for (const name of ['SECURITY_PEPPER', 'CLAIM_TOKEN_PEPPER']) {
+      const result = runtimeEnvSchema.safeParse(productionEnv({ [name]: value }));
+      expect(result.success, name).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues.map(({ path }) => path[0]), name).toEqual([name]);
+        expect(JSON.stringify(result.error.issues), name).not.toContain(value);
+      }
+    }
+  });
+
+  it.each([
+    ['SECURITY_PEPPER', 'ADMIN_JWT_SECRET'],
+    ['SECURITY_PEPPER', 'GUEST_JWT_SECRET'],
+    ['SECURITY_PEPPER', 'ADMIN_DASH_SECRET'],
+    ['CLAIM_TOKEN_PEPPER', 'ADMIN_JWT_SECRET'],
+    ['CLAIM_TOKEN_PEPPER', 'GUEST_JWT_SECRET'],
+    ['CLAIM_TOKEN_PEPPER', 'ADMIN_DASH_SECRET'],
+  ] as const)('rejects %s that reuses the value of %s', (pepper, credential) => {
+    const baseline = productionEnv();
+    const result = runtimeEnvSchema.safeParse({ ...baseline, [pepper]: baseline[credential] });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map(({ path }) => path[0])).toEqual([pepper]);
+      expect(JSON.stringify(result.error.issues)).not.toContain(baseline[credential]);
+    }
+  });
+
+  it('accepts the release synthetic production environment and hexadecimal peppers', () => {
+    expect(runtimeEnvSchema.safeParse(SYNTHETIC_PRODUCTION_ENVIRONMENT).success).toBe(true);
+    const hex = (purpose: string) => createHash('sha256').update(purpose, 'utf8').digest('hex');
+    expect(runtimeEnvSchema.safeParse(productionEnv({
+      SECURITY_PEPPER: hex('security-pepper'),
+      CLAIM_TOKEN_PEPPER: hex('claim-token-pepper'),
+    })).success).toBe(true);
+  });
+
+  it('rejects LOG_LEVEL=fatal, which the logger never emits, and accepts the levels it knows', () => {
+    const fatal = runtimeEnvSchema.safeParse(productionEnv({ LOG_LEVEL: 'fatal' }));
+    expect(fatal.success).toBe(false);
+    if (!fatal.success) expect(fatal.error.issues.map(({ path }) => path[0])).toEqual(['LOG_LEVEL']);
+    for (const level of ['trace', 'debug', 'info', 'warn', 'error']) {
+      expect(runtimeEnvSchema.safeParse(productionEnv({ LOG_LEVEL: level })).success, level).toBe(true);
+    }
+  });
 });
 
 describe('credential hashing and privacy-safe logging', () => {
@@ -285,6 +396,73 @@ describe('credential hashing and privacy-safe logging', () => {
     );
     expect(redactSensitiveText('Deployment 2026-07-15')).toBe('Deployment 2026-07-15');
     expect(redactSensitiveText('x'.repeat(100), 20)).toHaveLength(20);
+  });
+
+  it('keeps WebKit and Gecko stack frames, whose function name is followed by @ and a URL', () => {
+    expect(redactSensitiveText('fn@https://host/a.js:1:2')).toBe('fn@https://host/a.js:1:2');
+
+    const stack = [
+      'handleClick@https://guest.example/_next/static/chunks/app/page-abc123.js:1:2345',
+      'Foo.bar@https://guest.example/_next/static/chunks/app/page-abc123.js:2:3',
+      '@https://guest.example/_next/static/chunks/main.js:1:10',
+      'global code@https://guest.example/_next/static/chunks/main.js:3:1',
+    ].join('\n');
+    expect(redactSensitiveText(stack)).toBe(stack);
+  });
+
+  it('keeps V8 stack frames', () => {
+    const stack = [
+      'TypeError: x is undefined',
+      '    at handleClick (https://guest.example/_next/static/chunks/app/page-abc123.js:1:2345)',
+    ].join('\n');
+    expect(redactSensitiveText(stack)).toBe(stack);
+  });
+
+  it('still redacts an address that carries a scheme or sits next to a URL', () => {
+    expect(redactSensitiveText('guest@example.com')).toBe('[REDACTED_EMAIL]');
+    expect(redactSensitiveText('mailto:guest@example.com')).toBe('[REDACTED_EMAIL]');
+    expect(redactSensitiveText('https://guest@example.com/x')).toBe('[REDACTED_EMAIL]');
+    expect(redactSensitiveText('cc:guest@example.com,https://host.example/x')).toBe('[REDACTED_EMAIL]');
+  });
+
+  it('redacts an address with non-ASCII letters that sits next to a URL', () => {
+    expect(redactSensitiveText('μαρία@example.com,https://x.example/z')).toBe('[REDACTED_EMAIL]');
+    expect(redactSensitiveText('user@παράδειγμα.gr;https://x.example/z')).toBe('[REDACTED_EMAIL]');
+  });
+
+  it('keeps a WebKit frame whose function name has non-ASCII letters', () => {
+    const frame = 'Σφάλμα@https://guest.example/a.js:1:2';
+    expect(redactSensitiveText(frame)).toBe(frame);
+  });
+
+  it.each([
+    ['a decomposed accent directly before the @', 'Ζωή@example.com,https://x.example/z'.normalize('NFD')],
+    ['a decomposed accent in the domain label', 'user@παράδειγμα.gr;https://x.example/z'.normalize('NFD')],
+    ['Devanagari vowel signs, which are combining marks also in NFC', 'user@उदाहरण.भारत;https://x.example/z'],
+  ])('redacts an address with combining marks that sits next to a URL: %s', (_label, input) => {
+    expect(redactSensitiveText(input)).toBe('[REDACTED_EMAIL]');
+  });
+
+  it.each([
+    ['an ASCII digit', 'user@παράδειγμα1.gr;https://x.example/z'],
+    ['a non-ASCII digit (U+0663)', `user@παράδειγμα${String.fromCodePoint(0x0663)}.gr;https://x.example/z`],
+  ])('redacts an address whose non-ASCII domain label holds %s next to a URL', (_label, input) => {
+    expect(redactSensitiveText(input)).toBe('[REDACTED_EMAIL]');
+  });
+
+  it('keeps a WebKit frame whose function name has decomposed letters', () => {
+    const frame = 'Σφάλμα@https://guest.example/a.js:1:2'.normalize('NFD');
+    expect(redactSensitiveText(frame)).toBe(frame);
+  });
+
+  const embeddedJwt = `eyJ${'a'.repeat(24)}.eyJ${'b'.repeat(24)}.${'c'.repeat(24)}`;
+
+  it.each([
+    ['a cookie-style assignment', `guest_session=${embeddedJwt}; path=/`, '[REDACTED_TOKEN] path=/'],
+    ['quotes', `"${embeddedJwt}"`, '[REDACTED_TOKEN]'],
+    ['compact JSON holding two e-mail addresses', '{"to":"a@x.com","cc":"b@y.gr"}', '[REDACTED_EMAIL]'],
+  ])('redacts a secret or an address embedded in %s', (_label, input, expected) => {
+    expect(redactSensitiveText(input)).toBe(expected);
   });
 
   it.each([

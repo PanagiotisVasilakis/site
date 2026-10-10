@@ -289,3 +289,80 @@ describe('admin guests guest info', () => {
     expect(screen.queryByText(/legacy@example\.invalid|Not provided/u)).not.toBeInTheDocument();
   });
 });
+
+describe('admin guests create booking', () => {
+  // The body of the 422 answer of POST /api/admin/bookings: the generic message plus the issues.
+  function validationBody(message: string) {
+    return {
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Validation failed',
+        details: { validationErrors: [{ path: 'endDate', message, code: 'custom' }] },
+      },
+    };
+  }
+
+  function mockPage(createResponse?: Response) {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === '/api/admin/bookings' && createResponse) return createResponse;
+      const data = url.includes('action=list') ? { bookings: [] }
+        : url.includes('action=stats') ? { statistics: {} } : { requests: [] };
+      return new Response(JSON.stringify({ success: true, data }), { status: 200 });
+    });
+  }
+
+  async function renderPage() {
+    render(<AdminGuestsPage />);
+    await screen.findByText('No Bookings Found');
+  }
+
+  it('shows the reason of a rejected booking, not the generic validation message', async () => {
+    mockPage(new Response(JSON.stringify(validationBody('Check-out must be after check-in')), { status: 422 }));
+    await renderPage();
+
+    // The host picked the check-out first and a later check-in afterwards. A click on the submit
+    // button would stop at the native min check, so the form is submitted directly.
+    fireEvent.change(screen.getByLabelText('Check-out'), { target: { value: '2026-11-01' } });
+    fireEvent.change(screen.getByLabelText('Check-in'), { target: { value: '2026-11-05' } });
+    fireEvent.submit(document.querySelector('form')!);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/admin/bookings', expect.objectContaining({ method: 'POST' })));
+    expect(await screen.findByText('Check-out must be after check-in')).toBeInTheDocument();
+    expect(screen.queryByText('Validation failed')).not.toBeInTheDocument();
+  });
+
+  it('still shows the server message when the rejection has no validation issues', async () => {
+    mockPage(new Response(JSON.stringify({ error: { code: 'CONFLICT', message: 'A booking with this reference already exists' } }), { status: 409 }));
+    await renderPage();
+
+    fireEvent.change(screen.getByLabelText('Check-in'), { target: { value: '2026-11-01' } });
+    fireEvent.change(screen.getByLabelText('Check-out'), { target: { value: '2026-11-05' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create booking' }));
+
+    expect(await screen.findByText('A booking with this reference already exists')).toBeInTheDocument();
+  });
+
+  it('starts the check-out picker the day after check-in', async () => {
+    mockPage();
+    await renderPage();
+    const checkOut = screen.getByLabelText('Check-out');
+    expect(checkOut).not.toHaveAttribute('min');
+
+    fireEvent.change(screen.getByLabelText('Check-in'), { target: { value: '2026-11-30' } });
+    expect(checkOut).toHaveAttribute('min', '2026-12-01');
+
+    fireEvent.change(checkOut, { target: { value: '2026-11-30' } });
+    expect(checkOut).toBeInvalid();
+    fireEvent.change(checkOut, { target: { value: '2026-12-01' } });
+    expect(checkOut).toBeValid();
+  });
+
+  it('leaves the check-out picker open when check-in is the last supported day', async () => {
+    mockPage();
+    await renderPage();
+
+    fireEvent.change(screen.getByLabelText('Check-in'), { target: { value: '9999-12-31' } });
+
+    expect(screen.getByLabelText('Check-out')).not.toHaveAttribute('min');
+  });
+});

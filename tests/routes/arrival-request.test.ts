@@ -25,6 +25,7 @@ vi.mock('@/lib/bookingOutbox', () => ({ deliverOutboxEvent: mocks.deliverOutboxE
 vi.mock('@/lib/prisma', () => ({ prisma: { booking: { findUnique: mocks.findBooking } } }));
 
 import { GET, POST } from '@/app/api/check-in/arrival-request/route';
+import { logger } from '@/lib/logger-enterprise';
 
 const BOOKING_ID = '82000000-0000-4000-8000-000000000001';
 const USER_ID = '82000000-0000-4000-8000-000000000002';
@@ -69,6 +70,19 @@ describe('arrival-time request route', () => {
     expect((await response.json()).data).toMatchObject({ request: { requestedTime: '17:00', status: 'pending' }, notification: { status: 'sent' } });
   });
 
+  it('still answers 201 with a queued notification when the immediate delivery fails', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    mocks.create.mockResolvedValue({ request: record('17:00'), notificationEventId: 'event-1', created: true });
+    mocks.deliverOutboxEvent.mockRejectedValue(new Error('connection terminated'));
+
+    const response = await post({ requestedTime: '17:00' });
+
+    expect(response.status).toBe(201);
+    expect((await response.json()).data).toMatchObject({ request: { requestedTime: '17:00', status: 'pending' }, notification: { status: 'queued' } });
+    expect(mocks.deliverOutboxEvent).toHaveBeenCalledWith('event-1');
+    expect(warn).toHaveBeenCalledWith('Immediate outbox delivery failed', { eventId: 'event-1', error: 'connection terminated' });
+  });
+
   it('reports a request that was kept because one is already pending', async () => {
     mocks.create.mockResolvedValue({ request: record('16:30'), created: false });
 
@@ -102,6 +116,16 @@ describe('arrival-time request route', () => {
 
     expect(response.status).toBe(201);
     expect(mocks.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers 422 for an unknown body key and stores nothing', async () => {
+    const response = await post({ requestedTime: '17:00', note: 'Late flight' });
+
+    expect(response.status).toBe(422);
+    expect((await response.json()).error.details.validationErrors).toEqual([expect.objectContaining({ code: 'unrecognized_keys' })]);
+    expect(mocks.findBooking).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.deliverOutboxEvent).not.toHaveBeenCalled();
   });
 
   it('returns the latest request of the verified guest', async () => {

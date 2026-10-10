@@ -214,6 +214,7 @@ async function createBaselineFixture() {
     mediaType: 'application/vnd.oci.image.index.v1+json',
   }));
   await writeRelative(root, 'deploy/nginx/nginx.conf.template', [
+    'server_tokens off;',
     'include /etc/nginx/trusted-ingress/cloudflare-realip.conf;',
     'real_ip_header CF-Connecting-IP;',
     'geo $realip_remote_addr $cloudflare_source {',
@@ -765,6 +766,15 @@ test('rejects missing private attestation overwrite', async () => {
       '',
     ));
     assertRejected(await validateReleasePolicy(root), /X-Origin-Proxy-Attestation/u);
+  });
+});
+
+test('rejects a production Nginx configuration that does not hide its version', async () => {
+  await withFixture(async (root) => {
+    const configPath = path.join(root, 'deploy/nginx/nginx.conf.template');
+    const config = await readFile(configPath, 'utf8');
+    await writeFile(configPath, config.replace('server_tokens off;\n', ''));
+    assertRejected(await validateReleasePolicy(root), /server_tokens off;/u);
   });
 });
 

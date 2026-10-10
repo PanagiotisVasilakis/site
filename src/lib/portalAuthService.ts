@@ -211,6 +211,11 @@ export async function consumeBookingClaimGrant(input: {
     }
 
     const existingUser = await tx.user.findUnique({ where: { phoneE164: normalized.e164 } });
+    // Ownership first: for a booking that already has an owner, another phone gets the same answer
+    // whether or not it knows that account's password.
+    if (grant.booking.userId && grant.booking.userId !== existingUser?.id) {
+      throw new PortalAuthError('BOOKING_ALREADY_CLAIMED');
+    }
     let userId: string;
     if (existingUser) {
       if (existingUser.passwordHash) {
@@ -308,6 +313,23 @@ export async function consumeBookingClaimGrant(input: {
   throw new Error('Unreachable claim transaction state');
 }
 
+// Stands in for the stored hash of an unknown or password-less account, so that sign-in does the
+// same bcrypt work for every phone number. Created on first use; the cached promise is shared.
+let unusedPasswordHash: Promise<string> | undefined;
+
+async function hashUnusedPassword(): Promise<string> {
+  return bcrypt.hash(crypto.randomBytes(16).toString('hex'), BCRYPT_ROUNDS);
+}
+
+function getUnusedPasswordHash(): Promise<string> {
+  unusedPasswordHash ??= hashUnusedPassword().catch((error: unknown) => {
+    // A failed hash must not stay cached: the next attempt hashes again.
+    unusedPasswordHash = undefined;
+    throw error;
+  });
+  return unusedPasswordHash;
+}
+
 export async function authenticatePortalUser(input: {
   phone: string;
   password: string;
@@ -326,7 +348,11 @@ export async function authenticatePortalUser(input: {
     user = await prisma.user.findUnique({ where: { phoneE164 } });
     if (user) break;
   }
-  if (!user?.passwordHash || !(await bcrypt.compare(input.password, user.passwordHash))) {
+  // An unknown or password-less account is compared against a random hash, so the response time
+  // does not reveal whether the phone number has an account.
+  const comparedHash = user?.passwordHash || await getUnusedPasswordHash();
+  const matches = await bcrypt.compare(input.password, comparedHash);
+  if (!user?.passwordHash || !matches) {
     throw new PortalAuthError('INVALID_CREDENTIALS');
   }
 

@@ -25,7 +25,7 @@ export const dynamic = 'force-dynamic';
 
 const schema = z.object({
   claimToken: z.string().trim().min(32).max(256),
-});
+}).strict();
 
 const exchange = withErrorHandler(async (request: NextRequest) => {
   if (!(await getFeatureFlagsAsync()).portalEnabled) {

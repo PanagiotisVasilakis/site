@@ -98,6 +98,12 @@ const config = [
     // Inputs are length-capped before these linear IP-format expressions run.
     files: ['src/lib/net/getClientIp.ts'],
     rules: { 'security/detect-unsafe-regex': 'off' }
+  },
+  {
+    // Deliberate hostile input: the test feeds a javascript: failure link to
+    // PortalRefreshRedirect and asserts that it falls back to the site root.
+    files: ['tests/components/portal-refresh-redirect.test.tsx'],
+    rules: { 'no-script-url': 'off' }
   }
 ];
 

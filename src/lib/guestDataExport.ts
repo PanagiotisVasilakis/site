@@ -65,7 +65,7 @@ class GuestDataExport {
   async getBookingByReference(reference: string): Promise<BookingExport | null> {
     const booking = await guestStore.findBookingByReference(reference);
     if (!booking) {
-      logger.info('Booking not found', { reference });
+      logger.info('Booking not found', { referenceLength: reference.length });
       return null;
     }
     return this.getBookingDetails(booking.id);

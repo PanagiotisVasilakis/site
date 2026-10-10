@@ -178,7 +178,6 @@ async function main(): Promise<number> {
     `ALLOWED_ORIGINS=https://localhost:${WEB_PORT}`,
     'LOG_LEVEL=info',
     'ALERT_WEBHOOK_REQUIRED=0',
-    'PRISMA_AUTO_DISCONNECT=false',
     '',
   ].join('\n');
   // The smoke uses one database role for both files; production uses a separate migration role.
@@ -316,7 +315,7 @@ async function main(): Promise<number> {
       return state.caches.join(', ');
     });
     await check('offline: visited page and offline fallback', async () => {
-      await page.goto(`${BASE}/en/apartment`, { waitUntil: 'networkidle0' });
+      await page.goto(`${BASE}/en/moments`, { waitUntil: 'networkidle0' });
       // page.setOfflineMode only reaches the page's own targets, not the service worker, which would
       // keep fetching from the network; emulate offline on the service-worker target as well.
       const serviceWorker = await (await page.browser().waitForTarget((target) => target.type() === 'service_worker', { timeout: 10_000 })).createCDPSession();
@@ -328,7 +327,7 @@ async function main(): Promise<number> {
       offline = true;
       await setOffline(true);
       try {
-        const visited = await page.goto(`${BASE}/en/apartment`, { waitUntil: 'load' });
+        const visited = await page.goto(`${BASE}/en/moments`, { waitUntil: 'load' });
         assert(visited?.status() === 200 && (await page.$('main')), `visited page offline: ${visited?.status()}`);
         const unvisited = await page.goto(`${BASE}/el/phones`, { waitUntil: 'load' });
         const text = await page.evaluate(() => document.body.innerText);

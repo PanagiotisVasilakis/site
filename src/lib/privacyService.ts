@@ -3,6 +3,9 @@ import { Prisma } from '@/generated/prisma/client';
 import type { PrivacyRequest } from '@/generated/prisma/client';
 
 import { prisma } from '@/lib/prisma';
+import { redactSensitiveText } from '@/lib/redaction';
+
+const SERIALIZABLE_ATTEMPTS = 3;
 
 function privacySubjectDigest(kind: 'user' | 'booking', id: string): string {
   return crypto.createHash('sha256').update(`privacy-subject:v1:${kind}:${id}`).digest('hex');
@@ -10,13 +13,23 @@ function privacySubjectDigest(kind: 'user' | 'booking', id: string): string {
 
 /**
  * Erase one guest on the host's instruction (admin UI). The host verifies the
- * guest's identity out of band; the audit note records why and on whose request.
+ * guest's identity out of band; the audit note records why and how the request was
+ * verified, not who asked. The note outlives the erased guest, so it is stored through
+ * redactSensitiveText, which masks e-mail addresses and phone numbers.
  */
 export async function eraseGuestByAdmin(userId: string, auditNote: string) {
   const subject = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
   if (!subject) throw new Error('ERASURE_SUBJECT_NOT_FOUND');
   const { request } = await createVerifiedErasureRequest(userId, auditNote);
-  return completeErasureRequest(request.id, auditNote);
+  // Retry only the transaction: the request row is already committed and is reused, never created again.
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await completeErasureRequest(request.id, auditNote);
+    } catch (error) {
+      const conflict = error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034';
+      if (!conflict || attempt === SERIALIZABLE_ATTEMPTS) throw error;
+    }
+  }
 }
 
 /**
@@ -30,8 +43,17 @@ export async function eraseGuestForRetention(userId: string, auditNote: string, 
   const subject = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
   if (!subject) return false;
   const { request, created } = await createVerifiedErasureRequest(userId, auditNote);
-  const completed = await completeErasureRequest(request.id, auditNote, { bookingsEndedBefore, createdRequest: created });
-  return completed !== null;
+  // Retry only the transaction, as in eraseGuestByAdmin. The guard runs again on every attempt, so a
+  // guest who claimed a booking meanwhile is skipped and the request created above is deleted.
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      const completed = await completeErasureRequest(request.id, auditNote, { bookingsEndedBefore, createdRequest: created });
+      return completed !== null;
+    } catch (error) {
+      const conflict = error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034';
+      if (!conflict || attempt === SERIALIZABLE_ATTEMPTS) throw error;
+    }
+  }
 }
 
 async function createVerifiedErasureRequest(userId: string, auditNote: string) {
@@ -53,7 +75,7 @@ async function createVerifiedErasureRequest(userId: string, auditNote: string) {
         subjectDigest: privacySubjectDigest('user', userId),
         requestType: 'ERASURE',
         status: 'VERIFIED',
-        auditNote: auditNote.slice(0, 1_024),
+        auditNote: redactSensitiveText(auditNote, 1_024),
       },
     });
     return { request, created: true };
@@ -79,7 +101,7 @@ async function ensureVerified<T extends { id: string; status: string }>(request:
   if (request.status !== 'PENDING') return request;
   await prisma.privacyRequest.updateMany({
     where: { id: request.id, status: 'PENDING' },
-    data: { status: 'VERIFIED', auditNote: auditNote.slice(0, 1_024) },
+    data: { status: 'VERIFIED', auditNote: redactSensitiveText(auditNote, 1_024) },
   });
   return request;
 }
@@ -158,6 +180,14 @@ async function completeErasureRequest(requestId: string, auditNote: string, guar
         where: { OR: [{ userId: user.id }, { bookingId: { in: bookingIds } }] },
         data: { userId: null, guestName: null, guestEmail: null, guestPhone: null, message: null },
       });
+      // The erased bookings can be claimed again, and a booking holds at most one PENDING request
+      // (check_in_requests_one_pending_per_booking). Close the erased guest's undecided requests so
+      // they do not block the next claimant. REJECTED is the only terminal status; the booking link
+      // stays and no outbox event is created (the undelivered ones are cancelled above).
+      await tx.checkInRequest.updateMany({
+        where: { bookingId: { in: bookingIds }, status: 'PENDING' },
+        data: { status: 'REJECTED' },
+      });
       await tx.bookingClaimGrant.updateMany({
         where: { bookingId: { in: bookingIds }, revokedAt: null },
         data: { revokedAt: new Date() },
@@ -189,7 +219,7 @@ async function completeErasureRequest(requestId: string, auditNote: string, guar
       data: {
         status: 'COMPLETED',
         completedAt,
-        auditNote: auditNote.slice(0, 1_024),
+        auditNote: redactSensitiveText(auditNote, 1_024),
       },
     });
     await tx.securityAuditEvent.create({

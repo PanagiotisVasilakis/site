@@ -18,6 +18,7 @@ describe('Prisma PostgreSQL adapter configuration', () => {
       statement_timeout: 11_000,
       query_timeout: 12_000,
       lock_timeout: 3_000,
+      options: '-c TimeZone=UTC',
     });
     if (typeof result.config === 'string' || !('connectionString' in result.config)) {
       throw new Error('Expected a pg PoolConfig');
@@ -55,6 +56,7 @@ describe('Prisma PostgreSQL adapter configuration', () => {
         statement_timeout: 20_000,
         query_timeout: 25_000,
         lock_timeout: 5_000,
+        options: '-c TimeZone=UTC',
       },
     });
   });

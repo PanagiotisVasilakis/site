@@ -31,8 +31,6 @@ const managedEnvironment = [
   'CLAIM_TOKEN_PEPPER',
   'DATABASE_URL',
   'GUEST_JWT_SECRET',
-  'LOG_CONSOLE',
-  'PRISMA_AUTO_DISCONNECT',
   'SECURITY_PEPPER',
 ] as const;
 
@@ -102,8 +100,6 @@ function setApplicationEnvironment(databaseUrl: string): void {
   process.env.CLAIM_TOKEN_PEPPER = CLAIM_TOKEN_PEPPER;
   process.env.DATABASE_URL = databaseUrl;
   process.env.GUEST_JWT_SECRET = GUEST_JWT_SECRET;
-  process.env.LOG_CONSOLE = 'false';
-  process.env.PRISMA_AUTO_DISCONNECT = 'false';
   process.env.SECURITY_PEPPER = SECURITY_PEPPER;
 }
 

@@ -488,6 +488,7 @@ async function validateTrustedIngress(root, errors) {
       'ssl_verify_client on;',
       'cloudflare-origin-pull-ca.pem',
       'server 127.0.0.1:3000;',
+      'server_tokens off;',
     ];
     for (const marker of requiredMarkers) {
       if (!config.includes(marker)) errors.push(`production Nginx configuration lacks: ${marker}`);

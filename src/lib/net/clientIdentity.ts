@@ -61,7 +61,7 @@ export function createClientIdentityUnavailableResponse(error?: unknown): NextRe
   });
   return NextResponse.json({
     success: false,
-    error: { message: 'Service temporarily unavailable' },
+    error: { code: 'SERVICE_UNAVAILABLE', message: 'Service temporarily unavailable' },
   }, {
     status: 503,
     headers: {
@@ -97,18 +97,18 @@ export function requireCanonicalClientIp(
   if (attestation.includes(',')) {
     throw new ClientIdentityUnavailableError('multi_value');
   }
-  if (rawSource !== null && canonicalizeClientIp(rawSource) === null) {
+  if (rawSource === null) {
+    throw new ClientIdentityUnavailableError('missing');
+  }
+  if (canonicalizeClientIp(rawSource) === null) {
     throw new ClientIdentityUnavailableError(unavailableReason(rawSource));
   }
 
   const selected = getClientIp(request);
   const canonical = canonicalizeClientIp(selected);
   if (!canonical) {
-    throw new ClientIdentityUnavailableError(
-      // After the checks above, a non-null source is a valid IP, so a null
-      // result here means the attestation did not match the configured secret.
-      rawSource === null ? 'sentinel' : 'attestation_rejected',
-    );
+    // The source is a valid IP here, so the attestation did not match.
+    throw new ClientIdentityUnavailableError('attestation_rejected');
   }
   return canonical;
 }

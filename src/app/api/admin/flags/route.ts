@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode, readJsonBody } from '@/lib/apiErrorHandler';
+import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode, readJsonBody, ValidationError } from '@/lib/apiErrorHandler';
 import { isAdminRequest } from '@/lib/rbac';
 import { getFeatureFlagsAsync, setFeatureFlags, type FeatureFlags } from '@/lib/featureFlags';
 import { logger } from '@/lib/logger-enterprise';
@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 const schema = z.object({
   portalEnabled: z.boolean().optional(),
   checkinEnabled: z.boolean().optional(),
-}).refine((obj) => Object.keys(obj).length > 0, { message: 'At least one flag must be provided' });
+}).strict().refine((obj) => Object.keys(obj).length > 0, { message: 'At least one flag must be provided' });
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
   if (!(await isAdminRequest(req))) throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
@@ -23,7 +23,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const body = await readJsonBody(req, 8 * 1_024);
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
-    throw new ApiError(ApiErrorCode.VALIDATION_ERROR, 'Invalid flags payload', { issues: parsed.error.issues });
+    throw new ValidationError(parsed.error.issues);
   }
   const before = await getFeatureFlagsAsync();
   const updated = await setFeatureFlags(parsed.data);

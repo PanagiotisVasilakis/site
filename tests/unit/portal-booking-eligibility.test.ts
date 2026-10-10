@@ -40,10 +40,13 @@ describe('portal booking temporal eligibility', () => {
 
   it.each([
     ['starts today', '2030-06-15', '2030-06-18', true],
+    ['starts in one day', '2030-06-16', '2030-06-18', true],
     ['starts in exactly seven days', '2030-06-22', '2030-06-29', true],
     ['starts in eight days', '2030-06-23', '2030-06-30', false],
+    ['starts in thirty days', '2030-07-15', '2030-07-22', false],
     ['ended yesterday', '2030-06-01', '2030-06-14', false],
     ['ends today', '2030-06-01', '2030-06-15', true],
+    ['is already in progress', '2030-06-12', '2030-06-18', true],
     ['has an inverted date range', '2030-06-18', '2030-06-17', false],
   ])('%s', (_label, startDate, endDate, expected) => {
     expect(eligibilityFor(

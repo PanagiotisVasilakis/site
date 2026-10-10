@@ -9,7 +9,7 @@
 #   MIGRATE_ENV_FILE  root-owned env file for `migrate deploy` (its own database role)
 #
 # Nothing is read from a repository checkout at run time. The application port is
-# published on loopback only; the host Nginx is the only ingress.
+# published on loopback only; the Nginx container (host network) is the only ingress.
 name: qr-city-guide
 
 x-hardened: &hardened

@@ -4,6 +4,7 @@ import { withErrorHandler, validateRequestBody, createSuccessResponse, ApiError,
 import { GUEST_SESSION_COOKIE, parseGuestSession, verifyGuestSessionAccess } from '@/lib/guestSession';
 import { isAdminRequest } from '@/lib/rbac';
 import { getFeatureFlagsAsync } from '@/lib/featureFlags';
+import { PROPERTY_TIME_ZONE } from '@/data/stayPolicy';
 import { timePattern, wifiDisclosureWindow } from '@/lib/propertyTime';
 
 const preferencesSchema = z.object({
@@ -85,7 +86,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
         endDate: booking.endDate,
         checkInTime: prefs.checkInTime,
         checkOutTime: prefs.checkOutTime,
-        timeZone: process.env.PROPERTY_TIME_ZONE || 'Europe/Athens',
+        timeZone: PROPERTY_TIME_ZONE,
       });
       wifiAvailableAt = revealAt.toISOString();
       const now = new Date();
@@ -114,10 +115,11 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   }
 
   if (!(await isAdminRequest(request))) {
-    throw new ApiError(ApiErrorCode.FORBIDDEN, 'Admin credentials required to update preferences');
+    throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required to update preferences');
   }
 
-  const parseBody = validateRequestBody(preferencesSchema, 4 * 1_024);
+  // Strict for the request body only: readPreferences parses the stored value, which also carries updatedAt.
+  const parseBody = validateRequestBody(preferencesSchema.strict(), 4 * 1_024);
   const body = await parseBody(request);
 
   const prefs: CheckInPreferences = {

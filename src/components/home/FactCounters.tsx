@@ -6,7 +6,7 @@ import { isMotionFull } from '@/lib/motion/motionPreference';
 
 /** M34 counters run as long as the M6 louvres open (§5.3 --dur-reveal). */
 const COUNT_MS = 850;
-/** The same share in view as the louvres (HomeRevealObserver's default threshold). */
+/** The same share of the viewport as the louvres (HomeRevealObserver's default). */
 const THRESHOLD = 0.35;
 
 type Counter = { node: Text; value: number; final: string };
@@ -43,7 +43,7 @@ export default function FactCounters() {
         frame = progress < 1 ? requestAnimationFrame(step) : 0;
       };
       frame = requestAnimationFrame(step);
-    }, { threshold: THRESHOLD });
+    }, { rootMargin: `0px 0px -${Math.round(THRESHOLD * 100)}% 0px` });
     observer.observe(strip);
 
     return () => {

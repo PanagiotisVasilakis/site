@@ -249,7 +249,8 @@ async function create(
           userId,
           absoluteExpiresAt: new Date(now.getTime() + REFRESH_FAMILY_TTL_MS),
           deviceHash: opts?.deviceHint ?? null,
-          ipHash: opts?.ipHint ?? null,
+          // ipHint is deliberately not stored: the overlap check compares the device hash
+          // only, so an IP hash would be personal data that nothing reads.
         },
       });
       return tx.refreshToken.create({

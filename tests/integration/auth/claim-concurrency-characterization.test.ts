@@ -218,7 +218,6 @@ function spawnClaimWorker(
       DATABASE_URL: databaseUrlWithApplicationName(target, applicationName),
       GUEST_JWT_SECRET: CLAIM_RACE_JWT_SECRET,
       LOG_CONSOLE: 'false',
-      PRISMA_AUTO_DISCONNECT: 'false',
       SECURITY_PEPPER: CLAIM_RACE_SECURITY_PEPPER,
       // safeChildEnvironment deliberately strips application configuration.
       // Re-declare the private ingress attestation for these route workers.
@@ -492,11 +491,12 @@ async function readSafeClaimRaceState(
         && token.userId === owner.id
         && token.familyId === family.id,
       ),
+      // The family stores the device hash only; its ip_hash stays NULL because nothing reads it.
       contextHashesBound: Boolean(
         family
         && token
         && family.deviceHash?.length === 64
-        && family.ipHash?.length === 64,
+        && family.ipHash === null,
       ),
       descendants: tokens.filter((record) => Boolean(record.rotatedFromId)).length,
       rateLimitRecords: rateLimits.length,
@@ -715,8 +715,11 @@ describe.sequential('booking claim concurrency characterization', () => {
         responseRedacted: true,
       });
       expect(result.state.ownerPhone).not.toBe(loserClaimant.phone);
-      expect(result.state.rateLimitRecords).toBe(4);
-      expect(result.state.rateLimitCounts).toEqual([1, 1, 2, 2]);
+      // Three buckets, each spent twice because both workers share one address and one exchange cookie:
+      // the claim-exchange address bucket, the claim address bucket and the claim grant-digest bucket.
+      // The claim limiter is keyed on the grant digest, not on the phone, so the two phones share a bucket.
+      expect(result.state.rateLimitRecords).toBe(3);
+      expect(result.state.rateLimitCounts).toEqual([2, 2, 2]);
     }
   }, 600_000);
 

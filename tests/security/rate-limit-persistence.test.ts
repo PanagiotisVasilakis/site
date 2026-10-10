@@ -97,6 +97,45 @@ describe('durable sensitive-operation rate limiting', () => {
     expect(queryRaw.mock.calls[1][1]).toBe(firstIdentifierKey);
   });
 
+  // normalizePhone, which sign-in and claim use, drops every JavaScript \s character and accepts a
+  // '+' behind separators, so the limiter has to give all of those spellings one identifier bucket.
+  async function identifierBucket(identifier: string) {
+    privacyHmac.mockClear();
+    queryRaw.mockClear();
+    await checkSensitiveRateLimit(request('203.0.113.10'), {
+      scope: 'portal-signin', identifier, limit: 3, windowMs: 60_000,
+    });
+    return {
+      dimension: privacyHmac.mock.calls[1][0] as string,
+      key: queryRaw.mock.calls[1][1] as string,
+    };
+  }
+
+  it.each([
+    ['a tab', '+30\t6912345678'],
+    ['no-break spaces', '+30\u00a0691\u00a0234\u00a05678'],
+    ['ideographic spaces', '+30\u3000691\u3000234\u30005678'],
+    ['a parenthesised country code', '(+30) 691 234 5678'],
+  ] as const)('maps a phone number written with %s to the same identifier bucket', async (_label, identifier) => {
+    const reference = await identifierBucket('+30 691 234 5678');
+    const spelled = await identifierBucket(identifier);
+
+    expect(reference.dimension).toBe('portal-signin|identifier:+306912345678');
+    expect(spelled).toEqual(reference);
+  });
+
+  it('maps a phone number separated by any JavaScript whitespace character to the same identifier bucket', async () => {
+    const reference = await identifierBucket('+306912345678');
+    const separators = Array.from({ length: 0x10000 }, (_, code) => code).filter((code) => /\s/.test(String.fromCharCode(code)));
+
+    expect(separators).toContain(0xa0);
+    for (const code of separators) {
+      const separator = String.fromCharCode(code);
+      const spelled = await identifierBucket(`+30${separator}691${separator}234${separator}5678`);
+      expect(spelled, `U+${code.toString(16).padStart(4, '0')}`).toEqual(reference);
+    }
+  });
+
   it('denies when any dimension exceeds the limit and returns the strictest reset', async () => {
     const firstReset = new Date(Date.now() + 30_000);
     const secondReset = new Date(Date.now() + 60_000);

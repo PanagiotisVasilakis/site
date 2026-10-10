@@ -10,6 +10,7 @@ import {
   ValidationError,
   withErrorHandler,
 } from '@/lib/apiErrorHandler';
+import { nightsBetween, parseIsoDate, toDbDate } from '@/lib/availability/calendarDate';
 import { isSameOriginRequest } from '@/lib/net/sameOrigin';
 import { prisma } from '@/lib/prisma';
 import { isAdminRequest } from '@/lib/rbac';
@@ -21,19 +22,34 @@ export const dynamic = 'force-dynamic';
 // UTC calendar-date convention of src/lib/portalBookingEligibility.ts.
 const MANUAL_PROVIDER = 'manual';
 
+// A booking cannot be edited or deleted, so a typo in the year or the length has
+// to be caught at entry: 180 nights rejects a one-year typo and still fits a
+// long winter stay.
+const MAX_MANUAL_STAY_NIGHTS = 180;
+
+const isoDateSchema = z.iso.date().transform((value, context) => {
+  // z.iso.date() accepts years 0000-0099, which the UTC-midnight conversion
+  // would map to 1900-1999.
+  const date = parseIsoDate(value);
+  if (date === null) {
+    context.addIssue({ code: 'custom', message: 'Date must be between the years 0100 and 9999' });
+    return z.NEVER;
+  }
+  return date;
+});
+
 const schema = z.object({
-  startDate: z.iso.date(),
-  endDate: z.iso.date(),
+  startDate: isoDateSchema,
+  endDate: isoDateSchema,
   source: z.enum(['ONSITE', 'EXTERNAL']).default('ONSITE'),
   externalReference: z.string().trim().min(1).max(128).optional(),
 }).strict().refine((value) => value.endDate > value.startDate, {
   path: ['endDate'],
   message: 'Check-out must be after check-in',
+}).refine((value) => nightsBetween(value.startDate, value.endDate) <= MAX_MANUAL_STAY_NIGHTS, {
+  path: ['endDate'],
+  message: `A stay can be at most ${MAX_MANUAL_STAY_NIGHTS} nights`,
 });
-
-function toUtcDate(value: string): Date {
-  return new Date(`${value}T00:00:00.000Z`);
-}
 
 export const POST = withErrorHandler(async (request: NextRequest) => {
   if (!(await isAdminRequest(request))) {
@@ -52,8 +68,8 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       data: {
         id: crypto.randomUUID(),
         source: parsed.data.source,
-        startDate: toUtcDate(parsed.data.startDate),
-        endDate: toUtcDate(parsed.data.endDate),
+        startDate: toDbDate(parsed.data.startDate),
+        endDate: toDbDate(parsed.data.endDate),
         provider: MANUAL_PROVIDER,
         externalReference: parsed.data.externalReference ?? null,
       },

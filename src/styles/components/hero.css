@@ -7,7 +7,10 @@
   position: relative;
   height: min(760px, 88svh);
   min-height: 600px;
+  /* Vertical scroll and pinch-zoom stay native; only a sideways drag moves the view. The first line is
+     the fallback for an engine that rejects the `pinch-zoom` keyword. */
   touch-action: pan-y;
+  touch-action: pan-y pinch-zoom;
 }
 .hero__stage {
   position: absolute;

@@ -122,7 +122,7 @@ export const legalTranslations: Record<Locale, LegalDictionary> = {
                     },
                     {
                         title: "Guest portal and check-in", // legal review
-                        text: "When the host gives you access to the guest portal, we keep your mobile number, the password you choose (only as a one-way hash), the dates and reference of your booking, a record that you accepted the terms, and the arrival details you send us (name, e-mail, phone, arrival time and message). We use them to sign you in, to show you the information for your stay and to arrange your arrival.", // legal review
+                        text: "When the host gives you access to the guest portal, we keep your mobile number, the password you choose (only as a one-way hash), the dates and reference of your booking, a record that you accepted the terms, and the arrival time and message you send us (with the mobile number of your portal account). We use them to sign you in, to show you the information for your stay and to arrange your arrival.", // legal review
                         basis: "Legal basis: performance of the contract for your stay (Art. 6(1)(b) GDPR).", // legal review
                     },
                     {
@@ -158,7 +158,7 @@ export const legalTranslations: Record<Locale, LegalDictionary> = {
                     },
                     {
                         title: "Arrival notifications", // legal review
-                        text: "When you send your arrival details from the portal, they (name, e-mail, phone, arrival time, message and internal booking and account identifiers) are forwarded to the notification service the host uses to receive them.", // legal review
+                        text: "When you send your arrival details from the portal, they (arrival time, message, the mobile number of your account and internal booking and account identifiers) are forwarded to the notification service the host uses to receive them.", // legal review
                     },
                     {
                         title: "Operational alerts", // legal review
@@ -179,10 +179,11 @@ export const legalTranslations: Record<Locale, LegalDictionary> = {
             retention: {
                 title: "How long we keep data", // legal review
                 items: [
-                    "Arrival details (name, e-mail, phone, message): deleted {months} months after the booking ends.", // legal review
+                    "Arrival details (phone, message): deleted {months} months after the booking ends.", // legal review
                     "Portal account (mobile number, password, sign-ins): erased once every booking of the account ended more than {months} months ago. The booking dates and reference stay in the host's records without any link to you, for the host's tax obligations; only a record that the erasure took place, without your details, is kept.", // legal review
                     "Sign-in sessions: deleted 7 days after they expire. Sign-in renewal tokens and access links: deleted 30 days after they expire.", // legal review
                     "Security events, including error reports: 90 days. Request and sign-in attempt counters: until their time window ends.", // legal review
+                    "The web server's error log, which can contain your IP address and the address of the requested page: 14 days.", // legal review
                     "Arrival notifications to the host: deleted 30 days after delivery or, if delivery failed, 30 days after the last attempt.", // legal review
                     "Records that tax law requires are kept for as long as that law sets.", // legal review
                 ],
@@ -254,7 +255,7 @@ export const legalTranslations: Record<Locale, LegalDictionary> = {
                     },
                     {
                         title: "Πύλη επισκεπτών και check-in", // legal review
-                        text: "Όταν ο οικοδεσπότης σάς δώσει πρόσβαση στην πύλη επισκεπτών, διατηρούμε τον αριθμό του κινητού σας, τον κωδικό που επιλέγετε (μόνο ως μη αναστρέψιμο hash), τις ημερομηνίες και τον κωδικό της κράτησής σας, την καταγραφή ότι αποδεχθήκατε τους όρους, καθώς και τα στοιχεία άφιξης που μας στέλνετε (όνομα, e-mail, τηλέφωνο, ώρα άφιξης και μήνυμα). Τα χρησιμοποιούμε για τη σύνδεσή σας, για να σας δείχνουμε τις πληροφορίες της διαμονής σας και για να οργανώσουμε την άφιξή σας.", // legal review
+                        text: "Όταν ο οικοδεσπότης σάς δώσει πρόσβαση στην πύλη επισκεπτών, διατηρούμε τον αριθμό του κινητού σας, τον κωδικό που επιλέγετε (μόνο ως μη αναστρέψιμο hash), τις ημερομηνίες και τον κωδικό της κράτησής σας, την καταγραφή ότι αποδεχθήκατε τους όρους, καθώς και την ώρα άφιξης και το μήνυμα που μας στέλνετε (μαζί με τον αριθμό κινητού του λογαριασμού σας στην πύλη). Τα χρησιμοποιούμε για τη σύνδεσή σας, για να σας δείχνουμε τις πληροφορίες της διαμονής σας και για να οργανώσουμε την άφιξή σας.", // legal review
                         basis: "Νομική βάση: η εκτέλεση της σύμβασης για τη διαμονή σας (άρθρο 6 παρ. 1 στοιχ. β ΓΚΠΔ).", // legal review
                     },
                     {
@@ -290,7 +291,7 @@ export const legalTranslations: Record<Locale, LegalDictionary> = {
                     },
                     {
                         title: "Ειδοποιήσεις άφιξης", // legal review
-                        text: "Όταν στέλνετε τα στοιχεία άφιξης από την πύλη, αυτά (όνομα, e-mail, τηλέφωνο, ώρα άφιξης, μήνυμα και εσωτερικοί κωδικοί κράτησης και λογαριασμού) προωθούνται στην υπηρεσία ειδοποιήσεων που χρησιμοποιεί ο οικοδεσπότης για να τα λαμβάνει.", // legal review
+                        text: "Όταν στέλνετε τα στοιχεία άφιξης από την πύλη, αυτά (ώρα άφιξης, μήνυμα, ο αριθμός κινητού του λογαριασμού σας και εσωτερικοί κωδικοί κράτησης και λογαριασμού) προωθούνται στην υπηρεσία ειδοποιήσεων που χρησιμοποιεί ο οικοδεσπότης για να τα λαμβάνει.", // legal review
                     },
                     {
                         title: "Ειδοποιήσεις λειτουργίας", // legal review
@@ -311,10 +312,11 @@ export const legalTranslations: Record<Locale, LegalDictionary> = {
             retention: {
                 title: "Πόσο διατηρούμε τα δεδομένα", // legal review
                 items: [
-                    "Στοιχεία άφιξης (όνομα, e-mail, τηλέφωνο, μήνυμα): διαγράφονται {months} μήνες μετά το τέλος της κράτησης.", // legal review
+                    "Στοιχεία άφιξης (τηλέφωνο, μήνυμα): διαγράφονται {months} μήνες μετά το τέλος της κράτησης.", // legal review
                     "Λογαριασμός πύλης (κινητό, κωδικός, συνδέσεις): διαγράφεται όταν όλες οι κρατήσεις του έληξαν πριν από περισσότερους από {months} μήνες. Οι ημερομηνίες και ο κωδικός κράτησης μένουν στα αρχεία του οικοδεσπότη χωρίς σύνδεση με εσάς, για τις φορολογικές του υποχρεώσεις. Διατηρείται μόνο μια καταγραφή ότι έγινε η διαγραφή, χωρίς τα στοιχεία σας.", // legal review
                     "Συνεδρίες σύνδεσης: διαγράφονται 7 ημέρες μετά τη λήξη τους. Διακριτικά ανανέωσης σύνδεσης και σύνδεσμοι πρόσβασης: διαγράφονται 30 ημέρες μετά τη λήξη τους.", // legal review
                     "Συμβάντα ασφαλείας, μαζί με τις αναφορές σφαλμάτων: 90 ημέρες. Μετρητές αιτημάτων και προσπαθειών σύνδεσης: μέχρι να λήξει το χρονικό τους παράθυρο.", // legal review
+                    "Το αρχείο καταγραφής σφαλμάτων του διακομιστή ιστού, που μπορεί να περιέχει τη διεύθυνση IP σας και τη διεύθυνση της σελίδας που ζητήθηκε: 14 ημέρες.", // legal review
                     "Ειδοποιήσεις άφιξης προς τον οικοδεσπότη: διαγράφονται 30 ημέρες μετά την παράδοση ή, αν η παράδοση απέτυχε, 30 ημέρες μετά την τελευταία προσπάθεια.", // legal review
                     "Τα στοιχεία που απαιτεί η φορολογική νομοθεσία διατηρούνται για όσο ορίζει ο νόμος.", // legal review
                 ],

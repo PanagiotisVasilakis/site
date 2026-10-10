@@ -60,6 +60,10 @@ function adminRequest(
   });
 }
 
+function sourceBudgetKey(source: string): string {
+  return `sensitive:${privacyHmac(`admin-login|ip:${source}`, 'sensitive-rate-limit:v1')}`;
+}
+
 async function login(request: NextRequest): Promise<{ body: string; response: Response }> {
   const response = await adminLogin(request, { params: Promise.resolve({}) });
   return { response, body: await response.text() };
@@ -133,7 +137,7 @@ describe('admin login source-budget isolation', () => {
     ]);
   });
 
-  it('ignores attacker-supplied administrator hints without changing invalid responses', async () => {
+  it('rejects attacker-supplied administrator hints identically, without a session or a hint-keyed budget', async () => {
     const knownHint = await login(adminRequest(
       SOURCE_A,
       'same-length-invalid-token-a',
@@ -147,11 +151,50 @@ describe('admin login source-budget isolation', () => {
       'unknown-administrator',
     ));
 
-    expect(knownHint.response.status).toBe(401);
-    expect(unknownHint.response.status).toBe(401);
-    expect(knownHint.body).toBe(unknownHint.body);
+    // The login body is strict: a hint is an unrecognized key, whatever name it carries.
+    expect(knownHint.response.status).toBe(422);
+    expect(unknownHint.response.status).toBe(422);
+    const validation = (body: string) => {
+      const { error } = JSON.parse(body) as { error: { code: string; details: unknown } };
+      return { code: error.code, details: error.details };
+    };
+    expect(validation(knownHint.body)).toEqual(validation(unknownHint.body));
+    expect(validation(knownHint.body).details).toEqual({
+      validationErrors: [expect.objectContaining({ code: 'unrecognized_keys' })],
+    });
+    expect(knownHint.body + unknownHint.body).not.toMatch(/known-administrator|unknown-administrator/u);
     expect(mocks.createAdminSession).not.toHaveBeenCalled();
-    expect(counts).toHaveLength(2);
+    expect(mocks.signAdmin).not.toHaveBeenCalled();
+    // A plain request afterwards spends a budget, and every budget is keyed on a verified source, never on a hint.
+    await login(adminRequest(SOURCE_A, 'same-length-invalid-token-c'));
+    const sourceKeys = [sourceBudgetKey(SOURCE_A), sourceBudgetKey(SOURCE_B)];
+    expect(counts.size).toBeGreaterThan(0);
+    for (const key of counts.keys()) expect(sourceKeys).toContain(key);
+  });
+
+  it('answers 413 for a login body over 4 KiB without issuing a session', async () => {
+    const result = await login(adminRequest(SOURCE_A, 'x'.repeat(4 * 1_024)));
+
+    expect(result.response.status).toBe(413);
+    expect(result.response.headers.get('set-cookie')).toBeNull();
+    expect(mocks.createAdminSession).not.toHaveBeenCalled();
+    expect(mocks.signAdmin).not.toHaveBeenCalled();
+  });
+
+  it('answers 422 for a token longer than the longest production credential', async () => {
+    const result = await login(adminRequest(SOURCE_A, 'x'.repeat(513)));
+
+    expect(result.response.status).toBe(422);
+    expect(result.response.headers.get('set-cookie')).toBeNull();
+    expect(mocks.createAdminSession).not.toHaveBeenCalled();
+    expect(mocks.signAdmin).not.toHaveBeenCalled();
+  });
+
+  it('still checks a token of exactly 512 characters, the longest production credential', async () => {
+    const result = await login(adminRequest(SOURCE_A, 'x'.repeat(512)));
+
+    expect(result.response.status).toBe(401);
+    expect(mocks.createAdminSession).not.toHaveBeenCalled();
   });
 
   it('fails closed before session issuance when the limiter store fails', async () => {
@@ -165,5 +208,45 @@ describe('admin login source-budget isolation', () => {
     expect(result.body).not.toMatch(/database|diagnostics|203\.0\.113/iu);
     expect(mocks.createAdminSession).not.toHaveBeenCalled();
     expect(mocks.signAdmin).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['missing', ''],
+    ['shorter than the production minimum', ADMIN_CREDENTIAL.slice(0, 42)],
+  ])('answers 503 "Admin login disabled" before any rate-limit write or session when the production secret is %s', async (_label, value) => {
+    vi.stubEnv('ADMIN_DASH_SECRET', value);
+
+    const result = await login(adminRequest(SOURCE_A, ADMIN_CREDENTIAL));
+
+    expect(result.response.status).toBe(503);
+    expect(result.body).toBe('{"error":"Admin login disabled"}');
+    expect(result.response.headers.get('set-cookie')).toBeNull();
+    expect(counts.size).toBe(0);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.createAdminSession).not.toHaveBeenCalled();
+    expect(mocks.signAdmin).not.toHaveBeenCalled();
+  });
+
+  it('answers 400 "Admin login disabled" outside production when the secret is empty (O74)', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('ADMIN_DASH_SECRET', '');
+
+    const result = await login(adminRequest(SOURCE_A, ADMIN_CREDENTIAL));
+
+    expect(result.response.status).toBe(400);
+    expect(result.body).toBe('{"error":"Admin login disabled"}');
+    expect(counts.size).toBe(0);
+    expect(mocks.createAdminSession).not.toHaveBeenCalled();
+  });
+
+  it('issues the admin cookie as HttpOnly, SameSite=Strict, Path=/ and Secure in production', async () => {
+    const result = await login(adminRequest(SOURCE_A, ADMIN_CREDENTIAL));
+
+    expect(result.response.status).toBe(200);
+    const attributes = (result.response.headers.get('set-cookie') ?? '')
+      .split(/;\s*/u)
+      .slice(1)
+      .map((attribute) => attribute.toLowerCase());
+    expect(attributes).toEqual(expect.arrayContaining(['httponly', 'samesite=strict', 'path=/', 'secure']));
   });
 });

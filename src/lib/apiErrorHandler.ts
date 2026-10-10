@@ -409,6 +409,7 @@ export function createSuccessResponse<T>(
     status,
     headers: {
       'X-Correlation-ID': response.meta?.correlationId || '',
+      'Cache-Control': 'no-store',
     },
   });
 }

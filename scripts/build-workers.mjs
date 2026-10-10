@@ -10,8 +10,15 @@ import { build } from 'esbuild';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outdir = path.resolve(root, process.argv[2] ?? 'dist/workers');
-if (path.relative(root, outdir).startsWith('..')) {
-  throw new Error('The output directory must stay inside the repository');
+// The output directory is deleted below, so '' or '.' (the repository root itself) is refused too.
+const relativeOutdir = path.relative(root, outdir);
+if (
+  relativeOutdir === ''
+  || relativeOutdir === '..'
+  || relativeOutdir.startsWith(`..${path.sep}`)
+  || path.isAbsolute(relativeOutdir)
+) {
+  throw new Error('The output directory must be a subdirectory of the repository');
 }
 
 const entryPoints = ['scripts/drain-outbox.ts', 'scripts/run-operational-maintenance.ts'];

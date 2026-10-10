@@ -21,6 +21,16 @@ function isPostgresUrl(value) {
   }
 }
 
+// The object-level refine below also runs for a value that z.url() rejected. An unparsable
+// value must not throw there: the TypeError would hide the other issues and echo the value.
+function urlProtocol(value) {
+  try {
+    return new URL(value).protocol;
+  } catch {
+    return null;
+  }
+}
+
 function isTimeZone(value) {
   try {
     new Intl.DateTimeFormat('en', { timeZone: value }).format();
@@ -35,6 +45,9 @@ function isOriginProxySecret(value) {
     && !hasRepeatedPattern(value)
     && !/^(?:deadbeef|changeme|placeholder)/iu.test(value);
 }
+
+// The two peppers key HMACs, so the placeholder words of .env.example must not pass in production.
+const PEPPER_PLACEHOLDER = /replace|changeme|placeholder|example/iu;
 
 // The Airbnb calendar export URL carries a secret token in its query string,
 // so validation messages must never echo the value.
@@ -100,7 +113,7 @@ export const runtimeEnvSchema = z.object({
   )),
 
   PRISMA_LOG_LIFECYCLE: optionalEnv(z.enum(['0', '1'])),
-  LOG_LEVEL: optionalEnv(z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal'])),
+  LOG_LEVEL: optionalEnv(z.enum(['trace', 'debug', 'info', 'warn', 'error'])),
   LOG_CONSOLE: optionalEnv(z.enum(['true', 'false'])),
   LOG_STRUCTURED: optionalEnv(z.enum(['true', 'false'])),
   LOG_MAX_METADATA_SIZE: optionalEnv(z.string().regex(/^\d+$/)),
@@ -128,13 +141,24 @@ export const runtimeEnvSchema = z.object({
         credentialOwners.set(value, name);
       }
     }
+    for (const name of ['SECURITY_PEPPER', 'CLAIM_TOKEN_PEPPER']) {
+      const value = env[name];
+      if (!value) continue;
+      if (hasRepeatedPattern(value) || PEPPER_PLACEHOLDER.test(value)) {
+        context.addIssue({ code: 'custom', path: [name], message: `${name} must not be placeholder-like or patterned` });
+      }
+      const reused = ACTIVE_RUNTIME_CREDENTIAL_NAMES.find((other) => env[other] === value);
+      if (reused) {
+        context.addIssue({ code: 'custom', path: [name], message: `${name} must differ from ${reused}` });
+      }
+    }
   }
   if (env.NODE_ENV === 'production' && !env.NEXT_PUBLIC_SITE_URL) {
     context.addIssue({ code: 'custom', path: ['NEXT_PUBLIC_SITE_URL'], message: 'NEXT_PUBLIC_SITE_URL is required in production' });
   }
   if (env.NODE_ENV === 'production' && env.NEXT_PUBLIC_SITE_URL) {
-    const siteUrl = new URL(env.NEXT_PUBLIC_SITE_URL);
-    if (siteUrl.protocol !== 'https:') {
+    const protocol = urlProtocol(env.NEXT_PUBLIC_SITE_URL);
+    if (protocol !== null && protocol !== 'https:') {
       context.addIssue({ code: 'custom', path: ['NEXT_PUBLIC_SITE_URL'], message: 'NEXT_PUBLIC_SITE_URL must use HTTPS in production' });
     }
   }
@@ -160,21 +184,23 @@ export const runtimeEnvSchema = z.object({
   if (env.NODE_ENV === 'production' && !env.ORIGIN_PROXY_SHARED_SECRET) {
     context.addIssue({ code: 'custom', path: ['ORIGIN_PROXY_SHARED_SECRET'], message: 'ORIGIN_PROXY_SHARED_SECRET is required in production' });
   }
-  for (const [urlKey, tokenKey] of [
-    ['CHECKIN_REQUEST_WEBHOOK_URL', 'CHECKIN_REQUEST_WEBHOOK_TOKEN'],
-  ]) {
-    const url = env[urlKey];
-    if (url && !env[tokenKey]) {
-      context.addIssue({ code: 'custom', path: [tokenKey], message: `${tokenKey} is required when ${urlKey} is configured` });
-    }
-    if (env.NODE_ENV === 'production' && url && new URL(url).protocol !== 'https:') {
-      context.addIssue({ code: 'custom', path: [urlKey], message: `${urlKey} must use HTTPS in production` });
+  const checkInWebhookUrl = env.CHECKIN_REQUEST_WEBHOOK_URL;
+  if (checkInWebhookUrl && !env.CHECKIN_REQUEST_WEBHOOK_TOKEN) {
+    context.addIssue({ code: 'custom', path: ['CHECKIN_REQUEST_WEBHOOK_TOKEN'], message: 'CHECKIN_REQUEST_WEBHOOK_TOKEN is required when CHECKIN_REQUEST_WEBHOOK_URL is configured' });
+  }
+  if (env.NODE_ENV === 'production' && checkInWebhookUrl) {
+    const protocol = urlProtocol(checkInWebhookUrl);
+    if (protocol !== null && protocol !== 'https:') {
+      context.addIssue({ code: 'custom', path: ['CHECKIN_REQUEST_WEBHOOK_URL'], message: 'CHECKIN_REQUEST_WEBHOOK_URL must use HTTPS in production' });
     }
   }
   if (env.ALERT_WEBHOOK_REQUIRED === '1' && !env.ALERT_WEBHOOK_URL) {
     context.addIssue({ code: 'custom', path: ['ALERT_WEBHOOK_URL'], message: 'ALERT_WEBHOOK_URL is required when ALERT_WEBHOOK_REQUIRED=1' });
   }
-  if (env.NODE_ENV === 'production' && env.ALERT_WEBHOOK_URL && new URL(env.ALERT_WEBHOOK_URL).protocol !== 'https:') {
-    context.addIssue({ code: 'custom', path: ['ALERT_WEBHOOK_URL'], message: 'ALERT_WEBHOOK_URL must use HTTPS in production' });
+  if (env.NODE_ENV === 'production' && env.ALERT_WEBHOOK_URL) {
+    const protocol = urlProtocol(env.ALERT_WEBHOOK_URL);
+    if (protocol !== null && protocol !== 'https:') {
+      context.addIssue({ code: 'custom', path: ['ALERT_WEBHOOK_URL'], message: 'ALERT_WEBHOOK_URL must use HTTPS in production' });
+    }
   }
 });

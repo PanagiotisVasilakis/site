@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
+import { logger } from '@/lib/logger-enterprise';
 import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
 // This must name the newest schema migration (tests/unit/readiness-migration.test.ts
 // enforces it). Readiness is not merely a TCP/SELECT probe: the running binary
-// and database schema must agree.
+// and database schema must agree, so the newest finished migration in the database
+// has to be exactly this one. A database that is behind (migrate has not run yet) and
+// one that is ahead (an older image started after a later release migrated) are both
+// not ready.
 const EXPECTED_MIGRATION = '20260930120000_minimise_user_data';
 const READINESS_CACHE_MS = 2_000;
 let cachedReadiness: { ready: boolean; expiresAt: number } | null = null;
@@ -16,18 +20,32 @@ async function databaseReady(): Promise<boolean> {
     const rows = await prisma.$transaction(async (tx) => {
       await tx.$executeRawUnsafe("SET LOCAL statement_timeout = '1800ms'");
       await tx.$queryRaw`SELECT 1`;
+      // Byte order ("C"), so the database locale cannot change which migration is the newest.
       return tx.$queryRaw<Array<{ migration_name: string }>>`
         SELECT migration_name
         FROM _prisma_migrations
-        WHERE migration_name = ${EXPECTED_MIGRATION}
-          AND finished_at IS NOT NULL
+        WHERE finished_at IS NOT NULL
           AND rolled_back_at IS NULL
+        ORDER BY migration_name COLLATE "C" DESC
         LIMIT 1
       `;
     }, { timeout: 2_500 });
 
-    return rows.length === 1;
-  } catch {
+    const newest: string | undefined = rows[0]?.migration_name;
+    if (newest === EXPECTED_MIGRATION) return true;
+
+    // Behind: run the migrate service. Ahead: start the image that matches the database.
+    // Migration names start with a timestamp, so string order is the "C" order of the query.
+    const metadata = { expectedMigration: EXPECTED_MIGRATION, newestAppliedMigration: newest ?? null };
+    if (newest !== undefined && newest > EXPECTED_MIGRATION) {
+      logger.warn('Readiness: database schema is newer than this image', metadata);
+    } else {
+      logger.warn('Readiness: expected migration is not applied', metadata);
+    }
+    return false;
+  } catch (error) {
+    // Only the error name: the message can carry connection details.
+    logger.warn('Readiness: database check failed', { errorName: error instanceof Error ? error.name : 'unknown' });
     return false;
   }
 }

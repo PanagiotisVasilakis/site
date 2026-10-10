@@ -78,7 +78,7 @@ export function mountHeroGl({ hero, img, depthSrc }: { hero: HTMLElement; img: H
   let io: IntersectionObserver | null = null;
   let gl: GL | null = null;
   const U: Partial<Record<(typeof UNIFORMS)[number], WebGLUniformLocation | null>> = {};
-  const state = { ptr: [0, 0], tgt: [0, 0], scroll: 0, t0: 0, last: 0, frames: 0, slow: 0, visible: true, drag: null as null | [number, number] };
+  const state = { ptr: [0, 0], tgt: [0, 0], scroll: 0, t0: 0, last: 0, frames: 0, slow: 0, visible: true, drag: null as null | [number, number], chained: false };
   // The size of the crop uploaded as the texture; img.naturalWidth/Height follow a later <picture> switch.
   let texW = 0;
   let texH = 0;
@@ -188,7 +188,7 @@ export function mountHeroGl({ hero, img, depthSrc }: { hero: HTMLElement; img: H
       state.tgt[1] = ((event.clientY - r.top) / r.height - 0.5) * 2;
       kick();
     } else if (state.drag) {
-      // Sideways touch-drag; vertical stays native scroll (touch-action: pan-y on the hero).
+      // Sideways touch-drag; vertical stays native scroll (touch-action: pan-y pinch-zoom on the hero, so pinch-zoom stays native too).
       state.tgt[0] = Math.max(-1.4, Math.min(1.4, state.drag[1] + (event.clientX - state.drag[0]) / (hero.clientWidth * 0.35)));
       kick();
     }
@@ -208,7 +208,10 @@ export function mountHeroGl({ hero, img, depthSrc }: { hero: HTMLElement; img: H
 
   function frame(now: number) {
     raf = 0;
-    if (dead || !state.visible || document.hidden) return;
+    if (dead || !state.visible || document.hidden) {
+      state.chained = false;
+      return;
+    }
     if (!state.t0) state.t0 = now;
     const dt = state.last ? now - state.last : 1000;
     if (dt < FRAME_MS - 3) {
@@ -216,8 +219,10 @@ export function mountHeroGl({ hero, img, depthSrc }: { hero: HTMLElement; img: H
       return;
     }
     state.last = now;
-    // Watchdog: after 6 frames, more than 18 frames above 80 ms (a pause over 900 ms is not a slow frame).
-    if (++state.frames > 6 && dt > 80 && dt < 900 && ++state.slow > 18) return fail('slow-frames');
+    // Watchdog: after 6 frames, more than 18 frames above 80 ms. Only a frame that the previous frame
+    // scheduled counts: one started by input, resize or visibility measures the pause before it, not the
+    // GPU. A pause over 900 ms is not a slow frame either.
+    if (++state.frames > 6 && state.chained && dt > 80 && dt < 900 && ++state.slow > 18) return fail('slow-frames');
     const t = (now - state.t0) / 1000;
     const amb = smooth(0.3, 1.3, t) * (1 - smooth(3.4, 4.8, t)); // ambient drift, gone by 4.8 s
     const sweep = -0.7 + 2.9 * smooth(0.6, 4.2, t); // one warm pass
@@ -238,7 +243,8 @@ export function mountHeroGl({ hero, img, depthSrc }: { hero: HTMLElement; img: H
       }, FADE_MS);
     }
     const settling = Math.abs(state.tgt[0] - state.ptr[0]) + Math.abs(state.tgt[1] - state.ptr[1]) > 0.002;
-    if (t < 5 || settling || state.frames < 3) raf = requestAnimationFrame(frame);
+    state.chained = t < 5 || settling || state.frames < 3;
+    if (state.chained) raf = requestAnimationFrame(frame);
   }
   function kick() {
     if (!dead && !raf) raf = requestAnimationFrame(frame);

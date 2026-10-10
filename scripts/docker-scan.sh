@@ -107,11 +107,14 @@ scan_with_docker_scout() {
 
 case "$REQUESTED_SCANNER" in
   auto)
-    # Docker Scout comes last: it sends the image SBOM to Docker's service.
-    if has_trivy; then
-      scan_with_trivy
-    elif has_docker_engine; then
+    # The pinned, digest-verified container comes first: a host trivy is whatever version and
+    # origin the machine happens to have, so it runs only when no Docker engine is reachable (or
+    # when DOCKER_SCAN_SCANNER=trivy asks for it). Docker Scout comes last: it sends the image
+    # SBOM to Docker's service.
+    if has_docker_engine; then
       scan_with_trivy_container
+    elif has_trivy; then
+      scan_with_trivy
     elif has_docker_scout; then
       scan_with_docker_scout
     else

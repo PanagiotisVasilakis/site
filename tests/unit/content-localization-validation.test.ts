@@ -46,4 +46,59 @@ describe('validateLocalization', () => {
     getItemsByCategoryMock.mockReturnValue([{ id: 'taverna', name: 'Taverna', name_el: 'Ταβέρνα' }]);
     expect(() => validateLocalization(['en', 'el'])).not.toThrow();
   });
+
+  it('loads the items of every category in strict mode', () => {
+    validateLocalization(['en', 'el']);
+    expect(getItemsByCategoryMock).toHaveBeenCalledWith('food', { strict: true });
+  });
+
+  // pickLocale treats a whitespace-only value as missing, so the gate must too (R-437).
+  it.each([' ', '\t\n'])('throws when an item has the whitespace-only name_el %j', (blank) => {
+    getItemsByCategoryMock.mockReturnValue([{ ...item, name_el: blank }]);
+    expect(() => validateLocalization(['en', 'el'])).toThrow('Missing name for item taverna locale el');
+  });
+
+  it.each([' ', '\t\n'])('throws when a category has the whitespace-only title_el %j', (blank) => {
+    categoriesMock.length = 0;
+    categoriesMock.push({ ...category, title_el: blank });
+    expect(() => validateLocalization(['en', 'el'])).toThrow('Missing title for category food locale el');
+  });
+
+  it('does not accept a whitespace-only base field for the default locale', () => {
+    getItemsByCategoryMock.mockReturnValue([{ id: 'taverna', name: ' ', name_el: 'Ταβέρνα' }]);
+    expect(() => validateLocalization(['en', 'el'])).toThrow('Missing name for item taverna locale en');
+
+    categoriesMock.length = 0;
+    categoriesMock.push({ id: 'food', title: ' ', title_el: 'Φαγητό' });
+    getItemsByCategoryMock.mockReturnValue([]);
+    expect(() => validateLocalization(['en', 'el'])).toThrow('Missing title for category food locale en');
+  });
+
+  describe('item slugs (decision O50, R-446)', () => {
+    const slugged = (id: string, slug: string) => ({ ...item, id, slug });
+
+    it('accepts distinct well-formed slugs, also when another category uses the same ones', () => {
+      categoriesMock.push({ id: 'drink', title: 'Drink', title_en: 'Drink', title_el: 'Ποτό' });
+      getItemsByCategoryMock.mockReturnValue([slugged('taverna', 'old-taverna'), slugged('cafe', 'cafe-2')]);
+      expect(() => validateLocalization(['en', 'el'])).not.toThrow();
+    });
+
+    it('throws on an empty slug, which a name without ASCII letters or digits derives', () => {
+      getItemsByCategoryMock.mockReturnValue([slugged('taverna', '')]);
+      expect(() => validateLocalization(['en', 'el'])).toThrow('Empty slug for item taverna in category food');
+    });
+
+    it.each(['Old-Taverna', 'old taverna', ' old', '-old', 'old-', 'old--taverna', 'old_taverna', 'old/taverna', 'ταβέρνα'])(
+      'throws on the malformed slug %j',
+      (slug) => {
+        getItemsByCategoryMock.mockReturnValue([slugged('taverna', slug)]);
+        expect(() => validateLocalization(['en', 'el'])).toThrow('Malformed slug for item taverna in category food');
+      },
+    );
+
+    it('throws when two items of a category share a slug', () => {
+      getItemsByCategoryMock.mockReturnValue([slugged('taverna', 'old-town'), slugged('cafe', 'old-town')]);
+      expect(() => validateLocalization(['en', 'el'])).toThrow('Duplicate slug in category food: items taverna and cafe');
+    });
+  });
 });

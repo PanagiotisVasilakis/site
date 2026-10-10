@@ -22,9 +22,7 @@ const managedEnvironment = [
   'ADMIN_DASH_SECRET',
   'ADMIN_JWT_SECRET',
   'DATABASE_URL',
-  'LOG_CONSOLE',
   'ORIGIN_PROXY_SHARED_SECRET',
-  'PRISMA_AUTO_DISCONNECT',
   'SECURITY_PEPPER',
 ] as const;
 const originalEnvironment = new Map<string, string | undefined>();
@@ -37,9 +35,7 @@ function setApplicationEnvironment(databaseUrl: string): void {
   process.env.ADMIN_DASH_SECRET = ADMIN_CREDENTIAL;
   process.env.ADMIN_JWT_SECRET = 'rem-04-postgres-admin-jwt-secret-32-byte-minimum';
   process.env.DATABASE_URL = databaseUrl;
-  process.env.LOG_CONSOLE = 'false';
   process.env.ORIGIN_PROXY_SHARED_SECRET = ATTESTATION;
-  process.env.PRISMA_AUTO_DISCONNECT = 'false';
   process.env.SECURITY_PEPPER = 'rem-04-postgres-security-pepper-fixture-only';
 }
 

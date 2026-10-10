@@ -91,6 +91,13 @@ describe('core utility contracts', () => {
     expect(mapApiErrorToUI({ error: { code } }).summary).toContain(expected);
   });
 
+  it('names the real rate-limit wait in English and Greek (R-443)', () => {
+    const rateLimited = { error: { code: ApiErrorCode.RATE_LIMITED } };
+
+    expect(mapApiErrorToUI(rateLimited, 'en').summary).toBe('Too many attempts. Please wait up to an hour and try again.');
+    expect(mapApiErrorToUI(rateLimited, 'el').summary).toBe('Πάρα πολλές προσπάθειες. Περιμένετε έως μία ώρα και δοκιμάστε ξανά.');
+  });
+
   it('uses localized safe fallbacks for unknown errors', () => {
     expect(mapApiErrorToUI(null).summary).toContain('Something went wrong');
     expect(mapApiErrorToUI({ error: { code: ApiErrorCode.GATEWAY_TIMEOUT } }, 'el').summary).toContain('προσωρινά');

@@ -7,9 +7,10 @@ import crypto from 'node:crypto';
 import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
 import { readRuntimeCredential } from '@/lib/runtime-credentials.js';
 
+// Production credentials are at most 512 characters (runtime-credentials.js).
 const loginSchema = z.object({
-  token: z.string().min(1, 'Token is required'),
-});
+  token: z.string().min(1, 'Token is required').max(512),
+}).strict();
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   let secret: string | undefined;
@@ -22,7 +23,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return NextResponse.json({ error: 'Admin login disabled' }, { status: 400 });
   }
   
-  const body = await validateRequestBody(loginSchema)(req);
+  const body = await validateRequestBody(loginSchema, 4 * 1_024)(req);
   const { token } = body;
 
   const rateLimit = await checkSensitiveRateLimit(req, {

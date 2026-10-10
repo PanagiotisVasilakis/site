@@ -6,6 +6,8 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import crypto from 'node:crypto';
 
+import { isSensitiveFieldName } from '@/lib/redaction';
+
 // AsyncLocalStorage for proper context propagation across async operations
 // Note: This requires Node.js runtime (not Edge). For Edge routes, use fallback.
 const asyncLocalStorage = new AsyncLocalStorage<Partial<LogContext>>();
@@ -15,8 +17,8 @@ interface LogContext {
   route?: string;
 }
 
-type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
-// Levels this logger emits; 'trace' and 'fatal' remain valid configured thresholds.
+type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error';
+// Levels this logger emits; 'trace' remains a valid configured threshold.
 type EmittedLevel = 'debug' | 'info' | 'warn' | 'error';
 
 interface LogEntry {
@@ -64,15 +66,19 @@ const LOG_LEVELS: Record<LogLevel, number> = {
   info: 2,
   warn: 3,
   error: 4,
-  fatal: 5,
 } as const;
 
 class EnterpriseLogger {
   private config: LoggerConfig;
 
   constructor() {
+    const configuredLevel = process.env.LOG_LEVEL;
     this.config = {
-      level: (process.env.LOG_LEVEL as LogLevel) || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
+      // An unknown LOG_LEVEL is ignored: the workers do not run the environment schema, and a
+      // threshold outside LOG_LEVELS would silence every line, errors included.
+      level: configuredLevel !== undefined && Object.hasOwn(LOG_LEVELS, configuredLevel)
+        ? configuredLevel as LogLevel
+        : (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
       enableConsole: process.env.LOG_CONSOLE !== 'false',
       enableStructured: process.env.LOG_STRUCTURED === 'true',
       maxMetadataSize: parseInt(process.env.LOG_MAX_METADATA_SIZE || '1000', 10),
@@ -119,7 +125,9 @@ class EnterpriseLogger {
     const seen = new WeakSet<object>();
     const redactRecursively = (value: unknown, key = ''): unknown => {
       const lowerKey = key.toLowerCase();
-      const isSensitive = SENSITIVE_FIELDS.some((field) => lowerKey.includes(field.toLowerCase()));
+      // Union of the shared classifier and this list: a key that was redacted before stays redacted.
+      const isSensitive = isSensitiveFieldName(key)
+        || SENSITIVE_FIELDS.some((field) => lowerKey.includes(field.toLowerCase()));
       if (isSensitive) return REDACTION_PLACEHOLDER;
       if (value instanceof Error) return { name: value.name, message: value.message };
       if (!value || typeof value !== 'object') return value;

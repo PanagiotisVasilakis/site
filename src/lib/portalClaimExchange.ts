@@ -1,9 +1,20 @@
+import { timingSafeEqual } from 'node:crypto';
+
 import type { NextRequest, NextResponse } from 'next/server';
+
+import { privacyHmac } from '@/lib/privacyHash';
 
 const PORTAL_CLAIM_EXCHANGE_COOKIE = 'booking_claim_exchange';
 const PORTAL_CLAIM_EXCHANGE_MAX_AGE_SECONDS = 5 * 60;
 
 const TOKEN_DIGEST_PATTERN = /^[a-f0-9]{64}$/u;
+const EXCHANGE_COOKIE_PATTERN = /^([a-f0-9]{64})\.([a-f0-9]{64})$/u;
+
+// The stored grant digest can be read from the database, so the cookie also carries a MAC of it
+// under SECURITY_PEPPER, which the database never holds.
+function exchangeMac(tokenDigest: string): string {
+  return privacyHmac(tokenDigest, 'portal-claim-exchange:v1');
+}
 
 function cookieSecurityOptions() {
   return {
@@ -28,7 +39,7 @@ export function createPortalClaimExchangeCookie(
   }
   return {
     name: PORTAL_CLAIM_EXCHANGE_COOKIE,
-    value: tokenDigest,
+    value: `${tokenDigest}.${exchangeMac(tokenDigest)}`,
     options: {
       ...cookieSecurityOptions(),
       maxAge: Math.min(PORTAL_CLAIM_EXCHANGE_MAX_AGE_SECONDS, grantLifetimeSeconds),
@@ -48,9 +59,14 @@ function clearPortalClaimExchangeCookie() {
   };
 }
 
+// Returns the grant digest only for a cookie this server issued: `digest.mac`, both 64 hex
+// characters, the MAC matching. A bare digest, as stored in booking_claim_grants, is refused.
 export function readPortalClaimExchange(request: NextRequest): string | null {
   const value = request.cookies.get(PORTAL_CLAIM_EXCHANGE_COOKIE)?.value ?? '';
-  return TOKEN_DIGEST_PATTERN.test(value) ? value : null;
+  const match = EXCHANGE_COOKIE_PATTERN.exec(value);
+  if (!match) return null;
+  const [, digest, mac] = match;
+  return timingSafeEqual(Buffer.from(mac, 'hex'), Buffer.from(exchangeMac(digest), 'hex')) ? digest : null;
 }
 
 export function clearPresentedPortalClaimExchange(

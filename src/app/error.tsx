@@ -10,12 +10,12 @@ import { StatusLinks, StatusPage } from '@/components/stay/StatusPage';
 
 interface GlobalErrorProps {
   error: Error & { digest?: string };
-  reset: () => void;
+  retry: () => void;
 }
 
-// identity §9.10: the same calm layout as the 404, "Try again" (reset) and a Home link; no technical
+// identity §9.10: the same calm layout as the 404, "Try again" (retry) and a Home link; no technical
 // details on the page (the error is reported to the server-side error log).
-export default function GlobalError({ error, reset }: GlobalErrorProps) {
+export default function GlobalError({ error, retry }: GlobalErrorProps) {
   const pathname = usePathname();
   const locale: Locale = pathname?.startsWith('/el') ? 'el' : 'en';
   const t = getDictionary(locale);
@@ -41,7 +41,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
   return (
     <main id="main-content" className="status-main" role="main">
       <StatusPage title={t.errors.somethingWentWrong} lead={t.errors.unexpectedError}>
-        <Button variant="primary" className="status-page__action" onClick={() => reset()}>{t.errors.tryAgain}</Button>
+        <Button variant="primary" className="status-page__action" onClick={() => retry()}>{t.errors.tryAgain}</Button>
         <StatusLinks links={[{ href: `/${locale}`, label: t.cta.home }]} />
       </StatusPage>
     </main>

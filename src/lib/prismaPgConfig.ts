@@ -40,6 +40,9 @@ export function buildPrismaPgAdapterArgs(connectionString: string): {
     statement_timeout: DEFAULT_STATEMENT_TIMEOUT_MS,
     query_timeout: DEFAULT_QUERY_TIMEOUT_MS,
     lock_timeout: DEFAULT_LOCK_TIMEOUT_MS,
+    // adapter-pg sends timestamps without an offset and drops the offset on
+    // read: the session must be UTC.
+    options: '-c TimeZone=UTC',
   };
 
   try {

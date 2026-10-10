@@ -12,7 +12,7 @@ import { applyMigrationsFromEmpty } from '../support/migrations';
 import { readDisposablePostgresRuntime } from '../support/runtime';
 
 const runtime = readDisposablePostgresRuntime();
-const managedEnvironment = ['DATABASE_URL', 'LOG_CONSOLE', 'PRISMA_AUTO_DISCONNECT'] as const;
+const managedEnvironment = ['DATABASE_URL'] as const;
 type ManagedEnvironmentName = typeof managedEnvironment[number];
 
 const id = (n: number) => `71000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -62,8 +62,6 @@ describe.sequential('admin list keyset pagination on PostgreSQL', () => {
     await applyMigrationsFromEmpty(target);
     for (const name of managedEnvironment) originalEnvironment.set(name, process.env[name]);
     process.env.DATABASE_URL = target.databaseUrl;
-    process.env.LOG_CONSOLE = 'false';
-    process.env.PRISMA_AUTO_DISCONNECT = 'false';
     applicationPrisma = (await import('@/lib/prisma')).prisma;
   });
 

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   isAdminRequest: vi.fn(),
+  getAllBookings: vi.fn(),
   getBookingDetails: vi.fn(),
   searchBookingsByDateRange: vi.fn(),
 }));
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/lib/rbac', () => ({ isAdminRequest: mocks.isAdminRequest }));
 vi.mock('@/lib/guestDataExport', () => ({
   guestDataExport: {
+    getAllBookings: mocks.getAllBookings,
     getBookingDetails: mocks.getBookingDetails,
     searchBookingsByDateRange: mocks.searchBookingsByDateRange,
   },
@@ -47,6 +49,7 @@ describe('admin guests route query validation', () => {
     expect(mocks.getBookingDetails).toHaveBeenCalledWith(BOOKING_ID);
     expect(response.headers.get('content-disposition')).toContain(`booking_${BOOKING_ID}_`);
     expect(response.headers.get('content-disposition')).toMatch(/^attachment;/);
+    expect(response.headers.get('cache-control')).toBe('no-store');
   });
 
   it('answers 404 for a well-formed but unknown export bookingId', async () => {
@@ -89,4 +92,20 @@ describe('admin guests route query validation', () => {
     expect(range.status).toBe(200);
     expect(mocks.searchBookingsByDateRange).toHaveBeenLastCalledWith('2026-10-05', '2026-10-12');
   });
+
+  it.each(['action=list', `action=export&bookingId=${BOOKING_ID}`])(
+    'answers 401 to a non-admin (%s) without reading guest data',
+    async (query) => {
+      mocks.isAdminRequest.mockResolvedValue(false);
+      // A resolved value, so that a missing gate shows up as a 200 and not as a TypeError.
+      mocks.getAllBookings.mockResolvedValue([]);
+
+      const response = await get(query);
+
+      expect(response.status).toBe(401);
+      expect(mocks.isAdminRequest).toHaveBeenCalledOnce();
+      expect(mocks.getAllBookings).not.toHaveBeenCalled();
+      expect(mocks.getBookingDetails).not.toHaveBeenCalled();
+    },
+  );
 });

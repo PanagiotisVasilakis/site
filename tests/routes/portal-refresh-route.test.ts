@@ -4,9 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   rotateRefreshToken: vi.fn(),
   getFeatureFlagsAsync: vi.fn(),
+  checkSensitiveRateLimit: vi.fn(),
 }));
 
 vi.mock('@/lib/featureFlags', () => ({ getFeatureFlagsAsync: mocks.getFeatureFlagsAsync }));
+vi.mock('@/lib/sensitiveRateLimit', () => ({ checkSensitiveRateLimit: mocks.checkSensitiveRateLimit }));
 
 vi.mock('@/lib/guestDataStore', () => ({
   guestStore: { rotateRefreshToken: mocks.rotateRefreshToken },
@@ -17,11 +19,14 @@ vi.mock('@/lib/portalAuthHttp', () => ({
 
 import { POST } from '@/app/api/portal/refresh/route';
 
-function refresh(query = ''): Promise<Response> {
+function refresh(query = '', withCookie = true): Promise<Response> {
   // Route handlers see the server bind host in request.url (e.g. `next dev -H 0.0.0.0`).
   const request = new NextRequest(`http://0.0.0.0:3000/api/portal/refresh${query}`, {
     method: 'POST',
-    headers: { cookie: 'guest_rt=family-id.presented-secret', host: 'localhost:3001' },
+    headers: {
+      ...(withCookie ? { cookie: 'guest_rt=family-id.presented-secret' } : {}),
+      host: 'localhost:3001',
+    },
   });
   return POST(request, { params: Promise.resolve({}) });
 }
@@ -29,6 +34,12 @@ function refresh(query = ''): Promise<Response> {
 describe('portal refresh route response', () => {
   beforeEach(() => {
     mocks.getFeatureFlagsAsync.mockResolvedValue({ portalEnabled: true, checkinEnabled: true });
+    mocks.checkSensitiveRateLimit.mockResolvedValue({
+      allowed: true,
+      limit: 60,
+      remaining: 59,
+      resetAt: new Date('2026-10-09T12:15:00.000Z'),
+    });
     mocks.rotateRefreshToken.mockResolvedValue({
       status: 'rotated',
       old: { id: 'old-token', user_id: 'user-1' },
@@ -66,6 +77,45 @@ describe('portal refresh route response', () => {
     const response = await refresh();
 
     expect(response.status).toBe(404);
+    expect(mocks.rotateRefreshToken).not.toHaveBeenCalled();
+  });
+
+  it('limits refreshes per client address only, and checks the limit before it rotates', async () => {
+    const response = await refresh();
+
+    expect(response.status).toBe(200);
+    expect(mocks.checkSensitiveRateLimit).toHaveBeenCalledOnce();
+    // No identifier: a constant one would put every guest into one shared bucket.
+    expect(mocks.checkSensitiveRateLimit.mock.calls[0][1]).toStrictEqual({
+      scope: 'portal-refresh',
+      limit: 60,
+      windowMs: 15 * 60_000,
+    });
+    expect(mocks.checkSensitiveRateLimit.mock.invocationCallOrder[0])
+      .toBeLessThan(mocks.rotateRefreshToken.mock.invocationCallOrder[0]);
+  });
+
+  it('answers 429 without rotating anything or touching the cookies when the limit is exceeded', async () => {
+    mocks.checkSensitiveRateLimit.mockResolvedValue({
+      allowed: false,
+      limit: 60,
+      remaining: 0,
+      resetAt: new Date('2026-10-09T12:15:00.000Z'),
+    });
+
+    const response = await refresh();
+
+    expect(response.status).toBe(429);
+    expect(await response.json()).toMatchObject({ error: { code: 'RATE_LIMITED' } });
+    expect(response.headers.getSetCookie()).toEqual([]);
+    expect(mocks.rotateRefreshToken).not.toHaveBeenCalled();
+  });
+
+  it('never calls the limiter for a request without the refresh cookie', async () => {
+    const response = await refresh('', false);
+
+    expect(response.status).toBe(401);
+    expect(mocks.checkSensitiveRateLimit).not.toHaveBeenCalled();
     expect(mocks.rotateRefreshToken).not.toHaveBeenCalled();
   });
 });

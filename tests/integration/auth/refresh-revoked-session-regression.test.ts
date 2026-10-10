@@ -50,7 +50,6 @@ const managedEnvironment = [
   'DATABASE_URL',
   'SECURITY_PEPPER',
   'GUEST_JWT_SECRET',
-  'PRISMA_AUTO_DISCONNECT',
 ] as const;
 
 type ManagedEnvironmentName = typeof managedEnvironment[number];
@@ -159,7 +158,6 @@ function setApplicationEnvironment(databaseUrl: string): void {
   process.env.DATABASE_URL = databaseUrl;
   process.env.SECURITY_PEPPER = SYNTHETIC_SECURITY_PEPPER;
   process.env.GUEST_JWT_SECRET = SYNTHETIC_JWT_SECRET;
-  process.env.PRISMA_AUTO_DISCONNECT = 'false';
 }
 
 function restoreApplicationEnvironment(): void {

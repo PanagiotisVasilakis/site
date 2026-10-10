@@ -7,7 +7,7 @@ import { getDictionary } from '@/i18n/dictionaries';
 /**
  * identity §8 BalconyWindow, §9.1 item 5: the balcony photo in a window frame and an italic quote.
  * The louvred shutters are decoration: hidden from assistive technology, and shown only under motion
- * (M10 in motion.css), where they swing open once the window is 45 % in view. Otherwise the photo
+ * (M10 in motion.css), where they swing open once the window's top passes 55 % of the viewport. Otherwise the photo
  * is simply there.
  */
 export default function BalconyWindow({ locale }: { locale: Locale }) {

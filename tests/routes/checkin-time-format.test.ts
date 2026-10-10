@@ -58,12 +58,39 @@ describe('check-in time format', () => {
     expect((await response.json()).data).toMatchObject({ checkInTime: '15:00', checkOutTime: '11:00' });
   });
 
+  it('still serves a stored value that carries updatedAt, because only the POST body is strict', async () => {
+    mocks.settingFind.mockResolvedValue({ value: { checkInTime: '16:00', checkOutTime: '10:00', updatedAt: 1_700_000_000_000 }, updatedAt: new Date() });
+
+    const response = await getPreferences(request('/api/check-in/preferences'), { params: Promise.resolve({}) });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).data).toMatchObject({ checkInTime: '16:00', checkOutTime: '10:00' });
+  });
+
   it.each(['9:00', '24:00', '09:60'])('refuses to store the check-in time %s', async (checkInTime) => {
     mocks.isAdminRequest.mockResolvedValue(true);
 
     const response = await postPreferences(request('/api/check-in/preferences', { checkInTime, checkOutTime: '11:00' }), { params: Promise.resolve({}) });
 
     expect(response.status).toBe(422);
+    expect(mocks.settingUpsert).not.toHaveBeenCalled();
+  });
+
+  it('answers 422 for an unknown key in the admin preferences body and stores nothing', async () => {
+    mocks.isAdminRequest.mockResolvedValue(true);
+
+    const response = await postPreferences(request('/api/check-in/preferences', { checkInTime: '16:00', checkOutTime: '11:00', updatedAt: 0 }), { params: Promise.resolve({}) });
+
+    expect(response.status).toBe(422);
+    expect((await response.json()).error.details.validationErrors).toEqual([expect.objectContaining({ code: 'unrecognized_keys' })]);
+    expect(mocks.settingUpsert).not.toHaveBeenCalled();
+  });
+
+  it('answers 401 and stores nothing when the preferences POST has no admin session, even for a signed-in guest', async () => {
+    const response = await postPreferences(request('/api/check-in/preferences', { checkInTime: '09:00', checkOutTime: '11:00' }), { params: Promise.resolve({}) });
+
+    expect(response.status).toBe(401);
+    expect((await response.json()).error.code).toBe('UNAUTHORIZED');
     expect(mocks.settingUpsert).not.toHaveBeenCalled();
   });
 

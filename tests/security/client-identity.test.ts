@@ -8,6 +8,7 @@ import {
   requireCanonicalClientIp,
 } from '@/lib/net/clientIdentity';
 import { canonicalizeClientIp } from '@/lib/net/getClientIp';
+import { mapApiErrorToUI } from '@/lib/userFacingErrors';
 const CLIENT_IDENTITY_UNAVAILABLE = 'CLIENT_IDENTITY_UNAVAILABLE'; // response contract value
 
 describe('canonical client identity', () => {
@@ -69,6 +70,36 @@ describe('canonical client identity', () => {
     }));
   });
 
+  it.each([
+    ['a valid attestation', secret],
+    ['a wrong attestation', 'fedcba9876543210'.repeat(4)],
+  ])('reports an absent client-IP header as missing, not as the sentinel, with %s', (_label, attestation) => {
+    vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);
+    const request = new NextRequest('https://guest.test/api/auth', {
+      headers: { 'x-origin-proxy-attestation': attestation },
+    });
+
+    expect(() => requireCanonicalClientIp(request)).toThrow(expect.objectContaining({
+      code: CLIENT_IDENTITY_UNAVAILABLE,
+      reason: 'missing',
+    }));
+  });
+
+  it('keeps the sentinel reason for an upstream that sends the literal unknown', () => {
+    vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);
+    const request = new NextRequest('https://guest.test/api/auth', {
+      headers: {
+        'x-origin-verified-client-ip': 'unknown',
+        'x-origin-proxy-attestation': secret,
+      },
+    });
+
+    expect(() => requireCanonicalClientIp(request)).toThrow(expect.objectContaining({
+      code: CLIENT_IDENTITY_UNAVAILABLE,
+      reason: 'sentinel',
+    }));
+  });
+
   it('keeps internal classification out of the shared public response', async () => {
     const response = createClientIdentityUnavailableResponse();
 
@@ -77,10 +108,22 @@ describe('canonical client identity', () => {
     expect(response.headers.get('retry-after')).toBeNull();
     expect(await response.json()).toEqual({
       success: false,
-      error: { message: 'Service temporarily unavailable' },
+      error: { code: 'SERVICE_UNAVAILABLE', message: 'Service temporarily unavailable' },
     });
     expect(JSON.stringify(await createClientIdentityUnavailableResponse().json()))
       .not.toContain(CLIENT_IDENTITY_UNAVAILABLE);
+  });
+
+  it.each([
+    ['en', 'temporarily unavailable'],
+    ['el', 'προσωρινά'],
+  ] as const)('is shown to a %s guest as the unavailable message, not the generic one', async (locale, expected) => {
+    const body = await createClientIdentityUnavailableResponse().json();
+    const mapped = mapApiErrorToUI(body, locale);
+
+    expect(mapped.code).toBe('SERVICE_UNAVAILABLE');
+    expect(mapped.summary).toContain(expected);
+    expect(mapped.summary).not.toBe(mapApiErrorToUI(null, locale).summary);
   });
 
   it('logs only the bounded rejection reason at warn level', () => {

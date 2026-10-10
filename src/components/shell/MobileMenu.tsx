@@ -22,16 +22,20 @@ interface MobileMenuProps {
   variant: ShellVariant;
   t: Dictionary;
   isSignedIn: boolean;
+  portalEnabled: boolean;
+  checkinEnabled: boolean;
   onSignOut: () => void;
 }
 
 /**
  * identity §8 MobileMenu: a modal <dialog> (showModal: the browser traps focus and makes the page inert),
  * a sheet from the right. Escape and a backdrop click close it; focus returns to the menu button.
- * Page scroll is locked by `:root:has(.mobile-menu[open])` in shell.css.
+ * Page scroll is locked by `:root:has(.mobile-menu[open])` in shell.css. The account links follow the feature
+ * flags, because the guest and check-in pages answer 404 while their flag is off: no account block without the
+ * portal, no check-in link without check-in. Sign out does not depend on the check-in flag.
  */
 export default function MobileMenu({
-  id, open, onClose, triggerRef, locale, pathname, variant, t, isSignedIn, onSignOut,
+  id, open, onClose, triggerRef, locale, pathname, variant, t, isSignedIn, portalEnabled, checkinEnabled, onSignOut,
 }: MobileMenuProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -102,32 +106,36 @@ export default function MobileMenu({
           </div>
         )}
 
-        <div className="mobile-menu__account">
-          {isSignedIn ? (
-            <>
-              <Link href={`/${locale}/check-in`} className="mobile-menu__account-link shell-link" onClick={close}>
-                <Icon name="key" size={20} />
-                {t.checkin.navLabel}
-              </Link>
-              <button
-                type="button"
-                className="mobile-menu__account-link"
-                onClick={() => {
-                  close();
-                  onSignOut();
-                }}
-              >
+        {portalEnabled && (
+          <div className="mobile-menu__account">
+            {isSignedIn ? (
+              <>
+                {checkinEnabled && (
+                  <Link href={`/${locale}/check-in`} className="mobile-menu__account-link shell-link" onClick={close}>
+                    <Icon name="key" size={20} />
+                    {t.checkin.navLabel}
+                  </Link>
+                )}
+                <button
+                  type="button"
+                  className="mobile-menu__account-link"
+                  onClick={() => {
+                    close();
+                    onSignOut();
+                  }}
+                >
+                  <Icon name="user" size={20} />
+                  {t.ui.signOut}
+                </button>
+              </>
+            ) : (
+              <Link href={`/${locale}/guest?mode=signin`} className="mobile-menu__account-link shell-link" onClick={close}>
                 <Icon name="user" size={20} />
-                {t.ui.signOut}
-              </button>
-            </>
-          ) : (
-            <Link href={`/${locale}/guest?mode=signin`} className="mobile-menu__account-link shell-link" onClick={close}>
-              <Icon name="user" size={20} />
-              {t.ui.signIn}
-            </Link>
-          )}
-        </div>
+                {t.ui.signIn}
+              </Link>
+            )}
+          </div>
+        )}
 
         <div className="mobile-menu__prefs">
           <LanguageSwitch locale={locale} label={t.shell.language} />

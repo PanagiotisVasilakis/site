@@ -14,9 +14,7 @@ import { readDisposablePostgresRuntime } from '../support/runtime';
 const runtime = readDisposablePostgresRuntime();
 const managedEnvironment = [
   'DATABASE_URL',
-  'LOG_CONSOLE',
   'ORIGIN_PROXY_SHARED_SECRET',
-  'PRISMA_AUTO_DISCONNECT',
   'SECURITY_PEPPER',
 ] as const;
 const originalEnvironment = new Map<string, string | undefined>();
@@ -47,8 +45,6 @@ function setApplicationEnvironment(databaseUrl: string): void {
     if (!originalEnvironment.has(name)) originalEnvironment.set(name, process.env[name]);
   }
   process.env.DATABASE_URL = databaseUrl;
-  process.env.LOG_CONSOLE = 'false';
-  process.env.PRISMA_AUTO_DISCONNECT = 'false';
   process.env.SECURITY_PEPPER = 'd1a-integration-security-pepper-only';
   process.env.ORIGIN_PROXY_SHARED_SECRET =
     '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2';

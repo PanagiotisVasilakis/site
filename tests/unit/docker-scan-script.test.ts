@@ -8,15 +8,19 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 const TRIVY_IMAGE = 'aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c';
 const SCRIPT = path.resolve('scripts/docker-scan.sh');
 const IMAGE_REF = 'villa-app:0123456789ab';
+// What scan_with_trivy in the script passes to a host `trivy`.
+const HOST_TRIVY_ARGS = ['image', '--exit-code', '1', '--severity', 'HIGH,CRITICAL', '--scanners', 'vuln', IMAGE_REF];
 
 // Stand-in `docker` CLI: records every invocation (a marker line, then one argument per line),
 // emulates `docker save --output <file>` (the real CLI writes the file with mode 0600), records
-// the modes of the mounted tarball and its directory at `docker run`, reports the engine and the
-// Scout plugin as available, and exits from `docker run` with the status the test asks for.
+// the modes of the mounted tarball and its directory at `docker run`, reports the Scout plugin as
+// available, answers `docker info` and exits from `docker run` with the statuses the test asks for
+// (`docker info` succeeding means the engine is reachable).
 const DOCKER_STUB = `#!/bin/sh
 { printf '%s\\n' '@@'; for arg in "$@"; do printf '%s\\n' "$arg"; done; } >> "$DOCKER_STUB_LOG"
 case "$1" in
-  info|scout) exit 0 ;;
+  info) exit "$DOCKER_STUB_INFO_EXIT" ;;
+  scout) exit 0 ;;
   save)
     while [ "$#" -gt 0 ]; do
       if [ "$1" = --output ] || [ "$1" = -o ]; then (umask 077 && printf 'tar' > "$2"); fi
@@ -37,6 +41,13 @@ esac
 exit 99
 `;
 
+// Stand-in host `trivy`: records its arguments (one per line) and succeeds, so a run that reaches
+// it shows that the script chose the host binary.
+const TRIVY_STUB = `#!/bin/sh
+printf '%s\\n' "$@" >> "$TRIVY_STUB_LOG"
+exit 0
+`;
+
 const BASH = execFileSync('/bin/sh', ['-c', 'command -v bash'], { encoding: 'utf8' }).trim();
 
 // Fixed, git-ignored scratch directory. The bin directories are written once for the file
@@ -45,52 +56,68 @@ const BASH = execFileSync('/bin/sh', ['-c', 'command -v bash'], { encoding: 'utf
 const WORK = path.resolve('.runtime/docker-scan-test');
 const BIN = path.join(WORK, 'bin');
 const DOCKER_BIN = path.join(WORK, 'docker-bin');
+const TRIVY_BIN = path.join(WORK, 'trivy-bin');
 const TMP = path.join(WORK, 'tmp');
 const LOG = path.join(WORK, 'docker.log');
 const MODES = path.join(WORK, 'modes.txt');
+const TRIVY_LOG = path.join(WORK, 'trivy.log');
 
-// The script's PATH is BIN alone (plus DOCKER_BIN, which holds only the stub, when a test wants
-// Docker), so neither a host Trivy nor the real Docker CLI can be found. These wrappers expose
-// only the system tools the script and the stub need.
+// The script's PATH is BIN alone (plus DOCKER_BIN or TRIVY_BIN, which hold only their stub, when a
+// test wants Docker or a host Trivy), so neither a host Trivy nor the real Docker CLI can be
+// found. These wrappers expose only the system tools the script and the stubs need.
 const TOOL_WRAPPER = '#!/bin/sh\nexport PATH=/usr/bin:/bin\nexec "${0##*/}" "$@"\n';
 
 beforeAll(() => {
   rmSync(WORK, { recursive: true, force: true });
   mkdirSync(BIN, { recursive: true });
   mkdirSync(DOCKER_BIN);
+  mkdirSync(TRIVY_BIN);
   writeFileSync(path.join(BIN, 'mktemp'), TOOL_WRAPPER, { mode: 0o755 });
   writeFileSync(path.join(BIN, 'rm'), TOOL_WRAPPER, { mode: 0o755 });
   writeFileSync(path.join(BIN, 'chmod'), TOOL_WRAPPER, { mode: 0o755 });
   writeFileSync(path.join(BIN, 'ls'), TOOL_WRAPPER, { mode: 0o755 });
   writeFileSync(path.join(DOCKER_BIN, 'docker'), DOCKER_STUB, { mode: 0o755 });
+  writeFileSync(path.join(TRIVY_BIN, 'trivy'), TRIVY_STUB, { mode: 0o755 });
 });
 
 beforeEach(() => {
   rmSync(TMP, { recursive: true, force: true });
   rmSync(LOG, { force: true });
   rmSync(MODES, { force: true });
+  rmSync(TRIVY_LOG, { force: true });
   mkdirSync(TMP);
 });
 
 afterAll(() => rmSync(WORK, { recursive: true, force: true }));
 
-function runScan(scanner: string, { runExit = 0, docker = true }: { runExit?: number; docker?: boolean } = {}) {
+function runScan(
+  scanner: string,
+  {
+    runExit = 0,
+    docker = true,
+    infoExit = 0,
+    hostTrivy = false,
+  }: { runExit?: number; docker?: boolean; infoExit?: number; hostTrivy?: boolean } = {},
+) {
   const result = spawnSync(BASH, [SCRIPT, IMAGE_REF], {
     env: {
       ...process.env,
-      PATH: docker ? `${DOCKER_BIN}:${BIN}` : BIN,
+      PATH: [...(hostTrivy ? [TRIVY_BIN] : []), ...(docker ? [DOCKER_BIN] : []), BIN].join(':'),
       TMPDIR: TMP,
       DOCKER_SCAN_SCANNER: scanner,
       DOCKER_STUB_LOG: LOG,
       DOCKER_STUB_MODES: MODES,
       DOCKER_STUB_RUN_EXIT: String(runExit),
+      DOCKER_STUB_INFO_EXIT: String(infoExit),
+      TRIVY_STUB_LOG: TRIVY_LOG,
     },
     encoding: 'utf8',
   });
   const calls = existsSync(LOG)
     ? readFileSync(LOG, 'utf8').split('@@\n').filter(Boolean).map((call) => call.replace(/\n$/u, '').split('\n'))
     : [];
-  return { status: result.status, stderr: result.stderr, calls };
+  const trivyArgs = existsSync(TRIVY_LOG) ? readFileSync(TRIVY_LOG, 'utf8').split('\n').filter(Boolean) : [];
+  return { status: result.status, stderr: result.stderr, calls, trivyArgs };
 }
 
 function valuesOf(args: string[], ...flags: string[]) {
@@ -158,6 +185,39 @@ describe('docker:scan script (scripts/docker-scan.sh)', () => {
     expect(status).toBe(0);
     expect(calls.map((call) => call[0])).toEqual(['info', 'save', 'run']);
     expect(calls[2]).toContain(TRIVY_IMAGE);
+  });
+
+  it('prefers the pinned Trivy container over a host Trivy in auto mode when a Docker engine is reachable', () => {
+    const { status, calls, trivyArgs } = runScan('auto', { hostTrivy: true });
+
+    expect(status).toBe(0);
+    expect(calls.map((call) => call[0])).toEqual(['info', 'save', 'run']);
+    expect(calls[2]).toContain(TRIVY_IMAGE);
+    expect(trivyArgs).toEqual([]);
+  });
+
+  it('falls back to a host Trivy in auto mode when there is no Docker CLI', () => {
+    const { status, calls, trivyArgs } = runScan('auto', { docker: false, hostTrivy: true });
+
+    expect(status).toBe(0);
+    expect(calls).toEqual([]);
+    expect(trivyArgs).toEqual(HOST_TRIVY_ARGS);
+  });
+
+  it('falls back to a host Trivy in auto mode when the Docker engine does not answer', () => {
+    const { status, calls, trivyArgs } = runScan('auto', { infoExit: 1, hostTrivy: true });
+
+    expect(status).toBe(0);
+    expect(calls.map((call) => call[0])).toEqual(['info']);
+    expect(trivyArgs).toEqual(HOST_TRIVY_ARGS);
+  });
+
+  it('runs the host Trivy for DOCKER_SCAN_SCANNER=trivy even when a Docker engine is reachable', () => {
+    const { status, calls, trivyArgs } = runScan('trivy', { hostTrivy: true });
+
+    expect(status).toBe(0);
+    expect(calls).toEqual([]);
+    expect(trivyArgs).toEqual(HOST_TRIVY_ARGS);
   });
 
   it('refuses to pass without a scanner', () => {

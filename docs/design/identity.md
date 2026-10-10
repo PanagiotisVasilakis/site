@@ -103,7 +103,7 @@ The site is built around the one thing the photos prove: a sunlit second-floor b
 
 - **Day mode** is warm sand paper with terracotta (the bedroom wall), olive (the balcony plants) and the deep blue of the gulf.
 - **Night mode ("gulf night")** is deep sea blue, not grey.
-- **Motion follows light and real objects of the place.** A living photograph gains depth; one warm pass of light crosses Taygetos. Greek louvred shutters swing open. A paper relief runs from Taygetos to the gulf. A sun glow moves east to west as you scroll and becomes moonlight at night.
+- **Motion follows light and real objects of the place.** A living photograph gains depth; one warm pass of light crosses Taygetos. Greek louvred shutters swing open. A paper relief runs from Taygetos to the gulf. The scroll-driven sun glow (M16) is dropped, not implemented.
 
 ### 1.2 Name and taglines
 
@@ -348,7 +348,8 @@ Measure: running text ≤ 65ch; lead ≤ 38em.
 | `surface` | `#FFFBF5` | `#10252E` | Cards, calendar months |
 | `surface-sunken` | `#EDE4D5` | `#0D2129` | Quiet bands, notes, booked cells, hover |
 | `surface-raised` | `#FFFFFF` | `#163340` | Dialogs, menu sheet, popovers, toasts |
-| `glass` | `rgb(246 240 230 / .84)` | `rgb(10 26 33 / .80)` | Header pill, bottom bars (with `backdrop-filter: blur(16px) saturate(1.2)`) |
+| `glass` | `rgb(255 255 255 / .12)` | `rgb(255 255 255 / .25)` | Header pill (transparent, O43; the text halo in `shell.css` keeps text legible over photos) and the apartment chip strip. Backdrop blur 8 px (header) and 12 px (chips) |
+| `glass-bar` | `rgb(246 240 230 / .84)` | `rgb(10 26 33 / .80)` | Floating bars over content (QuoteBar, below `lg`), with `backdrop-filter: blur(16px) saturate(1.2)` |
 | `fg` | `#1C2528` | `#F2EBDF` | Body text, headings |
 | `fg-muted` | `#57524C` | `#A9B6BA` | Secondary text, prices per night, placeholders |
 | `fg-on-photo` | `#FFF8EE` | `#FFF8EE` | Text on photo scrims (hero, captions) |
@@ -396,7 +397,7 @@ Measure: running text ≤ 65ch; lead ≤ 38em.
 | `pin-bg` / `pin-fg` | `#FFFBF5` / `#1C2528` | same | Map pins are paper objects, the same in both themes |
 | `pin-home-bg` / `pin-home-fg` | `#A0452A` / `#FFFFFF` | same | "You're staying here" pin |
 | `shutter` / `shutter-hi` / `shutter-lo` / `shutter-frame` / `frame` | `#3C6258` / `#52806F` / `#294740` / `#31554C` / `#E4D8C4` | `#2B4B44` / `#3B6459` / `#1C332E` / `#233F39` / `#1A343D` | Greek shutter green and window frame (decorative) |
-| `glow` | `rgb(240 169 91 / .20)` | `rgb(128 204 218 / .08)` | Sun path (day) and moonlight (night) |
+| `glow` | `rgb(240 169 91 / .20)` | `rgb(128 204 218 / .08)` | **Dropped, not implemented (as of 2026-10-09):** no `glow` token in `tokens.css`. Was: sun path (day) and moonlight (night) |
 
 **Non-colour atmosphere tokens:**
 
@@ -416,7 +417,7 @@ Measure: running text ≤ 65ch; lead ≤ 38em.
 - Computed with `/private/tmp/claude-503/-Users-pvasilakis-site/e6271ddf-8171-43b6-8d73-718dfd3a7330/scratchpad/contrast.mjs`: the WCAG formula, with alpha tokens composited over the stated background (the composite hex is shown).
 - The R3-V2 unit test must reproduce these numbers.
 - Minimums: 4.5 for text, 3.0 for large text (≥ 24 px, or ≥ 18.66 px bold) and for UI boundaries and focus indicators.
-- **Result: 0 failures.** The table has 164 rows (the test's label count; rows with the same pair, minimum and ratio share one test case; rows from R3-V5b, V5c, V6, V7, V8, V9, V10 and V12a included); 163 have a minimum, and the decorative `sun` row has none (it is never text). R3-V9 note: over the stay hub's half sun, `fg-muted` would be 2.50:1 at night, so the sun is sized from `--text-d1` and ends above the lead; only the d1 H1 (large text) sits over it.
+- **Result: 0 failures.** The table has 143 rows (69 light, 66 dark, 8 both; rows from R3-V5b, V5c, V6, V7, V8, V9, V10 and V12a included). `tests/unit/design-tokens.test.ts` holds 21 more pairs (164 labels in all; rows with the same pair, minimum and ratio share one test case) and is the source of truth; 163 of its labels have a minimum, and the decorative `sun` row has none (it is never text). R3-V9 note: over the stay hub's half sun, `fg-muted` would be 2.50:1 at night, so the sun is sized from `--text-d1` and ends above the lead; only the d1 H1 (large text) sits over it.
 
 | Mode | Pair | FG | BG | Ratio | Min |
 |---|---|---|---|---|---|
@@ -639,7 +640,7 @@ Primary button glow: `0 14px 26px -14px rgb(160 69 42 / .55)` (light) / `0 14px 
 
 | Feature | Breakpoint |
 |---|---|
-| Header nav visible | `lg` |
+| Header nav visible | `xl` (O41; `lg` before) |
 | Header CTA visible | `sm` |
 | Fact strip in one row | `lg` |
 | Calendar: two months side by side | `md` |
@@ -653,7 +654,7 @@ Primary button glow: `0 14px 26px -14px rgb(160 69 42 / .55)` (light) / `0 14px 
 
 **Grid rule:** always `repeat(n, minmax(0, 1fr))`, never `1fr 1fr`. This avoids the aegean hub overflow bug. No page may clip overflowing content to hide it: `overflow-x: clip` is allowed only on `html`/`body` as a safety net. The V13 audit checks every element's right edge ≤ viewport width, not only `scrollWidth`.
 
-**z-index:** content 1, fixed sun glow 0 (behind content), sticky header 50, bottom bars 60, toasts 90. Dialogs use the top layer.
+**z-index:** content 1, sticky header 50, bottom bars: BookBar 60, PWA banner 50, QuoteBar 40; toasts 60 (same level as the BookBar; the toast host comes after the page in DOM order, `Toast.tsx`). Dialogs use the top layer.
 
 **Touch targets:** buttons 48 px (sm 40), icon buttons 44 px, chips 40 px with ≥ 8 px gaps, calendar cells ≥ 44 × 44 px. All meet WCAG 2.5.8.
 
@@ -755,17 +756,17 @@ The WebGL hero watches `data-motion` with a `MutationObserver` and tears down wh
 | M3 | Hero stage **recede** (graft 1) | `.hero__stage` goes to `perspective(1400px) translateY(6%) rotateX(16deg) scale(.86)`, `border-radius` 0 → `var(--radius-card)`. A dark overlay (`rgb(var(--scrim) / 0 → .55)`) and hero content opacity 1 → 0 plus `translateY(-80px)` over the first 70 % of the exit | Scroll: `view()` on `section.hero`, `animation-range: exit 0% exit 100%` | CSS scroll-driven | Static |
 | M4 | Hero dolly (T1) | `.hero__img` scale 1 → 1.14, `translateY(3%)`. Disabled when `[data-gl="on"]`, because the shader does the dolly | Scroll, same timeline | CSS scroll-driven | Static |
 | M5 | Living photograph (T2) | §5.6 | Pointer, sideways touch-drag, scroll; ambient drift ≤ 4.8 s | WebGL | Never mounted |
-| M6 | Fact strip | Six tiles open like louvres from `rotateX(-86deg)` (transform-origin top), 75 ms stagger, `--ease-shutter` | In view, once (IntersectionObserver, threshold .35) | CSS + IO | Visible |
+| M6 | Fact strip | Six tiles open like louvres from `rotateX(-86deg)` (transform-origin top), 75 ms stagger, `--ease-shutter` | Top passes 65 % of the viewport height, once (IntersectionObserver with `rootMargin` -35 % from the bottom, HomeRevealObserver) | CSS + IO | Visible |
 | M7 | Kinetic band (graft 2) | Row A (EN outline, `-webkit-text-stroke: 1px` in `fg` at 45 % opacity) translateX 4 % → −38 %. Row B (EL italic, `primary-text`) −40 % → 0 %. Separators are the SVG star. Font `clamp(3.2rem, 11vw, 9.5rem)` | Scroll: `view()`, `animation-range: cover` | CSS scroll-driven | Static offsets: row A −10 %, row B −20 % |
 | M8 | Highlights | Rise 40 px and untilt from `rotateX(18deg)`, 90 ms stagger. Afterwards they tilt toward the pointer (max 6°) on fine pointers | In view / pointer | CSS + IO; JS writes `--tx`/`--ty` (rAF-throttled) | Flat |
 | M9 | Season switch (graft 10) | Cards flip `rotateY` 0 → 90° → 0 (640 ms, `--ease-sweep`, 70 ms stagger); content swaps at 50 % | Click | CSS class + JS | Instant swap |
-| M10 | Balcony window **shutters** | Two louvred shutters swing to ±104° (`--dur-shutter`, spring); a warm flare fades; the photo settles 1.14 → 1 | 45 % in view, once | CSS 3D + IO | Shutters not rendered; the photo stays |
+| M10 | Balcony window **shutters** | Two louvred shutters swing to ±104° (`--dur-shutter`, spring); a warm flare fades; the photo settles 1.14 → 1 | Top passes 55 % of the viewport height, once (`data-reveal="0.45"`, `rootMargin` -45 % from the bottom) | CSS 3D + IO | Shutters not rendered; the photo stays |
 | M11 | Rooms coverflow (< 1024) | Each card `perspective(900px)`: `translateZ(-40px) rotateY(34deg) scale(.9)` → flat at the centre → mirrored; opacity .7 → 1 → .7 | The row's own horizontal scroll: `view(inline)` | CSS scroll-driven (0 JS) | Flat snap row |
 | M12 | Rooms deck fan (≥ 1024, graft 3) | Six cards pile, then fan out (`translate3d(pos*175px, |pos|*18px, -|pos|*70px) rotateZ(pos*5deg) rotateY(pos*-7deg)`, 800 ms spring). Chip or click lifts the active card (`translateZ(140px)`, `translateY(-34px)`, `shadow-object`); the others desaturate (`saturate(.75) brightness(.8)`). The stage tilts toward the pointer (max 6°) | In view, once (IO adds `.is-fanned`) / chip / pointer | CSS transitions + JS classes and custom properties | Fanned static, no tilt |
 | M13 | 14-night strip | Cells flip in `rotateY(-90deg)`, 45 ms stagger | In view, once | CSS + IO | Visible |
 | M14 | Relief map | Contour layers rise (`translateZ` 0 → 18/36/54 px), pins stand up, stage tilt `rotateX(40deg) rotateZ(-6deg)` (≥ 1024: 50°/−14°). The home pin pulses **2×** (1.6 s, 1.2 s delay; ends at 4.4 s) | In view / pointer (fine) | CSS 3D + IO + JS custom properties | Flat 2D plan |
 | M15 | Relief waves | Wave pattern `translateX(-60px → 0)` | Scroll: `view()` | CSS scroll-driven | Static |
-| M16 | Sun path | A fixed 110vmax element with a static radial gradient (`glow` token) translates from top-right to bottom-left. It is moonlight in Night mode. **Transform only**, not a `@property` gradient animation (compositor-only; changed from the mockup) | Scroll: `scroll(root)` | CSS scroll-driven | Glow parked top-right |
+| M16 | Sun path | **Dropped, not implemented (as of 2026-10-09).** Was: a fixed 110vmax element with a static radial gradient (`glow` token) translates from top-right to bottom-left. It is moonlight in Night mode. **Transform only**, not a `@property` gradient animation (compositor-only; changed from the mockup) | Scroll: `scroll(root)` | CSS scroll-driven | Glow parked top-right |
 | M17 | Generic section reveal | `translateY(32px)` + opacity over `--dur-reveal` | In view, once | CSS + IO | Visible |
 | M18 | Buttons | Hover (fine pointers): lift −2 px plus a warm glint sweep on primary (700 ms). Active: `scale(.98)` for 160 ms | Pointer | CSS | Colour change only |
 | M19 | Calendar month turn | Desktop previous/next: `rotateY(±58deg) translateZ(-40px)` → flat, 560 ms, origin at the spine | Click / PageUp / PageDown | CSS class | Instant |
@@ -788,7 +789,7 @@ The WebGL hero watches `data-motion` with a `MutationObserver` and tears down wh
 | M31 | Marketing header | 2 px `primary` hairline along the pill's bottom edge, `scaleX(0 → 1)` with the page scroll. Decorative (`aria-hidden`) | Scroll: `scroll(root)` | CSS scroll-driven | Not shown |
 | M32 | Marketing footer waves | Drift `translateX(-160px → 0)` (user units; the path runs one period past the viewBox) | Scroll: footer `view()`, entry | CSS scroll-driven | Static |
 | M33 | Apartment lead photo | CSS layered parallax: the photo drifts `translateY(-5% → 5%)` at `scale(1.12)` inside its frame; the frame recedes (`perspective(1400px) rotateX(7deg) scale(.95)`) as it leaves. Not WebGL: §5.10 gives the apartment no deferred GL budget (only the 1.5 KB fine-pointer effects chunk) | Scroll: `view()` | CSS scroll-driven | Static |
-| M34 | Fact strip numbers | Plain numbers count up from 0 (850 ms, ease-out cubic) as the louvres open; ordinals ("2nd", "2ος") stay as rendered, since their suffix belongs to the final digit. The server markup holds the final numbers and the count ends on that exact text | In view, once (IO, threshold .35) | JS (rAF) | Final numbers |
+| M34 | Fact strip numbers | Plain numbers count up from 0 (850 ms, ease-out cubic) as the louvres open; ordinals ("2nd", "2ος") stay as rendered, since their suffix belongs to the final digit. The server markup holds the final numbers and the count ends on that exact text | Top passes 65 % of the viewport height, once (IO with `rootMargin` -35 % from the bottom) | JS (rAF) | Final numbers |
 | M35 | Guide map pins | Drop 40 px with a squash-and-settle spring (760 ms), 45 ms stagger (`--i` set by LeafletMap through the CSSOM) | Map opens | CSS | Pins appear |
 
 ### 5.6 The 3D hero: "living photograph"
@@ -820,7 +821,7 @@ It is ported from `.runtime/design/messinian-light/hero-gl.js`, which the tech r
 
 **Loading sequence.**
 
-1. SSR renders only the `<picture>` (§7.2), the scrim and the content. `section.hero` has `touch-action: pan-y`, so vertical scroll stays native and a sideways drag moves the view.
+1. SSR renders only the `<picture>` (§7.2), the scrim and the content. `section.hero` has `touch-action: pan-y pinch-zoom` (`src/styles/components/hero.css:12-13`; the `pan-y` line above it is the fallback for engines without `pinch-zoom`), so vertical scroll and pinch-zoom stay native and a sideways drag moves the view. While the page is zoomed in, a one-finger sideways drag that starts on the hero does not pan the page, because `pan-y` allows only vertical one-finger panning (with the WebGL view running, the drag moves the view instead): pan with two fingers, which `pinch-zoom` allows, or start the drag below the hero. This limit is accepted.
 2. `HeroGlIsland` (client, ≤ 1.5 KB) runs `scheduleIdle`: after `load`, `requestIdleCallback({ timeout: 2500 })`, falling back to `setTimeout(1200)` because Safari has no `requestIdleCallback`. The idle helper is extracted from `src/components/DeferredRuntimeManagers.tsx:6-40` into `src/lib/motion/scheduleIdle.ts` and reused.
 3. **Capability gate** (`src/lib/motion/heroCapability.ts`, a pure function taking `navigator`, `document` and the hero element). It aborts if any of these holds:
    - `data-motion` ≠ `full`;
@@ -838,7 +839,7 @@ It is ported from `.runtime/design/messinian-light/hero-gl.js`, which the tech r
 7. The canvas fades in (`opacity`, 700 ms) after the second frame; then `section.hero` gets `data-gl="on"`.
 8. **Teardown (the `<img>` always stays underneath):**
    - `webglcontextlost`;
-   - the watchdog: after 6 frames, more than 18 frames above 80 ms;
+   - the watchdog: after 6 frames, more than 18 slow frames (longer than 80 ms and shorter than 900 ms); only a frame that the previous frame scheduled counts, so a frame started by input, scroll, resize or a visibility change, which measures the pause before it, does not;
    - a texture, asset or link error;
    - `data-motion` leaving `full`.
    - On teardown the canvas fades out, then `WEBGL_lose_context` is called and the canvas removed. The reason is recorded as `data-gl="off:<reason>"`.
@@ -865,7 +866,7 @@ It is ported from `.runtime/design/messinian-light/hero-gl.js`, which the tech r
 
 **React `<ViewTransition>`.**
 
-- It works in the Next 16.3.6 App Router with no configuration. Next vendors a React canary that exports it (CONFIRMED: `node_modules/next/dist/docs/01-app/02-guides/view-transitions.md:50`).
+- It works in the Next 16.3.8 App Router with no configuration. Next vendors a React canary that exports it (CONFIRMED: `node_modules/next/dist/docs/01-app/02-guides/view-transitions.md:50`).
 - Wrappers live in `page.tsx`, not in layouts (same guide).
 - It is a canary API, so it is isolated in `src/components/motion/PageTransition.tsx` and `SharedElement.tsx`.
 
@@ -1203,7 +1204,7 @@ A single editorial column (65ch), H1 d1, lead, sections with d3 titles, body at 
 ### 9.10 404 (`src/app/[locale]/not-found.tsx`, root) and errors (`error.tsx` ×2)
 
 - **404:** the S-style minimal header; a centred brand mark (96 px); H1 "This page is taking a siesta." / "Αυτή η σελίδα κάνει σιέστα."; lead; three links: Home, Kalamata guide, Your stay. No photo.
-- **Error:** the same layout, H1 "Something went wrong", a "Try again" button (the `reset()` action) and a Home link. No technical details.
+- **Error:** the same layout, H1 "Something went wrong", a "Try again" button (the `retry()` action) and a Home link. No technical details.
 
 ### 9.11 Offline (`/offline`, `/{l}/offline`) — R3-V9
 
@@ -1229,7 +1230,7 @@ A single editorial column (65ch), H1 d1, lead, sections with d3 titles, body at 
 |---|---|---|
 | 3D hero | Hand-written WebGL (≤ 6 KB gz) | three.js ≈ 176 KB, R3F ≥ 233 KB, OGL 10–15 KB for no gain; the CSP blocks their WASM loaders and CDN defaults (§5.6) |
 | Scroll and 3D motion | CSS scroll-driven animations, CSS 3D, `@starting-style`, IntersectionObserver | 0 KB; runs on the compositor; GSAP and Lenis are rejected |
-| Page and element transitions | React `<ViewTransition>` (shipped with Next 16.3.6) + `document.startViewTransition` | 0 KB extra |
+| Page and element transitions | React `<ViewTransition>` (shipped with Next 16.3.8) + `document.startViewTransition` | 0 KB extra |
 | Lightbox gestures | Native scroll-snap inside `<dialog>` | 0 KB; native momentum; replaces the `framer-motion` usage on public routes |
 | Calendar | `react-day-picker` ^9.14.0 (**already installed**, planned by R3-F09) | Accessible grid and keyboard support already built in; skinned with tokens |
 | Map | `leaflet` ^1.9.4 (already installed) | Existing; restyle only |
@@ -1246,7 +1247,7 @@ Current layout (2026-10-06):
 ```
 src/app/fonts/            fonts.ts, 6 × .woff2, OFL-NotoSerifDisplay.txt, OFL-Commissioner.txt, SOURCES.txt
 src/styles/tokens.css     @theme tokens (colour, font, text, radius, shadow, ease) + dark overrides in @layer base
-src/styles/base.css       @layer base: html/body (font-synthesis, grain, bg), focus ring, headings, links, :lang(el) rules, selection
+src/styles/base.css       @layer base: focus ring, :lang(el) tokens, scrollbars (body switch in shell.css; headings, links, selection deferred)
 src/styles/motion.css     all motion (gated by §5.2), keyframes, View Transition rules, reduced-motion reset
 src/styles/components/    ui, shell, hero, apartment, lightbox, home, guide, legal, calendar, stay, admin (.css, unlayered, imported by
                           globals.css) and map.css (imported by LeafletMap.tsx with leaflet.css)
@@ -1354,7 +1355,7 @@ public/house/balcony/hero/  crops + depth maps;  public/design/grain-*.webp;  pu
 - **Research (this workflow):** references, tech, fonts and assets research texts (§0 of the workflow input). Scratch files are in `.runtime/design/research/`.
 - **Winning mockup:** `.runtime/design/messinian-light/`: `DESIGN.md`, `styles.css`, `hero-gl.js`, `boot.js`, `tools/*`, `shots/*`.
 - **Graft mockups:** `.runtime/design/aegean-depth/` and `.runtime/design/kalamata-playful/`.
-- **Installed Next 16.3.6 docs and source (CONFIRMED by reading):**
+- **Installed Next docs and source, read at 16.3.6 (CONFIRMED by reading; the pin is now 16.3.8):**
   - `node_modules/next/dist/docs/01-app/03-api-reference/02-components/font.md` (`declarations`, `preload`, `adjustFontFallback`, `variable`)
   - `node_modules/next/dist/compiled/@next/font/dist/local/{loader.js,get-fallback-metrics-from-font-file.js}`
   - `node_modules/next/dist/build/webpack/loaders/next-font-loader/postcss-next-font.js`

@@ -40,8 +40,6 @@ const THIRD_CONTROL_FIXTURE: AuthPrincipalFixture = {
 const managedEnvironment = [
   'DATABASE_URL',
   'GUEST_JWT_SECRET',
-  'LOG_CONSOLE',
-  'PRISMA_AUTO_DISCONNECT',
   'SECURITY_PEPPER',
 ] as const;
 
@@ -160,8 +158,6 @@ function setApplicationEnvironment(databaseUrl: string): void {
   for (const name of managedEnvironment) originalEnvironment.set(name, process.env[name]);
   process.env.DATABASE_URL = databaseUrl;
   process.env.GUEST_JWT_SECRET = SYNTHETIC_JWT_SECRET;
-  process.env.LOG_CONSOLE = 'false';
-  process.env.PRISMA_AUTO_DISCONNECT = 'false';
   process.env.SECURITY_PEPPER = SYNTHETIC_SECURITY_PEPPER;
 }
 

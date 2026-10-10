@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { ApiError, ApiErrorCode, createSuccessResponse, readJsonBody, ValidationError, withErrorHandler } from '@/lib/apiErrorHandler';
 import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 import { normalizeLocale } from '@/i18n/config';
+import { STAY_HUB_PATH } from '@/components/shell/shellLinks';
 import { PortalAuthError, consumeBookingClaimGrant } from '@/lib/portalAuthService';
 import {
   clearPresentedPortalClaimExchange,
@@ -22,23 +23,26 @@ const schema = z.object({
   password: z.string().min(8).max(128),
   remember: z.boolean().optional().default(false),
   acceptTerms: z.literal(true),
-});
+}).strict();
 
 const claim = withErrorHandler(async (request: NextRequest) => {
-  if (!(await getFeatureFlagsAsync()).portalEnabled) {
+  const flags = await getFeatureFlagsAsync();
+  if (!flags.portalEnabled) {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }
   const parsed = schema.safeParse(await readJsonBody(request, 16 * 1_024));
   if (!parsed.success) throw new ValidationError(parsed.error.issues);
+  // The bucket follows the grant the caller proved it holds (read from the cookie, no database
+  // access), not the phone: a caller without the exchange cookie only spends its own address budget.
+  const tokenDigest = readPortalClaimExchange(request);
   const rateLimit = await checkSensitiveRateLimit(request, {
     scope: 'portal-claim',
-    identifier: parsed.data.phone,
+    identifier: tokenDigest ?? undefined,
     limit: 5,
     windowMs: 60 * 60_000,
   });
   if (!rateLimit.allowed) throw new ApiError(ApiErrorCode.RATE_LIMITED, 'Too many claim attempts');
 
-  const tokenDigest = readPortalClaimExchange(request);
   if (!tokenDigest) {
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'The claim token or account credentials are invalid');
   }
@@ -65,9 +69,11 @@ const claim = withErrorHandler(async (request: NextRequest) => {
 
   const lang = request.cookies.get('lang')?.value;
   const locale = normalizeLocale(lang);
+  // While check-in is off its page answers 404, so the guest lands on the stay hub instead.
+  const redirect = flags.checkinEnabled ? `/${locale}/check-in` : `/${locale}${STAY_HUB_PATH}`;
   const response = createSuccessResponse({
     bookingId: result.bookingId,
-    redirect: `/${locale}/check-in`,
+    redirect,
   });
   await attachPortalAuthCookies(request, response, { ...result, remember: parsed.data.remember });
   return response;

@@ -120,6 +120,7 @@ const handler = async (request: NextRequest) => {
       return NextResponse.json(exportData, {
         headers: {
           'Content-Disposition': `attachment; filename="booking_${params.bookingId}_${Date.now()}.json"`,
+          'Cache-Control': 'no-store',
         },
       });
 

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { normalizeLocale } from '@/i18n/config';
+import { notFound } from "next/navigation";
+import { locales, normalizeLocale } from '@/i18n/config';
 import { getDictionary } from "@/i18n/dictionaries";
 import { ToastProvider } from "@/components/Toast";
 import SiteHeader from "@/components/shell/SiteHeader";
@@ -28,6 +29,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 
 export default async function LocaleLayout({ children, params }: { children: React.ReactNode; params: Promise<{ locale: string }> }) {
   const { locale } = await params;
+  // The proxy does not run for dotted or _next… paths, so only a supported locale may serve localized pages.
+  if (!(locales as readonly string[]).includes(locale)) notFound();
   const eff = normalizeLocale(locale);
   const t = getDictionary(eff);
   // Avoid reading cookies server-side so the route can stay fully static; client components fetch session state.

@@ -79,7 +79,9 @@ function buildIcon(marker: Pick<LeafletMarkerData, 'markerType' | 'number'>, hom
 
 function computeIsDark() {
   if (typeof document === 'undefined') return false;
-  if (document.documentElement.getAttribute('data-theme') === 'dark') return true;
+  // An explicit Day or Night choice decides, as for the CSS tokens; only Auto (no attribute) follows the OS (R-378).
+  const theme = document.documentElement.getAttribute('data-theme');
+  if (theme === 'dark' || theme === 'light') return theme === 'dark';
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
 }
 
@@ -99,6 +101,7 @@ export default function LeafletMap({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const locationMarkerRef = useRef<L.Marker | null>(null);
   const markersRef = useRef(markers);
   const [locationError, setLocationError] = useState('');
 
@@ -164,14 +167,21 @@ export default function LeafletMap({
           }
           navigator.geolocation.getCurrentPosition(pos => {
             const { latitude, longitude } = pos.coords;
-            mapRef.current?.setView([latitude, longitude], 15);
-            L.marker([latitude, longitude], { icon: buildIcon({ markerType: 'service' }, mapLabels.home) }).addTo(mapRef.current!);
+            const current = mapRef.current;
+            // The answer can arrive after the map was removed, e.g. the guest switched to the list meanwhile (R-398).
+            if (!current) return;
+            current.setView([latitude, longitude], 15);
+            // One pin that follows the guest; it has no popup, so it is neither a tab stop nor a button (R-398).
+            if (locationMarkerRef.current) locationMarkerRef.current.setLatLng([latitude, longitude]);
+            else locationMarkerRef.current = L.marker([latitude, longitude], { icon: buildIcon({ markerType: 'service' }, mapLabels.home), interactive: false, keyboard: false }).addTo(current);
           }, () => setLocationError(mapLabels.locationUnavailable), {
             enableHighAccuracy: false,
             timeout: 10_000,
             maximumAge: 60_000,
           });
         };
+        // Like Leaflet's own buttons: a (double-)click on the control must not reach the map's zoom or popup handlers (R-394).
+        L.DomEvent.disableClickPropagation(div);
         return div;
       },
     });
@@ -186,6 +196,7 @@ export default function LeafletMap({
         div.setAttribute('aria-label', mapLabels.fitToMarkers);
         div.innerHTML = FIT_SVG;
         div.onclick = fitOriginAndMarkers;
+        L.DomEvent.disableClickPropagation(div);
         return div;
       },
     });
@@ -198,6 +209,7 @@ export default function LeafletMap({
       mapRef.current = null;
       tileLayerRef.current = null;
       markersLayerRef.current = null;
+      locationMarkerRef.current = null;
     };
   }, [applyTiles, center, fitOriginAndMarkers, mapLabels, zoom]);
 

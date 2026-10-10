@@ -19,11 +19,11 @@ vi.mock('@/lib/logger-enterprise', () => ({
 
 type PrismaGlobal = typeof globalThis & {
   __prisma__?: unknown;
-  __prismaShutdownHooksRegistered__?: boolean;
 };
 
 const prismaGlobal = globalThis as PrismaGlobal;
 const originalArgv = process.argv;
+const shutdownSignals = ['SIGINT', 'SIGTERM', 'SIGQUIT'] as const;
 
 async function loadPrismaModule(argv: string[]) {
   process.argv = argv;
@@ -31,32 +31,31 @@ async function loadPrismaModule(argv: string[]) {
   await import('@/lib/prisma');
 }
 
-function registeredProcessEvents(): string[] {
-  return vi.mocked(process.once).mock.calls.map(([event]) => String(event));
+function signalListenerCounts(): Record<string, number> {
+  return Object.fromEntries(shutdownSignals.map((signal) => [signal, process.listenerCount(signal)]));
 }
 
 describe('prisma client lifecycle', () => {
   beforeEach(() => {
     delete prismaGlobal.__prisma__;
-    delete prismaGlobal.__prismaShutdownHooksRegistered__;
     vi.stubEnv('DATABASE_URL', 'postgresql://user:pass@127.0.0.1:5432/app');
-    vi.stubEnv('NEXT_RUNTIME', '');
-    vi.stubEnv('PRISMA_AUTO_DISCONNECT', '');
     mocks.disconnect.mockResolvedValue(undefined);
-    vi.spyOn(process, 'once').mockReturnValue(process);
   });
 
   afterEach(() => {
     process.argv = originalArgv;
     delete prismaGlobal.__prisma__;
-    delete prismaGlobal.__prismaShutdownHooksRegistered__;
     vi.useRealTimers();
   });
 
-  it('registers shutdown hooks whatever the script path or runner looks like', async () => {
+  // Next's standalone server owns the web process's signals and the workers disconnect explicitly;
+  // a handler here that ends in process.exit() would cut off requests that are still in flight.
+  it('registers no SIGINT, SIGTERM or SIGQUIT listener whatever the script path or runner looks like', async () => {
+    const before = signalListenerCounts();
+
     await loadPrismaModule(['/usr/bin/node', '/srv/site-env/node_modules/.bin/tsx', 'scripts/drain-outbox.ts']);
 
-    expect(registeredProcessEvents()).toEqual(expect.arrayContaining(['beforeExit', 'SIGINT', 'SIGTERM']));
+    expect(signalListenerCounts()).toEqual(before);
   });
 
   it('does not disconnect on its own after query activity', async () => {

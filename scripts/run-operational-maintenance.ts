@@ -7,11 +7,10 @@ const errorMessage = (error: unknown) => (error instanceof Error ? error.message
 // Wait for every step to settle before failing, so disconnect() never races a
 // step that is still running and the results of the other steps are still logged.
 async function main() {
-  const steps = await Promise.allSettled([
-    evaluateOperationalAlerts(),
-    runRetention(),
-    syncAirbnbCalendar({ trigger: 'scheduled' }),
-  ]);
+  // The sync goes first: the stale-calendar alert rule must read the state this run leaves behind.
+  const [calendarStep] = await Promise.allSettled([syncAirbnbCalendar({ trigger: 'scheduled' })]);
+  const [alertsStep, retentionStep] = await Promise.allSettled([evaluateOperationalAlerts(), runRetention()]);
+  const steps = [alertsStep, retentionStep, calendarStep];
   const [alerts, retention, calendar] = steps.map((step) => (
     step.status === 'fulfilled' ? step.value : { error: errorMessage(step.reason) }
   ));

@@ -13,6 +13,7 @@ import {
 } from '@/lib/guestSession';
 import { logger as elogger } from '@/lib/logger-enterprise';
 import { requestAuthContext } from '@/lib/portalAuthHttp';
+import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
 
 function applyAuthCookies(response: NextResponse, sessionJwt: string, refreshToken?: string): void {
   const sessionCookie = createSessionCookie(sessionJwt);
@@ -120,6 +121,17 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const refresh = req.cookies.get(GUEST_REFRESH_COOKIE)?.value;
   if (!refresh) {
     return unauthorizedResponse();
+  }
+
+  // The limit is per client address only: a constant identifier would put every guest into one shared
+  // bucket. It runs after the cookie check, so requests without a cookie write nothing.
+  const rateLimit = await checkSensitiveRateLimit(req, {
+    scope: 'portal-refresh',
+    limit: 60,
+    windowMs: 15 * 60_000,
+  });
+  if (!rateLimit.allowed) {
+    throw new ApiError(ApiErrorCode.RATE_LIMITED, 'Too many refresh attempts');
   }
 
   const refreshed = await issueRefreshedSession(req, refresh);

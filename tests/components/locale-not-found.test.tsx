@@ -12,6 +12,7 @@ import LocaleNotFound from '@/app/[locale]/not-found';
 import RootNotFound from '@/app/not-found';
 import LocaleError from '@/app/[locale]/error';
 import RootError from '@/app/error';
+import { errorReporter } from '@/lib/errorReporting';
 
 const linkTargets = () => screen.getAllByRole('link').map((link) => [link.textContent, link.getAttribute('href')]);
 
@@ -63,15 +64,16 @@ describe.each([
   ['locale error boundary', LocaleError],
   ['root error boundary', RootError],
 ])('%s (identity §9.10)', (_name, ErrorPage) => {
-  it('shows "Something went wrong", a Try again button that calls reset(), a Home link and no technical details', () => {
+  // Next 16.3: only retry() re-fetches the segment; reset() re-renders the error it already received (R-396).
+  it('shows "Something went wrong", a Try again button that calls retry(), a Home link and no technical details', () => {
     pathname.current = '/en/apartment';
-    const reset = vi.fn();
+    const retry = vi.fn();
     const error = Object.assign(new Error('secret stack detail'), { digest: 'digest-123' });
-    const { container } = render(<ErrorPage error={error} reset={reset} />);
+    const { container } = render(<ErrorPage error={error} retry={retry} />);
 
     expect(screen.getByRole('heading', { level: 1, name: 'Something went wrong' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
-    expect(reset).toHaveBeenCalledTimes(1);
+    expect(retry).toHaveBeenCalledTimes(1);
     expect(linkTargets()).toEqual([['Home', '/en']]);
     expect(container).not.toHaveTextContent('secret stack detail');
     expect(container).not.toHaveTextContent('digest-123');
@@ -80,10 +82,22 @@ describe.each([
 
   it('speaks Greek on /el', () => {
     pathname.current = '/el';
-    render(<ErrorPage error={new Error('x')} reset={vi.fn()} />);
+    render(<ErrorPage error={new Error('x')} retry={vi.fn()} />);
 
     expect(screen.getByRole('heading', { level: 1, name: 'Κάτι πήγε στραβά' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Δοκιμάστε ξανά' })).toBeInTheDocument();
     expect(linkTargets()).toEqual([['Αρχική', '/el']]);
+  });
+});
+
+// R-424: render errors of every localized page end up here, so this boundary has to feed /api/errors.
+describe('locale error boundary reporting', () => {
+  it('reports the caught error once with the localeError category', () => {
+    pathname.current = '/en/apartment';
+    const error = new Error('render failed');
+    render(<LocaleError error={error} retry={vi.fn()} />);
+
+    expect(errorReporter.reportError).toHaveBeenCalledTimes(1);
+    expect(errorReporter.reportError).toHaveBeenCalledWith(error, { category: 'localeError' });
   });
 });

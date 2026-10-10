@@ -5,9 +5,10 @@ export const CURRENCY = 'EUR';
 
 /**
  * The property's calendar: Airbnb blocked nights are local calendar dates, so
- * "today" for availability is the date in this zone. The server-side
- * PROPERTY_TIME_ZONE environment variable (runtime-env-schema.js) defaults to
- * the same zone and governs check-in/check-out times of day.
+ * "today" for availability is the date in this zone. It is the only time-zone
+ * source, also for the check-in/check-out times of day (the Wi-Fi window). The
+ * PROPERTY_TIME_ZONE environment variable (runtime-env-schema.js) is validated
+ * at startup but not read.
  */
 export const PROPERTY_TIME_ZONE = 'Europe/Athens';
 

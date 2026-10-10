@@ -76,9 +76,12 @@ import { POST as reportClientError } from '@/app/api/errors/route';
 import { POST as claimBooking } from '@/app/api/portal/claims/route';
 import { POST as refreshPortalSession } from '@/app/api/portal/refresh/route';
 import { POST as reportCspViolation } from '@/app/api/security/csp-report/route';
+import { PortalAuthError } from '@/lib/portalAuthService';
+import { privacyHmac } from '@/lib/privacyHash';
 
 const ATTACKER_IP = '203.0.113.195';
 const REPORT_MARKER = 'd1a-report-sensitive-marker';
+const CLAIM_DIGEST = 'c3'.repeat(32);
 
 function request(
   path: string,
@@ -90,6 +93,35 @@ function request(
   headers.set('x-forwarded-for', ATTACKER_IP);
   headers.set('forwarded', `for=${ATTACKER_IP};proto=https`);
   return new NextRequest(`https://guest.example${path}`, { ...init, headers });
+}
+
+// The value the claim exchange issues: the stored grant digest plus a MAC under the server pepper.
+function claimExchangeValue(digest = CLAIM_DIGEST): string {
+  return `${digest}.${privacyHmac(digest, 'portal-claim-exchange:v1')}`;
+}
+
+function portalClaimLimiterKey(dimension: string): string {
+  return `sensitive:${privacyHmac(`portal-claim|${dimension}`, 'sensitive-rate-limit:v1')}`;
+}
+
+// A claim from an attested client address, so the limiter and the grant are reachable.
+function claimFromVerifiedAddress(cookie: string, phone: string): Promise<Response> {
+  return claimBooking(request('/api/portal/claims', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      cookie,
+      'x-origin-verified-client-ip': '198.51.100.73',
+      'x-origin-proxy-attestation': process.env.ORIGIN_PROXY_SHARED_SECRET ?? '',
+    },
+    body: JSON.stringify({
+      origin: 'ABROAD',
+      phone,
+      password: 'd1a-claim-password-marker',
+      remember: false,
+      acceptTerms: true,
+    }),
+  }), { params: Promise.resolve({}) });
 }
 
 // Unauthenticated public writes: each stores a security_audit_events row only
@@ -253,14 +285,12 @@ describe('missing client identity route boundary', () => {
   });
 
   it('blocks a claim before grant, ownership, audit, or credential mutation', async () => {
-    const claimToken = `claim_${'C'.repeat(43)}`;
     const phone = '+12025550129';
     const password = 'd1a-claim-password-marker';
     const response = await claimBooking(request('/api/portal/claims', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        claimToken,
         origin: 'ABROAD',
         phone,
         password,
@@ -271,12 +301,104 @@ describe('missing client identity route boundary', () => {
 
     await expectGenericIdentityUnavailable(response, [
       'portal-claim',
-      claimToken,
       phone,
       password,
     ]);
     expect(mocks.rateLimitQuery).not.toHaveBeenCalled();
     expect(mocks.consumeBookingClaimGrant).not.toHaveBeenCalled();
+  });
+
+  it('rejects a claim body that still carries the retired claimToken key before the identity check', async () => {
+    const response = await claimBooking(request('/api/portal/claims', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        claimToken: `claim_${'C'.repeat(43)}`,
+        origin: 'ABROAD',
+        phone: '+12025550129',
+        password: 'd1a-claim-password-marker',
+        remember: true,
+        acceptTerms: true,
+      }),
+    }), { params: Promise.resolve({}) });
+
+    expect(response.status).toBe(422);
+    expect(mocks.rateLimitQuery).not.toHaveBeenCalled();
+    expect(mocks.consumeBookingClaimGrant).not.toHaveBeenCalled();
+  });
+
+  it('blocks a claim that presents a valid exchange cookie before the limiter or any grant access', async () => {
+    const phone = '+12025550129';
+    const password = 'd1a-claim-password-marker';
+    const response = await claimBooking(request('/api/portal/claims', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        cookie: `booking_claim_exchange=${claimExchangeValue()}`,
+      },
+      body: JSON.stringify({
+        origin: 'ABROAD',
+        phone,
+        password,
+        remember: true,
+        acceptTerms: true,
+      }),
+    }), { params: Promise.resolve({}) });
+
+    // The route clears the presented exchange cookie on every claim response, so set-cookie is
+    // expected here; neither it, the body nor the diagnostics may carry the presented value.
+    expect(response.status).toBe(503);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('retry-after')).toBeNull();
+    const body = await response.text();
+    expect(body).toMatch(/service[_ ]unavailable|temporarily unavailable/i);
+    const exposed = JSON.stringify([
+      body,
+      response.headers.get('set-cookie'),
+      ...mocks.logger.trace.mock.calls,
+      ...mocks.logger.debug.mock.calls,
+      ...mocks.logger.info.mock.calls,
+      ...mocks.logger.warn.mock.calls,
+      ...mocks.logger.error.mock.calls,
+    ]).toLowerCase();
+    for (const value of [CLAIM_DIGEST, claimExchangeValue(), 'portal-claim', phone, password]) {
+      expect(exposed).not.toContain(value.toLowerCase());
+    }
+    expect(mocks.rateLimitTransaction).not.toHaveBeenCalled();
+    expect(mocks.rateLimitQuery).not.toHaveBeenCalled();
+    expect(mocks.consumeBookingClaimGrant).not.toHaveBeenCalled();
+  });
+
+  it('keys the claim limiter on the verified exchange digest, never on the phone', async () => {
+    const phone = '+12025550129';
+    mocks.consumeBookingClaimGrant.mockRejectedValue(new PortalAuthError('INVALID_CLAIM'));
+
+    const response = await claimFromVerifiedAddress(`booking_claim_exchange=${claimExchangeValue()}`, phone);
+
+    expect(response.status).toBe(401);
+    expect(mocks.consumeBookingClaimGrant).toHaveBeenCalledWith(
+      expect.objectContaining({ tokenDigest: CLAIM_DIGEST, phone }),
+    );
+    // One limiter transaction with two buckets: the client address and the presented grant.
+    expect(mocks.rateLimitTransaction).toHaveBeenCalledOnce();
+    const keys = mocks.rateLimitQuery.mock.calls.map((call) => call[1]);
+    expect(keys).toEqual([
+      portalClaimLimiterKey('ip:198.51.100.73'),
+      portalClaimLimiterKey(`identifier:${CLAIM_DIGEST}`),
+    ]);
+    expect(keys).not.toContain(portalClaimLimiterKey(`identifier:${phone}`));
+  });
+
+  it('spends only the address bucket of a claim whose exchange cookie is a bare digest', async () => {
+    const phone = '+12025550129';
+    mocks.consumeBookingClaimGrant.mockRejectedValue(new PortalAuthError('INVALID_CLAIM'));
+
+    const response = await claimFromVerifiedAddress(`booking_claim_exchange=${CLAIM_DIGEST}`, phone);
+
+    expect(response.status).toBe(401);
+    expect(mocks.consumeBookingClaimGrant).not.toHaveBeenCalled();
+    const keys = mocks.rateLimitQuery.mock.calls.map((call) => call[1]);
+    expect(keys).toEqual([portalClaimLimiterKey('ip:198.51.100.73')]);
   });
 
   it('blocks refresh before rotation and never sets or clears auth cookies', async () => {

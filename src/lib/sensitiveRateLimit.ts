@@ -20,8 +20,10 @@ interface RateLimitOptions {
 
 function normalizeIdentifier(value: string): string {
   const normalized = value.trim().toLowerCase();
-  if (!/^\+?[0-9 ()-]+$/.test(normalized)) return normalized;
-  const compact = normalized.replace(/[ ()-]/g, '');
+  // Same separators as normalizePhone (any \s character), so every spelling that sign-in resolves to one
+  // number shares one bucket.
+  const compact = normalized.replace(/[\s()-]/g, '');
+  if (!/^\+?[0-9]+$/.test(compact)) return normalized;
   const phone = normalizePhone(normalized, !compact.startsWith('+') && compact.length === 10 ? 'GR' : undefined);
   return phone?.e164 ?? normalized;
 }

@@ -27,7 +27,7 @@ import BalconyWindow from '@/components/home/BalconyWindow';
 import RoomsShowcase from '@/components/home/RoomsShowcase';
 import { homeRoomsFrom } from '@/components/home/homeRooms';
 import { homeSeasonsOn } from '@/components/home/homeSeason';
-import { housePhotosByRoom } from '@/data/housePhotos';
+import { APARTMENT_PHOTOS } from '@/data/apartmentPhotos';
 import { CLIMATE_FEE_SCHEDULE } from '@/data/stayPolicy';
 import { addDays, type IsoDate } from '@/lib/availability/calendarDate';
 
@@ -279,7 +279,7 @@ describe('BalconyWindow (identity §8, M10)', () => {
 });
 
 describe('RoomsShowcase (identity §8, M11/M12)', () => {
-  const rooms = homeRoomsFrom('en', housePhotosByRoom);
+  const rooms = homeRoomsFrom('en', APARTMENT_PHOTOS);
 
   it('builds six rooms from the apartment photos, lead photos per §7.3, linked to the apartment room sections', () => {
     expect(rooms.map((room) => [room.href, room.photo])).toEqual([
@@ -290,16 +290,23 @@ describe('RoomsShowcase (identity §8, M11/M12)', () => {
       ['/en/apartment#bathroom', '/house/bathroom/bathroom_6.jpeg'],
       ['/en/apartment#balcony', '/house/balcony/balcony_1.jpeg'],
     ]);
-    expect(homeRoomsFrom('el', housePhotosByRoom)[2]).toMatchObject({ name: 'Υπνοδωμάτιο 1', href: '/el/apartment#bedroom-1' });
+    expect(homeRoomsFrom('el', APARTMENT_PHOTOS)[2]).toMatchObject({ name: 'Υπνοδωμάτιο 1', href: '/el/apartment#bedroom-1' });
   });
 
   it('renders no chip and no card for a room without its photo', () => {
-    const withoutBedroom2 = homeRoomsFrom('en', { ...housePhotosByRoom, bedroom_2: [] });
+    const withoutBedroom2 = homeRoomsFrom('en', APARTMENT_PHOTOS.filter((photo) => photo.room !== 'bedroom-2'));
     render(<RoomsShowcase rooms={withoutBedroom2} chipsLabel="Rooms" trackLabel="Room photos" />);
 
     expect(screen.getAllByRole('button')).toHaveLength(5);
     expect(screen.queryByRole('button', { name: 'Bedroom 2' })).toBeNull();
     expect(screen.getAllByRole('link')).toHaveLength(5);
+  });
+
+  it('leaves a room out when only its lead photo is missing from the apartment photos', () => {
+    const withoutLead = homeRoomsFrom('en', APARTMENT_PHOTOS.filter((photo) => photo.src !== '/house/bedroom_2/bedroom_2_5.jpeg'));
+
+    expect(withoutLead.map((room) => room.href)).not.toContain('/en/apartment#bedroom-2');
+    expect(withoutLead).toHaveLength(5);
   });
 
   it('moves the active card with the arrow keys and keeps the chips in sync', async () => {

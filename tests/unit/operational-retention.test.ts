@@ -77,6 +77,20 @@ describe('operational retention', () => {
     expect(result.grants).toBe(4);
   });
 
+  it('removes expired limiter counters, sessions, refresh tokens, refresh families and security events after the published periods', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-07-14T00:00:00Z'));
+
+    await runRetention();
+
+    expect(prismaMock.rateLimit.deleteMany).toHaveBeenCalledWith({ where: { resetTime: { lt: new Date('2030-07-14T00:00:00Z') } } });
+    expect(prismaMock.session.deleteMany).toHaveBeenCalledWith({ where: { expiresAt: { lt: new Date('2030-07-07T00:00:00Z') } } });
+    expect(prismaMock.refreshToken.deleteMany).toHaveBeenCalledWith({ where: { expiresAt: { lt: new Date('2030-06-14T00:00:00Z') } } });
+    expect(prismaMock.refreshTokenFamily.deleteMany).toHaveBeenCalledWith({ where: { absoluteExpiresAt: { lt: new Date('2030-06-14T00:00:00Z') } } });
+    expect(prismaMock.securityAuditEvent.deleteMany).toHaveBeenCalledWith({ where: { occurredAt: { lt: new Date('2030-04-15T00:00:00Z') } } });
+    expect(prismaMock.outboxEvent.deleteMany).toHaveBeenCalledWith({ where: { status: 'DELIVERED', deliveredAt: { lt: new Date('2030-06-14T00:00:00Z') } } });
+  });
+
   it('redacts check-in request contact data 12 months after the booking ended', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-07-14T00:00:00Z'));

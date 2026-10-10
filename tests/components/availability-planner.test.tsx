@@ -20,9 +20,12 @@ import type { PublicAvailability } from '@/lib/prisma-repositories/availabilityR
 
 const TODAY = '2026-10-01' as IsoDate;
 const HORIZON_END = addDays(TODAY, 365);
+/** A server date that is not the 1st of its month; a year on, the horizon end is then mid-month too. */
+const MID_MONTH = '2026-10-07' as IsoDate;
 const PAGE_PATH = '/en/availability';
 const WHATSAPP_BASE = 'https://wa.me/306955810051';
 const LISTING_URL = 'https://www.airbnb.com/rooms/12345678';
+const MAX_NIGHTS_NOTE = 'A stay can be at most 30 nights. For a longer stay, call us or send a WhatsApp message.';
 
 const t = getDictionary('en').availability;
 
@@ -67,6 +70,11 @@ function stubViewport(wide: boolean) {
 
 function renderPlanner(overrides: Partial<PublicAvailability> = {}) {
   return render(<AvailabilityPlanner locale="en" availability={availability(overrides)} />);
+}
+
+/** The planner on another server date, with the same 365-night horizon and every night free. */
+function renderPlannerOn(today: IsoDate) {
+  return renderPlanner({ today, horizonEnd: addDays(today, 365), nights: nightsWith() });
 }
 
 function day(container: HTMLElement, date: string): HTMLButtonElement {
@@ -177,6 +185,53 @@ describe('AvailabilityPlanner', () => {
     expect(day(container, '2026-10-06')).toBeDisabled();
   });
 
+  it('explains the 30-night limit when a day past it becomes the new check-in', () => {
+    const { container } = renderPlanner();
+
+    fireEvent.click(day(container, '2026-11-02'));
+    // No booked night lies ahead: only the limit ends the check-out days, on Wed 2 Dec 2026.
+    expect(within(calendarNote()).getByText('Now choose your check-out day, at the latest Wed 2 Dec 2026.')).toBeInTheDocument();
+    expect(calendarNote()).toHaveClass('ui-callout--info');
+    expect(within(calendarNote()).queryByText(MAX_NIGHTS_NOTE)).not.toBeInTheDocument();
+
+    // 10 December is 38 nights on, but it can start a stay: it becomes the new check-in.
+    fireEvent.click(day(container, '2026-12-10'));
+
+    expect(window.location.hash).toBe('#checkin=2026-12-10');
+    expect(within(calendarNote()).getByText(MAX_NIGHTS_NOTE)).toBeInTheDocument();
+    expect(calendarNote()).toHaveClass('ui-callout--warning');
+    expect(within(calendarNote()).getByText('Now choose your check-out day, at the latest Sat 9 Jan 2027.')).toBeInTheDocument();
+    expect(within(calendarNote()).queryByText(/is booked/)).not.toBeInTheDocument();
+
+    // A later click inside the new window clears the explanation, and the next stay does not bring it back.
+    fireEvent.click(day(container, '2026-12-15'));
+
+    expect(window.location.hash).toBe('#checkin=2026-12-10&checkout=2026-12-15');
+    expect(screen.queryByText(MAX_NIGHTS_NOTE)).not.toBeInTheDocument();
+
+    fireEvent.click(day(container, '2026-12-20'));
+
+    expect(window.location.hash).toBe('#checkin=2026-12-20');
+    expect(within(calendarNote()).getByText('Now choose your check-out day, at the latest Tue 19 Jan 2027.')).toBeInTheDocument();
+    expect(within(calendarNote()).queryByText(MAX_NIGHTS_NOTE)).not.toBeInTheDocument();
+  });
+
+  it('drops the 30-night explanation when the fragment sets another check-in', () => {
+    const { container } = renderPlanner();
+
+    fireEvent.click(day(container, '2026-11-02'));
+    fireEvent.click(day(container, '2026-12-10'));
+    expect(within(calendarNote()).getByText(MAX_NIGHTS_NOTE)).toBeInTheDocument();
+
+    act(() => {
+      window.history.replaceState(null, '', `${PAGE_PATH}#checkin=2026-12-12`);
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+
+    expect(within(calendarNote()).getByText('Now choose your check-out day, at the latest Mon 11 Jan 2027.')).toBeInTheDocument();
+    expect(within(calendarNote()).queryByText(MAX_NIGHTS_NOTE)).not.toBeInTheDocument();
+  });
+
   it('disables days that cannot start a stay as long as their minimum', () => {
     const { container } = renderPlanner({
       nights: nightsWith({ '2026-10-10': 'b', '2026-10-17': 'b' }),
@@ -188,6 +243,30 @@ describe('AvailabilityPlanner', () => {
     expect(day(container, '2026-10-16')).toBeDisabled();
     expect(day(container, '2026-10-14')).toBeEnabled();
     expect(within(summary()).getByText(t.summary.empty)).toBeInTheDocument();
+  });
+
+  it('says in the accessible name why a free, priced night cannot start a stay', () => {
+    // The scenario above, on 7 October so that days before today are on screen too:
+    // the nights start at 7 October, six characters on from the nights of TODAY.
+    const { container } = renderPlanner({
+      today: MID_MONTH,
+      horizonEnd: addDays(MID_MONTH, 365),
+      nights: nightsWith({ '2026-10-10': 'b', '2026-10-17': 'b' }).slice(6).padEnd(365, 'o'),
+    });
+
+    // 15 and 16 October need 3 nights, but 17 October is booked.
+    expect(day(container, '2026-10-15')).toBeDisabled();
+    expect(day(container, '2026-10-15'))
+      .toHaveAccessibleName('Thursday, 15 October 2026, €95 per night, Minimum stay from this check-in: 3 nights.');
+    expect(day(container, '2026-10-16')).toBeDisabled();
+    expect(day(container, '2026-10-16'))
+      .toHaveAccessibleName('Friday, 16 October 2026, €95 per night, Minimum stay from this check-in: 3 nights.');
+    // A night that can start a stay, the booked night and a past day carry no such sentence.
+    expect(day(container, '2026-10-14')).toBeEnabled();
+    expect(day(container, '2026-10-14')).toHaveAccessibleName('Wednesday, 14 October 2026, €80 per night');
+    expect(day(container, '2026-10-17')).toHaveAccessibleName('Saturday, 17 October 2026, booked');
+    expect(day(container, '2026-10-06')).toBeDisabled();
+    expect(day(container, '2026-10-06')).toHaveAccessibleName('Tuesday, 6 October 2026');
   });
 
   it('explains the minimum stay and only enables check-out days that meet it', () => {
@@ -424,6 +503,27 @@ describe('AvailabilityPlanner', () => {
     expect(container.querySelector('.cal')).toHaveAttribute('data-turn', 'next');
   });
 
+  it('disables Previous on the first view when today is not the 1st, and one Next press shows the next two months', () => {
+    stubViewport(true);
+    const { container } = renderPlannerOn(MID_MONTH);
+    const previous = screen.getByRole('button', { name: t.previousMonths });
+    const next = screen.getByRole('button', { name: t.nextMonths });
+
+    // The first view starts at the 1st of October, so nothing lies before it.
+    expect(container.querySelector('[data-day="2026-10-09"]')).not.toBeNull();
+    expect(container.querySelector('[data-day="2026-11-09"]')).not.toBeNull();
+    expect(previous).toBeDisabled();
+    expect(next).toBeEnabled();
+
+    // A press on the disabled Previous does nothing, so it cannot swallow the next press.
+    fireEvent.click(previous);
+    fireEvent.click(next);
+    expect(container.querySelector('[data-day="2026-11-09"]')).not.toBeNull();
+    expect(container.querySelector('[data-day="2026-12-09"]')).not.toBeNull();
+    expect(container.querySelector('[data-day="2026-10-09"]')).toBeNull();
+    expect(previous).toBeEnabled();
+  });
+
   // The home SeasonSwitch links to '#m=YYYY-MM', the first month of a season.
   it('stacks months down to the month of the fragment #m=2027-06', () => {
     window.history.replaceState(null, '', `${PAGE_PATH}#m=2027-06`);
@@ -445,6 +545,24 @@ describe('AvailabilityPlanner', () => {
     expect(container.querySelector('[data-day="2027-07-15"]')).not.toBeNull();
     expect(container.querySelector('[data-day="2026-10-09"]')).toBeNull();
     expect(within(summary()).getByText(t.summary.empty)).toBeInTheDocument();
+  });
+
+  it('moves the two months back at the first Previous press after opening the horizon-end month with #m=2027-10', () => {
+    stubViewport(true);
+    // The horizon end is 7 October 2027, so October still has nights and '#m=2027-10' is accepted.
+    window.history.replaceState(null, '', `${PAGE_PATH}#m=2027-10`);
+    const { container } = renderPlannerOn(MID_MONTH);
+
+    // The last two months are on screen, September and October 2027, with nothing after them.
+    expect(container.querySelector('[data-day="2027-09-15"]')).not.toBeNull();
+    expect(container.querySelector('[data-day="2027-10-15"]')).not.toBeNull();
+    expect(screen.getByRole('button', { name: t.nextMonths })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: t.previousMonths }));
+    expect(container.querySelector('[data-day="2027-08-15"]')).not.toBeNull();
+    expect(container.querySelector('[data-day="2027-09-15"]')).not.toBeNull();
+    expect(container.querySelector('[data-day="2027-10-15"]')).toBeNull();
+    expect(screen.getByRole('button', { name: t.nextMonths })).toBeEnabled();
   });
 
   it.each([

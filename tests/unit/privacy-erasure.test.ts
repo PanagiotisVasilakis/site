@@ -1,13 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { Prisma } from '@/generated/prisma/client';
+
 const USER_ID = '4c939e37-ef9f-4fb2-8231-319896c89080';
 const BOOKING_ID = 'c6a502d6-6dd2-4a03-811e-694114f3122a';
+const SENSITIVE_NOTE = 'Asked by e-mail from maria@example.com or by phone on 6912345678';
+const REDACTED_NOTE = 'Asked by e-mail from [REDACTED_EMAIL] or by phone on [REDACTED_PHONE]';
 
 const tx = vi.hoisted(() => ({
   privacyRequest: { findUnique: vi.fn(), update: vi.fn(), delete: vi.fn() },
   user: { findUnique: vi.fn(), delete: vi.fn() },
   checkInRequest: { findMany: vi.fn(), updateMany: vi.fn() },
-  outboxEvent: { count: vi.fn(), updateMany: vi.fn() },
+  outboxEvent: { count: vi.fn(), updateMany: vi.fn(), create: vi.fn() },
   bookingClaimGrant: { updateMany: vi.fn() },
   booking: { updateMany: vi.fn() },
   securityAuditEvent: { create: vi.fn() },
@@ -22,6 +26,10 @@ const prismaMock = vi.hoisted(() => ({
 vi.mock('@/lib/prisma', () => ({ prisma: prismaMock }));
 
 import { eraseGuestByAdmin, eraseGuestForRetention } from '@/lib/privacyService';
+
+function knownError(code: string) {
+  return new Prisma.PrismaClientKnownRequestError(`Prisma error ${code}`, { code, clientVersion: 'test' });
+}
 
 describe('admin guest erasure', () => {
   beforeEach(() => {
@@ -74,6 +82,66 @@ describe('admin guest erasure', () => {
     expect(audit.data.eventType).toBe('privacy.erasure.completed');
     expect(JSON.stringify(audit)).not.toContain(USER_ID);
     expect(completed).toMatchObject({ status: 'COMPLETED' });
+  });
+
+  it('rejects the pending arrival request of each erased booking, keeping its booking link and creating no event', async () => {
+    await eraseGuestByAdmin(USER_ID, 'Guest asked by email');
+
+    // Frees the booking's single pending slot (check_in_requests_one_pending_per_booking) for the next claimant.
+    expect(tx.checkInRequest.updateMany).toHaveBeenCalledWith({
+      where: { bookingId: { in: [BOOKING_ID] }, status: 'PENDING' },
+      data: { status: 'REJECTED' },
+    });
+    // Only updateStatus notifies a decision; an erasure cancels events and never creates one.
+    expect(tx.outboxEvent.create).not.toHaveBeenCalled();
+  });
+
+  it('issues no pending-to-rejected update for a guest without bookings', async () => {
+    tx.user.findUnique.mockResolvedValue({ id: USER_ID, bookings: [] });
+
+    await eraseGuestByAdmin(USER_ID, 'reason');
+
+    expect(tx.checkInRequest.updateMany).toHaveBeenCalledTimes(1);
+    expect(tx.checkInRequest.updateMany).toHaveBeenCalledWith({
+      where: { userId: USER_ID },
+      data: { userId: null, guestName: null, guestEmail: null, guestPhone: null, message: null },
+    });
+  });
+
+  it('stores the audit note without e-mail addresses and phone numbers', async () => {
+    await eraseGuestByAdmin(USER_ID, SENSITIVE_NOTE);
+
+    expect(prismaMock.privacyRequest.create).toHaveBeenCalledWith({ data: expect.objectContaining({ auditNote: REDACTED_NOTE }) });
+    expect(tx.privacyRequest.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: 'COMPLETED', auditNote: REDACTED_NOTE }),
+    }));
+    const written = JSON.stringify([
+      prismaMock.privacyRequest.create.mock.calls,
+      tx.privacyRequest.update.mock.calls,
+      tx.securityAuditEvent.create.mock.calls,
+    ]);
+    expect(written).not.toContain('maria@example.com');
+    expect(written).not.toContain('6912345678');
+  });
+
+  it('redacts the audit note it writes when it upgrades a legacy PENDING request', async () => {
+    prismaMock.privacyRequest.findFirst.mockResolvedValue({
+      id: 'legacy-request',
+      requestType: 'ERASURE',
+      status: 'PENDING',
+      userId: USER_ID,
+    });
+    prismaMock.privacyRequest.updateMany.mockResolvedValue({ count: 1 });
+
+    await eraseGuestByAdmin(USER_ID, SENSITIVE_NOTE);
+
+    expect(prismaMock.privacyRequest.updateMany).toHaveBeenCalledWith({
+      where: { id: 'legacy-request', status: 'PENDING' },
+      data: { status: 'VERIFIED', auditNote: REDACTED_NOTE },
+    });
+    expect(tx.privacyRequest.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ auditNote: REDACTED_NOTE }),
+    }));
   });
 
   it('upgrades a legacy PENDING erasure request to VERIFIED and completes it', async () => {
@@ -154,6 +222,46 @@ describe('admin guest erasure', () => {
     expect(tx.user.delete).not.toHaveBeenCalled();
   });
 
+  it('runs the erasure in one Serializable transaction', async () => {
+    await eraseGuestByAdmin(USER_ID, 'reason');
+
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    expect(prismaMock.$transaction.mock.calls[0][1]).toEqual({ isolationLevel: 'Serializable' });
+  });
+
+  it('retries the erasure transaction after a serialization conflict and creates no second request', async () => {
+    prismaMock.$transaction.mockRejectedValueOnce(knownError('P2034'));
+
+    const completed = await eraseGuestByAdmin(USER_ID, 'Guest asked by email');
+
+    const createdId = (prismaMock.privacyRequest.create.mock.calls[0][0] as { data: { id: string } }).data.id;
+    expect(completed).toMatchObject({ status: 'COMPLETED' });
+    expect(prismaMock.privacyRequest.create).toHaveBeenCalledTimes(1);
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);
+    expect(tx.privacyRequest.findUnique).toHaveBeenCalledWith({ where: { id: createdId } });
+    expect(tx.user.delete).toHaveBeenCalledTimes(1);
+  });
+
+  it('rethrows the serialization conflict after three attempts', async () => {
+    const conflict = knownError('P2034');
+    prismaMock.$transaction.mockRejectedValue(conflict);
+
+    await expect(eraseGuestByAdmin(USER_ID, 'reason')).rejects.toBe(conflict);
+
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(3);
+    expect(prismaMock.privacyRequest.create).toHaveBeenCalledTimes(1);
+    expect(tx.user.delete).not.toHaveBeenCalled();
+  });
+
+  it('does not retry a transaction error that is not a serialization conflict', async () => {
+    const failure = knownError('P2028');
+    prismaMock.$transaction.mockRejectedValue(failure);
+
+    await expect(eraseGuestByAdmin(USER_ID, 'reason')).rejects.toBe(failure);
+
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+  });
+
   describe('automatic retention', () => {
     const CUTOFF = new Date('2029-07-14T00:00:00Z');
     const NOTE = 'Automatic retention';
@@ -222,6 +330,79 @@ describe('admin guest erasure', () => {
 
       expect(prismaMock.privacyRequest.create).not.toHaveBeenCalled();
       expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('runs the erasure and its cutoff re-check in one Serializable transaction', async () => {
+      tx.user.findUnique.mockResolvedValue({
+        id: USER_ID,
+        bookings: [{ id: BOOKING_ID, endDate: new Date('2029-07-13T00:00:00Z') }],
+      });
+
+      await eraseGuestForRetention(USER_ID, NOTE, CUTOFF);
+
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+      expect(prismaMock.$transaction.mock.calls[0][1]).toEqual({ isolationLevel: 'Serializable' });
+    });
+
+    it('completes a VERIFIED request left by an earlier run without creating a second one', async () => {
+      prismaMock.privacyRequest.findFirst.mockResolvedValue({
+        id: 'earlier-run-request',
+        requestType: 'ERASURE',
+        status: 'VERIFIED',
+        userId: USER_ID,
+      });
+      tx.user.findUnique.mockResolvedValue({
+        id: USER_ID,
+        bookings: [{ id: BOOKING_ID, endDate: new Date('2029-07-13T00:00:00Z') }],
+      });
+
+      await expect(eraseGuestForRetention(USER_ID, NOTE, CUTOFF)).resolves.toBe(true);
+
+      expect(prismaMock.privacyRequest.create).not.toHaveBeenCalled();
+      expect(tx.privacyRequest.findUnique).toHaveBeenCalledWith({ where: { id: 'earlier-run-request' } });
+      expect(tx.user.delete).toHaveBeenCalledWith({ where: { id: USER_ID } });
+      expect(tx.privacyRequest.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'earlier-run-request' } }));
+      expect(tx.privacyRequest.delete).not.toHaveBeenCalled();
+    });
+
+    it('retries after a serialization conflict and, when the retry skips, deletes the request it created', async () => {
+      prismaMock.$transaction.mockRejectedValueOnce(knownError('P2034'));
+      tx.user.findUnique.mockResolvedValue({
+        id: USER_ID,
+        bookings: [
+          { id: BOOKING_ID, endDate: new Date('2029-07-13T00:00:00Z') },
+          { id: 'recent-booking', endDate: new Date('2030-07-20T00:00:00Z') },
+        ],
+      });
+
+      await expect(eraseGuestForRetention(USER_ID, NOTE, CUTOFF)).resolves.toBe(false);
+
+      const createdId = (prismaMock.privacyRequest.create.mock.calls[0][0] as { data: { id: string } }).data.id;
+      expect(prismaMock.privacyRequest.create).toHaveBeenCalledTimes(1);
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(2);
+      expect(tx.privacyRequest.delete).toHaveBeenCalledTimes(1);
+      expect(tx.privacyRequest.delete).toHaveBeenCalledWith({ where: { id: createdId } });
+      expect(tx.user.delete).not.toHaveBeenCalled();
+    });
+
+    it('rethrows after three serialization conflicts and creates the request only once', async () => {
+      const conflict = knownError('P2034');
+      prismaMock.$transaction.mockRejectedValue(conflict);
+
+      await expect(eraseGuestForRetention(USER_ID, NOTE, CUTOFF)).rejects.toBe(conflict);
+
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(3);
+      expect(prismaMock.privacyRequest.create).toHaveBeenCalledTimes(1);
+      expect(tx.user.delete).not.toHaveBeenCalled();
+    });
+
+    it('does not retry a transaction error that is not a serialization conflict', async () => {
+      const failure = knownError('P2028');
+      prismaMock.$transaction.mockRejectedValue(failure);
+
+      await expect(eraseGuestForRetention(USER_ID, NOTE, CUTOFF)).rejects.toBe(failure);
+
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
     });
   });
 });

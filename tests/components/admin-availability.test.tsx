@@ -285,7 +285,7 @@ describe('admin availability & prices', () => {
       status = syncState({ stale: true, lastFailureAt: '2026-09-28T09:05:00.000Z', lastErrorCode: 'http_status', lastHttpStatus: 503 });
       await renderLoaded();
 
-      expect(screen.getByText('The calendar has not synced successfully in the last 12 hours.')).toBeInTheDocument();
+      expect(screen.getByText('The calendar has not synced successfully in the last 3 hours.')).toBeInTheDocument();
       expect(screen.getByText('http_status (HTTP 503)')).toBeInTheDocument();
     });
 

@@ -7,13 +7,14 @@ import { DayButton, DayPicker, type ClassNames, type DayButtonProps, type Modifi
 import { Icon } from '@/components/icons/Icon';
 import { Callout } from '@/components/ui/Callout';
 import { IconButton } from '@/components/ui/IconButton';
-import { CLIMATE_FEE_SCHEDULE } from '@/data/stayPolicy';
+import { CLIMATE_FEE_SCHEDULE, MAX_STAY_NIGHTS } from '@/data/stayPolicy';
 import type { Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 import { eachNight, fromLocalDate, nightsBetween, toLocalDate, type IsoDate } from '@/lib/availability/calendarDate';
 import { formatCentsShort } from '@/lib/availability/money';
 import {
   climateFeeGroups,
+  isCheckInAllowed,
   minimumNightsFor,
   quoteStay,
   rateForNight,
@@ -146,6 +147,8 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
   const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION);
   /** The booked night crossed by the last choice, which made that day the new check-in. */
   const [crossedNight, setCrossedNight] = useState<IsoDate | null>(null);
+  /** The last choice was a day more than MAX_STAY_NIGHTS after the check-in, which made that day the new check-in. */
+  const [pastMaxStay, setPastMaxStay] = useState(false);
   const [month, setMonth] = useState(() => toLocalDate(today));
   const [shownMonths, setShownMonths] = useState(STACK_STEP);
   const [turn, setTurn] = useState<Turn | null>(null);
@@ -196,6 +199,7 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
       }
       setSelection(fromFragment);
       setCrossedNight(null);
+      setPastMaxStay(false);
       const { checkIn } = fromFragment;
       const shown = checkIn < today ? today : checkIn >= horizonEnd ? horizonEnd : checkIn;
       setMonth(toLocalDate(shown));
@@ -207,9 +211,10 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
     return () => window.removeEventListener('hashchange', applyFragment);
   }, [context, today, horizonEnd, totalMonths]);
 
-  const select = useCallback((next: Selection, crossed: IsoDate | null = null) => {
+  const select = useCallback((next: Selection, crossed: IsoDate | null = null, overMax = false) => {
     setSelection(next);
     setCrossedNight(crossed);
+    setPastMaxStay(overMax);
     const { pathname, search } = window.location;
     window.history.replaceState(window.history.state, '', `${pathname}${search}${selectionFragment(next)}`);
   }, []);
@@ -265,6 +270,12 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
       const day = fromLocalDate(date);
       return checkOutDays !== null && day === checkOutDays.last && nightCodeOn(day, today, nights) === 'b';
     },
+    // A night that is free but cannot start a stay because the minimum stay does not fit before the next booked
+    // night. It has no class (MODIFIER_CLASSES); the accessible name says why.
+    tooShort: (date: Date) => {
+      const day = fromLocalDate(date);
+      return !choosingCheckOut && isCheckInAllowed(day, context.blockedNights, today, horizonEnd) && checkOutWindow(day, context) === null;
+    },
   };
 
   const labelDayButton = (date: Date, dayModifiers: Modifiers): string => {
@@ -275,6 +286,7 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
     else if (cents !== null) parts.push(fill(t.day.perNight, { price: formatCentsShort(cents, locale) }));
     else if (dayModifiers.priceOnRequest) parts.push(t.day.priceOnRequest);
     if (dayModifiers.checkOutOnly) parts.push(t.day.checkOutOnly);
+    if (dayModifiers.tooShort) parts.push(fill(t.prompts.minimumStay, { nights: nightsLabel(minimumNightsFor(fromLocalDate(date), rates), t.nights, locale) }));
     if (dayModifiers.selected) parts.push(t.day.selected);
     return parts.join(', ');
   };
@@ -289,7 +301,9 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
         select({ checkIn, checkOut: day });
       } else {
         const crossed = day > checkIn ? eachNight(checkIn, day).find((night) => nightCodeOn(night, today, nights) === 'b') : undefined;
-        select({ checkIn: day, checkOut: null }, crossed ?? null);
+        // Without a booked night in between, only the limit of MAX_STAY_NIGHTS can have ended the check-out days.
+        const pastMax = crossed === undefined && day > checkIn && nightsBetween(checkIn, day) > MAX_STAY_NIGHTS;
+        select({ checkIn: day, checkOut: null }, crossed ?? null, pastMax);
       }
     } else {
       select({ checkIn: day, checkOut: null });
@@ -310,7 +324,7 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
   const feeGroups = validation?.ok ? climateFeeGroups(validation.checkIn, validation.checkOut, CLIMATE_FEE_SCHEDULE) : [];
   const minimumNights = selection.checkIn === null ? 1 : minimumNightsFor(selection.checkIn, rates);
 
-  // The live note inside the calendar (polite): what to do next, the minimum stay and the crossing rule.
+  // The live note inside the calendar (polite): what to do next, the minimum stay, the crossing rule and the stay limit.
   const note: string[] = [];
   let noteIsWarning = false;
   if (selection.checkIn === null) {
@@ -318,6 +332,9 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
   } else if (checkOutDays !== null) {
     if (crossedNight !== null) {
       note.push(fill(t.prompts.crossing, { booked: formatStayDate(crossedNight, locale), date: formatStayDate(selection.checkIn, locale) }));
+      noteIsWarning = true;
+    } else if (pastMaxStay) {
+      note.push(fill(t.rejections.max_nights, { max: MAX_STAY_NIGHTS }));
       noteIsWarning = true;
     }
     note.push(fill(t.prompts.checkOut, { date: formatStayDate(checkOutDays.last, locale) }));
@@ -330,12 +347,18 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
   const first = toLocalDate(today);
   const last = toLocalDate(horizonEnd);
   const visibleMonths = wideScreen ? 2 : Math.min(shownMonths, totalMonths);
-  const secondMonth = new Date(month.getFullYear(), month.getMonth() + 1, 1);
-  const canGoBack = month > new Date(first.getFullYear(), first.getMonth(), 1);
+  // The first month react-day-picker shows: the 1st of `month`, kept within the first and the last pair.
+  const firstStart = new Date(first.getFullYear(), first.getMonth(), 1);
+  const lastPairStart = new Date(last.getFullYear(), last.getMonth() - 1, 1);
+  const shownMonth = month < firstStart ? firstStart
+    : month > lastPairStart ? lastPairStart
+    : new Date(month.getFullYear(), month.getMonth(), 1);
+  const secondMonth = new Date(shownMonth.getFullYear(), shownMonth.getMonth() + 1, 1);
+  const canGoBack = shownMonth > firstStart;
   const canGoForward = secondMonth < new Date(last.getFullYear(), last.getMonth(), 1);
 
   const turnTo = (direction: 'next' | 'prev') => {
-    handleMonthChange(new Date(month.getFullYear(), month.getMonth() + (direction === 'next' ? 1 : -1), 1));
+    handleMonthChange(new Date(shownMonth.getFullYear(), shownMonth.getMonth() + (direction === 'next' ? 1 : -1), 1));
   };
 
   const scrollToCard = () => {

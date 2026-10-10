@@ -60,6 +60,7 @@ const USER_ID = '81000000-0000-4000-8000-000000000004';
 const LEFTOVER_EVENT_ID = '81000000-0000-4000-8000-000000000005';
 const LEFTOVER_LEASED_EVENT_ID = '81000000-0000-4000-8000-000000000006';
 const LEFTOVER_STAY_ID = '81000000-0000-4000-8000-000000000007';
+const SECOND_EVENT_ID = '81000000-0000-4000-8000-000000000008';
 
 function seed(overrides: Row = {}) {
   db.checkInRequests.set(CHECK_IN_ID, {
@@ -193,6 +194,33 @@ describe('check-in outbox delivery state machine', () => {
     expect(event()).toMatchObject({ status: 'DEAD', attemptCount: 10, leaseOwner: null, lastError: 'connect ECONNREFUSED' });
   });
 
+  it.each([
+    ['an http:// URL', 'http://hooks.example.test/check-in', 'Webhook destination must use HTTPS in production'],
+    ['an unparsable URL', 'hooks.example.test/check-in', 'Invalid URL'],
+  ])('refuses %s in production without sending and keeps the event for retry', async (_label, url, lastError) => {
+    seed();
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('CHECKIN_REQUEST_WEBHOOK_URL', url);
+    // Without the guard this receiver would accept the guest payload and the bearer token.
+    fetchMock.mockResolvedValue(new Response('', { status: 200 }));
+
+    await expect(deliverOutboxEvent(EVENT_ID)).resolves.toBe(false);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(event()).toMatchObject({ status: 'PENDING', attemptCount: 1, leaseOwner: null, deliveredAt: null, lastError });
+  });
+
+  it('still sends over HTTPS in production', async () => {
+    seed();
+    vi.stubEnv('NODE_ENV', 'production');
+    fetchMock.mockResolvedValue(new Response('', { status: 200 }));
+
+    await expect(deliverOutboxEvent(EVENT_ID)).resolves.toBe(true);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(event()).toMatchObject({ status: 'DELIVERED', attemptCount: 1 });
+  });
+
   it('does not record a delivery for a lease it no longer owns', async () => {
     seed();
     fetchMock.mockImplementation(async () => {
@@ -228,6 +256,28 @@ describe('check-in outbox delivery state machine', () => {
 
     await expect(drainOutbox(10)).resolves.toEqual({ attempted: 0, delivered: 0 });
     expect(event()).toMatchObject({ status: 'LEASED', leaseOwner: 'busy-worker' });
+  });
+
+  it('lets every delivery settle before drainOutbox rejects on a database error', async () => {
+    seed();
+    db.events.set(SECOND_EVENT_ID, { ...event(), id: SECOND_EVENT_ID });
+    // The claim of the first event hits a database error; the receiver answers the second event on a later turn of the event loop.
+    const claim = prismaMock.outboxEvent.updateMany.getMockImplementation()!;
+    prismaMock.outboxEvent.updateMany.mockImplementation(async (args) => {
+      if (args.where.id === EVENT_ID && args.where.status === 'PENDING') throw new Error('connection terminated');
+      return claim(args);
+    });
+    fetchMock.mockImplementation(() => new Promise<Response>((resolve) => {
+      setImmediate(() => resolve(new Response('', { status: 200 })));
+    }));
+
+    const failure = await drainOutbox(10).then(() => undefined, (error: unknown) => error);
+
+    // The worker script disconnects Prisma as soon as drainOutbox rejects, so nothing may still be in flight by then.
+    expect(db.events.get(SECOND_EVENT_ID)).toMatchObject({ status: 'DELIVERED', attemptCount: 1, leaseOwner: null });
+    expect(failure).toBeInstanceOf(AggregateError);
+    expect((failure as AggregateError).errors).toEqual([expect.objectContaining({ message: 'connection terminated' })]);
+    expect((failure as AggregateError).message).toBe('1 outbox deliveries failed: connection terminated');
   });
 
   it('never claims a leftover booking-request event', async () => {

@@ -19,8 +19,6 @@ const managedEnvironment = [
   'ALERT_WEBHOOK_REQUIRED',
   'ALERT_WEBHOOK_URL',
   'DATABASE_URL',
-  'LOG_CONSOLE',
-  'PRISMA_AUTO_DISCONNECT',
 ] as const;
 type ManagedEnvironmentName = typeof managedEnvironment[number];
 
@@ -85,8 +83,6 @@ describe.sequential('Airbnb calendar sync on PostgreSQL', () => {
     delete process.env.ALERT_WEBHOOK_REQUIRED;
     process.env.AIRBNB_ICAL_URL = FEED_URL;
     process.env.DATABASE_URL = target.databaseUrl;
-    process.env.LOG_CONSOLE = 'false';
-    process.env.PRISMA_AUTO_DISCONNECT = 'false';
     applicationPrisma = (await import('@/lib/prisma')).prisma;
   });
 
@@ -205,7 +201,7 @@ describe.sequential('Airbnb calendar sync on PostgreSQL', () => {
     expect(afterHttpFailure).toMatchObject({ consecutiveFailures: 1, lastErrorCode: 'http_status', lastHttpStatus: 503 });
     expect(afterHttpFailure.nextAttemptAt.getTime() - afterHttpFailure.lastFailureAt!.getTime()).toBe(30 * 60_000);
     expect(afterParseFailure).toMatchObject({ consecutiveFailures: 2, lastErrorCode: 'unsupported_value', lastHttpStatus: null });
-    expect(afterParseFailure.nextAttemptAt.getTime() - afterParseFailure.lastFailureAt!.getTime()).toBe(60 * 60_000);
+    expect(afterParseFailure.nextAttemptAt.getTime() - afterParseFailure.lastFailureAt!.getTime()).toBe(45 * 60_000);
   });
 
   it('opens the stale calendar alert for an old last success and resolves it after a fresh one', async () => {

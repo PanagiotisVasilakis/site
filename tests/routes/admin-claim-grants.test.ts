@@ -20,6 +20,7 @@ const ATTESTATION = 'b'.repeat(64);
 function issue(options: {
   url?: string;
   id?: string;
+  body?: unknown;
   headers?: Record<string, string>;
 }): Promise<Response> {
   const id = options.id ?? BOOKING_ID;
@@ -28,7 +29,7 @@ function issue(options: {
   const request = new NextRequest(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json', cookie: 'admin_jwt=signed', ...options.headers },
-    body: JSON.stringify({ channel: 'REMOTE' }),
+    body: JSON.stringify(options.body ?? { channel: 'REMOTE' }),
   });
   return POST(request, { params: Promise.resolve({ id }) });
 }
@@ -91,5 +92,26 @@ describe('admin claim-grant issuance origin and id checks', () => {
 
     expect(response.status).toBe(404);
     expect(mocks.issueBookingClaimGrant).not.toHaveBeenCalled();
+  });
+
+  it('answers 422 for an unknown body key instead of issuing a grant with the default lifetime', async () => {
+    const response = await issue({
+      body: { channel: 'REMOTE', ttlMinute: 5 },
+      headers: { origin: 'http://localhost:3000', host: 'localhost:3000' },
+    });
+
+    expect(response.status).toBe(422);
+    expect(JSON.stringify(await response.json())).toContain('unrecognized_keys');
+    expect(mocks.issueBookingClaimGrant).not.toHaveBeenCalled();
+  });
+
+  it('still accepts the body the admin page sends (channel and ttlMinutes)', async () => {
+    const response = await issue({
+      body: { channel: 'ONSITE', ttlMinutes: 30 },
+      headers: { origin: 'http://localhost:3000', host: 'localhost:3000' },
+    });
+
+    expect(response.status).toBe(201);
+    expect(mocks.issueBookingClaimGrant).toHaveBeenCalledWith(expect.objectContaining({ channel: 'ONSITE', ttlMinutes: 30 }));
   });
 });

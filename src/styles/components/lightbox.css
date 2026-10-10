@@ -96,11 +96,15 @@
   outline-color: var(--color-band-focus);
 }
 
-/* §5.7 fallback without View Transitions: a 200 ms crossfade in. During a photo View Transition (photoMorph.ts
-   sets html[data-vt="photo"]) the morph replaces it. Reduced motion: instant. */
+/* §5.7 fallback without View Transitions: a 200 ms crossfade in, only in browsers without the view-transition-name
+   property. Not keyed on the absence of html[data-vt="photo"]: that attribute is removed when the morph ends
+   (photoMorph.ts) while the dialog is still open, and such a rule would fade the open dialog a second time.
+   Reduced motion: instant. */
 @media (prefers-reduced-motion: no-preference) {
-  :root[data-motion="full"]:not([data-vt="photo"]) .lightbox[open] {
-    animation: lightbox-fade-in 200ms var(--ease-glide);
+  @supports not (view-transition-name: none) {
+    :root[data-motion="full"] .lightbox[open] {
+      animation: lightbox-fade-in 200ms var(--ease-glide);
+    }
   }
 
   :root[data-motion="full"][data-vt="photo"]::view-transition-group(gallery-photo) {

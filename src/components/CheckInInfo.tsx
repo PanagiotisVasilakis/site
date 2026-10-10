@@ -456,6 +456,7 @@ export default function CheckInInfo({
   const [arrivalRequestSuccess, setArrivalRequestSuccess] = useState('');
   const [arrivalRequestError, setArrivalRequestError] = useState('');
   const sessionRefreshStarted = useRef(false);
+  const wifiReloadMissed = useRef(false);
 
   useEffect(() => {
     const loadPreferences = async () => {
@@ -496,6 +497,27 @@ export default function CheckInInfo({
     };
     loadArrivalRequest();
   }, []);
+
+  // R-391: the preferences are fetched once and the server adds the Wi-Fi details only after
+  // wifiAvailableAt, so a page left open before then reloads one second after it (the server
+  // guard also renews an expired session). Not while an arrival request is being typed, after
+  // that time (the reload would get the same answer, in a loop) or beyond the 32-bit timer
+  // limit (a browser fires such a timer at once). R-619: if the form was open while that time
+  // was still ahead and is closed after it, the reload is owed once; wifiReloadMissed records
+  // that, and a page loaded after the time starts with it false, so it never reloads.
+  useEffect(() => {
+    if (wifiNetwork || !wifiAvailableAt) return;
+    const delay = new Date(wifiAvailableAt).getTime() - Date.now();
+    if (isRequestingArrival) {
+      if (delay > 0) wifiReloadMissed.current = true;
+      return;
+    }
+    if (!(delay > 0) && !wifiReloadMissed.current) return;
+    const reloadIn = Math.max(0, delay + 1_000);
+    if (reloadIn > 2_147_483_647) return;
+    const timer = window.setTimeout(() => window.location.reload(), reloadIn);
+    return () => window.clearTimeout(timer);
+  }, [wifiAvailableAt, wifiNetwork, isRequestingArrival]);
 
   const copyToClipboard = async (text: string, target: CopyTarget) => {
     try {

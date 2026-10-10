@@ -3,8 +3,8 @@
 // a snapshot that only a successful sync replaces. Runs are serialised by a
 // short lease on the row, claimed and released with conditional updateMany
 // calls; the download and parsing run outside any transaction. A failed run
-// keeps the last good snapshot, records a code (never the URL or upstream
-// text) and backs off. Only database errors propagate.
+// keeps the last good snapshot and records a code (never the URL or upstream
+// text); a failed scheduled run also backs off. Only database errors propagate.
 
 import { randomUUID } from 'node:crypto';
 
@@ -22,7 +22,7 @@ const LEASE_MS = 60_000;
 /** A manual run starts at most this long after the last attempt (the admin route's Retry-After). */
 export const MANUAL_MIN_INTERVAL_MS = 60_000;
 const SYNC_INTERVAL_MINUTES = 30;
-const MAX_BACKOFF_MINUTES = 240;
+const MAX_BACKOFF_MINUTES = 45;
 const MAX_STORED_NIGHTS = 400; // calendar_sync_state_blocked_nights_check
 
 type CalendarSyncResult =
@@ -63,26 +63,38 @@ function failureOf(error: unknown): Failure {
   if (error instanceof CalendarFetchError) {
     return isRecordableHttpStatus(error.httpStatus) ? { code: error.code, httpStatus: error.httpStatus } : { code: error.code };
   }
-  if (error instanceof IcalParseError) return { code: error.code };
+  if (error instanceof IcalParseError) {
+    // A line number is not feed content; it is the only pointer to what the parser rejected.
+    logger.warn('Airbnb calendar feed did not parse', { code: error.code, line: error.line ?? null });
+    return { code: error.code };
+  }
   return { code: 'unexpected' };
 }
 
-async function recordFailure(leaseOwner: string, now: Date, failure: Failure): Promise<CalendarSyncResult> {
+async function recordFailure(
+  leaseOwner: string,
+  now: Date,
+  failure: Failure,
+  trigger: 'scheduled' | 'manual',
+): Promise<CalendarSyncResult> {
   const state = await prisma.calendarSyncState.findUnique({
     where: { id: CALENDAR_SYNC_STATE_ID },
     select: { consecutiveFailures: true },
   });
   if (!state) throw new Error('The calendar_sync_state row is missing');
-  // The first failure keeps the normal interval; each further one doubles it, up to four hours.
+  // The first failure keeps the normal interval; each further one doubles it, up to 45 minutes (30, 45,
+  // 45, ...), so a recovered feed is retried before the stale alert (CALENDAR_STALE_ALERT_MINUTES) opens.
   const backoffMinutes = Math.min(SYNC_INTERVAL_MINUTES * 2 ** state.consecutiveFailures, MAX_BACKOFF_MINUTES);
+  // Decision O64: only scheduled runs feed the backoff. A failed manual run records the error and leaves
+  // consecutiveFailures and nextAttemptAt alone, so a few retries by the host cannot postpone the automatic sync.
+  const feedsBackoff = trigger === 'scheduled';
   const written = await prisma.calendarSyncState.updateMany({
     where: { id: CALENDAR_SYNC_STATE_ID, leaseOwner },
     data: {
       lastFailureAt: now,
       lastErrorCode: failure.code,
       lastHttpStatus: failure.httpStatus ?? null,
-      consecutiveFailures: { increment: 1 },
-      nextAttemptAt: minutesAfter(now, backoffMinutes),
+      ...(feedsBackoff ? { consecutiveFailures: { increment: 1 }, nextAttemptAt: minutesAfter(now, backoffMinutes) } : {}),
       leaseOwner: null,
       leaseExpiresAt: null,
     },
@@ -92,7 +104,7 @@ async function recordFailure(leaseOwner: string, now: Date, failure: Failure): P
     status: 'failed',
     code: failure.code,
     httpStatus: failure.httpStatus ?? null,
-    consecutiveFailures: state.consecutiveFailures + 1,
+    consecutiveFailures: state.consecutiveFailures + (feedsBackoff ? 1 : 0),
   });
   return { status: 'failed', ...failure };
 }
@@ -107,7 +119,9 @@ function leaseLost(): CalendarSyncResult {
  * nextAttemptAt is due; a manual run (the admin) at most once a minute.
  * Neither runs while another run holds the lease. On success the snapshot
  * replaces the stored nights; lastFailureAt is kept as history, while
- * consecutiveFailures, lastErrorCode and lastHttpStatus are cleared.
+ * consecutiveFailures, lastErrorCode and lastHttpStatus are cleared. A failed
+ * manual run records the error but leaves consecutiveFailures and
+ * nextAttemptAt unchanged; only scheduled runs back off.
  */
 export async function syncAirbnbCalendar({ trigger }: { trigger: 'scheduled' | 'manual' }): Promise<CalendarSyncResult> {
   const url = process.env.AIRBNB_ICAL_URL;
@@ -148,7 +162,19 @@ export async function syncAirbnbCalendar({ trigger }: { trigger: 'scheduled' | '
   } catch (error) {
     outcome = failureOf(error);
   }
-  if (!('nights' in outcome)) return recordFailure(leaseOwner, now, outcome);
+  if (!('nights' in outcome)) return recordFailure(leaseOwner, now, outcome, trigger);
+
+  // Decision O47: a scheduled run never replaces stored future nights with an empty calendar; only 'Sync now' may.
+  if (trigger === 'scheduled' && outcome.nights.length === 0) {
+    const stored = await prisma.calendarSyncState.findUnique({
+      where: { id: CALENDAR_SYNC_STATE_ID },
+      select: { blockedNights: true },
+    });
+    const todayDb = toDbDate(today).getTime();
+    if (stored?.blockedNights.some((night) => night.getTime() >= todayDb)) {
+      return recordFailure(leaseOwner, now, { code: 'empty_feed' }, trigger);
+    }
+  }
 
   const written = await prisma.calendarSyncState.updateMany({
     where: { id: CALENDAR_SYNC_STATE_ID, leaseOwner },

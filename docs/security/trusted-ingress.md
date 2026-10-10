@@ -18,7 +18,7 @@ may be retained as a bounded correlation value, but it is not identity.
 
 | Consumer | Current source | Security impact | Required behavior |
 | --- | --- | --- | --- |
-| `sensitiveRateLimit` and admin login, portal claim exchange/claims/sessions, client-error and CSP-report writes | `requireCanonicalClientIp` | Durable limiter key and mutation admission | Require both private headers; generic `503` and zero write otherwise |
+| `sensitiveRateLimit` and admin login, portal claim exchange/claims/sessions/refresh, client-error and CSP-report writes | `requireCanonicalClientIp` | Durable limiter key and mutation admission | Require both private headers; generic `503` and zero write otherwise |
 | `portalAuthHttp` claim/login/refresh/session issuance | `requireCanonicalClientIp` | Session/refresh context binding | Fail before any session, refresh-family or cookie mutation |
 | `security-middleware-edge` CORS diagnostics and forwarded-protocol eligibility | `getClientIp` | Security-event correlation and permission to consider Nginx-overwritten protocol data | Verified identity or `unknown`; never use public forwarding headers as identity |
 | client error and CSP persistence diagnostics | `getClientIp` after the sensitive limiter | Privacy HMAC/hash input | Verified identity only; never store a raw public candidate |

@@ -96,6 +96,7 @@ describe('API response and deadline middleware', () => {
     const response = createSuccessResponse({ accepted: true }, 201, 'correlation-1');
     expect(response.status).toBe(201);
     expect(response.headers.get('x-correlation-id')).toBe('correlation-1');
+    expect(response.headers.get('cache-control')).toBe('no-store');
     const body = await response.json();
     expect(body).toEqual(expect.objectContaining({
       success: true,

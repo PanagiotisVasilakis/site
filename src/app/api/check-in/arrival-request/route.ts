@@ -7,13 +7,14 @@ import { checkInRequestRepository, type CheckInRequestRecord } from '@/lib/prism
 import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 import { timePattern } from '@/lib/propertyTime';
 import { createPortalBookingEligibilityWindow } from '@/lib/portalBookingEligibility';
+import { logger } from '@/lib/logger-enterprise';
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const requestSchema = z.object({
   requestedTime: z.string().regex(timePattern, 'Requested time must be in HH:MM format'),
   message: z.string().trim().max(500, 'Message must be 500 characters or fewer').optional(),
-});
+}).strict();
 
 export const dynamic = 'force-dynamic';
 
@@ -91,8 +92,15 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     eventType: 'check_in_time_request.created',
     nextStatus: 'PENDING',
   });
+  // The request and its outbox event are committed: the immediate delivery is best-effort and the outbox worker retries it.
   const delivered = created.notificationEventId
-    ? await (await import('@/lib/bookingOutbox')).deliverOutboxEvent(created.notificationEventId)
+    ? await (await import('@/lib/bookingOutbox')).deliverOutboxEvent(created.notificationEventId).catch((error: unknown) => {
+        logger.warn('Immediate outbox delivery failed', {
+          eventId: created.notificationEventId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return false;
+      })
     : false;
   const notification = !created.created
     ? { status: 'skipped' as const, reason: 'request_already_pending' }

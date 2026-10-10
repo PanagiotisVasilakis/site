@@ -242,6 +242,7 @@
 
 /* SummaryCard: surface, radius-dialog, shadow-raised; sticky at ≥ lg (see .planner__summary) */
 .summary-card {
+  scroll-margin-top: calc(var(--header-offset) + var(--header-h) + 16px);
   display: grid;
   gap: 14px;
   padding: 22px 20px;
@@ -354,6 +355,17 @@
 .quote-bar .quote-bar__text { min-width: 0; margin: 0; font-size: .9375rem; font-weight: 600; font-variant-numeric: tabular-nums lining-nums; }
 @media (min-width: 1024px) {
   .quote-bar { display: none; }
+}
+/* Below 640 px the fixed network-status pill (layout.tsx, 8-48 px from the left edge) sits over the bar's left end */
+@media (max-width: 639px) {
+  .quote-bar { padding-left: 56px; }
+}
+/* The footer and keyboard focus clear the shown QuoteBar, as the BookBar does (shell.css; WCAG 2.4.11). The doubled
+   class gives the scroll-padding selector specificity (0,3,0), like shell.css's :root:has(.bookbar.is-shown), so below
+   640 px it wins over the later :root:has(.net-status) { scroll-padding-bottom: 56px; } in stay.css (0,2,0) */
+@media (max-width: 1023.98px) {
+  :root:has(.quote-bar) .site-footer.site-footer { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  :root:has(.quote-bar.quote-bar) { scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 }
 
 /* No-JS list of the next nights (rendered inside <noscript>) */

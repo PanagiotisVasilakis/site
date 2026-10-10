@@ -113,6 +113,10 @@ async function notifyAlert(input: {
   value: number;
   openedAt: Date;
 }): Promise<void> {
+  // The workers never run the environment schema, so the production HTTPS rule is enforced here, before the bearer token is attached.
+  if (process.env.NODE_ENV === 'production' && new URL(input.url).protocol !== 'https:') {
+    throw new Error('ALERT_WEBHOOK_URL must use HTTPS in production');
+  }
   const headers: HeadersInit = { 'content-type': 'application/json' };
   if (process.env.ALERT_WEBHOOK_TOKEN) headers.authorization = `Bearer ${process.env.ALERT_WEBHOOK_TOKEN}`;
   const response = await fetch(input.url, {

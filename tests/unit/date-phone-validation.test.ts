@@ -17,6 +17,24 @@ describe('Wi-Fi disclosure window', () => {
     expect(window.expiresAt.toISOString()).toBe('2026-07-25T08:00:00.000Z');
   });
 
+  // Check-in 15:00 and check-out 11:00 Athens; the details show 24 h of elapsed time before check-in.
+  it.each([
+    ['winter (UTC+2)', '2027-01-10', '2027-01-15', '2027-01-09T13:00:00.000Z', '2027-01-15T09:00:00.000Z'],
+    ['check-in on the fall-back day', '2026-10-25', '2026-10-28', '2026-10-24T13:00:00.000Z', '2026-10-28T09:00:00.000Z'],
+    ['check-in on the spring-forward day', '2027-03-28', '2027-03-31', '2027-03-27T12:00:00.000Z', '2027-03-31T08:00:00.000Z'],
+    ['check-out on the spring-forward day', '2027-03-25', '2027-03-28', '2027-03-24T13:00:00.000Z', '2027-03-28T08:00:00.000Z'],
+  ])('computes the window for %s', (_label, start, end, reveal, expiry) => {
+    const window = wifiDisclosureWindow({
+      startDate: new Date(`${start}T00:00:00.000Z`),
+      endDate: new Date(`${end}T00:00:00.000Z`),
+      checkInTime: '15:00',
+      checkOutTime: '11:00',
+      timeZone: 'Europe/Athens',
+    });
+    expect(window.revealAt.toISOString()).toBe(reveal);
+    expect(window.expiresAt.toISOString()).toBe(expiry);
+  });
+
   it('rejects invalid property wall-clock times', () => {
     expect(() => wifiDisclosureWindow({
       startDate: new Date('2030-01-01'),
@@ -38,7 +56,7 @@ describe('phone and guest form validation', () => {
     expect(normalizePhone(input, origin)?.e164).toBe(expected);
   });
 
-  it.each(['', '123', '+1', '++30698', 'abcd', '+03012345678'])('rejects invalid phone %s', (input) => {
+  it.each(['', '123', '+1', '++30698', 'abcd', '+03012345678', '0123456789'])('rejects invalid phone %s', (input) => {
     expect(normalizePhone(input, 'GR')).toBeNull();
   });
 

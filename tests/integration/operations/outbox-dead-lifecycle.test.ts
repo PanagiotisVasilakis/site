@@ -16,8 +16,6 @@ const managedEnvironment = [
   'ALERT_WEBHOOK_REQUIRED',
   'ALERT_WEBHOOK_URL',
   'DATABASE_URL',
-  'LOG_CONSOLE',
-  'PRISMA_AUTO_DISCONNECT',
 ] as const;
 type ManagedEnvironmentName = typeof managedEnvironment[number];
 
@@ -73,8 +71,6 @@ describe.sequential('DEAD outbox event lifecycle on PostgreSQL', () => {
     delete process.env.ALERT_WEBHOOK_URL;
     delete process.env.ALERT_WEBHOOK_REQUIRED;
     process.env.DATABASE_URL = target.databaseUrl;
-    process.env.LOG_CONSOLE = 'false';
-    process.env.PRISMA_AUTO_DISCONNECT = 'false';
     applicationPrisma = (await import('@/lib/prisma')).prisma;
   });
 

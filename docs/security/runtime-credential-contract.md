@@ -19,6 +19,23 @@ two values. Each value must be generated from at least 32 random bytes and
 injected only at runtime. The repository never generates production
 credentials.
 
+The peppers `SECURITY_PEPPER` and `CLAIM_TOKEN_PEPPER` are not credentials of this
+map. In production, start-up rejects a pepper that is a repeated pattern,
+placeholder-like (`replace`, `changeme`, `placeholder`, `example`) or equal to one
+of the three values above (`src/lib/runtime-env-schema.js`).
+
+Rotating a pepper has visible effects. `SECURITY_PEPPER` keys the stored hashes
+of guest refresh tokens (`src/lib/crypto.ts`): after a rotation no stored
+refresh token verifies, so every guest signs in again when the current session
+ends. It also keys the MAC of the claim exchange cookie
+(`src/lib/portalClaimExchange.ts`), so a claim whose exchange came before the
+rotation fails once with `401` and the guest enters the token again, and the
+privacy HMACs (`src/lib/privacyHash.ts`): rate-limit buckets start empty, and
+hashed client addresses and device hints written before no longer match new
+ones. `CLAIM_TOKEN_PEPPER` keys the stored digest of every claim grant
+(`src/lib/portalAuthService.ts`): after a rotation no unconsumed grant can be
+claimed, and the host issues new grants.
+
 The retired names `JWT_SECRET`, `SESSION_SECRET`, `SECURITY_ENC_KEY_HEX`, and
 `SECURITY_ENC_KEY_HEX_PREVIOUS` have no executable consumer and are not part of
 the deployment contract. Do not recreate a consumer or alias to retain them.

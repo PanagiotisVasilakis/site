@@ -55,12 +55,13 @@ development resources for other hosts, and pages would not hydrate.
 
 ## Required runtime configuration
 
-The authoritative schema is `src/lib/runtime-env-schema.js`; `src/lib/env.ts` is its TypeScript validation wrapper. Required for the application:
+The authoritative schema is `src/lib/runtime-env-schema.js`; `scripts/start-standalone.mjs` validates the environment before it loads `server.js` and exits 78 on a schema failure. Required for the application:
 
-- `DATABASE_URL`
+- `DATABASE_URL`, without an `options` query parameter: the application pins every database session to `TimeZone=UTC` through the PostgreSQL `options` startup parameter (`src/lib/prismaPgConfig.ts`), and node-postgres lets an `options` value in the URL replace that pin
 - independently generated `ADMIN_JWT_SECRET`, `ADMIN_DASH_SECRET`, and
   `GUEST_JWT_SECRET`
 - `SECURITY_PEPPER` (at least 16 characters) and `CLAIM_TOKEN_PEPPER` (at least 32 characters); use `openssl rand -hex 32` for both (`npm run ensure-pepper` generates 64 hex characters for each locally). Neither falls back to the other or to a built-in value
+- in production, start-up also rejects (exit 78) a `SECURITY_PEPPER` or `CLAIM_TOKEN_PEPPER` that is a repeated pattern, contains `replace`, `changeme`, `placeholder` or `example` (any case), or equals `ADMIN_JWT_SECRET`, `GUEST_JWT_SECRET` or `ADMIN_DASH_SECRET`; the two peppers are not compared with each other
 - `GUEST_WIFI_NETWORK`, `GUEST_WIFI_PASSWORD`
 
 Production additionally requires:
@@ -76,6 +77,8 @@ production webhook URLs must use HTTPS.
 Optional `AIRBNB_ICAL_URL` is the Airbnb calendar export URL (`https://www.airbnb.com/calendar/ical/<listing id>.ics?s=<token>`), read server-side only by the calendar sync (see "Operational workers"); without it the availability page shows no calendar or prices, only a notice and the contact options. It is a secret (the `s` query parameter is a token): set it only in the production environment and never commit or log it. The schema accepts only https on the default port, no userinfo, the hosts `www.airbnb.com`, `airbnb.com`, `www.airbnb.gr`, `airbnb.gr`, and the path `/calendar/ical/<digits>.ics`.
 
 Optional `CARTO_BASEMAPS_KEY` (https://carto.com/basemaps/apikey/) is read server-side at request time and sent to browsers in the map tile URLs (CARTO Voyager in light, Dark Matter in dark); without it the map uses the standard OpenStreetMap tiles in both themes. It is public by design but should not be logged; restrict it to the site domain in the CARTO dashboard.
+
+Optional `LOG_LEVEL` accepts `trace`, `debug`, `info`, `warn` or `error`; the production start-up validation (`scripts/start-standalone.mjs`) rejects any other value, including `fatal`.
 
 Never place secrets in `NEXT_PUBLIC_*` variables.
 See `docs/security/runtime-credential-contract.md` for the production strength,
@@ -147,7 +150,7 @@ the approved SHA:
 NEXT_PUBLIC_SITE_URL=https://localhost:3002 npm run docker:build      # smoke build, same tags
 npm run smoke:image                                                    # mandatory; stop on any FAIL
 NEXT_PUBLIC_SITE_URL=https://your-host.example npm run docker:build   # villa-app:<sha>, -workers, -migrate
-npm run docker:scan                                                    # Trivy or Docker Scout, all three
+npm run docker:scan                                                    # pinned Trivy container, else host Trivy or Docker Scout; all three
 docker save villa-app:<sha> villa-app:<sha>-workers villa-app:<sha>-migrate | gzip > release-<sha>.tar.gz
 ```
 
@@ -183,9 +186,25 @@ ALTER DEFAULT PRIVILEGES FOR ROLE qr_migrator IN SCHEMA public
 ```
 
 `MIGRATE_ENV_FILE` then uses `qr_migrator` and `APP_ENV_FILE` uses `qr_app`.
-Default privileges apply only to objects created later: for a database already
-migrated by another role, grant on the existing tables and sequences or
-reassign their ownership to `qr_migrator` first. The production-image smoke
+Default privileges apply only to objects created later. For a database already
+migrated by another role, do both, in that database, before the first `migrate`:
+`REASSIGN OWNED BY <old role> TO qr_migrator;` (tables including `_prisma_migrations`,
+sequences, types, functions), then
+`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO qr_app;` and
+`GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO qr_app;`.
+
+PostgreSQL refuses `REASSIGN OWNED BY` for its bootstrap superuser
+(`cannot reassign ownership of objects owned by role ... because they are required by the database system`),
+and in the bundled PostgreSQL that superuser is `POSTGRES_USER`, usually the old
+role. In that case change the owners one by one instead, in the same database:
+`ALTER TABLE <table> OWNER TO qr_migrator;` for every table in schema `public`,
+`_prisma_migrations` included (a sequence owned by a table column moves with its
+table), and `ALTER TYPE <type> OWNER TO qr_migrator;` for every enum type in
+schema `public`; or restore a dump taken with `pg_dump --no-owner` while
+connected as `qr_migrator`. Then run the two `GRANT` statements above. Try this
+on a scratch copy of the database first.
+
+The production-image smoke
 uses one role for both files, so this two-role setup is not yet tested.
 
 The application is published on `127.0.0.1:${WEB_PORT:-3000}` only; Nginx is the
@@ -206,6 +225,32 @@ Keep the previous image reference until the new web container is healthy; rollin
 back means exporting the previous `APP_IMAGE` and `$C up -d web` (migrations are
 forward-only, so roll back only to a release that ran on the same schema).
 
+**Feature flags after the first migrate.** A database migrated from empty has the
+guest portal and check-in switched on: the migration
+`20260714090000_comprehensive_remediation` seeds the `feature_flags` setting with
+both flags `true`, and the production default of off applies only when that row is
+missing. Switch them off in `/admin/settings` right after `up -d --wait web` if the
+launch should be dark.
+
+**Upgrading a database that already holds data** (not yet exercised on this project;
+try it on a scratch database first). Some migrations refuse to drop data
+(`RAISE EXCEPTION 'Refusing to ...'`) and are applied one by one, so check the
+database before `run --rm migrate`; every count must be 0:
+
+```bash
+$C exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT
+  (SELECT count(*) FROM users) AS users,                                       -- 20260930120000
+  (SELECT count(*) FROM bookings WHERE reference IS NOT NULL) AS booking_refs,  -- 20260929120000
+  (SELECT count(*) FROM stay_requests) AS stay_requests,                       -- 20260928215800
+  (SELECT count(*) FROM outbox_events WHERE destination = 'booking_request_webhook'
+     OR aggregate_type = 'stay_request') AS booking_events;"
+```
+
+Run it only against a database that predates these migrations, since the queried
+columns disappear. A non-zero count needs an export or retention decision and
+explicit SQL first. After a refused run, mark it rolled back before retrying:
+`$C --profile ops run --rm migrate node node_modules/prisma/build/index.js migrate resolve --rolled-back <migration name>`.
+
 **Worker schedule.** The workers are one-off services of the same Compose file;
 run them from host timers with single-flight and bounded execution, e.g. root's crontab:
 
@@ -214,10 +259,15 @@ run them from host timers with single-flight and bounded execution, e.g. root's 
 */5 * * * * cd /opt/qr-city-guide && flock -n /run/lock/qr-operations.lock timeout 280 docker compose -f docker/docker-compose.prod.yml --profile ops run --rm --no-deps operations
 ```
 
-Each run prints one JSON line (or a `failed` event on stderr and exit 1); cron
-delivers both to syslog/journald. `--no-deps` keeps a database outage from
-restarting `db` from a timer. The alert path is the operations worker's
-`ALERT_WEBHOOK_URL`, independent of the failed job.
+Each run prints one JSON line (or a `failed` event on stderr and exit 1). Cron
+mails that output or drops it; append `2>&1 | logger -t qr-<worker>` (or use
+systemd timers) to get it into journald. `| logger` hides the job's exit status
+unless pipefail is set, so the pipeline can look successful to cron when the job
+failed. Cron does not inherit the operator shell, so `APP_IMAGE` and `APP_ENV_FILE`
+must be in the root-owned `.env`. `--no-deps` keeps a database outage from
+restarting `db` from a timer. The operations worker's `ALERT_WEBHOOK_URL` reports a
+failing outbox job, but nothing reports an operations job that fails or does not
+run; watch it from outside.
 
 **Production-image smoke (mandatory).** `npm run smoke:image` starts the three
 images of the checked-out commit with the same Compose file as an isolated
@@ -250,15 +300,15 @@ Both exit when their run finishes: they disconnect Prisma explicitly, which is
 what lets the process exit (idle pool connections would otherwise keep it alive
 for up to 300 s).
 
-The outbox worker uses bounded attempts, exponential backoff, leases, abandoned-lease recovery, and a terminal `DEAD` state. The operations worker evaluates database alert rules, retries failed alert notifications, applies retention, and syncs the Airbnb calendar when `AIRBNB_ICAL_URL` is set (a scheduled fetch at most every 30 minutes, backing off up to four hours after repeated failures; the admin can also start one manually, at most once a minute). The "Stale availability calendar" alert opens after three hours without a successful sync. A missing required alert webhook makes the operations run fail. A `DEAD` event opens the "Dead outbox events" alert until it is handled: "Retry notification" (arrival requests) requeues it, and retention deletes it after 30 days. Events cancelled by a guest erasure are `DEAD` by design; they never open the alert and are deleted on the next operations run.
+The outbox worker uses bounded attempts, exponential backoff, leases, abandoned-lease recovery, and a terminal `DEAD` state. The operations worker first syncs the Airbnb calendar when `AIRBNB_ICAL_URL` is set (a scheduled fetch at most every 30 minutes, backing off up to 45 minutes after repeated failures; the admin can also start one manually, at most once a minute), and only then evaluates database alert rules, retries failed alert notifications and applies retention, so the stale-calendar alert reads the state the same run leaves behind. A scheduled sync can fail with `empty_feed` (keeping the stored snapshot) when the calendar has no blocked nights from today on but the snapshot still has some; "Sync now" accepts a genuinely empty calendar. The "Stale availability calendar" alert opens after three hours without a successful sync. A missing required alert webhook makes the operations run fail. A `DEAD` event opens the "Dead outbox events" alert until it is handled: "Retry notification" (arrival requests) requeues it, and retention deletes it after 30 days. Events cancelled by a guest erasure are `DEAD` by design; they never open the alert and are deleted on the next operations run.
 
-Guest data retention (`GUEST_DATA_RETENTION_MONTHS` in `src/data/stayPolicy.ts`, 12 months after the booking end date; the accountant still has to confirm that tax retention needs nothing longer): each operations run clears the name, e-mail, phone and message of check-in requests whose booking ended that long ago, and erases, through the same audited path as the admin "Erase guest" action (privacy request with an automatic-retention note, `privacy.erasure.completed` audit event), up to 25 guest accounts whose every booking ended that long ago. Bookings stay, unlinked, with their platform reservation code. Each erasure re-checks the cutoff inside its transaction, so a guest who claims a new booking between selection and erasure is skipped (counted as `guestErasuresSkipped`) and keeps the account. A failed erasure makes the run fail after the rest of the batch has been attempted.
+Guest data retention (`GUEST_DATA_RETENTION_MONTHS` in `src/data/stayPolicy.ts`, 12 months after the booking end date; the accountant still has to confirm that tax retention needs nothing longer): each operations run clears the name, e-mail, phone and message of check-in requests whose booking ended that long ago, and erases, through the same audited path as the admin "Erase guest" action (privacy request with an automatic-retention note, `privacy.erasure.completed` audit event), up to 25 guest accounts whose every booking ended that long ago. Bookings stay, unlinked, with their platform reservation code. An erasure, by the admin or by retention, also sets the guest's pending arrival request to REJECTED; the request keeps its booking link, so the booking can receive a new request. Each erasure re-checks the cutoff inside its transaction, so a guest who claims a new booking between selection and erasure is skipped (counted as `guestErasuresSkipped`) and keeps the account. A failed erasure makes the run fail after the rest of the batch has been attempted.
 
 ## Troubleshooting
 
 - Version error: switch the active shell to Node 22.19/npm 11.18 and reinstall with `npm ci`.
 - A style sheet newly `@import`ed into `src/app/globals.css` is missing from a local `npm run build`: a stale Turbopack cache can drop it. Delete `.next/cache/turbopack` before the build whenever a change adds such an import. Docker builds start without `.next` (`.dockerignore`), so they are not affected.
-- Readiness fails: inspect the SQL error and migration state; liveness alone does not prove the app is ready.
+- Readiness fails (503): the web log names the cause in one warn line: `Readiness: database check failed` (the check threw: no SQL connection, a statement timeout, no `_prisma_migrations` table because the database was never migrated (run the migrate service), or no privilege to read that table; the line carries only the error name, so run the readiness query of `src/app/api/health/ready/route.ts` by hand as the application's database role to see which), `Readiness: expected migration is not applied` (run the migrate service), or `Readiness: database schema is newer than this image` (a newer migration is applied; deploy the image that ships it). Liveness alone does not prove the app is ready.
 - Production proxy validation fails: verify the Cloudflare source allowlist,
   Nginx header overwrite, and private attestation contract; do not trust a
   public forwarding header directly.

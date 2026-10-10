@@ -85,4 +85,40 @@ describe('operational alert webhook redirects', () => {
     expect(data.notificationLastError).not.toContain(receiver.host);
     expect(data.notificationLastError).not.toContain(TOKEN);
   });
+
+  it.each([
+    ['an http:// URL', 'http://alerts.example.test/hook', 'ALERT_WEBHOOK_URL must use HTTPS in production'],
+    ['an unparsable URL', 'alerts.example.test/hook', 'Invalid URL'],
+  ])('refuses %s in production before sending the alert or its token', async (_label, url, lastError) => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('ALERT_WEBHOOK_URL', url);
+    vi.stubEnv('ALERT_WEBHOOK_TOKEN', TOKEN);
+    // Without the guard this receiver would accept the alert and the bearer token.
+    fetchMock.mockResolvedValue(new Response('', { status: 200 }));
+
+    await expect(evaluateOperationalAlerts()).rejects.toThrow('1 operational alert notification(s) failed');
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(prismaMock.alert.update).toHaveBeenCalledTimes(1);
+    const { data } = prismaMock.alert.update.mock.calls[0][0];
+    expect(data).not.toHaveProperty('notificationDeliveredAt');
+    expect(data).toMatchObject({ notificationAttempts: { increment: 1 }, notificationLastError: lastError });
+  });
+
+  it('still sends the alert over HTTPS in production', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('ALERT_WEBHOOK_URL', 'https://alerts.example.test/hook');
+    vi.stubEnv('ALERT_WEBHOOK_TOKEN', TOKEN);
+    fetchMock.mockResolvedValue(new Response('', { status: 200 }));
+
+    await expect(evaluateOperationalAlerts()).resolves.toMatchObject({ opened: 1 });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe('https://alerts.example.test/hook');
+    expect(prismaMock.alert.update.mock.calls[0][0].data).toMatchObject({ notificationDeliveredAt: expect.any(Date), notificationLastError: null });
+  });
 });

@@ -85,6 +85,14 @@ function lastTiles() {
   return tileCalls.at(-1);
 }
 
+function stubOsColorScheme(dark: boolean) {
+  vi.stubGlobal('matchMedia', () => ({
+    matches: dark,
+    addEventListener() {},
+    removeEventListener() {},
+  }));
+}
+
 describe('LeafletMap tile source', () => {
   beforeEach(() => {
     tileCalls.length = 0;
@@ -129,6 +137,27 @@ describe('LeafletMap tile source', () => {
       url: `https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=${KEY}`,
       attribution: CARTO_ATTRIBUTION,
     });
+  });
+
+  // R-378: an explicit Day choice (data-theme="light") decides the basemap even on a dark OS, as it does for
+  // the page tokens; only without a choice (Auto, no attribute) does the OS colour scheme apply.
+  it('uses CARTO Voyager for an explicit Day choice on a dark OS', () => {
+    document.documentElement.setAttribute('data-theme', 'light');
+    stubOsColorScheme(true);
+    renderMap(KEY);
+    expect(lastTiles()).toEqual({
+      url: `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${KEY}`,
+      attribution: CARTO_ATTRIBUTION,
+    });
+  });
+
+  it.each([
+    [true, 'dark_all'],
+    [false, 'rastertiles/voyager'],
+  ])('follows the OS colour scheme (dark: %s) without an explicit choice', (osDark, style) => {
+    stubOsColorScheme(osDark);
+    renderMap(KEY);
+    expect(lastTiles()?.url).toBe(`https://basemaps.cartocdn.com/${style}/{z}/{x}/{y}{r}.png?key=${KEY}`);
   });
 
   it('keeps the key when the theme switches at runtime', async () => {

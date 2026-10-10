@@ -4,10 +4,7 @@ import type { Prisma } from '@/generated/prisma/client';
 import { logger } from '@/lib/logger-enterprise';
 import { buildPrismaPgAdapterArgs } from '@/lib/prismaPgConfig';
 
-type ExtendedGlobal = typeof globalThis & {
-  __prisma__?: PrismaClient;
-  __prismaShutdownHooksRegistered__?: boolean;
-};
+type ExtendedGlobal = typeof globalThis & { __prisma__?: PrismaClient };
 
 type PrismaClientWithEvents = PrismaClient & {
   $on(event: 'query', callback: (event: Prisma.QueryEvent) => void): void;
@@ -138,65 +135,3 @@ export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
     return true;
   },
 });
-
-function registerPrismaShutdownHooks(client: PrismaClient): void {
-  if (typeof process === 'undefined') {
-    return;
-  }
-
-  let disconnecting = false;
-
-  const cleanup = async (trigger: string): Promise<void> => {
-    if (disconnecting) return;
-    disconnecting = true;
-
-    try {
-      if (logPrismaLifecycle) {
-        logger.info('Disconnecting Prisma client', { trigger });
-      }
-      if (client && typeof client.$disconnect === 'function') {
-        await client.$disconnect();
-      } else {
-        logger.debug('Prisma client not initialized; skipping disconnect', { trigger });
-      }
-    } catch (disconnectError) {
-      logger.error('Failed to disconnect Prisma client cleanly', { trigger }, disconnectError);
-    }
-  };
-
-  const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
-  if (process.platform !== 'win32') {
-    signals.push('SIGQUIT');
-  }
-
-  const exitCodes: Record<string, number> = {
-    SIGINT: 130,
-    SIGTERM: 143,
-    SIGQUIT: 131,
-  };
-
-  process.once('beforeExit', () => {
-    void cleanup('beforeExit');
-  });
-
-  for (const signal of signals) {
-    process.once(signal, () => {
-      void cleanup(signal).finally(() => {
-        const exitCode = exitCodes[signal] ?? 0;
-        process.exit(exitCode);
-      });
-    });
-  }
-}
-
-if (!globalThisWithPrisma.__prismaShutdownHooksRegistered__) {
-  // Only register shutdown hooks when a real Prisma client instance is present.
-  // During build/generate steps DATABASE_URL may be missing and prisma is left undefined.
-  // Guarding avoids attempting to disconnect a non-initialized client on SIGINT during build.
-  const possiblePrisma = globalThisWithPrisma.__prisma__ as unknown;
-  const hasClient = Boolean(possiblePrisma && typeof (possiblePrisma as { $disconnect?: unknown })?.$disconnect === 'function');
-  if (hasClient) {
-    registerPrismaShutdownHooks(prisma);
-    globalThisWithPrisma.__prismaShutdownHooksRegistered__ = true;
-  }
-}

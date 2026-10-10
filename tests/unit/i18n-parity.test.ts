@@ -47,4 +47,16 @@ describe('dictionary parity', () => {
 
     expect(denormalized).toEqual([]);
   });
+
+  it('uses the same placeholders in English and Greek', () => {
+    const strings = (value: unknown, path: string, out: Map<string, string>) => {
+      if (typeof value === 'string') out.set(path, value);
+      else if (value && typeof value === 'object') for (const [key, entry] of Object.entries(value)) strings(entry, `${path}.${key}`, out);
+      return out;
+    };
+    const names = (text = '') => [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(',');
+    const en = strings(getDictionary('en'), '', new Map());
+    const el = strings(getDictionary('el'), '', new Map());
+    expect([...en].filter(([path, text]) => names(text) !== names(el.get(path)))).toEqual([]);
+  });
 });

@@ -1,7 +1,7 @@
 // The apartment page photo set (identity §7.3): 25 marketing photos per room, in order, with the crops.
 // Left out on purpose: living_3 (branded packaging), living_1_booking (duplicate), bedroom_4 (near-duplicate
 // of bedroom_3), bedroom_2_2 and bedroom_2_4 (duplicates), bathroom_5 (duplicate), bathroom_1 (soft), and
-// bathroom_8 / bathroom_2 (stay hub and house rules only).
+// bathroom_8 / bathroom_2 (reserved for the stay hub and house rules, not shown yet).
 
 /** Room keys; they are also the section ids (`/{l}/apartment#bedroom-1`, linked from the home rooms). */
 export const APARTMENT_ROOMS = ['living', 'kitchen', 'bedroom-1', 'bedroom-2', 'bathroom', 'balcony'] as const;
