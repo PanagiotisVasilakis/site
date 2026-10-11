@@ -44,10 +44,11 @@ function availability(overrides: Partial<PublicAvailability> = {}): PublicAvaila
   };
 }
 
-const ROOM_IDS = ['living', 'kitchen', 'bedroom-1', 'bedroom-2', 'bathroom', 'balcony'];
+const ROOM_IDS = ['living', 'kitchen', 'bedroom-1', 'bedroom-2', 'bathroom', 'balcony', 'details'];
 
-// identity §7.3: never shown in the marketing views (duplicates, soft, branded, stay-hub only).
+// identity §7.3: never shown in the marketing views (retired, duplicates, soft, branded, stay-hub only).
 const EXCLUDED = [
+  'living_1', 'living_2',
   'living_3', 'living_1_booking', 'bedroom_4', 'bedroom_2_2', 'bedroom_2_4',
   'bathroom_5', 'bathroom_1', 'bathroom_8', 'bathroom_2',
 ];
@@ -76,35 +77,54 @@ describe('apartment page (identity §9.2)', () => {
     }
   });
 
-  it('shows the 25 marketing photos in the §7.3 order and never an excluded one', async () => {
+  it('shows the 38 marketing photos in the §7.3 order and never an excluded one', async () => {
     const { container } = await renderPage('en');
 
     const sources = [...container.querySelectorAll('img')].map((img) => img.getAttribute('src') ?? '');
     for (const name of EXCLUDED) {
       expect(sources.filter((src) => src.includes(`/${name}.`)), name).toEqual([]);
     }
-    // The lead photo (living_8, LCP) and the 24 room tiles.
+    // The lead photo (living_8, LCP), the 27 room tiles and the 10 details tiles.
     const lead = container.querySelector('.apt-lead img');
     expect(lead?.getAttribute('src')).toBe('/house/living/living_8.jpeg');
     expect(lead?.getAttribute('loading')).toBe('eager');
     expect(lead?.getAttribute('fetchpriority')).toBe('high');
     const tiles = [...container.querySelectorAll('.apt-masonry img')].map((img) => img.getAttribute('src'));
     expect(tiles).toEqual([
-      '/house/living/living_6.jpeg', '/house/living/living_2.jpeg', '/house/living/living_7.jpeg',
-      '/house/living/living_1.jpeg', '/house/living/living_4.jpeg', '/house/living/living_5.jpeg',
+      '/house/living/living_6.jpeg', '/house/living/living_7.jpeg', '/house/living/living_9.jpeg',
+      '/house/living/living_10.jpeg', '/house/living/living_4.jpeg', '/house/living/living_5.jpeg',
       '/house/kitchen/kitchen_2.jpeg', '/house/kitchen/kitchen_6.jpeg', '/house/kitchen/kitchen_3.jpeg',
       '/house/kitchen/kitchen_4.jpeg', '/house/kitchen/kitchen_5.jpeg', '/house/kitchen/kitchen_1.jpeg',
       '/house/bedroom/bedroom_1.jpeg', '/house/bedroom/bedroom_2.jpeg', '/house/bedroom/bedroom_3.jpeg',
+      '/house/bedroom/bedroom_5.jpeg',
       '/house/bedroom_2/bedroom_2_5.jpeg', '/house/bedroom_2/bedroom_2_6.jpeg', '/house/bedroom_2/bedroom_2_3.jpeg',
       '/house/bedroom_2/bedroom_2_1.jpeg',
       '/house/bathroom/bathroom_6.jpeg', '/house/bathroom/bathroom_7.jpeg', '/house/bathroom/bathroom_3.jpeg',
       '/house/bathroom/bathroom_4.jpeg',
-      '/house/balcony/balcony_1.jpeg',
+      '/house/balcony/balcony_2.jpeg', '/house/balcony/balcony_1.jpeg', '/house/balcony/balcony_3.jpeg',
+      '/house/details/details_1.jpeg', '/house/details/details_2.jpeg', '/house/details/details_3.jpeg',
+      '/house/details/details_4.jpeg', '/house/details/details_5.jpeg', '/house/details/details_6.jpeg',
+      '/house/details/details_7.jpeg', '/house/details/details_8.jpeg', '/house/details/details_9.jpeg',
+      '/house/details/details_10.jpeg',
     ]);
     for (const img of container.querySelectorAll('.apt-masonry img')) {
       expect(img.getAttribute('alt'), img.getAttribute('src') ?? '').not.toBe('');
       expect(img.getAttribute('loading')).toBe('lazy');
     }
+  });
+
+  it.each([
+    ['en', 'Up close', 'Shells, wood and stone in the afternoon light'],
+    ['el', 'Από κοντά', 'Κοχύλια, ξύλο και πέτρα στο απογευματινό φως'],
+  ] as const)('closes the gallery (%s) with the details section: its own title and line, ten tiles', async (locale, title, line) => {
+    const { container } = await renderPage(locale);
+
+    const sections = [...container.querySelectorAll('section.apt-room')];
+    const details = sections[sections.length - 1] as HTMLElement;
+    expect(details.id).toBe('details');
+    expect(within(details).getByRole('heading', { level: 2 })).toHaveTextContent(title);
+    expect(details.querySelector('.apt-room__line')).toHaveTextContent(line);
+    expect(details.querySelectorAll('.apt-masonry img')).toHaveLength(10);
   });
 
   it.each([
@@ -221,18 +241,28 @@ describe('apartment page gallery wiring (identity §9.2, §8 GalleryLightbox)', 
 
     await user.click(tile('/house/kitchen/kitchen_2.jpeg'));
     expect(viewer().dialog).toHaveAttribute('open');
-    expect(viewer().counter).toHaveTextContent('8 / 25');
+    expect(viewer().counter).toHaveTextContent('8 / 38');
     expect(viewer().room).toHaveTextContent('Kitchen');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
     expect(viewer().dialog).not.toHaveAttribute('open');
 
-    await user.click(tile('/house/balcony/balcony_1.jpeg'));
-    expect(viewer().counter).toHaveTextContent('25 / 25');
+    await user.click(tile('/house/balcony/balcony_3.jpeg'));
+    expect(viewer().counter).toHaveTextContent('28 / 38');
     expect(viewer().room).toHaveTextContent('Balcony');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
 
+    await user.click(tile('/house/details/details_1.jpeg'));
+    expect(viewer().counter).toHaveTextContent('29 / 38');
+    expect(viewer().room).toHaveTextContent('Up close');
+    await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
+
+    await user.click(tile('/house/details/details_10.jpeg'));
+    expect(viewer().counter).toHaveTextContent('38 / 38');
+    expect(viewer().room).toHaveTextContent('Up close');
+    await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
+
     await user.click(container.querySelector('.apt-lead__open') as HTMLElement);
-    expect(viewer().counter).toHaveTextContent('1 / 25');
+    expect(viewer().counter).toHaveTextContent('1 / 38');
     expect(viewer().room).toHaveTextContent('Living room');
   });
 

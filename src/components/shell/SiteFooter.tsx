@@ -11,21 +11,24 @@ import LanguageSwitch from './LanguageSwitch';
 import { MotionSwitch } from './MotionSwitch';
 import { ThemeSetting } from './ThemeSwitch';
 import {
-  footerContactLinks, footerLegalLinks, footerNavLinks, footerStayLink, footerVariantFor, shellVariantFor,
+  footerBrandLines, footerContactId, footerContactLinks, footerLegalLinks, footerNavLinks, footerStayLink,
+  footerVariantFor, shellVariantFor,
 } from './shellLinks';
 
 const CONTACT_ICONS: Record<string, IconName> = { phone: 'phone', email: 'mail', instagram: 'camera', whatsapp: 'message' };
 
 /**
- * identity §8 SiteFooter. Marketing (also on guide pages): brand, nav, contact, "Your stay", MotionSwitch,
- * LanguageSwitch. Stay: MotionSwitch and LanguageSwitch only (no booking or availability link). Both also
- * carry the theme Segmented (see the note at the prefs) and the Privacy link (R3-L2).
- * The address/legal identity waits for its data (R3-L1): no placeholder is rendered (§1.4).
+ * identity §8 SiteFooter. Marketing (also on guide pages): brand with the primary tagline and the location line,
+ * nav, contact (on the home page this block is the `#contact` target of every "Contact" link), "Your stay",
+ * MotionSwitch, LanguageSwitch. Stay: the brand, MotionSwitch and LanguageSwitch only (no booking or
+ * availability link, no tagline). Both also carry the theme Segmented (see the note at the prefs) and the
+ * Privacy link (R3-L2). The address/legal identity waits for its data (R3-L1): no placeholder is rendered (§1.4).
  */
 export default function SiteFooter({ locale }: { locale: string }) {
   const pathname = usePathname() || `/${locale}`;
   const t = getDictionary(normalizeLocale(locale));
   const variant = footerVariantFor(shellVariantFor(pathname));
+  const brandLines = footerBrandLines(variant, t);
   const nav = footerNavLinks(variant, locale, t);
   const contact = footerContactLinks(variant, t);
   const stay = footerStayLink(variant, locale, t);
@@ -37,10 +40,18 @@ export default function SiteFooter({ locale }: { locale: string }) {
         <path d="M0 20c50 0 50-14 100-14s50 14 100 14 50-14 100-14 50 14 100 14 50-14 100-14 50 14 100 14 50-14 100-14 50 14 100 14 50-14 100-14 50 14 100 14 50-14 100-14 50 14 100 14 50-14 100-14 50 14 100 14" vectorEffect="non-scaling-stroke" />
       </svg>
       <div className="site-footer__inner">
-        <p className="site-footer__brand">
-          <BrandMark className="site-brand__mark" />
-          <span className="site-brand__name">Dolce Far Niente</span>
-        </p>
+        <div className="site-footer__about">
+          <p className="site-footer__brand">
+            <BrandMark className="site-brand__mark" />
+            <span className="site-brand__name">Dolce Far Niente</span>
+          </p>
+          {brandLines && (
+            <>
+              <p className="site-footer__tagline">{brandLines.tagline}</p>
+              <p className="site-footer__place">{brandLines.place}</p>
+            </>
+          )}
+        </div>
 
         {nav.length > 0 && (
           <nav className="site-footer__nav" aria-label={t.shell.footerNavigation}>
@@ -51,7 +62,7 @@ export default function SiteFooter({ locale }: { locale: string }) {
         )}
 
         {contact.length > 0 && (
-          <div className="site-footer__contact">
+          <div className="site-footer__contact" id={footerContactId(pathname)}>
             <p className="site-footer__heading">{t.shell.footerContact}</p>
             <ul className="site-footer__list">
               {contact.map((link) => (

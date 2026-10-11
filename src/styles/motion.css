@@ -172,9 +172,10 @@
   to { transform: scale(1.14) translateY(3%); }
 }
 
-/* Home sections (§5.5 M6-M12). Static by construction: components/home.css holds the final states, and
-   HomeRevealObserver adds `is-in` to each `[data-reveal]` element once it is in view. Without `linear()`
-   support --ease-shutter is `ease` (tokens.css), so these transitions keep running. */
+/* Home sections (§5.5 M6, M8-M12; M7 went with the KineticBand on 2026-10-11). Static by construction:
+   components/home.css holds the final states, and HomeRevealObserver adds `is-in` to each `[data-reveal]`
+   element once it is in view. Without `linear()` support --ease-shutter is `ease` (tokens.css), so these
+   transitions keep running. */
 @media (prefers-reduced-motion: no-preference) {
   /* M6 fact strip: the tiles open like louvres from rotateX(-86deg), 75 ms apart. */
   :root[data-motion="full"] .facts .fact,
@@ -261,19 +262,6 @@
   }
 
   @supports (animation-timeline: view()) {
-    /* M7 kinetic band: the rows move against each other with the scroll only. */
-    :root[data-motion="full"] .kinetic { view-timeline: --kinetic block; }
-    :root[data-motion="full"] .kinetic .kinetic__row--a .kinetic__text {
-      animation: kinetic-a linear both;
-      animation-timeline: --kinetic;
-      animation-range: cover;
-    }
-    :root[data-motion="full"] .kinetic .kinetic__row--b .kinetic__text {
-      animation: kinetic-b linear both;
-      animation-timeline: --kinetic;
-      animation-range: cover;
-    }
-
     /* M11 coverflow (< lg): each card turns by its place in the row's own horizontal scroll. */
     @media (max-width: 1023.98px) {
       :root[data-motion="full"] .rooms .room-card__3d {
@@ -298,16 +286,6 @@
   0% { opacity: 0; }
   25% { opacity: .95; }
   100% { opacity: 0; }
-}
-
-@keyframes kinetic-a {
-  from { transform: translateX(4%); }
-  to { transform: translateX(-38%); }
-}
-
-@keyframes kinetic-b {
-  from { transform: translateX(-40%); }
-  to { transform: translateX(0); }
 }
 
 @keyframes room-coverflow {

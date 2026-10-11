@@ -3,7 +3,6 @@ import { getDictionary } from "@/i18n/dictionaries";
 import { normalizeLocale } from '@/i18n/config';
 import HeroLivingPhoto from "@/components/home/hero/HeroLivingPhoto";
 import FactStrip from "@/components/home/FactStrip";
-import KineticBand from "@/components/home/KineticBand";
 import Highlights from "@/components/home/Highlights";
 import BalconyWindow from "@/components/home/BalconyWindow";
 import RoomsSection from "@/components/home/RoomsSection";
@@ -11,7 +10,6 @@ import NightsTeaser from "@/components/home/NightsTeaser";
 import LocationSection from "@/components/home/LocationSection";
 import HostLetter from "@/components/home/HostLetter";
 import FaqSection from "@/components/home/FaqSection";
-import ContactBand from "@/components/home/ContactBand";
 import HomeRevealObserver from "@/components/home/HomeRevealObserver";
 import { homeFromPriceCents, nightsTeaserFrom } from '@/components/home/homeNights';
 import AvailabilityBookBar from '@/components/shell/AvailabilityBookBar';
@@ -64,10 +62,9 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           __html: serializeJsonLd(organizationJsonLd())
         }}
       />
-      {/* identity §9.1 items 1-12 (no ReviewsStrip: no owner review data, §1.4) */}
+      {/* identity §9.1 items 1-11 except item 3: the KineticBand and the ContactBand (item 12) were removed on 2026-10-11 at the owner's request; the #contact target is the footer's contact block (SiteFooter). No ReviewsStrip: no owner review data, §1.4 */}
       <HeroLivingPhoto locale={eff} fromPriceCents={fromPriceCents} />
       <FactStrip locale={eff} />
-      <KineticBand />
       <Highlights locale={eff} now={now} />
       <BalconyWindow locale={eff} />
       <RoomsSection locale={eff} />
@@ -75,7 +72,6 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
       <LocationSection locale={eff} />
       <HostLetter locale={eff} />
       <FaqSection locale={eff} today={availability?.today ?? propertyToday(PROPERTY_TIME_ZONE, now)} />
-      <ContactBand locale={eff} />
       <HomeRevealObserver />
       <AvailabilityBookBar availability={availability} locale={eff} />
     </>

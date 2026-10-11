@@ -115,6 +115,23 @@ export function footerStayLink(variant: FooterVariant, locale: string, t: Dictio
     : null;
 }
 
+/**
+ * The marketing footer's lines under the wordmark (identity §1.2, §8 SiteFooter): the primary tagline and the
+ * location line of the hero lede, both owner-approved R3-C1 copy. None in the slim stay footer.
+ */
+export function footerBrandLines(variant: FooterVariant, t: Dictionary): { tagline: string; place: string } | null {
+  return variant === 'marketing' ? { tagline: t.home.heroTagline, place: t.home.heroFacts } : null;
+}
+
+/**
+ * The id of the footer's contact block: `contact` on the home page only. Every "Contact" link points to
+ * `/{l}#contact` (navLinks, ApartmentCta, ErrorSummary, the guest page); other pages leave the id out, so the
+ * availability page's own `#contact` section stays the only one there.
+ */
+export function footerContactId(pathname: string): string | undefined {
+  return firstSegment(pathname) === '' ? 'contact' : undefined;
+}
+
 /** Legal links: in both footer variants, so every page reaches the privacy notice (R3-L2). */
 export function footerLegalLinks(locale: string, t: Dictionary): ShellLink[] {
   return [{ key: 'privacy', href: `/${locale}/privacy`, label: t.legal.privacyLink }];

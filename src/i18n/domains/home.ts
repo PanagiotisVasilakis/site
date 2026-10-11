@@ -86,7 +86,6 @@ export interface HomeDictionary {
         cancellation: string;
         children: string;
     };
-    contact: { eyebrow: string; title: string; titleEm: string };
     /** BookBar (§8). `{date}` is the next free night. */
     bookBar: { freeTonight: string; nextFree: string };
 }
@@ -217,11 +216,6 @@ export const homeTranslations: Record<Locale, HomeDictionary> = {
             cancellation: "Can I cancel?",
             children: "Is it suitable for children?",
         },
-        contact: {
-            eyebrow: "Book your stay",
-            title: "Your balcony",
-            titleEm: "is waiting.",
-        },
         bookBar: {
             freeTonight: "Free tonight",
             nextFree: "Next free night: {date}",
@@ -348,11 +342,6 @@ export const homeTranslations: Record<Locale, HomeDictionary> = {
             climateFee: "Τι είναι το τέλος ανθεκτικότητας στην κλιματική κρίση;",
             cancellation: "Μπορώ να ακυρώσω;",
             children: "Είναι κατάλληλο για παιδιά;",
-        },
-        contact: {
-            eyebrow: "Κλείστε τη διαμονή σας",
-            title: "Το μπαλκόνι",
-            titleEm: "σας περιμένει.",
         },
         bookBar: {
             freeTonight: "Ελεύθερο απόψε",

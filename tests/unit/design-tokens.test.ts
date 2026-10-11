@@ -129,7 +129,7 @@ const LIGHT: Row[] = [
   ['fg-muted on surface-raised', 'fg-muted', 'surface-raised', 4.5, 7.73],
   ['primary-fg on primary', 'primary-fg', 'primary', 4.5, 6.21],
   ['primary-fg on primary-hover', 'primary-fg', 'primary-hover', 4.5, 7.75],
-  ['primary-text on bg / kinetic band EL row (primary-text) on bg', 'primary-text', 'bg', 4.5, 6.48],
+  ['primary-text on bg', 'primary-text', 'bg', 4.5, 6.48],
   ['primary-text on surface', 'primary-text', 'surface', 4.5, 7.12],
   ['primary-text on surface-sunken', 'primary-text', 'surface-sunken', 4.5, 5.82],
   ['accent on bg', 'accent', 'bg', 4.5, 7.36],
@@ -182,8 +182,8 @@ const LIGHT: Row[] = [
   ['map popup meta (olive) on surface-raised (R3-V8)', 'olive', 'surface-raised', 4.5, 7.04],
   ['map popup links (accent) on surface-raised (R3-V8)', 'accent', 'surface-raised', 4.5, 8.35],
   ['UI: phone row icon (primary-text) on its primary-tint disc over bg (R3-V8) / UI: amenity icon (primary-text) on its primary-tint disc over bg', 'primary-text', 'primary-tint@bg', 3, 5.47],
-  ['contact band title accent (band-accent) on warm-1 (R3-V5)', 'band-accent', 'warm-1', 4.5, 4.84],
-  ['UI: band-focus vs warm-1 (contact band links, R3-V5)', 'band-focus', 'warm-1', 3, 4.84],
+  ['warm section title accent (band-accent) on warm-1 (R3-V5)', 'band-accent', 'warm-1', 4.5, 4.84],
+  ['UI: band-focus vs warm-1 (focus ring on the warm section, R3-V5)', 'band-focus', 'warm-1', 3, 4.84],
   ['bookbar: fg on surface-raised .9 over black', 'fg', 'surface-raised*0.9@#000000', 4.5, 12.46],
   ['bookbar: fg on surface-raised .9 over white', 'fg', 'surface-raised*0.9@#FFFFFF', 4.5, 15.62],
   ['bookbar: fg-muted on surface-raised .9 over black', 'fg-muted', 'surface-raised*0.9@#000000', 4.5, 6.17],
@@ -209,7 +209,7 @@ const DARK: Row[] = [
   ['fg-muted on surface-raised', 'fg-muted', 'surface-raised', 4.5, 6.38],
   ['primary-fg on primary', 'primary-fg', 'primary', 4.5, 7.9],
   ['primary-fg on primary-hover', 'primary-fg', 'primary-hover', 4.5, 9.26],
-  ['primary-text on bg / kinetic band EL row (primary-text) on bg', 'primary-text', 'bg', 4.5, 8.88],
+  ['primary-text on bg', 'primary-text', 'bg', 4.5, 8.88],
   ['primary-text on surface', 'primary-text', 'surface', 4.5, 7.92],
   ['primary-text on surface-sunken', 'primary-text', 'surface-sunken', 4.5, 8.29],
   ['accent on bg', 'accent', 'bg', 4.5, 9.78],
@@ -260,8 +260,8 @@ const DARK: Row[] = [
   ['UI: phone row icon (primary-text) on its primary-tint disc over bg (R3-V8) / UI: amenity icon (primary-text) on its primary-tint disc over bg', 'primary-text', 'primary-tint@bg', 3, 6.83],
   // R3-V6 apartment page and GalleryLightbox
   ['UI: lightbox focus ring (band-focus) on viewer-bg', 'band-focus', 'viewer-bg', 3, 10.58],
-  ['contact band title accent (band-accent) on warm-1 (R3-V5)', 'band-accent', 'warm-1', 4.5, 6.57],
-  ['UI: band-focus vs warm-1 (contact band links, R3-V5)', 'band-focus', 'warm-1', 3, 6.57],
+  ['warm section title accent (band-accent) on warm-1 (R3-V5)', 'band-accent', 'warm-1', 4.5, 6.57],
+  ['UI: band-focus vs warm-1 (focus ring on the warm section, R3-V5)', 'band-focus', 'warm-1', 3, 6.57],
   ['bookbar: fg on surface-raised .9 over black', 'fg', 'surface-raised*0.9@#000000', 4.5, 11.99],
   ['bookbar: fg on surface-raised .9 over white', 'fg', 'surface-raised*0.9@#FFFFFF', 4.5, 8.25],
   ['bookbar: fg-muted on surface-raised .9 over black', 'fg-muted', 'surface-raised*0.9@#000000', 4.5, 6.82],
@@ -328,8 +328,8 @@ describe('design tokens: dark mode architecture (identity §3.1)', () => {
 });
 
 describe('design tokens: G-CONTRAST (identity §3.3)', () => {
-  it('covers all 164 documented rows', () => {
-    expect([...LIGHT, ...DARK, ...BOTH].flatMap(([pair]) => pair.split(' / ')).length).toBe(164);
+  it('covers all 162 documented rows', () => {
+    expect([...LIGHT, ...DARK, ...BOTH].flatMap(([pair]) => pair.split(' / ')).length).toBe(162);
   });
 
   it.each(CASES)('%s: %s', (mode, _pair, fg, bg, min, documented) => {

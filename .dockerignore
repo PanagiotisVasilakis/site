@@ -46,3 +46,6 @@ tmp
 .claude/
 CLAUDE.md
 PROGRESS.md
+
+# Owner photo originals (local, git-ignored, with EXIF metadata)
+jpegmini_optimized

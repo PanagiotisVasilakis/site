@@ -1,7 +1,8 @@
-/* Home sections after the hero (docs/design/identity.md §8, §9.1 items 2-12): FactStrip, KineticBand,
-   Intro + Highlights, BalconyWindow, RoomsShowcase, NightsTeaser, Location, HostLetter, FAQ, ContactBand. Unlayered (O38); the two-class
-   colour rules (0,2,0) date from the legacy cascade that R3-V12b deleted, and are kept as they are.
-   Static by construction (§5.1): these are the final states. Motion M6-M15, M24 is in motion.css. */
+/* Home sections after the hero (docs/design/identity.md §8, §9.1 items 2-11): FactStrip, Intro + Highlights,
+   BalconyWindow, RoomsShowcase, NightsTeaser, Location, HostLetter, FAQ. The KineticBand (item 3) and the
+   ContactBand (item 12) were removed on 2026-10-11. Unlayered (O38); the two-class colour rules (0,2,0) date from
+   the legacy cascade that R3-V12b deleted, and are kept as they are. Static by construction (§5.1): these are the
+   final states. Motion M6, M8-M15 and M24 is in motion.css. */
 
 /* FactStrip (§8): a raised card that overlaps the hero by 26 px (72 px at lg); 2 columns, one row at lg. */
 .facts {
@@ -96,43 +97,6 @@
     border-top: 0;
     border-left: 1px solid var(--color-border);
   }
-}
-
-/* KineticBand (§8, graft 2): decoration only. Static offsets are the reduced/unsupported state of M7. */
-.kinetic {
-  overflow: clip;
-  padding-top: clamp(48px, 9vw, 120px);
-  pointer-events: none;
-  user-select: none;
-}
-.kinetic .kinetic__row {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(3.2rem, 11vw, 9.5rem);
-  font-weight: 400;
-  line-height: 1.02;
-  letter-spacing: -.02em;
-  white-space: nowrap;
-}
-.kinetic .kinetic__text { display: inline-block; }
-.kinetic .kinetic__row--a .kinetic__text {
-  color: transparent;
-  -webkit-text-stroke: 1px color-mix(in srgb, var(--color-fg) 45%, transparent);
-  transform: translateX(-10%);
-}
-.kinetic .kinetic__row--a .kinetic__star { color: color-mix(in srgb, var(--color-fg) 45%, transparent); }
-.kinetic .kinetic__row--b .kinetic__text {
-  font-style: italic;
-  color: var(--color-primary-text);
-  transform: translateX(-20%);
-}
-.kinetic .kinetic__star {
-  display: inline-block;
-  width: .42em;
-  height: .42em;
-  margin: 0 .12em;
-  vertical-align: .08em;
-  stroke-width: 1.25;
 }
 
 /* Intro + Highlights (§8 SeasonSwitch + Highlights): 1 column, 2 at sm, 4 at lg. */
@@ -789,33 +753,3 @@
 }
 .faq .faq__p { margin: 0 0 12px; line-height: 1.6; }
 .faq .faq__list { margin: 0 0 12px; padding-left: 1.25em; list-style: disc; line-height: 1.6; }
-
-/* ContactBand (§8): warm band, d1 title, actions and the e-mail / Instagram links. */
-.contact.ui-section { padding-block: clamp(72px, 12vw, 160px) clamp(56px, 9vw, 112px); }
-.contact.ui-section .ui-section__title {
-  max-width: 12em;
-  font-size: var(--text-d1);
-  line-height: var(--text-d1--line-height);
-  letter-spacing: var(--text-d1--letter-spacing);
-}
-.contact .contact__actions { display: flex; flex-wrap: wrap; gap: 12px; }
-.contact .contact__links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 32px;
-  margin: 32px 0 0;
-  padding: 0;
-  list-style: none;
-}
-.contact .contact__link {
-  display: inline-flex;
-  align-items: center;
-  gap: .5em;
-  min-height: 44px;
-  font-size: var(--text-caption);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: .28em;
-  color: var(--color-band-fg);
-}
-.contact .contact__link:focus-visible { outline-color: var(--color-band-focus); }

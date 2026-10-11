@@ -257,6 +257,43 @@ describe('site shell', () => {
     const theme = within(screen.getByRole('contentinfo')).getByRole('group', { name: 'Theme' });
     expect(within(theme).getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'true');
   });
+
+  it.each([
+    ['en', '/en'],
+    ['el', '/el/moments'],
+  ] as const)('shows the tagline and the location line under the brand in the %s marketing footer (%s)', (locale, pathname) => {
+    navigation.pathname = pathname;
+    render(<SiteFooter locale={locale} />);
+    const footer = screen.getByRole('contentinfo');
+    const { heroTagline, heroFacts } = getDictionary(locale).home;
+    expect(within(footer).getByText(heroTagline)).toHaveClass('site-footer__tagline');
+    expect(within(footer).getByText(heroFacts)).toHaveClass('site-footer__place');
+  });
+
+  it('makes the home footer contact block the #contact target, with phone, e-mail, Instagram and WhatsApp', () => {
+    const { container } = render(<SiteFooter locale="en" />);
+    const target = container.querySelector('#contact') as HTMLElement;
+    expect(target).toHaveClass('site-footer__contact');
+    expect(within(target).getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
+      'tel:+306955810051',
+      'mailto:dolcefarnienteapartments@gmail.com',
+      'https://www.instagram.com/dolcefarniente_kalamata',
+      'https://wa.me/306955810051',
+    ]);
+  });
+
+  it.each(['/en/availability', '/el/apartment', '/el/moments'])('leaves the #contact id out of the footer on %s (the availability page has its own)', (pathname) => {
+    navigation.pathname = pathname;
+    const { container } = render(<SiteFooter locale={pathname.slice(1, 3)} />);
+    expect(container.querySelector('.site-footer__contact')).not.toBeNull();
+    expect(container.querySelector('#contact')).toBeNull();
+  });
+
+  it.each(['/en/stay', '/el/guest'])('keeps the stay footer slim: no tagline, location line or #contact (%s)', (pathname) => {
+    navigation.pathname = pathname;
+    const { container } = render(<SiteFooter locale={pathname.slice(1, 3)} />);
+    expect(container.querySelector('.site-footer__tagline, .site-footer__place, #contact')).toBeNull();
+  });
 });
 
 describe('LanguageSwitch', () => {

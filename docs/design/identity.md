@@ -3,7 +3,7 @@
 Final design system and implementation spec (R3-V1 output). This is `docs/design/identity.md`; the local mockups and screenshots it cites live in the gitignored `.runtime/design/` of the lead's machine and are not part of the repository.
 
 - **Status:** decided by the design lead on 2026-09-28 under owner decision O32 ("take the design decisions yourself; 3D, motion, something strong; make it wow"). G-DESIGN is a lead self-review.
-- **Implementation (2026-10-06):** R3-V2 to R3-V14 are done. R3-V12b deleted the legacy style sheets (`src/styles/01…13`), so references to them below are history. §11 shows the current file layout; the migration plan (§12) is kept as the record of how the system was introduced. The owner-approved marketing copy of R3-C1 is applied (2026-10-06; the `// C1 review` draft markers are removed), and the remaining owner inputs in §13 are open.
+- **Implementation (2026-10-06):** R3-V2 to R3-V14 are done. R3-V12b deleted the legacy style sheets (`src/styles/01…13`), so references to them below are history. §11 shows the current file layout; the migration plan (§12) is kept as the record of how the system was introduced. The owner-approved marketing copy of R3-C1 is applied (2026-10-06; the `// C1 review` draft markers are removed), and the remaining owner inputs in §13 are open. On 2026-10-11 the owner had the KineticBand (§0.2 graft 2, M7) and the ContactBand removed from the home page; the marketing footer's contact block became the `#contact` target (on the home page only), and the footer gained the tagline and the location line under the brand (§8 SiteFooter, §9.1).
 - **Scope:** every public route (en/el), the guest portal, and the admin (tokens only).
 - **Authority:** where this document and a mockup disagree, this document wins. The mockups in `.runtime/design/` are visual references only. Their JS is not production code.
 - **Evidence labels:** CONFIRMED means read in the code or docs of the installed version, or computed/measured here. SUSPECTED means not yet verified; each SUSPECTED item names the check that settles it.
@@ -31,7 +31,7 @@ Its weakness is "wow" (7, 7 and 8 against aegean's 8.5, 9 and 9). The grafts in 
 **Accepted.** Each graft is listed with the judges who proposed it.
 
 1. **From aegean (all 3 judges):** the hero **recedes into depth** on the first scroll. The photo stage tilts back and darkens (`rotateX 16°`, `scale .86`). It is CSS scroll-driven and chained with messinian's one-time light sweep.
-2. **From aegean (all 3):** a **bilingual kinetic serif band** right after the fact strip. EN is an outline serif; EL is a terracotta (`primary-text`, both themes) italic reading "Ταΰγετος ✦ Μεσσηνιακός κόλπος ✦ Καλαμάτα". It is scroll-linked, never loops, and is `aria-hidden`.
+2. **From aegean (all 3):** a **bilingual kinetic serif band** right after the fact strip. EN is an outline serif; EL is a terracotta (`primary-text`, both themes) italic reading "Ταΰγετος ✦ Μεσσηνιακός κόλπος ✦ Καλαμάτα". It is scroll-linked, never loops, and is `aria-hidden`. *Removed on 2026-10-11 at the owner's request (the moving rows were dizzying): the fact strip is now followed directly by the intro, and M7 is gone.*
 3. **From aegean (all 3):** a **3D deck-fan gallery** at ≥ 1024 px. Captions show on the active card only. Below 1024 px, messinian's native scroll-snap coverflow stays.
 4. **From aegean (all 3):** an **in-page "Reduce motion" switch** in the footer and the mobile menu, on top of `prefers-reduced-motion`.
 5. **From aegean and playful (judges 1 and 3):** a **circular View Transition reveal** from the Day/Night switch, when motion is allowed.
@@ -113,10 +113,9 @@ The site is built around the one thing the photos prove: a sunlit second-floor b
 
 | Use | EN | EL |
 |---|---|---|
-| Primary tagline (hero lede opening, OG description) | Slow days on a sunlit balcony in Kalamata. | Αργές μέρες σε ένα ηλιόλουστο μπαλκόνι στην Καλαμάτα. |
+| Primary tagline (hero lede opening, OG description, marketing footer) | Slow days on a sunlit balcony in Kalamata. | Αργές μέρες σε ένα ηλιόλουστο μπαλκόνι στην Καλαμάτα. |
 | Secondary (location band, share cards) | Taygetos at breakfast, the gulf a short drive away. | Ο Ταΰγετος στο πρωινό σας, ο κόλπος λίγα λεπτά με το αυτοκίνητο. |
 | Stay hub greeting | Welcome home. | Καλώς ήρθατε. |
-| Kinetic band (decorative, both locales) | Taygetos ✦ Messinian Gulf ✦ Kalamata | Ταΰγετος ✦ Μεσσηνιακός κόλπος ✦ Καλαμάτα |
 
 The final marketing strings belong to R3-C1, which the owner approves. The taglines above are the voice reference and the defaults.
 
@@ -178,13 +177,13 @@ Sizes are exact bytes from the jsDelivr data API for fontsource 5.3.0, fetched 2
 | `noto-serif-display-latin-wght-normal.woff2` | 41,232 | no | Latin headings |
 | `noto-serif-display-latin-wght-italic.woff2` | 49,264 | no | H1 "Dolce far niente", wordmark, italic accents |
 | `noto-serif-display-greek-wght-normal.woff2` | 30,004 | no | EL headings |
-| `noto-serif-display-greek-wght-italic.woff2` | 33,808 | no | EL italic accents; kinetic band EL row (both locales) |
+| `noto-serif-display-greek-wght-italic.woff2` | 33,808 | no | EL italic accents (today only on the EL home page) |
 | **Total** | **206,388** | 36,700 critical | |
 
 **Budget:**
 
 - **Preloaded:** ≤ 40 KB (Commissioner latin only).
-- **All fonts on any single page:** ≤ 210 KB. Roughly 176 KB on EN Home and 206 KB on EL Home.
+- **All fonts on any single page:** ≤ 210 KB. Roughly 206 KB on EL Home. EN Home was roughly 176 KB (computed from the sizes in the table above, not measured) while the kinetic band's Greek italic row was on it; without the band (removed 2026-10-11) EN Home should not fetch the Greek display italic, about 143 KB (SUSPECTED until a network log of a production build confirms it).
 - **Unicode ranges stop unneeded downloads.** A subset file is fetched only when the page renders glyphs in its unicode-range. Files are content-hashed and immutable-cached under `/_next/static/media`.
 - **Why the display italic is not preloaded.** The Home LCP element is the hero `<img>`; the budget keeps the critical path for the image.
   - The H1 first renders in the metric-adjusted Times New Roman fallback and swaps when the font arrives.
@@ -292,7 +291,7 @@ Sizes at 390 px and 1440 px are computed from the clamp formulas. They are Tailw
 | Token | CSS value | ≈390 | ≈1440 | Face / weight | Line height | Tracking | Use |
 |---|---|---|---|---|---|---|---|
 | `--text-hero` | `clamp(4rem, 1.9rem + 9.6vw, 8.75rem)` | 68 | 140 | display italic 400 | .86 | −.025em | Home H1 only |
-| `--text-d1` | `clamp(2.75rem, 1.7rem + 4.6vw, 5.5rem)` | 45 | 88 | display 400 | 1.02 (el 1.08) | −.015em | Page H1, contact title |
+| `--text-d1` | `clamp(2.75rem, 1.7rem + 4.6vw, 5.5rem)` | 45 | 88 | display 400 | 1.02 (el 1.08) | −.015em | Page H1 |
 | `--text-d2` | `clamp(2.25rem, 1.55rem + 3vw, 4rem)` | 36 | 64 | display 400 | 1.02 (el 1.08) | −.015em | Section titles |
 | `--text-d3` | `clamp(1.75rem, 1.4rem + 1.6vw, 2.5rem)` | 29 | 40 | display 400 / italic | 1.12 (el 1.15) | −.01em | Quotes, letter title, FAQ title, month caption on desktop |
 | `--text-h3` | `1.375rem` | 22 | 22 | display 400 | 1.15 | 0 | Card and tile titles |
@@ -310,7 +309,7 @@ Measure: running text ≤ 65ch; lead ≤ 38em.
 - **No `text-transform: uppercase` under `:lang(el)`.** Safari and iOS keep the tonos (caniuse, fonts research §4.4); for example the short weekday "Τρί" would render as "ΤΡΊ". Eyebrows, weekday headers, the wordmark place label, chips and legends use sentence case with tracking `.04em` in Greek.
 - Add `:lang(el) { --lh-display-extra: .06 }` for Greek display line-heights (values in the table above).
 - The language switch label is written "ΕΛ" by hand, not produced by transforming "ελ".
-- Mixed-language fragments carry `lang`: the H1 `lang="it"`, the kinetic band rows `lang="en"` / `lang="el"`.
+- Mixed-language fragments carry `lang`: the H1 `lang="it"` and each LanguageSwitch link (`lang` and `hreflang` of its locale).
 
 ---
 
@@ -379,7 +378,7 @@ Measure: running text ≤ 65ch; lead ≤ 38em.
 | `band-accent-fg` | `#231510` | `#231510` | Text on a `band-accent` fill |
 | `band-line` | `rgb(246 239 228 / .20)` | `rgb(242 235 223 / .20)` | Rules on bands |
 | `band-focus` | `#F2B27A` | `#F4B878` | Focus ring on bands and photos |
-| `warm-1` / `warm-2` / `warm-3` | `#7A3522` / `#3B1D14` / `#24130E` | `#5E2A1B` / `#2A1610` / `#140B08` | Contact "sunset" band: `radial-gradient(120% 140% at 85% 0%, warm-1, warm-2 55%, warm-3)` |
+| `warm-1` / `warm-2` / `warm-3` | `#7A3522` / `#3B1D14` / `#24130E` | `#5E2A1B` / `#2A1610` / `#140B08` | The `warm` Section variant (a "sunset" band): `radial-gradient(120% 140% at 85% 0%, warm-1, warm-2 55%, warm-3)`. No page uses it since the ContactBand was removed (2026-10-11) |
 | `warm-muted` | `#F0D9C8` | `#F0D9C8` | Secondary text on the warm band |
 | `cal-free-bg` | = `surface` | = `surface` | Free night cell |
 | `cal-price` | = `fg-muted` | = `fg-muted` | Price inside a cell |
@@ -417,7 +416,7 @@ Measure: running text ≤ 65ch; lead ≤ 38em.
 - Computed with `/private/tmp/claude-503/-Users-pvasilakis-site/e6271ddf-8171-43b6-8d73-718dfd3a7330/scratchpad/contrast.mjs`: the WCAG formula, with alpha tokens composited over the stated background (the composite hex is shown).
 - The R3-V2 unit test must reproduce these numbers.
 - Minimums: 4.5 for text, 3.0 for large text (≥ 24 px, or ≥ 18.66 px bold) and for UI boundaries and focus indicators.
-- **Result: 0 failures.** The table has 143 rows (69 light, 66 dark, 8 both; rows from R3-V5b, V5c, V6, V7, V8, V9, V10 and V12a included). `tests/unit/design-tokens.test.ts` holds 21 more pairs (164 labels in all; rows with the same pair, minimum and ratio share one test case) and is the source of truth; 163 of its labels have a minimum, and the decorative `sun` row has none (it is never text). R3-V9 note: over the stay hub's half sun, `fg-muted` would be 2.50:1 at night, so the sun is sized from `--text-d1` and ends above the lead; only the d1 H1 (large text) sits over it.
+- **Result: 0 failures.** The table has 141 rows (68 light, 65 dark, 8 both; rows from R3-V5b, V5c, V6, V7, V8, V9, V10 and V12a included; the two kinetic band rows went with the band on 2026-10-11). `tests/unit/design-tokens.test.ts` holds 21 more pairs (162 labels in all; rows with the same pair, minimum and ratio share one test case) and is the source of truth; 161 of its labels have a minimum, and the decorative `sun` row has none (it is never text). R3-V9 note: over the stay hub's half sun, `fg-muted` would be 2.50:1 at night, so the sun is sized from `--text-d1` and ends above the lead; only the d1 H1 (large text) sits over it.
 
 | Mode | Pair | FG | BG | Ratio | Min |
 |---|---|---|---|---|---|
@@ -456,7 +455,7 @@ Measure: running text ≤ 65ch; lead ≤ 38em.
 | light | band-muted on band-bg | `#B9CBCF` | `#0C3440` | **7.91** | 4.5 |
 | light | band-accent (text) on band-bg | `#F2B27A` | `#0C3440` | **7.23** | 4.5 |
 | light | band-accent-fg on band-accent (CTA) | `#231510` | `#F2B27A` | **9.63** | 4.5 |
-| light | band-fg on warm-1 (lightest stop of the contact band) | `#F6EFE4` | `#7A3522` | **7.79** | 4.5 |
+| light | band-fg on warm-1 (lightest stop of the warm band) | `#F6EFE4` | `#7A3522` | **7.79** | 4.5 |
 | light | warm-muted on warm-1 | `#F0D9C8` | `#7A3522` | **6.55** | 4.5 |
 | light | fg on header glass (transparent, O43) over bg | `#1C2528` | `#F7F2EA` | **13.99** | 4.5 |
 | light | cal: date on free cell | `#1C2528` | `#FFFBF5` | **15.15** | 4.5 |
@@ -472,7 +471,6 @@ Measure: running text ≤ 65ch; lead ≤ 38em.
 | light | cal: price on hovered cell (R3-V7) | `#57524C` | `#EDE4D5` | **6.13** | 4.5 |
 | light | QuoteBar: fg on glass-bar over bg (R3-V7) | `#1C2528` | `#F6F0E6` | **13.78** | 4.5 |
 | light | QuoteBar: fg on glass-bar over a primary cell (R3-V7) | `#1C2528` | `#E8D5C8` | **10.97** | 4.5 |
-| light | kinetic band EL row (primary-text) on bg | `#8F3D24` | `#F6F0E6` | **6.48** | 4.5 |
 | light | fg-muted on worst grain speck (8 % ink) | `#57524C` | `#E5E0D7` | **5.87** | 4.5 |
 | light | primary-text on worst grain speck | `#8F3D24` | `#E5E0D7` | **5.57** | 4.5 |
 | light | olive on worst grain speck | `#4F5E33` | `#E5E0D7` | **5.34** | 4.5 |
@@ -541,7 +539,6 @@ Measure: running text ≤ 65ch; lead ≤ 38em.
 | dark | cal: price on hovered cell (R3-V7) | `#A9B6BA` | `#0D2129` | **7.96** | 4.5 |
 | dark | QuoteBar: fg on glass-bar over bg (R3-V7) | `#F2EBDF` | `#0A1A21` | **14.99** | 4.5 |
 | dark | QuoteBar: fg on glass-bar over a primary cell (R3-V7) | `#F2EBDF` | `#363231` | **10.64** | 4.5 |
-| dark | kinetic band EL row (primary-text) on bg | `#F2A585` | `#0A1A21` | **8.88** | 4.5 |
 | dark | fg-muted on worst grain speck (8 % paper) | `#A9B6BA` | `#1D2B30` | **7.03** | 4.5 |
 | dark | UI: focus ring vs bg | `#F4B878` | `#0A1A21` | **10.12** | 3 |
 | dark | UI: focus ring vs surface | `#F4B878` | `#10252E` | **9.03** | 3 |
@@ -577,7 +574,7 @@ Measure: running text ≤ 65ch; lead ≤ 38em.
 
 **Open Graph share cards (R3-V11).** `npm run design:og` (`scripts/design/gen-og-images.ts`) measures each text line against the lightest pixel of the scrimmed photo inside its box and fails below 4.5:1. Measured (both locales): wordmark `band-fg` 6.84, place label `band-accent` 6.85, tagline `band-fg` 11.52. The brand mark above the wordmark is a logotype (no minimum): over its lightest pixel the waves give 2.85 and the sun 1.77, over the mean pixel 8.32 and 5.17.
 
-**R3-V12a (legacy CSS consumers).** Placeholders in the guest, check-in and admin fields move from the legacy slate colour to `fg-muted`, and the Leaflet attribution links in dark take `accent` instead of the legacy dark link colour (rows above). The kinetic band EL row is `primary-text` in both themes (8.88 in dark; the earlier `sun` row described a colour that was never rendered). Everything else reuses existing pairs: the skip link `accent-fg` on `accent`, the PWA banner `fg` on `surface-raised`, the focus ring rows, and the scrollbar thumb `border-control` (the "UI: border-control vs bg/surface" rows).
+**R3-V12a (legacy CSS consumers).** Placeholders in the guest, check-in and admin fields move from the legacy slate colour to `fg-muted`, and the Leaflet attribution links in dark take `accent` instead of the legacy dark link colour (rows above). The kinetic band EL row was `primary-text` in both themes (8.88 in dark; the earlier `sun` row described a colour that was never rendered); the band and its rows were removed on 2026-10-11. Everything else reuses existing pairs: the skip link `accent-fg` on `accent`, the PWA banner `fg` on `surface-raised`, the focus ring rows, and the scrollbar thumb `border-control` (the "UI: border-control vs bg/surface" rows).
 
 **R3-V12b (legacy sweep) adds no colour pair.** It deletes the legacy sheets. The dark-mode contrast findings they carried are closed by the surfaces that replaced them, and each of those surfaces is covered by an existing row:
 
@@ -757,7 +754,7 @@ The WebGL hero watches `data-motion` with a `MutationObserver` and tears down wh
 | M4 | Hero dolly (T1) | `.hero__img` scale 1 → 1.14, `translateY(3%)`. Disabled when `[data-gl="on"]`, because the shader does the dolly | Scroll, same timeline | CSS scroll-driven | Static |
 | M5 | Living photograph (T2) | §5.6 | Pointer, sideways touch-drag, scroll; ambient drift ≤ 4.8 s | WebGL | Never mounted |
 | M6 | Fact strip | Six tiles open like louvres from `rotateX(-86deg)` (transform-origin top), 75 ms stagger, `--ease-shutter` | Top passes 65 % of the viewport height, once (IntersectionObserver with `rootMargin` -35 % from the bottom, HomeRevealObserver) | CSS + IO | Visible |
-| M7 | Kinetic band (graft 2) | Row A (EN outline, `-webkit-text-stroke: 1px` in `fg` at 45 % opacity) translateX 4 % → −38 %. Row B (EL italic, `primary-text`) −40 % → 0 %. Separators are the SVG star. Font `clamp(3.2rem, 11vw, 9.5rem)` | Scroll: `view()`, `animation-range: cover` | CSS scroll-driven | Static offsets: row A −10 %, row B −20 % |
+| M7 | Kinetic band (graft 2) | **Removed on 2026-10-11 with the KineticBand (owner request).** Was: Row A (EN outline, `-webkit-text-stroke: 1px` in `fg` at 45 % opacity) translateX 4 % → −38 %. Row B (EL italic, `primary-text`) −40 % → 0 %. Separators are the SVG star. Font `clamp(3.2rem, 11vw, 9.5rem)` | Scroll: `view()`, `animation-range: cover` | CSS scroll-driven | Static offsets: row A −10 %, row B −20 % |
 | M8 | Highlights | Rise 40 px and untilt from `rotateX(18deg)`, 90 ms stagger. Afterwards they tilt toward the pointer (max 6°) on fine pointers | In view / pointer | CSS + IO; JS writes `--tx`/`--ty` (rAF-throttled) | Flat |
 | M9 | Season switch (graft 10) | Cards flip `rotateY` 0 → 90° → 0 (640 ms, `--ease-sweep`, 70 ms stagger); content swaps at 50 % | Click | CSS class + JS | Instant swap |
 | M10 | Balcony window **shutters** | Two louvred shutters swing to ±104° (`--dur-shutter`, spring); a warm flare fades; the photo settles 1.14 → 1 | Top passes 55 % of the viewport height, once (`data-reveal="0.45"`, `rootMargin` -45 % from the bottom) | CSS 3D + IO | Shutters not rendered; the photo stays |
@@ -892,7 +889,6 @@ Reduced motion comes from the OS setting or from the in-page switch (`data-motio
 - A flat room row or a fanned static deck.
 - A flat map.
 - Reveals already visible.
-- Static kinetic rows.
 - No sun movement.
 - View Transitions and scroll behaviour: instant.
 - Only colour and opacity changes on hover.
@@ -967,7 +963,7 @@ Screenshot proof in the mockup: `home-390-reduced.png`, `availability-390-reduce
 - **Contact:** `phone`, `message` (WhatsApp; generic bubble, the label says "WhatsApp"), `mail`, `camera` (Instagram; generic, the label says "Instagram"), `map-pin`, `directions`, `sos` (a ring with "112" set in text next to it).
 - **Stay facts:** `area` (m²), `bed`, `bath`, `guests`, `stairs` (floor), `parking` (a "P" sign drawn as a stroked square with P), `mountain`, `walk`, `car`, `bus` (fixes the 🚗-for-bus bug, assets research §6), `plane`.
 - **Amenities:** `wifi`, `snowflake` (A/C), `flame` (fireplace), `kitchen`, `washer`, `dishwasher`, `tv`, `baby` (cot, high chair), `key`, `lock`, `rules`.
-- **Guide:** `heart`, `heart-filled`, `search`, `filter`, `grid`, `map`, `compass`, `museum`, `beach`, `fork` (food), `star` (kinetic separator and "best price" legend).
+- **Guide:** `heart`, `heart-filled`, `search`, `filter`, `grid`, `map`, `compass`, `museum`, `beach`, `fork` (food), `star` (the home pin on the relief map).
 - **Status:** `info`, `check`, `alert`, `x-circle`, `clock`, `calendar`.
 
 **Brand mark** (from `messinian-light/assets/favicon.svg`): a half sun over two wave lines.
@@ -1008,18 +1004,21 @@ The old `balcony_1_hero_720.webp`, `_1440.webp` and `balcony_1_hero.webp` are de
 
 ### 7.3 Per-room photo selection (Apartment and Home)
 
-Marketing views: 25 photos. Excluded photos are listed with the reason, from the assets research.
+Marketing views: 38 photos (selection of 2026-10-11): 28 in the six rooms, then 10 in the details section "Up close". Excluded photos are listed with the reason. *Retired* files were moved out of `public/` into the owner's local, git-ignored folder `jpegmini_optimized/_retired-from-site/<room folder>/`.
 
 | Room (chip) | Lead photo and crop | Others, in order | Excluded from marketing |
 |---|---|---|---|
-| Living | `living_8`, crop top 8 % (blown lamp, AC unit) | `living_6` (crop bottom 15 %), `living_2` (crop the orange table corner, bottom-left), `living_7`, `living_1` (entrance), `living_4`, `living_5` | `living_3`: branded packaging. `living_1_booking`: duplicate |
+| Living | `living_8`, crop top 8 % (blown lamp, AC unit) | `living_6` (crop bottom 15 %), `living_7`, `living_9` (fireplace corner), `living_10` (entrance landing), `living_4`, `living_5` | `living_2`: branded packaging (*retired*). `living_1`: old entrance decor, replaced by `living_10` (*retired*). `living_3`: branded packaging. `living_1_booking`: duplicate |
 | Kitchen | `kitchen_2` | `kitchen_6`, `kitchen_3`, `kitchen_4`, `kitchen_5`, `kitchen_1` | none |
-| Bedroom 1 | `bedroom_1`, crop left 20 % (lace curtain) | `bedroom_2`, `bedroom_3` | `bedroom_4`: near-duplicate of `_3`, and 4:3 |
+| Bedroom 1 | `bedroom_1`, crop left 20 % (lace curtain) | `bedroom_2`, `bedroom_3`, `bedroom_5` (dressing table) | `bedroom_4`: near-duplicate of `_3`, and 4:3 |
 | Bedroom 2 | `bedroom_2_5` | `bedroom_2_6`, `bedroom_2_3`, `bedroom_2_1` | `bedroom_2_2` (duplicate of `_1`), `bedroom_2_4` (duplicate of `_3`) |
-| Bathroom | `bathroom_6` | `bathroom_7`, `bathroom_3` (washing machine), `bathroom_4` | `bathroom_5` (duplicate), `bathroom_1` (soft). `bathroom_8` (medicines) and `bathroom_2` (toilet signs) are **stay hub / house rules only** |
-| Balcony | `balcony_1` | none | none |
+| Bathroom | `bathroom_6` | `bathroom_7`, `bathroom_3` (washing machine), `bathroom_4` | `bathroom_5` (duplicate), `bathroom_1` (soft). `bathroom_8` (medicines) and `bathroom_2` (toilet signs): *retired*; restore them from that folder if the stay hub or the house rules ever show them |
+| Balcony | `balcony_2` (table under the awnings) | `balcony_1` (the hero master, §7.2), `balcony_3` (table in the awnings' shade) | none |
+| Up close (`details`; not a room, no home card) | `details_1` (sunlight through a sheer curtain) | `details_2` (table mirror and a cinnamon bundle), `details_3` (pomegranates, pine cones and driftwood, fireplace behind), `details_4` (white steps fanning around a turn of the staircase), `details_5` (wooden shelves), `details_6` (decorative pumpkin), `details_7` (shells from above), `details_8` (curtain tie-back), `details_9` (shells on the balcony table), `details_10` (silver mirror) | the placemats from above (its jute weave keeps the crops that show the table above the §7.1 `check:image-assets` limit); a second table-mirror frame (duplicate); the bedside lamp (cable and switch in frame); the gift basket (cluttered); the views over the rooftops (haze, wires, poles, drying racks); the sailboat by the arch (no clean 2:3 crop) |
 
-- **Home room cards:** the lead photo of each room at 4:5 below 1024 px and 4:3 at 1024 px and above, by `object-position`. The balcony card uses `object-position: 70% 60%` (table and chairs), so it does not repeat the hero framing.
+- **Owner photos of 2026-08-01** (`living_9`, `living_10`, `bedroom_5`, `balcony_2`, `balcony_3`, `details_1` to `details_10`): iPhone originals (Display P3, with EXIF metadata) cut to 2:3 and saved as 1280×1920 sRGB JPEGs without any metadata (sharp, mozjpeg, 4:2:0; the details photos at one fixed quality, 80). The originals are in `jpegmini_optimized/_site-masters/` (local, git-ignored). The owner's other photos stay unused in `jpegmini_optimized/`: listing exports of 1024 px or less (soft in the full-screen viewer, because the Next.js image optimizer never enlarges them and the browser stretches them to the screen), duplicates, branded packaging, guest-book pages with names, weaker or off-topic shots (dark, blurred, off-colour or cluttered), and the shots listed in §7.4.
+- **Home room cards:** the lead photo of each room at 4:5 below 1024 px and 330 × 420 px at 1024 px and above (`home.css`), by `object-position`. The balcony card uses `balcony_2` at `object-position: 50% 100%` (table and chairs), so the home page does not show `balcony_1` a third time after the hero and the BalconyWindow.
+- **Details section "Up close"** (`details`; Greek "Από κοντά"): the last gallery section of the apartment page, after the balcony, with the line "Shells, wood and stone in the afternoon light" (the ten photos were taken on 2026-08-01 between 16:55 and 17:45). Ten owner close-ups, all 2:3. Their order alternates warm and pale tiles in the viewer, in every mobile row and in every row at xl (CSS columns: 5 + 5 on mobile, 4 + 4 + 2 at md, 3 + 3 + 3 + 1 at xl). No home card (`homeRooms.ts` keeps its six rooms); the copy is in `house.ts`. Details add to the room photos and never stand in for them: no clutter or utility corners, no brands or packaging, no people or guest belongings, no private data, and nothing that suggests an amenity missing from `apartmentData.ts`. Three originals have EXIF orientation 6, so the processing calls `autoOrient()` before `extract()`; sharp applies the orientation first only in that order.
 - **Guide cards:** use the museum `*-hero` photos at 16:10. The square drawn emblems are not used, to avoid a second visual style.
   - `viktoria-karelia-hero.jpg` is almost black (L = .018), so it uses the **art tile** instead.
   - The **art tile** is `band-bg` with a `band-accent` 56 px category icon and the category name. It is a deliberate illustrated tile used for any entry without a licensed photo, never beige or striped placeholders.
@@ -1035,6 +1034,8 @@ Marketing views: 25 photos. Excluded photos are listed with the reason, from the
 | Host portrait | The host letter | Natural light on the balcony, 4:5, relaxed |
 | Bedroom 2 reshoot; the shower or bath | A sharp Bedroom 2 set; resolves the "bathtub" vs "rainfall shower" contradiction (assets research §6) | Wide angle, level verticals, lights on + daylight |
 | General | n/a | ≥ 2400 px long edge; no people except the host; no brands or packaging; no private documents |
+
+The owner's photos of 2026-08-01 also show the building and its entrance, the driveway, other balconies and the view over the rooftops; of these, only a close-up of the stairs is used (§7.3, details section). The rest stay unused until the owner decides whether the site gets a section for the exterior and entrance or the other balconies. The view frames are hazy and show wires, poles or drying racks; a clear view at golden hour (first row of the table above) would be the one to add.
 
 Until then:
 
@@ -1071,10 +1072,9 @@ Colour always comes from tokens.
 | **Field** | Label (15 px 600) above; input 48 px, `radius-field`, `surface` bg, 1 px `border-control`; hint 13 px `fg-muted` | Focus: ring. Error: `danger` 2 px border, message with icon, `aria-invalid`, `aria-describedby`. Phone: `inputmode="tel" autocomplete="tel"` |
 | **SiteHeader** | Glass pill, sticky `top: 10px`, 56 px, margin `10px var(--gutter)`, overlaps the hero via a negative bottom margin. Brand (mark + wordmark) on the left; nav at ≥ lg; tools (LanguageSwitch, ThemeSwitch, CTA, menu button below lg). **Variants:** `marketing` (nav: Apartment · Availability · Kalamata guide · Contact (`/{l}#contact`); CTA "Check dates" at ≥ sm) · `guide` (same nav, **no CTA**) · `stay` (brand links to `/{l}/stay`; items: Your stay · Kalamata guide; no marketing nav, no CTA) | Current page: `aria-current="page"` plus a 1.5 px `primary` underline. After 24 px of scroll: `shadow-raised`. Brand label min 12 px |
 | **MobileMenu** | `<dialog>` opened with `showModal()`, sheet from the right, `min(88vw, 380px)`, `surface-raised`, `shadow-overlay`. Contents: nav links (display 22 px), LanguageSwitch, theme Segmented (Auto/Day/Night), MotionSwitch; in the marketing variant also Call and WhatsApp (text plus icon) | Focus trapped natively; Esc and backdrop click close it; `html:has(dialog[open]) { overflow: hidden }`; focus returns to the menu button. Entry via `@starting-style` (M23) |
-| **SiteFooter** | Waves rule (1.4 px `border-strong`). **Marketing:** brand; nav; contact (phone, e-mail, Instagram, WhatsApp); address and legal identity (after R3-L1); Privacy; "Staying with us now? Your stay →"; MotionSwitch; LanguageSwitch. **Stay:** Privacy, MotionSwitch, LanguageSwitch | Bottom padding `calc(96px + env(safe-area-inset-bottom))` when a bottom bar exists |
+| **SiteFooter** | Waves rule (1.4 px `border-strong`). **Marketing:** brand, and under it the primary tagline (§1.2; display 400 at `--text-h3`, upright so the Greek pages need no extra italic file) and the location line (`fg-muted`, caption), both the hero lede copy (`home.heroTagline`, `home.heroFacts`); nav; contact (phone, e-mail, Instagram, WhatsApp; on the home page the block has `id="contact"`, the target of every "Contact" link); address and legal identity (after R3-L1); Privacy; "Staying with us now? Your stay →"; MotionSwitch; LanguageSwitch. **Stay:** Privacy, MotionSwitch, LanguageSwitch (no tagline, no contact block) | Bottom padding `calc(96px + env(safe-area-inset-bottom))` when a bottom bar exists. The `#contact` block has `scroll-margin-top` so the sticky header does not cover it. No booking CTA in the footer (guide pages share it, §9.5) |
 | **BookBar** (mobile, < lg; Home and Apartment only) | Glass pill, fixed 12 px from the edges plus `safe-area-inset-bottom`: "from €X / night · Free tonight" (or "Next free night: Tue 20 Oct") + `sm` primary "Check dates" | Hidden until the hero leaves the view, and while any in-page booking CTA is visible (IntersectionObserver). Hidden entirely when there is no price data. `visibility` is toggled for accessibility |
 | **FactStrip** | Six facts: `90 m²` · `2` bedrooms · `1` bathroom · `4` guests · `2nd` floor · `P` free parking. Last cell is a `link-arrow` "See free dates" (**no price**; fixes the duplicate price) | Card `shadow-raised`, overlaps the hero by 26 px (mobile) / 72 px (≥ lg). 2 columns on mobile, one row at ≥ lg. Motion M6 |
-| **KineticBand** | Two rows, `aria-hidden="true"`, `lang` per row, SVG star separators, `overflow: clip` | M7. Pure decoration; the information exists elsewhere |
 | **SeasonSwitch + Highlights** | Segmented "Summer (Apr–Oct)" / "Winter (Nov–Mar)" + 4 highlight cards per season (icon disc, `h3`, 15 px text, link "See summer dates" / "See winter dates" to `/{l}/availability` with the first month of that season in the F09 fragment scheme, e.g. `m=YYYY-MM`) | The default season is computed server-side from `propertyToday(PROPERTY_TIME_ZONE, now)` against `CLIMATE_FEE_SCHEDULE.highSeasonMonths`. The switch has `aria-controls`, and the list has `aria-live="polite"`. Card content comes from R3-C1 strings; no invented claims. M8 and M9 |
 | **BalconyWindow** | Frame (10 px, 14 px at ≥ 700), aspect 4:5 on mobile / 16:10 at ≥ 700, `perspective: 1500px`; two CSS-gradient louvred shutters (only under motion), flare layer, italic quote below | M10. The shutters are `aria-hidden` |
 | **RoomsShowcase** | Chips (6 rooms, synced to the centred or active card) + track. Below lg: coverflow, card width `min(68vw, 300px)`, 4:5, snap centre. At ≥ lg: deck fan, 330×420 cards. Captions (room number 13 px + name display 28 px + one line) **on the active or centred card only** | Chips and arrow keys move the active card; Enter opens `/{l}/apartment#<room>`; "See all photos". M11 and M12 |
@@ -1082,11 +1082,10 @@ Colour always comes from tokens.
 | **LocationRelief + DistanceList** | Band section: DistanceList (source of truth: numbered rows with name, "how", and value in display 22 px) + the relief map (`role="img"` with a text alternative, "Illustrative map, not to scale. Positions from the guide's map data.") | Pins come from `src/data/mapLocations.ts` coordinates. Below 700 px, non-home pins show number only. The home label reads "You're staying here" / "Εδώ μένετε". The overlapping "50 m" label is fixed by offset. M14 and M15 |
 | **HostLetter** | Paper card (`radius-object`, rotated −.8°, `shadow-object`, grain), italic title, drop cap in `primary-text`, signature, meta (languages, reply time) | Fields render only when owner data exists (§1.4). Motion: fade only |
 | **FAQAccordion** | `<details name="faq">` (exclusive accordion; Chrome 120, Safari 17.2, Firefox 130), summary 48 px min, 17 px 600, "+" rotating 45° in `primary-text`, answer `fg-muted` 60ch; first item open | Keyboard: native. M24 |
-| **ContactBand** | Warm band: title (d1), actions: "Book on Airbnb" (`on-band`, only when the listing URL is configured), WhatsApp and Call (`outline-on-band`, text + icon, never icon-only), e-mail and Instagram links | `id="contact"`. WhatsApp uses `wa.me/<host phone>` with dates only (R3-F09 rule) |
 | **Calendar** (react-day-picker 9, already a dependency, skinned; logic from `src/lib/availability/stayQuote.ts`) | Months: `surface`, `radius-card`, `shadow-rest`. Caption: display 26 px, nominative. Weekday row 12 px 600 `fg-muted` (EN uppercase, EL sentence case, full day names in `abbr title`). Cells ≥ 44 px (mobile min-height 58): date 16 px 600 + price 12 px. **Mobile (< md): stacked months**, 3 at first plus "Show 3 more months" up to the `AVAILABILITY_HORIZON_DAYS` horizon. **≥ md: 2 months side by side** with previous/next IconButtons and a page turn (M19) | **Day states:** free · best (pill) · booked (hatch, strike, `aria-disabled`, name "…, booked") · check-out-only (the first booked night after the chosen check-in, clickable, labelled "out") · past (opacity .45, disabled) · beyond horizon (disabled) · check-in and check-out (`cal-selected`, 12 px outer radius) · in range (`cal-range`) · today (underline, 3 px offset) · focus (inset ring) · hover (`surface-sunken`). **Keyboard:** WAI-ARIA APG grid (arrows, Home/End, PageUp/PageDown, Enter/Space; react-day-picker default) + `aria-selected`. **Live region** (polite) messages: "Choose your check-in night" → "Now pick your check-out, latest Fri 6 Nov" (`maxCheckOut`) → "Minimum 2 nights from this date" (`minimumNightsFor`) → **crossing rule:** "Sat 24 Oct is booked, so Tue 27 Oct is your new check-in" (graft 8). Messages also show **inside** the calendar as a `warning` Callout |
 | **SummaryCard** (quote) | `surface`, `radius-dialog`, `shadow-raised`; sticky `top: 90px` at ≥ lg. Parts: eyebrow "Your stay"; dates in display 32 px ("18–23 Oct", **en dash, never →**); sub line (full dates, nights, "up to 4 guests"); lines **grouped by price** ("5 nights × €85"); climate fee **grouped by season** ("4 × €8 Apr–Oct", "1 × €2 Nov–Mar"; `stayPolicy.ts`); dashed rule; total (display 44 px, `primary-text`, tabular); fine print; CTAs; trust line "You pay nothing on this site: booking and payment happen on Airbnb." | **States:** empty ("Pick your dates to see the total") · check-in chosen · complete · rejected (the `StayRejection` reason as a `warning` Callout) · stale data (warning note) · unavailable / not configured (the calendar is hidden; the card shows contact CTAs only; the page still works). CTAs: "Book these dates on Airbnb" (primary, only when the URL is set; Airbnb date parameters stay off until verified, per F09), WhatsApp and Call (secondary, text labels). Motion M20 |
 | **QuoteBar** (mobile, < lg) | Glass pill: "€465 · 5 nights · total" + "Book on Airbnb" (or "See details", which scrolls to the card, when there is no URL) | Shown only when a stay is complete **and** the SummaryCard is not in view |
-| **GalleryLightbox** | `<dialog>` full screen, bg `viewer-bg`; a horizontal **native scroll-snap** track (`scroll-snap-type: x mandatory`), images `object-fit: contain`; top bar: room name and "7 / 25" (tabular), close (44 px); previous/next at ≥ md (48 px glass IconButtons) | Swipe = native scroll (no gesture library). Keys: ←/→ (`scrollBy`), Home/End, Esc. The counter updates on `scrollend`, with an IntersectionObserver fallback. Only the current ±1 images are eager. Open and close morph (§5.7); reduced motion is instant. Replaces the `framer-motion` ±1000 px spring slides in `ApartmentGalleryLightbox.tsx:36-54` |
+| **GalleryLightbox** | `<dialog>` full screen, bg `viewer-bg`; a horizontal **native scroll-snap** track (`scroll-snap-type: x mandatory`), images `object-fit: contain`; top bar: room name and "7 / 38" (tabular), close (44 px); previous/next at ≥ md (48 px glass IconButtons) | Swipe = native scroll (no gesture library). Keys: ←/→ (`scrollBy`), Home/End, Esc. The counter updates on `scrollend`, with an IntersectionObserver fallback. Only the current ±1 images are eager. Open and close morph (§5.7); reduced motion is instant. Replaces the `framer-motion` ±1000 px spring slides in `ApartmentGalleryLightbox.tsx:36-54` |
 | **GuideCard** | Media 16:10 (photo or art tile); meta: category (`olive`, 13 px 600) · straight-line distance ("1.7 km", `fg-muted`, computed from the apartment coordinates in `mapLocations.ts`); title display 22 px; summary 15 px, 2-line clamp; footer: "Directions" (`link-arrow`, external, the existing Google Directions link) + Save | Save = favourite toggle (`aria-pressed`, `heart` / `heart-filled` in `primary-text`) with a burst (M21). Shared element name `guide-<slug>` |
 | **GuideFilters** | Search field (48 px, `search` icon, `type="search"`, clears with Esc) + category chips with counts + List/Map Segmented | Filtering is client-side over the SSR list; the result count is announced in a polite live region; the empty state is an EmptyPanel with "Clear filters" |
 | **MapCard** (Leaflet, restyled; tiles per R3-M1) | Pins are `L.divIcon` HTML identical to the relief pins (a paper pill with a number disc; home pin terracotta). Popup = compact GuideCard (title, category, distance, Directions, Details) | Keyboard: the list stays the primary navigation; the map is supplementary. Popup colours use tokens; no per-component dark selectors |
@@ -1106,7 +1105,7 @@ Shell per route: M = marketing header, G = guide header, S = stay header (§8). 
    - At ≥ 768 px: two-column content (text | actions) and a vertical "Scroll" hint (hint line runs 2×, ends by 4.6 s).
    - M1–M5.
 2. **FactStrip** overlapping the hero.
-3. **KineticBand.**
+3. *KineticBand: removed on 2026-10-11 at the owner's request; the FactStrip is followed directly by the intro, with no spacer.*
 4. **Intro + Highlights** with the SeasonSwitch (eyebrow "The apartment", title d2, lead).
 5. **BalconyWindow** (eyebrow "The balcony", title, window, italic quote).
 6. **RoomsShowcase** ("A slow walk through the rooms"; its headline sits outside any transformed element, which fixes the cut-off line).
@@ -1115,8 +1114,8 @@ Shell per route: M = marketing header, G = guide header, S = stay header (§8). 
 9. **HostLetter** (`id="host"`; `/about` 308-redirects here, per V5).
 10. **Optional ReviewsStrip** (only with the owner's real Airbnb data, §1.4).
 11. **FAQ**: check-in/out, parking, climate fee, cancellation (texts from R3-L6/L7), children and cot.
-12. **ContactBand** (`id="contact"`).
-13. **Footer** with "Staying with us now? Your stay →".
+12. *ContactBand: removed on 2026-10-11 at the owner's request; the footer's contact block is the `#contact` target (item 13).*
+13. **Footer** with the tagline and location line under the brand, the contact block (`id="contact"`, the target of every "Contact" link) and "Staying with us now? Your stay →".
 
 The mockup's `home-390-light.png` and `home-1440-light.png` show order and proportions. Where they conflict, the fixes in §0.3 apply.
 
@@ -1125,10 +1124,10 @@ The mockup's `home-390-light.png` and `home-1440-light.png` show order and propo
 - Page head: eyebrow, H1 "The apartment" (d1), a lead of one paragraph, FactStrip (inline, no overlap).
 - Lead photo: `living_8` crop, 3:2 at ≥ md and 4:5 on mobile, `radius-card`, LCP (eager, high priority).
 - Sticky room chips below the header (`top: calc(var(--header-offset) + var(--header-h) + 8px)`), anchor-linking to the room sections. The active chip follows scroll via IntersectionObserver.
-- Per room (`id` = room key): title d3, one line, a masonry gallery using CSS `columns` (2 on mobile, 3 at md, 4 at xl; 8/12 px gap; `break-inside: avoid`). Photos in the §7.3 order, tapping opens GalleryLightbox.
+- Per room, then the details section "Up close" (`id` = room key, or `details`): title d3, one line, a masonry gallery using CSS `columns` (2 on mobile, 3 at md, 4 at xl; 8/12 px gap; `break-inside: avoid`). Photos in the §7.3 order, tapping opens GalleryLightbox.
 - Amenities: grouped lists with icons (§6); 2 columns at ≥ md; facts only from `apartmentData.ts` after the R3-C1 contradiction fixes.
 - CTA section: "See free dates" (primary) + "Book on Airbnb" (secondary, when the URL is set).
-- The "Contact" link targets `/{l}#contact` (plan V6).
+- The "Contact" link targets `/{l}#contact` (plan V6): the home footer's contact block since 2026-10-11.
 
 ### 9.3 Availability `/{l}/availability` (M, no BookBar; QuoteBar) — R3-V7 (skins R3-F09)
 
@@ -1242,7 +1241,7 @@ A single editorial column (65ch), H1 d1, lead, sections with d3 titles, body at 
 
 ## 11. Implementation layout
 
-Current layout (2026-10-06):
+Current layout (2026-10-11):
 
 ```
 src/app/fonts/            fonts.ts, 6 × .woff2, OFL-NotoSerifDisplay.txt, OFL-Commissioner.txt, SOURCES.txt
@@ -1255,9 +1254,9 @@ src/components/ui/        Button, IconButton, Chip, Segmented, Surface, Section,
 src/components/icons/     Icon.tsx, BrandMark.tsx, iconNames.ts
 src/components/shell/     SiteHeader, MobileMenu, SiteFooter, BookBar, AvailabilityBookBar, LanguageSwitch, ThemeSwitch, MotionSwitch, shellLinks.ts
 src/components/motion/    SharedElement.tsx
-src/components/home/      hero/* (HeroLivingPhoto, HeroGlIsland, heroGl, heroCover), FactStrip, FactCounters, KineticBand, Highlights,
+src/components/home/      hero/* (HeroLivingPhoto, HeroGlIsland, heroGl, heroCover), FactStrip, FactCounters, Highlights,
                           SeasonHighlights, BalconyWindow, RoomsSection, RoomsShowcase, NightsTeaser, LocationSection, ReliefTilt, HostLetter,
-                          FaqSection, ContactBand, HomeRevealObserver
+                          FaqSection, HomeRevealObserver
 src/components/gallery/   ApartmentGallery, GalleryLightbox, photoMorph.ts
 src/components/guide/     GuideList, GuideCard, GuideDetail, FavoritesList, PhonesDirectory, SaveButton (map: src/components/InteractiveMap.tsx,
                           LeafletMap.tsx, maps/tileSource.ts)

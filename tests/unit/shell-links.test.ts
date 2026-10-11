@@ -4,6 +4,8 @@ import { getDictionary } from '@/i18n/dictionaries';
 import {
   STAY_HUB_PATH,
   brandHref,
+  footerBrandLines,
+  footerContactId,
   footerContactLinks,
   footerNavLinks,
   footerStayLink,
@@ -106,6 +108,25 @@ describe('shell links', () => {
     expect(footerContactLinks('marketing', getDictionary('en')).map(({ key }) => key)).toEqual([
       'phone', 'email', 'instagram', 'whatsapp',
     ]);
+  });
+
+  it('gives the marketing footer the hero tagline and location line under the brand, and the slim stay footer none', () => {
+    for (const locale of ['en', 'el'] as const) {
+      const t = getDictionary(locale);
+      expect(footerBrandLines('marketing', t)).toEqual({ tagline: t.home.heroTagline, place: t.home.heroFacts });
+      expect(footerBrandLines('stay', t)).toBeNull();
+    }
+    expect(footerBrandLines('marketing', getDictionary('en'))?.tagline).toBe('Slow days on a sunlit balcony in Kalamata.');
+  });
+
+  it('puts the target of every "Contact" link in the footer of the home page only', () => {
+    const contact = navLinks('marketing', 'en', getDictionary('en')).find((link) => link.key === 'contact');
+    expect(contact?.href).toBe(`/en#${footerContactId('/en')}`);
+    expect(footerContactId('/el')).toBe('contact');
+    expect(footerContactId('/el/')).toBe('contact');
+    for (const pathname of ['/en/availability', '/el/apartment', '/en/moments', '/en/privacy', '/en/guest', '/el/stay']) {
+      expect(footerContactId(pathname), pathname).toBeUndefined();
+    }
   });
 
   it('marks the current page by path, never a hash link', () => {

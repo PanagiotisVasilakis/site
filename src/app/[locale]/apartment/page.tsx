@@ -15,8 +15,8 @@ import { localizedAlternates, localizedOpenGraph } from '@/lib/seo';
 // The BookBar price comes from the availability read: rendered per request, like home and availability.
 export const dynamic = 'force-dynamic';
 
-/** The room names and lines are the home rooms showcase's (one source for both pages). */
-const ROOM_COPY: Readonly<Record<ApartmentRoomKey, HomeRoomKey>> = {
+/** The room names and lines are the home rooms showcase's (one source for both pages); the details section's are in house.ts. */
+const ROOM_COPY: Readonly<Record<Exclude<ApartmentRoomKey, 'details'>, HomeRoomKey>> = {
   living: 'living',
   kitchen: 'kitchen',
   'bedroom-1': 'bedroom1',
@@ -56,7 +56,7 @@ export default async function ApartmentPage({ params }: { params: Promise<{ loca
   const eff = normalizeLocale(locale);
   const t = getDictionary(eff);
   const ht = t.house;
-  const rooms = APARTMENT_ROOMS.map((key) => ({ key, ...t.home.rooms.items[ROOM_COPY[key]] }));
+  const rooms = APARTMENT_ROOMS.map((key) => ({ key, ...(key === 'details' ? ht.details : t.home.rooms.items[ROOM_COPY[key]]) }));
   const photos = APARTMENT_PHOTOS.map((photo) => ({ ...photo, alt: ht.photoAlts[photo.id] }));
   const availability = await apartmentAvailability(new Date());
 

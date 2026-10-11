@@ -22,7 +22,6 @@ vi.mock('next/link', () => ({
 import Home from '@/app/[locale]/page';
 import FactStrip from '@/components/home/FactStrip';
 import Highlights from '@/components/home/Highlights';
-import KineticBand from '@/components/home/KineticBand';
 import BalconyWindow from '@/components/home/BalconyWindow';
 import RoomsShowcase from '@/components/home/RoomsShowcase';
 import { homeRoomsFrom } from '@/components/home/homeRooms';
@@ -45,10 +44,10 @@ beforeEach(() => {
 });
 
 describe('home page sections (identity §9.1 items 2-6)', () => {
-  it('places the fact strip, kinetic band, intro, balcony and rooms after the hero, in that order', async () => {
+  it('places the fact strip after the hero and the intro directly after it, then the balcony and the rooms', async () => {
     const { container } = render(await Home({ params: Promise.resolve({ locale: 'en' }) }));
 
-    const order = ['[data-hero]', '.facts', '.kinetic', '#intro', '#balcony', '#rooms'].map((selector) => {
+    const order = ['[data-hero]', '.facts', '#intro', '#balcony', '#rooms'].map((selector) => {
       const element = container.querySelector(selector);
       expect(element, selector).not.toBeNull();
       return element as Element;
@@ -56,6 +55,9 @@ describe('home page sections (identity §9.1 items 2-6)', () => {
     for (let index = 1; index < order.length; index += 1) {
       expect(order[index - 1].compareDocumentPosition(order[index]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }
+    // The KineticBand was removed on 2026-10-11 (owner request): nothing sits between the fact strip and the intro.
+    expect(container.querySelector('.kinetic')).toBeNull();
+    expect(container.querySelector('.facts')?.nextElementSibling).toHaveAttribute('id', 'intro');
   });
 
   it('has no link to the check-in page, which 404s while check-in is disabled (R-305)', async () => {
@@ -152,21 +154,6 @@ describe('FactStrip (identity §8)', () => {
       expect(observed).toHaveLength(0);
       expect(numbers(container)).toEqual(['90', '2', '1', '4', '2nd', 'P']);
     });
-  });
-});
-
-describe('KineticBand (identity §8, M7)', () => {
-  it('is decorative: hidden from assistive technology, one row per language, SVG star separators', () => {
-    const { container } = render(<KineticBand />);
-
-    const band = container.querySelector('.kinetic');
-    expect(band).toHaveAttribute('aria-hidden', 'true');
-    const rows = Array.from(container.querySelectorAll('.kinetic__row'));
-    expect(rows.map((row) => row.getAttribute('lang'))).toEqual(['en', 'el']);
-    expect(rows[0]).toHaveTextContent('Taygetos');
-    expect(rows[1]).toHaveTextContent('Ταΰγετος');
-    expect(container.querySelectorAll('.kinetic__row svg').length).toBeGreaterThan(0);
-    expect(container.textContent).not.toContain('✦');
   });
 });
 
@@ -288,7 +275,7 @@ describe('RoomsShowcase (identity §8, M11/M12)', () => {
       ['/en/apartment#bedroom-1', '/house/bedroom/bedroom_1.jpeg'],
       ['/en/apartment#bedroom-2', '/house/bedroom_2/bedroom_2_5.jpeg'],
       ['/en/apartment#bathroom', '/house/bathroom/bathroom_6.jpeg'],
-      ['/en/apartment#balcony', '/house/balcony/balcony_1.jpeg'],
+      ['/en/apartment#balcony', '/house/balcony/balcony_2.jpeg'],
     ]);
     expect(homeRoomsFrom('el', APARTMENT_PHOTOS)[2]).toMatchObject({ name: 'Υπνοδωμάτιο 1', href: '/el/apartment#bedroom-1' });
   });

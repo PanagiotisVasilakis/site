@@ -140,7 +140,8 @@ describe('the scroll-driven class list used by the calm-mode assertions', () => 
 
   it('is parsed from the stylesheets (sanity check)', () => {
     expect(SCROLL_DRIVEN.has('hero')).toBe(true);
-    expect(SCROLL_DRIVEN.has('kinetic')).toBe(true);
+    // M15, in a later @supports block of motion.css (the kinetic band's M7 rules go with the band, 2026-10-11).
+    expect(SCROLL_DRIVEN.has('relief__waves')).toBe(true);
   });
 
   it('has no scroll-driven or animated rule in the stay stylesheet', () => {

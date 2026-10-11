@@ -34,7 +34,6 @@ vi.mock('@/data/contact', async (importOriginal) => {
 });
 
 import Home from '@/app/[locale]/page';
-import ContactBand from '@/components/home/ContactBand';
 import FaqSection from '@/components/home/FaqSection';
 import HostLetter from '@/components/home/HostLetter';
 import LocationSection from '@/components/home/LocationSection';
@@ -64,11 +63,11 @@ beforeEach(() => {
   Object.assign(mocks.contact, { airbnb: '', hostName: '', languages: '', replyTime: '' });
 });
 
-describe('home page order (identity §9.1 items 7-12)', () => {
-  it('places the teaser, location, host letter, FAQ and contact band after the rooms, in that order', async () => {
+describe('home page order (identity §9.1 items 7-11)', () => {
+  it('places the teaser, location, host letter and FAQ after the rooms, in that order, and ends with the FAQ', async () => {
     const { container } = await renderHome();
 
-    const order = ['#rooms', '#nights', '#location', '#host', '#faq', '#contact'].map((selector) => {
+    const order = ['#rooms', '#nights', '#location', '#host', '#faq'].map((selector) => {
       const element = container.querySelector(selector);
       expect(element, selector).not.toBeNull();
       return element as Element;
@@ -76,6 +75,11 @@ describe('home page order (identity §9.1 items 7-12)', () => {
     for (let index = 1; index < order.length; index += 1) {
       expect(order[index - 1].compareDocumentPosition(order[index]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }
+    // The ContactBand was removed on 2026-10-11 (owner request): the #contact target is the footer's contact block
+    // (SiteFooter in the locale layout; tests/components/site-shell.test.tsx), so the page has none and ends with the FAQ.
+    expect(container.querySelector('#contact')).toBeNull();
+    const sections = container.querySelectorAll('section');
+    expect(sections[sections.length - 1]).toHaveAttribute('id', 'faq');
   });
 });
 
@@ -163,31 +167,6 @@ describe('FAQ (identity §8 FAQAccordion)', () => {
     expect(items[2]).toHaveTextContent('April–October: €8 per night');
     expect(items[2]).toHaveTextContent('November–March: €2 per night');
     expect(items[3]).toHaveTextContent('Free cancellation up to 30 days before arrival');
-  });
-});
-
-describe('ContactBand (identity §8)', () => {
-  it('is the #contact target with WhatsApp, Call, e-mail and Instagram, and no Airbnb button without a listing URL', () => {
-    const { container } = render(<ContactBand locale="en" />);
-
-    expect(container.querySelector('section#contact')).not.toBeNull();
-    expect(screen.getByRole('link', { name: /WhatsApp/ })).toHaveAttribute('href', expect.stringMatching(/^https:\/\/wa\.me\//));
-    expect(screen.getByRole('link', { name: 'Call' })).toHaveAttribute('href', expect.stringMatching(/^tel:\+30/));
-    expect(screen.getByRole('link', { name: /@/ })).toHaveAttribute('href', expect.stringMatching(/^mailto:/));
-    expect(screen.getByRole('link', { name: /Instagram/ })).toHaveAttribute('href', expect.stringContaining('instagram.com'));
-    expect(screen.queryByRole('link', { name: /Airbnb/ })).toBeNull();
-    expect(container.innerHTML).not.toContain('airbnb');
-  });
-
-  it('shows "Book on Airbnb" only with a valid listing URL', () => {
-    mocks.contact.airbnb = 'https://evil.example/rooms/1';
-    const { unmount } = render(<ContactBand locale="en" />);
-    expect(screen.queryByRole('link', { name: /Airbnb/ })).toBeNull();
-    unmount();
-
-    mocks.contact.airbnb = 'https://www.airbnb.com/rooms/12345';
-    render(<ContactBand locale="en" />);
-    expect(screen.getByRole('link', { name: /Book on Airbnb/ })).toHaveAttribute('href', 'https://www.airbnb.com/rooms/12345');
   });
 });
 

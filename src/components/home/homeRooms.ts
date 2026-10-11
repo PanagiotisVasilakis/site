@@ -31,8 +31,8 @@ const HOME_ROOMS: ReadonlyArray<Readonly<{
   { key: 'bedroom1', photo: '/house/bedroom/bedroom_1.jpeg', position: '62% 50%', anchor: 'bedroom-1' },
   { key: 'bedroom2', photo: '/house/bedroom_2/bedroom_2_5.jpeg', position: '40% 50%', anchor: 'bedroom-2' },
   { key: 'bathroom', photo: '/house/bathroom/bathroom_6.jpeg', position: '45% 50%', anchor: 'bathroom' },
-  // §7.3: the table and chairs, so the card does not repeat the hero framing.
-  { key: 'balcony', photo: '/house/balcony/balcony_1.jpeg', position: '70% 60%', anchor: 'balcony' },
+  // §7.3: balcony_2 (table and chairs), so the home page does not show the hero photo balcony_1 a third time.
+  { key: 'balcony', photo: '/house/balcony/balcony_2.jpeg', position: '50% 100%', anchor: 'balcony' },
 ];
 
 export function homeRoomsFrom(locale: Locale, photos: ReadonlyArray<Pick<ApartmentPhoto, 'src'>>): HomeRoom[] {
