@@ -77,22 +77,23 @@ describe('apartment page (identity §9.2)', () => {
     }
   });
 
-  it('shows the 38 marketing photos in the §7.3 order and never an excluded one', async () => {
+  it('shows the 39 marketing photos in the §7.3 order and never an excluded one', async () => {
     const { container } = await renderPage('en');
 
     const sources = [...container.querySelectorAll('img')].map((img) => img.getAttribute('src') ?? '');
     for (const name of EXCLUDED) {
       expect(sources.filter((src) => src.includes(`/${name}.`)), name).toEqual([]);
     }
-    // The lead photo (living_8, LCP), the 27 room tiles and the 10 details tiles.
+    // The lead photo (living_8, LCP), the 28 room tiles and the 10 details tiles.
     const lead = container.querySelector('.apt-lead img');
     expect(lead?.getAttribute('src')).toBe('/house/living/living_8.jpeg');
     expect(lead?.getAttribute('loading')).toBe('eager');
     expect(lead?.getAttribute('fetchpriority')).toBe('high');
     const tiles = [...container.querySelectorAll('.apt-masonry img')].map((img) => img.getAttribute('src'));
     expect(tiles).toEqual([
-      '/house/living/living_6.jpeg', '/house/living/living_7.jpeg', '/house/living/living_9.jpeg',
-      '/house/living/living_10.jpeg', '/house/living/living_4.jpeg', '/house/living/living_5.jpeg',
+      '/house/living/living_6.jpeg', '/house/living/living_11.jpeg', '/house/living/living_7.jpeg',
+      '/house/living/living_9.jpeg', '/house/living/living_10.jpeg', '/house/living/living_4.jpeg',
+      '/house/living/living_5.jpeg',
       '/house/kitchen/kitchen_2.jpeg', '/house/kitchen/kitchen_6.jpeg', '/house/kitchen/kitchen_3.jpeg',
       '/house/kitchen/kitchen_4.jpeg', '/house/kitchen/kitchen_5.jpeg', '/house/kitchen/kitchen_1.jpeg',
       '/house/bedroom/bedroom_1.jpeg', '/house/bedroom/bedroom_2.jpeg', '/house/bedroom/bedroom_3.jpeg',
@@ -241,28 +242,33 @@ describe('apartment page gallery wiring (identity §9.2, §8 GalleryLightbox)', 
 
     await user.click(tile('/house/kitchen/kitchen_2.jpeg'));
     expect(viewer().dialog).toHaveAttribute('open');
-    expect(viewer().counter).toHaveTextContent('8 / 38');
+    expect(viewer().counter).toHaveTextContent('9 / 39');
     expect(viewer().room).toHaveTextContent('Kitchen');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
     expect(viewer().dialog).not.toHaveAttribute('open');
 
+    await user.click(tile('/house/living/living_11.jpeg'));
+    expect(viewer().counter).toHaveTextContent('3 / 39');
+    expect(viewer().room).toHaveTextContent('Living room');
+    await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
+
     await user.click(tile('/house/balcony/balcony_3.jpeg'));
-    expect(viewer().counter).toHaveTextContent('28 / 38');
+    expect(viewer().counter).toHaveTextContent('29 / 39');
     expect(viewer().room).toHaveTextContent('Balcony');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
 
     await user.click(tile('/house/details/details_1.jpeg'));
-    expect(viewer().counter).toHaveTextContent('29 / 38');
+    expect(viewer().counter).toHaveTextContent('30 / 39');
     expect(viewer().room).toHaveTextContent('Up close');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
 
     await user.click(tile('/house/details/details_10.jpeg'));
-    expect(viewer().counter).toHaveTextContent('38 / 38');
+    expect(viewer().counter).toHaveTextContent('39 / 39');
     expect(viewer().room).toHaveTextContent('Up close');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
 
     await user.click(container.querySelector('.apt-lead__open') as HTMLElement);
-    expect(viewer().counter).toHaveTextContent('1 / 38');
+    expect(viewer().counter).toHaveTextContent('1 / 39');
     expect(viewer().room).toHaveTextContent('Living room');
   });
 

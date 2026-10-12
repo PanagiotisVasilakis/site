@@ -79,6 +79,7 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
         photoAlts: {
             living_8: "Open-plan living room with a corner sofa, the dining table and the kitchen behind",
             living_6: "Corner sofa and coffee table, with the kitchen across the room",
+            living_11: "Dining table with six chairs beside the kitchen counter, seen through an arch",
             living_7: "Sofa facing the corner fireplace, with tall curtained windows",
             living_9: "Floor cushion with a fluffy throw beside the corner fireplace and a tall curtained window",
             living_10: "Entrance landing with a white cabinet, an umbrella stand and the front door",
@@ -142,6 +143,7 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
         photoAlts: {
             living_8: "Ενιαίο καθιστικό με γωνιακό καναπέ, την τραπεζαρία και την κουζίνα στο βάθος",
             living_6: "Γωνιακός καναπές και τραπεζάκι σαλονιού, με την κουζίνα απέναντι",
+            living_11: "Τραπεζαρία με έξι καρέκλες δίπλα στον πάγκο της κουζίνας, μέσα από μια καμάρα",
             living_7: "Καναπές απέναντι στο γωνιακό τζάκι, με ψηλά παράθυρα και κουρτίνες",
             living_9: "Μαξιλάρα δαπέδου με χνουδωτό ριχτάρι δίπλα στο γωνιακό τζάκι και σε ψηλό παράθυρο με κουρτίνες",
             living_10: "Το πλατύσκαλο της εισόδου με λευκό ντουλάπι, ομπρελοθήκη και την εξώπορτα",

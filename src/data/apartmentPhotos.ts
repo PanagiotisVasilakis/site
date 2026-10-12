@@ -1,8 +1,9 @@
-// The apartment page photo set (identity §7.3): 38 marketing photos per section (six rooms, then the details), in order, with the crops.
+// The apartment page photo set (identity §7.3): 39 marketing photos per section (six rooms, then the details), in order, with the crops.
 // Retired from public/ on 2026-10-11 (the owner keeps the files): living_1 (old entrance decor, now living_10),
 // living_2 (branded packaging), bathroom_2 (toilet signs) and bathroom_8 (medicines). Removed earlier: living_3
 // (branded packaging), living_1_booking, bedroom_4, bedroom_2_2, bedroom_2_4 and bathroom_5 (duplicates), bathroom_1
-// (soft). living_9, living_10, bedroom_5, balcony_2, balcony_3 and details_1 to details_10 are the owner's photos of 2026-08-01, cut to 2:3.
+// (soft). living_9, living_10, living_11, bedroom_5, balcony_2, balcony_3 and details_1 to details_10 are the owner's photos
+// of 2026-08-01, cut to 2:3.
 
 /**
  * Section keys: the six rooms (linked from the home room cards), then the details section ('Up close', no home card).
@@ -30,6 +31,8 @@ export const APARTMENT_PHOTOS = [
   // Living: living_8 is the page's lead photo (LCP); the blown lamp and the AC unit sit in the top 8 %.
   { id: 'living_8', room: 'living', src: '/house/living/living_8.jpeg', ...LANDSCAPE, crop: { top: .08 } },
   { id: 'living_6', room: 'living', src: '/house/living/living_6.jpeg', ...LANDSCAPE, crop: { bottom: .15 } },
+  // Owner exception of 2026-10-11 (identity §7.1): the brand labels on the dining table are blurred.
+  { id: 'living_11', room: 'living', src: '/house/living/living_11.jpeg', width: 1280, height: 1920 },
   { id: 'living_7', room: 'living', src: '/house/living/living_7.jpeg', ...LANDSCAPE },
   { id: 'living_9', room: 'living', src: '/house/living/living_9.jpeg', width: 1280, height: 1920 },
   { id: 'living_10', room: 'living', src: '/house/living/living_10.jpeg', width: 1280, height: 1920 },
@@ -73,5 +76,5 @@ export const APARTMENT_PHOTOS = [
 
 export type ApartmentPhotoId = (typeof APARTMENT_PHOTOS)[number]['id'];
 
-/** The page's lead photo; it opens the viewer at 1 / 38 and is not repeated in the Living tiles. */
+/** The page's lead photo; it opens the viewer at 1 / 39 and is not repeated in the Living tiles. */
 export const APARTMENT_LEAD_PHOTO_ID: ApartmentPhotoId = 'living_8';
