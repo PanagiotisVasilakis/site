@@ -12,7 +12,11 @@ const DEFAULT_THRESHOLD = 0.35;
  * threshold is a share of the element's own area, which an element taller than innerHeight /
  * threshold (the host letter at 400 % zoom) never reaches. The class only matters under the motion
  * gate (motion.css); without motion every section is already in its final state. Put `data-reveal`
- * on an element whose className React never changes, or a re-render would drop the class.
+ * on an element whose className React never changes, or a re-render would drop the class. At load,
+ * two frames after the observers start, every target whose top is already above the viewport's
+ * bottom edge is revealed too, so a restored scroll position reveals what it passed. The fact strip
+ * overlaps the hero, so it sits in the bottom 35 % of the first screen and would stay an empty card
+ * until the first scroll.
  */
 export default function HomeRevealObserver() {
   useEffect(() => {
@@ -22,6 +26,7 @@ export default function HomeRevealObserver() {
       return undefined;
     }
     const observers = new Map<number, IntersectionObserver>();
+    const owners = new Map<HTMLElement, IntersectionObserver>();
     for (const target of targets) {
       const parsed = Number.parseFloat(target.dataset.reveal ?? '');
       const threshold = parsed > 0 && parsed <= 1 ? parsed : DEFAULT_THRESHOLD;
@@ -37,8 +42,22 @@ export default function HomeRevealObserver() {
         observers.set(threshold, observer);
       }
       observer.observe(target);
+      owners.set(target, observer);
     }
-    return () => observers.forEach((observer) => observer.disconnect());
+    // Two frames later: the first runs before the next paint, so only after the second has the hidden state certainly been painted and the M6/M8 transitions still play.
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        for (const [target, observer] of owners) {
+          if (target.classList.contains('is-in') || target.getBoundingClientRect().top >= window.innerHeight) continue;
+          target.classList.add('is-in');
+          observer.unobserve(target);
+        }
+      });
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      observers.forEach((observer) => observer.disconnect());
+    };
   }, []);
 
   return null;

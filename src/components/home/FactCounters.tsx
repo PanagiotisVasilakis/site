@@ -28,14 +28,16 @@ export default function FactCounters() {
       return node instanceof Text && /^\d+$/u.test(node.data) ? [{ node, value: Number(node.data), final: node.data }] : [];
     });
     let frame = 0;
+    let started = false;
 
-    const observer = new IntersectionObserver((entries) => {
-      if (!entries.some((entry) => entry.isIntersecting)) return;
+    const start = () => {
+      if (started) return;
+      started = true;
       observer.disconnect();
-      let start = 0;
+      let begin = 0;
       const step = (now: number) => {
-        if (!start) start = now;
-        const progress = Math.min(1, (now - start) / COUNT_MS);
+        if (!begin) begin = now;
+        const progress = Math.min(1, (now - begin) / COUNT_MS);
         const eased = 1 - (1 - progress) ** 3;
         for (const counter of counters) {
           counter.node.data = progress < 1 ? `${Math.round(counter.value * eased)}` : counter.final;
@@ -43,11 +45,22 @@ export default function FactCounters() {
         frame = progress < 1 ? requestAnimationFrame(step) : 0;
       };
       frame = requestAnimationFrame(step);
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) start();
     }, { rootMargin: `0px 0px -${Math.round(THRESHOLD * 100)}% 0px` });
     observer.observe(strip);
+    // A strip already on screen at load (it overlaps the hero) starts two frames later, as HomeRevealObserver reveals it.
+    let loadFrame = requestAnimationFrame(() => {
+      loadFrame = requestAnimationFrame(() => {
+        if (strip.getBoundingClientRect().top < window.innerHeight) start();
+      });
+    });
 
     return () => {
       observer.disconnect();
+      cancelAnimationFrame(loadFrame);
       cancelAnimationFrame(frame);
       for (const counter of counters) counter.node.data = counter.final;
     };

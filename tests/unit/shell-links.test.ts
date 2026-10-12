@@ -89,12 +89,32 @@ describe('shell links', () => {
       ['Availability', '/en/availability'],
       ['Kalamata guide', '/en/moments'],
       ['Contact', '/en#contact'],
+      ['Your stay', '/en/stay'],
     ]);
     expect(headerCta('marketing', 'en', t)).toEqual({ key: 'check-dates', href: '/en/availability', label: 'Check dates' });
     expect(menuContactLinks('marketing', t).map(({ key, href }) => [key, href])).toEqual([
       ['call', 'tel:+306955810051'],
       ['whatsapp', 'https://wa.me/306955810051'],
     ]);
+  });
+
+  it.each([
+    ['en', 'Your stay'],
+    ['el', 'Η διαμονή σας'],
+  ] as const)('ends the marketing and guide nav with "Your stay" and lists it once in the footer (%s)', (locale, label) => {
+    const t = getDictionary(locale);
+    const stay = { key: 'stay', href: `/${locale}${STAY_HUB_PATH}`, label: t.ui.yourStay };
+    expect(stay.label).toBe(label);
+    expect(navLinks('marketing', locale, t).at(-1)).toEqual(stay);
+    expect(navLinks('guide', locale, t).at(-1)).toEqual(stay);
+    // The footer shows "Your stay" on its own (footerStayLink): the nav list must not repeat it.
+    expect(footerNavLinks('marketing', locale, t).map(({ key }) => key)).not.toContain('stay');
+    expect(footerStayLink('marketing', locale, t)).toEqual({
+      key: 'your-stay', href: `/${locale}${STAY_HUB_PATH}`, label: t.shell.footerStay,
+    });
+    const footerHubLinks = [...footerNavLinks('marketing', locale, t), footerStayLink('marketing', locale, t)]
+      .filter((link) => link?.href === `/${locale}${STAY_HUB_PATH}`);
+    expect(footerHubLinks).toHaveLength(1);
   });
 
   it('gives guide pages the same nav without a CTA or menu contact rows', () => {

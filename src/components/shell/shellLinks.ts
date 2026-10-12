@@ -56,7 +56,8 @@ export function brandHref(variant: ShellVariant, locale: string): string {
 
 /**
  * Header and menu navigation. The stay variant carries no booking or availability link (§9.4):
- * only "Your stay" and "Kalamata guide".
+ * only "Your stay" and "Kalamata guide". The marketing and guide navigation ends with "Your stay", for guests
+ * who start from the public site (the in-stay pages carry it as their first item).
  */
 export function navLinks(variant: ShellVariant, locale: string, t: Dictionary): ShellLink[] {
   const guide: ShellLink = { key: 'guide', href: `/${locale}/moments`, label: t.shell.navGuide };
@@ -71,6 +72,7 @@ export function navLinks(variant: ShellVariant, locale: string, t: Dictionary): 
     { key: 'availability', href: `/${locale}/availability`, label: t.shell.navAvailability },
     guide,
     { key: 'contact', href: `/${locale}#contact`, label: t.shell.navContact },
+    { key: 'stay', href: `/${locale}${STAY_HUB_PATH}`, label: t.ui.yourStay },
   ];
 }
 
@@ -103,10 +105,13 @@ export function footerContactLinks(variant: FooterVariant, t: Dictionary): Shell
   ];
 }
 
-/** Footer navigation: the full nav plus "Your stay" in marketing; nothing in the slim stay footer. */
+/**
+ * Footer navigation: the full nav plus "Your stay" in marketing; nothing in the slim stay footer. The footer shows
+ * "Your stay" on its own (footerStayLink), so the nav list leaves that item out.
+ */
 export function footerNavLinks(variant: FooterVariant, locale: string, t: Dictionary): ShellLink[] {
   if (variant === 'stay') return [];
-  return navLinks('marketing', locale, t);
+  return navLinks('marketing', locale, t).filter((link) => link.key !== 'stay');
 }
 
 export function footerStayLink(variant: FooterVariant, locale: string, t: Dictionary): ShellLink | null {

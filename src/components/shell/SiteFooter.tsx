@@ -90,7 +90,7 @@ export default function SiteFooter({ locale }: { locale: string }) {
 
         <div className="site-footer__prefs">
           {/* Deviation from §8 (owner to confirm): the header icon only toggles Day/Night and the menu
-              button is hidden at ≥ 1280 px, so the footer also carries Auto · Day · Night at every width. */}
+              button is hidden at ≥ 1320 px, so the footer also carries Auto · Day · Night at every width. */}
           <ThemeSetting t={t.shell} />
           <MotionSwitch t={t.shell} />
           <LanguageSwitch locale={locale} label={t.shell.language} />

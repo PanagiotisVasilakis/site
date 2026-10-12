@@ -77,14 +77,14 @@ describe('apartment page (identity §9.2)', () => {
     }
   });
 
-  it('shows the 39 marketing photos in the §7.3 order and never an excluded one', async () => {
+  it('shows the 41 marketing photos in the §7.3 order and never an excluded one', async () => {
     const { container } = await renderPage('en');
 
     const sources = [...container.querySelectorAll('img')].map((img) => img.getAttribute('src') ?? '');
     for (const name of EXCLUDED) {
       expect(sources.filter((src) => src.includes(`/${name}.`)), name).toEqual([]);
     }
-    // The lead photo (living_8, LCP), the 28 room tiles and the 10 details tiles.
+    // The lead photo (living_8, LCP), the 30 room tiles and the 10 details tiles.
     const lead = container.querySelector('.apt-lead img');
     expect(lead?.getAttribute('src')).toBe('/house/living/living_8.jpeg');
     expect(lead?.getAttribute('loading')).toBe('eager');
@@ -103,6 +103,7 @@ describe('apartment page (identity §9.2)', () => {
       '/house/bathroom/bathroom_6.jpeg', '/house/bathroom/bathroom_7.jpeg', '/house/bathroom/bathroom_3.jpeg',
       '/house/bathroom/bathroom_4.jpeg',
       '/house/balcony/balcony_2.jpeg', '/house/balcony/balcony_1.jpeg', '/house/balcony/balcony_3.jpeg',
+      '/house/balcony/balcony_4.jpeg', '/house/balcony/balcony_5.jpeg',
       '/house/details/details_1.jpeg', '/house/details/details_2.jpeg', '/house/details/details_3.jpeg',
       '/house/details/details_4.jpeg', '/house/details/details_5.jpeg', '/house/details/details_6.jpeg',
       '/house/details/details_7.jpeg', '/house/details/details_8.jpeg', '/house/details/details_9.jpeg',
@@ -242,33 +243,43 @@ describe('apartment page gallery wiring (identity §9.2, §8 GalleryLightbox)', 
 
     await user.click(tile('/house/kitchen/kitchen_2.jpeg'));
     expect(viewer().dialog).toHaveAttribute('open');
-    expect(viewer().counter).toHaveTextContent('9 / 39');
+    expect(viewer().counter).toHaveTextContent('9 / 41');
     expect(viewer().room).toHaveTextContent('Kitchen');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
     expect(viewer().dialog).not.toHaveAttribute('open');
 
     await user.click(tile('/house/living/living_11.jpeg'));
-    expect(viewer().counter).toHaveTextContent('3 / 39');
+    expect(viewer().counter).toHaveTextContent('3 / 41');
     expect(viewer().room).toHaveTextContent('Living room');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
 
     await user.click(tile('/house/balcony/balcony_3.jpeg'));
-    expect(viewer().counter).toHaveTextContent('29 / 39');
+    expect(viewer().counter).toHaveTextContent('29 / 41');
+    expect(viewer().room).toHaveTextContent('Balcony');
+    await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
+
+    await user.click(tile('/house/balcony/balcony_4.jpeg'));
+    expect(viewer().counter).toHaveTextContent('30 / 41');
+    expect(viewer().room).toHaveTextContent('Balcony');
+    await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
+
+    await user.click(tile('/house/balcony/balcony_5.jpeg'));
+    expect(viewer().counter).toHaveTextContent('31 / 41');
     expect(viewer().room).toHaveTextContent('Balcony');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
 
     await user.click(tile('/house/details/details_1.jpeg'));
-    expect(viewer().counter).toHaveTextContent('30 / 39');
+    expect(viewer().counter).toHaveTextContent('32 / 41');
     expect(viewer().room).toHaveTextContent('Up close');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
 
     await user.click(tile('/house/details/details_10.jpeg'));
-    expect(viewer().counter).toHaveTextContent('39 / 39');
+    expect(viewer().counter).toHaveTextContent('41 / 41');
     expect(viewer().room).toHaveTextContent('Up close');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
 
     await user.click(container.querySelector('.apt-lead__open') as HTMLElement);
-    expect(viewer().counter).toHaveTextContent('1 / 39');
+    expect(viewer().counter).toHaveTextContent('1 / 41');
     expect(viewer().room).toHaveTextContent('Living room');
   });
 

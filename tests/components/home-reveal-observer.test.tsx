@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { render } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { StrictMode } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import FactCounters from '@/components/home/FactCounters';
 import HomeRevealObserver from '@/components/home/HomeRevealObserver';
@@ -37,6 +38,56 @@ function stubObserver() {
   });
   return observations;
 }
+
+/** A controllable requestAnimationFrame: a queue the test flushes by hand, so it decides when a frame runs. */
+function stubFrames() {
+  const queue = new Map<number, FrameRequestCallback>();
+  const cancelled: number[] = [];
+  let lastId = 0;
+  let executed = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    lastId += 1;
+    queue.set(lastId, callback);
+    return lastId;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+    cancelled.push(id);
+    queue.delete(id);
+  });
+  return {
+    cancelled,
+    executed: () => executed,
+    pending: () => Array.from(queue.keys()),
+    /** Runs the frames queued so far; a frame requested while they run waits for the next flush. */
+    flush: (now = 1000) => {
+      const due = Array.from(queue.values());
+      queue.clear();
+      for (const callback of due) {
+        executed += 1;
+        callback(now);
+      }
+    },
+  };
+}
+
+/** jsdom lays nothing out (every rect is zero, top 0 < innerHeight): a target sits below the viewport unless a test places it. */
+const tops = new WeakMap<Element, number>();
+function placeAt(element: Element, top: number) {
+  tops.set(element, top);
+}
+
+let frames: ReturnType<typeof stubFrames>;
+let rectSpy: ReturnType<typeof vi.spyOn>;
+
+beforeEach(() => {
+  frames = stubFrames();
+  rectSpy = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function rect(this: Element) {
+    const top = tops.get(this) ?? window.innerHeight + 200;
+    return { x: 0, y: 0, width: 0, height: 0, top, bottom: top + 100, left: 0, right: 0, toJSON: () => ({}) };
+  });
+});
+
+afterEach(() => rectSpy.mockRestore());
 
 describe('HomeRevealObserver trigger (R-379)', () => {
   it('reveals by a share of the viewport, not of the element: a rootMargin and no threshold', () => {
@@ -125,6 +176,191 @@ describe('HomeRevealObserver trigger (R-379)', () => {
   });
 });
 
+describe('HomeRevealObserver load-time reveal', () => {
+  it('reveals a target already on screen after the second frame, without an intersection report, and leaves one below the viewport observed', () => {
+    const observations = stubObserver();
+    const { container } = render(
+      <>
+        <div data-reveal id="onscreen" />
+        <div data-reveal id="below" />
+        <HomeRevealObserver />
+      </>,
+    );
+    const onscreen = container.querySelector('#onscreen') as HTMLElement;
+    const below = container.querySelector('#below') as HTMLElement;
+    placeAt(onscreen, 100);
+    const [observation] = observations;
+
+    // The hidden state is painted first, so the M6/M8 transitions still play.
+    expect(onscreen).not.toHaveClass('is-in');
+
+    // The first frame runs before the next paint: it only schedules the second.
+    frames.flush();
+    expect(onscreen).not.toHaveClass('is-in');
+    expect(observation.unobserved).toStrictEqual([]);
+    expect(frames.pending()).toHaveLength(1);
+
+    frames.flush();
+
+    expect(onscreen).toHaveClass('is-in');
+    expect(observation.unobserved).toStrictEqual([onscreen]);
+    expect(below).not.toHaveClass('is-in');
+    expect(observation.disconnected).toBe(false);
+  });
+
+  it('also reveals a target already above the viewport (a restored scroll position)', () => {
+    const observations = stubObserver();
+    const { container } = render(
+      <>
+        <div data-reveal id="above" />
+        <HomeRevealObserver />
+      </>,
+    );
+    const above = container.querySelector('#above') as HTMLElement;
+    placeAt(above, -400);
+
+    frames.flush();
+    expect(above).not.toHaveClass('is-in');
+
+    frames.flush();
+
+    expect(above).toHaveClass('is-in');
+    expect(observations[0].unobserved).toStrictEqual([above]);
+  });
+
+  it('unobserves a revealed target from the observer that owns its share', () => {
+    const observations = stubObserver();
+    const { container } = render(
+      <>
+        <div data-reveal id="first" />
+        <div data-reveal="0.45" id="window" />
+        <HomeRevealObserver />
+      </>,
+    );
+    const first = container.querySelector('#first') as HTMLElement;
+    const windowTarget = container.querySelector('#window') as HTMLElement;
+    placeAt(first, 100);
+    placeAt(windowTarget, 120);
+
+    frames.flush();
+    expect(observations.map(({ unobserved }) => unobserved)).toStrictEqual([[], []]);
+
+    frames.flush();
+
+    expect(observations.map(({ unobserved }) => unobserved)).toStrictEqual([[first], [windowTarget]]);
+  });
+
+  it('cancels the load-time frame when it unmounts first, so nothing is revealed afterwards', () => {
+    stubObserver();
+    const { container, unmount } = render(
+      <>
+        <div data-reveal id="onscreen" />
+        <HomeRevealObserver />
+      </>,
+    );
+    const onscreen = container.querySelector('#onscreen') as HTMLElement;
+    placeAt(onscreen, 100);
+    expect(frames.pending()).toHaveLength(1);
+    const [scheduled] = frames.pending();
+
+    unmount();
+    expect(frames.cancelled).toContain(scheduled);
+    frames.flush();
+
+    expect(onscreen).not.toHaveClass('is-in');
+  });
+
+  it('cancels the second frame when it unmounts between the two frames, so nothing is revealed afterwards', () => {
+    const observations = stubObserver();
+    const { container, unmount } = render(
+      <>
+        <div data-reveal id="onscreen" />
+        <HomeRevealObserver />
+      </>,
+    );
+    const onscreen = container.querySelector('#onscreen') as HTMLElement;
+    placeAt(onscreen, 100);
+
+    frames.flush();
+    expect(onscreen).not.toHaveClass('is-in');
+    expect(frames.pending()).toHaveLength(1);
+    const [second] = frames.pending();
+
+    unmount();
+    expect(frames.cancelled).toContain(second);
+    expect(frames.pending()).toHaveLength(0);
+    frames.flush();
+
+    expect(onscreen).not.toHaveClass('is-in');
+    expect(observations[0].unobserved).toStrictEqual([]);
+  });
+
+  it('leaves a target that is already revealed alone: the frames skip it and do not unobserve it again', () => {
+    const observations = stubObserver();
+    const { container } = render(
+      <>
+        <div data-reveal id="reported" />
+        <div className="is-in" data-reveal id="served" />
+        <HomeRevealObserver />
+      </>,
+    );
+    const reported = container.querySelector('#reported') as HTMLElement;
+    const served = container.querySelector('#served') as HTMLElement;
+    placeAt(reported, 100);
+    placeAt(served, 100);
+    const [observation] = observations;
+    // The server markup already carries is-in on one target, so it is never observed.
+    expect(observation.targets).toStrictEqual([reported]);
+
+    // An intersection report reveals the other one before the frames run.
+    observation.report([{ target: reported, isIntersecting: true }]);
+    expect(reported).toHaveClass('is-in');
+    expect(observation.unobserved).toStrictEqual([reported]);
+
+    expect(() => {
+      frames.flush();
+      frames.flush();
+    }).not.toThrow();
+
+    expect(reported).toHaveClass('is-in');
+    expect(served).toHaveClass('is-in');
+    expect(observation.unobserved).toStrictEqual([reported]);
+    expect(frames.pending()).toHaveLength(0);
+  });
+
+  it('under StrictMode (effects run, clean up and run again) reveals the on-screen target once and keeps the one below observed', () => {
+    const observations = stubObserver();
+    const { container } = render(
+      <StrictMode>
+        <div data-reveal id="onscreen" />
+        <div data-reveal id="below" />
+        <HomeRevealObserver />
+      </StrictMode>,
+    );
+    const onscreen = container.querySelector('#onscreen') as HTMLElement;
+    const below = container.querySelector('#below') as HTMLElement;
+    placeAt(onscreen, 100);
+
+    // The first run is cleaned up: its observer is disconnected and its pending frame cancelled.
+    expect(observations).toHaveLength(2);
+    expect(observations.map(({ disconnected }) => disconnected)).toStrictEqual([true, false]);
+    expect(frames.cancelled).toHaveLength(1);
+    expect(frames.pending()).toHaveLength(1);
+    expect(frames.pending()).not.toContain(frames.cancelled[0]);
+
+    frames.flush();
+    expect(onscreen).not.toHaveClass('is-in');
+    frames.flush();
+
+    expect(onscreen).toHaveClass('is-in');
+    expect(below).not.toHaveClass('is-in');
+    expect(observations.map(({ unobserved }) => unobserved)).toStrictEqual([[], [onscreen]]);
+    expect(observations[1].targets).toStrictEqual([onscreen, below]);
+    expect(observations[1].disconnected).toBe(false);
+    expect(frames.pending()).toHaveLength(0);
+  });
+});
+
 describe('FactCounters trigger (R-379)', () => {
   afterEach(() => document.documentElement.removeAttribute('data-motion'));
 
@@ -140,5 +376,161 @@ describe('FactCounters trigger (R-379)', () => {
     expect(observations).toHaveLength(1);
     expect(observations[0].options).toStrictEqual({ rootMargin: '0px 0px -35% 0px' });
     expect(observations[0].targets).toStrictEqual([container.querySelector('.facts')]);
+  });
+});
+
+describe('FactCounters load-time count', () => {
+  afterEach(() => document.documentElement.removeAttribute('data-motion'));
+
+  function renderStrip() {
+    document.documentElement.setAttribute('data-motion', 'full');
+    const observations = stubObserver();
+    const view = render(
+      <section className="facts" data-reveal>
+        <span className="fact__num">90</span>
+        <span className="fact__num">4</span>
+        <span className="fact__num fact__num--sign">P</span>
+        <FactCounters />
+      </section>,
+    );
+    const strip = view.container.querySelector('.facts') as HTMLElement;
+    const numbers = () => Array.from(strip.querySelectorAll('.fact__num:not(.fact__num--sign)'), (element) => element.textContent);
+    return { ...view, observations, strip, numbers };
+  }
+
+  it('starts counting after the second frame when the strip is on screen at mount, with no intersection report, and ends on the server text', () => {
+    const { strip, numbers } = renderStrip();
+    placeAt(strip, 100);
+    expect(numbers()).toStrictEqual(['90', '4']);
+
+    // The first frame runs before the next paint: it only schedules the second, which starts the count.
+    frames.flush(1000);
+    expect(numbers()).toStrictEqual(['90', '4']);
+    expect(frames.pending()).toHaveLength(1);
+
+    // The count has started (its step is queued) but has not rewritten a digit yet.
+    frames.flush(1000);
+    expect(numbers()).toStrictEqual(['90', '4']);
+    expect(frames.pending()).toHaveLength(1);
+
+    frames.flush(1000);
+    const [first, second] = numbers();
+    expect(first).not.toBe('90');
+    expect(second).not.toBe('4');
+
+    frames.flush(1100);
+    const [early, earlySecond] = numbers();
+    expect(early).not.toBe('90');
+    expect(earlySecond).not.toBe('4');
+
+    frames.flush(3000);
+    expect(numbers()).toStrictEqual(['90', '4']);
+    expect(frames.pending()).toHaveLength(0);
+  });
+
+  it('leaves a strip below the viewport alone until an intersection report', () => {
+    const { observations, strip, numbers } = renderStrip();
+
+    frames.flush(1000);
+    expect(frames.executed()).toBe(1);
+    expect(frames.pending()).toHaveLength(1);
+    expect(numbers()).toStrictEqual(['90', '4']);
+
+    frames.flush(1000);
+    expect(frames.executed()).toBe(2);
+    expect(numbers()).toStrictEqual(['90', '4']);
+    expect(frames.pending()).toHaveLength(0);
+
+    observations[0].report([{ target: strip, isIntersecting: false }]);
+    frames.flush(1000);
+    expect(numbers()).toStrictEqual(['90', '4']);
+
+    observations[0].report([{ target: strip, isIntersecting: true }]);
+    frames.flush(1000);
+    frames.flush(1100);
+    expect(numbers()[0]).not.toBe('90');
+    expect(numbers()[1]).not.toBe('4');
+
+    frames.flush(3000);
+    expect(numbers()).toStrictEqual(['90', '4']);
+  });
+
+  it('cancels the load-time frame when it unmounts first, so no count starts afterwards', () => {
+    const { strip, numbers, unmount } = renderStrip();
+    placeAt(strip, 100);
+    expect(frames.pending()).toHaveLength(1);
+    const [scheduled] = frames.pending();
+
+    unmount();
+    expect(frames.cancelled).toContain(scheduled);
+    frames.flush(1000);
+
+    expect(frames.pending()).toHaveLength(0);
+    expect(numbers()).toStrictEqual(['90', '4']);
+  });
+
+  it('cancels the second frame when it unmounts between the two frames, so no count starts afterwards', () => {
+    const { observations, strip, numbers, unmount } = renderStrip();
+    placeAt(strip, 100);
+
+    frames.flush(1000);
+    expect(frames.pending()).toHaveLength(1);
+    const [second] = frames.pending();
+
+    unmount();
+    expect(frames.cancelled).toContain(second);
+    expect(frames.pending()).toHaveLength(0);
+    frames.flush(1000);
+
+    expect(frames.executed()).toBe(1);
+    expect(frames.pending()).toHaveLength(0);
+    expect(numbers()).toStrictEqual(['90', '4']);
+    expect(observations[0].disconnected).toBe(true);
+  });
+
+  it('under StrictMode (effects run, clean up and run again) starts the count once and ends on the server text', () => {
+    document.documentElement.setAttribute('data-motion', 'full');
+    const observations = stubObserver();
+    const { container } = render(
+      <StrictMode>
+        <section className="facts" data-reveal>
+          <span className="fact__num">90</span>
+          <span className="fact__num">4</span>
+          <FactCounters />
+        </section>
+      </StrictMode>,
+    );
+    const strip = container.querySelector('.facts') as HTMLElement;
+    const numbers = () => Array.from(strip.querySelectorAll('.fact__num'), (element) => element.textContent);
+    placeAt(strip, 100);
+
+    // The first run is cleaned up: its observer is disconnected and its pending load frame cancelled.
+    expect(observations).toHaveLength(2);
+    expect(observations.map(({ disconnected }) => disconnected)).toStrictEqual([true, false]);
+    // (The cleanup also passes its idle count-frame id 0 to cancelAnimationFrame, a no-op: only real ids are counted.)
+    expect(frames.cancelled.filter((id) => id > 0)).toHaveLength(1);
+    expect(frames.pending()).toHaveLength(1);
+    expect(frames.cancelled).not.toContain(frames.pending()[0]);
+    expect(numbers()).toStrictEqual(['90', '4']);
+
+    frames.flush(1000);
+    expect(numbers()).toStrictEqual(['90', '4']);
+    expect(frames.pending()).toHaveLength(1);
+
+    // One count only: a single step frame is queued, the cancelled first run adds none.
+    frames.flush(1000);
+    expect(numbers()).toStrictEqual(['90', '4']);
+    expect(frames.pending()).toHaveLength(1);
+    expect(observations.map(({ disconnected }) => disconnected)).toStrictEqual([true, true]);
+
+    frames.flush(1000);
+    const [first, second] = numbers();
+    expect(first).not.toBe('90');
+    expect(second).not.toBe('4');
+    expect(frames.pending()).toHaveLength(1);
+
+    frames.flush(3000);
+    expect(numbers()).toStrictEqual(['90', '4']);
+    expect(frames.pending()).toHaveLength(0);
   });
 });

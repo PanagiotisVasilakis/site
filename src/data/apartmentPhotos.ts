@@ -1,9 +1,10 @@
-// The apartment page photo set (identity §7.3): 39 marketing photos per section (six rooms, then the details), in order, with the crops.
+// The apartment page photo set (identity §7.3): 41 marketing photos per section (six rooms, then the details), in order, with the crops.
 // Retired from public/ on 2026-10-11 (the owner keeps the files): living_1 (old entrance decor, now living_10),
 // living_2 (branded packaging), bathroom_2 (toilet signs) and bathroom_8 (medicines). Removed earlier: living_3
 // (branded packaging), living_1_booking, bedroom_4, bedroom_2_2, bedroom_2_4 and bathroom_5 (duplicates), bathroom_1
-// (soft). living_9, living_10, living_11, bedroom_5, balcony_2, balcony_3 and details_1 to details_10 are the owner's photos
-// of 2026-08-01, cut to 2:3.
+// (soft). living_9, living_10, living_11, bedroom_5, balcony_2, balcony_3, balcony_4, balcony_5 and details_1 to details_10
+// are the owner's photos of 2026-08-01, cut to 2:3. balcony_4 and balcony_5 (IMG_6251, IMG_6256) were added on 2026-10-12 at the
+// owner request; balcony_4 is cut to 3:2.
 
 /**
  * Section keys: the six rooms (linked from the home room cards), then the details section ('Up close', no home card).
@@ -61,6 +62,8 @@ export const APARTMENT_PHOTOS = [
   // balcony_1 is also the master of the home hero crops and the share cards (identity §7.2).
   { id: 'balcony_1', room: 'balcony', src: '/house/balcony/balcony_1.jpeg', ...LANDSCAPE },
   { id: 'balcony_3', room: 'balcony', src: '/house/balcony/balcony_3.jpeg', width: 1280, height: 1920 },
+  { id: 'balcony_4', room: 'balcony', src: '/house/balcony/balcony_4.jpeg', width: 1920, height: 1280 },
+  { id: 'balcony_5', room: 'balcony', src: '/house/balcony/balcony_5.jpeg', width: 1280, height: 1920 },
   // Details ('Up close', identity §7.3): owner close-ups of 2026-08-01, all 2:3; no home card (homeRooms.ts).
   { id: 'details_1', room: 'details', src: '/house/details/details_1.jpeg', width: 1280, height: 1920 },
   { id: 'details_2', room: 'details', src: '/house/details/details_2.jpeg', width: 1280, height: 1920 },
@@ -76,5 +79,5 @@ export const APARTMENT_PHOTOS = [
 
 export type ApartmentPhotoId = (typeof APARTMENT_PHOTOS)[number]['id'];
 
-/** The page's lead photo; it opens the viewer at 1 / 39 and is not repeated in the Living tiles. */
+/** The page's lead photo; it opens the viewer at 1 / 41 and is not repeated in the Living tiles. */
 export const APARTMENT_LEAD_PHOTO_ID: ApartmentPhotoId = 'living_8';

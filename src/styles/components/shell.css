@@ -193,12 +193,13 @@
 @media (min-width: 768px) {
   .site-header .site-header__lang { display: inline-flex; }
 }
-/* §4.4 puts the nav at lg; it moves to xl because the Greek marketing nav plus the tools does not fit the
-   pill at 1024 px (the wordmark was cut by 99 px). Until xl the menu button carries the nav. */
+/* §4.4 puts the nav at lg; it moves to 1320 px because the Greek marketing nav (five links, "Your stay" is the
+   last) plus the tools does not fit the pill below that: at 1024 px the wordmark was cut by 99 px, and at 1280 px
+   the fifth link cut it to "Dolce Far Ni…". Until 1320 px the menu button carries the nav. */
 @media (min-width: 1024px) {
   .site-header { padding: 0 6px 0 16px; }
 }
-@media (min-width: 1280px) {
+@media (min-width: 1320px) {
   .site-nav { display: flex; gap: 24px; }
   .site-header .site-header__account { display: inline-flex; }
   .site-header .site-header__menu-btn { display: none; }

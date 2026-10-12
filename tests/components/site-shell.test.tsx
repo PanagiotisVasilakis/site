@@ -124,12 +124,13 @@ describe('site shell', () => {
     expect(pointerEffects).toHaveBeenCalledWith(true);
     const nav = screen.getAllByRole('navigation', { name: 'Primary navigation' })[0];
     expect(within(nav).getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
-      '/en/apartment', '/en/availability', '/en/moments', '/en#contact',
+      '/en/apartment', '/en/availability', '/en/moments', '/en#contact', '/en/stay',
     ]);
     expect(screen.getByRole('link', { name: 'Check dates' })).toHaveAttribute('href', '/en/availability');
     const menu = screen.getByRole('dialog', { hidden: true });
     expect(within(menu).getByRole('link', { name: /Call/, hidden: true })).toHaveAttribute('href', 'tel:+306955810051');
     expect(within(menu).getByRole('link', { name: /WhatsApp/, hidden: true })).toHaveAttribute('href', 'https://wa.me/306955810051');
+    expect(within(menu).getByRole('link', { name: 'Your stay', hidden: true })).toHaveAttribute('href', '/en/stay');
   });
 
   it('marks the current page with aria-current', () => {
@@ -229,6 +230,8 @@ describe('site shell', () => {
     render(<SiteFooter locale="en" />);
     const footer = screen.getByRole('contentinfo');
     expect(within(footer).getByRole('link', { name: /Staying with us now\? Your stay/ })).toHaveAttribute('href', '/en/stay');
+    // The header nav now ends with "Your stay"; the footer must not repeat it in its own nav.
+    expect(within(footer).getAllByRole('link').filter((link) => link.getAttribute('href') === '/en/stay')).toHaveLength(1);
     expect(within(footer).getByRole('link', { name: 'dolcefarnienteapartments@gmail.com' })).toHaveAttribute(
       'href', 'mailto:dolcefarnienteapartments@gmail.com',
     );

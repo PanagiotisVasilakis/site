@@ -23,8 +23,8 @@ import { brandHref, headerCta, headerOverlaysHero, isCurrentLink, navLinks, shel
 const WORDMARK = 'Dolce Far Niente';
 
 /**
- * identity §8 SiteHeader: a sticky glass pill with the brand, the nav (≥ lg), the language and theme
- * switches, the marketing CTA (≥ sm) and the menu button (< lg). The variant follows the route
+ * identity §8 SiteHeader: a sticky glass pill with the brand, the nav (≥ 1320 px), the language and theme
+ * switches, the marketing CTA (≥ sm) and the menu button (< 1320 px). The variant follows the route
  * (shellVariantFor). It also keeps `data-motion` in sync (useMotionPreference, §5.2) and mounts the
  * pointer effects (tilt, magnetic buttons; not on the calm stay routes). R3-V14: the marketing header
  * carries the scroll-progress hairline (M31), and the brand mark's intro (M26) ends by removing the boot
