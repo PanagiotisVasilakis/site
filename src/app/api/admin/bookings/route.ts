@@ -10,9 +10,10 @@ import {
   ValidationError,
   withErrorHandler,
 } from '@/lib/apiErrorHandler';
-import { nightsBetween, parseIsoDate, toDbDate } from '@/lib/availability/calendarDate';
+import { nightsBetween, toDbDate } from '@/lib/availability/calendarDate';
 import { isSameOriginRequest } from '@/lib/net/sameOrigin';
 import { prisma } from '@/lib/prisma';
+import { isoDateSchema } from '@/lib/prisma-repositories/ratePeriodRepository';
 import { isAdminRequest } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
@@ -26,17 +27,6 @@ const MANUAL_PROVIDER = 'manual';
 // to be caught at entry: 180 nights rejects a one-year typo and still fits a
 // long winter stay.
 const MAX_MANUAL_STAY_NIGHTS = 180;
-
-const isoDateSchema = z.iso.date().transform((value, context) => {
-  // z.iso.date() accepts years 0000-0099, which the UTC-midnight conversion
-  // would map to 1900-1999.
-  const date = parseIsoDate(value);
-  if (date === null) {
-    context.addIssue({ code: 'custom', message: 'Date must be between the years 0100 and 9999' });
-    return z.NEVER;
-  }
-  return date;
-});
 
 const schema = z.object({
   startDate: isoDateSchema,

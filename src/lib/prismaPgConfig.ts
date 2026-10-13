@@ -23,8 +23,12 @@ const PRISMA_URL_PARAMS = [
   'schema',
 ] as const;
 
+// Digits only: a unit suffix or a fraction ("5s", "1.5", "20x") falls back to the
+// default instead of being truncated to a wrong, tiny value. statement_timeout,
+// query_timeout and lock_timeout are milliseconds; connect_timeout, pool_timeout
+// and the two lifetime parameters are seconds.
 function parsePositiveInteger(value: string | null): number | undefined {
-  if (!value) return undefined;
+  if (!value || !/^[0-9]+$/.test(value)) return undefined;
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }

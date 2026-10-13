@@ -190,6 +190,7 @@ describe('navigation and popup presentation', () => {
     const labels = {
       address: 'Address', phone: 'Phone', directions: 'Directions', website: 'Website', details: 'Details',
       home: 'Home', locateMe: 'Locate', locationUnavailable: 'Unavailable', fitToMarkers: 'Fit', zoomIn: 'In', zoomOut: 'Out',
+      closePopup: 'Close',
     };
     const html = buildBasePopupHtml({
       id: 'marker',

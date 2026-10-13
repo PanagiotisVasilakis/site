@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   read: vi.fn(),
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
-  contact: { airbnb: '', hostName: '', languages: '', replyTime: '' },
+  contact: { hostName: '', languages: '', replyTime: '' },
 }));
 
 vi.mock('next/headers', () => ({ headers: async () => new Headers() }));
@@ -17,12 +17,11 @@ vi.mock('@/lib/logger-enterprise', () => ({ logger: mocks.logger }));
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => <a href={href} {...props}>{children}</a>,
 }));
-// The owner data (Airbnb listing, host profile) is empty in the repository; tests switch it per case.
+// The owner data (host profile) is empty in the repository; tests switch it per case.
 vi.mock('@/data/contact', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/data/contact')>();
   return {
     ...actual,
-    get AIRBNB_LISTING_URL() { return mocks.contact.airbnb; },
     get HOST_PROFILE() {
       return {
         name: mocks.contact.hostName,
@@ -60,7 +59,7 @@ async function renderHome(locale = 'en') {
 
 beforeEach(() => {
   mocks.read.mockResolvedValue(availability());
-  Object.assign(mocks.contact, { airbnb: '', hostName: '', languages: '', replyTime: '' });
+  Object.assign(mocks.contact, { hostName: '', languages: '', replyTime: '' });
 });
 
 describe('home page order (identity §9.1 items 7-11)', () => {

@@ -142,6 +142,7 @@ describe('admin availability & prices', () => {
       ['a price below €1', { first: '2026-10-01', last: '2026-10-31', price: '0,99', minimum: '2' }, 'The price must be between €1.00 and €10,000.00.'],
       ['a minimum of 31 nights', { first: '2026-10-01', last: '2026-10-31', price: '85', minimum: '31' }, 'Minimum nights must be a whole number from 1 to 30.'],
       ['a minimum of 0 nights', { first: '2026-10-01', last: '2026-10-31', price: '85', minimum: '0' }, 'Minimum nights must be a whole number from 1 to 30.'],
+      ['a last night of 9999-12-31', { first: '9999-12-30', last: '9999-12-31', price: '85', minimum: '1' }, 'The last night must be before 9999-12-31.'],
     ])('explains %s without calling the API', async (_label, values, message) => {
       await renderLoaded();
 

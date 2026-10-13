@@ -200,8 +200,14 @@ const FORBIDDEN_DEPLOY_COMMANDS = Object.freeze([
   ['Cloudflare Pages deployment command', /\bcloudflare\s+pages\s+deploy\b/iu],
   ['GitHub Pages deployment command', /\bgh-pages\b/iu],
   ['Git push', /\bgit\s+push\b/iu],
+  // Global options may sit between `git` and `push` (`git -C dir push`). A ';', '&' or '|'
+  // ends the command, so a later command on the same line is not read as part of it.
+  ['Git push', /\bgit\s+-[^\n;&|]*\spush\b/iu],
   ['Docker registry push', /\bdocker\s+push\b/iu],
   ['Docker registry push', /\bdocker\s+image\s+push\b/iu],
+  // `docker-compose` followed by a name character or a dot is a file name, not the command.
+  ['Docker Compose push', /\bdocker(?:\s+compose\b|-compose(?![\w.-]))[^\n]*\bpush\b/iu],
+  ['Docker/Buildx push flag', /(?:^|\s)--push(?:\s|=|$)/mu],
   ['package publication', /\bnpm\s+publish\b/iu],
 ]);
 
@@ -211,6 +217,17 @@ const POLICY_SELF_FILES = new Set([
 ]);
 
 const LOOPBACK_PORT_MAPPING = /^(?:127\.0\.0\.1|\[::1\]):[^:]+:[^:]+$/u;
+// `network_mode: host` as a block entry or inside a flow mapping, key and value quoted or not.
+const HOST_NETWORK_MODE = /(?:^|[{,\s])["']?network_mode["']?\s*:\s*["']?host["']?(?=$|[\s,}#])/iu;
+
+// `log_format origin_safe` runs to the first ';' that ends a line, so a ';' inside the
+// quoted format cannot cut the variable check short.
+const NGINX_ORIGIN_SAFE_LOG_FORMAT = /log_format\s+origin_safe\s([\s\S]*?);[ \t]*$/mu;
+const NGINX_ORIGIN_SAFE_ACCESS_LOG = /access_log\s+[^\s;]+\s+origin_safe(?=[\s;])/u;
+// Request line, query string and client address variables. The trailing \b matches whole
+// names only, so $request_id, $request_method and $request_time are allowed.
+const NGINX_FORBIDDEN_LOG_VARIABLE =
+  /\$(?:request|request_uri|args|query_string|is_args|remote_addr|binary_remote_addr|http_x_forwarded_for|http_referer)\b/gu;
 
 async function readOptional(filePath) {
   try {
@@ -262,19 +279,23 @@ function validateGateProfile(gates, errors) {
   for (const [index, expected] of EXPECTED_GATE_PROFILE.entries()) {
     const gate = gates[index];
     const [id, command, args, environment] = expected;
+
+    // The deny-list runs before the profile comparison, so a substituted gate that deploys,
+    // pushes or migrates is named; the comparison below still reports the mismatch.
+    if (gate && Array.isArray(gate.args)) {
+      const rendered = renderCommand(gate.command, gate.args);
+      for (const [label, pattern] of FORBIDDEN_DEPLOY_COMMANDS) {
+        if (pattern.test(rendered)) errors.push(`${label} is forbidden inside verify:release`);
+      }
+      if (/\b(?:prisma\s+migrate|migrate\s+deploy|system:migrate|db:migrate)\b/iu.test(rendered)) {
+        errors.push('persistent migration commands are forbidden inside verify:release');
+      }
+    }
+
     if (!gate || gate.id !== id || gate.command !== command
       || JSON.stringify(gate.args) !== JSON.stringify(args)
       || gate.environment !== environment) {
       errors.push(`release gate ${index + 1} must be the restricted ${id} profile`);
-      continue;
-    }
-
-    const rendered = renderCommand(gate.command, gate.args);
-    for (const [label, pattern] of FORBIDDEN_DEPLOY_COMMANDS) {
-      if (pattern.test(rendered)) errors.push(`${label} is forbidden inside verify:release`);
-    }
-    if (/\b(?:prisma\s+migrate|migrate\s+deploy|system:migrate|db:migrate)\b/iu.test(rendered)) {
-      errors.push('persistent migration commands are forbidden inside verify:release');
     }
   }
 }
@@ -428,8 +449,12 @@ async function validatePostgresReferences(root, errors) {
 
 // Every list item of every `ports:` block (any service or extension field), plus any
 // non-list `ports:` value (flow sequence or alias, on the key's line or as the block's
-// first content line), which is checked as one entry and therefore fails closed.
-// Long-syntax items (`- target:`) never match the loopback form.
+// first content line), which is checked as one entry and therefore fails closed. A `ports`
+// key inside a flow mapping (after `{` or `,`, quoted or not, anywhere in a non-comment
+// line) is found the same way and the rest of its line is one entry. Long-syntax items
+// (`- target:`) never match the loopback form.
+const FLOW_PORTS_KEY = /[{,]\s*["']?ports["']?\s*:(.*)$/u;
+
 function publishedPortEntries(compose) {
   const entries = [];
   let portsIndent;
@@ -450,7 +475,11 @@ function publishedPortEntries(compose) {
     }
     portsIndent = undefined;
     const key = /^(?:ports|"ports"|'ports')\s*:(?=\s|$)(.*)$/u.exec(trimmed);
-    if (key === null) continue;
+    if (key === null) {
+      const flow = FLOW_PORTS_KEY.exec(trimmed);
+      if (flow !== null) entries.push(flow[1].trim());
+      continue;
+    }
     const value = key[1].trim();
     if (value === '' || value.startsWith('#')) {
       portsIndent = indent;
@@ -462,8 +491,18 @@ function publishedPortEntries(compose) {
   return entries;
 }
 
+// Removes Nginx '#' comments: a '#' at the start of a line or after whitespace, ';', '{'
+// or '}' runs to the end of the line, so a marker inside a comment is not active
+// configuration. A missing file (undefined) stays undefined. A '#' inside a quoted
+// string would be cut; the template has none.
+function stripNginxComments(source) {
+  return source?.replace(/(^|[\s;{}])#.*$/gmu, '$1');
+}
+
 async function validateTrustedIngress(root, errors) {
-  const config = await readOptional(path.join(root, 'deploy/nginx/nginx.conf.template'));
+  const config = stripNginxComments(
+    await readOptional(path.join(root, 'deploy/nginx/nginx.conf.template')),
+  );
   const manifestSource = await readOptional(path.join(root, 'deploy/nginx/cloudflare-ips.json'));
   const realIp = await readOptional(path.join(root, 'deploy/nginx/includes/cloudflare-realip.conf'));
   const geo = await readOptional(path.join(root, 'deploy/nginx/includes/cloudflare-geo.conf'));
@@ -493,7 +532,7 @@ async function validateTrustedIngress(root, errors) {
     for (const marker of requiredMarkers) {
       if (!config.includes(marker)) errors.push(`production Nginx configuration lacks: ${marker}`);
     }
-    if (/set_real_ip_from\s+(?:0\.0\.0\.0\/0|::\/0)/u.test(config + realIp)) {
+    if (/set_real_ip_from\s+(?:0\.0\.0\.0\/0|::\/0)/u.test(config + stripNginxComments(realIp))) {
       errors.push('wildcard trusted proxy networks are forbidden');
     }
     if (/\$proxy_add_x_forwarded_for/u.test(config)) {
@@ -567,10 +606,95 @@ async function validateTrustedIngress(root, errors) {
       );
     }
   }
+  // Host networking ignores `ports:` and would listen on every host interface.
+  const hostNetwork = (productionCompose ?? '').split('\n').some((line) => {
+    const trimmed = line.trim();
+    return !trimmed.startsWith('#') && HOST_NETWORK_MODE.test(trimmed);
+  });
+  if (hostNetwork) {
+    errors.push(
+      'docker/docker-compose.prod.yml: network_mode: host is forbidden;'
+      + ' the application port is published on loopback only',
+    );
+  }
+}
+
+// The services of docker/docker-compose.prod.yml that run the application code. The
+// standalone server forces NODE_ENV=production once it runs, but the start-up gate
+// validates the launching environment, and the workers never go through server.js; an
+// env file with NODE_ENV=development would therefore skip every production-only rule.
+// `environment:` overrides `env_file:`, so the pin is a literal `NODE_ENV: production`
+// entry in each service's own `environment:` mapping (R-698).
+const PRODUCTION_PINNED_SERVICES = ['web', 'outbox', 'operations'];
+const NODE_ENV_PIN = /^NODE_ENV\s*:\s*(?:production|"production"|'production')$/u;
+const YAML_TRAILING_COMMENT = /\s+#.*$/u;
+
+// The non-comment lines of every service of a Compose file, as { indent, text }, by service
+// name. Line-based like publishedPortEntries: a service written as a flow mapping has no
+// block here and therefore counts as not pinned (fails closed).
+function composeServiceLines(compose) {
+  const services = new Map();
+  let inServices = false;
+  let serviceIndent;
+  let current;
+  for (const line of compose.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed === '' || trimmed.startsWith('#')) continue;
+    const indent = line.length - line.trimStart().length;
+    if (indent === 0) {
+      inServices = /^services\s*:(?:\s|$)/u.test(trimmed);
+      serviceIndent = undefined;
+      current = undefined;
+      continue;
+    }
+    if (!inServices) continue;
+    serviceIndent ??= indent;
+    if (indent === serviceIndent) {
+      const name = /^["']?([\w.-]+)["']?\s*:/u.exec(trimmed);
+      current = name === null ? undefined : [];
+      if (name !== null) services.set(name[1], current);
+    } else if (current !== undefined) {
+      current.push({ indent, text: trimmed.replace(YAML_TRAILING_COMMENT, '') });
+    }
+  }
+  return services;
+}
+
+// True when the service's own `environment:` mapping has a direct NODE_ENV: production entry.
+function pinsProductionNodeEnv(lines) {
+  const keyIndent = lines[0]?.indent;
+  let environmentIndent;
+  let entryIndent;
+  for (const { indent, text } of lines) {
+    if (environmentIndent !== undefined && indent > environmentIndent) {
+      entryIndent ??= indent;
+      if (indent === entryIndent && NODE_ENV_PIN.test(text)) return true;
+      continue;
+    }
+    environmentIndent = indent === keyIndent && /^environment\s*:$/u.test(text) ? indent : undefined;
+    entryIndent = undefined;
+  }
+  return false;
+}
+
+async function validateProductionNodeEnvPin(root, errors) {
+  const compose = await readOptional(path.join(root, 'docker/docker-compose.prod.yml'));
+  // validatePostgresReferences reports a missing file.
+  if (compose === undefined) return;
+  const services = composeServiceLines(compose);
+  for (const name of PRODUCTION_PINNED_SERVICES) {
+    if (!pinsProductionNodeEnv(services.get(name) ?? [])) {
+      errors.push(
+        `docker/docker-compose.prod.yml: service "${name}" must set environment NODE_ENV: production`,
+      );
+    }
+  }
 }
 
 async function validateLayeredRateLimiting(root, errors) {
-  const config = await readOptional(path.join(root, 'deploy/nginx/nginx.conf.template'));
+  const config = stripNginxComments(
+    await readOptional(path.join(root, 'deploy/nginx/nginx.conf.template')),
+  );
   const readiness = await readOptional(path.join(root, 'src/app/api/health/ready/route.ts'));
   const limiter = await readOptional(path.join(root, 'src/lib/sensitiveRateLimit.ts'));
   const retention = await readOptional(path.join(root, 'src/lib/operationalMonitor.ts'));
@@ -739,6 +863,12 @@ async function validateSecretScanning(root, errors) {
     || !/private-key-material/u.test(config)) {
     errors.push('secret scanner must extend maintained defaults with database URL and private-key rules');
   }
+  // A finding may be accepted only through the hashed fixture allowlist. Gitleaks hides a
+  // finding behind any allowlist table or key and drops default rules through disabledRules,
+  // so neither word may appear in the configuration, whatever the letter case or TOML form.
+  if (config !== undefined && /allowlist|disabledRules/iu.test(config)) {
+    errors.push('secret scanner configuration must not add allowlists or disable rules');
+  }
 
   const scanner = await readOptional(path.join(root, 'scripts/check-secrets.mjs'));
   for (const marker of [
@@ -752,6 +882,7 @@ async function validateSecretScanning(root, errors) {
     'historical-incident-baseline.json',
     "'.next/standalone'",
     'ENV_FILE_PATTERN',
+    'rejectEnvironmentFiles: true',
     'GITLEAKS_BIN',
     'binarySha256',
     'formatFinding',
@@ -770,6 +901,12 @@ async function validateSecretScanning(root, errors) {
     || !/(?:^|\n)\.env\.\*(?:\n|$)/u.test(dockerIgnore)
     || !/(?:^|\n)!\.env\.example(?:\n|$)/u.test(dockerIgnore)) {
     errors.push('Docker inputs must exclude ignored .env files while retaining .env.example');
+  }
+  // The root-level lines above match only the top of the Docker context. These match at any
+  // depth, so a docker/.env or a nested *.pem never reaches the builder stage ('COPY . .').
+  const dockerIgnoreLines = dockerIgnore?.split('\n') ?? [];
+  if (!['**/.env', '**/.env.*', '**/*.pem'].every((line) => dockerIgnoreLines.includes(line))) {
+    errors.push('Docker inputs must exclude .env files and PEM keys at any depth: **/.env, **/.env.* and **/*.pem');
   }
 
   if (!await exists(path.join(root, 'docs/security/secret-scanning.md'))) {
@@ -849,9 +986,18 @@ async function validateClaimTokenTransport(root, errors) {
     errors.push('guest claim UI must enforce Referrer-Policy: no-referrer');
   }
 
-  const nginx = await readOptional(path.join(root, 'deploy/nginx/nginx.conf.template'));
+  const nginx = stripNginxComments(
+    await readOptional(path.join(root, 'deploy/nginx/nginx.conf.template')),
+  );
   if (nginx === undefined || !nginx.includes('$uri') || nginx.includes('$request_uri')) {
     errors.push('Nginx logging must exclude query strings from the claim transport');
+  }
+  const logFormat = nginx === undefined ? undefined : NGINX_ORIGIN_SAFE_LOG_FORMAT.exec(nginx)?.[1];
+  if (logFormat === undefined || !NGINX_ORIGIN_SAFE_ACCESS_LOG.test(nginx)) {
+    errors.push('Nginx must define log_format origin_safe and write the access log with it');
+  }
+  for (const variable of new Set((logFormat ?? '').match(NGINX_FORBIDDEN_LOG_VARIABLE) ?? [])) {
+    errors.push(`Nginx log_format origin_safe must not contain ${variable}`);
   }
 
   const adminGrant = await readOptional(
@@ -874,7 +1020,7 @@ function dockerLogicalLines(source) {
 
   for (const rawLine of source.split(/\r?\n/u)) {
     const trimmed = rawLine.trim();
-    if (pending === '' && (trimmed === '' || trimmed.startsWith('#'))) continue;
+    if (trimmed.startsWith('#') || (pending === '' && trimmed === '')) continue;
 
     const continued = /\\\s*$/u.test(rawLine);
     const fragment = trimmed.replace(/\\\s*$/u, '').trim();
@@ -918,6 +1064,37 @@ function validateSecurityImageRunnerStage(dockerSource, errors) {
   }
   if (!runner.some((line) => /^RUN\s/iu.test(line) && removesNpmAndNpx(line))) {
     errors.push(`${dockerRelative}: runner stage must remove npm and npx`);
+  }
+}
+
+function validateSecurityImageBaseImages(dockerSource, errors) {
+  const dockerRelative = 'docker/Dockerfile.security';
+  const stageNames = new Set();
+  const digests = new Set();
+
+  for (const line of dockerLogicalLines(dockerSource)) {
+    if (!/^FROM\s/iu.test(line)) continue;
+    const [, image, keyword, name, ...extra] = line.split(/\s+/u);
+    const references = stageNames.has(image.toLowerCase());
+    if (keyword !== undefined && /^AS$/iu.test(keyword) && name !== undefined) {
+      stageNames.add(name.toLowerCase());
+    }
+    if (references) continue;
+
+    const digest = /^node:[0-9]+-alpine@(sha256:[0-9a-f]{64})$/u.exec(image)?.[1];
+    const named = keyword === undefined
+      || (/^AS$/iu.test(keyword) && name !== undefined && extra.length === 0);
+    if (digest === undefined || !named) {
+      errors.push(
+        `${dockerRelative}: external FROM instructions must be node:<major>-alpine@sha256:<64 hex> with an optional AS name: ${line}`,
+      );
+    } else {
+      digests.add(digest);
+    }
+  }
+
+  if (digests.size > 1) {
+    errors.push(`${dockerRelative}: all external FROM instructions must use the same Node image digest`);
   }
 }
 
@@ -1083,9 +1260,13 @@ export async function validateReleasePolicy(
   await validateSecretScanning(root, errors);
   await validateClaimTokenTransport(root, errors);
   await validateRuntimeCredentialContract(root, errors);
+  await validateProductionNodeEnvPin(root, errors);
   const dockerSource = await readOptional(path.join(root, 'docker/Dockerfile.security'));
   if (dockerSource === undefined) errors.push('docker/Dockerfile.security is required');
-  else validateSecurityImageRunnerStage(dockerSource, errors);
+  else {
+    validateSecurityImageRunnerStage(dockerSource, errors);
+    validateSecurityImageBaseImages(dockerSource, errors);
+  }
   await validateVerifyImplementation(root, errors);
 
   return [...new Set(errors)].sort();

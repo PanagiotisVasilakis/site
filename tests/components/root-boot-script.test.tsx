@@ -48,14 +48,20 @@ function installMatchMedia(matching: string[]) {
   matchingQueries = matching;
 }
 
+type Timer = { callback: () => void; delay: number };
+
 async function runBoot() {
   const html = (await bootScript()).props.dangerouslySetInnerHTML?.__html ?? '';
   // Executes the exact inline script the layout ships, as the browser would before hydration,
-  // in a context whose globals are this document, its storage and a controlled matchMedia.
+  // in a context whose globals are this document, its storage, a controlled matchMedia and a
+  // setTimeout that only records the callback, so a test decides when (and whether) the timer fires.
   const matchMedia = (query: string) => ({ matches: matchingQueries.includes(query), media: query });
-  const context: Record<string, unknown> = { document, localStorage, sessionStorage, matchMedia };
+  const timers: Timer[] = [];
+  const setTimeout = (callback: () => void, delay: number) => timers.push({ callback, delay });
+  const context: Record<string, unknown> = { document, localStorage, sessionStorage, matchMedia, setTimeout };
   context.window = context;
   runInNewContext(html, context);
+  return timers;
 }
 
 const root = document.documentElement;
@@ -68,6 +74,8 @@ describe('root layout boot script (identity §5.2)', () => {
     root.removeAttribute('data-theme');
     root.removeAttribute('data-motion');
     root.removeAttribute('data-intro');
+    root.removeAttribute('data-reveal-ready');
+    document.body.replaceChildren();
     matchingQueries = [];
   });
 
@@ -140,5 +148,81 @@ describe('root layout boot script (identity §5.2)', () => {
     localStorage.removeItem('motion');
     await runBoot();
     expect(root.hasAttribute('data-intro')).toBe(true);
+  });
+});
+
+describe('root layout boot script failsafe (R-633)', () => {
+  beforeEach(() => {
+    requestHeaders.values = new Map([['x-nonce', 'abc123'], ['x-locale', 'en']]);
+    localStorage.clear();
+    sessionStorage.clear();
+    root.removeAttribute('data-theme');
+    root.removeAttribute('data-motion');
+    root.removeAttribute('data-intro');
+    root.removeAttribute('data-reveal-ready');
+    document.body.replaceChildren();
+    matchingQueries = ['(prefers-reduced-motion: no-preference)'];
+  });
+
+  function addRevealTarget() {
+    const target = document.createElement('div');
+    target.setAttribute('data-reveal', '');
+    document.body.append(target);
+  }
+
+  async function armedTimer() {
+    const timers = await runBoot();
+    expect(root.getAttribute('data-motion')).toBe('full');
+    expect(timers).toHaveLength(1);
+    return timers[0];
+  }
+
+  it('arms one 4 s timer in the full-motion branch', async () => {
+    const timer = await armedTimer();
+    expect(timer.delay).toBe(4000);
+  });
+
+  it('disarms motion when a [data-reveal] block exists and nothing hydrated (no data-reveal-ready)', async () => {
+    addRevealTarget();
+    const timer = await armedTimer();
+    expect(root.getAttribute('data-motion')).toBe('full');
+
+    timer.callback();
+
+    expect(root.hasAttribute('data-motion')).toBe(false);
+  });
+
+  it('keeps motion armed once data-reveal-ready is set', async () => {
+    addRevealTarget();
+    const timer = await armedTimer();
+    root.setAttribute('data-reveal-ready', '');
+
+    timer.callback();
+
+    expect(root.getAttribute('data-motion')).toBe('full');
+  });
+
+  it('never touches a stored reduce: no timer is armed, and a reduce set before the timer fires survives it', async () => {
+    addRevealTarget();
+    localStorage.setItem('motion', 'reduce');
+    expect(await runBoot()).toHaveLength(0);
+    expect(root.getAttribute('data-motion')).toBe('reduce');
+
+    root.removeAttribute('data-motion');
+    localStorage.removeItem('motion');
+    const timer = await armedTimer();
+    root.setAttribute('data-motion', 'reduce');
+
+    timer.callback();
+
+    expect(root.getAttribute('data-motion')).toBe('reduce');
+  });
+
+  it('never touches a page without [data-reveal]', async () => {
+    const timer = await armedTimer();
+
+    timer.callback();
+
+    expect(root.getAttribute('data-motion')).toBe('full');
   });
 });

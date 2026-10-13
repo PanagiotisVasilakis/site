@@ -58,11 +58,12 @@ const RULES: RuleDefinition[] = [
   },
   {
     name: 'Recent high-severity security events',
-    description: 'High or critical security audit events were recorded in the last five minutes.',
+    description: 'High or critical security audit events were recorded in the last ten minutes.',
     metricName: 'security.high.count',
     comparison: 'gt',
     threshold: 0,
-    windowMinutes: 5,
+    // Twice the five-minute schedule: consecutive evaluations overlap, so an event stored between two runs is counted by the next one.
+    windowMinutes: 10,
     severity: 'high',
     read: (windowMinutes) => prisma.securityAuditEvent.count({
       where: {
@@ -163,6 +164,7 @@ export async function evaluateOperationalAlerts(): Promise<{ opened: number; res
       update: {
         description: definition.description,
         metricName: definition.metricName,
+        windowMinutes: definition.windowMinutes,
       },
     });
     if (!rule.enabled) continue;

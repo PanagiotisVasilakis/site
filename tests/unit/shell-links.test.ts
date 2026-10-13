@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { getDictionary } from '@/i18n/dictionaries';
 import {
@@ -16,6 +16,7 @@ import {
   localeSwitchHref,
   menuContactLinks,
   navLinks,
+  scrollToCurrentHash,
   shellVariantFor,
 } from '@/components/shell/shellLinks';
 
@@ -173,5 +174,94 @@ describe('localeSwitchHref', () => {
   it('adds a locale to a path without one', () => {
     expect(localeSwitchHref('/', 'el')).toBe('/el');
     expect(localeSwitchHref('/offline', 'en', '', '')).toBe('/en/offline');
+  });
+});
+
+describe('scrollToCurrentHash (R-689)', () => {
+  const click = (init: Partial<Parameters<typeof scrollToCurrentHash>[0]> = {}) => ({
+    button: 0,
+    defaultPrevented: false,
+    metaKey: false,
+    ctrlKey: false,
+    shiftKey: false,
+    altKey: false,
+    preventDefault: vi.fn(),
+    ...init,
+  });
+
+  /** A page at `pathname` + `hash` whose only element with an id is `ids`. */
+  function stubPage(pathname: string, hash: string, ids: Record<string, { scrollIntoView: () => void }> = {}) {
+    vi.stubGlobal('window', { location: { pathname, hash, search: '' } });
+    vi.stubGlobal('document', { getElementById: (id: string) => ids[id] ?? null });
+  }
+
+  it('prevents the default and scrolls to the target when the URL already is the link', () => {
+    const target = { scrollIntoView: vi.fn() };
+    stubPage('/en', '#contact', { contact: target });
+    const event = click();
+    scrollToCurrentHash(event, '/en#contact');
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+    expect(target.scrollIntoView).toHaveBeenCalledTimes(1);
+    // No options: the page's CSS decides how it scrolls (there is no smooth scrolling, so reduced motion stays instant).
+    expect(target.scrollIntoView).toHaveBeenCalledWith();
+  });
+
+  it('does the same for the Greek home page', () => {
+    const target = { scrollIntoView: vi.fn() };
+    stubPage('/el', '#contact', { contact: target });
+    const event = click();
+    scrollToCurrentHash(event, '/el#contact');
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+    expect(target.scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['the first click: the URL has no hash yet', '/en', ''],
+    ['another hash', '/en', '#host'],
+    ['another page', '/en/apartment', '#contact'],
+    ['another locale', '/el', '#contact'],
+  ])('leaves the click to the router: %s', (_name, pathname, hash) => {
+    const target = { scrollIntoView: vi.fn() };
+    stubPage(pathname, hash, { contact: target });
+    const event = click();
+    scrollToCurrentHash(event, '/en#contact');
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(target.scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a link without a hash', '/en/apartment'],
+    ['a link with an empty hash', '/en#'],
+    ['a phone link', 'tel:+306955810051'],
+  ])('ignores %s', (_name, href) => {
+    const target = { scrollIntoView: vi.fn() };
+    stubPage('/en/apartment', '', { contact: target });
+    const event = click();
+    scrollToCurrentHash(event, href);
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(target.scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['ctrl', { ctrlKey: true }],
+    ['meta', { metaKey: true }],
+    ['shift', { shiftKey: true }],
+    ['alt', { altKey: true }],
+    ['the middle button', { button: 1 }],
+    ['an event another handler already prevented', { defaultPrevented: true }],
+  ])('leaves a click with %s to the browser', (_name, init) => {
+    const target = { scrollIntoView: vi.fn() };
+    stubPage('/en', '#contact', { contact: target });
+    const event = click(init);
+    scrollToCurrentHash(event, '/en#contact');
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(target.scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it('prevents nothing when the page has no element with that id', () => {
+    stubPage('/en', '#contact');
+    const event = click();
+    scrollToCurrentHash(event, '/en#contact');
+    expect(event.preventDefault).not.toHaveBeenCalled();
   });
 });

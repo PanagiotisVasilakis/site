@@ -54,19 +54,15 @@ const config = [
       'no-debugger': 'error', // Remove debug statements
       'no-alert': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
-      'react-hooks/immutability': 'off',
       'react-hooks/purity': 'off',
-      'react-hooks/set-state-in-effect': 'off',
-      'react-hooks/static-components': 'off'
+      'react-hooks/set-state-in-effect': 'off'
     }
   },
   {
     files: ['scripts/**/*.{js,mjs,ts}'],
     rules: {
       // Relax some rules for build scripts
-      'security/detect-non-literal-fs-filename': 'off',
-      'security/detect-child-process': 'off',
-      'no-console': 'off'
+      'security/detect-non-literal-fs-filename': 'off'
     }
   },
   {
@@ -93,11 +89,6 @@ const config = [
       'tests/integration/support/migrations.ts',
     ],
     rules: { 'security/detect-non-literal-fs-filename': 'off' }
-  },
-  {
-    // Inputs are length-capped before these linear IP-format expressions run.
-    files: ['src/lib/net/getClientIp.ts'],
-    rules: { 'security/detect-unsafe-regex': 'off' }
   },
   {
     // Deliberate hostile input: the test feeds a javascript: failure link to

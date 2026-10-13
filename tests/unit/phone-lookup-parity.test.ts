@@ -70,6 +70,7 @@ describe('admin phone search and guest sign-in resolve the same accounts', () =>
     ['Greek local form of a +30 account', '691 234 5678', '+306912345678', true],
     ['international form of a +30 account', '+306912345678', '+306912345678', true],
     ['10 digits without + stored internationally', '4917123456', '+4917123456', true],
+    ['00 international call prefix of a +30 account', '0030 691 234 5678', '+306912345678', true],
     ['10 digits starting with 0 (invalid international reading)', '0123456789', '+300123456789', false],
     ['unparseable input', 'not a phone', '+306912345678', false],
   ])('%s', async (_label, input, stored, found) => {
@@ -83,7 +84,7 @@ describe('admin phone search and guest sign-in resolve the same accounts', () =>
   });
 
   it('tries the same phone numbers in the same order', async () => {
-    for (const input of ['691 234 5678', '+306912345678', '4917123456', '0123456789', 'not a phone']) {
+    for (const input of ['691 234 5678', '+306912345678', '0030 691 234 5678', '4917123456', '0123456789', 'not a phone']) {
       m.repoFindByPhone.mockReset().mockResolvedValue(undefined);
       m.prismaUserFindUnique.mockReset().mockResolvedValue(null);
 

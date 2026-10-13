@@ -68,6 +68,7 @@ const labels: LeafletMapLabels = {
   fitToMarkers: 'Fit',
   zoomIn: 'Zoom in',
   zoomOut: 'Zoom out',
+  closePopup: 'Close',
 };
 
 const OSM_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';

@@ -52,11 +52,18 @@ describe('phone and guest form validation', () => {
     [' 698-123-4567 ', 'GR', '+306981234567'],
     ['+15551234567', 'ABROAD', '+15551234567'],
     ['441234567890', undefined, '+441234567890'],
+    ['0030 694 123 4567', undefined, '+306941234567'],
+    ['0030 694 123 4567', 'GR', '+306941234567'],
+    ['0049 170 1234567', 'ABROAD', '+491701234567'],
+    ['(0044) 7911-123456', 'ABROAD', '+447911123456'],
   ] as const)('normalizes %s to E.164', (input, origin, expected) => {
     expect(normalizePhone(input, origin)?.e164).toBe(expected);
   });
 
-  it.each(['', '123', '+1', '++30698', 'abcd', '+03012345678', '0123456789'])('rejects invalid phone %s', (input) => {
+  it.each([
+    '', '123', '+1', '++30698', 'abcd', '+03012345678', '0123456789',
+    '00', '0030', '00abc12345678', '000306941234567', '+00306941234567', '0030.694.123.4567', '0030/6941234567',
+  ])('rejects invalid phone %s', (input) => {
     expect(normalizePhone(input, 'GR')).toBeNull();
   });
 

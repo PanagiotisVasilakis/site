@@ -21,6 +21,11 @@ export interface HouseDictionary {
     guideTitle: string;
     roomsNavLabel: string;
     /**
+     * The apartment page's parking section (`#parking`, identity section 7.3): one photo, before the details section, no home card.
+     * Added at the owner's request of 2026-10-12; name and line chosen by decision D12.
+     */
+    parking: { name: string; line: string };
+    /**
      * The apartment page's closing gallery section (`#details`, identity §7.3): close-ups, not a room, no home card.
      * Name and line chosen under the owner's delegation of 2026-10-11 (not R3-C1).
      */
@@ -60,6 +65,7 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
         intro: "Two bedrooms, a bright open-plan living room and a sunny balcony, 50 m from Kalamata Town Hall. Taygetos at breakfast, the gulf a short drive away.",
         guideTitle: "Your apartment guide",
         roomsNavLabel: "Rooms",
+        parking: { name: "Parking", line: "Free and private, outdoors at the property" },
         details: { name: "Up close", line: "Shells, wood and stone in the afternoon light" },
         amenities: { eyebrow: "Amenities", title: "What you will find" },
         cta: {
@@ -108,6 +114,7 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
             balcony_3: "Glass-top table shaded by the awnings, with the mountains in the distance",
             balcony_4: "Balcony corner with a green railing and a view over trees to the distant mountains, with a broom, a mop bucket and a drying rack on the left",
             balcony_5: "Long balcony in the sun with a sliding door and louvred shutter, a green railing and the neighbouring houses beyond",
+            parking_1: "Concrete outdoor parking area beside the building, with flowering shrubs and trees on the left and a wire-mesh fence at the back",
             details_1: "Sunlight through a sheer curtain, with a leaf-shaped shadow and a round tie-back",
             details_2: "Round table mirror reflecting a painting of trees, beside a bundle of cinnamon sticks and a pine cone",
             details_3: "Pomegranates, pine cones and driftwood on a platter, with the corner fireplace behind",
@@ -126,6 +133,7 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
         intro: "Δύο υπνοδωμάτια, ένα φωτεινό ενιαίο καθιστικό και ένα ηλιόλουστο μπαλκόνι, 50 μ. από το Δημαρχείο της Καλαμάτας. Ο Ταΰγετος στο πρωινό σας, ο κόλπος λίγα λεπτά με το αυτοκίνητο.",
         guideTitle: "Ο οδηγός του διαμερίσματός σας",
         roomsNavLabel: "Δωμάτια",
+        parking: { name: "Πάρκινγκ", line: "Δωρεάν και ιδιωτικό, σε εξωτερικό χώρο του καταλύματος" },
         details: { name: "Από κοντά", line: "Κοχύλια, ξύλο και πέτρα στο απογευματινό φως" },
         amenities: { eyebrow: "Παροχές", title: "Τι θα βρείτε" },
         cta: {
@@ -174,6 +182,7 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
             balcony_3: "Τραπέζι με γυάλινη επιφάνεια στη σκιά των τεντών, με τα βουνά να φαίνονται στο βάθος",
             balcony_4: "Γωνία του μπαλκονιού με πράσινο κάγκελο και θέα πάνω από δέντρα προς τα μακρινά βουνά, με σκούπα, κουβά σφουγγαρίσματος και απλώστρα αριστερά",
             balcony_5: "Μακρόστενο μπαλκόνι με ήλιο, συρόμενη πόρτα και παντζούρι με περσίδες, πράσινο κάγκελο και τα γειτονικά σπίτια στο βάθος",
+            parking_1: "Τσιμεντοστρωμένος υπαίθριος χώρος στάθμευσης δίπλα στο κτίριο, με ανθισμένους θάμνους και δέντρα αριστερά και φράχτη με συρματόπλεγμα στο βάθος",
             details_1: "Ηλιόφως μέσα από αέρινη κουρτίνα, με σκιά σε σχήμα φύλλου και στρογγυλή πιάστρα",
             details_2: "Στρογγυλός επιτραπέζιος καθρέφτης που αντανακλά έναν πίνακα με δέντρα, δίπλα σε δεματάκι με ξυλάκια κανέλας και κουκουνάρι",
             details_3: "Ρόδια, κουκουνάρια και θαλασσόξυλο σε πιατέλα, με το γωνιακό τζάκι στο βάθος",

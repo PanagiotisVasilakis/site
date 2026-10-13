@@ -3,6 +3,7 @@
  * - Strips spaces, dashes, parentheses.
  * - If origin === 'GR' and input is 10 local digits not starting with 0, prefix +30. A 10-digit input with a leading 0
  *   falls through to the international rules below and is rejected, as it is at sign-in (phoneLookupCandidates).
+ * - A leading 00 (international call prefix) followed only by digits is read as +.
  * - If input starts with +, keep as is after stripping and validate E.164 length (8..15 total digits typical ITU range).
  * - If input is purely digits and 8..15 digits, treat as missing plus: return with '+' prefixed (international).
  * - Reject otherwise.
@@ -13,8 +14,10 @@ export type Origin = 'GR' | 'ABROAD';
 export function normalizePhone(input: string, origin?: Origin): { e164: string } | null {
   if (typeof input !== 'string') return null;
   // Remove common separators
-  const raw = input.replace(/[\s\-()]/g, '');
-  if (!raw) return null;
+  const stripped = input.replace(/[\s\-()]/g, '');
+  if (!stripped) return null;
+  // The 00 international call prefix is written as '+' (digits only; a bare '00' falls through and is rejected)
+  const raw = /^00\d+$/.test(stripped) ? `+${stripped.slice(2)}` : stripped;
 
   // Greek local auto-prefix (+30) for 10-digit locals
   if (origin === 'GR' && /^[1-9]\d{9}$/.test(raw)) {

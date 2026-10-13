@@ -5,7 +5,11 @@
  * (identity §9.11), so a redirect (e.g. `/` → `/en`) is never replayed from the
  * cache and online visitors always get the current deploy. Visited public pages
  * are kept for offline reading and stand in for a 5xx answer of the origin,
- * except the live pages (home, apartment, availability). PwaManager
+ * except the live pages (home, apartment, availability). A page opened by a
+ * client-side navigation is fetched and kept when PwaManager posts its URL
+ * (CACHE_PAGE). A failed navigation to an /en or /el page without a kept copy is
+ * redirected to `/{locale}/offline?from=<page>`, so that the offline page hydrates
+ * at its own URL (R-648); any other path gets the root /offline page. PwaManager
  * registers `/sw.js?v=<version>&build=<build>` from /version.json, so every
  * build installs a new worker and a new cache.
  */
@@ -16,8 +20,8 @@ const CACHE_PREFIX = 'guest-guide-';
 const CACHE_NAME = `${CACHE_PREFIX}${BUILD}`;
 
 const OFFLINE_PAGES = ['/offline', '/en/offline', '/el/offline'];
+// Precached best-effort next to the offline pages: a missing one never fails the install.
 const OFFLINE_ASSETS = [
-  ...OFFLINE_PAGES,
   '/app.webmanifest',
   '/favicon.ico',
   '/icons/icon-192.png',
@@ -77,9 +81,9 @@ function linkHrefs(html, extension) {
     .filter((href) => href.split('?')[0].endsWith(extension));
 }
 
-/** `<script src="…">` values of an HTML page. */
+/** `<script src="…">` values of an HTML page, without the `noModule` ones (Next's polyfills): a browser that runs this worker never loads them. */
 function scriptSrcs(html) {
-  return [...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/gu)].map((match) => match[1]);
+  return [...html.matchAll(/<script\b(?![^>]*\snomodule[\s=/>])[^>]*\bsrc="([^"]+)"/giu)].map((match) => match[1]);
 }
 
 /** `url(…)` values of a stylesheet that end in `.woff2`. */
@@ -97,7 +101,8 @@ async function cachedText(cache, url) {
 // The offline pages must render in the brand fonts and tokens (identity §9.11) and hydrate (Retry). The global
 // CSS, the next/font files and the build scripts have content-hashed URLs, so they are read from the precached
 // offline pages: their stylesheets, then every woff2 those stylesheets reference, and their `<script src>`
-// files. Build assets are served cache-first below.
+// files. Build assets are served cache-first below. The scripts are required (a failure rejects, so the install
+// fails: R-647); the CSS and the fonts are best-effort.
 async function precacheOfflineSubresources(cache) {
   const pages = await Promise.all(OFFLINE_PAGES.map((url) => cachedText(cache, url)));
   const origin = self.location.origin;
@@ -111,15 +116,18 @@ async function precacheOfflineSubresources(cache) {
   ]);
   await Promise.allSettled([...fonts].map((url) => cache.add(url)));
   const scripts = [...new Set(pages.flatMap((html) => buildAssetUrls(scriptSrcs(html), origin)))];
-  await Promise.allSettled(scripts.map((url) => cache.add(url)));
+  await Promise.all(scripts.map((url) => cache.add(url)));
 }
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
     // No cookies: /en/offline and /el/offline must not rewrite the visitor's `lang` cookie (src/proxy.ts).
+    // The offline pages and their scripts are required: a failed install keeps the previous worker and cache, and
+    // PwaManager registers again on the next page load (R-647). The manifest and the icons are best-effort.
+    await Promise.all(OFFLINE_PAGES.map((url) => cache.add(new Request(url, { credentials: 'omit' }))));
     await Promise.allSettled(OFFLINE_ASSETS.map((url) => cache.add(new Request(url, { credentials: 'omit' }))));
-    await precacheOfflineSubresources(cache).catch(() => {});
+    await precacheOfflineSubresources(cache);
   })());
 });
 
@@ -141,13 +149,36 @@ self.addEventListener('message', (event) => {
   if (event.data.type === 'REQUEST_VERSION') {
     event.source?.postMessage({ type: 'RUNTIME_VERSION', meta: { version: VERSION, build: BUILD } });
   }
+  if (event.data.type === 'CACHE_PAGE') event.waitUntil(storePage(event.data.url));
 });
 
-async function networkFirstPage(request, pathname) {
+// A page reached by a client-side navigation (a tap on a next/link) is not a `navigate` request, so the fetch
+// handler never stores it. PwaManager sends the URL it landed on; the URL comes from page script, so it gets the
+// same rules as a navigation: same origin, no /api/, no network-only page, and only an answer that isStorable.
+// The offline pages are precached without cookies at install and are never fetched again here.
+async function storePage(href) {
+  try {
+    const url = new URL(href);
+    if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
+    if (isNetworkOnlyPage(url.pathname) || OFFLINE_PAGES.includes(url.pathname)) return;
+    const response = await fetchInternal(new Request(url.href));
+    if (isStorable(response)) await (await caches.open(CACHE_NAME)).put(url.href, response);
+  } catch { /* offline, an unusable URL or a failed cache write: the page is simply not kept */ }
+}
+
+/** The unlocalized offline page, or plain text when even that was not precached. */
+async function rootOfflinePage(cache) {
+  return (await cache.match('/offline'))
+    || new Response('Offline', { status: 503, statusText: 'Offline', headers: { 'content-type': 'text/plain' } });
+}
+
+async function networkFirstPage(request, pathname, search) {
   const cache = await caches.open(CACHE_NAME);
+  const isOfflinePage = OFFLINE_PAGES.includes(pathname);
   try {
     const response = await fetchInternal(request);
-    if (isStorable(response) && !isNetworkOnlyPage(pathname)) {
+    // The offline pages stay as the install precached them (no cookies): a navigation never stores one, under any query.
+    if (isStorable(response) && !isNetworkOnlyPage(pathname) && !isOfflinePage) {
       cache.put(request, response.clone()).catch(() => {});
     }
     // Origin outage (Nginx 502, Cloudflare 52x) resolves the fetch: a visited copy beats the error page.
@@ -157,12 +188,19 @@ async function networkFirstPage(request, pathname) {
     }
     return response;
   } catch {
+    // An offline page is answered from the precache by pathname, whatever its query, and never redirects: the
+    // redirect below lands on it.
+    if (isOfflinePage) return (await cache.match(pathname)) || rootOfflinePage(cache);
     const cached = isNetworkOnlyPage(pathname) ? undefined : await cache.match(request);
     if (cached) return cached;
+    // R-648: the localized offline page is not shown under the requested URL (it would hydrate against that
+    // route: another header and footer, a layout jump, a hydration error) but at its own, which names the page
+    // in `from` for Retry (OfflineActions). Any other path gets the root /offline page.
     const locale = pathname.split('/')[1];
-    return (await cache.match(`/${locale}/offline`))
-      || (await cache.match('/offline'))
-      || new Response('Offline', { status: 503, statusText: 'Offline', headers: { 'content-type': 'text/plain' } });
+    if (locale === 'en' || locale === 'el') {
+      return Response.redirect(`/${locale}/offline?from=${encodeURIComponent(pathname + search)}`, 302);
+    }
+    return rootOfflinePage(cache);
   }
 }
 
@@ -195,7 +233,7 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/api/')) return;
 
   if (request.mode === 'navigate') {
-    event.respondWith(networkFirstPage(request, url.pathname));
+    event.respondWith(networkFirstPage(request, url.pathname, url.search));
     return;
   }
   // Content-hashed build output never changes under the same URL.

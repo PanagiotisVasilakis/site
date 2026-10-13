@@ -12,7 +12,7 @@ import { MotionSwitch } from './MotionSwitch';
 import { ThemeSetting } from './ThemeSwitch';
 import {
   footerBrandLines, footerContactId, footerContactLinks, footerLegalLinks, footerNavLinks, footerStayLink,
-  footerVariantFor, shellVariantFor,
+  footerVariantFor, scrollToCurrentHash, shellVariantFor,
 } from './shellLinks';
 
 const CONTACT_ICONS: Record<string, IconName> = { phone: 'phone', email: 'mail', instagram: 'camera', whatsapp: 'message' };
@@ -56,7 +56,14 @@ export default function SiteFooter({ locale }: { locale: string }) {
         {nav.length > 0 && (
           <nav className="site-footer__nav" aria-label={t.shell.footerNavigation}>
             {nav.map((link) => (
-              <Link key={link.key} href={link.href} className="site-footer__link shell-link">{link.label}</Link>
+              <Link
+                key={link.key}
+                href={link.href}
+                className="site-footer__link shell-link"
+                onClick={(event) => scrollToCurrentHash(event, link.href)}
+              >
+                {link.label}
+              </Link>
             ))}
           </nav>
         )}
@@ -89,7 +96,7 @@ export default function SiteFooter({ locale }: { locale: string }) {
         )}
 
         <div className="site-footer__prefs">
-          {/* Deviation from §8 (owner to confirm): the header icon only toggles Day/Night and the menu
+          {/* Deviation from §8 (owner-approved, O41 in PROGRESS.md): the header icon only toggles Day/Night and the menu
               button is hidden at ≥ 1320 px, so the footer also carries Auto · Day · Night at every width. */}
           <ThemeSetting t={t.shell} />
           <MotionSwitch t={t.shell} />

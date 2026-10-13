@@ -1,16 +1,17 @@
-// The apartment page photo set (identity §7.3): 41 marketing photos per section (six rooms, then the details), in order, with the crops.
+// The apartment page photo set (identity §7.3): 42 marketing photos per section (six rooms, the parking, then the details), in order, with the crops.
 // Retired from public/ on 2026-10-11 (the owner keeps the files): living_1 (old entrance decor, now living_10),
 // living_2 (branded packaging), bathroom_2 (toilet signs) and bathroom_8 (medicines). Removed earlier: living_3
 // (branded packaging), living_1_booking, bedroom_4, bedroom_2_2, bedroom_2_4 and bathroom_5 (duplicates), bathroom_1
 // (soft). living_9, living_10, living_11, bedroom_5, balcony_2, balcony_3, balcony_4, balcony_5 and details_1 to details_10
 // are the owner's photos of 2026-08-01, cut to 2:3. balcony_4 and balcony_5 (IMG_6251, IMG_6256) were added on 2026-10-12 at the
-// owner request; balcony_4 is cut to 3:2.
+// owner request; balcony_4 is cut to 3:2. parking_1 (IMG_6211, taken on 2026-08-01) was added on 2026-10-12 at the owner request,
+// cut to 3:2 to the left of the entrance: no door, house plate or sticker is in the frame.
 
 /**
- * Section keys: the six rooms (linked from the home room cards), then the details section ('Up close', no home card).
- * They are also the section ids (`/{l}/apartment#bedroom-1`, `#details`).
+ * Section keys: the six rooms (linked from the home room cards), then the parking and details sections ('Parking' and 'Up close', no home cards).
+ * They are also the section ids (`/{l}/apartment#bedroom-1`, `#parking`, `#details`).
  */
-export const APARTMENT_ROOMS = ['living', 'kitchen', 'bedroom-1', 'bedroom-2', 'bathroom', 'balcony', 'details'] as const;
+export const APARTMENT_ROOMS = ['living', 'kitchen', 'bedroom-1', 'bedroom-2', 'bathroom', 'balcony', 'parking', 'details'] as const;
 export type ApartmentRoomKey = (typeof APARTMENT_ROOMS)[number];
 
 /** Fractions of the frame cut off each side (§7.3 crops). */
@@ -58,12 +59,15 @@ export const APARTMENT_PHOTOS = [
   { id: 'bathroom_7', room: 'bathroom', src: '/house/bathroom/bathroom_7.jpeg', ...LANDSCAPE },
   { id: 'bathroom_3', room: 'bathroom', src: '/house/bathroom/bathroom_3.jpeg', ...PORTRAIT },
   { id: 'bathroom_4', room: 'bathroom', src: '/house/bathroom/bathroom_4.jpeg', width: 1280, height: 1920 },
+  // Balcony order: 2:3, 2:3, 3:2, 3:2, 2:3 keeps the CSS columns level; with 2:3, 3:2, 2:3, 3:2, 2:3 the lone 3:2 photo stood alone in a column (R-691).
   { id: 'balcony_2', room: 'balcony', src: '/house/balcony/balcony_2.jpeg', width: 1280, height: 1920 },
+  { id: 'balcony_3', room: 'balcony', src: '/house/balcony/balcony_3.jpeg', width: 1280, height: 1920 },
   // balcony_1 is also the master of the home hero crops and the share cards (identity §7.2).
   { id: 'balcony_1', room: 'balcony', src: '/house/balcony/balcony_1.jpeg', ...LANDSCAPE },
-  { id: 'balcony_3', room: 'balcony', src: '/house/balcony/balcony_3.jpeg', width: 1280, height: 1920 },
   { id: 'balcony_4', room: 'balcony', src: '/house/balcony/balcony_4.jpeg', width: 1920, height: 1280 },
   { id: 'balcony_5', room: 'balcony', src: '/house/balcony/balcony_5.jpeg', width: 1280, height: 1920 },
+  // Parking (identity section 7.3): the owner's one photo of the parking, cut to 3:2; a section with one photo shows it alone (single-tile layout).
+  { id: 'parking_1', room: 'parking', src: '/house/parking/parking_1.jpeg', width: 1920, height: 1280 },
   // Details ('Up close', identity §7.3): owner close-ups of 2026-08-01, all 2:3; no home card (homeRooms.ts).
   { id: 'details_1', room: 'details', src: '/house/details/details_1.jpeg', width: 1280, height: 1920 },
   { id: 'details_2', room: 'details', src: '/house/details/details_2.jpeg', width: 1280, height: 1920 },
@@ -79,5 +83,5 @@ export const APARTMENT_PHOTOS = [
 
 export type ApartmentPhotoId = (typeof APARTMENT_PHOTOS)[number]['id'];
 
-/** The page's lead photo; it opens the viewer at 1 / 41 and is not repeated in the Living tiles. */
+/** The page's lead photo; it opens the viewer at 1 / 42 and is not repeated in the Living tiles. */
 export const APARTMENT_LEAD_PHOTO_ID: ApartmentPhotoId = 'living_8';

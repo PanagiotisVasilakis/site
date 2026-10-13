@@ -9,7 +9,7 @@ import type { PublicAvailability } from '@/lib/prisma-repositories/availabilityR
 const FROM_PRICE_WINDOW_NIGHTS = 60;
 const TEASER_NIGHTS = 14;
 
-export type NightState = 'open' | 'booked' | 'unknown';
+type NightState = 'open' | 'booked' | 'unknown';
 
 export type NightCell = Readonly<{
   date: IsoDate;

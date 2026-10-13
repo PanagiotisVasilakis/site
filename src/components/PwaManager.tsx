@@ -1,5 +1,6 @@
 "use client";
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 import internalFetch from '@/lib/internalFetchClient';
 import { logger } from '@/lib/logger-client';
 
@@ -8,10 +9,49 @@ import { logger } from '@/lib/logger-client';
 const readStored = (read: () => string | null): string | null => { try { return read(); } catch { return null; } };
 const writeStored = (write: () => void): void => { try { write(); } catch { /* storage blocked: the value is not remembered */ } };
 
+// The worker runs in production, or in development when NEXT_PUBLIC_FORCE_SW_DEV is set; otherwise it is unregistered.
+const isServiceWorkerEnabled = (): boolean => process.env.NODE_ENV === 'production' || Boolean(process.env.NEXT_PUBLIC_FORCE_SW_DEV);
+
+const withoutHash = (url: string): string => url.split('#')[0];
+
+// The worker stores a page only for a full navigation (public/sw.js). A page reached by a client-side navigation is
+// handed to it here, so that it can be opened offline later (R-628). No controller, or no service worker: nothing to tell.
+const cacheCurrentPage = (): void => {
+  try {
+    navigator.serviceWorker.controller?.postMessage({ type: 'CACHE_PAGE', url: withoutHash(window.location.href) });
+  } catch { /* service workers unavailable or denied */ }
+};
+
 export default function PwaManager() {
+  const pathname = usePathname();
+  const mountedPathname = useRef(pathname);
+
+  // Every pathname change after mount is a client-side navigation.
+  useEffect(() => {
+    if (pathname === mountedPathname.current) return;
+    mountedPathname.current = pathname;
+    if (isServiceWorkerEnabled()) cacheCurrentPage();
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!isServiceWorkerEnabled()) return;
+    // This component mounts when the browser is idle: the guest may already have navigated away from the page
+    // the browser loaded (the worker saw that one as a navigation, not this one).
+    const loaded = performance.getEntriesByType('navigation')[0];
+    if (loaded && withoutHash(loaded.name) !== withoutHash(window.location.href)) cacheCurrentPage();
+    // First visit: the worker only takes control after this page loaded, so it never saw the page. Tell it once.
+    const eventController = new AbortController();
+    try {
+      if (!navigator.serviceWorker.controller) {
+        navigator.serviceWorker.addEventListener('controllerchange', cacheCurrentPage, { once: true, signal: eventController.signal });
+      }
+    } catch { /* service workers unavailable or denied */ }
+    return () => eventController.abort();
+  }, []);
+
   useEffect(() => {
       // In dev, aggressively unregister any existing SW (from prior prod build) to avoid intercepting RSC / flight data causing JSON parse errors.
-      if (process.env.NODE_ENV !== 'production' && !process.env.NEXT_PUBLIC_FORCE_SW_DEV) {
+      if (!isServiceWorkerEnabled()) {
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
           // Optional: clear our app's caches
@@ -132,6 +172,14 @@ export default function PwaManager() {
         const newVersion: string | undefined = meta.version;
         const newBuild: string | undefined = meta.build;
         if (!newVersion) return;
+        // The worker that controls the page is the version that runs, whatever was stored before: a waiting worker
+        // can take over by itself (every tab closed), and only the Refresh button would have advanced the baseline.
+        // A message from a waiting worker keeps the banner logic below.
+        if (e.source && e.source === swContainer?.controller) {
+          writeStored(() => localStorage.setItem('app-version', newVersion));
+          if (newBuild) writeStored(() => localStorage.setItem('app-build', newBuild));
+          return;
+        }
         const storedVersion = readStored(() => localStorage.getItem('app-version'));
         const storedBuild = readStored(() => localStorage.getItem('app-build'));
         const shortNewBuild = newBuild ? newBuild.slice(0,8) : '';

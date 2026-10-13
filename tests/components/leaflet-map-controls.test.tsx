@@ -30,6 +30,7 @@ const labels: LeafletMapLabels = {
   fitToMarkers: 'Fit',
   zoomIn: 'Zoom in',
   zoomOut: 'Zoom out',
+  closePopup: 'Close',
 };
 
 // [longitude, latitude], under 2 km apart: the fit lands below the maximum zoom, so a zoom step is still possible.
@@ -40,9 +41,12 @@ const markers: LeafletMarkerData[] = [
 
 const getCurrentPosition = vi.fn<Geolocation['getCurrentPosition']>();
 
+// The Greek page's labels for the popup close button (R-687); a module constant, as the labels are an effect dependency.
+const greekLabels: LeafletMapLabels = { ...labels, closePopup: 'Κλείσιμο' };
+
 // The same labels and markers on every render: only the zoom prop may rebuild the map (it is an effect dependency).
-function mapElement(zoom = 13) {
-  return <LeafletMap center={[22.1, 37.04]} zoom={zoom} labels={labels} markers={markers} />;
+function mapElement(zoom = 13, mapLabels: LeafletMapLabels = labels) {
+  return <LeafletMap center={[22.1, 37.04]} zoom={zoom} labels={mapLabels} markers={markers} />;
 }
 
 function control(name: string) {
@@ -188,5 +192,44 @@ describe('LeafletMap Locate me (R-398)', () => {
     unmount();
 
     expect(() => answerLocate(37.03, 22.11)).not.toThrow();
+  });
+});
+
+// R-687: Leaflet hard-codes aria-label="Close popup" on the popup's close button, so a Greek screen-reader user heard
+// English there. The component sets the label from the map labels each time a popup opens.
+describe('LeafletMap popup close button (R-687)', () => {
+  function dataPin(map: L.Map, title: string) {
+    let found: L.Marker | undefined;
+    map.eachLayer((layer) => {
+      if (layer instanceof L.Marker && layer.options.title === title) found = layer;
+    });
+    if (!found) throw new Error(`No pin titled ${title}`);
+    return found;
+  }
+
+  function closeButton(container: HTMLElement) {
+    const button = container.querySelector('.leaflet-popup-close-button');
+    if (!button) throw new Error('The popup has no close button');
+    return button;
+  }
+
+  it('names the close button from the Greek labels on the first and on the second open', () => {
+    const { container } = render(mapElement(13, greekLabels));
+    const pin = dataPin(currentMap(), 'Police');
+
+    pin.openPopup();
+    expect(closeButton(container)).toHaveAttribute('aria-label', 'Κλείσιμο');
+
+    pin.closePopup();
+    pin.openPopup();
+    expect(closeButton(container)).toHaveAttribute('aria-label', 'Κλείσιμο');
+  });
+
+  it('names the close button from the English labels', () => {
+    const { container } = render(mapElement());
+
+    dataPin(currentMap(), 'Home').openPopup();
+
+    expect(closeButton(container)).toHaveAttribute('aria-label', 'Close');
   });
 });

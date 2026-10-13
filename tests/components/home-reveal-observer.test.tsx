@@ -87,7 +87,42 @@ beforeEach(() => {
   });
 });
 
-afterEach(() => rectSpy.mockRestore());
+afterEach(() => {
+  rectSpy.mockRestore();
+  document.documentElement.removeAttribute('data-reveal-ready');
+});
+
+describe('HomeRevealObserver hydration flag (R-633)', () => {
+  const root = document.documentElement;
+
+  it('sets data-reveal-ready on <html> when it mounts, so the boot script failsafe sees that this page hydrated', () => {
+    stubObserver();
+    expect(root.hasAttribute('data-reveal-ready')).toBe(false);
+
+    render(
+      <>
+        <div data-reveal />
+        <HomeRevealObserver />
+      </>,
+    );
+
+    expect(root.hasAttribute('data-reveal-ready')).toBe(true);
+  });
+
+  it('sets the flag without IntersectionObserver too', () => {
+    vi.stubGlobal('IntersectionObserver', undefined);
+    expect(root.hasAttribute('data-reveal-ready')).toBe(false);
+
+    render(
+      <>
+        <div data-reveal />
+        <HomeRevealObserver />
+      </>,
+    );
+
+    expect(root.hasAttribute('data-reveal-ready')).toBe(true);
+  });
+});
 
 describe('HomeRevealObserver trigger (R-379)', () => {
   it('reveals by a share of the viewport, not of the element: a rootMargin and no threshold', () => {

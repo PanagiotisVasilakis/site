@@ -13,8 +13,9 @@ function hasText(value: unknown): boolean {
 // Checked word by word because lint:security flags the nested quantifier of that one-liner.
 const SLUG_WORD = /^[a-z0-9]+$/;
 
-// Throws if any localized required field missing for configured locales, or if an
-// item slug is empty, malformed or used twice within its category.
+// Throws if any localized required field missing for configured locales, if an
+// item id is used twice within its category, or if an item slug is empty,
+// malformed or used twice within its category.
 // Non-default locales must have their own non-empty field; only the default
 // locale may fall back to the base field.
 // Items load in strict mode, so a malformed file or item fails here instead of being skipped.
@@ -27,6 +28,7 @@ export function validateLocalization(locales: string[]) {
       }
     }
     const items = getItemsByCategory(c.id, { strict: true });
+    const idOwners = new Set<string>();
     const slugOwners = new Map<string, string>();
     for (const it of items) {
       for (const loc of locales) {
@@ -35,6 +37,9 @@ export function validateLocalization(locales: string[]) {
           throw new Error(`Missing name for item ${it.id} locale ${loc}`);
         }
       }
+      // The id is a React key, a favourites id and a lookup key, so it must be unique within its category.
+      if (idOwners.has(it.id)) throw new Error(`Duplicate id in category ${c.id}: ${it.id}`);
+      idOwners.add(it.id);
       // The loader gives every item its slug: the pinned one, else the one derived from the English name.
       if (it.slug === undefined) continue;
       if (it.slug === '') throw new Error(`Empty slug for item ${it.id} in category ${c.id}`);

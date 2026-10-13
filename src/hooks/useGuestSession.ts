@@ -28,14 +28,15 @@ export function useGuestSession() {
             });
 
             const body = res.ok ? await res.json().catch(() => null) : null;
-            const signedIn = body?.data?.authenticated === true;
             if (version === requestVersion.current) {
-                setIsSignedIn(signedIn);
-                // 200: the portal is on. 404: it is off. Other statuses say nothing about the flags.
+                // 200: the portal is on and the body says whether the guest is signed in. 404: the portal is off and
+                // nobody is signed in. Other statuses say nothing about the session or the flags.
                 if (res.ok) {
+                    setIsSignedIn(body?.data?.authenticated === true);
                     setPortalEnabled(true);
                     setCheckinEnabled(body?.data?.checkinEnabled === true);
                 } else if (res.status === 404) {
+                    setIsSignedIn(false);
                     setPortalEnabled(false);
                     setCheckinEnabled(false);
                 }

@@ -234,6 +234,22 @@
 @media (min-width: 768px) {
   .apt-masonry .apt-masonry__item { margin-bottom: 12px; }
 }
+/* A section whose tiles all share one box ratio: rows, not columns, so only the last row can be short (R-700). */
+.apt-masonry.apt-masonry--grid {
+  columns: auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.apt-masonry.apt-masonry--grid .apt-masonry__item {
+  margin-bottom: 0;
+}
+@media (min-width: 768px) {
+  .apt-masonry.apt-masonry--grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+}
+@media (min-width: 1280px) {
+  .apt-masonry.apt-masonry--grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
 .apt-masonry .apt-tile {
   position: relative;
   display: block;

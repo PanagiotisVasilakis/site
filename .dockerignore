@@ -26,9 +26,10 @@ axe-a11y-report*.json
 next-env.d.ts
 *.log
 .DS_Store
+**/.DS_Store
 .env
 .env.*
-# Any depth (docker/.env, nested keys). The root-only lines above stay: release-policy.mjs requires them.
+# Any depth (docker/.env, nested keys). release-policy.mjs requires these lines and the root-only lines above.
 **/.env
 **/.env.*
 **/*.pem

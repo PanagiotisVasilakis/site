@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { BrandMark } from '@/components/icons/BrandMark';
 import { Icon } from '@/components/icons/Icon';
+import { useToast } from '@/components/Toast';
 import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
 import { useGuestSession } from '@/hooks/useGuestSession';
@@ -17,7 +18,9 @@ import { usePointerEffects } from '@/lib/motion/pointerEffects';
 import LanguageSwitch from './LanguageSwitch';
 import MobileMenu from './MobileMenu';
 import { ThemeSwitch } from './ThemeSwitch';
-import { brandHref, headerCta, headerOverlaysHero, isCurrentLink, navLinks, shellVariantFor } from './shellLinks';
+import {
+  brandHref, headerCta, headerOverlaysHero, isCurrentLink, navLinks, scrollToCurrentHash, shellVariantFor,
+} from './shellLinks';
 
 /** The wordmark (identity §1.2): the brand in every locale; the place label below it is localized. */
 const WORDMARK = 'Dolce Far Niente';
@@ -33,6 +36,7 @@ const WORDMARK = 'Dolce Far Niente';
 export default function SiteHeader({ locale }: { locale: string }) {
   const pathname = usePathname() || `/${locale}`;
   const router = useRouter();
+  const toast = useToast();
   const t = getDictionary(normalizeLocale(locale));
   const variant = shellVariantFor(pathname);
   const cta = headerCta(variant, locale, t);
@@ -66,6 +70,8 @@ export default function SiteHeader({ locale }: { locale: string }) {
     if (await signOut()) {
       router.replace(`/${locale}`);
       router.refresh();
+    } else {
+      toast.push(t.ui.signOutFailed);
     }
   };
 
@@ -94,6 +100,7 @@ export default function SiteHeader({ locale }: { locale: string }) {
               href={link.href}
               className="site-nav__link shell-link"
               aria-current={isCurrentLink(pathname, link.href) ? 'page' : undefined}
+              onClick={(event) => scrollToCurrentHash(event, link.href)}
             >
               {link.label}
             </Link>

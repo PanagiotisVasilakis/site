@@ -27,6 +27,7 @@ export interface LeafletMapLabels {
   fitToMarkers: string;
   zoomIn: string;
   zoomOut: string;
+  closePopup: string;
 }
 
 export interface LeafletMapProps {
@@ -234,6 +235,10 @@ export default function LeafletMap({
       });
       const baseHtml = buildBasePopupHtml(markerData, mapLabels);
       marker.bindPopup(baseHtml);
+      // Leaflet hard-codes aria-label="Close popup" on the close button; name it in the page's language (R-687).
+      marker.on('popupopen', (event) => {
+        event.popup.getElement()?.querySelector('.leaflet-popup-close-button')?.setAttribute('aria-label', mapLabels.closePopup);
+      });
       marker.on('add', () => {
         const element = marker.getElement();
         element?.setAttribute('aria-label', markerData.name);

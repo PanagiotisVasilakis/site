@@ -59,9 +59,9 @@ test('synthetic high-entropy credential assignment fails', async () => {
   assert.ok(result.unexpected.every((finding) => finding.classification === 'secret-assignment'));
 });
 
-async function scanWithAllowlist(contents, allowlist) {
+async function scanWithAllowlist(contents, allowlist, name = 'fixture.env') {
   return withFixture(async (root) => {
-    await writeFile(path.join(root, 'fixture.env'), contents, { encoding: 'utf8', mode: 0o600 });
+    await writeFile(path.join(root, name), contents, { encoding: 'utf8', mode: 0o600 });
     return scanPathForTest(root, { allowlist });
   });
 }
@@ -106,6 +106,32 @@ test('each occurrence of a reviewed value needs its own entry', async () => {
   assert.equal(once.unexpected.length, 1);
   assert.deepEqual(twice.unexpected, []);
   assert.equal(twice.accepted.length, 2);
+});
+
+test('a reviewed value found in another file stays unexpected and its entry goes stale', async () => {
+  const line = `DATABASE_URL=${reviewedDatabaseUrl('Synthetic9Credential7Only')}\n`;
+  const [finding] = (await scanWithAllowlist(line, [])).unexpected;
+  const entry = { classification: 'synthetic-test-fixture', path: finding.path, rule: finding.rule, valueSha256: finding.valueSha256 };
+
+  const copied = await scanWithAllowlist(line, [entry], 'copied.env');
+
+  assert.notEqual(finding.path, 'copied.env');
+  assert.equal(copied.accepted.length, 0);
+  assert.deepEqual(copied.unexpected.map((item) => item.path), ['copied.env']);
+  assert.deepEqual(copied.stale.map((item) => item.path), [finding.path]);
+});
+
+test('a reviewed value reported under another rule stays unexpected and its entry goes stale', async () => {
+  const line = `DATABASE_URL=${reviewedDatabaseUrl('Synthetic9Credential7Only')}\n`;
+  const [finding] = (await scanWithAllowlist(line, [])).unexpected;
+  const entry = { classification: 'synthetic-test-fixture', path: finding.path, rule: 'generic-api-key', valueSha256: finding.valueSha256 };
+
+  const other = await scanWithAllowlist(line, [entry]);
+
+  assert.notEqual(finding.rule, entry.rule);
+  assert.equal(other.accepted.length, 0);
+  assert.deepEqual(other.unexpected.map((item) => item.rule), [finding.rule]);
+  assert.deepEqual(other.stale.map((item) => item.rule), [entry.rule]);
 });
 
 test('synthetic private key fails', async () => {
@@ -159,8 +185,8 @@ const SCANNER_FILES = [
 
 // check-secrets.mjs derives its repository root from its own location, so a copy
 // under a scratch root scans with the scratch gitleaks.toml and never touches the
-// real configuration.
-async function withScratchScanner(configText, callback) {
+// real configuration. editLock, when given, rewrites the copied tool.lock.json.
+async function withScratchScanner(configText, callback, editLock) {
   const scratch = await mkdtemp(path.join(os.tmpdir(), 'secret-scanner-copy-'));
   try {
     for (const relative of SCANNER_FILES) {
@@ -169,6 +195,12 @@ async function withScratchScanner(configText, callback) {
       await copyFile(new URL(`../../${relative}`, import.meta.url), target);
     }
     await writeFile(path.join(scratch, 'config/secret-scanning/gitleaks.toml'), configText);
+    if (editLock) {
+      const lockPath = path.join(scratch, 'config/secret-scanning/tool.lock.json');
+      const lock = JSON.parse(await readFile(lockPath, 'utf8'));
+      editLock(lock);
+      await writeFile(lockPath, JSON.stringify(lock));
+    }
     const scanner = await import(
       pathToFileURL(path.join(scratch, 'scripts/check-secrets.mjs')).href
     );
@@ -202,6 +234,37 @@ test('a scanner that cannot load its configuration fails closed instead of passi
       ),
     );
   });
+});
+
+// The scanner binary stays the genuine one (GITLEAKS_BIN); only the copied lock is rewritten,
+// so each case breaks exactly one of the two checks that verifyScanner makes.
+async function scanWithEditedLock(editLock) {
+  const realConfig = await readFile(
+    new URL('../../config/secret-scanning/gitleaks.toml', import.meta.url),
+    'utf8',
+  );
+  return withScratchScanner(realConfig, (scanner) => withFixture(async (root) => {
+    await writeFile(path.join(root, 'fixture.env'), 'PUBLIC_LABEL=not-sensitive\n', { encoding: 'utf8', mode: 0o600 });
+    return scanner.scanPathForTest(root);
+  }), editLock);
+}
+
+test('a scanner binary whose hash differs from the repository lock is rejected', async () => {
+  await assert.rejects(
+    scanWithEditedLock((lock) => {
+      for (const artifact of Object.values(lock.artifacts)) artifact.binarySha256 = '0'.repeat(64);
+    }),
+    /binary does not match the repository lock/u,
+  );
+});
+
+test('a scanner whose version differs from the repository lock is rejected', async () => {
+  await assert.rejects(
+    scanWithEditedLock((lock) => {
+      lock.version = '0.0.0';
+    }),
+    /version does not match the repository lock/u,
+  );
 });
 
 test('an inline scanner suppression comment fails the scan instead of hiding the finding', async () => {

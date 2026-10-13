@@ -44,7 +44,7 @@ function availability(overrides: Partial<PublicAvailability> = {}): PublicAvaila
   };
 }
 
-const ROOM_IDS = ['living', 'kitchen', 'bedroom-1', 'bedroom-2', 'bathroom', 'balcony', 'details'];
+const ROOM_IDS = ['living', 'kitchen', 'bedroom-1', 'bedroom-2', 'bathroom', 'balcony', 'parking', 'details'];
 
 // identity §7.3: never shown in the marketing views (retired, duplicates, soft, branded, stay-hub only).
 const EXCLUDED = [
@@ -77,14 +77,14 @@ describe('apartment page (identity §9.2)', () => {
     }
   });
 
-  it('shows the 41 marketing photos in the §7.3 order and never an excluded one', async () => {
+  it('shows the 42 marketing photos in the §7.3 order and never an excluded one', async () => {
     const { container } = await renderPage('en');
 
     const sources = [...container.querySelectorAll('img')].map((img) => img.getAttribute('src') ?? '');
     for (const name of EXCLUDED) {
       expect(sources.filter((src) => src.includes(`/${name}.`)), name).toEqual([]);
     }
-    // The lead photo (living_8, LCP), the 30 room tiles and the 10 details tiles.
+    // The lead photo (living_8, LCP), the 30 room tiles, the parking tile and the 10 details tiles.
     const lead = container.querySelector('.apt-lead img');
     expect(lead?.getAttribute('src')).toBe('/house/living/living_8.jpeg');
     expect(lead?.getAttribute('loading')).toBe('eager');
@@ -102,8 +102,9 @@ describe('apartment page (identity §9.2)', () => {
       '/house/bedroom_2/bedroom_2_1.jpeg',
       '/house/bathroom/bathroom_6.jpeg', '/house/bathroom/bathroom_7.jpeg', '/house/bathroom/bathroom_3.jpeg',
       '/house/bathroom/bathroom_4.jpeg',
-      '/house/balcony/balcony_2.jpeg', '/house/balcony/balcony_1.jpeg', '/house/balcony/balcony_3.jpeg',
+      '/house/balcony/balcony_2.jpeg', '/house/balcony/balcony_3.jpeg', '/house/balcony/balcony_1.jpeg',
       '/house/balcony/balcony_4.jpeg', '/house/balcony/balcony_5.jpeg',
+      '/house/parking/parking_1.jpeg',
       '/house/details/details_1.jpeg', '/house/details/details_2.jpeg', '/house/details/details_3.jpeg',
       '/house/details/details_4.jpeg', '/house/details/details_5.jpeg', '/house/details/details_6.jpeg',
       '/house/details/details_7.jpeg', '/house/details/details_8.jpeg', '/house/details/details_9.jpeg',
@@ -127,6 +128,52 @@ describe('apartment page (identity §9.2)', () => {
     expect(within(details).getByRole('heading', { level: 2 })).toHaveTextContent(title);
     expect(details.querySelector('.apt-room__line')).toHaveTextContent(line);
     expect(details.querySelectorAll('.apt-masonry img')).toHaveLength(10);
+  });
+
+  it.each([
+    ['en', 'Parking', 'Free and private, outdoors at the property'],
+    ['el', 'Πάρκινγκ', 'Δωρεάν και ιδιωτικό, σε εξωτερικό χώρο του καταλύματος'],
+  ] as const)('has a parking section (%s) before the details: its own title and line, one tile shown alone', async (locale, title, line) => {
+    const { container } = await renderPage(locale);
+
+    // The order proves that Parking sits between the balcony and the details, so it is not the last section.
+    expect([...container.querySelectorAll('section.apt-room')].map((section) => section.id)).toEqual(ROOM_IDS);
+    const parking = container.querySelector('section#parking') as HTMLElement;
+    expect(parking).not.toBeNull();
+    expect(within(parking).getByRole('heading', { level: 2 })).toHaveTextContent(title);
+    expect(parking.querySelector('.apt-room__line')).toHaveTextContent(line);
+
+    const images = parking.querySelectorAll('.apt-masonry img');
+    expect(images).toHaveLength(1);
+    expect(images[0].getAttribute('src')).toBe('/house/parking/parking_1.jpeg');
+    expect(images[0].getAttribute('alt') ?? '').not.toBe('');
+    expect(images[0].getAttribute('sizes')).toBe('(min-width: 900px) 820px, 92vw');
+
+    expect(parking.querySelector('ul.apt-masonry')).toHaveClass('apt-masonry--single');
+    expect(container.querySelectorAll('.apt-masonry--single')).toHaveLength(1);
+
+    const nav = container.querySelector('nav.apt-chips') as HTMLElement;
+    expect(within(nav).getByRole('link', { name: title })).toHaveAttribute('href', '#parking');
+  });
+
+  it('lays out the sections whose tiles share one box ratio as a row-major grid, the others as columns (R-700)', async () => {
+    const { container } = await renderPage('en');
+
+    const layout = (id: string) => (container.querySelector(`section#${id} ul.apt-masonry`) as HTMLElement).className;
+    const ratios = (id: string) => new Set([...container.querySelectorAll(`section#${id} .apt-tile`)].map((tile) => (tile as HTMLElement).style.aspectRatio));
+    // Ten 2:3 details tiles and four equal 3:2 bedroom-2 tiles: a grid, so only the last row is short and no column is left empty.
+    for (const id of ['details', 'bedroom-2']) {
+      expect(layout(id), id).toBe('apt-masonry apt-masonry--grid');
+      expect(ratios(id).size, id).toBe(1);
+    }
+    // Sections that mix 3:2 and 2:3 tiles stay CSS columns.
+    for (const id of ['living', 'kitchen', 'bedroom-1', 'bathroom', 'balcony']) {
+      expect(layout(id), id).toBe('apt-masonry');
+      expect(ratios(id).size, id).toBeGreaterThan(1);
+    }
+    // The single parking tile is shown alone (D3), not as a grid.
+    expect(layout('parking')).toBe('apt-masonry apt-masonry--single');
+    expect(container.querySelectorAll('.apt-masonry--grid')).toHaveLength(2);
   });
 
   it.each([
@@ -243,43 +290,54 @@ describe('apartment page gallery wiring (identity §9.2, §8 GalleryLightbox)', 
 
     await user.click(tile('/house/kitchen/kitchen_2.jpeg'));
     expect(viewer().dialog).toHaveAttribute('open');
-    expect(viewer().counter).toHaveTextContent('9 / 41');
+    expect(viewer().counter).toHaveTextContent('9 / 42');
     expect(viewer().room).toHaveTextContent('Kitchen');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
     expect(viewer().dialog).not.toHaveAttribute('open');
 
     await user.click(tile('/house/living/living_11.jpeg'));
-    expect(viewer().counter).toHaveTextContent('3 / 41');
+    expect(viewer().counter).toHaveTextContent('3 / 42');
     expect(viewer().room).toHaveTextContent('Living room');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
 
+    // R-691: balcony_3 (2:3) sits before balcony_1 (3:2), so the single landscape photo does not end up alone in a column.
     await user.click(tile('/house/balcony/balcony_3.jpeg'));
-    expect(viewer().counter).toHaveTextContent('29 / 41');
+    expect(viewer().counter).toHaveTextContent('28 / 42');
+    expect(viewer().room).toHaveTextContent('Balcony');
+    await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
+
+    await user.click(tile('/house/balcony/balcony_1.jpeg'));
+    expect(viewer().counter).toHaveTextContent('29 / 42');
     expect(viewer().room).toHaveTextContent('Balcony');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
 
     await user.click(tile('/house/balcony/balcony_4.jpeg'));
-    expect(viewer().counter).toHaveTextContent('30 / 41');
+    expect(viewer().counter).toHaveTextContent('30 / 42');
     expect(viewer().room).toHaveTextContent('Balcony');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
 
     await user.click(tile('/house/balcony/balcony_5.jpeg'));
-    expect(viewer().counter).toHaveTextContent('31 / 41');
+    expect(viewer().counter).toHaveTextContent('31 / 42');
     expect(viewer().room).toHaveTextContent('Balcony');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
 
+    await user.click(tile('/house/parking/parking_1.jpeg'));
+    expect(viewer().counter).toHaveTextContent('32 / 42');
+    expect(viewer().room).toHaveTextContent('Parking');
+    await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
+
     await user.click(tile('/house/details/details_1.jpeg'));
-    expect(viewer().counter).toHaveTextContent('32 / 41');
+    expect(viewer().counter).toHaveTextContent('33 / 42');
     expect(viewer().room).toHaveTextContent('Up close');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
 
     await user.click(tile('/house/details/details_10.jpeg'));
-    expect(viewer().counter).toHaveTextContent('41 / 41');
+    expect(viewer().counter).toHaveTextContent('42 / 42');
     expect(viewer().room).toHaveTextContent('Up close');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
 
     await user.click(container.querySelector('.apt-lead__open') as HTMLElement);
-    expect(viewer().counter).toHaveTextContent('1 / 41');
+    expect(viewer().counter).toHaveTextContent('1 / 42');
     expect(viewer().room).toHaveTextContent('Living room');
   });
 

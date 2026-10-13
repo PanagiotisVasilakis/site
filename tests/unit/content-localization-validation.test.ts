@@ -74,6 +74,23 @@ describe('validateLocalization', () => {
     expect(() => validateLocalization(['en', 'el'])).toThrow('Missing title for category food locale en');
   });
 
+  // The id is a React key, a favourites id and a lookup key, so it must be unique per category (R-699, decision D13).
+  describe('item ids (R-699)', () => {
+    it('throws when two items of a category share an id but have different slugs', () => {
+      getItemsByCategoryMock.mockReturnValue([
+        { ...item, slug: 'old-taverna' },
+        { ...item, name: 'Cafe', name_en: 'Cafe', name_el: 'Καφέ', slug: 'cafe' },
+      ]);
+      expect(() => validateLocalization(['en', 'el'])).toThrow('Duplicate id in category food: taverna');
+    });
+
+    it('accepts the same id in different categories', () => {
+      categoriesMock.push({ id: 'drink', title: 'Drink', title_en: 'Drink', title_el: 'Ποτό' });
+      getItemsByCategoryMock.mockReturnValue([{ ...item }]);
+      expect(() => validateLocalization(['en', 'el'])).not.toThrow();
+    });
+  });
+
   describe('item slugs (decision O50, R-446)', () => {
     const slugged = (id: string, slug: string) => ({ ...item, id, slug });
 

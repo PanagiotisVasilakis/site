@@ -48,6 +48,9 @@ services:
     <<: *hardened
     image: ${APP_IMAGE:?APP_IMAGE is required (npm run docker:build prints it)}
     env_file: ${APP_ENV_FILE:?APP_ENV_FILE is required (root-owned application env file)}
+    # Overrides a NODE_ENV in the env file: the start-up gate must validate production mode.
+    environment:
+      NODE_ENV: production
     ports:
       - "127.0.0.1:${WEB_PORT:-3000}:3000"
     tmpfs:
@@ -77,6 +80,8 @@ services:
     image: ${APP_IMAGE:?APP_IMAGE is required (npm run docker:build prints it)}-workers
     command: ["node", "dist/workers/drain-outbox.mjs"]
     env_file: ${APP_ENV_FILE:?APP_ENV_FILE is required (root-owned application env file)}
+    environment:
+      NODE_ENV: production
     profiles:
       - ops
     depends_on:
@@ -90,6 +95,8 @@ services:
     image: ${APP_IMAGE:?APP_IMAGE is required (npm run docker:build prints it)}-workers
     command: ["node", "dist/workers/run-operational-maintenance.mjs"]
     env_file: ${APP_ENV_FILE:?APP_ENV_FILE is required (root-owned application env file)}
+    environment:
+      NODE_ENV: production
     profiles:
       - ops
     depends_on:

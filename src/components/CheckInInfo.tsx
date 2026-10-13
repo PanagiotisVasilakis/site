@@ -456,7 +456,7 @@ export default function CheckInInfo({
   const [arrivalRequestSuccess, setArrivalRequestSuccess] = useState('');
   const [arrivalRequestError, setArrivalRequestError] = useState('');
   const sessionRefreshStarted = useRef(false);
-  const wifiReloadMissed = useRef(false);
+  const wifiRevealAwaited = useRef(false);
 
   useEffect(() => {
     const loadPreferences = async () => {
@@ -499,25 +499,90 @@ export default function CheckInInfo({
   }, []);
 
   // R-391: the preferences are fetched once and the server adds the Wi-Fi details only after
-  // wifiAvailableAt, so a page left open before then reloads one second after it (the server
-  // guard also renews an expired session). Not while an arrival request is being typed, after
-  // that time (the reload would get the same answer, in a loop) or beyond the 32-bit timer
-  // limit (a browser fires such a timer at once). R-619: if the form was open while that time
-  // was still ahead and is closed after it, the reload is owed once; wifiReloadMissed records
-  // that, and a page loaded after the time starts with it false, so it never reloads.
+  // wifiAvailableAt, so a page that was open before then asks the server again one second after
+  // it (the server guard also renews an expired session). The page is not reloaded: only the
+  // three Wi-Fi fields are updated, so the open forms, their messages and the offline state stay
+  // as they are (R-683, R-684). R-682: a phone that slept may not fire one long timer, so the
+  // same request is also made when the tab returns (visibilitychange, pageshow) after that time,
+  // at most one at a time. After a failed request it is repeated once when the connection comes
+  // back ('online'); a 401 goes to the session refresh page once, like the submit path. A page
+  // loaded after the time (wifiRevealAwaited stays false) sends nothing: after the stay the
+  // server still answers without the details, so asking again would only repeat that answer.
+  // No timer is set beyond the 32-bit limit (a browser fires such a timer at once).
   useEffect(() => {
     if (wifiNetwork || !wifiAvailableAt) return;
-    const delay = new Date(wifiAvailableAt).getTime() - Date.now();
-    if (isRequestingArrival) {
-      if (delay > 0) wifiReloadMissed.current = true;
-      return;
-    }
-    if (!(delay > 0) && !wifiReloadMissed.current) return;
-    const reloadIn = Math.max(0, delay + 1_000);
-    if (reloadIn > 2_147_483_647) return;
-    const timer = window.setTimeout(() => window.location.reload(), reloadIn);
-    return () => window.clearTimeout(timer);
-  }, [wifiAvailableAt, wifiNetwork, isRequestingArrival]);
+    const revealAt = new Date(wifiAvailableAt).getTime();
+    const delay = revealAt - Date.now();
+    if (delay > 0) wifiRevealAwaited.current = true;
+    if (!wifiRevealAwaited.current) return;
+
+    let active = true;
+    let requestInFlight = false;
+    let onlineRetryLeft = 1;
+    let waitingForOnline = false;
+
+    const refetchWifi = async () => {
+      if (requestInFlight || sessionRefreshStarted.current) return;
+      requestInFlight = true;
+      let failed = false;
+      try {
+        const res = await internalFetch('/api/check-in/preferences');
+        if (!active) return;
+        if (res.status === 401) {
+          sessionRefreshStarted.current = true;
+          window.location.replace(`/${effLocale}/portal/refresh?next=${encodeURIComponent(`/${effLocale}/check-in`)}`);
+          return;
+        }
+        if (!res.ok) {
+          failed = true;
+          return;
+        }
+        const data = await res.json();
+        if (!active) return;
+        if (data.data) {
+          setWifiNetwork(data.data.wifi?.network || '');
+          setWifiPassword(data.data.wifi?.password || '');
+          setWifiAvailableAt(typeof data.data.wifiAvailableAt === 'string' ? data.data.wifiAvailableAt : null);
+        }
+      } catch (error) {
+        if (!active) return;
+        console.error('Failed to refresh the Wi-Fi details:', error);
+        failed = true;
+      } finally {
+        requestInFlight = false;
+        if (failed && onlineRetryLeft > 0) {
+          onlineRetryLeft -= 1;
+          waitingForOnline = true;
+        }
+      }
+    };
+
+    const refetchAfterReturn = () => {
+      if (Date.now() >= revealAt) refetchWifi();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refetchAfterReturn();
+    };
+    const onOnline = () => {
+      if (!waitingForOnline) return;
+      waitingForOnline = false;
+      refetchWifi();
+    };
+
+    const timer = delay > 0 && delay + 1_000 <= 2_147_483_647
+      ? window.setTimeout(refetchWifi, delay + 1_000)
+      : undefined;
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('pageshow', refetchAfterReturn);
+    window.addEventListener('online', onOnline);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('pageshow', refetchAfterReturn);
+      window.removeEventListener('online', onOnline);
+    };
+  }, [wifiAvailableAt, wifiNetwork, effLocale]);
 
   const copyToClipboard = async (text: string, target: CopyTarget) => {
     try {

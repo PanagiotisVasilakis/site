@@ -72,8 +72,10 @@
 }
 
 /* GuideFilters: search, chips with counts, List/Map, the live result count */
+/* minmax(0, 1fr): the implicit auto column would grow to the chip row's min-content and push List/Map off a phone screen. */
 .guide-filters {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   margin-bottom: 24px;
 }

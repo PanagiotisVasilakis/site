@@ -43,16 +43,27 @@
   box-shadow: none;
 }
 
-/* PWA update banner and iOS add-to-home tip ([locale]/layout.tsx): a toast-like pill at the bottom centre.
-   No `display` here: the `hidden` utility hides it until PwaManager sets an inline `display: flex`. */
-.pwa-banner {
+/* PWA update banner and iOS add-to-home tip ([locale]/layout.tsx): toast-like pills at the bottom centre.
+   .pwa-banners is the one fixed container (16 px gutters, flex column), so a narrow viewport gives each pill the
+   full width and two shown pills stack instead of overlapping; it lets clicks through, the pills take them back.
+   No `display` on .pwa-banner: the `hidden` utility hides it until PwaManager sets an inline `display: flex`. */
+.pwa-banners {
   position: fixed;
+  right: 16px;
   bottom: calc(8px + env(safe-area-inset-bottom));
-  left: 50%;
+  left: 16px;
   z-index: 50;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 8px;
-  max-width: calc(100vw - 32px);
+  pointer-events: none;
+}
+.pwa-banner {
+  position: static;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
   padding: 6px 6px 6px 16px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
@@ -60,7 +71,7 @@
   box-shadow: var(--shadow-overlay);
   font-family: var(--font-text);
   font-size: var(--text-caption);
-  translate: -50% 0;
+  pointer-events: auto;
 }
 .pwa-banner.pwa-banner { color: var(--color-fg); }
 .pwa-banner .pwa-banner__actions { display: flex; align-items: center; gap: 4px; }

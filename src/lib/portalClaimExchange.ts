@@ -33,10 +33,13 @@ export function createPortalClaimExchangeCookie(
   if (!TOKEN_DIGEST_PATTERN.test(tokenDigest)) {
     throw new Error('Portal claim exchange received an invalid token digest');
   }
-  const grantLifetimeSeconds = Math.floor((grantExpiresAt.getTime() - now.getTime()) / 1_000);
-  if (grantLifetimeSeconds < 1) {
+  const grantLifetimeMs = grantExpiresAt.getTime() - now.getTime();
+  if (grantLifetimeMs <= 0) {
     throw new Error('Portal claim exchange grant is already expired');
   }
+  // A grant with under a second left still gets a one-second cookie; the claim then answers the
+  // normal 401 for the expired grant instead of this exchange failing with a 500.
+  const grantLifetimeSeconds = Math.max(1, Math.floor(grantLifetimeMs / 1_000));
   return {
     name: PORTAL_CLAIM_EXCHANGE_COOKIE,
     value: `${tokenDigest}.${exchangeMac(tokenDigest)}`,

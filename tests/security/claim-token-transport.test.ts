@@ -319,6 +319,21 @@ describe('claim capability transport', () => {
     }
     expect(source).toContain('$uri');
   });
+
+  it('writes the Nginx access log with a format that carries no request line, query string or client address', () => {
+    // Same reading as the release policy: a comment is not active configuration.
+    const template = readFileSync('deploy/nginx/nginx.conf.template', 'utf8').replace(
+      /(^|[\s;{}])#.*$/gmu,
+      '$1',
+    );
+    const logFormat = /log_format\s+origin_safe\s([\s\S]*?);[ \t]*$/mu.exec(template)?.[1];
+
+    expect(logFormat).toBeDefined();
+    expect(template).toMatch(/access_log\s+[^\s;]+\s+origin_safe(?=[\s;])/u);
+    expect(logFormat).not.toMatch(
+      /\$(?:request|request_uri|args|query_string|is_args|remote_addr|binary_remote_addr|http_x_forwarded_for|http_referer)\b/u,
+    );
+  });
 });
 
 describe('claim exchange cookie bounds', () => {
@@ -330,6 +345,43 @@ describe('claim exchange cookie bounds', () => {
       now,
     );
     expect(cookie.options.maxAge).toBe(75);
+  });
+
+  it.each([
+    ['999 ms', 999, 1],
+    ['1 ms', 1, 1],
+    ['1000 ms', 1_000, 1],
+    ['1999 ms', 1_999, 1],
+    ['2000 ms', 2_000, 2],
+  ])('gives a grant with %s left a whole-second lifetime of at least one second', (_label, msLeft, maxAge) => {
+    const now = new Date('2030-01-01T00:00:00.000Z');
+    const cookie = createPortalClaimExchangeCookie(
+      TOKEN_DIGEST,
+      new Date(now.getTime() + msLeft),
+      now,
+    );
+    expect(cookie.options.maxAge).toBe(maxAge);
+  });
+
+  it('caps the lifetime at five minutes', () => {
+    const now = new Date('2030-01-01T00:00:00.000Z');
+    const cookie = createPortalClaimExchangeCookie(
+      TOKEN_DIGEST,
+      new Date('2030-01-01T01:00:00.000Z'),
+      now,
+    );
+    expect(cookie.options.maxAge).toBe(300);
+  });
+
+  it.each([
+    ['at the same instant', 0],
+    ['1 ms ago', -1],
+    ['an hour ago', -3_600_000],
+  ])('still refuses a grant that expired %s', (_label, msLeft) => {
+    const now = new Date('2030-01-01T00:00:00.000Z');
+    expect(() =>
+      createPortalClaimExchangeCookie(TOKEN_DIGEST, new Date(now.getTime() + msLeft), now),
+    ).toThrow('Portal claim exchange grant is already expired');
   });
 });
 

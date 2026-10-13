@@ -42,6 +42,7 @@ export default function InteractiveMap({
     fitToMarkers: mapT.fitToMarkers,
     zoomIn: mapT.zoomIn,
     zoomOut: mapT.zoomOut,
+    closePopup: mapT.closePopup,
   }), [mapT]);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [shouldRenderInteractive, setShouldRenderInteractive] = useState(false);

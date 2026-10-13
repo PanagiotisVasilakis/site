@@ -54,12 +54,15 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{
             // Boot script, docs/design/identity.md §5.2: data-theme only for a stored choice (otherwise the CSS
             // media query follows the OS); data-motion="full" is the only flag that arms motion. data-intro marks the
-            // first full-motion load of the browser session, for the brand mark intro (R3-V14, §5.5 M26).
+            // first full-motion load of the browser session, for the brand mark intro (R3-V14, §5.5 M26). Failsafe
+            // (R-633): 4 s later data-motion="full" is removed if a [data-reveal] block exists and HomeRevealObserver
+            // has not set data-reveal-ready (the bundle is late or failed), so no block stays hidden.
             __html: `(function(){var d=document.documentElement,r=null;
 try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')d.setAttribute('data-theme',t)}catch(e){}
 try{r=localStorage.getItem('motion')}catch(e){}
 if(r==='reduce')d.setAttribute('data-motion','reduce');
 else if(window.matchMedia&&matchMedia('(prefers-reduced-motion: no-preference)').matches){d.setAttribute('data-motion','full');
+setTimeout(function(){if(d.getAttribute('data-motion')==='full'&&!d.hasAttribute('data-reveal-ready')&&document.querySelector('[data-reveal]'))d.removeAttribute('data-motion')},4000);
 try{if(!sessionStorage.getItem('brand-intro')){sessionStorage.setItem('brand-intro','1');d.setAttribute('data-intro','')}}catch(e){}}})()`,
           }}
         />

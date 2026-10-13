@@ -375,6 +375,49 @@
   to { transform: translateX(0); }
 }
 
+/* Print (R-704). A printout never scrolls, so HomeRevealObserver never adds `is-in` and every block above would
+   print in its hidden state. Force the final state of each `:not(.is-in)` rule at once (no transition) and keep
+   the closed shutters off the balcony photo. Each hidden class needs an entry here: motion-css-gate.test.ts.
+   The final states are the ones in components/home.css and the transition rules above. */
+@media print {
+  :root[data-motion="full"] .facts .fact,
+  :root[data-motion="full"] .facts .facts__more,
+  :root[data-motion="full"] .intro .hl,
+  :root[data-motion="full"] .teaser .night {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  :root[data-motion="full"] .window .window__img {
+    transform: none !important;
+    transition: none !important;
+  }
+  :root[data-motion="full"] .window .shutter { display: none !important; }
+  :root[data-motion="full"] .location .relief__contour,
+  :root[data-motion="full"] .location .relief__pins {
+    opacity: 1 !important;
+    transform: translateZ(calc(var(--z) * 1px)) !important;
+    transition: none !important;
+  }
+  /* The letter keeps its resting tilt from home.css: only the fade is hidden. */
+  :root[data-motion="full"] .host .letter {
+    opacity: 1 !important;
+    transition: none !important;
+  }
+}
+
+/* The rooms deck exists from lg only: its final state is the fan of home.css, not `transform: none` (that
+   would stack all six cards on the same spot). */
+@media print and (min-width: 1024px) {
+  :root[data-motion="full"] .rooms .room-card {
+    transform:
+      translate3d(calc(var(--pos) * var(--spread)), calc(var(--apos) * 18px - var(--lift) * 34px), calc(var(--apos) * -70px + var(--lift) * 140px))
+      rotateZ(calc(var(--pos) * 5deg * (1 - var(--lift))))
+      rotateY(calc(var(--pos) * -7deg * (1 - var(--lift)))) !important;
+    transition: none !important;
+  }
+}
+
 /* Kalamata guide (§5.5 M21, M25; §5.7 shared element; §8 Card hover). Static by construction: guide.css
    holds the final states; without the gate nothing moves (the heart only changes its fill). */
 @media (prefers-reduced-motion: no-preference) {
@@ -521,12 +564,13 @@
 
   @supports (animation-timeline: view()) {
     /* M28 section headings rise out of a 3D plane as they scroll in (marketing pages: the Section primitive
-       is not used on the calm stay routes, which stay-routes.test.tsx checks). */
+       is not used on the calm stay routes, which stay-routes.test.tsx checks). The rise ends with the entry
+       phase, so a heading that is fully in view at load (a tall viewport) already stands at its final state. */
     :root[data-motion="full"] .ui-section .ui-section__title {
       transform-origin: 50% 100%;
       animation: section-title-rise linear both;
       animation-timeline: view();
-      animation-range: entry 0% cover 30%;
+      animation-range: entry 0% entry 100%;
     }
     /* Until a heading has risen, its tilted top edge projects wider than the column (perspective), which
        widened the document on home at 360–1024 px (R3-V13 overflow audit). `clip` trims only what lies

@@ -148,6 +148,36 @@ export function isCurrentLink(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+/** The part of a click that scrollToCurrentHash reads (React's MouseEvent has all of it). */
+interface LinkClick {
+  button: number;
+  defaultPrevented: boolean;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+  preventDefault: () => void;
+}
+
+/**
+ * The onClick of a nav link (header, menu, footer). next/link scrolls to a hash only when the hash changes, so a
+ * click on `/{l}#contact` while the URL already ends in `#contact` did nothing (R-689, decision D13). In exactly
+ * that case this prevents the navigation and scrolls to the target itself, without options: the page's CSS
+ * decides how it scrolls (scroll-margin, no smooth scrolling, so reduced motion stays instant). Every other click
+ * is left to next/link or the browser: other URLs, modified clicks and a target that is not on the page.
+ */
+export function scrollToCurrentHash(event: LinkClick, href: string): void {
+  const hashAt = href.indexOf('#');
+  if (hashAt < 0) return;
+  if (event.defaultPrevented || event.button !== 0) return;
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  if (`${window.location.pathname}${window.location.hash}` !== href) return;
+  const target = document.getElementById(href.slice(hashAt + 1));
+  if (!target) return;
+  event.preventDefault();
+  target.scrollIntoView();
+}
+
 /**
  * The same page in another locale (identity §8 LanguageSwitch, logic from the former LocaleSwitcher):
  * swaps or adds the locale segment and keeps the query and the hash. The legacy claim query names are

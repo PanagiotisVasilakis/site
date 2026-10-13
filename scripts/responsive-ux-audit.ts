@@ -56,6 +56,8 @@ interface ViewMetrics {
   overflowingElementSamples: string[];
   touchTargetFailures: number;
   touchTargetSamples: string[];
+  touchTargetBelow24Count: number;
+  touchTargetBelow24Samples: string[];
   truncatedTextCount: number;
   truncationSamples: string[];
   focusableCount: number;
@@ -241,6 +243,9 @@ const DEFAULT_ROUTES: RouteTarget[] = [
   { id: 'apartment-en', path: '/en/apartment', journey: 'property-details', locale: 'en' },
   { id: 'favorites-en', path: '/en/favorites', journey: 'favorites', locale: 'en' },
   { id: 'phones-en', path: '/en/phones', journey: 'category-browsing', locale: 'en' },
+  { id: 'moments-en', path: '/en/moments', journey: 'guide', locale: 'en' },
+  { id: 'moments-el', path: '/el/moments', journey: 'guide', locale: 'el' },
+  { id: 'privacy-en', path: '/en/privacy', journey: 'privacy', locale: 'en' },
 ];
 
 function toTimestampSafe(date = new Date()): string {
@@ -264,6 +269,9 @@ function parseRoutesFromEnv(): RouteTarget[] {
     .split(',')
     .map((entry) => entry.trim())
     .filter(Boolean);
+  if (paths.length === 0) {
+    throw new Error('RESPONSIVE_PATHS contains no path.');
+  }
 
   return paths.map((routePath, index) => {
     const pathWithoutQuery = routePath.split('?')[0] || '/';
@@ -350,14 +358,23 @@ function evaluateIssues(
     });
   }
 
+  if (metrics.overflowingElementCount > 0) {
+    issues.push({
+      code: 'element_beyond_viewport',
+      severity: 'major',
+      message: `${metrics.overflowingElementCount} elements extend 24px or more beyond the viewport width`,
+    });
+  }
+
   if (viewport.kind === 'phone') {
-    if (metrics.touchTargetFailures >= 10) {
+    if (metrics.touchTargetBelow24Count > 0) {
       issues.push({
         code: 'touch_target_major',
         severity: 'major',
-        message: `${metrics.touchTargetFailures} interactive elements are below 44x44 touch target guidance`,
+        message: `${metrics.touchTargetBelow24Count} non-inline interactive elements are below the 24x24 minimum`,
       });
-    } else if (metrics.touchTargetFailures > 0) {
+    }
+    if (metrics.touchTargetFailures > 0) {
       issues.push({
         code: 'touch_target_minor',
         severity: 'minor',
@@ -471,7 +488,9 @@ function markdownFromReport(report: AuditReport): string {
 
       if (cell.metrics) {
         lines.push(`- Horizontal overflow (px): ${cell.metrics.horizontalOverflowPx}`);
+        lines.push(`- Elements beyond the viewport (24px or more): ${cell.metrics.overflowingElementCount}`);
         lines.push(`- Touch target failures: ${cell.metrics.touchTargetFailures}`);
+        lines.push(`- Touch targets below 24x24 (not inline): ${cell.metrics.touchTargetBelow24Count}`);
         lines.push(`- Truncated text count: ${cell.metrics.truncatedTextCount}`);
 
         if (cell.metrics.overflowingElementSamples.length > 0) {
@@ -480,6 +499,10 @@ function markdownFromReport(report: AuditReport): string {
 
         if (cell.metrics.touchTargetSamples.length > 0) {
           lines.push(`- Touch target samples: ${cell.metrics.touchTargetSamples.join(' | ')}`);
+        }
+
+        if (cell.metrics.touchTargetBelow24Samples.length > 0) {
+          lines.push(`- Touch targets below 24x24 samples: ${cell.metrics.touchTargetBelow24Samples.join(' | ')}`);
         }
 
         if (cell.metrics.truncationSamples.length > 0) {
@@ -523,7 +546,21 @@ async function collectMetrics(page: Page): Promise<ViewMetrics> {
       const root = document.documentElement;
       const body = document.body;
       const docWidth = Math.max((root && root.scrollWidth) || 0, (body && body.scrollWidth) || 0);
-      const viewportWidth = window.innerWidth;
+      // clientWidth is the layout width of the page; window.innerWidth grows with the content under
+      // Chrome mobile emulation and would hide the overflow.
+      const viewportWidth = root.clientWidth;
+
+      // html, body and main.site-main clip overflow-x on purpose; that clip is what hides the defects
+      // this scan exists to find, so they do not count as clipping ancestors.
+      const isIgnoredAncestor = (ancestor) =>
+        ancestor === root || ancestor === body || ancestor.matches('main.site-main');
+      const hasClippingAncestor = (element) => {
+        for (let ancestor = element.parentElement; ancestor; ancestor = ancestor.parentElement) {
+          if (isIgnoredAncestor(ancestor)) continue;
+          if (window.getComputedStyle(ancestor).overflowX !== 'visible') return true;
+        }
+        return false;
+      };
 
       const allElements = Array.from(document.querySelectorAll('body *'));
       const overflowingElements = allElements
@@ -531,10 +568,11 @@ async function collectMetrics(page: Page): Promise<ViewMetrics> {
           if (shouldIgnoreElement(element)) return false;
           const rect = element.getBoundingClientRect();
           if (rect.width === 0 || rect.height === 0) return false;
-          return rect.left < -1 || rect.right > viewportWidth + 1;
-        })
-        .slice(0, 8)
-        .map((element) => describeNode(element));
+          if (Math.max(-rect.left, rect.right - viewportWidth) < 24) return false;
+          if (element.parentElement && element.parentElement.closest('svg')) return false;
+          if (element.closest('[aria-hidden="true"]')) return false;
+          return !hasClippingAncestor(element);
+        });
 
       const interactiveSelector = [
         'button',
@@ -560,9 +598,14 @@ async function collectMetrics(page: Page): Promise<ViewMetrics> {
           if (rect.width === 0 || rect.height === 0) return false;
 
           return rect.width < 44 || rect.height < 44;
-        })
-        .slice(0, 8)
-        .map((element) => describeNode(element));
+        });
+
+      // Below the 24x24 minimum (WCAG 2.5.8); targets that are inline in a line of text are exempt.
+      const touchTargetBelow24 = touchTargetFailures.filter((element) => {
+        if (window.getComputedStyle(element).display === 'inline') return false;
+        const rect = element.getBoundingClientRect();
+        return rect.width < 24 || rect.height < 24;
+      });
 
       const truncationCandidates = Array.from(document.querySelectorAll('h1,h2,h3,h4,p,span,a,button,label'));
       const clipped = truncationCandidates
@@ -580,9 +623,7 @@ async function collectMetrics(page: Page): Promise<ViewMetrics> {
 
           if (!clippingEnabled) return false;
           return htmlElement.scrollWidth > htmlElement.clientWidth + 4;
-        })
-        .slice(0, 8)
-        .map((element) => describeNode(element));
+        });
 
       const focusableSelector = [
         'a[href]',
@@ -598,11 +639,13 @@ async function collectMetrics(page: Page): Promise<ViewMetrics> {
       return {
         horizontalOverflowPx: Math.max(0, docWidth - viewportWidth),
         overflowingElementCount: overflowingElements.length,
-        overflowingElementSamples: overflowingElements,
+        overflowingElementSamples: overflowingElements.slice(0, 8).map((element) => describeNode(element)),
         touchTargetFailures: touchTargetFailures.length,
-        touchTargetSamples: touchTargetFailures,
+        touchTargetSamples: touchTargetFailures.slice(0, 8).map((element) => describeNode(element)),
+        touchTargetBelow24Count: touchTargetBelow24.length,
+        touchTargetBelow24Samples: touchTargetBelow24.slice(0, 8).map((element) => describeNode(element)),
         truncatedTextCount: clipped.length,
-        truncationSamples: clipped,
+        truncationSamples: clipped.slice(0, 8).map((element) => describeNode(element)),
         focusableCount,
         interactiveCount: interactiveElements.length,
         h1Count: document.querySelectorAll('h1').length,
@@ -612,6 +655,34 @@ async function collectMetrics(page: Page): Promise<ViewMetrics> {
   `;
 
   return (await page.evaluate(script)) as ViewMetrics;
+}
+
+/** Builds the report for the given cells and writes its JSON and Markdown files (used by both run paths). */
+async function writeReport(
+  outputDir: string,
+  timestamp: string,
+  viewports: ViewportPreset[],
+  routes: RouteTarget[],
+  cells: AuditCell[],
+): Promise<AuditReport> {
+  const report: AuditReport = {
+    generatedAt: new Date().toISOString(),
+    baseUrl: DEFAULT_BASE_URL,
+    viewportIds: viewports.map((viewport) => viewport.id),
+    routePaths: routes.map((route) => route.path),
+    summary: summarize(cells),
+    cells,
+  };
+
+  const jsonPath = path.join(outputDir, `responsive-ux-audit-${timestamp}.json`);
+  const mdPath = path.join(outputDir, `responsive-ux-audit-${timestamp}.md`);
+
+  await writeFile(jsonPath, JSON.stringify(report, null, 2), 'utf8');
+  await writeFile(mdPath, markdownFromReport(report), 'utf8');
+
+  console.log(`[responsive-ux] JSON report: ${path.relative(process.cwd(), jsonPath)}`);
+  console.log(`[responsive-ux] Markdown report: ${path.relative(process.cwd(), mdPath)}`);
+  return report;
 }
 
 async function runAudit() {
@@ -676,23 +747,7 @@ async function runAudit() {
       })),
     );
 
-    const report: AuditReport = {
-      generatedAt: new Date().toISOString(),
-      baseUrl: DEFAULT_BASE_URL,
-      viewportIds: viewports.map((viewport) => viewport.id),
-      routePaths: routes.map((route) => route.path),
-      summary: summarize(cells),
-      cells,
-    };
-
-    const jsonPath = path.join(outputDir, `responsive-ux-audit-${timestamp}.json`);
-    const mdPath = path.join(outputDir, `responsive-ux-audit-${timestamp}.md`);
-
-    await writeFile(jsonPath, JSON.stringify(report, null, 2), 'utf8');
-    await writeFile(mdPath, markdownFromReport(report), 'utf8');
-
-    console.log(`[responsive-ux] JSON report: ${path.relative(process.cwd(), jsonPath)}`);
-    console.log(`[responsive-ux] Markdown report: ${path.relative(process.cwd(), mdPath)}`);
+    await writeReport(outputDir, timestamp, viewports, routes, cells);
     console.log('[responsive-ux] Completed with launch failure artifacts.');
     process.exitCode = 1;
     return;
@@ -787,27 +842,16 @@ async function runAudit() {
     await browser.close();
   }
 
-  const report: AuditReport = {
-    generatedAt: new Date().toISOString(),
-    baseUrl: DEFAULT_BASE_URL,
-    viewportIds: viewports.map((viewport) => viewport.id),
-    routePaths: routes.map((route) => route.path),
-    summary: summarize(cells),
-    cells,
-  };
-
-  const jsonPath = path.join(outputDir, `responsive-ux-audit-${timestamp}.json`);
-  const mdPath = path.join(outputDir, `responsive-ux-audit-${timestamp}.md`);
-
-  await writeFile(jsonPath, JSON.stringify(report, null, 2), 'utf8');
-  await writeFile(mdPath, markdownFromReport(report), 'utf8');
-
-  console.log(`[responsive-ux] JSON report: ${path.relative(process.cwd(), jsonPath)}`);
-  console.log(`[responsive-ux] Markdown report: ${path.relative(process.cwd(), mdPath)}`);
+  const report = await writeReport(outputDir, timestamp, viewports, routes, cells);
   console.log(
     `[responsive-ux] Summary - pass:${report.summary.pass} minor:${report.summary.minor} major:${report.summary.major} critical:${report.summary.critical}`,
   );
   console.log(`[responsive-ux] Completed in ${Date.now() - runStarted}ms`);
+
+  if (cells.some((cell) => cell.metrics === null)) {
+    console.error('[responsive-ux] Failing: at least one cell could not be measured (no metrics).');
+    process.exitCode = 1;
+  }
 
   if (FAIL_ON_ISSUES && (report.summary.major > 0 || report.summary.critical > 0)) {
     console.error('[responsive-ux] Failing due to major/critical issues (RESPONSIVE_UX_FAIL_ON_ISSUES=1).');

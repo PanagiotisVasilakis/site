@@ -91,3 +91,61 @@ describe('motion gate in the design stylesheets (identity §5.2)', () => {
     expect(unsupported).toEqual([]);
   });
 });
+
+// R-704: a printout never scrolls, so nothing adds `is-in` and every reveal that waits for it would print hidden.
+// R-705: the M28 heading rise must end inside the entry phase, or a heading already in view at load is dimmed.
+const MOTION_RULES = RULES.filter((rule) => rule.file === 'motion.css');
+// `print|only\s+print` and not `(only\s+)?print`: security/detect-unsafe-regex flags the nested quantifier.
+const PRINT_RULES = MOTION_RULES.filter((rule) => rule.atRules.some((at) => /^@media\s+(?:print|only\s+print)\b/u.test(at)));
+const valueOf = (body: string, property: string) => {
+  for (const declaration of body.replace(/\{[^{}]*\}/gu, '').split(';')) {
+    const [name, ...value] = declaration.split(':');
+    if (name.trim() === property) return value.join(':').replace(/\s+/gu, ' ').trim();
+  }
+  return undefined;
+};
+/** The hidden element of each `:not(.is-in)` part: the classes of its last compound selector. */
+const hiddenTargets = MOTION_RULES.filter((rule) => rule.selector.includes(':not(.is-in)')).flatMap((rule) =>
+  rule.selector.split(',').filter((part) => part.includes(':not(.is-in)')).flatMap((part) =>
+    [...(part.trim().split(/\s+/u).pop() ?? '').matchAll(/\.([\w-]+)/gu)]
+      .map((match) => ({ rule, className: match[1] }))
+      .filter(({ className }) => className !== 'is-in')));
+/** `.className` as a whole class of the selector part, not as the start of a longer one (`.fact` inside `.facts__more`). */
+const hasClass = (part: string, className: string) => [...part.matchAll(/\.([\w-]+)/gu)].some((match) => match[1] === className);
+const printResets = (className: string, property: string) => PRINT_RULES.filter((rule) =>
+  rule.selector.split(',').some((part) => part.includes(':root[data-motion="full"]') && hasClass(part, className))
+  && /!important$/u.test(valueOf(rule.body, property) ?? ''));
+
+describe('print and heading range of the motion gate (R-704, R-705)', () => {
+  it('finds the hidden reveal states (sanity check)', () => {
+    expect(hiddenTargets.map(({ className }) => className)).toEqual(expect.arrayContaining([
+      'fact', 'facts__more', 'hl', 'window__img', 'room-card', 'night', 'relief__contour', 'relief__pins', 'letter',
+    ]));
+  });
+
+  it('forces the final state of every :not(.is-in) class in print', () => {
+    const missing: string[] = [];
+    for (const { rule, className } of hiddenTargets) {
+      for (const property of ['opacity', 'transform']) {
+        if (valueOf(rule.body, property) === undefined) continue;
+        const resets = printResets(className, property);
+        const ok = property === 'opacity'
+          ? resets.some((reset) => valueOf(reset.body, 'opacity') === '1 !important')
+          : resets.length > 0;
+        if (!ok) missing.push(`.${className} ${property}`);
+      }
+    }
+    expect([...new Set(missing)]).toEqual([]);
+  });
+
+  it('removes the closed shutters in print', () => {
+    expect(PRINT_RULES.some((rule) => rule.selector.includes('.window .shutter') && valueOf(rule.body, 'display') === 'none !important')).toBe(true);
+  });
+
+  it('ends the M28 heading rise inside the entry phase', () => {
+    const ranges = MOTION_RULES.filter((rule) => rule.selector.includes('.ui-section__title'))
+      .map((rule) => valueOf(rule.body, 'animation-range'))
+      .filter((value) => value !== undefined);
+    expect(ranges).toEqual(['entry 0% entry 100%']);
+  });
+});

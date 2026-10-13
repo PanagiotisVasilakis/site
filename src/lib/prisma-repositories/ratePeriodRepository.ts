@@ -16,7 +16,7 @@ import { prisma } from '@/lib/prisma';
 const MAX_PERIOD_NIGHTS = 366;
 const MAX_TRANSACTION_ATTEMPTS = 3;
 
-const isoDateSchema = z.iso.date().transform((value, context) => {
+export const isoDateSchema = z.iso.date().transform((value, context) => {
   // z.iso.date() accepts years 0000-0099, which the UTC-midnight conversion
   // would map to 1900-1999.
   const date = parseIsoDate(value);

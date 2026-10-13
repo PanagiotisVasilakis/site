@@ -98,7 +98,7 @@ describe('FactStrip (identity §8)', () => {
 
     const list = container.firstElementChild as HTMLElement;
     expect(list.tagName).toBe('UL');
-    expect(list).toHaveAccessibleName(locale === 'en' ? 'Key facts' : 'Βασικά στοιχεία');
+    expect(list).toHaveAccessibleName('Key facts');
     expect(stripFacts).toHaveLength(6);
     expect(items(container)).toEqual(stripFacts);
     expect(container.querySelector('a, [data-cta-watch], [data-reveal], .facts')).toBeNull();

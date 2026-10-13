@@ -116,6 +116,9 @@ describe('durable sensitive-operation rate limiting', () => {
     ['no-break spaces', '+30\u00a0691\u00a0234\u00a05678'],
     ['ideographic spaces', '+30\u3000691\u3000234\u30005678'],
     ['a parenthesised country code', '(+30) 691 234 5678'],
+    ['the 00 international call prefix', '0030 691 234 5678'],
+    ['the 00 international call prefix without separators', '00306912345678'],
+    ['the 00 prefix and a parenthesised country code', '(0030) 691-234-5678'],
   ] as const)('maps a phone number written with %s to the same identifier bucket', async (_label, identifier) => {
     const reference = await identifierBucket('+30 691 234 5678');
     const spelled = await identifierBucket(identifier);

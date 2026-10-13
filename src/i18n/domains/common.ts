@@ -26,6 +26,7 @@ export interface CommonDictionary {
         list: string;
         signIn: string;
         signOut: string;
+        signOutFailed: string;
         menu: string;
         closeMenu: string;
         primaryNavigation: string;
@@ -90,6 +91,7 @@ export interface CommonDictionary {
         fitToMarkers: string;
         zoomIn: string;
         zoomOut: string;
+        closePopup: string;
     };
 }
 
@@ -107,6 +109,7 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             list: "List",
             signIn: "Sign in",
             signOut: "Sign out",
+            signOutFailed: "We couldn't sign you out. Try again.",
             menu: "Open menu",
             closeMenu: "Close menu",
             primaryNavigation: "Primary navigation",
@@ -207,6 +210,7 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             fitToMarkers: "Fit to markers",
             zoomIn: "Zoom in",
             zoomOut: "Zoom out",
+            closePopup: "Close",
         },
     },
     el: {
@@ -218,6 +222,7 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             list: "Λίστα",
             signIn: "Σύνδεση",
             signOut: "Αποσύνδεση",
+            signOutFailed: "Δεν ήταν δυνατή η αποσύνδεση. Δοκιμάστε ξανά.",
             menu: "Άνοιγμα μενού",
             closeMenu: "Κλείσιμο μενού",
             primaryNavigation: "Κύρια πλοήγηση",
@@ -318,6 +323,7 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             fitToMarkers: "Προβολή όλων των σημείων",
             zoomIn: "Μεγέθυνση",
             zoomOut: "Σμίκρυνση",
+            closePopup: "Κλείσιμο",
         },
     },
 };

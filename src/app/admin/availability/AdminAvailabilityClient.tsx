@@ -103,6 +103,7 @@ function validate(form: FormState): Validated {
   if (!/^[0-9]+$/.test(form.minimum.trim()) || minimum < 1 || minimum > MAX_STAY_NIGHTS) {
     return { ok: false, message: `Minimum nights must be a whole number from 1 to ${MAX_STAY_NIGHTS}.` };
   }
+  if (last === '9999-12-31') return { ok: false, message: 'The last night must be before 9999-12-31.' };
   return {
     ok: true,
     body: { startDate: first, endDate: addDays(last, 1), nightlyPriceCents: cents, minimumNights: minimum },

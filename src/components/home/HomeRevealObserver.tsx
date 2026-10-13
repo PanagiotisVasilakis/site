@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 
-/** M6, M8, M10, M12 and M17 reveal once the element's top is past this share of the viewport (§5.5). */
+/** M6, M8, M10 and M12 reveal once the element's top is past this share of the viewport (§5.5). */
 const DEFAULT_THRESHOLD = 0.35;
 
 /**
@@ -20,6 +20,8 @@ const DEFAULT_THRESHOLD = 0.35;
  */
 export default function HomeRevealObserver() {
   useEffect(() => {
+    // First statement, on every path: tells the boot script's 4 s failsafe (layout.tsx) that this page hydrated.
+    document.documentElement.setAttribute('data-reveal-ready', '');
     const targets = Array.from(document.querySelectorAll<HTMLElement>('[data-reveal]:not(.is-in)'));
     if (typeof IntersectionObserver === 'undefined') {
       targets.forEach((target) => target.classList.add('is-in'));

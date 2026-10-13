@@ -41,8 +41,10 @@ export default async function LocaleLayout({ children, params }: { children: Rea
       <ToastProvider>
       <DeferredRuntimeManagers />
   <SiteHeader locale={eff} />
-      {/* Update banner and iOS Add to Home Screen tip (shell.css .pwa-banner): hidden until PwaManager sets
-          display: flex; the first <span> holds the message PwaManager rewrites. */}
+      {/* Update banner and iOS Add to Home Screen tip (shell.css .pwa-banners / .pwa-banner): one fixed column
+          container at the bottom so the pills never overlap; each is hidden until PwaManager sets display: flex;
+          the first <span> holds the message PwaManager rewrites. */}
+      <div className="pwa-banners">
       <div
         id="update-banner"
         className="pwa-banner hidden"
@@ -59,6 +61,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   <div id="ios-a2hs-tip" role="region" aria-label={t.a2hs.region} className="pwa-banner hidden">
         <span>{t.a2hs.message}</span>
         <button id="ios-tip-close" type="button" aria-label={t.a2hs.close} className="ui-icon-btn"><Icon name="close" size={20} /></button>
+      </div>
       </div>
   <main id="main-content" className="site-main" role="main">{children}</main>
   <SiteFooter locale={eff} />

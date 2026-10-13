@@ -30,7 +30,7 @@ export type StayValidation =
   | Readonly<{ ok: true; checkIn: IsoDate; checkOut: IsoDate; nights: number }>
   | Readonly<{ ok: false; reason: StayRejection }>;
 
-export type PriceGroup = Readonly<{ nightlyPriceCents: number; nights: number; amountCents: number }>;
+type PriceGroup = Readonly<{ nightlyPriceCents: number; nights: number; amountCents: number }>;
 
 export type StayQuote =
   | Readonly<{
