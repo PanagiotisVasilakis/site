@@ -44,6 +44,9 @@ describe('core utility contracts', () => {
     ['/safe%2f..%2fadmin'],
     ['/safe\\admin'],
     ['/safe\nadmin'],
+    ['/.//evil.example'],
+    ['/en/..//evil.example'],
+    ['/a/..//evil.example/x?y=1#z'],
   ])('rejects unsafe redirect input %s', (input) => {
     expect(toSafeLocalPath(input, 'https://guest.test/start')).toBeNull();
   });

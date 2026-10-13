@@ -8,6 +8,8 @@ import { isMotionFull } from '@/lib/motion/motionPreference';
 const COUNT_MS = 850;
 /** The same share of the viewport as the louvres (HomeRevealObserver's default). */
 const THRESHOLD = 0.35;
+/** HomeRevealObserver's resize debounce: a burst of resize events starts the check once. */
+const RESIZE_DEBOUNCE_MS = 150;
 
 type Counter = { node: Text; value: number; final: string };
 
@@ -51,17 +53,29 @@ export default function FactCounters() {
       if (entries.some((entry) => entry.isIntersecting)) start();
     }, { rootMargin: `0px 0px -${Math.round(THRESHOLD * 100)}% 0px` });
     observer.observe(strip);
+    const startIfVisible = () => {
+      if (strip.getBoundingClientRect().top < window.innerHeight) start();
+    };
     // A strip already on screen at load (it overlaps the hero) starts two frames later, as HomeRevealObserver reveals it.
     let loadFrame = requestAnimationFrame(() => {
-      loadFrame = requestAnimationFrame(() => {
-        if (strip.getBoundingClientRect().top < window.innerHeight) start();
-      });
+      loadFrame = requestAnimationFrame(startIfVisible);
     });
+    // A viewport that grows later fires no intersection report, so repeat the check, debounced (R-685); start() is idempotent.
+    let resizeTimer: ReturnType<typeof setTimeout> | undefined;
+    const onResize = () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(startIfVisible, RESIZE_DEBOUNCE_MS);
+    };
+    window.addEventListener('resize', onResize);
+    window.visualViewport?.addEventListener('resize', onResize);
 
     return () => {
       observer.disconnect();
       cancelAnimationFrame(loadFrame);
       cancelAnimationFrame(frame);
+      clearTimeout(resizeTimer);
+      window.removeEventListener('resize', onResize);
+      window.visualViewport?.removeEventListener('resize', onResize);
       for (const counter of counters) counter.node.data = counter.final;
     };
   }, []);

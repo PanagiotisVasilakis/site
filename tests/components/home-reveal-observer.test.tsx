@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { render } from '@testing-library/react';
-import { StrictMode } from 'react';
+import { StrictMode, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import FactCounters from '@/components/home/FactCounters';
@@ -396,6 +396,92 @@ describe('HomeRevealObserver load-time reveal', () => {
   });
 });
 
+describe('HomeRevealObserver after a viewport change (R-685)', () => {
+  beforeEach(() => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }));
+  afterEach(() => vi.useRealTimers());
+
+  /** Mounts one target below the viewport, runs both load frames (it stays hidden), then moves it into the bottom 35 % band, which no intersection report covers. */
+  function mountBelowThenGrow(wrap: (children: ReactNode) => ReactNode = (children) => children) {
+    const observations = stubObserver();
+    const view = render(
+      <>
+        {wrap(
+          <>
+            <div data-reveal id="band" />
+            <HomeRevealObserver />
+          </>,
+        )}
+      </>,
+    );
+    const band = view.container.querySelector('#band') as HTMLElement;
+    frames.flush();
+    frames.flush();
+    expect(band).not.toHaveClass('is-in');
+    placeAt(band, window.innerHeight * 0.8);
+    return { ...view, observations, band };
+  }
+
+  it('reveals a target that the viewport growth left in the bottom 35 %, after a debounced window resize, and unobserves it', () => {
+    const { observations, band } = mountBelowThenGrow();
+
+    window.dispatchEvent(new Event('resize'));
+    window.dispatchEvent(new Event('resize'));
+    expect(band).not.toHaveClass('is-in');
+    vi.advanceTimersByTime(500);
+
+    expect(band).toHaveClass('is-in');
+    expect(observations[0].unobserved).toStrictEqual([band]);
+  });
+
+  it('reveals the same way on a visualViewport resize', () => {
+    const viewport = new EventTarget();
+    vi.stubGlobal('visualViewport', viewport);
+    const { observations, band } = mountBelowThenGrow();
+
+    viewport.dispatchEvent(new Event('resize'));
+    vi.advanceTimersByTime(500);
+
+    expect(band).toHaveClass('is-in');
+    expect(observations[0].unobserved).toStrictEqual([band]);
+  });
+
+  it('keeps a target below the viewport hidden and observed after a resize', () => {
+    const { observations, band } = mountBelowThenGrow();
+    placeAt(band, window.innerHeight + 50);
+
+    window.dispatchEvent(new Event('resize'));
+    vi.advanceTimersByTime(500);
+
+    expect(band).not.toHaveClass('is-in');
+    expect(observations[0].unobserved).toStrictEqual([]);
+  });
+
+  it('stops listening and drops a pending pass when it unmounts', () => {
+    const viewport = new EventTarget();
+    vi.stubGlobal('visualViewport', viewport);
+    const { observations, band, unmount } = mountBelowThenGrow();
+
+    window.dispatchEvent(new Event('resize'));
+    unmount();
+    window.dispatchEvent(new Event('resize'));
+    viewport.dispatchEvent(new Event('resize'));
+    vi.advanceTimersByTime(500);
+
+    expect(band).not.toHaveClass('is-in');
+    expect(observations[0].unobserved).toStrictEqual([]);
+  });
+
+  it('under StrictMode only the live effect run reveals on a resize', () => {
+    const { observations, band } = mountBelowThenGrow((children) => <StrictMode>{children}</StrictMode>);
+
+    window.dispatchEvent(new Event('resize'));
+    vi.advanceTimersByTime(500);
+
+    expect(band).toHaveClass('is-in');
+    expect(observations.map(({ unobserved }) => unobserved)).toStrictEqual([[], [band]]);
+  });
+});
+
 describe('FactCounters trigger (R-379)', () => {
   afterEach(() => document.documentElement.removeAttribute('data-motion'));
 
@@ -566,6 +652,76 @@ describe('FactCounters load-time count', () => {
 
     frames.flush(3000);
     expect(numbers()).toStrictEqual(['90', '4']);
+    expect(frames.pending()).toHaveLength(0);
+  });
+});
+
+describe('FactCounters after a viewport change (R-685)', () => {
+  beforeEach(() => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }));
+  afterEach(() => {
+    vi.useRealTimers();
+    document.documentElement.removeAttribute('data-motion');
+  });
+
+  function renderGrown() {
+    document.documentElement.setAttribute('data-motion', 'full');
+    stubObserver();
+    const view = render(
+      <section className="facts" data-reveal>
+        <span className="fact__num">90</span>
+        <span className="fact__num">4</span>
+        <FactCounters />
+      </section>,
+    );
+    const strip = view.container.querySelector('.facts') as HTMLElement;
+    const numbers = () => Array.from(strip.querySelectorAll('.fact__num'), (element) => element.textContent);
+    frames.flush(1000);
+    frames.flush(1000);
+    expect(frames.pending()).toHaveLength(0);
+    placeAt(strip, window.innerHeight * 0.8);
+    return { ...view, numbers };
+  }
+
+  it('starts counting after a debounced resize when the strip now sits in the bottom 35 %, and counts once', () => {
+    const { numbers } = renderGrown();
+
+    window.dispatchEvent(new Event('resize'));
+    window.dispatchEvent(new Event('resize'));
+    expect(frames.pending()).toHaveLength(0);
+    vi.advanceTimersByTime(500);
+    expect(frames.pending()).toHaveLength(1);
+
+    window.dispatchEvent(new Event('resize'));
+    vi.advanceTimersByTime(500);
+    expect(frames.pending()).toHaveLength(1);
+
+    frames.flush(1000);
+    frames.flush(1100);
+    expect(numbers()[0]).not.toBe('90');
+    frames.flush(3000);
+    expect(numbers()).toStrictEqual(['90', '4']);
+    expect(frames.pending()).toHaveLength(0);
+  });
+
+  it('starts on a visualViewport resize too', () => {
+    const viewport = new EventTarget();
+    vi.stubGlobal('visualViewport', viewport);
+    renderGrown();
+
+    viewport.dispatchEvent(new Event('resize'));
+    vi.advanceTimersByTime(500);
+
+    expect(frames.pending()).toHaveLength(1);
+  });
+
+  it('does not start on a resize after it unmounts', () => {
+    const { unmount } = renderGrown();
+
+    window.dispatchEvent(new Event('resize'));
+    unmount();
+    window.dispatchEvent(new Event('resize'));
+    vi.advanceTimersByTime(500);
+
     expect(frames.pending()).toHaveLength(0);
   });
 });

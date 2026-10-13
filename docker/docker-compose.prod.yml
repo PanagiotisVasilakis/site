@@ -21,6 +21,13 @@ x-hardened: &hardened
   cap_drop:
     - ALL
 
+# The json-file limits bound the disk use of container logs; the owner may change them.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   db:
     image: postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
@@ -33,6 +40,7 @@ services:
     volumes:
       - postgres-prod-data:/var/lib/postgresql/data
     restart: unless-stopped
+    logging: *logging
     security_opt:
       - no-new-privileges:true
     tmpfs:
@@ -61,6 +69,7 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    logging: *logging
 
   # One-off per release, before the new web image starts: docker compose run --rm migrate
   migrate:

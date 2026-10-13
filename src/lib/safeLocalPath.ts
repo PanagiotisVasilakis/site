@@ -22,6 +22,7 @@ export function toSafeLocalPath(
     const base = new URL(baseHref);
     const target = new URL(value, base);
     if (!['http:', 'https:'].includes(base.protocol) || target.origin !== base.origin) return null;
+    if (target.pathname.startsWith('//')) return null;
     return `${target.pathname}${target.search}${target.hash}`;
   } catch {
     return null;
