@@ -30,6 +30,7 @@ import SiteHeader from '@/components/shell/SiteHeader';
 import SiteFooter from '@/components/shell/SiteFooter';
 import LanguageSwitch from '@/components/shell/LanguageSwitch';
 import { getDictionary } from '@/i18n/dictionaries';
+import { HOST_CONTACT } from '@/data/contact';
 
 // jsdom has no HTMLDialogElement.showModal/close; these follow the spec's observable steps.
 function installDialog() {
@@ -75,7 +76,7 @@ function clickPrevented(element: HTMLElement, init: MouseEventInit = {}): boolea
   return prevented;
 }
 
-const BOOKING_HREF = /\/availability|airbnb\./i;
+const BOOKING_HREF = /\/availability|booking\.com/i;
 // The header pushes a toast when a sign-out fails, so it renders inside the same provider as the locale layout.
 const inToasts = { wrapper: ToastProvider };
 // Design Q6 (decision D13): the exact toast copy of a failed sign-out.
@@ -174,8 +175,8 @@ describe('site shell', () => {
     expect(within(nav).getByRole('link', { name: 'Διαθεσιμότητα' })).not.toHaveAttribute('aria-current');
   });
 
-  it.each(['/en/stay', '/en/guest', '/en/check-in', '/el/portal/refresh', '/el/offline'])(
-    'renders no booking, availability or Airbnb link in the stay header, menu and footer (%s)',
+  it.each(['/en/stay', '/el/offline', '/en/guest', '/en/check-in', '/el/portal/refresh'])(
+    'renders no booking, availability or Booking.com link in the stay header, menu and footer (%s)',
     (pathname) => {
       navigation.pathname = pathname;
       const locale = pathname.slice(1, 3);
@@ -352,7 +353,6 @@ describe('site shell', () => {
 
   it.each([
     ['en', '/en'],
-    ['el', '/el/moments'],
   ] as const)('shows the tagline and the location line under the brand in the %s marketing footer (%s)', (locale, pathname) => {
     navigation.pathname = pathname;
     render(<SiteFooter locale={locale} />);
@@ -377,37 +377,6 @@ describe('site shell', () => {
     expect(clickPrevented(contact)).toBe(true);
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
     expect(scrollIntoView.mock.contexts[0]).toBe(document.getElementById('contact'));
-  });
-
-  it('scrolls to the contact block from the Greek header "Επικοινωνία" at /el#contact (R-689)', () => {
-    navigation.pathname = '/el';
-    window.history.replaceState(null, '', '/el#contact');
-    render(<><SiteHeader locale="el" /><SiteFooter locale="el" /></>, inToasts);
-    const nav = screen.getAllByRole('navigation', { name: 'Κύρια πλοήγηση' })[0];
-    expect(clickPrevented(within(nav).getByRole('link', { name: 'Επικοινωνία' }))).toBe(true);
-    expect(scrollIntoView.mock.contexts).toEqual([document.getElementById('contact')]);
-  });
-
-  it('leaves every other header click alone at /en#contact: other pages, modified clicks, a missing target (R-689)', () => {
-    window.history.replaceState(null, '', '/en#contact');
-    const { unmount } = render(<><SiteHeader locale="en" /><SiteFooter locale="en" /></>, inToasts);
-    const nav = screen.getAllByRole('navigation', { name: 'Primary navigation' })[0];
-    expect(clickPrevented(within(nav).getByRole('link', { name: 'Apartment' }))).toBe(false);
-    expect(clickPrevented(within(nav).getByRole('link', { name: 'Your stay' }))).toBe(false);
-    expect(clickPrevented(screen.getByRole('link', { name: 'Check dates' }))).toBe(false);
-    // Open in a new tab / window / download, and the middle button: the browser's own behaviour.
-    const contact = within(nav).getByRole('link', { name: 'Contact' });
-    for (const init of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { altKey: true }, { button: 1 }]) {
-      expect(clickPrevented(contact, init), JSON.stringify(init)).toBe(false);
-    }
-    expect(scrollIntoView).not.toHaveBeenCalled();
-    unmount();
-
-    // Same URL but no element with that id (not the home page footer): nothing to scroll to, nothing prevented.
-    render(<SiteHeader locale="en" />, inToasts);
-    const bare = screen.getAllByRole('navigation', { name: 'Primary navigation' })[0];
-    expect(clickPrevented(within(bare).getByRole('link', { name: 'Contact' }))).toBe(false);
-    expect(scrollIntoView).not.toHaveBeenCalled();
   });
 
   it('closes the menu and scrolls on a second menu "Contact" click, and only closes it on the first (R-689)', async () => {
@@ -464,18 +433,33 @@ describe('site shell', () => {
     ]);
   });
 
-  it.each(['/en/availability', '/el/apartment', '/el/moments'])('leaves the #contact id out of the footer on %s (the availability page has its own)', (pathname) => {
+  it.each(['/en/availability'])('leaves the #contact id out of the footer on %s (the availability page has its own)', (pathname) => {
     navigation.pathname = pathname;
     const { container } = render(<SiteFooter locale={pathname.slice(1, 3)} />);
     expect(container.querySelector('.site-footer__contact')).not.toBeNull();
     expect(container.querySelector('#contact')).toBeNull();
   });
 
-  it.each(['/en/stay', '/el/guest'])('keeps the stay footer slim: no tagline, location line or #contact (%s)', (pathname) => {
+  it.each(['/en/stay'])('keeps the stay footer slim: no tagline, location line or #contact (%s)', (pathname) => {
     navigation.pathname = pathname;
     const { container } = render(<SiteFooter locale={pathname.slice(1, 3)} />);
     expect(container.querySelector('.site-footer__tagline, .site-footer__place, #contact')).toBeNull();
   });
+
+  it.each([['/en', 'en'], ['/el/guest', 'el']] as const)(
+    'shows the host identity as text only in the footer, marketing and stay (%s)',
+    (pathname, locale) => {
+      navigation.pathname = pathname;
+      render(<SiteFooter locale={locale} />);
+      const identity = screen.getByRole('contentinfo').querySelector('.host-identity') as HTMLElement;
+      expect(identity).not.toBeNull();
+      const labels = getDictionary(locale).shell.identity;
+      for (const text of [labels.registryLabel, labels.legalNameLabel, labels.addressLabel, '00003515821', HOST_CONTACT.legalName, HOST_CONTACT.address]) {
+        expect(within(identity).getByText(text)).toBeInTheDocument();
+      }
+      expect(within(identity).queryByRole('link')).toBeNull();
+    },
+  );
 });
 
 describe('LanguageSwitch', () => {

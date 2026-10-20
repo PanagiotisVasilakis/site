@@ -126,41 +126,16 @@ class GuestDataExport {
     totalBookings: number;
     totalUsers: number;
     totalClaimedBookings: number;
-    bookingsBySource: Record<string, number>;
-    bookingsByStatus: Record<string, number>;
   }> {
     const [bookings, users] = await Promise.all([
         this.getAllBookingsRaw(),
         this.getAllUsersRaw(),
       ]);
 
-      const bookingsBySource: Record<string, number> = {};
-      const bookingsByStatus: Record<string, number> = {};
-
-      const now = new Date().toISOString().slice(0, 10);
-
-      bookings.forEach((booking) => {
-        bookingsBySource[booking.source] = (bookingsBySource[booking.source] || 0) + 1;
-
-        // Determine status based on dates
-        const bookingStart = calendarDate(booking.startDate);
-        const bookingEnd = calendarDate(booking.endDate);
-        let status = 'upcoming';
-        if (bookingEnd < now) {
-          status = 'completed';
-        } else if (bookingStart <= now && bookingEnd >= now) {
-          status = 'active';
-        }
-
-        bookingsByStatus[status] = (bookingsByStatus[status] || 0) + 1;
-      });
-
     return {
         totalBookings: bookings.length,
         totalUsers: users.length,
         totalClaimedBookings: bookings.filter((booking) => booking.accessStatus === 'VERIFIED').length,
-        bookingsBySource,
-        bookingsByStatus,
     };
   }
 

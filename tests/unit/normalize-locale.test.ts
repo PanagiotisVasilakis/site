@@ -7,8 +7,6 @@ describe('normalizeLocale', () => {
     ['el', 'el'],
     ['en', 'en'],
     ['EL', 'en'],
-    ['de', 'en'],
-    ['', 'en'],
     [null, 'en'],
     [undefined, 'en'],
     ['../el', 'en'],

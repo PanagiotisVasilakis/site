@@ -60,13 +60,11 @@ export function mapApiErrorToUI(err: unknown, locale: ErrLocale = 'en'): UIError
 
     const fieldList = fieldMap ? entriesToMessages(fieldMap) : detailsRaw?.hints;
 
-    const details = detailsRaw as unknown as { validationErrors?: Array<{ path?: string; message?: string }> } | undefined;
-
     switch (code) {
       case ApiErrorCode.VALIDATION_ERROR: {
         const fields: Record<string, string> = {};
         const list: string[] = [];
-  const issues: Array<{ path?: string; message?: string }> = details?.validationErrors || [];
+        const issues: Array<{ path?: string; message?: string }> = detailsRaw?.validationErrors || [];
         for (const i of issues) {
           if (i?.path) fields[i.path] = i.message || m.invalidValue;
           if (i?.message) list.push(i.message);

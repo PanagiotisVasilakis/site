@@ -14,7 +14,7 @@ import { fromDbDate } from '@/lib/availability/calendarDate';
 import {
   CALENDAR_SYNC_STATE_ID,
   MANUAL_MIN_INTERVAL_MS,
-  syncAirbnbCalendar,
+  syncBookingCalendar,
 } from '@/lib/availability/calendarSync';
 import { isSameOriginRequest } from '@/lib/net/sameOrigin';
 import { prisma } from '@/lib/prisma';
@@ -22,10 +22,10 @@ import { isAdminRequest } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
 
-// The Airbnb calendar sync as the admin sees it. GET reports the sync state
+// The Booking.com calendar sync as the admin sees it. GET reports the sync state
 // (instants as ISO strings, horizon dates as ISO calendar dates, the number of
 // blocked nights); POST runs a manual sync. Neither ever returns or logs
-// AIRBNB_ICAL_URL: `configured` only says whether it is set.
+// BOOKING_ICAL_URL: `configured` only says whether it is set.
 
 /** Same threshold as the "Stale availability calendar" alert, so the page and the alert agree. */
 const STALE_AFTER_MS = CALENDAR_STALE_ALERT_MINUTES * 60 * 1_000;
@@ -38,7 +38,7 @@ async function requireAdmin(request: NextRequest): Promise<void> {
   }
 }
 
-const isConfigured = () => Boolean(process.env.AIRBNB_ICAL_URL);
+const isConfigured = () => Boolean(process.env.BOOKING_ICAL_URL);
 
 export const GET = withErrorHandler(async (request: NextRequest) => {
   await requireAdmin(request);
@@ -99,7 +99,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   const parsed = syncRequestSchema.safeParse(await readJsonBody(request, 256));
   if (!parsed.success) throw new ValidationError(parsed.error.issues);
 
-  const result = await syncAirbnbCalendar({ trigger: 'manual' });
+  const result = await syncBookingCalendar({ trigger: 'manual' });
   switch (result.status) {
     case 'synced':
       return createSuccessResponse({ status: result.status, nights: result.blockedNights });

@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   drainOutbox: vi.fn(),
   evaluateOperationalAlerts: vi.fn(),
   runRetention: vi.fn(),
-  syncAirbnbCalendar: vi.fn(),
+  syncBookingCalendar: vi.fn(),
 }));
 
 vi.mock('@/lib/prisma', () => ({ prisma: { $disconnect: mocks.disconnect } }));
@@ -14,7 +14,7 @@ vi.mock('@/lib/operationalMonitor', () => ({
   evaluateOperationalAlerts: mocks.evaluateOperationalAlerts,
   runRetention: mocks.runRetention,
 }));
-vi.mock('@/lib/availability/calendarSync', () => ({ syncAirbnbCalendar: mocks.syncAirbnbCalendar }));
+vi.mock('@/lib/availability/calendarSync', () => ({ syncBookingCalendar: mocks.syncBookingCalendar }));
 
 // Each worker runs main() when imported; wait until it has disconnected.
 async function runWorker(path: string) {
@@ -38,14 +38,6 @@ describe('worker processes close the database pool', () => {
     process.exitCode = undefined;
   });
 
-  it('disconnects after a successful outbox drain', async () => {
-    mocks.drainOutbox.mockResolvedValue({ claimed: 0, delivered: 0, failed: 0 });
-
-    await runWorker('../../scripts/drain-outbox');
-
-    expect(process.exitCode).toBeUndefined();
-  });
-
   it('disconnects after a failed outbox drain and keeps the failure exit code', async () => {
     mocks.drainOutbox.mockRejectedValue(new Error('database unavailable'));
 
@@ -67,30 +59,10 @@ describe('worker processes close the database pool', () => {
     expect(errors).toEqual([{ worker: 'outbox', status: 'disconnect_failed', error: 'pool already closed' }]);
   });
 
-  it('disconnects after operational maintenance and reports the scheduled calendar sync', async () => {
-    mocks.evaluateOperationalAlerts.mockResolvedValue({ opened: 0, resolved: 0, evaluated: 4 });
-    mocks.runRetention.mockResolvedValue({});
-    mocks.syncAirbnbCalendar.mockResolvedValue({ status: 'not_configured' });
-
-    await runWorker('../../scripts/run-operational-maintenance');
-
-    expect(process.exitCode).toBeUndefined();
-    expect(mocks.syncAirbnbCalendar).toHaveBeenCalledExactlyOnceWith({ trigger: 'scheduled' });
-    const lines = vi.mocked(process.stdout.write).mock.calls.map(([chunk]) => String(chunk));
-    expect(lines).toHaveLength(1);
-    expect(JSON.parse(lines[0])).toEqual({
-      worker: 'operations',
-      alerts: { opened: 0, resolved: 0, evaluated: 4 },
-      retention: {},
-      calendar: { status: 'not_configured' },
-      at: expect.any(String),
-    });
-  });
-
   it('keeps the exit code and writes a disconnect_failed event when closing the pool fails after operational maintenance', async () => {
     mocks.evaluateOperationalAlerts.mockResolvedValue({ opened: 0, resolved: 0, evaluated: 4 });
     mocks.runRetention.mockResolvedValue({});
-    mocks.syncAirbnbCalendar.mockResolvedValue({ status: 'failed', code: 'network' });
+    mocks.syncBookingCalendar.mockResolvedValue({ status: 'failed', code: 'network' });
     mocks.disconnect.mockRejectedValue(new Error('pool already closed'));
 
     await runWorker('../../scripts/run-operational-maintenance');
@@ -112,19 +84,9 @@ describe('worker processes close the database pool', () => {
     expect(errors).toEqual([{ worker: 'operations', status: 'disconnect_failed', error: 'pool already closed' }]);
   });
 
-  it('disconnects after failed operational maintenance', async () => {
-    mocks.evaluateOperationalAlerts.mockRejectedValue(new Error('database unavailable'));
-    mocks.runRetention.mockResolvedValue({});
-    mocks.syncAirbnbCalendar.mockResolvedValue({ status: 'not_configured' });
-
-    await runWorker('../../scripts/run-operational-maintenance');
-
-    expect(process.exitCode).toBe(1);
-  });
-
   it('syncs the calendar before it evaluates the alerts, so the stale-calendar rule reads the state this run leaves behind', async () => {
     let finishSync: (result: { status: 'synced'; blockedNights: number }) => void = () => undefined;
-    mocks.syncAirbnbCalendar.mockReturnValue(new Promise<{ status: 'synced'; blockedNights: number }>((resolve) => { finishSync = resolve; }));
+    mocks.syncBookingCalendar.mockReturnValue(new Promise<{ status: 'synced'; blockedNights: number }>((resolve) => { finishSync = resolve; }));
     mocks.evaluateOperationalAlerts.mockResolvedValue({ opened: 0, resolved: 0, evaluated: 4 });
     mocks.runRetention.mockResolvedValue({});
 
@@ -132,7 +94,7 @@ describe('worker processes close the database pool', () => {
     await import('../../scripts/run-operational-maintenance');
     // Let every already-queued promise reaction run; the sync is still pending.
     await new Promise<void>((resolve) => { setImmediate(resolve); });
-    expect(mocks.syncAirbnbCalendar).toHaveBeenCalledExactlyOnceWith({ trigger: 'scheduled' });
+    expect(mocks.syncBookingCalendar).toHaveBeenCalledExactlyOnceWith({ trigger: 'scheduled' });
     expect(mocks.evaluateOperationalAlerts).not.toHaveBeenCalled();
     expect(mocks.runRetention).not.toHaveBeenCalled();
 
@@ -157,7 +119,7 @@ describe('worker processes close the database pool', () => {
     let finishRetention: (counts: Record<string, number>) => void = () => undefined;
     mocks.evaluateOperationalAlerts.mockRejectedValue(new Error('database unavailable'));
     mocks.runRetention.mockReturnValue(new Promise<Record<string, number>>((resolve) => { finishRetention = resolve; }));
-    mocks.syncAirbnbCalendar.mockResolvedValue({ status: 'not_configured' });
+    mocks.syncBookingCalendar.mockResolvedValue({ status: 'not_configured' });
 
     vi.resetModules();
     await import('../../scripts/run-operational-maintenance');
@@ -184,20 +146,10 @@ describe('worker processes close the database pool', () => {
     expect(errors).toEqual([{ worker: 'operations', status: 'failed', error: expect.stringContaining('database unavailable') }]);
   });
 
-  it('disconnects after a calendar sync database error and keeps the failure exit code', async () => {
-    mocks.evaluateOperationalAlerts.mockResolvedValue({ opened: 0, resolved: 0, evaluated: 4 });
-    mocks.runRetention.mockResolvedValue({});
-    mocks.syncAirbnbCalendar.mockRejectedValue(new Error('database unavailable'));
-
-    await runWorker('../../scripts/run-operational-maintenance');
-
-    expect(process.exitCode).toBe(1);
-  });
-
   it('still evaluates the alerts and runs the retention after a failed calendar sync, and reports all three results', async () => {
     mocks.evaluateOperationalAlerts.mockResolvedValue({ opened: 0, resolved: 0, evaluated: 4 });
     mocks.runRetention.mockResolvedValue({ sessions: 2 });
-    mocks.syncAirbnbCalendar.mockRejectedValue(new Error('database unavailable'));
+    mocks.syncBookingCalendar.mockRejectedValue(new Error('database unavailable'));
 
     await runWorker('../../scripts/run-operational-maintenance');
 

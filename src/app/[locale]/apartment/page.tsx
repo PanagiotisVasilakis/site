@@ -7,12 +7,13 @@ import ApartmentCta from '@/components/apartment/ApartmentCta';
 import ApartmentGallery from '@/components/gallery/ApartmentGallery';
 import FactStrip from '@/components/home/FactStrip';
 import AvailabilityBookBar from '@/components/shell/AvailabilityBookBar';
+import { HostIdentity } from '@/components/shell/HostIdentity';
 import type { Metadata } from 'next';
 import { logger } from '@/lib/logger-enterprise';
 import { readPublicAvailability, type PublicAvailability } from '@/lib/prisma-repositories/availabilityRepository';
 import { localizedAlternates, localizedOpenGraph } from '@/lib/seo';
 
-// The BookBar price comes from the availability read: rendered per request, like home and availability.
+// The BookBar's free-night note comes from the availability read: rendered per request, like home and availability.
 export const dynamic = 'force-dynamic';
 
 /** The room names and lines are the home rooms showcase's (one source for both pages); the parking and details sections' are in house.ts. */
@@ -39,13 +40,13 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   };
 }
 
-/** The availability data for the BookBar price (identity §1.4, §8), or null. */
+/** The availability data for the BookBar's free-night note (identity §1.4, §8), or null. */
 async function apartmentAvailability(now: Date): Promise<PublicAvailability | null> {
   try {
     return await readPublicAvailability(now);
   } catch {
     // No details: the error may carry connection data. The page then shows no BookBar.
-    logger.error('Apartment price could not be read');
+    logger.error('Apartment availability could not be read');
     return null;
   }
 }
@@ -68,6 +69,7 @@ export default async function ApartmentPage({ params }: { params: Promise<{ loca
         <h1 className="apt-head__title">{ht.title}</h1>
         <p className="apt-head__lead">{ht.intro}</p>
         <FactStrip locale={eff} inline />
+        <HostIdentity labels={t.shell.identity} className="host-identity--page" />
       </header>
       <ApartmentGallery
         rooms={rooms}

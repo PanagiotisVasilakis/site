@@ -86,13 +86,10 @@
     animation: hero-sweep var(--dur-sweep) var(--ease-sweep) .8s both, hero-slide-in 1.4s var(--ease-glide) .15s both;
   }
 
-  /* M2: lede, price and CTAs rise 18 px (staggered 0 / .25 / .4 s). */
-  :root[data-motion="full"] .hero .hero__lede,
-  :root[data-motion="full"] .hero .hero__price,
+  /* M2: the CTAs rise 18 px (after .4 s). */
   :root[data-motion="full"] .hero .hero__actions > .ui-btn {
     animation: hero-rise .9s var(--ease-glide) both;
   }
-  :root[data-motion="full"] .hero .hero__price { animation-delay: .25s; }
   :root[data-motion="full"] .hero .hero__actions > .ui-btn { animation-delay: .4s; }
 
   /* Scroll hint (≥ 768 px): the line runs twice and ends by 4.6 s. */

@@ -46,9 +46,14 @@ network and volume even when a check fails.
 3. Sensitive routes answer `503` without the Nginx identity headers; a
    Chromium-shaped CSP report with the identity headers is accepted (`204`).
 4. In headless Chrome: the service worker installs and controls the page after
-   a reload, its cache is named after the build, a visited page and an unvisited
-   page both render offline (the unvisited one as the offline fallback), and
-   no CSP violation or console error occurs while online.
+   a reload, and its cache is named after the build. A page that the guest
+   reaches by a client-side link from `/en/stay` (the guide tile, not visited
+   before) is kept by the worker and opens offline with its heading (R-628). A
+   visited page renders offline. An unvisited page is answered by the offline
+   fallback at `/{locale}/offline?from=<page>` (R-648) and must hydrate there:
+   React has attached the handler of the Retry button, no page error is raised,
+   no error-boundary text appears, and the 112 call tile is in the page. No CSP
+   violation or console error occurs while online.
 5. The guest journey over HTTP with the identity headers: admin sign-in, booking
    creation, claim-grant issue, claim exchange and claim, `/en/check-in` with the
    guest session, an arrival-time request (`201`) approved by the admin, and the
@@ -58,7 +63,9 @@ network and volume even when a check fails.
    JSON output.
 
 Every check is reported as `ok` or `FAIL` with its reason; the exit code is 1
-when any check failed. The browser reaches the container as
+when any check failed. The browser launch is a fatal check: when Chrome cannot
+start, the report still prints, the checks after it are reported as skipped, and
+the exit code is 1. The browser reaches the container as
 `http://localhost:<port>`, which Chrome treats as a secure context, so the
 production `Secure` cookies are sent exactly as behind HTTPS.
 

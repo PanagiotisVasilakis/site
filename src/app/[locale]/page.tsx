@@ -11,23 +11,21 @@ import LocationSection from "@/components/home/LocationSection";
 import HostLetter from "@/components/home/HostLetter";
 import FaqSection from "@/components/home/FaqSection";
 import HomeRevealObserver from "@/components/home/HomeRevealObserver";
-import { homeFromPriceCents, nightsTeaserFrom } from '@/components/home/homeNights';
+import { nightsTeaserFrom } from '@/components/home/homeNights';
 import AvailabilityBookBar from '@/components/shell/AvailabilityBookBar';
 import { headers } from 'next/headers';
 import { serializeJsonLd } from '@/lib/jsonLd';
 import { localizedAlternates, localizedOpenGraph, organizationJsonLd } from '@/lib/seo';
-import { PROPERTY_TIME_ZONE } from '@/data/stayPolicy';
-import { propertyToday } from '@/lib/availability/calendarDate';
 import { logger } from '@/lib/logger-enterprise';
 import { readPublicAvailability, type PublicAvailability } from '@/lib/prisma-repositories/availabilityRepository';
 
-/** The availability data for the hero price, the 14-night teaser and the BookBar (identity §1.4), or null. */
+/** The availability data for the 14-night teaser and the BookBar (identity §1.4), or null. */
 async function homeAvailability(now: Date): Promise<PublicAvailability | null> {
   try {
     return await readPublicAvailability(now);
   } catch {
-    // No details: the error may carry connection data. The page then shows no price and no teaser.
-    logger.error('Home price could not be read');
+    // No details: the error may carry connection data. The page then shows no teaser and no BookBar.
+    logger.error('Home availability could not be read');
     return null;
   }
 }
@@ -49,7 +47,6 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   const eff = normalizeLocale(locale);
   const now = new Date();
   const availability = await homeAvailability(now);
-  const fromPriceCents = availability ? homeFromPriceCents(availability) : null;
   const teaser = availability ? nightsTeaserFrom(availability) : null;
 
   return (
@@ -63,15 +60,15 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         }}
       />
       {/* identity §9.1 items 1-11 except item 3: the KineticBand and the ContactBand (item 12) were removed on 2026-10-11 at the owner's request; the #contact target is the footer's contact block (SiteFooter). No ReviewsStrip: no owner review data, §1.4 */}
-      <HeroLivingPhoto locale={eff} fromPriceCents={fromPriceCents} />
+      <HeroLivingPhoto locale={eff} />
       <FactStrip locale={eff} />
       <Highlights locale={eff} now={now} />
       <BalconyWindow locale={eff} />
       <RoomsSection locale={eff} />
-      {teaser ? <NightsTeaser data={teaser} locale={eff} now={now} /> : null}
+      {teaser ? <NightsTeaser cells={teaser} locale={eff} /> : null}
       <LocationSection locale={eff} />
       <HostLetter locale={eff} />
-      <FaqSection locale={eff} today={availability?.today ?? propertyToday(PROPERTY_TIME_ZONE, now)} />
+      <FaqSection locale={eff} />
       <HomeRevealObserver />
       <AvailabilityBookBar availability={availability} locale={eff} />
     </>

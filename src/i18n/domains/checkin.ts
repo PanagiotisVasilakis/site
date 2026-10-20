@@ -54,7 +54,6 @@ export interface CheckinInfoDictionary {
     tvDetail: string;
     /** Check-in page UI strings (moved from inline locale ternaries). */
     panel: {
-        heroTitle: string;
         quickActions: string;
         copyWifi: string;
         openMaps: string;
@@ -148,7 +147,6 @@ export const checkinInfoTranslations: Record<Locale, CheckinInfoDictionary> = {
         tvInfo: "Entertainment:",
         tvDetail: "Smart TV with Netflix and YouTube available",
         panel: {
-            heroTitle: "Make yourself at home in Kalamata",
             quickActions: "Quick actions",
             copyWifi: "Copy Wi-Fi",
             openMaps: "Open Maps",
@@ -225,7 +223,6 @@ export const checkinInfoTranslations: Record<Locale, CheckinInfoDictionary> = {
         tvInfo: "Ψυχαγωγία:",
         tvDetail: "Έξυπνη τηλεόραση — διαθέσιμα Netflix και YouTube",
         panel: {
-            heroTitle: "Νιώστε σαν στο σπίτι σας στην Καλαμάτα",
             quickActions: "Γρήγορες ενέργειες",
             copyWifi: "Αντιγραφή Wi-Fi",
             openMaps: "Άνοιγμα χάρτη",

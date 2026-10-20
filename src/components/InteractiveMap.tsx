@@ -4,7 +4,6 @@ import dynamic from 'next/dynamic';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
 import { normalizeLocale } from '@/i18n/config';
-import StaticLocationMap from './StaticLocationMap';
 import { APARTMENT_LOCATION } from '@/data/mapLocations';
 import type { LeafletMapLabels, LeafletMarkerData } from '@/components/LeafletMap';
 
@@ -15,7 +14,7 @@ interface InteractiveMapProps {
   zoom?: number;
   height?: string;
   className?: string;
-  locale?: string; // for localized static fallback
+  locale?: string; // for the localized map labels
   cartoBasemapsKey?: string;
 }
 
@@ -46,21 +45,12 @@ export default function InteractiveMap({
   }), [mapT]);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [shouldRenderInteractive, setShouldRenderInteractive] = useState(false);
-  const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
-    setHasMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hasMounted) return;
     const el = containerRef.current;
     if (!el) return;
 
-    const IntersectionObserverCtor =
-      typeof window !== 'undefined'
-        ? window.IntersectionObserver ?? globalThis.IntersectionObserver
-        : undefined;
+    const IntersectionObserverCtor = window.IntersectionObserver;
 
     if (!IntersectionObserverCtor) {
       setShouldRenderInteractive(true);
@@ -81,7 +71,7 @@ export default function InteractiveMap({
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasMounted]);
+  }, []);
 
   return (
     <div ref={containerRef} className={`relative ${className}`} style={{ height }}>
@@ -99,9 +89,6 @@ export default function InteractiveMap({
           <p className="map-placeholder__text">{mapT.deferredInteractiveLabel}</p>
         </div>
       )}
-      <noscript>
-        <StaticLocationMap height={height} className="mt-4" locale={locale} />
-      </noscript>
     </div>
   );
 }

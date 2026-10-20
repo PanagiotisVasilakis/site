@@ -13,7 +13,7 @@
  * - Server-side utilities
  */
 
-type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+type LogLevel = 'debug' | 'warn' | 'error';
 
 interface LogMetadata {
   [key: string]: unknown;
@@ -56,9 +56,6 @@ class ClientLogger {
       case 'debug':
         if (this.isDev) console.debug(fullMessage);
         break;
-      case 'info':
-        console.info(fullMessage);
-        break;
       case 'warn':
         console.warn(fullMessage);
         break;
@@ -70,10 +67,6 @@ class ClientLogger {
 
   debug(message: string, meta?: LogMetadata) {
     this.log('debug', message, meta);
-  }
-
-  info(message: string, meta?: LogMetadata) {
-    this.log('info', message, meta);
   }
 
   warn(message: string, meta?: LogMetadata | Error) {

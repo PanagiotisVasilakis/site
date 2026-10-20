@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type { Prisma, PrismaClient } from '@/generated/prisma/client';
 import { createPortalBookingEligibilityWindow } from '@/lib/portalBookingEligibility';
 
+import { withVerifiedDisposableDatabase } from '../support/database-safety';
 import type { DisposableDatabaseTarget } from '../support/database-safety';
 import {
   createIsolatedDatabase,
@@ -52,7 +53,7 @@ async function seedGuestWithBooking(): Promise<void> {
       data: {
         id: id(BOOKING),
         source: 'EXTERNAL',
-        provider: 'airbnb',
+        provider: 'booking',
         externalReference: 'HM-CHECK-IN-REPOSITORY',
         startDate: businessToday,
         endDate,
@@ -309,5 +310,29 @@ describe.sequential('check-in request repository on PostgreSQL', () => {
         select: { id: true },
       })).toEqual([{ id: next.request.id }]);
     }, 'verification');
+  });
+
+  it('rolls the request back together with its outbox event when the event insert fails', async () => {
+    await seedGuestWithBooking();
+    const { checkInRequestRepository } = await import('@/lib/prisma-repositories/checkInRequestRepository');
+
+    // The event row is rejected after the request row was written: the nested create must leave neither row behind.
+    await withVerifiedDisposableDatabase(requireTarget(), 'seed', (client) => client.query(
+      `ALTER TABLE outbox_events ADD CONSTRAINT reject_created_events CHECK (event_type <> 'check_in_time_request.created') NOT VALID`,
+    ));
+    try {
+      await expect(checkInRequestRepository.create({
+        bookingId: id(BOOKING),
+        userId: id(GUEST),
+        guestPhone: phone(GUEST),
+        requestedTime: '15:00',
+        message: 'Rejected event',
+      }, CREATED_NOTIFICATION)).rejects.toThrow('reject_created_events');
+      expect(await withTestPrismaClient(requireTarget(), (prisma) => prisma.checkInRequest.count())).toBe(0);
+    } finally {
+      await withVerifiedDisposableDatabase(requireTarget(), 'seed', (client) => client.query(
+        'ALTER TABLE outbox_events DROP CONSTRAINT reject_created_events',
+      ));
+    }
   });
 });

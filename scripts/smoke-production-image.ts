@@ -16,7 +16,7 @@ import { randomBytes } from 'node:crypto';
 import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import puppeteer, { type Browser, type Page } from 'puppeteer';
+import puppeteer, { type Browser, type CDPSession, type Page } from 'puppeteer';
 
 const REPO = process.cwd();
 const PROJECT = 'qr-city-guide-smoke';
@@ -148,6 +148,12 @@ async function call(jar: CookieJar, method: string, pathname: string, body?: unk
 
 async function json<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
+}
+
+/** page.setOfflineMode does not reach the service-worker target, so the worker gets the same emulation through its own session. */
+async function setOffline(page: Page, serviceWorker: CDPSession, value: boolean): Promise<void> {
+  await page.setOfflineMode(value);
+  await serviceWorker.send('Network.emulateNetworkConditions', { offline: value, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
 }
 
 const calendarDate = (daysFromToday: number) => new Date(Date.now() + daysFromToday * 86_400_000).toISOString().slice(0, 10);
@@ -285,22 +291,28 @@ async function main(): Promise<number> {
       assert(response.status === 204, `status ${response.status}`);
     });
 
-    // Browser checks.
-    browser = await puppeteer.launch({ headless: true });
-    const page: Page = await browser.newPage();
+    // Browser checks. The launch and the page setup are one fatal check: when they fail, the report still prints.
+    // A failed launch skips every later check, so the checks below only run with `page` set.
+    let page: Page;
     const consoleErrors: string[] = [];
+    const pageErrors: string[] = [];
     let offline = false;
-    page.on('console', (message) => {
-      if (message.type() === 'error' && !offline) consoleErrors.push(message.text().slice(0, 200));
-    });
-    await page.evaluateOnNewDocument(() => {
-      const violations: string[] = [];
-      Object.defineProperty(window, '__cspViolations', { value: violations });
-      document.addEventListener('securitypolicyviolation', (event) => {
-        violations.push(`${event.violatedDirective} ${event.blockedURI}`);
+    await check('browser launches', async () => {
+      browser = await puppeteer.launch({ headless: true });
+      page = await browser.newPage();
+      page.on('console', (message) => {
+        if (message.type() === 'error' && !offline) consoleErrors.push(message.text().slice(0, 200));
       });
-    });
-    await page.setExtraHTTPHeaders(identityHeaders);
+      page.on('pageerror', (error) => pageErrors.push(String(error)));
+      await page.evaluateOnNewDocument(() => {
+        const violations: string[] = [];
+        Object.defineProperty(window, '__cspViolations', { value: violations });
+        document.addEventListener('securitypolicyviolation', (event) => {
+          violations.push(`${event.violatedDirective} ${event.blockedURI}`);
+        });
+      });
+      await page.setExtraHTTPHeaders(identityHeaders);
+    }, { fatal: true });
 
     await check('service worker installs and caches the build', async () => {
       await page.goto(`${BASE}/en`, { waitUntil: 'networkidle0', timeout: 60_000 });
@@ -314,26 +326,58 @@ async function main(): Promise<number> {
       assert(await page.evaluate(() => Boolean(navigator.serviceWorker.controller)), 'page not controlled after reload');
       return state.caches.join(', ');
     });
-    await check('offline: visited page and offline fallback', async () => {
-      await page.goto(`${BASE}/en/moments`, { waitUntil: 'networkidle0' });
-      // page.setOfflineMode only reaches the page's own targets, not the service worker, which would
-      // keep fetching from the network; emulate offline on the service-worker target as well.
+    await check('offline: page reached by a client-side link is kept (R-628)', async () => {
+      await page.goto(`${BASE}/en/stay`, { waitUntil: 'networkidle0', timeout: 60_000 });
+      await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller), { timeout: 10_000 });
+      // The guide tile is a next/link: its click is a client-side navigation only once React has attached the handler.
+      const guide = 'a.stay-tile__link[href="/en/moments"]';
+      await page.waitForFunction((selector: string) => Object.keys(document.querySelector(selector) ?? {}).some((key) => key.startsWith('__reactProps$')), { timeout: 10_000 }, guide);
+      // A mark on this document: a full navigation would drop it.
+      await page.evaluate(() => { Object.assign(window, { smokeSoftNavigation: true }); });
+      const keptBefore = await page.evaluate(async (href: string) => Boolean(await caches.match(href)), `${BASE}/en/moments`);
+      assert(!keptBefore, '/en/moments was already kept, so the client-side navigation proves nothing');
+      await page.click(guide);
+      await page.waitForFunction(() => location.pathname === '/en/moments', { timeout: 10_000 });
+      const sameDocument = await page.evaluate(() => 'smokeSoftNavigation' in window);
+      assert(sameDocument, 'the guide link made a full navigation, not a client-side one');
+      // PwaManager hands the URL to the worker after the client-side navigation: wait until the worker has kept it.
+      await page.waitForFunction(async (href: string) => Boolean(await caches.match(href)), { timeout: 10_000 }, `${BASE}/en/moments`);
       const serviceWorker = await (await page.browser().waitForTarget((target) => target.type() === 'service_worker', { timeout: 10_000 })).createCDPSession();
-      const setOffline = async (value: boolean) => {
-        await page.setOfflineMode(value);
-        await serviceWorker.send('Network.emulateNetworkConditions', { offline: value, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
-      };
       await serviceWorker.send('Network.enable');
       offline = true;
-      await setOffline(true);
+      await setOffline(page, serviceWorker, true);
+      try {
+        const reopened = await page.goto(`${BASE}/en/moments`, { waitUntil: 'load' });
+        const heading = await page.evaluate(() => document.querySelector('h1.guide-head__title')?.textContent?.trim() ?? '');
+        assert(reopened?.status() === 200 && heading === 'Kalamata guide', `reopened offline: ${reopened?.status()} heading "${heading}"`);
+      } finally {
+        await setOffline(page, serviceWorker, false);
+        await serviceWorker.detach();
+        offline = false;
+      }
+    });
+    await check('offline: visited page and offline fallback', async () => {
+      await page.goto(`${BASE}/en/moments`, { waitUntil: 'networkidle0' });
+      const serviceWorker = await (await page.browser().waitForTarget((target) => target.type() === 'service_worker', { timeout: 10_000 })).createCDPSession();
+      await serviceWorker.send('Network.enable');
+      offline = true;
+      await setOffline(page, serviceWorker, true);
       try {
         const visited = await page.goto(`${BASE}/en/moments`, { waitUntil: 'load' });
         assert(visited?.status() === 200 && (await page.$('main')), `visited page offline: ${visited?.status()}`);
+        const errorsBefore = pageErrors.length;
         const unvisited = await page.goto(`${BASE}/el/phones`, { waitUntil: 'load' });
+        // The fallback hydrates at its own URL (R-648): Retry is live once React has attached its props to the button.
+        await page.waitForFunction((selector: string) => Object.keys(document.querySelector(selector) ?? {}).some((key) => key.startsWith('__reactProps$')), { timeout: 10_000 }, 'button.status-page__link');
         const text = await page.evaluate(() => document.body.innerText);
         assert(unvisited?.status() === 200 && /offline|σύνδεση/iu.test(text), `unvisited page offline: ${unvisited?.status()} ${text.slice(0, 80)}`);
+        const fallback = new URL(page.url());
+        assert(fallback.pathname === '/el/offline' && fallback.searchParams.get('from') === '/el/phones', `unvisited page answered at ${page.url()}`);
+        assert(!/something went wrong|an unexpected error occurred|κάτι πήγε στραβά|απροσδόκητο σφάλμα/iu.test(text), `error boundary on the offline fallback: ${text.slice(0, 80)}`);
+        assert(await page.$('a[href="tel:112"]'), 'no 112 tile on the offline fallback');
+        assert(pageErrors.length === errorsBefore, `page error on the offline fallback: ${pageErrors.slice(errorsBefore).join('; ')}`);
       } finally {
-        await setOffline(false);
+        await setOffline(page, serviceWorker, false);
         await serviceWorker.detach();
         offline = false;
       }
@@ -408,7 +452,7 @@ async function main(): Promise<number> {
       const event = lastJsonLine(compose(['--profile', 'ops', 'run', '--rm', '--no-deps', 'operations']));
       const alerts = event.alerts as { evaluated?: number } | undefined;
       const calendar = event.calendar as { status?: string } | undefined;
-      // The smoke environment sets no AIRBNB_ICAL_URL, so the calendar sync must not run.
+      // The smoke environment sets no BOOKING_ICAL_URL, so the calendar sync must not run.
       assert(event.worker === 'operations' && alerts?.evaluated === 4 && calendar?.status === 'not_configured', JSON.stringify(event));
       return `alerts evaluated ${String(alerts.evaluated)}, calendar ${calendar.status}`;
     });

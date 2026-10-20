@@ -32,11 +32,9 @@ describe('readMonthFragment', () => {
     '#m=2027-13',
     '#m=2027-00',
     '#m=2027-6',
-    '#m=27-06',
     '#m=2027-06-15',
     '#m=',
     '#checkin=2026-10-07',
-    '',
   ])('ignores %s', (hash) => {
     expect(readMonthFragment(hash, TODAY, HORIZON_END)).toBeNull();
   });

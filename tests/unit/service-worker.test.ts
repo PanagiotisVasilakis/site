@@ -135,7 +135,7 @@ describe('service worker', () => {
 
     const upFront = added.filter(({ url }) => !new URL(url).pathname.startsWith('/_next/static/'));
     expect(upFront.map(({ url }) => new URL(url).pathname)).toEqual(
-      expect.arrayContaining(['/offline', '/en/offline', '/el/offline', '/app.webmanifest', '/icons/icon-192.png']),
+      expect.arrayContaining(['/offline', '/en/offline', '/el/offline', '/icons/icon-192.png']),
     );
     for (const { url, credentials } of upFront) expect(credentials, url).toBe('omit');
   });
@@ -180,7 +180,7 @@ describe('service worker', () => {
   // offline page (or with an offline page whose scripts were missing, so Retry stayed inert), and activation then
   // deleted the previous complete cache. The three offline pages and their module scripts are now required: a
   // failure rejects the install, the browser keeps the previous worker and cache and registers again on the next
-  // page load. The manifest, the icons, the CSS and the fonts stay best-effort.
+  // page load. The favicon, the icons, the CSS and the fonts stay best-effort.
   describe('install: complete or failed (R-647)', () => {
     const CACHE = 'guest-guide-build-2';
     const script = '/_next/static/chunks/0main.js';
@@ -192,7 +192,7 @@ describe('service worker', () => {
       <script src="${script}" async=""></script>
       </head><body>offline</body></html>`;
     const secondary = [
-      '/app.webmanifest', '/favicon.ico',
+      '/favicon.ico',
       '/icons/icon-192.png', '/icons/icon-512.png', '/icons/icon-maskable-512.png', '/icons/apple-touch-icon.png',
     ];
 
@@ -235,7 +235,7 @@ describe('service worker', () => {
       await expect(dispatch(handlers, 'install', {})).rejects.toThrow(`Failed to fetch ${script}`);
     });
 
-    it('does not reject the install when the manifest, the favicon or an icon cannot be precached', async () => {
+    it('does not reject the install when the favicon or an icon cannot be precached', async () => {
       for (const path of secondary) {
         const { handlers, stores } = installingWith([path]);
 
@@ -328,20 +328,6 @@ describe('service worker', () => {
     expect(precached.every((url) => url.origin === ORIGIN)).toBe(true);
   });
 
-  it('serves the precached fonts offline (cache-first for build assets)', async () => {
-    const font = '/_next/static/media/commissioner_latin-s.p.woff2';
-    const { handlers } = loadWorker(fetchImpl, (url) => {
-      const path = new URL(url, ORIGIN).pathname;
-      if (path.endsWith('/offline')) return new Response(`<link rel="preload" href="${font}" as="font">`, { status: 200 });
-      return new Response(`precached ${path}`, { status: 200 });
-    });
-    await dispatch(handlers, 'install', {});
-
-    online = false;
-    const response = await dispatch(handlers, 'fetch', { request: { url: `${ORIGIN}${font}`, method: 'GET', mode: 'cors' } }) as Response;
-    expect(await response.text()).toBe(`precached ${font}`);
-  });
-
   it('keeps the stay pages behind sign-in network-only (check-in, guest, portal)', async () => {
     const { handlers, stores } = loadWorker(fetchImpl);
     await dispatch(handlers, 'install', {});
@@ -395,8 +381,8 @@ describe('service worker', () => {
     const unvisited = await dispatch(handlers, 'fetch', navigation('/el/phones')) as Response;
     expect([unvisited.status, await unvisited.text()]).toEqual([502, 'error 502']);
 
-    // Network-only pages (private, and live ones with prices and free nights) never come from the cache, even
-    // when an entry exists: an outage must not replay a stale price either (R-312, R-460).
+    // Network-only pages (private, and live ones with free nights) never come from the cache, even
+    // when an entry exists: an outage must not replay stale availability either (R-312, R-460).
     const cache = stores.get('guest-guide-build-2')!;
     for (const path of ['/en/portal', '/en/availability', '/en', '/el', '/en/apartment', '/el/apartment']) {
       cache.set(`${ORIGIN}${path}`, basic(`stale ${path}`));
@@ -428,7 +414,7 @@ describe('service worker', () => {
   });
 
   // R-312: the availability calendar is force-dynamic. R-460: home and apartment render the same live data
-  // (from-price, "Free tonight", the 14-night open/booked strip), so they are network-only too.
+  // ("Free tonight", the 14-night open/booked strip), so they are network-only too.
   it('keeps the live pages network-only (availability, home, apartment): never stored, never replayed offline (R-312, R-460)', async () => {
     const { handlers, stores } = loadWorker(fetchImpl);
     await dispatch(handlers, 'install', {});

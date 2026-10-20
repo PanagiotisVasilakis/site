@@ -12,8 +12,6 @@ import { Icon } from "@/components/icons/Icon";
 import { siteUrl } from '@/lib/site';
 import { localizedOpenGraph } from '@/lib/seo';
 
-// Removed font variable placeholders.
-
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
   const eff = normalizeLocale(locale);
@@ -33,7 +31,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   if (!(locales as readonly string[]).includes(locale)) notFound();
   const eff = normalizeLocale(locale);
   const t = getDictionary(eff);
-  // Avoid reading cookies server-side so the route can stay fully static; client components fetch session state.
+  // No cookies are read here (the root layout reads request headers, so the route is rendered per request); client components fetch session state.
   return (
   <div data-locale={eff} lang={eff}>
   <DocumentLocale locale={eff} />
@@ -63,7 +61,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
         <button id="ios-tip-close" type="button" aria-label={t.a2hs.close} className="ui-icon-btn"><Icon name="close" size={20} /></button>
       </div>
       </div>
-  <main id="main-content" className="site-main" role="main">{children}</main>
+  <main id="main-content" className="site-main">{children}</main>
   <SiteFooter locale={eff} />
       <div className="fixed bottom-2 left-2 z-50 sm:hidden">
         <StatusCluster labels={{

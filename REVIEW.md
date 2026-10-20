@@ -1,6 +1,6 @@
 # Review 5: the delta since f7958fa, the areas Review 4 never read, and a cleanup inventory (2026-10-12 to 2026-10-13)
 
-Repository: `qr-city-guide` @ `main` `b82684c` plus the uncommitted work of 2026-10-12 (the Parking section, the guide-filters CSS fix F0 and one corrected line of `CLAUDE.md`). IDs continue at R-627 and run to R-800 (174 findings: 157 from the review and 17 found during the fix phase). The findings are in the section `# Review 5 findings` at the end of this file; Review 4 (R-375 to R-626) follows this block unchanged.
+Repository: `qr-city-guide` @ `main` `b82684c` plus the uncommitted work of 2026-10-12 (the Parking section, the guide-filters CSS fix F0 and one corrected line of `CLAUDE.md`). IDs continue at R-627 and run to R-881 (255 findings: 157 from the review, 17 found during the fix phase, 16 from the cleanup of 2026-10-13, R-801 to R-816, each a deletion of unused or redundant code, several of them reopened Review 4 declines, and 43 found afterwards by the cleanup follow-up and the deferred waves, R-817 to R-859, and 22 found by the Booking.com feed project of 2026-10-20, R-860 to R-881). The findings are in the section `# Review 5 findings` at the end of this file; Review 4 (R-375 to R-626) follows this block unchanged.
 
 **Why this review.** Review 4 reviewed commit `f7958fa` (a 551-file commit). Four commits followed: the Review 4 follow-up `64a953c` (120 findings fixed in 60 tasks, checked by per-task gates and verifiers only), `9d4784f` (KineticBand and ContactBand removed), `20846fe` (the photo set) and `b82684c` (balcony photos, the 'Your stay' navigation link, the 1320 px nav breakpoint, the reveal-at-load fix). One of those fixes (R-379) had already produced a user-visible defect that the owner found on 2026-10-12. On the same day the owner asked for a serious deep review under the agreed rules and for the deletion of all unused and redundant code.
 
@@ -14,22 +14,23 @@ Repository: `qr-city-guide` @ `main` `b82684c` plus the uncommitted work of 2026
 |---|---|
 | Critical | 0 |
 | High | 1 |
-| Medium | 6 |
-| Low | 111 |
-| Nit | 56 |
+| Medium | 10 |
+| Low | 150 |
+| Nit | 94 |
 
-Status: CONFIRMED 163, SUSPECTED 11. 0 Critical. Outcome of the fix phase (2026-10-13): 77 FIXED (the evidence of each is in its Resolution line, including the High R-627 measured in Chrome and all six Mediums), 10 DECLINED with a written reason, 87 DEFERRED-OWNER: 81 of them are tasks that decision D13 specified but that were not run because the owner asked on 2026-10-13 to watch the consumption (resumable on request: `.runtime/review5/fix/decision-D13.json`), 6 need the owner's own input (the legal draft, the history of two lint rules, a platform lock, a structural choice, the production host, the owner-only lines of CLAUDE.md). After the first report the owner asked for R-795, R-789, R-685 and R-637: R-795, R-685 and R-637 were fixed, R-789 was not reproducible and is DECLINED. Every finding ends FIXED, DECLINED or DEFERRED-OWNER: none is OPEN.
+Status: CONFIRMED 234, SUSPECTED 21. 0 Critical. Outcome (2026-10-13 to 2026-10-20, ledger of `resolve.mjs ledger`): 172 FIXED (129 of R-627 to R-800 including the High R-627 measured in Chrome and its six Mediums R-628 to R-633, 16 of the cleanup R-801 to R-816, 27 of the findings R-817 and later including the four Mediums R-858, R-866, R-878, R-881), 18 DECLINED with a written reason (12 of R-627 to R-800, 2 of R-817 to R-859, 4 of R-860 to R-881), 65 DEFERRED-OWNER (33 of R-627 to R-800, 30 of R-817 to R-859, 2 of R-860 to R-881; the reason is written in each Resolution line): R-644, R-645, R-735, R-748, R-753 and R-762 need the owner's own input; R-877 and R-879 wait for the owner's wording; the others are findings that decision D13 specified, that the fix phase found, or that the follow-up and deferred waves found and that by rule were not fixed inside the task that found them, and part of them were not scheduled because the owner asked on 2026-10-13 to watch the consumption (resumable on request: `.runtime/review5/fix/decision-D13.json`). Every finding ends FIXED, DECLINED or DEFERRED-OWNER: none is OPEN.
 
 | Category | Count |
 |---|---|
-| Tests | 46 |
-| Bug | 32 |
-| Maintainability | 25 |
-| Error handling | 15 |
-| Logic | 13 |
-| Security | 16 |
-| Redundant | 9 |
-| Unused | 7 |
+| Tests | 70 |
+| Bug | 35 |
+| Maintainability | 48 |
+| Error handling | 20 |
+| Logic | 18 |
+| Security | 17 |
+| Redundant | 15 |
+| Unused | 17 |
+| Legal | 4 |
 | Legacy | 5 |
 | Concurrency | 2 |
 | Performance | 2 |
@@ -2460,6 +2461,7 @@ None.
   Merging groups that look identical (keying climateFeeGroups by season, cents and months instead of effectiveFrom|season) would also remove the double line, but it changes the documented contract and the stay-quote test at L342; that is a lead decision.
 - Fix risk: Index keys are safe for this static, order-stable list (no per-item state). Test: render StaySummary (or the planner with a mocked two-rule schedule) for a stay across the new rule's effectiveFrom where the low amount is unchanged; expect no console.error and the two detail lines.
 - Resolution: DEFERRED to the owner by the decision agent (2026-10-09): The key collision only happens once a dated climate-fee rule exists, so it is fixed (index keys, O65) inside the deferred R3-L6/L7 fee-schedule task.
+- Resolution update (2026-10-14, host data task, pricing change HD-P1b): MOOT. The owner stated that the ΤΑΚΚ is part of the nightly price, so the climate-fee breakdown, `climateFeeGroups` and the keys of its lines were deleted; `StaySummary.tsx` renders only the price groups and the total (zero-hit search of the removed symbols in src, tests and scripts; patch R5-HD-P1b.patch).
 
 ### R-394: Custom Locate and Fit controls do not stop event propagation: a double-click on them zooms the map
 - Severity: Low
@@ -18164,6 +18166,87 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 | R-798 | Low | CONFIRMED | Security | The publication deny-list still misses docker global options and `--output type=registry` |
 | R-799 | Nit | CONFIRMED | Bug | In A4 portrait print the rooms deck keeps its horizontal row, so cards 3 to 6 lie beyond the page width |
 | R-800 | Nit | CONFIRMED | Tests | The 'removes its scroll listener on unmount' test of the useScroll tests cannot fail |
+| R-801 | Low | CONFIRMED | Redundant | The local-only browser guard of the audit scripts exists in two byte-identical copies |
+| R-802 | Nit | CONFIRMED | Unused | audit-vitals stores an interaction id that nothing reads |
+| R-803 | Low | CONFIRMED | Unused | The licence gate carries a dormant per-package fallback table and a no-op type intersection |
+| R-804 | Nit | CONFIRMED | Unused | Write-only refreshed_at claim in the admin token and a dead optional member of the guest-session parameter |
+| R-805 | Nit | CONFIRMED | Redundant | prisma.ts assigns undefined to an already absent global and casts a client to object |
+| R-806 | Low | CONFIRMED | Redundant | The service worker keeps a pass-through fetch wrapper and precaches a manifest it never serves from cache |
+| R-807 | Nit | CONFIRMED | Unused | The client logger has an info level nobody calls and userFacingErrors casts a value it already has |
+| R-808 | Low | CONFIRMED | Redundant | The guest refresh path has a dead session check, duplicated log-and-rethrow wrappers, an unused alias and a dead contention field |
+| R-809 | Nit | CONFIRMED | Unused | Admin guest statistics compute two tallies nobody reads, and the claim-grant helper has a parameter that is never set |
+| R-810 | Nit | CONFIRMED | Unused | Small UI leftovers: a redundant Navigator cast, an unused calendar class and an unused check-in heroTitle key |
+| R-811 | Low | CONFIRMED | Unused | The unreachable StaticLocationMap no-JavaScript fallback, five dictionary keys only it read, and four redundant map nits |
+| R-812 | Nit | CONFIRMED | Redundant | Four native main elements carry role="main", and two layout comments are stale |
+| R-813 | Nit | CONFIRMED | Unused | MetricCard has two props that no caller passes |
+| R-814 | Nit | CONFIRMED | Redundant | clearMocks: true is a no-op next to mockReset: true in both Vitest configs |
+| R-815 | Nit | CONFIRMED | Unused | The ignore files still list the runtime files of the removed filesystem analytics |
+| R-816 | Nit | CONFIRMED | Unused | privacySubjectDigest accepts a booking kind that no caller uses |
+| R-817 | Nit | CONFIRMED | Maintainability | The header comment of scripts/lib/local-only-browser.ts said the guard is the same as audit-vitals.ts, although audit-vitals.ts imports it |
+| R-818 | Nit | SUSPECTED | Logic | A planner click more than 30 nights after the check-in, with the first booked night on the last check-out day, shows only the crossing note and never names the cap |
+| R-819 | Nit | SUSPECTED | Bug | The logout-failure banner and the refresh-failure banner use the same fixed position and can overlap |
+| R-820 | Low | CONFIRMED | Security | The logger now renders a URL object with its full href, query string included |
+| R-821 | Nit | SUSPECTED | Error handling | Structured logging still serialises error.code unsanitised, so a bigint or cyclic code throws |
+| R-822 | Nit | SUSPECTED | Error handling | A throwing getter in log metadata escapes the log call |
+| R-823 | Nit | SUSPECTED | Maintainability | LOG_MAX_METADATA_SIZE is accepted by the environment schema for any digit string, but the logger silently maps small values to 1000 |
+| R-824 | Nit | CONFIRMED | Tests | The non-Error branch of the new errorName expression in calendarSync.ts is not executed by any test |
+| R-825 | Nit | CONFIRMED | Tests | Test gaps left by T-F29, T-F31 and T-F34: logout failure clearing, strict LOG_MAX_METADATA_SIZE parsing, reduceCause null and primitive causes, the typeof branch of the calendar sync error name |
+| R-826 | Low | CONFIRMED | Tests | No test reaches copyCandidateFiles, the source-gate copier of check-secrets.mjs, so bypassing the shared copy helper there goes undetected |
+| R-827 | Nit | CONFIRMED | Tests | The repeated-occurrence guard of the generated-artifact secret disposition survives mutation: semanticOccurrences.length === 1 can become >= 1 or be removed with all 55 tests green |
+| R-828 | Nit | SUSPECTED | Error handling | diagnosticText of the integration database-safety guard has no cycle guard and its nested AggregateError case is untested |
+| R-829 | Nit | SUSPECTED | Error handling | In both offline checks of the image smoke, setOffline(true) runs before the try, so a throw leaves the worker session attached and offline set |
+| R-830 | Low | CONFIRMED | Logic | The browser preflight exits 0 when only a non-Puppeteer browser is healthy and the bundled Chrome failed, although axe and vitals launch the bundled Chrome unless CHROME_PATH is set |
+| R-831 | Nit | CONFIRMED | Maintainability | The Env list in the header comment of audit-vitals.ts does not mention CHROME_PATH, and an empty CHROME_PATH is passed as an empty executablePath |
+| R-832 | Low | CONFIRMED | Bug | KEEP_REPORTS as whitespace, "0x5", "1e1", "  3 " or "-0" passed the first fix of R-662 and deleted reports (whitespace and -0 deleted all of them) |
+| R-833 | Nit | SUSPECTED | Error handling | prune-reports.ts would abort after a partial deletion if a directory matches a report name pattern, and no automated test covers the script |
+| R-834 | Low | CONFIRMED | Tests | The release policy accepts a verify-release spawn with shell: true as long as the text shell: false appears anywhere, including a comment |
+| R-835 | Low | SUSPECTED | Tests | Part of the mutants of R-657 still survive after T-F43: validateControlledEnvironments, the exec, deploy and migration checks of validateVerifyImplementation, the removed-script checks, the root .env lines of .dockerignore, gitleaks.toml rules and the weakening mutants |
+| R-836 | Nit | CONFIRMED | Tests | The orchestrator key-mask loop skips every .env.example name that is also set in the test runner environment |
+| R-837 | Nit | CONFIRMED | Maintainability | docs/testing.md describes only part of what the strengthened logout and revoked-session integration tests now prove |
+| R-838 | Low | CONFIRMED | Maintainability | The release policy error text says material is forbidden "in the repository" but the check scans only deploy/nginx |
+| R-839 | Low | CONFIRMED | Maintainability | layered-rate-limiting.md asks operators to monitor 429 and 503 totals and authentication-failure totals that no code produces |
+| R-840 | Nit | CONFIRMED | Maintainability | The runtime error hint of prisma.ts says tsx scripts need DATABASE_URL exported in the shell, which scripts/README.md no longer says |
+| R-841 | Nit | CONFIRMED | Maintainability | The task slices of decision D13 ask for npm run test:integration as evidence while the subagent contract forbids Docker, so two implementers ran the Docker suite and one left a disposable container behind |
+| R-842 | Nit | CONFIRMED | Maintainability | CLAUDE.md lists exported test-only helpers as something not to add, while decision D13 asked for shared test support exports (utcDateOffset, runMigrationFile, withScenario, startRedirectingReceiver) |
+| R-843 | Low | CONFIRMED | Legal | The privacy notice still says the site takes no bookings and you book on Airbnb or directly with the host, while the site now links to Booking.com too |
+| R-844 | Nit | CONFIRMED | Tests | formatPercent has an untested RangeError branch in an enforced coverage module, and no test pins the shipped VAT_RATE_PERCENT |
+| R-845 | Low | CONFIRMED | Legal | The availability page still shows the old draft cancellation policy (30 days, 50 percent for 14 to 30 days, nothing within 14 days) and no withdrawal statement, because task T6 was blocked |
+| R-846 | Low | CONFIRMED | Maintainability | Comments, one test label, the design document and two CSS rules still describe the removed hero lede and a supplied legal name |
+| R-847 | Low | CONFIRMED | Tests | No test covers the privacy page controller row for an empty host name |
+| R-848 | Nit | CONFIRMED | Legal | The English privacy notice labels the controller name 'Legal name' while the host is a private individual and the footer says 'Host name' |
+| R-849 | Low | CONFIRMED | Tests | The tier-1 test reduction removed five rejection rows of the euro input parser and one invalid-date row of validateStay |
+| R-850 | Low | SUSPECTED | Legal | The price sentence 'the prices on this page include all taxes and fees' and the Airbnb trust line 'Airbnb's own fees may apply' can be read as contradictory once the Airbnb URL is set |
+| R-851 | Nit | CONFIRMED | Maintainability | The placeholder list in the header comment of the availability dictionary omits {booked} |
+| R-852 | Low | CONFIRMED | Maintainability | README says the price texts on the availability page are marked '// legal review', and identity.md says every total carries the Airbnb trust line; both are too broad |
+| R-853 | Low | CONFIRMED | Tests | The availability page test no longer pins that a stale read hides the calendar when rate periods exist |
+| R-854 | Low | CONFIRMED | Tests | A price can be put back into the home hero without any test failing |
+| R-855 | Nit | CONFIRMED | Tests | The 'Booked' legend of the home nights strip (shown only when a night is booked) is pinned by no test |
+| R-856 | Nit | CONFIRMED | Maintainability | The header comment of calendarDate.ts still says the module serves availability and prices |
+| R-857 | Nit | CONFIRMED | Maintainability | After the no-price documents task docs/design/identity.md had lost a blank line and still named the removed stale-data warning and the quote card |
+| R-858 | Medium | CONFIRMED | Logic | With Booking.com as the only channel the availability page has no calendar at all, and its text still tells guests to choose dates in the calendar |
+| R-859 | Low | CONFIRMED | Maintainability | The home host letter and about ten Greek guest texts speak of the host as a woman while the name given for the host is masculine |
+| R-860 | Low | CONFIRMED | Tests | The Booking.com export allowlist was pinned by too few reject rows |
+| R-861 | Low | CONFIRMED | Tests | The 8-character floor of the gitleaks rule booking-calendar-export-token was pinned by no test |
+| R-862 | Low | CONFIRMED | Maintainability | Comments of the iCal parser said more than the code does |
+| R-863 | Low | CONFIRMED | Tests | A Booking.com button rendered without an href was invisible to the hide tests |
+| R-864 | Low | CONFIRMED | Maintainability | Documents and CLAUDE.md named the retired AIRBNB_ICAL_URL, a reserved BOOKING_ICAL_URL and the unconfirmed retention while the code had moved to the Booking.com feed |
+| R-865 | Nit | CONFIRMED | Tests | Three UI rules are pinned by no test: the how-to-book Booking.com step with an invalid link, the sr-only 'opens in a new tab' text of the apartment CTA and the hero button, and the absence of the removed withdrawal section |
+| R-866 | Medium | CONFIRMED | Maintainability | The canonical Booking.com property URL was offered to the owner as a free choice, but isBookingComListingUrl accepts only Share links |
+| R-867 | Low | CONFIRMED | Bug | Without a calendar the availability page still told guests to choose dates in the calendar |
+| R-868 | Low | CONFIRMED | Tests | The dictionary guard 'no price, fee or cancellation wording' missed the Greek fee name, totals and refunds |
+| R-869 | Low | CONFIRMED | Tests | The parser validates a cancelled event before it skips it, but no test pinned it |
+| R-870 | Low | CONFIRMED | Tests | The lower bound of the recordable HTTP status was untested |
+| R-871 | Low | CONFIRMED | Maintainability | The runbook's shape-check one-liner printed token material for unexpected links |
+| R-872 | Low | CONFIRMED | Maintainability | The first-sync remedy omitted the web restart and the first scheduled run |
+| R-873 | Low | CONFIRMED | Tests | The migration test pinned 5 of the 15 columns that the migration resets and never ran the empty-table re-seed branch |
+| R-874 | Low | CONFIRMED | Tests | The stale gates of the availability page and of nextFreeNight were redundant in the tests |
+| R-875 | Low | CONFIRMED | Logic | When every night of the horizon is blocked the planner still prompts 'Choose your check-in night.' |
+| R-876 | Low | CONFIRMED | Tests | The timeout.aborted fallback of the fetcher is never decisive in a test |
+| R-877 | Nit | CONFIRMED | Maintainability | With a valid link the how-to-book bullets read as a sequence although Booking.com and phone/WhatsApp are alternatives |
+| R-878 | Medium | CONFIRMED | Maintainability | PROGRESS.md sent the owner to a commit map that predated the feed project and omitted 22 of its paths |
+| R-879 | Low | CONFIRMED | Logic | In the release state the apartment CTA lead and the 'See free dates' / 'Check dates' CTAs still point to a calendar that is not shown |
+| R-880 | Nit | CONFIRMED | Maintainability | The screen-reader-only heading 'Choose your dates' still labels the planner region when no calendar is shown |
+| R-881 | Medium | CONFIRMED | Tests | The orchestrator test of the release policy cannot pass as a gate of verify:release, because the key mask has already blanked the names that it expects to be unset |
 
 ### R-627: Guide filter block is wider than a phone viewport: the List/Map toggle and the last category chips sit off-screen and cannot be reached at 360-700 px (outside the unit's files, found while testing the shell with reduced motion)
 - Severity: High
@@ -18437,7 +18520,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Rewrite the step to match scripts/README.md: build with NEXT_PUBLIC_SITE_URL=https://localhost:3002, run npm run smoke:image, then build with the production URL and run npm run docker:scan on that last build. A pointer such as 'sequence: scripts/README.md#production' is enough. Verifier on the fix: Correct: rewrite step 5 to the localhost build, smoke, production build, scan order, or point to scripts/README.md#production (the anchor already exists, release-verification.md:L324 links it). fixRisk is fair: no test or policy reads this file. Keep verify:release first (it does not need the images).
 - Fix risk: Documentation only. Check that no test pins this paragraph: `git grep -n 'smoke:image' -- tests scripts/tests` before editing.
 - Found by: R5-U29a (W34); candidate N-002
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F55, resumable on request.
+- Resolution: FIXED by T-F55 and the corrective retry T-F55r (wave W9B, 2026-10-13, Haiku max): the release and security documents state what the gates and the code do (check families, Controlled Nginx digest update with the lock tag and verifiedAt fields and the runbook text, argument-vector calls not seen by text patterns, failed admin logins visible only in the application log and the Nginx access log, CLAIM_TOKEN_PEPPER in SECURITY.md), and the apiErrorHandler comment says the same. Evidence: phrase counts RED to GREEN, validate:release-policy exit 0, verifier probes of the claims against the code; the false sentence about certificate material (the check covers deploy/nginx only) was corrected. Patches R5-T-F55.patch, R5-T-F55r.patch. Lead gates W9B and W9C0 (labels W9B-*, W9C0-*): typecheck 0, lint 0, lint:security 0, knip 0, release policy (validate and test) 0, secrets 0, check:image-assets 0, git diff --check 0 (documents and comments only); independent verifier wf_0578fd41-5e7 (T-F56 PASS, T-F55 FAIL for one false sentence, corrected by T-F55r and read by the lead).
 
 ### R-642: docs/release-verification.md says the policy does not scan natural-language documentation and lists a subset of its checks; the Nginx digest pin has no update procedure
 - Severity: Low
@@ -18455,7 +18538,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Reword L328-L329 (it also requires fixed phrases in the origin-ingress runbook and the layered rate-limiting contract and rejects retired credential names in SECURITY.md and scripts/README.md), add the missing check families to L312-L318, and add a 'Controlled Nginx digest update' paragraph naming image.lock.json, EXPECTED_NGINX_IMAGE and the fixture in scripts/tests/release-policy.test.mjs. Verifier on the fix: Documentation-only fix is correct; the policy does not read this file. The suggested 'Controlled Nginx digest update' paragraph should list image.lock.json, EXPECTED_NGINX_IMAGE (release-policy.mjs) and the fixture in scripts/tests/release-policy.test.mjs. Fix risk is fair. Could be merged into one doc task with the M-004 sentence.
 - Fix risk: Documentation only; the policy does not read this file.
 - Found by: R5-U25 (W3); candidate M-012
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F55, resumable on request.
+- Resolution: FIXED by T-F55 and the corrective retry T-F55r (wave W9B, 2026-10-13, Haiku max): the release and security documents state what the gates and the code do (check families, Controlled Nginx digest update with the lock tag and verifiedAt fields and the runbook text, argument-vector calls not seen by text patterns, failed admin logins visible only in the application log and the Nginx access log, CLAIM_TOKEN_PEPPER in SECURITY.md), and the apiErrorHandler comment says the same. Evidence: phrase counts RED to GREEN, validate:release-policy exit 0, verifier probes of the claims against the code; the false sentence about certificate material (the check covers deploy/nginx only) was corrected. Patches R5-T-F55.patch, R5-T-F55r.patch. Lead gates W9B and W9C0 (labels W9B-*, W9C0-*): typecheck 0, lint 0, lint:security 0, knip 0, release policy (validate and test) 0, secrets 0, check:image-assets 0, git diff --check 0 (documents and comments only); independent verifier wf_0578fd41-5e7 (T-F56 PASS, T-F55 FAIL for one false sentence, corrected by T-F55r and read by the lead).
 
 ### R-643: layered-rate-limiting.md promises 'bounded route/status counters' for admin login; no counter exists at HEAD
 - Severity: Low
@@ -18473,7 +18556,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Replace the sentence with what exists, for example: 'Failed logins appear only as the info log line "API request completed" with status 401 or 429; there is no counter or alert rule for them (future work, with the named-identity budgets).' Also drop or reword the comment at src/lib/apiErrorHandler.ts:317 in the same change. Alternatively add a real alert rule, but that is a new feature and needs approval. Verifier on the fix: Correct and minimal. The replacement sentence is accurate: 401/429 answers are returned (not thrown) and so reach the 'API request completed' info log with status. Rewording the apiErrorHandler.ts:L317 comment in the same change is right (comment-only edit). fixRisk is fair: the sentence is not a release-policy marker (verified marker list), so validate:release-policy should stay green. Adjacent, not claimed: the 'Operational signals' bullet 'application 429 and 503 totals by bounded operation category' (L90) is also not backed by any counter at HEAD, but it is phrased as a monitoring [...]
 - Fix risk: Documentation only. scripts/lib/release-policy.mjs checks markers in layered-rate-limiting.md (R-608 note): run `npm run validate:release-policy` once after editing to be sure the sentence is not a required marker.
 - Found by: R5-U29a (W34); candidate N-001
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F55, resumable on request.
+- Resolution: FIXED by T-F55 and the corrective retry T-F55r (wave W9B, 2026-10-13, Haiku max): the release and security documents state what the gates and the code do (check families, Controlled Nginx digest update with the lock tag and verifiedAt fields and the runbook text, argument-vector calls not seen by text patterns, failed admin logins visible only in the application log and the Nginx access log, CLAIM_TOKEN_PEPPER in SECURITY.md), and the apiErrorHandler comment says the same. Evidence: phrase counts RED to GREEN, validate:release-policy exit 0, verifier probes of the claims against the code; the false sentence about certificate material (the check covers deploy/nginx only) was corrected. Patches R5-T-F55.patch, R5-T-F55r.patch. Lead gates W9B and W9C0 (labels W9B-*, W9C0-*): typecheck 0, lint 0, lint:security 0, knip 0, release policy (validate and test) 0, secrets 0, check:image-assets 0, git diff --check 0 (documents and comments only); independent verifier wf_0578fd41-5e7 (T-F56 PASS, T-F55 FAIL for one false sentence, corrected by T-F55r and read by the lead).
 
 ### R-644: Secret-scanner lock supports only darwin-arm64, but the release docs never say so; verify:release gate 1 throws on any other platform
 - Severity: Low
@@ -18492,7 +18575,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Add one sentence to secret-scanning.md (and the prerequisite bullet in release-verification.md): 'The lock lists the darwin-arm64 artifact only; another platform needs a reviewed addition to tool.lock.json (archive and binary SHA-256) before verify:release can run there.' Adding the entries themselves needs the owner (download and hash of official artifacts) and is a separate task. Verifier on the fix: Correct: one sentence in secret-scanning.md plus the prerequisite bullet is the minimal change; adding linux/darwin-x64 lock entries is a separate owner task (official archive and binary hashes), as the finder says. fixRisk is fair; run npm run validate:release-policy once after editing, since release-policy pins parts of the secret-scanning setup.
 - Fix risk: Documentation only for the sentence. Adding platform entries touches scripts/lib/release-policy.mjs expectations and the secret-scanning tests, so it needs its own task and a run of `npm run test:secret-scanning` with GITLEAKS_BIN set.
 - Found by: R5-U29a (W34); candidate N-003
-- Resolution: DEFERRED-OWNER: the documentation part (task T-F55) is not done (economy instruction of 2026-10-13); the owner part is the gitleaks tool lock, which holds darwin-arm64 only: if verify:release must run on another platform, download the official gitleaks 8.30.1 archive for it and approve adding its checksums to tool.lock.json as a separate task.
+- Resolution: DEFERRED-OWNER: the documentation part is FIXED by T-F55 (wave W9B, 2026-10-13): release-verification.md and secret-scanning.md state that the gitleaks tool lock holds darwin-arm64 only; the owner part remains: if verify:release must run on another platform, download the official gitleaks 8.30.1 archive for it and approve adding its checksums to tool.lock.json as a separate task.
 
 ### R-645: Four react-hooks rules are switched off in both ESLint configs with no written reason; two of them report nothing when enabled
 - Severity: Low
@@ -18586,7 +18669,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Drop the fallback and fail clearly: `const axeSource = (axePkg as unknown as { source?: string }).source; if (!axeSource) throw new Error('axe-core exposes no source');`. Verifier on the fix: Correct and minimal: `const axeSource = (axePkg as unknown as { source?: string }).source; if (!axeSource) throw new Error('axe-core exposes no source');`. No lint disable or any needed; the existing cast stays. Fix risk none; run `npm run typecheck` after.
 - Fix risk: None for axe-core 4.12.1 (the dependency is ^4.10.0).
 - Found by: R5-U27 (W34); candidate H-009
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F42, resumable on request.
+- Resolution: FIXED by T-F42 (W8A), together with the parts of T-F03 (batch B1): axe-core must expose its source (no require fallback, R-649); axe and vitals launch the browser named by CHROME_PATH (R-650); the default axe pages gain the guide, moments, availability, privacy and Greek home pages (R-664 axe part); empty AXE_PATHS and VITALS_PATHS fail instead of running nothing (R-745 axe and vitals parts). Evidence: empty-path runs exit 1 with the named error, no browser started; verifier PASS (its own runs of the same inputs). The full audit:a11y run on a dev server was not done. Patch R5-T-F42.patch. Lead gates W8A (labels W8A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2461 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets (test:secret-scanning and check:secrets:sources) 0, check:image-assets 0, production build 0, git diff --check 0, three consecutive npm run test:integration runs 23 files / 125 tests each; independent verifier wf_097f5602-7a2.
 
 ### R-650: check-browser-runtime recommends CHROME_PATH, which axe-a11y.ts and audit-vitals.ts ignore, and exits 0 when only a non-Puppeteer browser is healthy
 - Severity: Low
@@ -18607,7 +18690,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Either make the preflight fail (exit 1) when the 'puppeteer-executable' probe is not healthy, or have axe-a11y.ts and audit-vitals.ts pass `executablePath: process.env.RESPONSIVE_CHROME_PATH || process.env.CHROME_PATH` like the responsive audit, and correct the hint text. Verifier on the fix: Both proposed fixes work. The smallest correct one is to change the hint text to export PUPPETEER_EXECUTABLE_PATH (read natively by puppeteer 25.12.0, so all three audits pick it up without code changes); I read getConfiguration.js:108-109 and BrowserLauncher.js:355-360 (config.executablePath) but did not execute a launch with it. Passing executablePath in the two scripts is the alternative and matches the responsive audit.
 - Fix risk: Changing the launch options of two audits changes which Chrome they use when CHROME_PATH is set in the shell; run both once after the change.
 - Found by: R5-U27 (W34); candidate H-007
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F42, resumable on request.
+- Resolution: FIXED by T-F42 (W8A), together with the parts of T-F03 (batch B1): axe-core must expose its source (no require fallback, R-649); axe and vitals launch the browser named by CHROME_PATH (R-650); the default axe pages gain the guide, moments, availability, privacy and Greek home pages (R-664 axe part); empty AXE_PATHS and VITALS_PATHS fail instead of running nothing (R-745 axe and vitals parts). Evidence: empty-path runs exit 1 with the named error, no browser started; verifier PASS (its own runs of the same inputs). The full audit:a11y run on a dev server was not done. Patch R5-T-F42.patch. Lead gates W8A (labels W8A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2461 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets (test:secret-scanning and check:secrets:sources) 0, check:image-assets 0, production build 0, git diff --check 0, three consecutive npm run test:integration runs 23 files / 125 tests each; independent verifier wf_097f5602-7a2.
 
 ### R-651: No test exercises the gate's own integrity controls: scanner hash and version check, environment-file rejection wiring, allowlist path and rule binding
 - Severity: Low
@@ -18645,7 +18728,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Make both copiers share one helper so the existing test covers both paths: extract 'async function copyIntoScanRoot(source, target, relative) { await mkdir(path.dirname(target), { recursive: true, mode: 0o700 }); await copyFile(source, target); await chmod(target, 0o600); await rejectInlineSuppression(target, relative); }' and call it from copyCandidateFiles and copyResolvedCandidateFiles (the 'mode: 0o600' text that release-policy requires stays in the report seed). Alternatively run rejectInlineSuppression once inside isolatedScan over the copied files, tolerating the ENOENT skip. Verifier on the fix: Correct. Smallest robust fix: make both copiers share one per-file helper (copy, chmod, rejectInlineSuppression) or move the check into isolatedScan after the copy loop, so the existing test covers both paths; alternatively let scanPathForTest/withScratchScanner reach the non-resolved path. No test-only exports beyond the existing scanPathForTest pattern. fixRisk: check-secrets.mjs is a policed gate (release-policy.mjs:743-760 requires marker strings; keep them); rerun secret-scanning.test.mjs, release-policy.test.mjs and `node scripts/check-secrets.mjs sources`.
 - Fix risk: Low. Run 'npm run test:secret-scanning', 'npm run test:release-policy' and 'npm run check:secrets:sources' (needs GITLEAKS_BIN). Keep the thrown message identical ('Inline scanner suppression is forbidden: <path>').
 - Found by: R5-U5 (W1a); candidate C-008; also found independently by R5-U18 (wave 2a, D-018)
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F40, resumable on request.
+- Resolution: FIXED by T-F40 (W8A): one copier path with the suppression check and modes (R-652), a real repeated-occurrence test for the generated-artifact disposition (R-757) and a clear error when git is missing or fails (R-747). Evidence: node --test secret-scanning 55/55 (baseline 53), REDs for the spawn error and the repeated occurrence; verifier PASS-WITH-NOTES (two coverage residuals recorded as new findings). Patch R5-T-F40.patch. Lead gates W8A (labels W8A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2461 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets (test:secret-scanning and check:secrets:sources) 0, check:image-assets 0, production build 0, git diff --check 0, three consecutive npm run test:integration runs 23 files / 125 tests each; independent verifier wf_097f5602-7a2.
 
 ### R-653: Push/publication deny-list misses the push forms of the toolchain in use (--push, docker compose push, git -C ... push, argv-style calls) and 8 of its 12 patterns have no test
 - Severity: Low
@@ -18741,7 +18824,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: One negative test per decision, not per marker: tampered tool lock; verify-release.mjs with 'shell: true'; retired dependency and alias; deploy command inside a script file; a 31st gate appended; .dockerignore without '!.env.example'; plus an optional { gates, environments } argument (or an exported pure comparison) so validateControlledEnvironments can be tested. Keep every existing test (O36/O46). Verifier on the fix: Direction is right and consistent with O36/O46 (only adds tests, nothing is removed). 'One negative test per decision, not per marker' is the sensible bound; the validateControlledEnvironments seam (optional { gates, environments } argument) is the only production-code change and is small. The unrelated R-240 (policy proportionality, content not recoverable from the files I read) was declined as an owner option; this item adds tests rather than removing policy, so I treat it as not conflicting. Cost: the policy tests already run in about 2 s, so extra tests are cheap.
 - Fix risk: Tests only; the seam adds one optional field to the validateReleasePolicy options.
 - Found by: R5-U25 (W3); candidate M-009
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F43, resumable on request.
+- Resolution: FIXED by T-F43 (wave W9A, 2026-10-13, Haiku max, scope as decided in D13): the release policy gets one negative test per decision of the six asked (tool lock tampering, a verify-release spawn with shell: true, the retired dependency and alias, a deploy command in an active script file, the 31st gate, .dockerignore without !.env.example) plus an orphan-check test; the orchestrator environment test asserts all hostile keys and the key mask from .env.example (R-673); the git marker and the deploy name regex were simplified with no behaviour change (R-749; part (c) validateLocalDefaults stays as D13 decided). Evidence: node --test release-policy 145/145 (138 before), 11 scratch mutants each failing the intended test, base-environment sweep 18/18, regex equivalence probe over 8,108,742 names with 0 differences; verifier PASS-WITH-NOTES (substring-marker bypass and residual survivors recorded as new findings). Patch R5-T-F43.patch. Lead gates W9A (labels W9A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2361 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets 0, check:image-assets 0, git diff --check 0; npm run test:integration 23 files / 132 tests passed on the re-run alone (73.6 s); the first run of the wave failed 2 timing tests (A3 claim barrier, a migration with exit 124) in files the wave did not touch while a leaked disposable container of an implementer run and other load were present (the container was removed by its exact ID after checking its labels, image digest, tmpfs and loopback port); independent verifier wf_e76a26a9-dba.
 
 ### R-658: gitleaks.toml can add allowlists or disable rules and every gate stays green, although the docs say a finding can be accepted only through the hashed allowlist
 - Severity: Low
@@ -18834,7 +18917,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: -const KEEP = Number(process.env.KEEP_REPORTS || 5); +const KEEP = Number(process.env.KEEP_REPORTS || 5); +if (!Number.isInteger(KEEP) || KEEP < 1) { + console.error('[prune] KEEP_REPORTS must be a positive integer'); + process.exit(1); +} Verifier on the fix: Correct: validate after parsing and exit 1 on a non-integer or negative value. Keep `KEEP < 0` (not `< 1`) if KEEP_REPORTS=0 ('delete all') should stay valid; the finder's own fix risk note says this. Low is fair (regenerable advisory output in the current directory).
 - Fix risk: KEEP_REPORTS=0 (delete all) stops working; allow KEEP < 0 only if 0 must stay valid (use `KEEP < 0`).
 - Found by: R5-U26 (W34); candidate H-020
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F39, resumable on request.
+- Resolution: FIXED by T-F39 and the corrective retry T-F39r (W8A): KEEP_REPORTS must be unset, empty or digits only; anything else prints the error and exits 1 before deleting. The W8A verifier failed T-F39 (whitespace-only deleted every report); T-F39r requires /^\d+$/ on the raw string. Evidence: probe logs T-F39r-red.log and T-F39r-green.log (every invalid value exit 1 with seven files kept); eslint and typecheck 0. No automated test (the script has none). Patches R5-T-F39.patch, R5-T-F39r.patch. Lead gates W8A (labels W8A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2461 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets (test:secret-scanning and check:secrets:sources) 0, check:image-assets 0, production build 0, git diff --check 0, three consecutive npm run test:integration runs 23 files / 125 tests each; independent verifier wf_097f5602-7a2.
 
 ### R-663: scripts/README.md tells developers to source .env.local with the shell, which breaks for valid dotenv values containing spaces
 - Severity: Low
@@ -18849,7 +18932,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Replace the snippet with `npx tsx --env-file=.env.local scripts/drain-outbox.ts` (or document that values in .env.local must be quoted for this snippet). Verifier on the fix: Docs-only and correct. `npx tsx --env-file=.env.local scripts/drain-outbox.ts` works (verified with Node 22.19.0 and the repo's tsx). Note that --env-file reads one file only (not the .env.development.local/.env.development/.env precedence), and a variable already set in the shell wins over the file; state that in the README. The alternative (tell developers to quote values with spaces) is smaller but leaves `$`, `#` and quote differences between shell and dotenv.
 - Fix risk: Docs only; `--env-file` does not use Next's precedence over .env.development.local/.env, so say which file it reads.
 - Found by: R5-U26 (W34); candidate H-022
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F56, resumable on request.
+- Resolution: FIXED by T-F56 (W9B): the developer documents match the code (dated test-file counts dropped, the time-zone constant named, the tsx --env-file snippet verified with a probe, the Nginx wording, the orchestrator refusal of a non-loopback DATABASE_URL, the NODE_ENV pin) and two stale test comments were corrected. Evidence: stale phrases RED to GREEN, probe log T-F56-envfile-probe.log, validate:release-policy exit 0; verifier PASS. Patch R5-T-F56.patch. Lead gates W9B and W9C0 (labels W9B-*, W9C0-*): typecheck 0, lint 0, lint:security 0, knip 0, release policy (validate and test) 0, secrets 0, check:image-assets 0, git diff --check 0 (documents and comments only); independent verifier wf_0578fd41-5e7 (T-F56 PASS, T-F55 FAIL for one false sentence, corrected by T-F55r and read by the lead).
 
 ### R-664: Default route lists leave out the guide page /en/moments (the page with the filter bar and the map); the axe defaults also omit availability, privacy and every el page
 - Severity: Low (the finder said Medium: Advisory manual audits, no production effect, one-line additions, and /en/moments is already in audit-vitals defaults; adding the route to the responsive audit alone would NOT have caught R5-F0 under [...])
@@ -18868,7 +18951,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Add `{ id: 'moments-en', path: '/en/moments', journey: 'guide', locale: 'en' }`, `{ id: 'moments-el', path: '/el/moments', journey: 'guide', locale: 'el' }` and `/en/privacy` to DEFAULT_ROUTES; add /en/moments,/en/availability,/en/privacy,/el,/el/moments to the axe default list (or make both scripts derive the list from one shared constant). Verifier on the fix: Adding moments-en/el and privacy-en to DEFAULT_ROUTES and the missing pages to the axe default list is correct. Correct the fixRisk number: 27 more cells add roughly 66 MB of screenshots at the measured 2.4 MB per cell (197 MB / 81), not about 200 MB (guide pages are long, so allow up to ~100 MB). A shared constant for the route list is optional and would be new abstraction (needs owner yes); the plain additions are enough. Note the guide page then gets touch-target/clipping/h1 and axe coverage, but overflow only after H-002.
 - Fix risk: The default matrix grows from 9x9 = 81 to 12x9 = 108 cells (about 200 MB more screenshots, see the reports finding); axe gains about 2 minutes of settle time (4 s per page).
 - Found by: R5-U27 (W34); candidate H-003
-- Resolution: DEFERRED-OWNER (economy): the responsive-audit part is FIXED by T-F03 (batch B1, 2026-10-13); the axe and vitals part (task T-F42 in decision-D13.json) is not done under the owner's instruction of 2026-10-13 to watch the consumption, resumable on request.
+- Resolution: FIXED by T-F42 (W8A), together with the parts of T-F03 (batch B1): axe-core must expose its source (no require fallback, R-649); axe and vitals launch the browser named by CHROME_PATH (R-650); the default axe pages gain the guide, moments, availability, privacy and Greek home pages (R-664 axe part); empty AXE_PATHS and VITALS_PATHS fail instead of running nothing (R-745 axe and vitals parts). Evidence: empty-path runs exit 1 with the named error, no browser started; verifier PASS (its own runs of the same inputs). The full audit:a11y run on a dev server was not done. Patch R5-T-F42.patch. Lead gates W8A (labels W8A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2461 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets (test:secret-scanning and check:secrets:sources) 0, check:image-assets 0, production build 0, git diff --check 0, three consecutive npm run test:integration runs 23 files / 125 tests each; independent verifier wf_097f5602-7a2.
 
 ### R-665: The responsive audit exits 0 when no route could be loaded (server down, wrong port) unless RESPONSIVE_UX_FAIL_ON_ISSUES=1
 - Severity: Low
@@ -18905,7 +18988,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: In the smoke check 'offline: visited page and offline fallback', after the unvisited goto, wait for hydration and assert it, e.g.: ```ts await page.waitForFunction(() => Object.keys(document.querySelector('main') ?? {}).some((key) => key.startsWith('__reactFiber$')), { timeout: 10_000 }); assert(!/something went wrong|κάτι πήγε στραβά/iu.test(await page.evaluate(() => document.body.innerText)), 'error boundary replaced the offline page'); ``` (or click Retry and assert the handler ran). Lead-run gate, so it is a script edit for the owner or an implementer with the smoke in scope. Verifier on the fix: Correct and proportionate: extend the existing 'offline: visited page and offline fallback' check so that, after the offline navigation to an unvisited page, it waits for hydration (e.g. page.waitForFunction on the Retry button handler/`__next_f` completion or clicks Retry and asserts the page does not leave the offline view), asserts the 112 tile link is present, and asserts no error-boundary text and no pageerror. fixRisk: the check only runs in the Docker smoke, so it needs a real `npm run smoke:image`; keep it free of sleeps and avoid flakiness from service-worker timing (use waitFor with [...]
 - Fix risk: Runs only in the Docker smoke. The React fiber key is an internal detail; if it changes, the probe fails loudly and can be replaced by a click on the Retry button.
 - Found by: R5-X1 (W1a); candidate C-017
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F41, resumable on request.
+- Resolution: FIXED (code and docs) by T-F41 (W8A): smoke:image reports a failed browser launch as a fatal check and still prints the results (R-754), and proves the offline page hydrates and that a soft navigation is stored and served offline (R-666). Runtime proof is the owner step npm run docker:build and npm run smoke:image (Docker and a registry); verifier PASS (selectors and texts read against the components and the worker). Patch R5-T-F41.patch. Lead gates W8A (labels W8A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2461 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets (test:secret-scanning and check:secrets:sources) 0, check:image-assets 0, production build 0, git diff --check 0, three consecutive npm run test:integration runs 23 files / 125 tests each; independent verifier wf_097f5602-7a2.
 
 ### R-667: load_environment documents 'same parser and precedence as next dev' but differs: no ${VAR} expansion, empty inherited variables are overridden
 - Severity: Low
@@ -19035,7 +19118,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Assert the whole set: for every key of HOSTILE_INTEGRATION_ENVIRONMENT except INTEGRATION_POSTGRES_IMAGE check calls[0].environment[key] against the exported constant (this also removes the duplicate-constant drift noted in R-575), plus NODE_ENV and TZ; add a test with gates [integration passes, later gate fails] that expects the check:integration-orphans call. Verifier on the fix: Correct and tests-only. Comparing calls[0].environment against HOSTILE_INTEGRATION_ENVIRONMENT (minus INTEGRATION_POSTGRES_IMAGE) covers the 11 DB/PG keys; NODE_ENV, TZ, NEXT_TELEMETRY_DISABLED, NPM_CONFIG_UPDATE_NOTIFIER and PAGER need their own asserts because they are not in that constant. Add the [integration passes, later gate fails] orphan test. Fix risk is fair (tests only).
 - Fix risk: Tests only.
 - Found by: R5-U25 (W3); candidate M-008
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F43, resumable on request.
+- Resolution: FIXED by T-F43 (wave W9A, 2026-10-13, Haiku max, scope as decided in D13): the release policy gets one negative test per decision of the six asked (tool lock tampering, a verify-release spawn with shell: true, the retired dependency and alias, a deploy command in an active script file, the 31st gate, .dockerignore without !.env.example) plus an orphan-check test; the orchestrator environment test asserts all hostile keys and the key mask from .env.example (R-673); the git marker and the deploy name regex were simplified with no behaviour change (R-749; part (c) validateLocalDefaults stays as D13 decided). Evidence: node --test release-policy 145/145 (138 before), 11 scratch mutants each failing the intended test, base-environment sweep 18/18, regex equivalence probe over 8,108,742 names with 0 differences; verifier PASS-WITH-NOTES (substring-marker bypass and residual survivors recorded as new findings). Patch R5-T-F43.patch. Lead gates W9A (labels W9A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2361 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets 0, check:image-assets 0, git diff --check 0; npm run test:integration 23 files / 132 tests passed on the re-run alone (73.6 s); the first run of the wave failed 2 timing tests (A3 claim barrier, a migration with exit 124) in files the wave did not touch while a leaked disposable container of an implementer run and other load were present (the container was removed by its exact ID after checking its labels, image digest, tmpfs and loopback port); independent verifier wf_e76a26a9-dba.
 
 ### R-674: SECURITY.md incident guidance names only SECURITY_PEPPER and advises 'rehash' of tokens that cannot be rehashed
 - Severity: Low
@@ -19050,7 +19133,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Replace line 36 with: 'If `SECURITY_PEPPER` or `CLAIM_TOKEN_PEPPER` is ever leaked, rotate it in the runtime secret source and restart; the effects of each rotation (refresh tokens, claim exchange cookies, claim grants, rate-limit buckets) are listed in docs/security/runtime-credential-contract.md.' Add CLAIM_TOKEN_PEPPER to line 10. Verifier on the fix: The proposed L36 text and the L10 addition are correct and minimal; since L7-L8 already links the contract, the L36 change can be even smaller. fixRisk correction: scripts/lib/release-policy.mjs:L998 does scan SECURITY.md (activeConfigurationFiles) for the obsolete names JWT_SECRET, SESSION_SECRET, SECURITY_ENC_KEY_HEX(_PREVIOUS) (token split on non-[A-Z0-9_]); the proposed wording contains none of them, so it stays green. scripts/tests/release-policy.test.mjs:L89 only fixture-writes a SECURITY.md stub. Run npm run validate:release-policy once after the edit.
 - Fix risk: Documentation only. scripts/lib/release-policy.mjs does not check SECURITY.md markers (`grep -n 'SECURITY.md' scripts/lib/release-policy.mjs` was not needed to be non-empty; run `npm run validate:release-policy` once after the edit).
 - Found by: R5-U29a (W34); candidate N-005
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F55, resumable on request.
+- Resolution: FIXED by T-F55 and the corrective retry T-F55r (wave W9B, 2026-10-13, Haiku max): the release and security documents state what the gates and the code do (check families, Controlled Nginx digest update with the lock tag and verifiedAt fields and the runbook text, argument-vector calls not seen by text patterns, failed admin logins visible only in the application log and the Nginx access log, CLAIM_TOKEN_PEPPER in SECURITY.md), and the apiErrorHandler comment says the same. Evidence: phrase counts RED to GREEN, validate:release-policy exit 0, verifier probes of the claims against the code; the false sentence about certificate material (the check covers deploy/nginx only) was corrected. Patches R5-T-F55.patch, R5-T-F55r.patch. Lead gates W9B and W9C0 (labels W9B-*, W9C0-*): typecheck 0, lint 0, lint:security 0, knip 0, release policy (validate and test) 0, secrets 0, check:image-assets 0, git diff --check 0 (documents and comments only); independent verifier wf_0578fd41-5e7 (T-F56 PASS, T-F55 FAIL for one false sentence, corrected by T-F55r and read by the lead).
 
 ### R-675: Rate-period form: a last night of 9999-12-31 makes validate() throw and the submit does nothing visible
 - Severity: Low
@@ -19080,7 +19163,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Add a describe block to tests/components/admin-guests.test.tsx: spy on window.confirm and window.prompt; assert no request when confirm returns false, when the prompt returns null or 'ab', and a POST to /api/admin/guests/{userId}/erase with body { confirm: true, auditNote } otherwise; assert the access-reset POST body and that Reset access is disabled for a VERIFIED booking outside the claim window. Verifier on the fix: Proposed test block is correct and feasible in tests/components/admin-guests.test.tsx (fetchMock and the list-response helper already exist; spy on window.confirm/prompt with mockImplementation per test because mockReset is on; use a VERIFIED booking with a user object, dates inside and outside isWithinClaimWindow). Test-only, fixRisk fair; keep default tests off the network. No security test is removed (O36/O46 untouched). Severity Low is fair: server still validates confirm and note length, the gap is the confirmation dialog and the request shape.
 - Fix risk: Test-only. Use mockImplementation per test (mockReset is on in vitest.config.ts) and keep default tests off the network.
 - Found by: R5-U13 (W2); candidate D-004
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F28, resumable on request.
+- Resolution: FIXED by T-F28 (W7A): switching the search type clears the typed query (R-677) and Erase and Reset access have tests for confirm, prompt, trimmed note, request body and the claim window (R-676). Evidence: RED 1 failed | 23 passed, GREEN 24/24; five mutants of the page killed by the new tests in the implementer run and six more by the verifier; verifier PASS. Patch R5-T-F28.patch. Lead gates W7A (labels W7A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2425 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, check:image-assets 0, production build 0, git diff --check 0, npm run test:integration 23 files / 125 tests; independent verifier wf_f5886768-654 (read-only, mutation probes in scratch copies).
 
 ### R-677: Admin guests search: switching the search type keeps the typed text, so a hidden value is sent as startDate
 - Severity: Low
@@ -19098,7 +19181,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Clear the text when the type changes: `onChange={(e) => { setSearchType(e.target.value as 'reference' | 'phone' | 'date'); setSearchQuery('') }}`. Verifier on the fix: Correct and minimal: clear the text in the select's onChange (`setSearchType(...); setSearchQuery('')`). Existing test 'uses a date input and an encoded, trimmed query' sets the type first, so it is unaffected. fixRisk Low is fair; add one test that the Search request is not sent (and the field is empty) after switching type with text typed. Severity Low is right (admin-only, one-click recoverable, no data effect).
 - Fix risk: Low. The existing test 'uses a date input and an encoded, trimmed query for the date search' changes the type before typing and is unaffected. Add a test that switching the type empties the state (the Search request must not be sent with the old text).
 - Found by: R5-U13 (W2); candidate D-003
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F28, resumable on request.
+- Resolution: FIXED by T-F28 (W7A): switching the search type clears the typed query (R-677) and Erase and Reset access have tests for confirm, prompt, trimmed note, request body and the claim window (R-676). Evidence: RED 1 failed | 23 passed, GREEN 24/24; five mutants of the page killed by the new tests in the implementer run and six more by the verifier; verifier PASS. Patch R5-T-F28.patch. Lead gates W7A (labels W7A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2425 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, check:image-assets 0, production build 0, git diff --check 0, npm run test:integration 23 files / 125 tests; independent verifier wf_f5886768-654 (read-only, mutation probes in scratch copies).
 
 ### R-678: Manual-booking route copies the rate-period isoDateSchema instead of sharing it
 - Severity: Low
@@ -19162,7 +19245,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Track the logout failure separately instead of reusing status: add `const [logoutFailed, setLogoutFailed] = useState(false);`, in logout() clear it at the start and call `setLogoutFailed(true)` in the catch (instead of setStatus('error')), and render `{logoutFailed && <div className="admin-session-error ..." role="alert">Logout failed. Try again.</div>}` without the Retry-now button. Add a component test: logout answers 500 -> 'Logout failed' shown, 'Token refresh failed' absent. Verifier on the fix: Correct and minimal: a separate `logoutFailed` state with its own role=alert text, no Retry-now button. Keep the new markup on existing admin token classes (tests/unit/admin-css-tokens.test.ts scans AdminSessionManager.tsx for palette utilities) and do not re-add animate-pulse (R-476 declined/motion gate). Fix risk is fair: only the 'Session: error' label after a failed logout changes. Q-013's 'Logout failure shows an error' test depends on this fix.
 - Fix risk: Small. The 'Session: error' label no longer appears after a failed logout (arguably correct). Re-run tests/components/admin-session-manager.test.tsx; the existing refresh-failure test still expects the 'Token refresh failed' text for refresh errors.
 - Found by: R5-U30 (W34); candidate Q-007
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F29, resumable on request.
+- Resolution: FIXED by T-F29 (W7A): a failed admin logout has its own message and no refresh banner (R-680); the session manager flows (reload on expiry, retry, 200 without expiresAt, 503) are tested (R-707, R-768). Evidence: RED 1 failed | 14 passed, GREEN 15/15; verifier PASS-WITH-NOTES (one test gap, recorded as a new finding). Patch R5-T-F29.patch. Lead gates W7A (labels W7A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2425 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, check:image-assets 0, production build 0, git diff --check 0, npm run test:integration 23 files / 125 tests; independent verifier wf_f5886768-654 (read-only, mutation probes in scratch copies).
 
 ### R-681: R-434 fix attributes the restart to a booked night that lies beyond the 30-night cap, so the cap explanation is withheld
 - Severity: Low
@@ -19180,7 +19263,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Treat the booked night as the reason only when it is what ends the window (checkOutDays.last), otherwise fall back to the cap check. In handleSelect: `const firstBooked = day > checkIn ? eachNight(checkIn, day).find((night) => nightCodeOn(night, today, nights) === 'b') : undefined; const crossed = firstBooked !== undefined && firstBooked === checkOutDays?.last ? firstBooked : undefined; const pastMax = crossed === undefined && day > checkIn && nightsBetween(checkIn, day) > MAX_STAY_NIGHTS; select({ checkIn: day, checkOut: null }, crossed ?? null, pastMax);` and fix the comment above pastMax. Verifier on the fix: The proposed fix is correct. Treat the booked night as the reason only when `firstBooked === checkOutDays?.last`, else fall back to the cap check. I derived that firstBooked !== last implies firstBooked > checkIn+30 (otherwise last = firstBooked), hence day > checkIn+30 and pastMax is true, so exactly one of the two notes is chosen; the existing crossing test (7 Oct, click 12 Oct, booked 10 Oct) keeps its message because last = 10 Oct. fixRisk Low is fair (only the note text changes; add one regression test with a booked night more than 30 nights after the check-in). Also fix the comment [...]
 - Fix risk: Low; only the note changes. The existing crossing test (check-in 7 Oct, click 12 Oct, booked 10 Oct) keeps its message because the first booked night equals checkOutDays.last. Add a regression test with a booked night more than 30 nights after the check-in (for example 2026-12-20: click 2026-11-02, then 2026-12-25 expects the max_nights text and no 'is booked' text). The case of a booked night exactly at check-in + 30 coincides with the cap and keeps the crossing message.
 - Found by: R5-U13 (W2); candidate D-001
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F26, resumable on request.
+- Resolution: FIXED by T-F26 (wave W7A, 2026-10-13, Haiku max): the planner names the 30-night cap when the cap, not a far booked night, ends the window (crossing note only when the first booked night is the last check-out day). Evidence: RED 1 failed | 54 passed (T-F26-red.log), GREEN 55/55 (T-F26-green.log); verifier PASS (the new test fails against the pre-task component). Patch R5-T-F26.patch. Lead gates W7A (labels W7A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2425 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, check:image-assets 0, production build 0, git diff --check 0, npm run test:integration 23 files / 125 tests; independent verifier wf_f5886768-654 (read-only, mutation probes in scratch copies).
 
 ### R-682: Wi-Fi reload relies on one long browser timer and the device clock; nothing re-checks when the tab returns, so a stale 'Available from' page can stay
 - Severity: Low
@@ -19420,7 +19503,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Before the generic object branch add `if (typeof value === 'bigint') return value.toString();` and `if (value instanceof Date) return Number.isNaN(value.getTime()) ? 'Invalid Date' : value.toISOString();`, and make `seen` track the current path only (`seen.add(value)` before recursing, `seen.delete(value)` after). Add three rows to tests/unit/logger-enterprise.test.ts. Verifier on the fix: Real but latent. Minimal fix in redactRecursively: bigint -> String(value), Date -> toISOString(), URL -> href, Map/Set -> Array.from before recursing; track ancestors only (delete the node from `seen` once its children are processed) so a repeated object is not marked circular; guard JSON.stringify(redacted) with try/catch and a '_unserializable' marker. Same file as C-022: one task. Fix risk low: changes log output only (Dates stop printing as {}); tests/unit/logger-enterprise.test.ts and the redaction tests must stay green; add one row per value type. Low is fair only as a trap for the [...]
 - Fix risk: Output of Date values changes from {} to an ISO string; check tests that spy on logger output (tests/unit/logger-enterprise.test.ts, tests/security/api-boundaries.test.ts, client-identity.test.ts import the real logger).
 - Found by: R5-U3 (W1a); candidate C-021
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F31, resumable on request.
+- Resolution: FIXED by T-F31 (W7A): the logger metadata keeps dates, repeated objects, bigints, Map and Set, survives odd values and a throwing toJSON, and LOG_MAX_METADATA_SIZE and the structured cause are parsed strictly (R-694, R-764). Evidence: RED 25 failed | 21 passed, GREEN 46/46; verifier PASS-WITH-NOTES (test gaps and a Low security note on URL values, both recorded as new findings). Patch R5-T-F31.patch. Lead gates W7A (labels W7A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2425 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, check:image-assets 0, production build 0, git diff --check 0, npm run test:integration 23 files / 125 tests; independent verifier wf_f5886768-654 (read-only, mutation probes in scratch copies).
 
 ### R-695: The 'Recent high-severity security events' alert uses a 5-minute window equal to its 5-minute schedule, so an event stored between two evaluations is never counted
 - Severity: Low
@@ -19672,7 +19755,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Add four tests: Logout success calls POST /api/admin/logout and window.location.reload (stub window.location with vi.stubGlobal); Logout failure shows an error (see the logout banner finding); 'Retry now' after a rejected refresh triggers one more fetch at once; a 200 without expiresAt and a 503 both show 'Token refresh failed' and neither redirects before expiry. Verifier on the fix: Correct. The four tests are feasible (location.reload can be stubbed with vi.stubGlobal as in the scratch run). The 'Logout failure shows an error' test only makes sense after Q-007 is fixed, so sequence them together in one task (same file). Fix risk fair.
 - Fix risk: Test-only. Stub window.location.reload per test (jsdom's location is not configurable).
 - Found by: R5-U30 (W34); candidate Q-013
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F29, resumable on request.
+- Resolution: FIXED by T-F29 (W7A): a failed admin logout has its own message and no refresh banner (R-680); the session manager flows (reload on expiry, retry, 200 without expiresAt, 503) are tested (R-707, R-768). Evidence: RED 1 failed | 14 passed, GREEN 15/15; verifier PASS-WITH-NOTES (one test gap, recorded as a new finding). Patch R5-T-F29.patch. Lead gates W7A (labels W7A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2425 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, check:image-assets 0, production build 0, git diff --check 0, npm run test:integration 23 files / 125 tests; independent verifier wf_f5886768-654 (read-only, mutation probes in scratch copies).
 
 ### R-708: HeroGlIsland tests never exercise a failing capability gate with a usable crop, so ignoring the gate result passes all 17 tests
 - Severity: Low
@@ -19806,7 +19889,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Change the comment to: // Exchange: one client-address key; claims: client-address and grant-digest keys. Verifier on the fix: Correct: change the comment to `claims: client-address and grant-digest keys`. Comment only; no assertion or script reads it.
 - Fix risk: None: comment only; no assertion, lint rule or script reads it.
 - Found by: R5-U21 (W34); candidate G-004
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F56, resumable on request.
+- Resolution: FIXED by T-F56 (W9B): the developer documents match the code (dated test-file counts dropped, the time-zone constant named, the tsx --env-file snippet verified with a probe, the Nginx wording, the orchestrator refusal of a non-loopback DATABASE_URL, the NODE_ENV pin) and two stale test comments were corrected. Evidence: stale phrases RED to GREEN, probe log T-F56-envfile-probe.log, validate:release-policy exit 0; verifier PASS. Patch R5-T-F56.patch. Lead gates W9B and W9C0 (labels W9B-*, W9C0-*): typecheck 0, lint 0, lint:security 0, knip 0, release policy (validate and test) 0, secrets 0, check:image-assets 0, git diff --check 0 (documents and comments only); independent verifier wf_0578fd41-5e7 (T-F56 PASS, T-F55 FAIL for one false sentence, corrected by T-F55r and read by the lead).
 
 ### R-715: utcDateOffset is copied nine times into the integration tests
 - Severity: Low
@@ -19831,7 +19914,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Add `export function utcDateOffset(now: Date, days: number): Date` (the one-liner form) to tests/integration/support/fixtures.ts, delete the nine local definitions (claim-concurrency-characterization 128-136, claim-ineligible-window-regression 88-96, claim-lifecycle-characterization 103-111, guest-access-reset 59-61, logout-characterization 172-180, portal-eligibility-consistency 81-89, refresh-overlap-classification 216-224, refresh-revocation-race 91-99, auth/support/auth-fixtures 73-81) and add the name to each existing `support/fixtures` import. No file is added and no test is removed. Verifier on the fix: Sound and clearly a net reduction (about 80 lines removed, about 3 added plus nine import edits); a pure date helper hides nothing a test proves and is allowed as an export of a test support module (CLAUDE.md Testing rules concern production code). Use the one-liner form. Placement in tests/integration/support/fixtures.ts avoids new imports (auth/support/auth-fixtures.ts would also fit but only two of the nine files import it). fixRisk fair: the tests run only under Docker, so npm run test:integration must be run after the edit; the nine files include auth and eligibility-window tests [...]
 - Fix risk: Test-only; every call site passes an integer day offset and both bodies return the same UTC-midnight date for any integer. Re-run `npm run typecheck`, `npm run lint -- --max-warnings=0`, `npm run check:dead-code` and `npm run test:integration`.
 - Found by: R5-X7 (W5); candidate K-005
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F58, resumable on request.
+- Resolution: FIXED by T-F58 (wave W9C, 2026-10-14, Haiku max): the copied Deferred helpers of the integration auth tests are replaced by Promise.withResolvers (R-720) and the copied utcDateOffset helpers by one export of tests/integration/support/fixtures.ts (R-715), with the lock-observation helper and the twin tests written once. Evidence: the 83 test titles before and after are identical (vitest list on the snapshot and on the current tree), per-file expect counts unchanged except the merged twin (90 to 89 static, both cases still run all assertions via the it.each row), the old and new utcDateOffset agree on 54,576 and 127,171,572 date pairs; integration 132/132; verifier PASS-WITH-NOTES. Patch R5-T-F58.patch. Lead gates W9C (labels W9C-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2361 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets 0, check:image-assets 0, git diff --check 0; npm run test:integration 23 files / 132 tests passed (74.9 s); independent verifier wf_e346918a-8a5 (snapshot plus patch byte-identical to the files, test titles identical before and after, scratch mutants killed).
 
 ### R-716: Session-only logout, the path of every sign-in without remember-me, is proven for a single session only
 - Severity: Low
@@ -19850,7 +19933,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Call issueSessionOnly twice for REVOKED_SESSION_FIXTURE (same user and booking) and once for ISOLATED_AUTH_FIXTURE, log out the first and assert with verifyGuestSessionAccess(parseGuestSession(token)) that the other two are still accepted and the first is rejected. safeGraphState would then report sessions { total: 2, active: 1, revoked: 1 } for the primary principal. Verifier on the fix: Correct in substance. Prefer adding a new test (or a new case) rather than changing L1's literal expectations, since adding sessions to L1 changes its `before`/`afterFirst` totals. safeGraphState filters by userId+bookingId, so the primary principal would report sessions { total: 2, active: 1, revoked: 1 } and the isolated principal's session needs includeIsolatedPrincipal: true. Unexecuted (Docker).
 - Fix risk: Test only; the third session needs includeIsolatedPrincipal: true. Expected values derived by reading, not executed.
 - Found by: R5-U22b (W34); candidate G-009
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F51, resumable on request.
+- Resolution: FIXED by T-F51 (W9A): the logout characterization proves the multi-session scope (a session-only logout leaves the other sessions valid), forged credentials (wrong secret, foreign-signed JWT with the real sid) revoke nothing, and L1 and L4 are strengthened (positive control, revocation reason, zero replay events). Evidence: 7 scratch mutants A to G each fail the intended new test, base unmutated 9/9; integration green; verifier PASS. Patch R5-T-F51.patch. Lead gates W9A (labels W9A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2361 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets 0, check:image-assets 0, git diff --check 0; npm run test:integration 23 files / 132 tests passed on the re-run alone (73.6 s); the first run of the wave failed 2 timing tests (A3 claim barrier, a migration with exit 124) in files the wave did not touch while a leaked disposable container of an implementer run and other load were present (the container was removed by its exact ID after checking its labels, image digest, tmpfs and loopback port); independent verifier wf_e76a26a9-dba.
 
 ### R-717: L1: the refresh 'denial' assertion cannot fail, because a refresh request without guest_rt is answered 401 before any session state is read
 - Severity: Low
@@ -19869,7 +19952,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Replace the refresh call by `await expect(loadedModules.sessionModule.verifyGuestSessionAccess(loadedModules.sessionModule.parseGuestSession(session.sessionToken))).resolves.toBeNull();` (the JWT still parses, the DB row is revoked, so the access check must return null), or drop the refreshDenial lines and keep afterFirst/finalState. Verifier on the fix: Correct. verifyGuestSessionAccess(parseGuestSession(token)) returns null for a revoked row (guestSession.ts:L151-L154) while the JWT still parses (not expired, valid signature); sessionModule is already loaded and used the same way at L384. Prefer replacing the vacuous refresh call over dropping it, so the revoked-session access check is exercised. Unexecuted (Docker).
 - Fix risk: Test only; verifyGuestSessionAccess returns null for a revoked row (guestSession.ts:151-154).
 - Found by: R5-U22b (W34); candidate G-011
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F51, resumable on request.
+- Resolution: FIXED by T-F51 (W9A): the logout characterization proves the multi-session scope (a session-only logout leaves the other sessions valid), forged credentials (wrong secret, foreign-signed JWT with the real sid) revoke nothing, and L1 and L4 are strengthened (positive control, revocation reason, zero replay events). Evidence: 7 scratch mutants A to G each fail the intended new test, base unmutated 9/9; integration green; verifier PASS. Patch R5-T-F51.patch. Lead gates W9A (labels W9A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2361 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets 0, check:image-assets 0, git diff --check 0; npm run test:integration 23 files / 132 tests passed on the re-run alone (73.6 s); the first run of the wave failed 2 timing tests (A3 claim barrier, a migration with exit 124) in files the wave did not touch while a leaked disposable container of an implementer run and other load were present (the container was removed by its exact ID after checking its labels, image digest, tmpfs and loopback port); independent verifier wf_e76a26a9-dba.
 
 ### R-718: No test sends a well-formed refresh token with a wrong secret, or a well-formed session JWT with a wrong signature, to logout or refresh
 - Severity: Low
@@ -19889,7 +19972,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: In L3 (or a new test) keep the id of primary.refreshToken and replace the secret (`${id}.synthetic-wrong-secret`). Send it to performLogout without a valid session cookie and to performRefresh (with and without the real session cookie); expect EXPECTED_LOGOUT / EXPECTED_REFRESH_DENIAL and both graphs still equal to ACTIVE_BOUND_GRAPH (rotate returns 'invalid' at :327-331 without revoking; revokeFamilyForToken returns false at :627-629). Add one case with a guest_session JWT signed by another secret that carries the real sid, sent to logout, and expect no revocation. Verifier on the fix: Correct. By my trace: a wrong-secret cookie to performRefresh returns 'invalid' at L327-L331 (route maps it to 401 with both cookies cleared) without revoking, and to performLogout (no session cookie) revokeFamilyForToken returns false (L627-L629), so the response is EXPECTED_LOGOUT and both graphs stay ACTIVE_BOUND_GRAPH. A JWT signed with another secret carrying the real sid makes parseGuestSessionBinding return 'invalid', so logout revokes nothing. Each refresh counts against the 60/15-minute budget (see G-013). Unexecuted (Docker); run `npm run test:integration` after adding.
 - Fix risk: Test only. The expected outcomes are derived from the code paths named above and were not executed (Docker is not available in this review): run npm run test:integration after adding them. Each extra refresh request counts against the 60-per-15-minutes budget of the refresh route (see the rate-budget nit).
 - Found by: R5-U22b (W34); candidate G-007
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F51, resumable on request.
+- Resolution: FIXED by T-F51 (W9A): the logout characterization proves the multi-session scope (a session-only logout leaves the other sessions valid), forged credentials (wrong secret, foreign-signed JWT with the real sid) revoke nothing, and L1 and L4 are strengthened (positive control, revocation reason, zero replay events). Evidence: 7 scratch mutants A to G each fail the intended new test, base unmutated 9/9; integration green; verifier PASS. Patch R5-T-F51.patch. Lead gates W9A (labels W9A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2361 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets 0, check:image-assets 0, git diff --check 0; npm run test:integration 23 files / 132 tests passed on the re-run alone (73.6 s); the first run of the wave failed 2 timing tests (A3 claim barrier, a migration with exit 124) in files the wave did not touch while a leaked disposable container of an implementer run and other load were present (the container was removed by its exact ID after checking its labels, image digest, tmpfs and loopback port); independent verifier wf_e76a26a9-dba.
 
 ### R-719: Lock order of revokeFamilyForToken (logout and sign-in revocation) is not pinned by any concurrent integration test
 - Severity: Low
@@ -19909,7 +19992,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Parametrize executeRace (L222-L352) with the revocation call and add one case per ordering that calls revokeRepository.revokeFamilyForToken(`${ROOT_CREDENTIAL_ID}.${ROOT_SECRET}`, 'race_test_revocation'). The expected result and RaceState are the same as for the two existing orderings (revocationResult true, familyReason 'race_test_revocation'). No existing assertion is removed or weakened (O36/O46). Verifier on the fix: Correct. I traced both orderings for revokeFamilyForToken: revoke-first blocks on the family lock held by the blocker (query contains "refresh_token_families" and FOR UPDATE), then rotate reaches "users" held by the first pid and ends invalid; refresh-first rotates, then the revocation takes both locks, finds the root token (revokedAt is not checked there), and revokeFamilyGraph writes the reason, giving the same RaceState as the existing cases (familyReason 'race_test_revocation', revocationResult true). The reason must be passed explicitly (default is 'logout'). fixRisk is fair: test-only, [...]
 - Fix risk: Test-only; needs Docker through npm run test:integration. Pass the reason argument explicitly because the function defaults to 'logout'. One repetition per ordering is enough because the barrier makes the interleaving deterministic; each repetition costs one fresh database plus migrations.
 - Found by: R5-U22a (W34); candidate G-001
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F50, resumable on request.
+- Resolution: FIXED by T-F50 (W9A): the revocation race test now also pins revokeFamilyForToken in both orderings (R-719) and its diagnostics check is non-vacuous: it asserts that the replacement hash and salt never reach the log (R-772). Evidence: titles 3 to 5, all original assertions kept; integration green on the re-run; verifier PASS-WITH-NOTES (no mutation run for this task, the lock-order reasoning is by reading). Patch R5-T-F50.patch. Lead gates W9A (labels W9A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2361 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets 0, check:image-assets 0, git diff --check 0; npm run test:integration 23 files / 132 tests passed on the re-run alone (73.6 s); the first run of the wave failed 2 timing tests (A3 claim barrier, a migration with exit 124) in files the wave did not touch while a leaked disposable container of an implementer run and other load were present (the container was removed by its exact ID after checking its labels, image digest, tmpfs and loopback port); independent verifier wf_e76a26a9-dba.
 
 ### R-720: createDeferred and the Deferred interface are copied into four integration tests; Promise.withResolvers does the same
 - Severity: Low
@@ -19934,7 +20017,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: In the four files delete `interface Deferred<T>` and `function createDeferred` and replace `createDeferred<X>()` by `Promise.withResolvers<X>()` at the 16 call sites. Optionally replace calendar-sync.test.ts:135-138 by `const { promise: released, resolve: release } = Promise.withResolvers<void>();`. No test is deleted. Verifier on the fix: Correct and the best-value item of the round: it adds no helper at all (standard library replaces ~64 lines of hand-written code), nothing is hidden from the tests, no test or assertion is removed (O36/O46 respected), and the semantics are the same (same promise/resolve/reject triple; resolve() with no argument still type-checks for <void>). The optional calendar-sync.test.ts:135-138 change is fine too. fixRisk is fair: the code paths run only under Docker, so npm run test:integration (at least the four auth files + calendar-sync) must be run by the lead after the edit; typecheck, lint [...]
 - Fix risk: Test-only. The four files are auth/security integration tests (O36/O46: nothing removed, only the helper). Re-run `npm run typecheck`, `npm run lint -- --max-warnings=0`, `npm run check:dead-code` and `npm run test:integration` (Docker) because the barrier logic of these tests runs only there.
 - Found by: R5-X7 (W5); candidate K-004
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F58, resumable on request.
+- Resolution: FIXED by T-F58 (wave W9C, 2026-10-14, Haiku max): the copied Deferred helpers of the integration auth tests are replaced by Promise.withResolvers (R-720) and the copied utcDateOffset helpers by one export of tests/integration/support/fixtures.ts (R-715), with the lock-observation helper and the twin tests written once. Evidence: the 83 test titles before and after are identical (vitest list on the snapshot and on the current tree), per-file expect counts unchanged except the merged twin (90 to 89 static, both cases still run all assertions via the it.each row), the old and new utcDateOffset agree on 54,576 and 127,171,572 date pairs; integration 132/132; verifier PASS-WITH-NOTES. Patch R5-T-F58.patch. Lead gates W9C (labels W9C-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2361 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets 0, check:image-assets 0, git diff --check 0; npm run test:integration 23 files / 132 tests passed (74.9 s); independent verifier wf_e346918a-8a5 (snapshot plus patch byte-identical to the files, test titles identical before and after, scratch mutants killed).
 
 ### R-721: A refresh with an explicitly revoked family is never checked for the absence of a high-severity theft signal; the state snapshots ignore audit rows and revocation reasons
 - Severity: Low
@@ -19953,7 +20036,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: In this test and in L4, count securityAuditEvent rows with eventType 'portal.refresh_token_replay' after the refresh and expect 0 (withTestPrismaClient(authTarget, (prisma) => prisma.securityAuditEvent.count({ where: { eventType: 'portal.refresh_token_replay' } }))). Also read the family's revocationReason before and after the refresh and expect it unchanged ('logout'). Verifier on the fix: Correct and minimal: count securityAuditEvent rows with eventType 'portal.refresh_token_replay' after the refresh and expect 0, and read the family's revocationReason before and after. The reason stays 'logout' (the repository default at L619) and afterEach clears the audit table, so the count starts at 0. The L4 variant lives in logout-characterization.test.ts, which already imports withTestPrismaClient. Unexecuted (Docker).
 - Fix risk: Test only. After revokeFamilyForToken the reason is 'logout' (default at refreshTokenRepository.ts:619) and the quiet branch cannot overwrite it; afterEach clears the audit table, so the count starts at 0. Not executed here (Docker).
 - Found by: R5-U22b (W34); candidate G-008
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F51, T-F52, resumable on request.
+- Resolution: FIXED by T-F51 and T-F52 (W9A): the revoked-session regression proves that an already revoked family creates no theft signal (revocation reason unchanged, zero portal.refresh_token_replay rows), proves natural refresh-token expiry without revoking the family, and its three titles say what is proven; resetAuthFixtures also clears rate_limits. Evidence: integration green on the re-run (22 tests in the file); verifier PASS-WITH-NOTES (no mutant was run against the expiry test). Patches R5-T-F51.patch, R5-T-F52.patch. Lead gates W9A (labels W9A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2361 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets 0, check:image-assets 0, git diff --check 0; npm run test:integration 23 files / 132 tests passed on the re-run alone (73.6 s); the first run of the wave failed 2 timing tests (A3 claim barrier, a migration with exit 124) in files the wave did not touch while a leaked disposable container of an implementer run and other load were present (the container was removed by its exact ID after checking its labels, image digest, tmpfs and loopback port); independent verifier wf_e76a26a9-dba.
 
 ### R-722: The natural-expiry cases cover the session and the family but never the refresh token's own expiresAt
 - Severity: Low
@@ -19974,7 +20057,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Add a test beside the family-expiry one: rewrite the token through withTestPrismaClient(..., 'failure-fixture') with `prisma.refreshToken.update({ where: { id: chain.sessionId }, data: { expiresAt: new Date(Date.now() - 60_000) } })` (as the replay test does for revokedAt), call performRefresh, and expect EXPECTED_UNAUTHORIZED, after == before, refreshTokens { active: 0, expired: 1, revoked: 0 } and the family not revoked. Verifier on the fix: The proposed test is correct: update refreshToken where id = chain.sessionId to an expired expiresAt through withTestPrismaClient(..., 'failure-fixture'), call performRefresh, expect EXPECTED_UNAUTHORIZED, after == before, refreshTokens { active: 0, expired: 1, revoked: 0 } and the family not revoked. The finder's impact sentence ('would keep rotating until the 30-day family cap') should be reworded to the side-effect difference above; severity Low is still defensible because the test also protects against removal of both guards. Unexecuted (Docker).
 - Fix risk: Test only. The expected state follows from :416 returning 'invalid' without revoking (same shape as the family-expiry test); not executed here (Docker).
 - Found by: R5-U22b (W34); candidate G-010
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F52, resumable on request.
+- Resolution: FIXED by T-F51 and T-F52 (W9A): the revoked-session regression proves that an already revoked family creates no theft signal (revocation reason unchanged, zero portal.refresh_token_replay rows), proves natural refresh-token expiry without revoking the family, and its three titles say what is proven; resetAuthFixtures also clears rate_limits. Evidence: integration green on the re-run (22 tests in the file); verifier PASS-WITH-NOTES (no mutant was run against the expiry test). Patches R5-T-F51.patch, R5-T-F52.patch. Lead gates W9A (labels W9A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2361 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets 0, check:image-assets 0, git diff --check 0; npm run test:integration 23 files / 132 tests passed on the re-run alone (73.6 s); the first run of the wave failed 2 timing tests (A3 claim barrier, a migration with exit 124) in files the wave did not touch while a leaked disposable container of an implementer run and other load were present (the container was removed by its exact ID after checking its labels, image digest, tmpfs and loopback port); independent verifier wf_e76a26a9-dba.
 
 ### R-723: Claim race tests never race two distinct grants of one booking: the booking-level single-owner guard and the sibling-revoke deadlock/retry path are exercised by no test
 - Severity: Low
@@ -19990,7 +20073,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix risk: Test code only; needs Docker (npm run test:integration). Expect about 1 s extra per repetition for PostgreSQL's default deadlock_timeout; keep repetitions modest (5-10) and CLAIM_WORKER_TIMEOUT_MS unchanged. The worker's 5 s lock_timeout (src/lib/prismaPgConfig.ts:13) is above deadlock_timeout, so it does not fire first.
 - To confirm: In a scratch copy remove the `OR` guard at portalAuthService.ts:L261-L268 and the Serializable option at L304, run the integration suite, and see whether A2/A3 stay green; then add the 'a4' race (two distinct grants, distinct phones, barrier on UPDATE "bookings") and check that it goes red with the mutation and green without it. Run request: Lead, Docker: after the scratch-copy mutation described in toConfirm, run `npm run test:integration` (the runner takes no file filter; tests/integration/run.ts runs vitest.integration.config.ts) and report whether claim-concurrency-characterization A2/A3 stay green.
 - Found by: R5-U21 (W34); candidate G-005
-- Resolution: DEFERRED-OWNER (economy): SUSPECTED; the reproduction command is recorded in decision-D13.json (leadReproduce) and was not run under the owner's instruction of 2026-10-13 to watch the consumption; a confirmed reproduction would become the conditional task T-F65.
+- Resolution: DECLINED (lead reproduction, 2026-10-14): decision D13 creates T-F65 only if A2 and A3 of the claim concurrency characterization still pass when the booking guard (OR userId null or the same user) and the Serializable option are removed from the claim exchange. In a scratch copy with exactly that mutation A2 still passed but A3 failed (500 INTERNAL_ERROR instead of the generic 401; .runtime/cleanup3/logs/r723-run.log), so the existing suite catches the removal; the gap of two distinct grants of one booking stays latent.
 
 ### R-724: Nineteen integration test files use the deprecated describe.sequential
 - Severity: Low
@@ -20023,7 +20106,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Add a fifth case: through withVerifiedDisposableDatabase(requireTarget(), 'seed', ...) run `ALTER TABLE outbox_events ADD CONSTRAINT reject_created_events CHECK (event_type <> 'check_in_time_request.created') NOT VALID`; expect checkInRequestRepository.create(...) to reject and prisma.checkInRequest.count() to be 0 (the nested write rolled back as one); drop the constraint in a finally. Verifier on the fix: Fix is sound: with the CHECK ... NOT VALID constraint on outbox_events.event_type the nested write fails; at HEAD the whole nested create rolls back (count 0, relies on Prisma's nested-write transaction, which production already relies on and which the new case would itself prove), a split variant leaves the request (count 1) and goes red. Simplest form: withTestPrismaClient(..., prisma => prisma.$executeRawUnsafe(...)) as in the admin isolation test, with DROP CONSTRAINT in a finally. Risk fair: DDL inside one case on the file's own disposable DB. This is a follow-up to R-515/T48 (which [...]
 - Fix risk: DDL on the file's own disposable database inside one case; the constraint must be dropped in the finally so the other cases and afterEach see the normal schema. No production change. Run only through npm run test:integration.
 - Found by: R5-U24a (W34); candidate G-017
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F53, resumable on request.
+- Resolution: FIXED by T-F53 (W9A): the check-in request repository test proves atomicity with an injected CHECK that rejects the created event (no request row remains, R-725) and the guest-data retention tests compare before and after counts in their own client so they do not depend on each other (R-777); no retention value or rule was touched. Evidence: RED with a split-write mutant, GREEN integration; verifier PASS. Patch R5-T-F53.patch. Lead gates W9A (labels W9A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2361 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets 0, check:image-assets 0, git diff --check 0; npm run test:integration 23 files / 132 tests passed on the re-run alone (73.6 s); the first run of the wave failed 2 timing tests (A3 claim barrier, a migration with exit 124) in files the wave did not touch while a leaked disposable container of an implementer run and other load were present (the container was removed by its exact ID after checking its labels, image digest, tmpfs and loopback port); independent verifier wf_e76a26a9-dba.
 
 ### R-726: Admin login lockout is never tested with the correct credential: a refactor that lets a valid token through after the budget is spent passes every assertion
 - Severity: Low
@@ -20060,7 +20143,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Make healthy imply the transport the harness uses: add --host=127.0.0.1 to the probe ('pg_isready --host=127.0.0.1 --username="$POSTGRES_USER" --dbname="$POSTGRES_DB"'), because the temporary server never listens on TCP. Optionally retry the first connect() for ECONNREFUSED/ECONNRESET inside the existing bounded deadline and include error.code (not the URL) in the rejection reason. Verifier on the fix: If the premise holds, adding `--host=127.0.0.1` to the probe is the standard fix (the temporary server does not listen on TCP; the final server listens on '*' in the official image). Optionally retry the first connect() for ECONNREFUSED/ECONNRESET inside a bounded deadline and include error.code (not the URL) in the reason. Fix risk fair (needs Docker; several consecutive starts). Keep Low at most: fail-closed, no safety effect, rerun is the cost. Do not change before the lead has measured it.
 - Fix risk: The real server listens on all addresses in the official image after init, so a loopback TCP probe works; confirm with several consecutive npm run test:integration start-ups on Docker (needs Docker, lead only). docs/testing.md step 4 ('Wait on Docker health and a real PostgreSQL fingerprint') stays accurate.
 - Found by: R5-U24b (W34); candidate G-022
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F37, resumable on request.
+- Resolution: FIXED by T-F37 (wave W8A, 2026-10-13, Haiku max): the integration health probe waits on TCP (pg_isready --host=127.0.0.1) and the Prisma CLI child gets CHECKPOINT_DISABLE (no telemetry call). Evidence: static RED 4 of 7 checks failed, GREEN 7 of 7 (T-F37-red.log, T-F37-green.log); three consecutive integration runs passed with the new probe, which is its runtime proof; verifier PASS. Patch R5-T-F37.patch. Lead gates W8A (labels W8A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2461 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets (test:secret-scanning and check:secrets:sources) 0, check:image-assets 0, production build 0, git diff --check 0, three consecutive npm run test:integration runs 23 files / 125 tests each; independent verifier wf_097f5602-7a2.
 
 ### R-728: The guard's default unit test catches only 9 of 33 single-condition mutations of the safety checks; 19 independent Docker-identity, live-fingerprint and runtime-context conditions can be deleted with every test green
 - Severity: Low
@@ -20083,7 +20166,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Extend tests/unit/integration-database-safety.test.ts with table-driven negative rows that start from validDockerInspection() or a valid live row and break exactly one field each, asserting the specific reason substring and not only 'safety guard rejected': Tmpfs missing, Binds containing the data dir, AutoRemove false, RestartPolicy always, port binding with another HostIp/HostPort or two entries, State not healthy, labels disposable/repositoryId/fingerprint, Id/Name; live row with another user, owner, server_port, null server_address, version 150000 and 170000, wrong marker, unmarked database that already has a comment; allowUnmarked with a non-bootstrap operation; readDisposablePostgresRuntime with a mismatching user, mismatching control database and port 0/65536. Each row must go red when its production condition is deleted (rerun the scratch driver: node mutations.mjs). Verifier on the fix: Correct and consistent with O36/O46/R-249(a): it adds tests, removes nothing. All 19-20 conditions are reachable through the existing injection points (validDockerInspection(), a mocked connect returning a live row, readDisposablePostgresRuntime(env)), so table-driven rows that break one field and assert the specific reason substring are feasible; verify each row by re-running the scratch driver. The fixture file's credential-bearing URL is allowlisted by value hash (config/secret-scanning/current-fixture-allowlist.json L66), so new rows must not add another credential-bearing URL literal. [...]
 - Fix risk: Test-only; nothing is removed (O36/O46). The file's existing credential-bearing URL is allowlisted by value hash in config/secret-scanning/current-fixture-allowlist.json, so new rows must not add another credential-bearing URL literal. Verify with npx vitest run --config vitest.config.ts tests/unit/integration-database-safety.test.ts and by re-running the mutations.
 - Found by: R5-U24b (W34); candidate G-020
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F38, resumable on request.
+- Resolution: FIXED by T-F38 (W8A): the database safety guard keeps the causes of an AggregateError in its diagnostics (R-729) and every condition of the guard has a test row (R-728). Evidence: RED 1 failed | 48 passed, GREEN 49/49; 34 of 36 single-condition mutants each killed by exactly one test (the two survivors are equivalent); verifier PASS. Patch R5-T-F38.patch. Lead gates W8A (labels W8A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2461 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets (test:secret-scanning and check:secrets:sources) 0, check:image-assets 0, production build 0, git diff --check 0, three consecutive npm run test:integration runs 23 files / 125 tests each; independent verifier wf_097f5602-7a2.
 
 ### R-729: sanitizeDatabaseDiagnostics prints only AggregateError.message, so run.ts shows one generic sentence and drops both causes when setup or teardown fails twice
 - Severity: Low
@@ -20098,7 +20181,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: In database-safety.ts add a recursive helper and use it for the first line of sanitizeDatabaseDiagnostics: +function diagnosticText(value: unknown): string { + if (value instanceof AggregateError) { + return [value.message, ...value.errors.map(diagnosticText)].join(' | '); + } + return value instanceof Error ? value.message : String(value); +} ... - let text = value instanceof Error ? value.message : String(value); + let text = diagnosticText(value); Add a unit test beside 'redacts connection URLs and credentials from diagnostics' in tests/unit/integration-database-safety.test.ts: an AggregateError with two inner errors, one containing the password, must show both reasons and not the password. Verifier on the fix: Correct. A recursive diagnosticText() that joins message and errors keeps the existing URL regex, per-secret redaction loop and 12,000-character tail, so unsanitized inner errors (teardown) stay redacted; the setup cause is pre-sanitized already. Alternative equally minimal: put the causes into the AggregateError message in database-lifecycle.ts (as R-603's fix), but then each inner message must be sanitized there. Add the unit test beside 'redacts connection URLs and credentials' (L244) with an AggregateError containing the password in one cause. Diagnostics-only; no exit code change.
 - Fix risk: Diagnostics text only. The combined text still goes through the same URL regex, the per-secret redaction loop and the 12,000-character tail cut, so secrets inside inner errors (the teardown inner errors are not pre-sanitized) are still removed. No behaviour or exit-code change.
 - Found by: R5-U24b (W34); candidate G-021
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F38, resumable on request.
+- Resolution: FIXED by T-F38 (W8A): the database safety guard keeps the causes of an AggregateError in its diagnostics (R-729) and every condition of the guard has a test row (R-728). Evidence: RED 1 failed | 48 passed, GREEN 49/49; 34 of 36 single-condition mutants each killed by exactly one test (the two survivors are equivalent); verifier PASS. Patch R5-T-F38.patch. Lead gates W8A (labels W8A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2461 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets (test:secret-scanning and check:secrets:sources) 0, check:image-assets 0, production build 0, git diff --check 0, three consecutive npm run test:integration runs 23 files / 125 tests each; independent verifier wf_097f5602-7a2.
 
 ### R-730: The Prisma CLI child of the migration helper is not told CHECKPOINT_DISABLE: PRISMA_HIDE_UPDATE_MESSAGE only hides the message, the usage check can still be sent to checkpoint.prisma.io
 - Severity: Low
@@ -20123,7 +20206,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Add `CHECKPOINT_DISABLE: '1',` next to PRISMA_HIDE_UPDATE_MESSAGE in the childEnvironment of runPrismaMigrateProcess (one line, same value the migrate image already uses). Whether the release-gate base environment should also carry it (it affects any prisma call a gate makes) is a separate decision in scripts/lib/release-gates.mjs. Verifier on the fix: The one line `CHECKPOINT_DISABLE: '1',` next to PRISMA_HIDE_UPDATE_MESSAGE in runPrismaMigrateProcess is correct and has no effect on migrate deploy. It covers only this harness: other prisma CLI calls (npm ci postinstall `prisma generate`, dev orchestrator migrate) ping too, so whether the release-gate base env (scripts/lib/release-gates.mjs) should also carry it is a separate owner/decision-agent call, as the finder says. Impact is a policy inconsistency (anonymous usage metadata to a vendor, no repo content), hence Low. Run npm run test:integration once after the edit.
 - Fix risk: Only disables the CLI's telemetry GET; no effect on migrate deploy. Run npm run test:integration once (Docker, lead only).
 - Found by: R5-U24b (W34); candidate G-023
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F37, resumable on request.
+- Resolution: FIXED by T-F37 (wave W8A, 2026-10-13, Haiku max): the integration health probe waits on TCP (pg_isready --host=127.0.0.1) and the Prisma CLI child gets CHECKPOINT_DISABLE (no telemetry call). Evidence: static RED 4 of 7 checks failed, GREEN 7 of 7 (T-F37-red.log, T-F37-green.log); three consecutive integration runs passed with the new probe, which is its runtime proof; verifier PASS. Patch R5-T-F37.patch. Lead gates W8A (labels W8A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2461 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets (test:secret-scanning and check:secrets:sources) 0, check:image-assets 0, production build 0, git diff --check 0, three consecutive npm run test:integration runs 23 files / 125 tests each; independent verifier wf_097f5602-7a2.
 
 ### R-731: Wi-Fi window route tests never serve host-stored check-in/check-out times: a route that ignores them stays green
 - Severity: Low
@@ -20209,7 +20292,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: CLAUDE.md:59: write `src/lib/auth/admin.ts`, `src/lib/adminPageAuth.ts`, `src/lib/rbac.ts`. Add [Production-image smoke](docs/deployment/production-image-smoke.md) to the README Documentation list and to CLAUDE.md line 96. Verifier on the fix: Correct and trivial: write the two full paths in CLAUDE.md:L59 and add one link each to README.md and CLAUDE.md:L96. CLAUDE.md is on the Never-delegated list, so the CLAUDE.md edit stays DEFERRED-OWNER, as the finder says; the README link could be done by an implementer. No release-policy or test reads these lines (README.md is not an input of the policy except scripts/README.md).
 - Fix risk: None (documentation). CLAUDE.md is owner-only, so DEFERRED-OWNER.
 - Found by: R5-U29a (W34); candidate N-006
-- Resolution: DEFERRED-OWNER: part FIXED by the lead (2026-10-13, under the owner's permission of 2026-10-12 to correct proven-false statements): CLAUDE.md line 59 now names src/lib/adminPageAuth.ts and src/lib/rbac.ts. Not done: the developer-docs part (task T-F56, economy instruction of 2026-10-13) and the omission of docs/deployment/production-image-smoke.md from the reference-docs list on line 96 of CLAUDE.md (an omission, not a false statement: only the owner adds it).
+- Resolution: DEFERRED-OWNER: the developer-docs part is FIXED by T-F56 (wave W9B, 2026-10-13) and CLAUDE.md line 59 by the lead on 2026-10-13 under the permission of 2026-10-12; not done: the omission of docs/deployment/production-image-smoke.md from the reference-docs list on line 96 of CLAUDE.md, an owner-only line.
 
 ### R-736: identity.md nit group: M12 names a class and a spread the code does not have, --text-fact at 1440 is 46 not 48, nonexistent tokens in the usage rules, stale example counter
 - Severity: Nit
@@ -20284,7 +20367,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Either refresh the line from a real `npm test` and `npm run test:integration` run, or drop the figures and keep the layer list (the per-layer list at L11-14 already describes the content). Prefer dropping: it removes the recurring drift. Verifier on the fix: Dropping the figures (keeping the layer list at L11-L14) is the better of the two fixes, since a refreshed number goes stale again at the next test change. Documentation only; fixRisk fair.
 - Fix risk: Documentation only.
 - Found by: R5-U29a (W34); candidate N-004
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F56, resumable on request.
+- Resolution: FIXED by T-F56 (W9B): the developer documents match the code (dated test-file counts dropped, the time-zone constant named, the tsx --env-file snippet verified with a probe, the Nginx wording, the orchestrator refusal of a non-loopback DATABASE_URL, the NODE_ENV pin) and two stale test comments were corrected. Evidence: stale phrases RED to GREEN, probe log T-F56-envfile-probe.log, validate:release-policy exit 0; verifier PASS. Patch R5-T-F56.patch. Lead gates W9B and W9C0 (labels W9B-*, W9C0-*): typecheck 0, lint 0, lint:security 0, knip 0, release policy (validate and test) 0, secrets 0, check:image-assets 0, git diff --check 0 (documents and comments only); independent verifier wf_0578fd41-5e7 (T-F56 PASS, T-F55 FAIL for one false sentence, corrected by T-F55r and read by the lead).
 
 ### R-741: docs/testing.md still says PROPERTY_TIME_ZONE governs property time-of-day behaviour after T45 made the env variable unread
 - Severity: Nit
@@ -20299,7 +20382,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Reword to name the constant: 'The `PROPERTY_TIME_ZONE` constant in `src/data/stayPolicy.ts` (the only time-zone source; the environment variable of the same name is validated but not read) applies to property time-of-day behavior and does not redefine this authentication boundary.' Verifier on the fix: Correct: reword to 'The property time zone (the `PROPERTY_TIME_ZONE` constant in `src/data/stayPolicy.ts`; the environment variable of that name is not read) applies to ...'. Docs only; no test pins the sentence. fixRisk: none.
 - Fix risk: Documentation only. Check that the release-policy and docs tests do not parse this paragraph (grep docs/testing.md in scripts/lib and tests).
 - Found by: R5-X3 (W1a); candidate C-007
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F56, resumable on request.
+- Resolution: FIXED by T-F56 (W9B): the developer documents match the code (dated test-file counts dropped, the time-zone constant named, the tsx --env-file snippet verified with a probe, the Nginx wording, the orchestrator refusal of a non-loopback DATABASE_URL, the NODE_ENV pin) and two stale test comments were corrected. Evidence: stale phrases RED to GREEN, probe log T-F56-envfile-probe.log, validate:release-policy exit 0; verifier PASS. Patch R5-T-F56.patch. Lead gates W9B and W9C0 (labels W9B-*, W9C0-*): typecheck 0, lint 0, lint:security 0, knip 0, release policy (validate and test) 0, secrets 0, check:image-assets 0, git diff --check 0 (documents and comments only); independent verifier wf_0578fd41-5e7 (T-F56 PASS, T-F55 FAIL for one false sentence, corrected by T-F55r and read by the lead).
 
 ### R-742: The scripts/** block turns off security/detect-child-process and no-console although neither has any hit; the first one hides future exec(variable) calls in every script
 - Severity: Nit (the finder said Low: The claim is true but its security weight is overstated. eslint-plugin-security 3.0.1 rules/detect-child-process.js reports only (a) require('child_process') outside a declarator and (b) a call whose [...])
@@ -20376,7 +20459,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: After the filter: `if (PATHS.length === 0) throw new Error('AXE_PATHS contains no path');` and the same guards for VITALS_PATHS and RESPONSIVE_PATHS (parseRoutesFromEnv). Verifier on the fix: The guard is correct and tiny (`if (PATHS.length === 0) throw new Error(...)`), same for the other two scripts. Fix risk none. Given the unrealistic trigger it is hygiene only; fold into the next edit of those files rather than a task of its own.
 - Fix risk: None for current usage (defaults are non-empty).
 - Found by: R5-U27 (W34); candidate H-006
-- Resolution: DEFERRED-OWNER (economy): the responsive-audit part is FIXED by T-F03 (batch B1, 2026-10-13); the axe and vitals part (task T-F42 in decision-D13.json) is not done under the owner's instruction of 2026-10-13 to watch the consumption, resumable on request.
+- Resolution: FIXED by T-F42 (W8A), together with the parts of T-F03 (batch B1): axe-core must expose its source (no require fallback, R-649); axe and vitals launch the browser named by CHROME_PATH (R-650); the default axe pages gain the guide, moments, availability, privacy and Greek home pages (R-664 axe part); empty AXE_PATHS and VITALS_PATHS fail instead of running nothing (R-745 axe and vitals parts). Evidence: empty-path runs exit 1 with the named error, no browser started; verifier PASS (its own runs of the same inputs). The full audit:a11y run on a dev server was not done. Patch R5-T-F42.patch. Lead gates W8A (labels W8A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2461 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets (test:secret-scanning and check:secrets:sources) 0, check:image-assets 0, production build 0, git diff --check 0, three consecutive npm run test:integration runs 23 files / 125 tests each; independent verifier wf_097f5602-7a2.
 
 ### R-746: A scanner run that exits 1 with an empty report (gitleaks partial scan) is accepted as a clean scan
 - Severity: Nit (the finder said Low: The code-side acceptance is real, but I could not make the pinned gitleaks 8.30.1 produce exit 1 with an empty report under the gate's arguments, and the finder's listed triggers (read error, [...])
@@ -20414,7 +20497,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: const result = spawnSync(...); const gitCommit = (result.stdout ?? '').trim(); and replace the loop by a direct validationFiles.push({ relative: normalizedRelative(repositoryRoot, prerenderPath), source: prerenderPath }). Verifier on the fix: Correct and tiny: `const git = spawnSync(...); if (git.error) throw new Error('git is required to identify the build commit.'); const gitCommit = String(git.stdout ?? '').trim();` and inline the single loop body. fixRisk: negligible; rerun scripts/tests/secret-scanning.test.mjs (it imports buildGeneratedArtifactDispositionContext) and `npm run check:secrets:artifacts` after a build. Two unrelated nits in one finding; fine as a Nit group.
 - Fix risk: Low. Run 'npm run test:secret-scanning' (the fixtures run git in a non-repository temp dir) and 'npm run check:secrets:artifacts'.
 - Found by: R5-U5 (W1a); candidate C-012
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F40, resumable on request.
+- Resolution: FIXED by T-F40 (W8A): one copier path with the suppression check and modes (R-652), a real repeated-occurrence test for the generated-artifact disposition (R-757) and a clear error when git is missing or fails (R-747). Evidence: node --test secret-scanning 55/55 (baseline 53), REDs for the spawn error and the repeated occurrence; verifier PASS-WITH-NOTES (two coverage residuals recorded as new findings). Patch R5-T-F40.patch. Lead gates W8A (labels W8A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2461 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets (test:secret-scanning and check:secrets:sources) 0, check:image-assets 0, production build 0, git diff --check 0, three consecutive npm run test:integration runs 23 files / 125 tests each; independent verifier wf_097f5602-7a2.
 
 ### R-748: POSTGRES_IMAGE_POLICY_STAGES and POSTGRES_IMAGE_POLICY_FAILURE_CLASSES are exported but used only to derive two types in their own file
 - Severity: Nit
@@ -20448,7 +20531,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: (a) drop 'git'; (b) /^(?:deploy|release)(?::|$)/iu; (c) keep or replace by a check that the orchestrator has no non-development mode; (d) assert on a key read from .env.example inside the test. Verifier on the fix: All four fixes are correct and tiny. For (a) keep 'ls-files' as the real marker; for (c) the finder's 'keep or replace' is a decision for the lead; for (d) the test should assert a key it reads from .env.example. Fix risk none, as stated.
 - Fix risk: None.
 - Found by: R5-U25 (W3); candidate M-013
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F43, resumable on request.
+- Resolution: FIXED by T-F43 (wave W9A, 2026-10-13, Haiku max, scope as decided in D13): the release policy gets one negative test per decision of the six asked (tool lock tampering, a verify-release spawn with shell: true, the retired dependency and alias, a deploy command in an active script file, the 31st gate, .dockerignore without !.env.example) plus an orphan-check test; the orchestrator environment test asserts all hostile keys and the key mask from .env.example (R-673); the git marker and the deploy name regex were simplified with no behaviour change (R-749; part (c) validateLocalDefaults stays as D13 decided). Evidence: node --test release-policy 145/145 (138 before), 11 scratch mutants each failing the intended test, base-environment sweep 18/18, regex equivalence probe over 8,108,742 names with 0 differences; verifier PASS-WITH-NOTES (substring-marker bypass and residual survivors recorded as new findings). Patch R5-T-F43.patch. Lead gates W9A (labels W9A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2361 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets 0, check:image-assets 0, git diff --check 0; npm run test:integration 23 files / 132 tests passed on the re-run alone (73.6 s); the first run of the wave failed 2 timing tests (A3 claim barrier, a migration with exit 124) in files the wave did not touch while a leaked disposable container of an implementer run and other load were present (the container was removed by its exact ID after checking its labels, image digest, tmpfs and loopback port); independent verifier wf_e76a26a9-dba.
 
 ### R-750: scripts/README.md still says production runs 'behind the host Nginx' after R-473 changed the same phrase in the compose file
 - Severity: Nit
@@ -20466,7 +20549,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: scripts/README.md:140: 'behind the pinned Nginx container (host network)'; same in README.md:39. Verifier on the fix: Correct: replace 'the host Nginx' with 'the pinned Nginx container (host network)' in scripts/README.md:140 and README.md:39. Docs only; no test pins either sentence (grep). fixRisk: none.
 - Fix risk: None for gates: release-policy reads scripts/README.md only for obsolete credential names. Run validate:release-policy once.
 - Found by: R5-U5 (W1a); candidate C-011
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F56, resumable on request.
+- Resolution: FIXED by T-F56 (W9B): the developer documents match the code (dated test-file counts dropped, the time-zone constant named, the tsx --env-file snippet verified with a probe, the Nginx wording, the orchestrator refusal of a non-loopback DATABASE_URL, the NODE_ENV pin) and two stale test comments were corrected. Evidence: stale phrases RED to GREEN, probe log T-F56-envfile-probe.log, validate:release-policy exit 0; verifier PASS. Patch R5-T-F56.patch. Lead gates W9B and W9C0 (labels W9B-*, W9C0-*): typecheck 0, lint 0, lint:security 0, knip 0, release policy (validate and test) 0, secrets 0, check:image-assets 0, git diff --check 0 (documents and comments only); independent verifier wf_0578fd41-5e7 (T-F56 PASS, T-F55 FAIL for one false sentence, corrected by T-F55r and read by the lead).
 
 ### R-751: Each responsive-audit run with screenshots adds about 200 MB under reports/responsive-ux and nothing prunes it
 - Severity: Nit (the finder said Low: Gitignored (.gitignore:45,47) and dockerignored (.dockerignore:16) local artifacts, screenshots are opt-out (RESPONSIVE_SCREENSHOTS=0), and the repo's own reports show only 1 of 4 runs kept [...])
@@ -20533,7 +20616,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Wrap the launch in 'await check("browser launches", async () => { browser = await puppeteer.launch({ headless: true }); }, { fatal: true });' and create the page only when it succeeded (or catch around the browser section and push the error into results). Verifier on the fix: Correct: record the failure and continue to the report, e.g. `await check('browser launch', async () => { browser = await puppeteer.launch({ headless: true }); }, { fatal: true });` plus guarding the later browser checks, or a catch that pushes a result before rethrowing. fixRisk: low; the smoke needs Docker to exercise, so the lead must run `npm run smoke:image` once after the edit and keep the 'All N checks passed' line contract.
 - Fix risk: Low. Needs Docker and the images to verify (npm run smoke:image, lead only).
 - Found by: R5-U5 (W1a); candidate C-013; also found independently by R5-U19 (wave 2a, D-007)
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F41, resumable on request.
+- Resolution: FIXED (code and docs) by T-F41 (W8A): smoke:image reports a failed browser launch as a fatal check and still prints the results (R-754), and proves the offline page hydrates and that a soft navigation is stored and served offline (R-666). Runtime proof is the owner step npm run docker:build and npm run smoke:image (Docker and a registry); verifier PASS (selectors and texts read against the components and the worker). Patch R5-T-F41.patch. Lead gates W8A (labels W8A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2461 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets (test:secret-scanning and check:secrets:sources) 0, check:image-assets 0, production build 0, git diff --check 0, three consecutive npm run test:integration runs 23 files / 125 tests each; independent verifier wf_097f5602-7a2.
 
 ### R-755: `up` starts the dev server before checking that curl exists, so a missing curl leaves the app running after a fatal exit
 - Severity: Nit (the finder said Low: The ordering defect is real, but it needs a machine without curl; curl ships with macOS and every mainstream Linux, the README targets 'macOS or Linux shell', and the consequence is a stray dev [...])
@@ -20587,7 +20670,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Add a case whose source map contains the commit URL twice (a second source file or twice in link.tsx) and expect null, or rename the test to what it checks. Verifier on the fix: Correct: add a case whose source map contains the commit URL twice (a second source with the link.tsx name or two matches in one source) and expect null, or rename the test to what it checks. No risk; the identifier is a public Next commit hash, so the consequence is low.
 - Fix risk: None.
 - Found by: R5-U18 (W2); candidate D-023
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F40, resumable on request.
+- Resolution: FIXED by T-F40 (W8A): one copier path with the suppression check and modes (R-652), a real repeated-occurrence test for the generated-artifact disposition (R-757) and a clear error when git is missing or fails (R-747). Evidence: node --test secret-scanning 55/55 (baseline 53), REDs for the spawn error and the repeated occurrence; verifier PASS-WITH-NOTES (two coverage residuals recorded as new findings). Patch R5-T-F40.patch. Lead gates W8A (labels W8A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2461 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets (test:secret-scanning and check:secrets:sources) 0, check:image-assets 0, production build 0, git diff --check 0, three consecutive npm run test:integration runs 23 files / 125 tests each; independent verifier wf_097f5602-7a2.
 
 ### R-758: GUIDE_FILTER_KEYS, NightState, GalleryRoom and PriceGroup are exported but referenced only inside their own file
 - Severity: Nit
@@ -20690,7 +20773,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Log `{ errorName: error instanceof Error ? error.name : typeof error }` in that branch (name only, as elsewhere, because upstream text can hold the secret URL). Verifier on the fix: Correct: in failureOf's last branch add `logger.warn('Airbnb calendar sync failed unexpectedly', { errorName: error instanceof Error ? error.name : typeof error })` (name only, like the other sites; never the message or stack, which could in principle carry the feed URL token). Fix risk very low; add a log assertion beside the existing 'unexpected' test. Nit is right.
 - Fix risk: None for behaviour; add one row to tests/unit/calendar-sync.test.ts.
 - Found by: R5-U3 (W1a); candidate C-024
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F34, resumable on request.
+- Resolution: FIXED by T-F34 (W7A): an unexpected calendar-sync failure logs the error class name only (never the message, which carries the feed URL). Evidence: RED 1 failed | 35 passed, GREEN 36/36; verifier PASS-WITH-NOTES (typeof branch untested, recorded as a new finding). Patch R5-T-F34.patch. Lead gates W7A (labels W7A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2425 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, check:image-assets 0, production build 0, git diff --check 0, npm run test:integration 23 files / 125 tests; independent verifier wf_f5886768-654 (read-only, mutation probes in scratch copies).
 
 ### R-764: Nits (grouped, logger configuration): LOG_MAX_METADATA_SIZE below 120 empties every over-limit metadata object and a non-numeric value removes the cap; LOG_STRUCTURED=true prints indented multi-line JSON and an unsanitized circular error cause makes the logger throw
 - Severity: Nit
@@ -20713,7 +20796,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Clamp the budget (for example `Number.isInteger(n) && n >= 200 ? n : 1000`) and use `z.string().regex(/^\d{3,6}$/)`; print structured entries with `JSON.stringify(entry)` (one line) and pass `cause` through sanitizeMetadata or reduce it to name and message. Verifier on the fix: Parse LOG_MAX_METADATA_SIZE as a strict integer with a floor (ignore non-numeric values and values below about 200 and use 1000, as the constructor already does for LOG_LEVEL); in structured mode print single-line `JSON.stringify(entry)` and run `cause` through the sanitiser or reduce it to name and message. Same file as C-021, one task. Fix risk low: tests/unit/logger-enterprise.test.ts stubs LOG_STRUCTURED=false and LOG_MAX_METADATA_SIZE=1000, so add rows for the new branches; a collector that already parses the pretty-printed form would see a format change. Nit is right: config knobs that [...]
 - Fix risk: Tests that assert the structured output format; nobody sets LOG_STRUCTURED today (.env.example sets false).
 - Found by: R5-U3 (W1a); candidate C-022
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F31, resumable on request.
+- Resolution: FIXED by T-F31 (W7A): the logger metadata keeps dates, repeated objects, bigints, Map and Set, survives odd values and a throwing toJSON, and LOG_MAX_METADATA_SIZE and the structured cause are parsed strictly (R-694, R-764). Evidence: RED 25 failed | 21 passed, GREEN 46/46; verifier PASS-WITH-NOTES (test gaps and a Low security note on URL values, both recorded as new findings). Patch R5-T-F31.patch. Lead gates W7A (labels W7A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2425 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, check:image-assets 0, production build 0, git diff --check 0, npm run test:integration 23 files / 125 tests; independent verifier wf_f5886768-654 (read-only, mutation probes in scratch copies).
 
 ### R-765: A claim token with less than one second left answers 500 instead of 401
 - Severity: Nit
@@ -20793,7 +20876,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Replace the body of the test: advance(26) and assert refreshCalls() === 1 first; then change mocks.pathname.current, rerender with the same expiresAt, advance(10) and assert refreshCalls() === 1 and mocks.router.replace not called. Verifier on the fix: The proposed test body (advance(26), assert 1, navigate with the same prop, advance(10), assert still 1 and no replace) is correct and kills the mutant. Use mockImplementation(async () => refreshed(145)) so the new test does not depend on the one-shot Response body. Fix risk fair (test-only).
 - Fix risk: Test-only; verified green at HEAD and red for the mutant in the scratch copy.
 - Found by: R5-U30 (W34); candidate Q-011
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F29, resumable on request.
+- Resolution: FIXED by T-F29 (W7A): a failed admin logout has its own message and no refresh banner (R-680); the session manager flows (reload on expiry, retry, 200 without expiresAt, 503) are tested (R-707, R-768). Evidence: RED 1 failed | 14 passed, GREEN 15/15; verifier PASS-WITH-NOTES (one test gap, recorded as a new finding). Patch R5-T-F29.patch. Lead gates W7A (labels W7A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2425 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, check:image-assets 0, production build 0, git diff --check 0, npm run test:integration 23 files / 125 tests; independent verifier wf_f5886768-654 (read-only, mutation probes in scratch copies).
 
 ### R-769: home-sections-v5c.test.tsx: the AIRBNB_LISTING_URL mock and its contact.airbnb field are dead since the ContactBand tests were removed
 - Severity: Nit
@@ -20850,7 +20933,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: (a) Two file-level constants beside the existing ones, used by both tests of each pair with `toEqual(CONST)`, plus one `readUserLockObservations(monitor)` that returns the rows for both waiters. (b) One `it.each([[title1, 'different-context'], [title2, 'invalid-binding']] as const)('%s', ...)` with the two original titles, so both cases still run. (c) One constant for the generic 401 loser used by the A2 and A3 tests. (d) A local `fakeServiceWorkerContainer()` factory with `ReturnType<typeof fakeServiceWorkerContainer>` as the type. No test case is removed. Verifier on the fix: All four duplications are real, but the finding bundles four unrelated concerns in four files and the proposed fixes are not equally good, so it should be split rather than done as one task. Worth doing: (b) one it.each over the two original titles (about -44 lines, same two cases, matches the existing it.each convention) and the (a) readUserLockObservations(monitor) helper (identical, parameter-free query, about -20 lines). Marginal: (d) a fakeServiceWorkerContainer() factory in a default-suite component test (about -10 lines; runnable here with npm test). Not recommended as proposed: (a) [...]
 - Fix risk: The auth files are under O36/O46: the proposal removes no test case and no assertion, it only shares identical expected values, so the decision agent should confirm that sharing the literal is acceptable for readability. Re-run `npm run test:integration` (refresh-overlap-classification, refresh-revoked-session-regression, claim-concurrency-characterization), `npm test` for pwa-manager, typecheck and lint; check that the it.each names equal the old titles.
 - Found by: R5-X7 (W5); candidate K-009
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F58, T-F60, resumable on request.
+- Resolution: FIXED by T-F58 and T-F60 (W9C): the copied helpers of the integration auth tests (lock observations, utcDateOffset) and of the default suite (the redirecting receiver and the fake service-worker container of the pwa manager test) are written once; the shared constants stay as D13 decided. Evidence: see R-715 and R-782. Patches R5-T-F58.patch, R5-T-F60.patch. Lead gates W9C (labels W9C-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2361 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets 0, check:image-assets 0, git diff --check 0; npm run test:integration 23 files / 132 tests passed (74.9 s); independent verifier wf_e346918a-8a5 (snapshot plus patch byte-identical to the files, test titles identical before and after, scratch mutants killed).
 
 ### R-772: expect(diagnostics).not.toContain(REPLACEMENT_SECRET) can never fail because the repository never receives that plaintext
 - Severity: Nit
@@ -20865,7 +20948,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Assert on what the repository really receives: expect(diagnostics).not.toContain(hashSecret(REPLACEMENT_SECRET, REPLACEMENT_SALT)) and expect(diagnostics).not.toContain(REPLACEMENT_SALT). Keep L320-L321 (harmless; nothing is removed). Verifier on the fix: Correct and strengthening only: assert not.toContain(hashSecret(REPLACEMENT_SECRET, REPLACEMENT_SALT)) and not.toContain(REPLACEMENT_SALT). The current log call (message plus Error) contains neither, so it passes; unexecuted (Docker). Nothing is removed (O36/O46 respected). fixRisk fair.
 - Fix risk: Test-only. The current log call (refreshTokenRepository.ts:L568: a message plus the Error) contains neither value, so the stronger assertion passes; verify with npm run test:integration (Docker).
 - Found by: R5-U22a (W34); candidate G-002
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F50, resumable on request.
+- Resolution: FIXED by T-F50 (W9A): the revocation race test now also pins revokeFamilyForToken in both orderings (R-719) and its diagnostics check is non-vacuous: it asserts that the replacement hash and salt never reach the log (R-772). Evidence: titles 3 to 5, all original assertions kept; integration green on the re-run; verifier PASS-WITH-NOTES (no mutation run for this task, the lock-order reasoning is by reading). Patch R5-T-F50.patch. Lead gates W9A (labels W9A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2361 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets 0, check:image-assets 0, git diff --check 0; npm run test:integration 23 files / 132 tests passed on the re-run alone (73.6 s); the first run of the wave failed 2 timing tests (A3 claim barrier, a migration with exit 124) in files the wave did not touch while a leaked disposable container of an implementer run and other load were present (the container was removed by its exact ID after checking its labels, image digest, tmpfs and loopback port); independent verifier wf_e76a26a9-dba.
 
 ### R-773: The refresh limiter added for R-506 gives each integration file a shared 60-request budget that resetAuthFixtures does not reset
 - Severity: Nit
@@ -20884,7 +20967,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Add `prisma.rateLimit.deleteMany()` to the transaction in resetAuthFixtures (auth-fixtures.ts, used only by these two files), or document the budget next to the afterEach. Verifier on the fix: Correct and minimal: add `prisma.rateLimit.deleteMany()` to the transaction in resetAuthFixtures (the model is already used by claim-ineligible-window-regression.test.ts:L239); no other fixture reads rate_limits. Alternative: a one-line comment next to afterEach. Value is marginal; unexecuted (Docker).
 - Fix risk: Test support only; no other fixture reads rate_limits.
 - Found by: R5-U22b (W34); candidate G-013
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F52, resumable on request.
+- Resolution: FIXED by T-F51 and T-F52 (W9A): the revoked-session regression proves that an already revoked family creates no theft signal (revocation reason unchanged, zero portal.refresh_token_replay rows), proves natural refresh-token expiry without revoking the family, and its three titles say what is proven; resetAuthFixtures also clears rate_limits. Evidence: integration green on the re-run (22 tests in the file); verifier PASS-WITH-NOTES (no mutant was run against the expiry test). Patches R5-T-F51.patch, R5-T-F52.patch. Lead gates W9A (labels W9A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2361 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets 0, check:image-assets 0, git diff --check 0; npm run test:integration 23 files / 132 tests passed on the re-run alone (73.6 s); the first run of the wave failed 2 timing tests (A3 claim barrier, a migration with exit 124) in files the wave did not touch while a leaked disposable container of an implementer run and other load were present (the container was removed by its exact ID after checking its labels, image digest, tmpfs and loopback port); independent verifier wf_e76a26a9-dba.
 
 ### R-774: Titles name cases that are not isolated: 'another user', 'another booking', 'only its refresh chain'
 - Severity: Nit
@@ -20904,7 +20987,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Rename the titles to what they prove, or hand-sign a JWT with the real sid and another userId/bookingId (jsonwebtoken is imported in this file) and add one overlap case with a mismatched present binding. Verifier on the fix: Renaming titles is harmless and removes nothing; the optional hand-signed JWT with the real sid and another userId/bookingId (jsonwebtoken is imported in this file) would add a real case, expected 401 with 'session_binding_mismatch'. Low value because the server only signs claims taken from the same session row, so Nit is right. Unexecuted (Docker).
 - Fix risk: Test only.
 - Found by: R5-U22b (W34); candidate G-012
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F52, resumable on request.
+- Resolution: FIXED by T-F51 and T-F52 (W9A): the revoked-session regression proves that an already revoked family creates no theft signal (revocation reason unchanged, zero portal.refresh_token_replay rows), proves natural refresh-token expiry without revoking the family, and its three titles say what is proven; resetAuthFixtures also clears rate_limits. Evidence: integration green on the re-run (22 tests in the file); verifier PASS-WITH-NOTES (no mutant was run against the expiry test). Patches R5-T-F51.patch, R5-T-F52.patch. Lead gates W9A (labels W9A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2361 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets 0, check:image-assets 0, git diff --check 0; npm run test:integration 23 files / 132 tests passed on the re-run alone (73.6 s); the first run of the wave failed 2 timing tests (A3 claim barrier, a migration with exit 124) in files the wave did not touch while a leaked disposable container of an implementer run and other load were present (the container was removed by its exact ID after checking its labels, image digest, tmpfs and loopback port); independent verifier wf_e76a26a9-dba.
 
 ### R-775: runMigrationFile and withScenario are copied byte for byte into three migration tests
 - Severity: Nit
@@ -20924,7 +21007,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Export `runMigrationFile(client, migration)` and `withScenario(target, arrange, restore, action)` from tests/integration/support/migrations.ts (path from REPOSITORY_ROOT instead of the current directory), delete the two local functions and their comments in the three files, and pass `MIGRATION` / `requireTarget()` at the call sites (4-5 per file). The SQL strings and every assertion stay in the test files. Optional: the 7-line `_prisma_migrations` finished/rolled_back query that opens the first test of each file. Verifier on the fix: Correct, but marginal. Net saving is about 30 lines (about 57 removed, about 20 added to migrations.ts, plus longer call sites: a four-argument positional withScenario(requireTarget(), arrange, restore, action) and 12 runMigrationFile(client, MIGRATION) edits). The SQL and every assertion stay in the test files, so nothing is hidden and nothing removed (O36/O46), but these are contract tests of migrations that must refuse ambiguous data, verifiable only under Docker. Also delete the now-unused MIGRATION_FILE constants, their 'integration runner starts Vitest with the repository root as cwd' [...]
 - Fix risk: Needs a decision on one more shared helper (net about -30 lines, no new file). Migration tests are contract tests (O36/O46): no test or assertion is removed. Re-run `npm run test:integration` for the three files plus typecheck and lint; check that the cwd-relative path and REPOSITORY_ROOT point to the same prisma/migrations folder.
 - Found by: R5-X7 (W5); candidate K-007
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F59, resumable on request.
+- Resolution: FIXED by T-F59 (W9C): the three migration tests share runMigrationFile and withScenario from tests/integration/support/migrations.ts. Evidence: the 19 titles are identical before and after, sorted expect lines identical, every SQL string and message constant stays in the test files, the migration path equals the old one; integration 132/132; verifier PASS-WITH-NOTES. Patch R5-T-F59.patch. Lead gates W9C (labels W9C-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2361 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets 0, check:image-assets 0, git diff --check 0; npm run test:integration 23 files / 132 tests passed (74.9 s); independent verifier wf_e346918a-8a5 (snapshot plus patch byte-identical to the files, test titles identical before and after, scratch mutants killed).
 
 ### R-776: The migration fixture claims to re-create country_origin 'as 000_init defined' it, but makes the column nullable where 000_init has NOT NULL
 - Severity: Nit
@@ -20943,7 +21026,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Comment only: '// Simplified pre-migration shape: country_origin is nullable here so that each guard can be tested alone; 000_init defines it NOT NULL, so a real user row always trips the first guard.' Verifier on the fix: Comment-only fix is correct and sufficient; no code or test behaviour changes. Suggested wording (nullable here so each guard can be tested alone; 000_init defines NOT NULL, so a real user row always trips the first guard) is accurate. Alternatively make the fixture exact (NOT NULL) and drop the two unreachable cases, but that removes tests (O36/O46 spirit) and is not needed.
 - Fix risk: None, comment only.
 - Found by: R5-U24a (W34); candidate G-019
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F56, resumable on request.
+- Resolution: FIXED by T-F56 (W9B): the developer documents match the code (dated test-file counts dropped, the time-zone constant named, the tsx --env-file snippet verified with a probe, the Nginx wording, the orchestrator refusal of a non-loopback DATABASE_URL, the NODE_ENV pin) and two stale test comments were corrected. Evidence: stale phrases RED to GREEN, probe log T-F56-envfile-probe.log, validate:release-policy exit 0; verifier PASS. Patch R5-T-F56.patch. Lead gates W9B and W9C0 (labels W9B-*, W9C0-*): typecheck 0, lint 0, lint:security 0, knip 0, release policy (validate and test) 0, secrets 0, check:image-assets 0, git diff --check 0 (documents and comments only); independent verifier wf_0578fd41-5e7 (T-F56 PASS, T-F55 FAIL for one false sentence, corrected by T-F55r and read by the lead).
 
 ### R-777: The second retention case asserts the privacy-request and audit-event counts that the first case leaves behind
 - Severity: Nit (the finder said Low: The claim is true but the assertion still catches the regression it is meant to catch (a request left behind by the skip would make the count 2, not 1). The real defect is only that case 2 cannot run [...])
@@ -20961,7 +21044,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Read both counts before the eraseGuestForRetention call (`const before = { requests: await prisma.privacyRequest.count(), events: await prisma.securityAuditEvent.count({ where: { eventType: 'privacy.erasure.completed' } }) }` inside a first withTestPrismaClient call) and assert that the counts after the call equal `before`. Verifier on the fix: Fix is correct: read both counts before the eraseGuestForRetention call (a first withTestPrismaClient call) and assert the after-counts equal them. Test-only; verify with npm run test:integration. Fix risk fair. Low value; cheap to do together with other test edits in this file.
 - Fix risk: Test only; keeps the claim 'leaves no request behind' and removes the dependency on case 1.
 - Found by: R5-U24a (W34); candidate G-016
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F53, resumable on request.
+- Resolution: FIXED by T-F53 (W9A): the check-in request repository test proves atomicity with an injected CHECK that rejects the created event (no request row remains, R-725) and the guest-data retention tests compare before and after counts in their own client so they do not depend on each other (R-777); no retention value or rule was touched. Evidence: RED with a split-write mutant, GREEN integration; verifier PASS. Patch R5-T-F53.patch. Lead gates W9A (labels W9A-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2361 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets 0, check:image-assets 0, git diff --check 0; npm run test:integration 23 files / 132 tests passed on the re-run alone (73.6 s); the first run of the wave failed 2 timing tests (A3 claim barrier, a migration with exit 124) in files the wave did not touch while a leaked disposable container of an implementer run and other load were present (the container was removed by its exact ID after checking its labels, image digest, tmpfs and loopback port); independent verifier wf_e76a26a9-dba.
 
 ### R-778: The integration seeding client is not pinned to a UTC session although the application client is (R-510), so the timestamp seeds of the operations tests are right only while the image defaults to UTC
 - Severity: Nit (the finder said Low: Latent only: the image is pinned by exact tag and index digest (postgres-image-policy.ts L112-L116 rejects any other reference) and the integration suite already contains a canary that fails visibly [...])
@@ -20985,7 +21068,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix risk: Harness change used by every integration file: run the whole npm run test:integration. The session option is already used by the application client, so no new behaviour.
 - To confirm: Add a `SHOW TimeZone` query (expect 'UTC') to a verification step through the application client and the harness client and run npm run test:integration; if it returns UTC the finding stays latent. Run request: npm run test:integration with a temporary `SHOW TimeZone` assertion in any integration file (Docker, lead only)
 - Found by: R5-U24a (W34); candidate G-018
-- Resolution: DEFERRED-OWNER (economy): SUSPECTED; the reproduction command is recorded in decision-D13.json (leadReproduce) and was not run under the owner's instruction of 2026-10-13 to watch the consumption; a confirmed reproduction would become the conditional task T-F66.
+- Resolution: DECLINED (lead probe, 2026-10-13): decision D13 created T-F66 only if the pinned PostgreSQL image answers a time zone other than UTC; the lead started the pinned image without network and SHOW TimeZone answered UTC (.runtime/cleanup2/logs/r778-probe.log), so the seeding client already runs in a UTC session; the finding stays latent.
 
 ### R-779: Admin token test claims 'every admin colour' but checks a fixed property list: named colours in border-top, box-shadow, outline-color etc. pass
 - Severity: Nit
@@ -21074,7 +21157,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix: Move the function once to a new tests/unit/support/redirecting-receiver.ts (vitest.config.ts includes only tests/**/*.test.{ts,tsx}, so it is not collected), import it in both files and drop the two now unused `node:http`/`node:net` imports there. Net about -25 lines. Verifier on the fix: The claim is true, but the fix is not a clear improvement and I recommend not doing it. Only two copies exist; removing 2x23 lines and adding one 23-line module plus an import line in each test nets about -20 lines, and it creates a new file and a new convention (tests/unit/support/, none exists today), which the owner rules reserve for explicit approval. The redirect assertions stay in the tests, so nothing would be hidden, and the type-check passes, but the cost (new folder convention) is about equal to the benefit. Suggest DECLINED (rule of three not met) or DEFERRED; revisit if a third [...]
 - Fix risk: Needs approval for a new file and a new convention (a support folder under tests/unit). Re-run the two test files, `npm run typecheck`, `npm run lint -- --max-warnings=0` and `npm run check:dead-code`. The redirect assertions (receiver.requests, no secret in lastError) stay in the tests (O36/O46).
 - Found by: R5-X7 (W5); candidate K-008
-- Resolution: DEFERRED-OWNER (economy): not done under the owner's instruction of 2026-10-13 to watch the consumption; specified in decision-D13.json (.runtime/review5/fix/) as task T-F60, resumable on request.
+- Resolution: FIXED by T-F60 (W9C): the booking outbox and the alert webhook tests import one startRedirectingReceiver from tests/unit/support/redirecting-receiver.ts and the pwa manager test builds its two fake containers from one factory. Evidence: 49 tests pass before and after with identical titles; scratch mutants (a receiver answering 200, a throwing fake addEventListener) fail the tests, so the shared helpers are exercised; verifier PASS-WITH-NOTES. Patch R5-T-F60.patch. Lead gates W9C (labels W9C-*): typecheck 0, lint 0, lint:security 0, default suite 168 files / 2361 tests, coverage thresholds met (93.68 / 88.13 / 95.86 / 94.67), knip 0, release policy 0, secrets 0, check:image-assets 0, git diff --check 0; npm run test:integration 23 files / 132 tests passed (74.9 s); independent verifier wf_e346918a-8a5 (snapshot plus patch byte-identical to the files, test titles identical before and after, scratch mutants killed).
 
 ### R-783: Nit: nothing tests the worker's side of the update protocol (message, SKIP_WAITING, activation broadcast), so the contract with PwaManager is held together by hand-built messages
 - Severity: Nit
@@ -21377,3 +21460,1311 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix risk: None.
 - Found by: B4 verifier on T-F23 (batch B4)
 - Resolution: DEFERRED-OWNER (economy): not scheduled under the owner's instruction of 2026-10-13 to watch the consumption; resumable on request.
+
+### R-801: The local-only browser guard of the audit scripts exists in two byte-identical copies
+- Severity: Low
+- Category: Redundant
+- Status: CONFIRMED
+- Location: scripts/axe-a11y.ts, scripts/responsive-ux-audit.ts
+- Evidence:
+  ```
+  axe-a11y.ts and responsive-ux-audit.ts each declared LOCAL_ONLY_ARGS, LOOPBACK_HOSTS, isLocalUrl and the same ten-line request interception (service-worker bypass, continue local, abort and log each blocked host once); both comments said "same as audit-vitals.ts"
+  ```
+- Problem: About 26 lines were duplicated in two files, and the guard that keeps the advisory audits off the network is security-relevant: a fix in one copy would not reach the other.
+- Impact: A future change to the guard (for example a new allowed host) can be made in one script and forgotten in the other.
+- Fix: New scripts/lib/local-only-browser.ts exports LOCAL_ONLY_ARGS, LOOPBACK_HOSTS and blockNonLocalRequests(page, blockedHosts, tag); the three audit scripts import it; the loopback BASE checks and the log lines stay.
+- Fix risk: Low; a script-only change, not run in a browser here: tsx loads the helper, typecheck, lint and knip are green.
+- Found by: the cleanup of 2026-10-13 (owner request of 2026-10-12 to delete all unused and redundant code): scanners, Haiku triage, Sonnet second stage, one Opus decision on the hard items
+- Resolution: FIXED by C01 (cleanup batch CL1, 2026-10-13): the helper exists, axe-a11y.ts and responsive-ux-audit.ts import it (audit-vitals.ts imports LOCAL_ONLY_ARGS), the log text and both loopback BASE checks are unchanged (patch R5-C01.patch). `isLocalUrl` is not exported (knip flags an export that only the helper uses). Lead check: `npx tsx -e "import('./scripts/lib/local-only-browser.ts')"` lists LOCAL_ONLY_ARGS, LOOPBACK_HOSTS and blockNonLocalRequests. Lead gates (labels CL1, CL2, CL34): typecheck 0, lint 0, lint:security 0, suite 168 files / 2379 tests, coverage thresholds met (93.68 / 88.17 / 95.86 / 94.67), knip 0, release policy 0, production build 0, git diff --check 0, `npm run test:integration` 23 files / 125 tests; independent verifier (wf_ce9beee1-50c) PASS for C03, C04, C05, C07, C10 and PASS-WITH-NOTES for C08 (the removed statistics fields are an owner-approved change of an admin-only response).
+
+### R-802: audit-vitals stores an interaction id that nothing reads
+- Severity: Nit
+- Category: Unused
+- Status: CONFIRMED
+- Location: scripts/audit-vitals.ts
+- Evidence:
+  ```
+  `events: Array<{ id: number; duration: number }>;` and `store.events.push({ id: event.interactionId, duration: event.duration })`; the only consumer takes the maximum of `event.duration`
+  ```
+- Problem: The id is written to the page-side store, typed in two places and never read.
+- Impact: None at run time; dead data in a local script.
+- Fix: Drop id from the events type, the push and the cast; keep the interactionId guard that filters to interaction events.
+- Fix risk: None; typecheck covers the three places.
+- Found by: the cleanup of 2026-10-13 (owner request of 2026-10-12 to delete all unused and redundant code): scanners, Haiku triage, Sonnet second stage, one Opus decision on the hard items
+- Resolution: FIXED by C01 (CL1): the events type, the push and the cast carry only `duration` (patch R5-C01.patch). Lead gates (labels CL1, CL2, CL34): typecheck 0, lint 0, lint:security 0, suite 168 files / 2379 tests, coverage thresholds met (93.68 / 88.17 / 95.86 / 94.67), knip 0, release policy 0, production build 0, git diff --check 0, `npm run test:integration` 23 files / 125 tests; independent verifier (wf_ce9beee1-50c) PASS for C03, C04, C05, C07, C10 and PASS-WITH-NOTES for C08 (the removed statistics fields are an owner-approved change of an admin-only response).
+
+### R-803: The licence gate carries a dormant per-package fallback table and a no-op type intersection
+- Severity: Low
+- Category: Unused
+- Status: CONFIRMED
+- Location: scripts/check-licenses.ts
+- Evidence:
+  ```
+  `const PACKAGE_LICENSE_FALLBACKS: Record<string, string[]> = { atomically: ['MIT'], 'seq-queue': ['MIT'], 'stubborn-fs': ['MIT'] };` and `if (results.size === 0 && PACKAGE_LICENSE_FALLBACKS[packageName]) { ... }`; `packages?: Record<string, (ManifestLike & { version?: unknown }) | undefined>`
+  ```
+- Problem: None of the three packages is in either lockfile or in node_modules, so the table never applied; if one of them appeared without licence metadata the gate would silently accept it as MIT instead of reporting it.
+- Impact: A latent fail-open in a supply-chain gate (no current effect). The intersection with `version?: unknown` added nothing.
+- Fix: Delete the table, its use and the packageName parameter of extractLicenses; use plain ManifestLike.
+- Fix risk: Low; a package without licence metadata is now reported as "missing licence metadata" (fail closed). ALLOWED_LICENSES and PACKAGE_LICENSE_EXCEPTIONS are untouched.
+- Found by: the cleanup of 2026-10-13 (owner request of 2026-10-12 to delete all unused and redundant code): scanners, Haiku triage, Sonnet second stage, one Opus decision on the hard items
+- Resolution: FIXED by C02 (CL1): the table, its use, the parameter and the intersection are gone (patch R5-C02.patch); tests/unit/check-licenses.test.ts 3/3; `npm run security:license-check` (lead) rc 0 "All package licenses comply with the allowlist." Lead gates (labels CL1, CL2, CL34): typecheck 0, lint 0, lint:security 0, suite 168 files / 2379 tests, coverage thresholds met (93.68 / 88.17 / 95.86 / 94.67), knip 0, release policy 0, production build 0, git diff --check 0, `npm run test:integration` 23 files / 125 tests; independent verifier (wf_ce9beee1-50c) PASS for C03, C04, C05, C07, C10 and PASS-WITH-NOTES for C08 (the removed statistics fields are an owner-approved change of an admin-only response).
+
+### R-804: Write-only refreshed_at claim in the admin token and a dead optional member of the guest-session parameter
+- Severity: Nit
+- Category: Unused
+- Status: CONFIRMED
+- Location: src/app/api/admin/refresh/route.ts, src/lib/auth/admin.ts, src/lib/guestSession.ts
+- Evidence:
+  ```
+  `refreshed_at: Math.floor(Date.now() / 1000),` in the admin refresh payload and `refreshed_at?: number;` in the payload type; `payload: Omit<GuestSessionPayload, 'type'> & { type?: 'guest' }` in signGuestSession
+  ```
+- Problem: git grep finds no reader of refreshed_at anywhere (code, tests, docs); signGuestSession has one caller that never passes type, and the body overwrites it with 'guest' anyway.
+- Impact: None at run time; the claim is only extra bytes in each refreshed admin cookie.
+- Fix: Delete the claim and its type member; type the parameter as Omit<GuestSessionPayload, 'type'>.
+- Fix risk: Low; verifyAdmin and the admin session checks read only type, role, session_id and login_at (verifier read them).
+- Found by: the cleanup of 2026-10-13 (owner request of 2026-10-12 to delete all unused and redundant code): scanners, Haiku triage, Sonnet second stage, one Opus decision on the hard items
+- Resolution: FIXED by C03 (CL1): claim, type member and parameter member removed (patch R5-C03.patch); admin-refresh, admin-logout, auth-session and portal-auth-client-identity tests 35/35; the verifier confirmed that nothing reads refreshed_at and that the signed guest token still always has type guest. Lead gates (labels CL1, CL2, CL34): typecheck 0, lint 0, lint:security 0, suite 168 files / 2379 tests, coverage thresholds met (93.68 / 88.17 / 95.86 / 94.67), knip 0, release policy 0, production build 0, git diff --check 0, `npm run test:integration` 23 files / 125 tests; independent verifier (wf_ce9beee1-50c) PASS for C03, C04, C05, C07, C10 and PASS-WITH-NOTES for C08 (the removed statistics fields are an owner-approved change of an admin-only response).
+
+### R-805: prisma.ts assigns undefined to an already absent global and casts a client to object
+- Severity: Nit
+- Category: Redundant
+- Status: CONFIRMED
+- Location: src/lib/prisma.ts:L105-L134
+- Evidence:
+  ```
+  `} else { // Leave undefined during build/time when no DATABASE_URL is configured. globalThisWithPrisma.__prisma__ = undefined as unknown as PrismaClient; }`; `Reflect.get(client as unknown as object, prop, receiver)`; `Reflect.set(client as unknown as object, prop, value)`
+  ```
+- Problem: The else branch sets an optional property that is already falsy; the PrismaClient class instance already satisfies the object parameter of Reflect.
+- Impact: None at run time (the verifier read every use of __prisma__: typed reads, deletes and test fakes only).
+- Fix: Remove the else branch and the two casts; the set trap stays.
+- Fix risk: None; typecheck accepted both.
+- Found by: the cleanup of 2026-10-13 (owner request of 2026-10-12 to delete all unused and redundant code): scanners, Haiku triage, Sonnet second stage, one Opus decision on the hard items
+- Resolution: FIXED by C04 (CL1): patch R5-C04.patch; tests/unit/prisma-lifecycle.test.ts 2/2. Reopens R-592a and R-592b of Review 4 (declined as harmless on 2026-10-09; reopened by the owner request of 2026-10-12). Lead gates (labels CL1, CL2, CL34): typecheck 0, lint 0, lint:security 0, suite 168 files / 2379 tests, coverage thresholds met (93.68 / 88.17 / 95.86 / 94.67), knip 0, release policy 0, production build 0, git diff --check 0, `npm run test:integration` 23 files / 125 tests; independent verifier (wf_ce9beee1-50c) PASS for C03, C04, C05, C07, C10 and PASS-WITH-NOTES for C08 (the removed statistics fields are an owner-approved change of an admin-only response).
+
+### R-806: The service worker keeps a pass-through fetch wrapper and precaches a manifest it never serves from cache
+- Severity: Low
+- Category: Redundant
+- Status: CONFIRMED
+- Location: public/sw.js, tests/unit/service-worker.test.ts
+- Evidence:
+  ```
+  `function fetchInternal(input, init) { return fetch(input, init); }` (four call sites with `new Request(...)` or `request`, which the internal-fetch lint rule never flagged); `'/app.webmanifest',` in OFFLINE_ASSETS although the fetch handler has no branch that would answer it from the cache
+  ```
+- Problem: The wrapper only renamed fetch; the manifest was downloaded on every install and never read back from the cache offline (no page or precache logic references it).
+- Impact: One extra request per install; misleading comment and test titles ("the manifest ... best-effort").
+- Fix: Call fetch directly and delete the wrapper; drop the manifest entry; rename the comment and the test title to the favicon and the icons.
+- Fix risk: Low; the worker is client code, covered by tests/unit/service-worker.test.ts.
+- Found by: the cleanup of 2026-10-13 (owner request of 2026-10-12 to delete all unused and redundant code): scanners, Haiku triage, Sonnet second stage, one Opus decision on the hard items
+- Resolution: FIXED by C05 (CL1): patch R5-C05.patch; service-worker, privacy-storage-inventory and brand tests 53/53 (verifier); git grep fetchInternal finds only REVIEW.md. Reopens R-573d and R-591a of Review 4. Lead gates (labels CL1, CL2, CL34): typecheck 0, lint 0, lint:security 0, suite 168 files / 2379 tests, coverage thresholds met (93.68 / 88.17 / 95.86 / 94.67), knip 0, release policy 0, production build 0, git diff --check 0, `npm run test:integration` 23 files / 125 tests; independent verifier (wf_ce9beee1-50c) PASS for C03, C04, C05, C07, C10 and PASS-WITH-NOTES for C08 (the removed statistics fields are an owner-approved change of an admin-only response).
+
+### R-807: The client logger has an info level nobody calls and userFacingErrors casts a value it already has
+- Severity: Nit
+- Category: Unused
+- Status: CONFIRMED
+- Location: src/lib/logger-client.ts, src/lib/userFacingErrors.ts
+- Evidence:
+  ```
+  `type LogLevel = 'debug' | 'info' | 'warn' | 'error';` with `case 'info'` and `info(message, meta)`; `const details = detailsRaw as unknown as { validationErrors?: ... } | undefined;`
+  ```
+- Problem: No code calls logger.info of the client logger (typecheck is the proof once the method is gone); the re-cast of detailsRaw repeated a type the variable already carries.
+- Impact: None at run time.
+- Fix: Remove the level, the case and the method; read detailsRaw?.validationErrors directly.
+- Fix risk: None.
+- Found by: the cleanup of 2026-10-13 (owner request of 2026-10-12 to delete all unused and redundant code): scanners, Haiku triage, Sonnet second stage, one Opus decision on the hard items
+- Resolution: FIXED by C06 (CL1): patch R5-C06.patch; logger-client, core-utilities and client-identity tests green. Lead gates (labels CL1, CL2, CL34): typecheck 0, lint 0, lint:security 0, suite 168 files / 2379 tests, coverage thresholds met (93.68 / 88.17 / 95.86 / 94.67), knip 0, release policy 0, production build 0, git diff --check 0, `npm run test:integration` 23 files / 125 tests; independent verifier (wf_ce9beee1-50c) PASS for C03, C04, C05, C07, C10 and PASS-WITH-NOTES for C08 (the removed statistics fields are an owner-approved change of an admin-only response).
+
+### R-808: The guest refresh path has a dead session check, duplicated log-and-rethrow wrappers, an unused alias and a dead contention field
+- Severity: Low
+- Category: Redundant
+- Status: CONFIRMED
+- Location: src/app/api/portal/refresh/route.ts:L90-L94, src/lib/guestDataStore.ts, src/lib/prisma-repositories/refreshTokenRepository.ts:L58-L61
+- Evidence:
+  ```
+  `|| !rotated.session` after `|| !rotated.token`; `try { ... } catch (error) { logger.error('guestStore: failed to rotate refresh token', error); throw error; }` around code that the repository already logs and rethrows; `export type GuestRefreshTokenRec = PrismaGuestRefreshTokenRec;` with no importer; `familyId: string;` in RefreshGenerationContention
+  ```
+- Problem: The repository returns session and sessionToken together for status rotated, so the session check was always false; every failure was logged by the repository and again by withErrorHandler; nothing read familyId of the contention result (it never leaves rotate).
+- Impact: None at run time; a failed rotation was logged up to three times.
+- Fix: Drop the check, the two wrappers (and the logger import), the export keyword of the alias and the field with its assignment.
+- Fix risk: Low, an auth path: the verifier read the repository return, every caller and the mocks of tests/routes and tests/security; integration (auth files included) 125/125.
+- Found by: the cleanup of 2026-10-13 (owner request of 2026-10-12 to delete all unused and redundant code): scanners, Haiku triage, Sonnet second stage, one Opus decision on the hard items
+- Resolution: FIXED by C07 (CL2) and C16 (CL4: the dedent had left four spaces on two blank lines of guestDataStore.ts, found by git diff --check and removed): patches R5-C07.patch, R5-C16.patch; portal-refresh-route, client-identity-route-regression, portal-auth-client-identity, auth-session and guest-data-store tests green; verifier PASS. Reopens R-590a, R-590b and R-590c of Review 4. Lead gates (labels CL1, CL2, CL34): typecheck 0, lint 0, lint:security 0, suite 168 files / 2379 tests, coverage thresholds met (93.68 / 88.17 / 95.86 / 94.67), knip 0, release policy 0, production build 0, git diff --check 0, `npm run test:integration` 23 files / 125 tests; independent verifier (wf_ce9beee1-50c) PASS for C03, C04, C05, C07, C10 and PASS-WITH-NOTES for C08 (the removed statistics fields are an owner-approved change of an admin-only response).
+
+### R-809: Admin guest statistics compute two tallies nobody reads, and the claim-grant helper has a parameter that is never set
+- Severity: Nit
+- Category: Unused
+- Status: CONFIRMED
+- Location: src/lib/guestDataExport.ts:L129-L163, src/app/admin/guests/page.tsx, tests/unit/guest-data-export.test.ts
+- Evidence:
+  ```
+  `bookingsBySource: Record<string, number>; bookingsByStatus: Record<string, number>;` filled in a forEach that derives upcoming, active and completed from the dates; `const issueClaimGrant = async (bookingId: string, channel: 'REMOTE' | 'ONSITE' = 'REMOTE')` called only as `issueClaimGrant(booking.booking.id)`
+  ```
+- Problem: The admin page renders only totalBookings, totalUsers and totalClaimedBookings; git grep finds no reader of the two tallies; the channel parameter is always its default.
+- Impact: Dead computation on every statistics request; the admin-only GET /api/admin/guests?action=stats no longer returns the two fields (owner is the only administrator, approved by the decision agent).
+- Fix: Remove the fields, the tallies and the test that asserted only them (with its afterEach and import); send the literal channel REMOTE.
+- Fix risk: Low; the request body is byte-identical, calendarDate is still used.
+- Found by: the cleanup of 2026-10-13 (owner request of 2026-10-12 to delete all unused and redundant code): scanners, Haiku triage, Sonnet second stage, one Opus decision on the hard items
+- Resolution: FIXED by C08 (CL2): patch R5-C08.patch; tests 2379 (one test fewer: "counts a booking that starts today as active", which covered only the removed tally); guest-data-export, admin-guests and admin-guests-errors green; verifier PASS-WITH-NOTES (the note is the response change above). Reopens R-585b of Review 4. Lead gates (labels CL1, CL2, CL34): typecheck 0, lint 0, lint:security 0, suite 168 files / 2379 tests, coverage thresholds met (93.68 / 88.17 / 95.86 / 94.67), knip 0, release policy 0, production build 0, git diff --check 0, `npm run test:integration` 23 files / 125 tests; independent verifier (wf_ce9beee1-50c) PASS for C03, C04, C05, C07, C10 and PASS-WITH-NOTES for C08 (the removed statistics fields are an owner-approved change of an admin-only response).
+
+### R-810: Small UI leftovers: a redundant Navigator cast, an unused calendar class and an unused check-in heroTitle key
+- Severity: Nit
+- Category: Unused
+- Status: CONFIRMED
+- Location: src/components/home/hero/HeroGlIsland.tsx, src/components/availability/AvailabilityPlanner.tsx, src/components/CheckInInfo.tsx, src/i18n/domains/checkin.ts
+- Evidence:
+  ```
+  `heroGateFailure(navigator as Navigator & { deviceMemory?: number }, document, hero)`; `footer: 'cal__footer',` in CALENDAR_CLASSES; `heroTitle: panel.heroTitle,` and the heroTitle strings of the check-in dictionary (type, en, el)
+  ```
+- Problem: heroGateFailure already accepts a plain Navigator; no library or CSS reads the footer class key; no component renders the check-in heroTitle.
+- Impact: None at run time; two translated strings that nobody sees.
+- Fix: Remove the cast, the class entry and the three heroTitle declarations and the pass-through.
+- Fix risk: Low; i18n parity and the component tests pass.
+- Found by: the cleanup of 2026-10-13 (owner request of 2026-10-12 to delete all unused and redundant code): scanners, Haiku triage, Sonnet second stage, one Opus decision on the hard items
+- Resolution: FIXED by C09 (CL2): patch R5-C09.patch; 9 test files / 143 tests (hero-gl-island, hero-capability, availability-planner, i18n-parity, check-in and stay tests). Lead gates (labels CL1, CL2, CL34): typecheck 0, lint 0, lint:security 0, suite 168 files / 2379 tests, coverage thresholds met (93.68 / 88.17 / 95.86 / 94.67), knip 0, release policy 0, production build 0, git diff --check 0, `npm run test:integration` 23 files / 125 tests; independent verifier (wf_ce9beee1-50c) PASS for C03, C04, C05, C07, C10 and PASS-WITH-NOTES for C08 (the removed statistics fields are an owner-approved change of an admin-only response).
+
+### R-811: The unreachable StaticLocationMap no-JavaScript fallback, five dictionary keys only it read, and four redundant map nits
+- Severity: Low
+- Category: Unused
+- Status: CONFIRMED
+- Location: src/components/InteractiveMap.tsx, src/components/StaticLocationMap.tsx, src/i18n/domains/house.ts, src/components/LeafletMap.tsx, src/data/mapLocations.ts, docs/design/identity.md
+- Evidence:
+  ```
+  `<noscript><StaticLocationMap height={height} className="mt-4" locale={locale} /></noscript>` inside InteractiveMap, which is imported only by ApartmentLocationMap, which is loaded only through next/dynamic with ssr false (CheckInInfo.tsx:68, GuideList.tsx:23); LocationPanelDictionary keys apartmentTitle, city, blurb, howToEnableMapTitle, howToEnableSteps; `if (tags.has('museum') || tags.has('culture') || tags.has('history')) return 'attraction';` before `return 'attraction';`
+  ```
+- Problem: The noscript markup was never in a server HTML (the verifier traced every import path), so the 98-line component and its Greek and English texts were dead; a hasMounted state only delayed the observer by one render; casts of Leaflet controls and a Locale-or-string parameter were redundant.
+- Impact: None at run time; two translations and a component to maintain for nothing; docs/design/identity.md named the deleted component.
+- Fix: Delete the component, the noscript block, the keys, the no-op branch, the casts and hasMounted; point the design document at ApartmentLocationMap.
+- Fix risk: Low; the verifier read the removed code against every consumer.
+- Found by: the cleanup of 2026-10-13 (owner request of 2026-10-12 to delete all unused and redundant code): scanners, Haiku triage, Sonnet second stage, one Opus decision on the hard items
+- Resolution: FIXED by C10 (CL2): patch R5-C10.patch; 7 map and i18n test files / 53 tests; git grep StaticLocationMap finds only REVIEW.md; verifier PASS (reachability of the noscript block: UNREACHABLE, CONFIRMED). Reopens R-555a-d and R-587a-d of Review 4. Lead gates (labels CL1, CL2, CL34): typecheck 0, lint 0, lint:security 0, suite 168 files / 2379 tests, coverage thresholds met (93.68 / 88.17 / 95.86 / 94.67), knip 0, release policy 0, production build 0, git diff --check 0, `npm run test:integration` 23 files / 125 tests; independent verifier (wf_ce9beee1-50c) PASS for C03, C04, C05, C07, C10 and PASS-WITH-NOTES for C08 (the removed statistics fields are an owner-approved change of an admin-only response).
+
+### R-812: Four native main elements carry role="main", and two layout comments are stale
+- Severity: Nit
+- Category: Redundant
+- Status: CONFIRMED
+- Location: src/app/[locale]/layout.tsx, src/app/error.tsx, src/app/not-found.tsx, src/app/offline/page.tsx
+- Evidence:
+  ```
+  `<main id="main-content" className="status-main" role="main">`; `// Avoid reading cookies server-side so the route can stay fully static` (the root layout reads request headers, so the route is rendered per request); `// Removed font variable placeholders.`
+  ```
+- Problem: A native main element already exposes the landmark; the comments described a state of the code that no longer exists.
+- Impact: None at run time.
+- Fix: Remove the attribute four times, delete the placeholder comment and correct the cookie comment.
+- Fix risk: None; tests that use getByRole(main) still match.
+- Found by: the cleanup of 2026-10-13 (owner request of 2026-10-12 to delete all unused and redundant code): scanners, Haiku triage, Sonnet second stage, one Opus decision on the hard items
+- Resolution: FIXED by C11 (CL2): patch R5-C11.patch; locale-not-found and stay-routes component tests green. Reopens R-573b and R-573c of Review 4. Lead gates (labels CL1, CL2, CL34): typecheck 0, lint 0, lint:security 0, suite 168 files / 2379 tests, coverage thresholds met (93.68 / 88.17 / 95.86 / 94.67), knip 0, release policy 0, production build 0, git diff --check 0, `npm run test:integration` 23 files / 125 tests; independent verifier (wf_ce9beee1-50c) PASS for C03, C04, C05, C07, C10 and PASS-WITH-NOTES for C08 (the removed statistics fields are an owner-approved change of an admin-only response).
+
+### R-813: MetricCard has two props that no caller passes
+- Severity: Nit
+- Category: Unused
+- Status: CONFIRMED
+- Location: src/components/ui/MetricCard.tsx
+- Evidence:
+  ```
+  `icon?: ReactNode; valueClassName?: string;` and `{icon ? <div className="text-3xl" aria-hidden>{icon}</div> : null}`
+  ```
+- Problem: Every caller passes only label and value.
+- Impact: None at run time.
+- Fix: Remove the props and the icon branch; fix the accent class.
+- Fix risk: None.
+- Found by: the cleanup of 2026-10-13 (owner request of 2026-10-12 to delete all unused and redundant code): scanners, Haiku triage, Sonnet second stage, one Opus decision on the hard items
+- Resolution: FIXED by C12 (CL2): patch R5-C12.patch; the admin component tests that render MetricCard are green. Reopens R-585a of Review 4. Lead gates (labels CL1, CL2, CL34): typecheck 0, lint 0, lint:security 0, suite 168 files / 2379 tests, coverage thresholds met (93.68 / 88.17 / 95.86 / 94.67), knip 0, release policy 0, production build 0, git diff --check 0, `npm run test:integration` 23 files / 125 tests; independent verifier (wf_ce9beee1-50c) PASS for C03, C04, C05, C07, C10 and PASS-WITH-NOTES for C08 (the removed statistics fields are an owner-approved change of an admin-only response).
+
+### R-814: clearMocks: true is a no-op next to mockReset: true in both Vitest configs
+- Severity: Nit
+- Category: Redundant
+- Status: CONFIRMED
+- Location: vitest.config.ts:L18, vitest.integration.config.ts:L16
+- Evidence:
+  ```
+  installed vitest runner (node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:4421-4429): `if (restoreMocks) vi.restoreAllMocks(); if (mockReset) vi.resetAllMocks(); if (clearMocks) vi.clearAllMocks();` (clearing runs after the reset, which already clears calls and results)
+  ```
+- Problem: The option does nothing once mockReset is on.
+- Impact: None; a reader may believe it matters.
+- Fix: Delete the line from both configs.
+- Fix risk: None; the full suite and the integration suite pass.
+- Found by: the cleanup of 2026-10-13 (owner request of 2026-10-12 to delete all unused and redundant code): scanners, Haiku triage, Sonnet second stage, one Opus decision on the hard items
+- Resolution: FIXED by C13 (CL3): patch R5-C13.patch; both configs load; suite 168 files / 2379 tests and integration 125/125 after the change. Reopens R-573a of Review 4. Lead gates (labels CL1, CL2, CL34): typecheck 0, lint 0, lint:security 0, suite 168 files / 2379 tests, coverage thresholds met (93.68 / 88.17 / 95.86 / 94.67), knip 0, release policy 0, production build 0, git diff --check 0, `npm run test:integration` 23 files / 125 tests; independent verifier (wf_ce9beee1-50c) PASS for C03, C04, C05, C07, C10 and PASS-WITH-NOTES for C08 (the removed statistics fields are an owner-approved change of an admin-only response).
+
+### R-815: The ignore files still list the runtime files of the removed filesystem analytics
+- Severity: Nit
+- Category: Unused
+- Status: CONFIRMED
+- Location: .dockerignore:L19-L23 and L37-L41, .gitignore
+- Evidence:
+  ```
+  `analytics-data.json`, `analytics-ratelimit.json`, `analytics-backups`, `data/secure`, `data/*.db`, `data/*.sqlite` in .dockerignore; the same group under "# generated local runtime data" in .gitignore; no `data/` directory exists and git grep finds no code that writes these paths
+  ```
+- Problem: CLAUDE.md states there is no analytics or filesystem persistence any more; the entries guard files nothing creates.
+- Impact: None; a stray local data/*.db would now enter the Docker build context of the builder stage (`COPY . .`, docker/Dockerfile.security:23) and show as untracked, but nothing in the repository creates one.
+- Fix: Delete the entries (the "# legacy raw SQL" block stays).
+- Fix risk: Low; the release policy pins some .dockerignore lines and still passes (138/138).
+- Found by: the cleanup of 2026-10-13 (owner request of 2026-10-12 to delete all unused and redundant code): scanners, Haiku triage, Sonnet second stage, one Opus decision on the hard items
+- Resolution: FIXED by C14 (CL4): patch R5-C14.patch; validate:release-policy and test:release-policy 138/138; `git check-ignore` still ignores src/generated/prisma and .env.local. Reopens R-573e of Review 4. Lead gates (labels CL1, CL2, CL34): typecheck 0, lint 0, lint:security 0, suite 168 files / 2379 tests, coverage thresholds met (93.68 / 88.17 / 95.86 / 94.67), knip 0, release policy 0, production build 0, git diff --check 0, `npm run test:integration` 23 files / 125 tests; independent verifier (wf_ce9beee1-50c) PASS for C03, C04, C05, C07, C10 and PASS-WITH-NOTES for C08 (the removed statistics fields are an owner-approved change of an admin-only response).
+
+### R-816: privacySubjectDigest accepts a booking kind that no caller uses
+- Severity: Nit
+- Category: Unused
+- Status: CONFIRMED
+- Location: src/lib/privacyService.ts
+- Evidence:
+  ```
+  `function privacySubjectDigest(kind: 'user' | 'booking', id: string): string {` with a single caller that passes 'user'
+  ```
+- Problem: The union member is never passed.
+- Impact: None at run time.
+- Fix: Narrow the parameter to 'user'.
+- Fix risk: None; typecheck.
+- Found by: the cleanup of 2026-10-13 (owner request of 2026-10-12 to delete all unused and redundant code): scanners, Haiku triage, Sonnet second stage, one Opus decision on the hard items
+- Resolution: FIXED by C15 (CL4): patch R5-C15.patch; privacy-erasure, operational-retention and admin-guest-erasure tests 35/35. Reopens R-589a of Review 4. Lead gates (labels CL1, CL2, CL34): typecheck 0, lint 0, lint:security 0, suite 168 files / 2379 tests, coverage thresholds met (93.68 / 88.17 / 95.86 / 94.67), knip 0, release policy 0, production build 0, git diff --check 0, `npm run test:integration` 23 files / 125 tests; independent verifier (wf_ce9beee1-50c) PASS for C03, C04, C05, C07, C10 and PASS-WITH-NOTES for C08 (the removed statistics fields are an owner-approved change of an admin-only response).
+
+### R-817: The header comment of scripts/lib/local-only-browser.ts said the guard is the same as audit-vitals.ts, although audit-vitals.ts imports it
+- Severity: Nit
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: scripts/lib/local-only-browser.ts:L3
+- Evidence:
+  ```
+  // Local only (same as audit-vitals.ts): dead proxy for every other host, host resolver limited to localhost,
+  ```
+- Problem: Created by the consolidation C01 (R-801): audit-vitals.ts now imports LOCAL_ONLY_ARGS from the helper, so the comment pointed at a copy that no longer exists.
+- Impact: A reader looks for a second copy that is gone.
+- Fix: Drop the parenthesis from the comment.
+- Fix risk: None.
+- Found by: C01 implementer concern and lead read of the cleanup patch
+- Resolution: FIXED by C17 (wave W7A, 2026-10-13, Haiku max): the first comment line no longer names audit-vitals.ts (patch R5-C17.patch); typecheck, eslint and eslint security on the file exit 0.
+
+### R-818: A planner click more than 30 nights after the check-in, with the first booked night on the last check-out day, shows only the crossing note and never names the cap
+- Severity: Nit
+- Category: Logic
+- Status: SUSPECTED
+- Location: src/components/availability/AvailabilityPlanner.tsx (handleSelect), src/lib/availability/stayQuote.ts (validateStay)
+- Evidence:
+  ```
+  validateStay checks nights > MAX_STAY_NIGHTS before blocked nights; decision D13 requires the crossing message when the first booked night is the last check-out day (example from reading: check-in 7 Oct, booked 10 Oct, click 20 Nov)
+  ```
+- Problem: Two true reasons apply (the 30-night cap and the booked night); the note shows the crossing one only.
+- Impact: A guest sees why the range stops at the booked night but not that the stay would also exceed 30 nights; no wrong price or booking results.
+- Fix: Name both reasons, or decide that the crossing note is enough.
+- Fix risk: Low; a message choice (owner wording).
+- To confirm: Run the planner test with check-in 7 Oct, a booked night on 10 Oct and a click on 20 Nov.
+- Found by: T-F26 implementer concern (wave W7A)
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; by rule not fixed inside the task that found it; the wording is a product choice).
+
+### R-819: The logout-failure banner and the refresh-failure banner use the same fixed position and can overlap
+- Severity: Nit
+- Category: Bug
+- Status: SUSPECTED
+- Location: src/components/AdminSessionManager.tsx
+- Evidence:
+  ```
+  both banners use the classes 'fixed top-12 right-2 z-50' (implementer reading)
+  ```
+- Problem: A failed logout while a refresh retry is also failing renders two banners at the same place.
+- Impact: The top banner hides the other one; cosmetic, admin only.
+- Fix: Stack the banners or show one at a time.
+- Fix risk: Low.
+- To confirm: Render the manager with both states in a browser and look.
+- Found by: T-F29 implementer concern (wave W7A)
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; by rule not fixed inside the task that found it).
+
+### R-820: The logger now renders a URL object with its full href, query string included
+- Severity: Low
+- Category: Security
+- Status: CONFIRMED
+- Location: src/lib/logger-enterprise.ts (metadata reduction of URL values)
+- Evidence:
+  ```
+  src/lib/logger-enterprise.ts: `if (value instanceof URL) return value.href;` returns before any redaction (redaction works on key names); the W7A verifier ran new URL("https://u:pw@example.com/p?token=abc").href on Node 22.19.0 and got the string with userinfo and token; decision D13 for R-694 asks for the href; CLAUDE.md: never persist full URLs with query strings
+  ```
+- Problem: A URL object under a non-sensitive key (for example { target: new URL(...) }) is logged with userinfo and query secrets; before T-F31 such a value was logged as {}. The repository treats feed URLs as secrets (calendarSync.ts keeps the URL out of logs).
+- Impact: Latent: a future log call could write a feed token or other query secret to the log.
+- Fix: Reduce URL values to origin plus pathname (no search, no hash) in the logger, with a test.
+- Fix risk: Low; changes decision D13's wording for URL values.
+- Found by: T-F31 implementer concern (wave W7A)
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; it changes a behaviour that decision D13 fixed, so a decision round decides).
+
+### R-821: Structured logging still serialises error.code unsanitised, so a bigint or cyclic code throws
+- Severity: Nit
+- Category: Error handling
+- Status: SUSPECTED
+- Location: src/lib/logger-enterprise.ts (formatError)
+- Evidence:
+  ```
+  implementer reading: formatError copies error.code into the structured entry before JSON serialisation
+  ```
+- Problem: A thrown error whose code is a bigint or a cyclic object makes JSON.stringify throw inside the logger.
+- Impact: A log call can throw instead of logging; needs an unusual error object.
+- Fix: Reduce error.code with the same reducer as the metadata.
+- Fix risk: Low.
+- To confirm: Log an Error with code = 1n in structured mode.
+- Found by: T-F31 implementer concern (wave W7A)
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; by rule not fixed inside the task that found it).
+
+### R-822: A throwing getter in log metadata escapes the log call
+- Severity: Nit
+- Category: Error handling
+- Status: SUSPECTED
+- Location: src/lib/logger-enterprise.ts
+- Evidence:
+  ```
+  implementer reading: Object.entries reads getters, so a getter that throws propagates out of the reducer
+  ```
+- Problem: The reducer survives odd values (decision D13) but not a metadata object whose getter throws.
+- Impact: A logging call can throw; needs an unusual object.
+- Fix: Read entries inside the existing try or guard each property.
+- Fix risk: Low.
+- To confirm: Log { get x() { throw new Error('boom'); } }.
+- Found by: T-F31 implementer concern (wave W7A)
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; by rule not fixed inside the task that found it).
+
+### R-823: LOG_MAX_METADATA_SIZE is accepted by the environment schema for any digit string, but the logger silently maps small values to 1000
+- Severity: Nit
+- Category: Maintainability
+- Status: SUSPECTED
+- Location: src/lib/runtime-env-schema.js:L119, src/lib/logger-enterprise.ts
+- Evidence:
+  ```
+  implementer reading: the schema accepts digit strings from 0 to 199; the logger falls back to 1000 for them (decision D13: no schema change)
+  ```
+- Problem: A value that start-up validation accepts has no effect.
+- Impact: An operator who sets a small limit gets 1000 without a message.
+- Fix: Make the schema range and the logger floor agree.
+- Fix risk: Low; the schema is authoritative for the environment (CLAUDE.md).
+- To confirm: Start the logger with LOG_MAX_METADATA_SIZE=100 and read the effective limit.
+- Found by: T-F31 implementer concern (wave W7A)
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; D13 excluded a schema change).
+
+### R-824: The non-Error branch of the new errorName expression in calendarSync.ts is not executed by any test
+- Severity: Nit
+- Category: Tests
+- Status: CONFIRMED
+- Location: src/lib/availability/calendarSync.ts (failureOf), tests/unit/calendar-sync.test.ts
+- Evidence:
+  ```
+  logger.warn('Airbnb calendar sync failed unexpectedly', { errorName: error instanceof Error ? error.name : typeof error })
+  ```
+- Problem: Only a thrown Error is exercised; a thrown string or object takes the typeof branch.
+- Impact: One uncovered branch of a coverage-listed module (thresholds still met).
+- Fix: One more row with a thrown string.
+- Fix risk: None.
+- Found by: T-F34 implementer concern (wave W7A)
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; one small test row).
+
+### R-825: Test gaps left by T-F29, T-F31 and T-F34: logout failure clearing, strict LOG_MAX_METADATA_SIZE parsing, reduceCause null and primitive causes, the typeof branch of the calendar sync error name
+- Severity: Nit
+- Category: Tests
+- Status: CONFIRMED
+- Location: tests/components/admin-session-manager.test.tsx, tests/unit/logger-enterprise.test.ts, tests/unit/calendar-sync.test.ts
+- Evidence:
+  ```
+  scratch mutants that pass: no setLogoutFailed(false) at the start of logout() (15/15 green); parseInt(value, 10) instead of the strict /^\d+$/ parse (46/46); a reduceCause without the null/undefined branch or returning undefined for primitives (46/46); errorName: String(error) for non-Error throws (36/36)
+  ```
+- Problem: Four behaviours that the code implements are not pinned by a test.
+- Impact: A regression in one of them would not fail the suite; none is a security rule except the typeof branch, which keeps a thrown string (possibly with the feed URL) out of the log.
+- Fix: One row each (a thrown string in calendar-sync.test.ts is the most useful one).
+- Fix risk: None.
+- Found by: W7A verifier (T-F29, T-F31, T-F34)
+- Resolution: DEFERRED-OWNER (new, found by the W7A verifier; the owner asked on 2026-10-13 to cut the number of tests, so no test is added for Nits unless the owner asks).
+
+### R-826: No test reaches copyCandidateFiles, the source-gate copier of check-secrets.mjs, so bypassing the shared copy helper there goes undetected
+- Severity: Low
+- Category: Tests
+- Status: CONFIRMED
+- Location: scripts/check-secrets.mjs:L126-L144, scripts/tests/secret-scanning.test.mjs
+- Evidence:
+  ```
+  W8A verifier mutation: replacing the helper call in copyCandidateFiles by a plain mkdir and copyFile keeps all 55 tests green; the tests drive only copyIntoScanRoot
+  ```
+- Problem: The helper that rejects an inline scanner-suppression comment and sets the 0700 and 0600 modes is protected by tests on one path only; the source-gate path has none.
+- Impact: A change that makes the source gate copy files without the suppression check passes the suite, so a suppression comment could hide a finding in the source scan.
+- Fix: A test that runs the source scan over a temporary git repository with one tracked file that holds an inline suppression comment, or export copyCandidateFiles.
+- Fix risk: Low; scripts-only test.
+- Found by: T-F40 implementer concern and W8A verifier
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; by rule not fixed inside the task that found it); it adds a test to a gate test file and the owner asked on 2026-10-13 to cut the number of tests.
+
+### R-827: The repeated-occurrence guard of the generated-artifact secret disposition survives mutation: semanticOccurrences.length === 1 can become >= 1 or be removed with all 55 tests green
+- Severity: Nit
+- Category: Tests
+- Status: CONFIRMED
+- Location: scripts/lib/generated-artifact-secret-disposition.mjs:L160-L164, scripts/tests/secret-scanning.test.mjs
+- Evidence:
+  ```
+  T-F40 survivor logs (T-F40-survivor-*.log) and a W8A verifier probe: a variant with two link.tsx sources that hold different 40-hex hashes is killed by the mutant; the real test is not
+  ```
+- Problem: The second guard is unpinned; decision D13 asked for one case only.
+- Impact: A weakening of the guard would not fail a test.
+- Fix: Add the two-source case.
+- Fix risk: None.
+- Found by: T-F40 implementer concern and W8A verifier
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; by rule not fixed inside the task that found it).
+
+### R-828: diagnosticText of the integration database-safety guard has no cycle guard and its nested AggregateError case is untested
+- Severity: Nit
+- Category: Error handling
+- Status: SUSPECTED
+- Location: tests/integration/support/database-safety.ts (diagnosticText)
+- Evidence:
+  ```
+  implementer reading: AggregateError.errors is writable, so a self-referencing array would recurse without bound; verifier mutation: replacing the recursive call by a non-recursive one keeps 49/49 green
+  ```
+- Problem: The recursion has no depth or cycle limit and the nested case has no row.
+- Impact: Test-harness diagnostics only; the repository builds fresh local failure arrays at its AggregateError sites.
+- Fix: A visited set or a depth limit and a nested row.
+- Fix risk: None.
+- To confirm: Create an AggregateError whose errors array contains itself and call the guard.
+- Found by: T-F38 implementer concern and W8A verifier
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; by rule not fixed inside the task that found it).
+
+### R-829: In both offline checks of the image smoke, setOffline(true) runs before the try, so a throw leaves the worker session attached and offline set
+- Severity: Nit
+- Category: Error handling
+- Status: SUSPECTED
+- Location: scripts/smoke-production-image.ts
+- Evidence:
+  ```
+  implementer reading: setOffline(true) is called before the try block in the offline checks; if it throws, the finally that restores state does not run
+  ```
+- Problem: A failing emulation call leaves later console errors unrecorded.
+- Impact: Only a run that already fails; pre-existing.
+- Fix: Move the call inside the try.
+- Fix risk: None.
+- To confirm: Make setOffline throw in a unit probe of the script.
+- Found by: T-F41 implementer concern (wave W8A)
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; by rule not fixed inside the task that found it).
+
+### R-830: The browser preflight exits 0 when only a non-Puppeteer browser is healthy and the bundled Chrome failed, although axe and vitals launch the bundled Chrome unless CHROME_PATH is set
+- Severity: Low
+- Category: Logic
+- Status: CONFIRMED
+- Location: scripts/check-browser-runtime.ts:L143-L150
+- Evidence:
+  ```
+  implementer reading of the preflight exit logic after T-F42 made axe and vitals honour CHROME_PATH; decision D13 asked for no exit-code change
+  ```
+- Problem: The preflight can report success for a machine on which the audits then fail to launch.
+- Impact: An advisory audit fails after a green preflight; no production effect.
+- Fix: Exit non-zero when the browser that the audits will launch (bundled or CHROME_PATH) is not healthy.
+- Fix risk: Low.
+- Found by: T-F42 implementer concern (wave W8A)
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; by rule not fixed inside the task that found it).
+
+### R-831: The Env list in the header comment of audit-vitals.ts does not mention CHROME_PATH, and an empty CHROME_PATH is passed as an empty executablePath
+- Severity: Nit
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: scripts/audit-vitals.ts:L18-L23, scripts/axe-a11y.ts
+- Evidence:
+  ```
+  verifier reading; puppeteer-core ChromeLauncher uses the default executable when executablePath is falsy, so the empty string is harmless
+  ```
+- Problem: A documentation gap after T-F42.
+- Impact: None at run time.
+- Fix: Add CHROME_PATH to the Env list of both scripts.
+- Fix risk: None.
+- Found by: W8A verifier note on T-F42
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; by rule not fixed inside the task that found it).
+
+### R-832: KEEP_REPORTS as whitespace, "0x5", "1e1", "  3 " or "-0" passed the first fix of R-662 and deleted reports (whitespace and -0 deleted all of them)
+- Severity: Low
+- Category: Bug
+- Status: CONFIRMED
+- Location: scripts/prune-reports.ts:L9-L13
+- Evidence:
+  ```
+  `const KEEP = Number(process.env.KEEP_REPORTS || 5);` followed by the integer check: Number(" ") is 0, Number("0x5") is 5, Number("1e1") is 10; verifier scratch run: KEEP_REPORTS=" " exit 0, kept 0, removed 7
+  ```
+- Problem: The first fix validated the converted number, not the raw string.
+- Impact: A blank value in an environment file wipes the a11y reports (advisory data).
+- Fix: Require /^\d+$/ on the raw string; unset or empty keeps the default 5.
+- Fix risk: None.
+- Found by: T-F39 implementer concern and W8A verifier (FAIL, corrected by T-F39r)
+- Resolution: FIXED by T-F39r (wave W8A, 2026-10-13, Haiku max, a corrective retry after the W8A verifier failed T-F39): scripts/prune-reports.ts takes the default 5 for an unset or empty value and otherwise requires /^\d+$/ on the raw string; probe (scratch copy with seven report files, node 22.19.0, tsx): " ", "  3 ", "0x5", "1e1", "-0", "2.5", "abc", "-1", "5x" and "3\n" all exit 1 with seven files kept, unset and "" keep 5, "5" keeps 5, "0" removes all (T-F39r-red.log, T-F39r-green.log in .runtime/review5/fix/logs); eslint and typecheck exit 0. Patch R5-T-F39r.patch.
+
+### R-833: prune-reports.ts would abort after a partial deletion if a directory matches a report name pattern, and no automated test covers the script
+- Severity: Nit
+- Category: Error handling
+- Status: SUSPECTED
+- Location: scripts/prune-reports.ts:L34
+- Evidence:
+  ```
+  implementer reading: fs.unlinkSync on a directory named axe-a11y-report-NN.json throws; grep finds no test file that references KEEP_REPORTS or prune-reports
+  ```
+- Problem: The pruning loop has no per-file error handling and its only proof is the probe logs.
+- Impact: An advisory report cleanup could stop half way; no production effect.
+- Fix: Skip non-files (statSync isFile) and catch per file.
+- Fix risk: None.
+- To confirm: mkdir a directory named axe-a11y-report-99.json in a scratch cwd with more than five matching entries and run the script.
+- Found by: T-F39r implementer concern (wave W8A)
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; by rule not fixed inside the task that found it).
+
+### R-834: The release policy accepts a verify-release spawn with shell: true as long as the text shell: false appears anywhere, including a comment
+- Severity: Low
+- Category: Tests
+- Status: CONFIRMED
+- Location: scripts/lib/release-policy.mjs:L771-L785 (validateVerifyImplementation), scripts/tests/release-policy.test.mjs
+- Evidence:
+  ```
+  W9A verifier: the check is a substring marker; a scratch copy of verify-release.mjs whose only shell: false is in a comment and whose spawn uses shell: true passes; the new T-F43 test only proves that removing the marker fails
+  ```
+- Problem: Substring markers can be satisfied by comments, so the gate that forbids a shell in the release gate script can be bypassed by text.
+- Impact: A reviewer must catch it; the gate does not.
+- Fix: Reject any shell option other than false in the spawn call (a parsed check, not a substring), with a negative test.
+- Fix risk: Low; scripts-only.
+- Found by: T-F43 implementer concern and W9A verifier
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; by rule not fixed inside the task that found it).
+
+### R-835: Part of the mutants of R-657 still survive after T-F43: validateControlledEnvironments, the exec, deploy and migration checks of validateVerifyImplementation, the removed-script checks, the root .env lines of .dockerignore, gitleaks.toml rules and the weakening mutants
+- Severity: Low
+- Category: Tests
+- Status: SUSPECTED
+- Location: scripts/lib/release-policy.mjs, scripts/tests/release-policy.test.mjs
+- Evidence:
+  ```
+  T-F43 implementer concern: the six tests that decision D13 asked for do not cover the rest of the finders survivor list (taken from the finder sweep and not re-measured); validateLocalDefaults and validateControlledEnvironments have no seam
+  ```
+- Problem: Several release-policy rules have no negative test.
+- Impact: A weakened rule would not fail the policy tests.
+- Fix: One negative test per rule, or a seam for validateControlledEnvironments.
+- Fix risk: Low.
+- To confirm: Re-run the mutation sweep of the finder against the current policy tests.
+- Found by: T-F43 implementer concern (wave W9A)
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; by rule not fixed inside the task that found it); adding tests to a gate test file conflicts with the owner request of 2026-10-13 to cut tests only for the default suite, so this one needs the owner decision.
+
+### R-836: The orchestrator key-mask loop skips every .env.example name that is also set in the test runner environment
+- Severity: Nit
+- Category: Tests
+- Status: CONFIRMED
+- Location: scripts/tests/release-policy.test.mjs:L1853
+- Evidence:
+  ```
+  the loop filters with process.env[name] === undefined, so a name such as ALERT_WEBHOOK_TOKEN set in the runner is no longer asserted blank; the two removed unconditional asserts did assert it
+  ```
+- Problem: The assertion depends on the runner environment.
+- Impact: Marginal: other names still catch a missing mask.
+- Fix: Assert against a controlled environment instead of skipping.
+- Fix risk: None.
+- Found by: W9A verifier note on T-F43
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; by rule not fixed inside the task that found it).
+
+### R-837: docs/testing.md describes only part of what the strengthened logout and revoked-session integration tests now prove
+- Severity: Nit
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: docs/testing.md:L86 and L108
+- Evidence:
+  ```
+  L86 lists the logout coverage without the wrong-secret and foreign-signed credential categories; L108 describes only the replay branch, not the quiet authorization_chain_revoked branch (R-721)
+  ```
+- Problem: The test documentation lags the tests.
+- Impact: None at run time.
+- Fix: Two sentences.
+- Fix risk: None.
+- Found by: T-F51 and T-F52 implementer concerns (wave W9A)
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; by rule not fixed inside the task that found it).
+
+### R-838: The release policy error text says material is forbidden "in the repository" but the check scans only deploy/nginx
+- Severity: Low
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: scripts/lib/release-policy.mjs:L591-L595
+- Evidence:
+  ```
+  for (const relative of await filesBelow(path.join(root, 'deploy/nginx'), root)) { if (/\.(?:key|pem|p12|pfx|crt)$/iu.test(relative)) errors.push(`secret or certificate material is forbidden in the repository: ${relative}`) }; probe in a scratch copy: docs/x.pem gives no error, deploy/nginx/x.pem gives it
+  ```
+- Problem: The message promises a whole-repository scan; key files elsewhere are caught only by the Gitleaks gates, if they recognise them. The document sentence that copied the claim was corrected by T-F55r.
+- Impact: A reader of the policy output believes a PEM file anywhere is caught by this gate.
+- Fix: Reword the message to "under deploy/nginx", or widen the scan to the tracked tree with a test.
+- Fix risk: Low.
+- Found by: W9B verifier on T-F55
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; by rule not fixed inside the task that found it).
+
+### R-839: layered-rate-limiting.md asks operators to monitor 429 and 503 totals and authentication-failure totals that no code produces
+- Severity: Low
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: docs/security/layered-rate-limiting.md:L82-L95 (Operational signals)
+- Evidence:
+  ```
+  implementer grep: no counter for these totals in src, deploy, docker or scripts
+  ```
+- Problem: The section reads as a description of existing signals; it is a wish list.
+- Impact: An operator looks for metrics that do not exist.
+- Fix: Reword it as future work or implement the counters.
+- Fix risk: None.
+- Found by: T-F55 implementer concern (wave W9B)
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; by rule not fixed inside the task that found it).
+
+### R-840: The runtime error hint of prisma.ts says tsx scripts need DATABASE_URL exported in the shell, which scripts/README.md no longer says
+- Severity: Nit
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: src/lib/prisma.ts:L116
+- Evidence:
+  ```
+  T-F56 documented `tsx --env-file=.env.local` (R-663) and verified that it reads the named file with the shell value winning; the hint at prisma.ts:116 still says the variable must be exported
+  ```
+- Problem: The hint is incomplete after the documentation fix.
+- Impact: None at run time; slightly misleading error text.
+- Fix: Mention the --env-file option in the hint.
+- Fix risk: None.
+- Found by: T-F56 implementer concern (wave W9B)
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; by rule not fixed inside the task that found it).
+
+### R-841: The task slices of decision D13 ask for npm run test:integration as evidence while the subagent contract forbids Docker, so two implementers ran the Docker suite and one left a disposable container behind
+- Severity: Nit
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: .runtime/review5/tools/implement-slices.js (CONTRACT), .runtime/review5/fix/slices/T-F51.md, T-F53.md
+- Evidence:
+  ```
+  T-F51 ran the integration suite nine times (seven mutants, base, green) and T-F53 ran it too; both disclosed it as a deviation; a container site-integration-test-58dafad09c40 (run-id 58dafad09c40) was still running 25 minutes later and the lead first integration run of the wave failed two timing tests (A3 barrier, a migration with exit 124) at 558 s; the container was removed by its exact ID after checking labels, image digest, tmpfs and loopback port, and the re-run alone passed 132/132 in 73.6 s
+  ```
+- Problem: Two rules contradict each other; the slice evidence clause wins in the implementers mind.
+- Impact: Parallel Docker load makes the shared integration run flaky and can leak containers.
+- Fix: Tell the slices that Docker evidence is the lead step, or allow one serialized run by the lead only.
+- Fix risk: None.
+- Found by: lead, wave W9A (T-F51 and T-F53 disclosed deviations, one leaked container)
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; by rule not fixed inside the task that found it).
+
+### R-842: CLAUDE.md lists exported test-only helpers as something not to add, while decision D13 asked for shared test support exports (utcDateOffset, runMigrationFile, withScenario, startRedirectingReceiver)
+- Severity: Nit
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: CLAUDE.md (Testing rules), tests/integration/support/fixtures.ts, tests/integration/support/migrations.ts, tests/unit/support/redirecting-receiver.ts
+- Evidence:
+  ```
+  CLAUDE.md Testing rules: "Do not add sleeps, NODE_ENV=test behavior, auth bypasses, exported test-only helpers or in-memory production fallbacks."; the three implementers disclosed that their support modules now export these helpers, as D13 required
+  ```
+- Problem: The rule most likely targets helpers exported from production modules for tests; the wording does not say so, and support modules under tests already exported helpers before W9C.
+- Impact: None at run time; a future reader or reviewer may flag the support exports.
+- Fix: Owner: state in CLAUDE.md that test support modules under tests/**/support are exempt (an owner-only edit), or move the helpers.
+- Fix risk: None.
+- Found by: T-F58, T-F59 and T-F60 implementer concerns (wave W9C)
+- Resolution: DEFERRED-OWNER (new, found during the deferred waves; by rule not fixed inside the task that found it); CLAUDE.md is an owner file.
+
+### R-843: The privacy notice still says the site takes no bookings and you book on Airbnb or directly with the host, while the site now links to Booking.com too
+- Severity: Low
+- Category: Legal
+- Status: CONFIRMED
+- Location: src/i18n/domains/legal.ts:105 (en) and :238 (el)
+- Evidence:
+  ```
+  legal.ts:105: "The site takes no bookings: you book on Airbnb or directly with the host." with the Greek twin at :238; BOOKING_COM_LISTING_URL is valid in src/data/contact.ts and the Booking.com button renders on the home hero, the apartment page and the availability page; lines :169 and :302 already say links go to Instagram, WhatsApp, Google Maps, Airbnb and other sites, which covers Booking.com
+  ```
+- Problem: The introduction of the notice names only Airbnb as the booking channel.
+- Impact: A statement of the privacy notice is incomplete; a text accuracy matter for the owner or the lawyer, not a functional defect.
+- Fix: The owner or the lawyer decides whether to add Booking.com to the sentence (legal.ts is the owner draft, O82, and is not edited by agents).
+- Fix risk: None.
+- Found by: HD2 verifier (host data task, T4)
+- Resolution: DEFERRED-OWNER (new, found during the host data task of 2026-10-14; by rule not fixed inside the task that found it).
+- Resolution update (2026-10-20): the owner's decision 1 makes the notice wrong in more places, and the owner's standing permission of the same day ("do not ask again, I give you from now on the permission to make whatever change is needed") overrides decision O82 for the mechanical channel-name replacements. The lead applied A1, A4, A5, A6+A7 and A8 in src/i18n/domains/legal.ts (the English and Greek introductions, the English and Greek links items and the Greek calendar item: Airbnb -> Booking.com, the `// legal review` markers kept, nothing else; i18n parity, privacy page, storage inventory and guest terms tests: 37 passed; the hashed guest terms do not contain the notice, so no version bump; independent verifier wf_b6c19a30-6a5). A2+A3 (the English recipients item 4, lines 156-157) was DENIED by the auto-mode classifier ('dangerous', no explanation) and is NOT applied; it was not retried or worked around. The exact edit is `.runtime/hostdata/pending/legal-A2-A3-remaining.patch` (`patch -p1` from the repository root, or two lines by hand). The finding stays DEFERRED-OWNER until the owner applies it; BOOKING_ICAL_URL stays unset in production until then (gate: `git grep -n -i 'air[b]nb' -- src/i18n/domains/legal.ts` prints nothing). Open for the owner or a lawyer, no text proposed: whether Booking.com must be listed as a recipient at all (GDPR Art. 13(1)(e)), its role as controller and as source of the booking data (Art. 14), international transfers, the tax retention of the unlinked booking rows, the controller entry.
+
+### R-844: formatPercent has an untested RangeError branch in an enforced coverage module, and no test pins the shipped VAT_RATE_PERCENT
+- Severity: Nit
+- Category: Tests
+- Status: CONFIRMED
+- Location: src/lib/availability/money.ts:56-58, src/data/stayPolicy.ts (VAT_RATE_PERCENT), tests/components/availability-page.test.tsx
+- Evidence:
+  ```
+  verifier: no test reaches the non-finite branch of formatPercent (the VAT 0 test never calls it because the page guard skips it); the page test mocks VAT_RATE_PERCENT with a getter, so changing the shipped 13 to 12 in a scratch copy still passes 28/28; global coverage thresholds still met (93.68 / 88.15 / 95.89 / 94.71)
+  ```
+- Problem: One branch and the shipped value are unpinned.
+- Impact: An accidental change of the shipped VAT percentage would not fail a test; by design the accountant flips one number.
+- Fix: One it.each row for NaN and Infinity in tests/unit/availability-money.test.ts and, if wanted, one assertion of the shipped value.
+- Fix risk: None.
+- Found by: HD3 verifier (host data task, T5)
+- Resolution: FIXED by HD-P1b (host data task, 2026-10-14, wave HD8): `formatPercent` and the `VAT_RATE_PERCENT` and `MUNICIPAL_STAY_FEE_PERCENT` constants were deleted together with the fee display (the owner stated that the ΤΑΚΚ is part of the nightly price). Evidence: `git grep -nw` of the removed symbols over src, tests and scripts: zero hits (verifier re-run); full gates HD8 all 0, coverage 93.57 / 87.98 / 95.76 / 94.59 (thresholds met); verifier wf_d41d9a74-64a PASS-WITH-NOTES. Patch R5-HD-P1b.patch.
+
+### R-845: The availability page still shows the old draft cancellation policy (30 days, 50 percent for 14 to 30 days, nothing within 14 days) and no withdrawal statement, because task T6 was blocked
+- Severity: Low
+- Category: Legal
+- Status: CONFIRMED
+- Location: src/i18n/domains/availability.ts (cancellation lists, withdrawal text), tests/components/availability-page.test.tsx, tests/components/home-sections-v5c.test.tsx
+- Evidence:
+  ```
+  the auto-mode permission classifier denied the Edit of the Greek cancellation list in availability.ts (no reason given) on 2026-10-14; the batch was restored from its snapshot and the intended edit saved as .runtime/review-patches/R5-HD-T6.blocked.patch; the pending Greek edits are in the scratchpad file HD-T6/pending-el-edits.json; the owner rule is 40 days free cancellation and the withdrawal exemption of N. 2251/1994 art. 3ιβ
+  ```
+- Problem: The published draft policy contradicts the owner policy and omits the withdrawal statement.
+- Impact: A guest reads a cancellation policy that is not the host real one (B3 blocker of the go-live list).
+- Fix: Apply the saved T6 edit: the English and Greek cancellation lists become one confirmed line (free cancellation up to 40 days before check-in) plus the existing travel insurance line, the withdrawal text gets the owner statement and the citation, the two test pins change; i18n parity needs both locales in one step.
+- Fix risk: Low; legal wording is the owner text with the marker // legal review.
+- Found by: HD4 implementer HD-T6 (blocked by the permission system) and the lead
+- Resolution: FIXED by HD-P2 (host data task, 2026-10-14, wave HD9; the blocked T6 texts were replaced by the pricing-based wording): the availability page shows free cancellation up to 40 days before check-in, no cancellation less than 40 days before check-in, travel insurance recommended, and the withdrawal statement with the art. 3ιβ citation (both TODO(lawyer) comments kept), in English and Greek. Evidence: verifier wf_fd53e2db-064 PASS (every string equals the slice by code points; mutants 40 to 30, a missing 'and fees', Latin TAKK and a duplicated price sentence all fail the literal pins); lead Chromium check on the production build (`.runtime/hostdata/avail-check.cjs`): the three cancellation lines, the citation and exactly one price sentence appear in en and el at 1440 and 390 px; full gates HD9 all 0. Patches R5-HD-P2.patch, R5-HD-P4.patch.
+- Resolution update (2026-10-20, owner decision): MOOT for the withdrawal statement. The owner decided that the right-of-withdrawal notice goes now that guests do not book on the site (a legal choice that is the owner's): the availability section, the dictionary keys withdrawalTitle and withdrawal, both TODO(lawyer) comments, the heading, text and citation expectations of tests/components/availability-page.test.tsx and the document mentions were deleted (tasks FD-W2-C, FD-W3-B, FD-W4-A to FD-W4-D), so the lawyer's check (task R3-L6/L7) is no longer pending for it. The texts survive only in .runtime/review-patches/R5-HD-P2.patch (git-ignored) and in quotes in this file.
+
+### R-846: Comments, one test label, the design document and two CSS rules still describe the removed hero lede and a supplied legal name
+- Severity: Low
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: src/components/shell/HostIdentity.tsx:6; src/components/shell/SiteFooter.tsx:26; src/app/[locale]/privacy/page.tsx:18; src/components/shell/shellLinks.ts:125; src/styles/components/shell.css:352-353; tests/unit/design-tokens.test.ts:279; src/styles/components/hero.css:94-103,142; src/styles/motion.css:89-92; docs/design/identity.md:116,140,298,557,569,755,1082,1111,1112
+- Evidence:
+  ```
+  HostIdentity.tsx:6 '(registry number ΑΜΑ, legal name, address)'; privacy/page.tsx:18 'The controller's legal name and address (R3-L1) are supplied in HOST_CONTACT since 2026-10-14' while HOST_CONTACT.legalName is ''; shellLinks.ts:125 'location line of the hero lede'; git grep -n 'hero__lede\|hero__facts' -- src tests scripts finds only hero.css:94,103,142 and motion.css:90 (no element renders them since HD-T12)
+  ```
+- Problem: After HD-T9 (the host is a private individual, the name is still empty) and HD-T12 (the hero lede and the fallback price line are gone) several comments, a test label, design-document lines and three CSS rules still say the opposite or are dead.
+- Impact: Misleading text for the next maintainer; three dead CSS rules. No runtime effect.
+- Fix: Task HD-T13: edit the comments and the label, delete the dead rules after the reference search, correct the identity.md lines.
+- Fix risk: Low: comments, a test label and CSS rules without a user; the lead re-checks the hero in a browser.
+- Found by: HD6 verifier (host data task, T9 and T12)
+- Resolution: FIXED by HD-T13 and HD-T14 (host data task, 2026-10-14, Haiku 5.5 max): the comments of HostIdentity, SiteFooter, the privacy page, shellLinks and shell.css, the design-tokens row label, the dead rules `.hero .hero__lede` and `.hero__facts` (hero.css, motion.css) and the identity.md lines. Evidence: `git grep -nw hero__lede` and `hero__facts` over src, tests, scripts and docs: zero hits; 7 test files 271/271 before and after (HD-T13), motion-css-gate and design-tokens 173/173 before and after (HD-T14); full gates HD11 all 0 (2368 tests, coverage 93.57 / 87.98 / 95.76 / 94.59); Chromium check of the home hero and the availability page on the production build (en/el at 1440, 768, 390 px): all PASS; patches R5-HD-T13.patch, R5-HD-T14.patch; verifiers wf_989ea478-ac2 (PASS-WITH-NOTES, the notes became HD-T14) and wf_dc9f9cd7-62b (PASS-WITH-NOTES, no miss).
+
+### R-847: No test covers the privacy page controller row for an empty host name
+- Severity: Low
+- Category: Tests
+- Status: CONFIRMED
+- Location: tests/components/privacy-page.test.tsx; src/app/[locale]/privacy/page.tsx:60
+- Evidence:
+  ```
+  grep -n 'legalName|controller|Legal name|Επωνυμία|Ονοματεπώνυμο' tests/components/privacy-page.test.tsx returns only lines 23, 31, 36, 37, 57 and none asserts the controller name row; the page adds the row only when CONTROLLER.legalName is truthy (privacy/page.tsx:60)
+  ```
+- Problem: The rule 'no empty labelled name row while HOST_CONTACT.legalName is empty' is covered by code reading only; the same rule for the footer and the page heads is pinned by tests.
+- Impact: A regression that drops the truthiness guard would put a blank labelled row on the public privacy page without any test failing.
+- Fix: One assertion in tests/components/privacy-page.test.tsx that the controller list has no legalNameLabel term while HOST_CONTACT.legalName is empty (two plain expectations as in the identity tests).
+- Fix risk: None; adds one assertion to an existing test, the owner wants fewer tests overall.
+- Found by: HD6 verifier (host data task, T9)
+- Resolution: DEFERRED-OWNER (new, found during the host data task of 2026-10-14; by rule not fixed inside the task that found it; the owner wants fewer tests, so the decision round decides).
+
+### R-848: The English privacy notice labels the controller name 'Legal name' while the host is a private individual and the footer says 'Host name'
+- Severity: Nit
+- Category: Legal
+- Status: CONFIRMED
+- Location: src/i18n/domains/legal.ts:110 (EN) versus :243 (EL) and src/i18n/domains/shell.ts identity.legalNameLabel
+- Evidence:
+  ```
+  legal.ts:110 `legalNameLabel: "Legal name", // legal review`; legal.ts:243 `legalNameLabel: "Ονοματεπώνυμο", // legal review`; shell.ts: 'Host name' / 'Ονοματεπώνυμο'
+  ```
+- Problem: Once the owner enters the name the English privacy page labels it 'Legal name' and the footer 'Host name'; the Greek labels already agree.
+- Impact: A small wording mismatch on the privacy page; legal.ts is the owner draft and is not edited by agents (O82).
+- Fix: The owner or the lawyer decides whether the English label becomes 'Host name' or 'Full name'.
+- Fix risk: None.
+- Found by: HD6 verifier (host data task, T9)
+- Resolution: DEFERRED-OWNER (O82: legal.ts is never edited by agents; found during the host data task of 2026-10-14).
+
+### R-849: The tier-1 test reduction removed five rejection rows of the euro input parser and one invalid-date row of validateStay
+- Severity: Low
+- Category: Tests
+- Status: CONFIRMED
+- Location: tests/unit/availability-money.test.ts:24-40; tests/unit/stay-quote.test.ts (validateStay it.each, row ['10/10/2026', '2026-10-12'])
+- Evidence:
+  ```
+  git diff HEAD -- tests/unit/availability-money.test.ts shows the removed rows '   ', ',5', '0x10', 'Infinity', 'NaN' of the parseEuroInputToCents rejection list (task TD1-03 of the 2026-10-13 test reduction, same-branch duplicates per its cover check); src/lib/availability/money.ts:17-27 rejects them through WHOLE_EUROS/FRACTION_CENTS before Number()
+  ```
+- Problem: Input-validation rows that HEAD pinned are gone; the repo rule (O36/O46) says such tests are only strengthened. The kept rows ('abc', '1e3', '.50', '85.') exercise the same regex branches, so the coverage did not change, but the Number() quirks '0x10', 'Infinity' and 'NaN' are no longer named.
+- Impact: A change that replaces the regexes by Number() parsing would still be caught by 'abc' and '1e3' but not by name for hex, Infinity and NaN.
+- Fix: Restore the six rows (no new it), or record the owner's OK under O36/O46 that same-branch rows may go.
+- Fix risk: None.
+- Found by: HD8 verifier (host data task, pricing change P1b)
+- Resolution: DECLINED (owner decision 2026-10-15: "leave them deleted"): the five rejection rows of the euro parser and the invalid-date row of validateStay stay removed; the kept rows exercise the same regex branches. No code change.
+
+### R-850: The price sentence 'the prices on this page include all taxes and fees' and the Airbnb trust line 'Airbnb's own fees may apply' can be read as contradictory once the Airbnb URL is set
+- Severity: Low
+- Category: Legal
+- Status: SUSPECTED
+- Location: src/i18n/domains/availability.ts:139 and :186 (en), :256 and :303 (el); src/components/availability/StaySummary.tsx:110
+- Evidence:
+  ```
+  en.intro: 'The prices on this page include all taxes and fees, including the climate resilience fee (ΤΑΚΚ).' StaySummary.tsx:110 renders summary.trustAirbnb when isAirbnbListingUrl(AIRBNB_LISTING_URL) is true: 'Final price confirmed on Airbnb; Airbnb's own fees may apply. You pay nothing on this site.' The Airbnb URL is not set today, so the trust line is not shown yet.
+  ```
+- Problem: After the Airbnb listing URL is set (R3-L1) the summary card shows a total next to a sentence that other fees may apply; the intro sentence is scoped 'on this page' but the Airbnb line is on the same page.
+- Impact: A possibly unclear price statement after R3-L1; a legal-review point, not a code defect.
+- Fix: Part of the owner's or the lawyer's pass over the intro and trustAirbnb texts (both carry the // legal review marker); no change without the owner's wording.
+- Fix risk: None.
+- To confirm: The owner sets the Airbnb URL and reads the rendered page.
+- Found by: HD9 verifier (host data task, pricing change P2)
+- Resolution: DEFERRED-OWNER (the wording is the owner's; found during the host data task of 2026-10-14).
+
+### R-851: The placeholder list in the header comment of the availability dictionary omits {booked}
+- Severity: Nit
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: src/i18n/domains/availability.ts:1-5 (used at about lines 164 and 281)
+- Evidence:
+  ```
+  Header: '{count}, {nights}, {price}, {date}, {max}, {time}, {checkin}, {checkout}.' while the crossing strings use '{booked} is booked, so {date} is your new check-in.' (en) and '{booked}: κρατημένη. Νέα άφιξη: {date}.' (el); the old header did not list {booked} either.
+  ```
+- Problem: The header claims to list the placeholders but misses one that two strings use.
+- Impact: Documentation only.
+- Fix: Add {booked} to the header comment in a later cleanup.
+- Fix risk: None.
+- Found by: HD9 verifier (host data task, pricing change P2)
+- Resolution: DEFERRED-OWNER (economy: a nit that predates the host data task, found by the HD9 verifier).
+
+### R-852: README says the price texts on the availability page are marked '// legal review', and identity.md says every total carries the Airbnb trust line; both are too broad
+- Severity: Low
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: README.md:59 (sentence 'The cancellation, withdrawal and price texts ... marked `// legal review`'); docs/design/identity.md:141
+- Evidence:
+  ```
+  availability.ts: only the sentences written or changed on 2026-10-14 carry the marker ('Prices are per night, in euros.', the Airbnb price sentence and 'Nothing is booked or paid on this site.' do not); StaySummary.tsx:110 `{isAirbnbListingUrl(AIRBNB_LISTING_URL) ? t.summary.trustAirbnb : t.summary.trust}` with AIRBNB_LISTING_URL = ''
+  ```
+- Problem: Two documentation statements claim more than the code does.
+- Impact: A reader may think every price sentence was reviewed, or that the Airbnb trust line is shown today.
+- Fix: Task HD-T13 rewords both statements.
+- Fix risk: None (documentation).
+- Found by: HD10 verifier and lead (host data task, pricing change P3)
+- Resolution: FIXED by HD-T13 and HD-T14: the README sentence now says that the price statement, the cancellation and the withdrawal texts are the owner's statements of 2026-10-14 and that the sentences written or changed that day carry `// legal review`; identity.md line 141 now says that the total carries `summary.trustAirbnb` (quoted in full, equal to availability.ts:186) when the Airbnb URL is set, otherwise `summary.trust`. Evidence: verifiers wf_989ea478-ac2 and wf_dc9f9cd7-62b (the quote is character-identical to the dictionary string); gates policy, secrets, diff check 0.
+
+### R-853: The availability page test no longer pins that a stale read hides the calendar when rate periods exist
+- Severity: Low
+- Category: Tests
+- Status: CONFIRMED
+- Location: tests/components/availability-page.test.tsx:32 and :93-101
+- Evidence:
+  ```
+  The fixture default is `rates: []` and the stale test sets no rates; a scratchpad mutant that restores the old calendarShown (`rates.length > 0 || /[ob]/.test(nights)` for stale reads) passes all 11 tests.
+  ```
+- Problem: The behaviour changed by the no-price task (a stale calendar is replaced by the contact options even when rate periods exist) is tested only with an empty rates array; production always has rate periods.
+- Impact: A later edit that shows the planner for a stale read would pass the whole file and present unknown nights as selectable.
+- Fix: Task NP-T4.1 gives the stale, not_configured and fresh-calendar page tests a non-empty rates array.
+- Fix risk: None.
+- Found by: NP1 verifier (no-price change, wave W1)
+- Resolution: FIXED by NP-T4.1 (no-price change, 2026-10-16, Haiku 5.5 max): the page tests for the fresh, not_configured and stale reads now pass a non-empty rates array. Evidence: verifier wf_3b5f1923-9ab (mutants: the old calendarShown restored, a euro in the hero, a blank host name: each fails the new assertions); the old tests pass all three mutants, the new ones fail them; gates NP4 all 0 (2322 tests).
+
+### R-854: A price can be put back into the home hero without any test failing
+- Severity: Low
+- Category: Tests
+- Status: CONFIRMED
+- Location: tests/components/hero-living-photo.test.tsx; src/components/home/hero/HeroLivingPhoto.tsx
+- Evidence:
+  ```
+  A scratchpad mutant that adds `<p className="hero__price">from €85 / night</p>` inside .hero__actions passes all five home test files (43 tests); a control mutant fails, so the aliasing works.
+  ```
+- Problem: The no-price rule for the first block of the home page is pinned by no component test; the dictionary guard covers only dictionary strings.
+- Impact: A later edit can restore a hero price without a red test.
+- Fix: Two assertions in an existing hero test (task NP-T4.3).
+- Fix risk: None.
+- Found by: NP2 verifier (no-price change, wave W2)
+- Resolution: FIXED by NP-T4.3: two assertions in the existing hero test (`.hero__price` absent, no euro sign in the page). Evidence: mutants (a hero__price paragraph with a euro amount, and a class-less span with a euro amount) both fail; the real component passes 4/4; verifier wf_3b5f1923-9ab (mutants: the old calendarShown restored, a euro in the hero, a blank host name: each fails the new assertions).
+
+### R-855: The 'Booked' legend of the home nights strip (shown only when a night is booked) is pinned by no test
+- Severity: Nit
+- Category: Tests
+- Status: CONFIRMED
+- Location: src/components/home/NightsTeaser.tsx:35; tests/components/home-sections-v5c.test.tsx
+- Evidence:
+  ```
+  A mutant `const hasBooked = true;` passes all five home test files (43 tests).
+  ```
+- Problem: A regression to an always-visible legend is not caught.
+- Impact: Cosmetic.
+- Fix: Optional: .teaser__legend assertions in the existing 'shows 14 nights' test and in a fully free case.
+- Fix risk: None.
+- Found by: NP2 verifier (no-price change, wave W2)
+- Resolution: DEFERRED-OWNER (economy: the owner wants fewer tests; a nit found by the NP2 verifier).
+
+### R-856: The header comment of calendarDate.ts still says the module serves availability and prices
+- Severity: Nit
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: src/lib/availability/calendarDate.ts:1
+- Evidence:
+  ```
+  Line 1: '// Calendar dates for availability and prices: ISO 'YYYY-MM-DD' strings with'; after NP-T3.1 stayQuote.ts has no price code.
+  ```
+- Problem: The comment names a price role that the module no longer has.
+- Impact: Documentation only.
+- Fix: Task NP-T4.3 drops ' and prices' from the comment. Renaming stayQuote.ts (it no longer quotes) is a separate decision and would touch 5 importers: not done.
+- Fix risk: None.
+- Found by: NP3 verifier (no-price change, wave W3)
+- Resolution: FIXED by NP-T4.3: ' and prices' removed from the first comment line of calendarDate.ts (code and other lines byte-identical per the verifier).
+
+### R-857: After the no-price documents task docs/design/identity.md had lost a blank line and still named the removed stale-data warning and the quote card
+- Severity: Nit
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: docs/design/identity.md:128-129, 369, 601, 610
+- Evidence:
+  ```
+  The snapshot had an empty line before '### 1.4 Honesty rules (binding)'; the `warning` token row said 'Stale data'; `--radius-dialog` and `--shadow-raised` rows said 'Quote card' although the summary card is the user of both tokens (calendar.css summary-card rule).
+  ```
+- Problem: Four lines of the design document disagreed with the code or with the file layout after task NP-T4.2.
+- Impact: Documentation only.
+- Fix: Task NP-T4.4: restore the blank line and reword the three rows.
+- Fix risk: None.
+- Found by: NP4 verifier (no-price change, wave W4)
+- Resolution: FIXED by NP-T4.4 (Haiku 5.5 max): the patch has exactly the four hunks of the slice (lead diff check), git diff --check 0, release policy 0, no test or script pins the old wording (search in tests, scripts, src, README, docs).
+
+### R-858: With Booking.com as the only channel the availability page has no calendar at all, and its text still tells guests to choose dates in the calendar
+- Severity: Medium
+- Category: Logic
+- Status: CONFIRMED
+- Location: src/lib/prisma-repositories/availabilityRepository.ts (not_configured without AIRBNB_ICAL_URL); src/i18n/domains/availability.ts intro and howToBook[0]; src/app/[locale]/availability/page.tsx calendarShown
+- Evidence:
+  ```
+  Screenshot of /en/availability on the production build (.runtime/hostdata/shots/noprice-availability-en-1440.png): the intro reads 'Choose your check-in night, then your check-out day.', the info note says free dates cannot be shown, and the first how-to-book step says 'Choose your check-in night and check-out day in the calendar.' The only calendar source is AIRBNB_ICAL_URL (BOOKING_ICAL_URL is a reserved empty line that nothing reads); the owner uses only Booking.com.
+  ```
+- Problem: The owner wants the site to show availability only, but without an Airbnb export no availability is shown, and two sentences point at a calendar that is not there. The 14-night strip and the mobile BookBar are hidden for the same reason.
+- Impact: Guests see no free dates and instructions that refer to a missing calendar until a Booking.com calendar feed exists.
+- Fix: The Booking.com calendar feed (design A in plan-result.json, key plan.feedDesign), approved by the owner on 2026-10-16; the two sentences then become true. Not fixed inside the no-price change (new feature, schema and protected integration tests).
+- Fix risk: The feed needs a migration, about ten production files, owner answers (the export URL shape, booked-only or booked-and-closed export) and an owner OK for the singleton assertions of tests/integration/availability-schema.test.ts.
+- Found by: lead (no-price change, Chromium check of the production build without a database)
+- Resolution: FIXED in code (2026-10-20, Booking.com feed project, waves W0 to W4 as batches FD0 to FD8 and HZ1/HZ2): BOOKING_ICAL_URL replaces the Airbnb feed (one feed; https only, default port, no userinfo, a non-empty query, and exactly the pairs ical.booking.com => /v1/export and admin.booking.com => /hotel/hoteladmin/ical.html for the start URL and for every redirect; the singleton calendar_sync_state row is re-keyed to 'booking' by migration 20261020120000_booking_calendar_source with its snapshot reset); reservations and closures both show as booked; the operations worker syncs at most every 30 minutes and the public pages hide the calendar after 12 hours without a successful sync. Evidence: independent verifiers for every task (wf_651c9fb4-6d0, wf_9b81a205-89d, wf_f85e25db-991, wf_b6c19a30-6a5, wf_1fe23ccc-4b1, wf_05c5f977-ec2, wf_8adf3da1-cea) with mutants of the allowlist, the parser, the sync, the page and the migration; a five-lens holistic review (wf_3cb5bc15-472: no Critical, High or Medium security or correctness defect after 72 URL classes and 400,000 fuzz mutations of the allowlist, real fetch redirects, 512 MiB compression bombs and 220 mutants) and the decision round D-HOLISTIC; the Docker-backed integration suite on real PostgreSQL 16: 24 files, 137 tests; a browser check of the production build against a seeded throwaway PostgreSQL 16 (scenarios fresh, tonight blocked and stale 12 h 05 min in en and el at 1440, 768 and 390 px): 119 of 119 checks, 0 failures; npm run verify:release PASSED 30/30 gates (185.9 s: default suite 168 files / 2335 tests, coverage 93.75 / 87.96 / 95.91 / 94.86, typecheck, lint, security lint, dead-code, licenses, Prisma integrity with 25 migration files, build, artifact secret scan, orphan check); npm run docker:build built the three images (villa-app:5bf315845ac4-dirty, -workers, -migrate); npm run smoke:image: all 25 checks passed (the new migration applied to an empty database, readiness 200, operations worker 'calendar not_configured'); Docker objects unchanged afterwards. Not verified against a real feed: the owner creates the export in the Booking.com extranet with booked and closed dates (Probe A: the real URL shape and an example export were never seen), sets BOOKING_ICAL_URL in the production environment only after the English privacy-notice edit of R-843, and checks one reservation and one closed date after the first 'Sync now' (README 'Open owner inputs' and the first-sync paragraph of scripts/README.md).
+
+### R-859: The home host letter and about ten Greek guest texts speak of the host as a woman while the name given for the host is masculine
+- Severity: Low
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: src/i18n/domains/home.ts:200-202, 322, 325; checkin.ts:200, 246, 255, 261; portal.ts:84, 93, 105; stay.ts:115
+- Evidence:
+  ```
+  EN 'looked after by its host herself. She ...' (home.ts:200-202); EL 'η ίδια η οικοδέσποινά του' and 'οικοδέσποινα' in ten Greek lines; HOST_CONTACT.legalName is now 'Παναγιώτης Βασιλάκης / Panagiotis Vasilakis'.
+  ```
+- Problem: The owner texts and the identity block name different-sounding hosts; whether Panagiotis Vasilakis is the registered operator and another person is the day-to-day host is a fact only the owner knows.
+- Impact: Possible confusion for guests; no functional defect.
+- Fix: The owner decides (same person: new wording for about 13 strings; different persons: nothing). HOST_PROFILE.name stays '' (no signature) until then.
+- Fix risk: None.
+- Found by: decision round D-NOPRICE (Opus agent, no-price change)
+- Resolution: DECLINED by the owner (2026-10-20): the hosts are the owner's mother, who is the hostess and writes the home letter, and the owner (HOST_CONTACT.legalName), so the feminine host texts in English and Greek are correct and nothing was changed. HOST_PROFILE.name stays '' because her name is not published anywhere.
+
+### R-860: The Booking.com export allowlist was pinned by too few reject rows
+- Severity: Low
+- Category: Tests
+- Status: CONFIRMED
+- Location: tests/unit/ical-fetch.test.ts (start-URL table and redirect table); tests/security/security-boundaries.test.ts (env-schema table)
+- Evidence:
+  ```
+  Mutants of isBookingCalendarUrl (src/lib/runtime-env-schema.js) that left all 203 tests of the three files green: a trailing-slash path accepted; a redirect guard without the non-empty-query condition; a check of only the username or only the password; a bare '?' accepted; a trailing-dot host accepted; a host that only ends in booking.com.
+  ```
+- Problem: No row named these six loosenings, and the redirect table had no 'no query' row, so the guard that protects the secret feed URL (SSRF, token leak) could be weakened with a green suite.
+- Impact: A later edit could loosen the allowlist unnoticed.
+- Fix: 22 reject rows: start-URL table +7, redirect table +8, env-schema table +7 (task FD-W1-Br).
+- Fix risk: None: rows only, each rejected by the unchanged predicate.
+- Found by: verifier FD1sec (Booking.com feed project, wave W1)
+- Resolution: FIXED by FD-W1-Br (2026-10-20, Haiku 5.5 max, patch R5-FD-W1-Br.patch). Evidence: verifier wf_9b81a205-89d: 25 mutants of the predicate, three of them in the redirect path only and three at the call sites only, are all killed by the new rows; the one survivor (search.length > 0 instead of > 1) is provably equivalent because URL.search is '' or at least 2 characters; gates FD1c all 0 (2355 tests).
+
+### R-861: The 8-character floor of the gitleaks rule booking-calendar-export-token was pinned by no test
+- Severity: Low
+- Category: Tests
+- Status: CONFIRMED
+- Location: scripts/tests/secret-scanning.test.mjs; config/secret-scanning/gitleaks.toml (rule booking-calendar-export-token, quantifier {8,})
+- Evidence:
+  ```
+  On a scratch copy of the toml (gitleaks 8.30.1) changing {8,} to {16,} stops the detection of 8-character tokens, but the tests used only a 31-character token and the 7-character placeholder 'fixture', so both versions passed.
+  ```
+- Problem: The shortest token that the rule reports was not pinned.
+- Impact: A change of the quantifier would silently let short real tokens through the secret scan.
+- Fix: A third sample with an 8-character token built from pieces and a sorted comparison of the three hashes (task FD-W1-Fr); the 7-character side was already pinned by 'fixture'.
+- Fix risk: None.
+- Found by: verifier FD1sec (Booking.com feed project, wave W1)
+- Resolution: FIXED by FD-W1-Fr (2026-10-20, patch R5-FD-W1-Fr.patch). Evidence: verifier wf_9b81a205-89d, scratch repository root with its own toml: {16,} and {9,} fail the 'fails' test, {7,} and {4,} fail the 'placeholders' test; npm run check:secrets:sources passed (findings=0).
+
+### R-862: Comments of the iCal parser said more than the code does
+- Severity: Low
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: src/lib/availability/icalParser.ts (file header, the comment of IcalParseError, the doc comment of parseBlockedRanges, the doc of the code malformed_line); tests/unit/ical-parser.test.ts line 28
+- Evidence:
+  ```
+  The header said recurrence properties are 'read' (they throw unsupported_recurrence), that 'anything outside the subset throws' (components other than VEVENT are skipped: tests 'ignores a VALARM inside a VEVENT', 'ignores VTIMEZONE and VTODO components'), that every other property is dropped, and its list of throws omitted an end after the year 9999; the IcalParseError comment said 'size caps have none' (too_many_events carries the BEGIN:VEVENT line); the malformed_line doc lacked the BEGIN/END name case; a fixture comment said 'Folded at 75 octets' for a 71-octet line; 'DURATION with DATE values' hid that DURATION is whole days or weeks.
+  ```
+- Problem: Documentation that a maintainer trusts when changing the parser contradicted the code.
+- Impact: A maintainer could believe that unknown components or a recurrence rule inside a VTIMEZONE fail the sync, or that an event cap error has no line number.
+- Fix: Comment-only tasks FD-W1-Er, Er2, Er3, Er4 and Er5 (five passes; every statement of the final header was cited against a throw site and a pinning test by the verifier of Er4).
+- Fix risk: None: comment lines only (the diff of the non-comment lines is empty each time).
+- Found by: verifiers FD1rest, FD1c, FD2, FD3, FD4 and the holistic review (Booking.com feed project)
+- Resolution: FIXED by FD-W1-Er to FD-W1-Er5 (2026-10-20, Haiku 5.5 max, patches R5-FD-W1-Er.patch to R5-FD-W1-Er5.patch). Evidence: verifiers wf_651c9fb4-6d0, wf_9b81a205-89d, wf_f85e25db-991, wf_b6c19a30-6a5 and wf_1fe23ccc-4b1 confirmed each pass; the independent verifier of the final text (wf_8adf3da1-cea) confirmed every sentence of the header and of the IcalParseError comment against the code (all 18 throw sites and probes on the real parser); tests/unit/ical-parser.test.ts 102 passed. Three Nit-level imprecisions remain on purpose and are not worth a sixth pass: SUMMARY's value is never read but its line must still be well formed; DURATION accepts at most 5 digits; the malformed_line doc does not name an invalid parameter name.
+
+### R-863: A Booking.com button rendered without an href was invisible to the hide tests
+- Severity: Low
+- Category: Tests
+- Status: CONFIRMED
+- Location: tests/components/availability-planner.test.tsx (two hide tests); tests/components/apartment-page.test.tsx (hide loop); tests/components/hero-living-photo.test.tsx (two tests)
+- Evidence:
+  ```
+  Replacing the condition `{bookingHref ? (` by `{true ? (` in BookingOptions.tsx, ApartmentCta.tsx and HeroLivingPhoto.tsx (the anchor then has no href) left 43, 25 and 25 tests green, because the hide assertions query role=link and an anchor without href has no link role.
+  ```
+- Problem: A dead 'Book on Booking.com' button (identity section 1.4 forbids placeholder buttons) would pass the suite.
+- Impact: A future edit that drops the validity condition ships a dead call to action.
+- Fix: One text-absence assertion in each hide test, no new test (tasks FD-W2-Ar and FD-W2-Br).
+- Fix risk: None.
+- Found by: verifier FD2 (Booking.com feed project, wave W2)
+- Resolution: FIXED by FD-W2-Ar and FD-W2-Br (2026-10-20, patches R5-FD-W2-Ar.patch, R5-FD-W2-Br.patch). Evidence: verifier wf_b6c19a30-6a5: the undefined-href, empty-href and fallback-href mutants die in all three components; the assertions are not vacuous (with a valid link the text query finds the anchor, also in the Greek render).
+
+### R-864: Documents and CLAUDE.md named the retired AIRBNB_ICAL_URL, a reserved BOOKING_ICAL_URL and the unconfirmed retention while the code had moved to the Booking.com feed
+- Severity: Low
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: .env.example; README.md; scripts/README.md; docs/design/identity.md (16 passages); docs/architecture/deployment-target.md; CLAUDE.md lines 51, 67, 98; PROGRESS.md live to-do items
+- Evidence:
+  ```
+  git grep -i for AIRBNB_ICAL, 'separate change', 'reserved' and 'accountant' over these files after wave W1 listed the passages; CLAUDE.md said the only calendar source was the Airbnb URL; PROGRESS.md told the operator to set AIRBNB_ICAL_URL.
+  ```
+- Problem: An operator following the documents would set a variable that nothing reads and the calendar would stay 'not_configured' with no alert.
+- Impact: Transitional between the waves; a release in that state would have been misdocumented.
+- Fix: Tasks FD-W4-A to FD-W4-D (documents), the lead's edit of CLAUDE.md and of the live to-do items of PROGRESS.md.
+- Fix risk: None.
+- Found by: verifiers FD1sec, FD3 and FD4 and the holistic review (Booking.com feed project)
+- Resolution: FIXED by FD-W4-A to FD-W4-D, FD-W4-Br/Bs/Dr/Ds and the lead (2026-10-20). Evidence: verifier wf_1fe23ccc-4b1 (W4-A and W4-C PASS, W4-B and W4-D PASS-WITH-NOTES, every note fixed afterwards; the last .env.example wording, 'a non-default port', by FD-W4-Dt after the verifier wf_8adf3da1-cea) and the holistic documents review (every number, name, exit code and command checked against the code); the repository-wide sweep for airbnb, withdrawal, accountant, R3-L6 outside the history records, the old migration, the new migration test and legal.ts lines 156-157 prints nothing.
+
+### R-865: Three UI rules are pinned by no test: the how-to-book Booking.com step with an invalid link, the sr-only 'opens in a new tab' text of the apartment CTA and the hero button, and the absence of the removed withdrawal section
+- Severity: Nit
+- Category: Tests
+- Status: CONFIRMED
+- Location: src/app/[locale]/availability/page.tsx (how-to-book list); src/components/apartment/ApartmentCta.tsx; src/components/home/hero/HeroLivingPhoto.tsx
+- Evidence:
+  ```
+  Verifier wf_f85e25db-991 mutants: always rendering the step with an invalid link, dropping the sr-only span in ApartmentCta, and re-adding the withdrawal Section all survived; none of these rules was pinned before the change either.
+  ```
+- Problem: Small UI rules without a test.
+- Impact: A regression in these rules would go unnoticed; two of them are cosmetic and the third (the withdrawal Section) was removed on purpose and no longer type-checks once its dictionary keys are gone.
+- Fix: None.
+- Fix risk: None.
+- Found by: verifier FD2 (Booking.com feed project, wave W2) and the lead
+- Resolution: DECLINED (lead, 2026-10-20): the rules were unpinned before this change, the owner wants fewer tests (O36/O46 protect only security, auth, legal and contract tests), and the withdrawal pins were removed on purpose by the owner's decision of 2026-10-20.
+
+### R-866: The canonical Booking.com property URL was offered to the owner as a free choice, but isBookingComListingUrl accepts only Share links
+- Severity: Medium
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: README.md line 61; src/data/contact.ts line 45 (TODO); src/lib/contactLinks.ts lines 15-31
+- Evidence:
+  ```
+  README: 'which Booking.com link to publish (the Share link in the code or the canonical property URL)'; the validator accepts only /^\/Share-[A-Za-z0-9_-]+$/ on www.booking.com or booking.com; run on the real function: the canonical hotel URL false, with a query false, https://www.booking.com/Share-AiCapK true.
+  ```
+- Problem: Replacing the constant by the canonical URL makes bookingComHref() return undefined and the only booking button disappears from the home, apartment and availability pages with no error.
+- Impact: Silent loss of the only booking channel after an owner edit that the documents invited.
+- Fix: The two texts say that only a Share link passes and that a canonical URL also needs a change of the validator and of its test (tasks FD-HZ1-A and FD-HZ2-C).
+- Fix risk: None (text only).
+- Found by: holistic review (guest-ui and docs-ops reviewers) and decision round D-HOLISTIC H1
+- Resolution: FIXED by FD-HZ1-A and FD-HZ2-C (2026-10-20, patches R5-FD-HZ1-A.patch, R5-FD-HZ2-C.patch). Evidence: verifier wf_05c5f977-ec2 ran the real validator on the shipped constant, a canonical URL, query, http, look-alike hosts and ports, named the three pages that call bookingComHref() and found no other text that offers the canonical URL. The owner's choice of the link stays an open input.
+
+### R-867: Without a calendar the availability page still told guests to choose dates in the calendar
+- Severity: Low
+- Category: Bug
+- Status: CONFIRMED
+- Location: src/app/[locale]/availability/page.tsx (lead and how-to-book list); src/i18n/domains/availability.ts intro, howToBook[0], howToBookBookingCom
+- Evidence:
+  ```
+  Scratch render of the page for not_configured, stale and a read error: the planner section held only the info notice and the contact card, while the lead 'Choose your check-in night, then your check-out day.', step 1 'in the calendar' and 'Book the same dates on Booking.com.' were rendered unconditionally. At HEAD the calendar showed whenever rate periods existed (HEAD page.tsx:86), so this contradiction is a regression of this uncommitted change (the no-price work), not an old wart; it is the first public state while BOOKING_ICAL_URL is unset.
+  ```
+- Problem: The page contradicted itself in the state that the release starts in.
+- Impact: Confusing instructions for guests until the owner sets the export URL.
+- Fix: Render the lead, step 1 and the 'same dates' step only when a calendar is shown; one absence assertion in each of the stale and not-configured tests and one presence assertion; one sentence in the design spec (task FD-HZ1-B). No new guest text.
+- Fix risk: In the no-calendar states the how-to-book list no longer names Booking.com (the contact card keeps the Booking.com button).
+- Found by: holistic review (correctness and guest-ui reviewers) and decision round D-HOLISTIC H2
+- Resolution: FIXED by FD-HZ1-B (2026-10-20, patch R5-FD-HZ1-B.patch). Evidence: verifier wf_05c5f977-ec2: six mutants (unconditional lead, unconditional step 1, dropped calendar condition, swapped conditions, step only for an invalid link, whole list dropped) are all killed; the page was rendered in EN and EL for four states and nothing is left dead or empty; .avail-page__head is a grid and the lead is removed, not hidden. Residual risk recorded in R-879.
+
+### R-868: The dictionary guard 'no price, fee or cancellation wording' missed the Greek fee name, totals and refunds
+- Severity: Low
+- Category: Tests
+- Status: CONFIRMED
+- Location: tests/unit/i18n-parity.test.ts lines 63-77
+- Evidence:
+  ```
+  The regex missed 'Τέλος ανθεκτικότητας στην κλιματική κρίση' (the Greek name of the removed climate fee), 'Μερικό σύνολο', 'Σύνολο', 'Total', 'Subtotal', 'Επιστροφή χρημάτων', 'Refund of 50%'; it caught 'Climate resilience fee' and 'Δωρεάν ακύρωση'.
+  ```
+- Problem: The exact strings that the owner had removed could be re-added with the guard still green.
+- Impact: The owner's decision of 2026-10-15 (no price, fee or cancellation text) was protected only for English fee words.
+- Fix: Alternatives for the Greek fee stem, totals, refunds and 'κλιματικ' added to the regex; the {total} placeholder of the photo counter and 'Κλιματισμός' stay allowed (task FD-HZ1-C). No new test.
+- Fix risk: Future wording with 'total', 'συνολ', 'επιστροφ' or 'κλιματικ' in the four guarded domains fails the test by design.
+- Found by: holistic review (guest-ui reviewer) and decision round D-HOLISTIC H4
+- Resolution: FIXED by FD-HZ1-C (2026-10-20, patch R5-FD-HZ1-C.patch). Evidence: verifier wf_05c5f977-ec2: the 9 strings that must be flagged are flagged, the 6 that must not are not; the walk covers 546 real strings with 0 false positives; mutants that add 'Free dates Total', 'Διαθεσιμότητα Σύνολο', 'Free dates, refund' fail the test.
+
+### R-869: The parser validates a cancelled event before it skips it, but no test pinned it
+- Severity: Low
+- Category: Tests
+- Status: CONFIRMED
+- Location: src/lib/availability/icalParser.ts lines 257-261; tests/unit/ical-parser.test.ts
+- Evidence:
+  ```
+  Mutant P35 (`if (!event.cancelled) ranges.push(eventRange(event));`) survived the parser and sync tests; a cancelled event with DTEND before DTSTART must give invalid_range and one without DTSTART invalid_event.
+  ```
+- Problem: The strictness is part of the documented contract (the header lists these errors without an exception) but was unpinned.
+- Impact: A reorder of eventRange and the cancelled check would silently accept malformed cancelled events.
+- Fix: One row in the existing invalid_range table and one assertion in the existing 'rejects an event without DTSTART' test (task FD-HZ1-D); no zero-length case, so the contingency patch for the open zero-length question stays applicable.
+- Fix risk: A later decision to skip malformed cancelled events must edit these two lines.
+- Found by: holistic review (test-strength reviewer) and decision round D-HOLISTIC H9
+- Resolution: FIXED by FD-HZ1-D (2026-10-20, patch R5-FD-HZ1-D.patch). Evidence: verifier wf_05c5f977-ec2: P35 fails both new checks, P36 and P37 fail the missing-DTSTART assertion (P37 both); 102 tests pass.
+
+### R-870: The lower bound of the recordable HTTP status was untested
+- Severity: Low
+- Category: Tests
+- Status: CONFIRMED
+- Location: src/lib/availability/calendarSync.ts lines 60-61; tests/unit/calendar-sync.test.ts lines 337-351
+- Evidence:
+  ```
+  Mutant S30 (status >= 0) survived all tests; the column CHECK is 100..599 (migration 20260928181000, line 59) and the test pinned only 600 and 999.
+  ```
+- Problem: A broken lower bound would make recordFailure throw a database error instead of recording the failure.
+- Impact: No backoff would be stored and the run would fail every five minutes (whether Node's fetch can surface a status below 100 was not verified).
+- Fix: The row 99 added to the existing it.each (task FD-HZ1-E).
+- Fix risk: None.
+- Found by: holistic review (test-strength reviewer) and decision round D-HOLISTIC H10
+- Resolution: FIXED by FD-HZ1-E (2026-10-20, patch R5-FD-HZ1-E.patch). Evidence: verifier wf_05c5f977-ec2: S30 to S33 die on the 99 row, S34 and S35 on the 600 and 999 rows; 36 tests pass.
+
+### R-871: The runbook's shape-check one-liner printed token material for unexpected links
+- Severity: Low
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: scripts/README.md line 77
+- Evidence:
+  ```
+  The first version printed the whole pasted value in Node's ERR_INVALID_URL message when the https:// prefix was missing and could not show userinfo; the second printed query key names and the path of any host, so 'https://ical.booking.com/v1/export?FAKESECRETVALUE' printed the value; the proposed third version still printed u.protocol verbatim ('FAKESECRETTOKEN:abc' printed 'fakesecrettoken:').
+  ```
+- Problem: A check whose purpose is to avoid printing the secret printed it for links of an unexpected shape.
+- Impact: A pasted token could reach the operator's terminal and its scrollback.
+- Fix: The command now prints only fixed words: https: or other-protocol, the host and the path only when they are the expected ones (otherwise other-host and other-path), t or no-t, USERINFO, or 'not an absolute URL' (tasks FD-W4-Br, FD-W4-Bs, FD-HZ1-F).
+- Fix risk: http links print other-protocol (no finer diagnosis; both are rejected anyway).
+- Found by: verifier FD4, holistic review (security and docs-ops reviewers) and decision round D-HOLISTIC H11
+- Resolution: FIXED by FD-W4-Br, FD-W4-Bs and FD-HZ1-F (2026-10-20). Evidence: verifier wf_05c5f977-ec2 extracted the command by script and ran it in bash 3.2 and zsh 5.9 on 48 synthetic inputs plus EOF cases: 0 leaks of the FAKESECRET marker or of any non-ASCII input text, 0 stderr output, identical output in both shells.
+
+### R-872: The first-sync remedy omitted the web restart and the first scheduled run
+- Severity: Low
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: scripts/README.md line 258
+- Evidence:
+  ```
+  The sentence ended 'delete BOOKING_ICAL_URL until it is fixed'; web reads the variable through env_file when its container is created (docker/docker-compose.prod.yml line 58; availabilityRepository.ts line 93), and a migrated row is due at once (next_attempt_at = CURRENT_TIMESTAMP) so the operations run (every 5 minutes) can make the first sync before the operator checks it.
+  ```
+- Problem: Deleting the line did not hide a wrong calendar until web was recreated.
+- Impact: Guests could see a fully free calendar from a wrong link.
+- Fix: The sentence now says to run the compose command that recreates web, and that the first scheduled run can sync within 5 minutes (task FD-HZ1-F).
+- Fix risk: SUSPECTED, not run (no Docker for the verifier): the remedy relies on compose recreating web when the env file changed, the same assumption as the paragraph above it.
+- Found by: holistic review (docs-ops reviewer) and decision round D-HOLISTIC H12
+- Resolution: FIXED by FD-HZ1-F (2026-10-20, patch R5-FD-HZ1-F.patch). Evidence: verifier wf_05c5f977-ec2 confirmed statically the env_file, the Dockerfile CMD, the single environment parse at start-up, the run --rm operations service and the cron line.
+
+### R-873: The migration test pinned 5 of the 15 columns that the migration resets and never ran the empty-table re-seed branch
+- Severity: Low
+- Category: Tests
+- Status: CONFIRMED
+- Location: tests/integration/booking-calendar-source-migration.test.ts vs prisma/migrations/20261020120000_booking_calendar_source/migration.sql
+- Evidence:
+  ```
+  The legacy state seeded and the assertions selected only five columns; removing the reset of last_attempt_at, next_attempt_at, last_failure_at, last_error_code, last_http_status, the lease pair, created_at or the re-seed INSERT left every case green (replay on PGlite: 10 mutants survived the old test).
+  ```
+- Problem: created_at matters: operationalMonitor.ts measures staleness from lastSuccessAt ?? createdAt, so a re-keyed row that kept an old created_at would open the stale alert at the first failed sync.
+- Impact: An edit of the one-shot migration could drop a reset and every test would stay green.
+- Fix: Seed a non-default value in every reset column, select all 15 columns, compare with a freshly seeded row, and add one case for the empty table (task FD-HZ2-A).
+- Fix risk: The 'recent' windows use the database clock only.
+- Found by: holistic review (test-strength reviewer) and decision round D-HOLISTIC H6
+- Resolution: FIXED by FD-HZ2-A (2026-10-20, patch R5-FD-HZ2-A.patch). Evidence: lead's npm run test:integration on real PostgreSQL 16: 24 files, 137 tests passed, the file has 5 cases; verifier wf_05c5f977-ec2 replayed the scenarios on PGlite: all 11 mutants (ten resets and the INSERT) are killed, with the old test 10 survived.
+
+### R-874: The stale gates of the availability page and of nextFreeNight were redundant in the tests
+- Severity: Low
+- Category: Tests
+- Status: CONFIRMED
+- Location: src/app/[locale]/availability/page.tsx lines 76-78; src/components/home/homeNights.ts line 30; tests/components/availability-page.test.tsx; tests/unit/home-nights.test.ts
+- Evidence:
+  ```
+  Mutants A02 (calendarShown without its status clause) and N2 (the stale check of nextFreeNight deleted) survived because both stale fixtures carried all-unknown nights, which is what the repository produces for stale data.
+  ```
+- Problem: Each layer's own gate could not fail in isolation.
+- Impact: A change of the repository's encoding would leave the page tests green.
+- Fix: The two stale fixtures carry known nights (task FD-HZ2-B): two one-token edits, no new test.
+- Fix risk: The fixtures model a state the repository does not produce today (the comments say why); A01 (fresh with all-unknown nights) stays unpinned.
+- Found by: holistic review (test-strength reviewer) and decision round D-HOLISTIC H7
+- Resolution: FIXED by FD-HZ2-B (2026-10-20, patch R5-FD-HZ2-B.patch). Evidence: verifier wf_05c5f977-ec2: with the new fixtures A02 and N2 are killed, with the old fixtures both survive; 19 tests pass. A01 is an accepted survivor.
+
+### R-875: When every night of the horizon is blocked the planner still prompts 'Choose your check-in night.'
+- Severity: Low
+- Category: Logic
+- Status: CONFIRMED
+- Location: src/components/availability/AvailabilityPlanner.tsx lines 279-280 (HEAD 330-331); src/components/availability/StaySummary.tsx line 50
+- Evidence:
+  ```
+  Scratch render with 365 blocked nights: 92 disabled day buttons and the prompt unchanged; the summary offers Booking.com, call and WhatsApp. At a fully blocked horizon nextFreeNight returns null and no mobile bar renders.
+  ```
+- Problem: No text says that nothing is free in the shown period.
+- Impact: A guest taps disabled days without feedback; the booking and contact options stay available.
+- Fix: None: a fix needs a new guest sentence (no dictionary string says 'no free night'; the 'unavailable' notice would say that dates cannot be shown).
+- Fix risk: Residual UX gap, more likely now that closures are part of the feed.
+- Found by: holistic review (guest-ui reviewer) and decision round D-HOLISTIC H3
+- Resolution: DECLINED (decision D-HOLISTIC H3, Opus 5.5 max, 2026-10-20): the behaviour is older than this change, nothing is wrong in the data, the options stay available, and a fix needs owner-approved wording; known limitation (the reason that the home bar shows the next free night, given in the review, is wrong: no bar renders).
+
+### R-876: The timeout.aborted fallback of the fetcher is never decisive in a test
+- Severity: Low
+- Category: Tests
+- Status: CONFIRMED
+- Location: src/lib/availability/icalFetch.ts line 143; tests/unit/ical-fetch.test.ts
+- Evidence:
+  ```
+  Mutant F17 (the line `if (timeout.aborted) throw new CalendarFetchError('timeout');` deleted) survived; on Node 22.19.0 AbortSignal.timeout aborts with a TimeoutError DOMException that isTimeoutError already maps.
+  ```
+- Problem: A defensive line for runtimes that wrap the abort error is not pinned.
+- Impact: If a future runtime wraps abort errors, a timeout would be logged as 'network' (a diagnostic code only).
+- Fix: None.
+- Fix risk: Do not delete the line as unreachable without a reference search.
+- Found by: holistic review (test-strength reviewer) and decision round D-HOLISTIC H8
+- Resolution: DECLINED (decision D-HOLISTIC H8, Opus 5.5 max, 2026-10-20): defensive fallback, impact is only the diagnostic code; pinning it needs a stub of an abort reason that the real timer never produces; F17 is recorded as an accepted survivor.
+
+### R-877: With a valid link the how-to-book bullets read as a sequence although Booking.com and phone/WhatsApp are alternatives
+- Severity: Nit
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: src/app/[locale]/availability/page.tsx lines 132-136; src/i18n/domains/availability.ts howToBookBookingCom and howToBook[1] (TODO (owner) comments)
+- Evidence:
+  ```
+  Scratch render with the shipped link: [1] Choose... in the calendar. [2] Book the same dates on Booking.com. [3] Call us or send a WhatsApp message with your dates: ... [4] Arrival instructions ...; the Airbnb version ended 'payment and confirmation happen there', the new line has no such ending and no 'or'.
+  ```
+- Problem: A guest may read steps 2 and 3 as both required.
+- Impact: Misreading risk only.
+- Fix: New guest wording ('Or ...' or one merged line) is the owner's pending decision about the Booking.com wording.
+- Fix risk: None.
+- Found by: holistic review (guest-ui reviewer) and decision round D-HOLISTIC H5
+- Resolution: DEFERRED-OWNER (decision D-HOLISTIC H5, 2026-10-20: the Booking.com booking wording is an open owner input, TODO (owner) at availability.ts howToBookBookingCom; any new sentence would be invented guest text; under the H2 fix the ambiguity remains only in the calendar-shown state).
+
+### R-878: PROGRESS.md sent the owner to a commit map that predated the feed project and omitted 22 of its paths
+- Severity: Medium
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: PROGRESS.md (the two latest RESUME FROM lines, 'Current state', 'Decisions in force' O22, the portal-flags line); .runtime/review5/COMMIT-MAP.md; .runtime/cleanup3/commit-map.mjs
+- Evidence:
+  ```
+  git status listed 203 entries and the map 181; missing: the untracked migration directory prisma/migrations/20261020120000_booking_calendar_source/, its integration test, schema.prisma, the manifest, the readiness route, runtime-env-schema.js, icalFetch.ts, icalParser.ts, operationalMonitor.ts, the admin route and others; the generator skipped every R5-FD patch; O22 still said availability came from the Airbnb export; the live to-do said the portal flags default to off although the first migration seeds them on (O48).
+  ```
+- Problem: A commit made by the old map would have left out the new migration directory and the exported function that calendarSync.ts needs.
+- Impact: A broken commit or release.
+- Fix: A 'feed' family in the generator, a regenerated map, a new RESUME FROM line, O22 rewritten, the stale lines marked superseded (lead).
+- Fix risk: None.
+- Found by: holistic review (docs-ops reviewer) and decision round D-HOLISTIC H13
+- Resolution: FIXED by the lead (2026-10-20): the generator has the feed family, the map was regenerated on the final tree and compared with git status (0 missing paths), the map tells the owner to git add the new migration directory and its test, PROGRESS.md carries the RESUME FROM of 2026-10-20 and the corrected O22 and flags lines.
+
+### R-879: In the release state the apartment CTA lead and the 'See free dates' / 'Check dates' CTAs still point to a calendar that is not shown
+- Severity: Low
+- Category: Logic
+- Status: CONFIRMED
+- Location: src/i18n/domains/house.ts line 69 ('Free nights are on the availability calendar.', rendered by ApartmentCta.tsx line 20); the CTAs 'See free dates', 'Check dates', 'See summer dates'
+- Evidence:
+  ```
+  While BOOKING_ICAL_URL is unset, /availability shows the notice and the contact options instead of a calendar; at HEAD the lead read 'Free nights and their prices are on the availability calendar.' and the calendar showed whenever rate periods existed.
+  ```
+- Problem: Texts on other pages promise a calendar for the transitional state before the owner sets the export URL.
+- Impact: Confusion for guests for as long as the variable is unset (days: the release order sets it right after the migration and the privacy-notice edit).
+- Fix: Not fixed: it needs owner-approved guest wording or a conditional text that depends on the calendar state of every page that links to the availability page.
+- Fix risk: None.
+- Found by: decision round D-HOLISTIC (residual of H2)
+- Resolution: DEFERRED-OWNER (decision D-HOLISTIC, 2026-10-20: guest-facing wording that depends on when the owner sets BOOKING_ICAL_URL; the state is transitional; not fixed by any item of the round).
+
+### R-880: The screen-reader-only heading 'Choose your dates' still labels the planner region when no calendar is shown
+- Severity: Nit
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: src/app/[locale]/availability/page.tsx lines 108-110 (section aria-labelledby with the sr-only h2 t.plannerTitle)
+- Evidence:
+  ```
+  Scratch render in EN and EL of the not_configured, stale and read-error states: the headings are 'Choose your dates [sr-only] | How to book | Contact' and the region holds only the info notice and the contact card.
+  ```
+- Problem: A calendar-dependent heading survived the H2 fix for screen-reader users.
+- Impact: Minor wording mismatch for screen-reader users in the no-calendar states; no visual or functional effect.
+- Fix: Render the heading and the aria-labelledby only when a calendar is shown.
+- Fix risk: None.
+- Found by: verifier HZ (Booking.com feed project, final batch)
+- Resolution: DECLINED (lead, 2026-10-20, Nit): the region still holds the notice that says why no dates can be chosen and the booking and contact buttons, so the heading names the region's purpose truthfully enough; a change would need another batch and gate cycle for no functional gain; revisit if the page regions are restructured.
+
+### R-881: The orchestrator test of the release policy cannot pass as a gate of verify:release, because the key mask has already blanked the names that it expects to be unset
+- Severity: Medium
+- Category: Tests
+- Status: CONFIRMED
+- Location: scripts/tests/release-policy.test.mjs lines 1853-1855 (test 'release orchestrator executes every gate in order with restricted environments'); scripts/verify-release.mjs localEnvironmentKeyMask
+- Evidence:
+  ```
+  npm run verify:release stopped at gate 3 of 30 ('Local release-policy tests'): `not ok 141 ... error: '.env.example must name keys that the key mask blanks'`. The filter `process.env[name] === undefined` leaves no name when every name of .env.example is already set to the empty string, which is what the orchestrator gives its child. Reproduced in bash with all 26 names set to '': the single test fails with exactly that message; in a plain shell npm run test:release-policy passes 145 of 145.
+  ```
+- Problem: The filter came with the fix of R-673 (task T-F43, wave W9A, 2026-10-13); verify:release had not been run since 2026-10-10, so the mandatory release gate could never pass again.
+- Impact: No release verification was possible on the tree after Review 5, whatever the code did.
+- Fix: The filter treats a blank name as unset: `(process.env[name] ?? '') === ''`, plus one comment line (task FD-RL-A). The test is wrong, not the orchestrator.
+- Fix risk: None: a name that the host environment sets to a real value is still left out of the assertion.
+- Found by: lead (first run of npm run verify:release after Review 5, Booking.com feed project)
+- Resolution: FIXED by FD-RL-A (2026-10-20, Haiku 5.5 max, patch R5-FD-RL-A.patch). Evidence: the lead's reproduction before the fix (blanked environment: 1 failed; plain: passed); after the fix both runs give 145 of 145; npm run verify:release PASSED 30/30 gates (185.9 s) on the final tree, with the default suite 168 files / 2335 tests, coverage 93.75 / 87.96 / 95.91 / 94.86, integration 24 files / 137 tests, build and artifact secret scan.

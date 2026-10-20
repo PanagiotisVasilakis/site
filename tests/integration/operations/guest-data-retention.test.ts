@@ -63,7 +63,7 @@ async function seed() {
         data: {
           id: id(booking),
           source: 'EXTERNAL',
-          provider: 'airbnb',
+          provider: 'booking',
           externalReference: `HM-RETENTION-${booking}`,
           startDate: monthsAgo(endedMonthsAgo + 1),
           endDate: monthsAgo(endedMonthsAgo),
@@ -195,6 +195,11 @@ describe.sequential('guest data retention on PostgreSQL', () => {
   it('re-checks the cutoff inside the erasure transaction and leaves no request behind when it skips', async () => {
     const { eraseGuestForRetention } = await import('@/lib/privacyService');
     const cutoff = monthsAgo(12);
+    // The baseline is read here, not assumed: the first case leaves its own erasure rows behind.
+    const before = await withTestPrismaClient(requireTarget(), async (prisma) => ({
+      requests: await prisma.privacyRequest.count(),
+      events: await prisma.securityAuditEvent.count({ where: { eventType: 'privacy.erasure.completed' } }),
+    }), 'verification');
 
     // MIXED_GUEST has a booking that ended 1 month ago, as if claimed after runRetention selected the guest.
     await expect(eraseGuestForRetention(id(MIXED_GUEST), 'Automatic retention', cutoff)).resolves.toBe(false);
@@ -203,8 +208,8 @@ describe.sequential('guest data retention on PostgreSQL', () => {
       expect(await prisma.user.count({ where: { id: id(MIXED_GUEST) } })).toBe(1);
       expect(await prisma.booking.findUnique({ where: { id: id(MIXED_RECENT_BOOKING) }, select: { userId: true } }))
         .toEqual({ userId: id(MIXED_GUEST) });
-      expect(await prisma.privacyRequest.count()).toBe(1);
-      expect(await prisma.securityAuditEvent.count({ where: { eventType: 'privacy.erasure.completed' } })).toBe(1);
+      expect(await prisma.privacyRequest.count()).toBe(before.requests);
+      expect(await prisma.securityAuditEvent.count({ where: { eventType: 'privacy.erasure.completed' } })).toBe(before.events);
     }, 'verification');
   });
 });

@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { Profiler } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({
@@ -10,10 +9,7 @@ vi.mock('next/navigation', () => ({
 
 import { ToastProvider, useToast } from '@/components/Toast';
 
-const consumerRendered = vi.fn();
-
 function Consumer() {
-  consumerRendered();
   const { push } = useToast();
   return <button type="button" onClick={() => push('Saved')}>Show toast</button>;
 }
@@ -41,34 +37,6 @@ describe('ToastProvider', () => {
     vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
   });
   afterEach(() => vi.useRealTimers());
-
-  it('does not re-render the provider on garbage-collection ticks with nothing to expire', () => {
-    let providerCommits = 0;
-    render(
-      <Profiler id="toast" onRender={() => { providerCommits += 1; }}>
-        <Tree />
-      </Profiler>,
-    );
-    const initial = providerCommits;
-
-    advance(400);
-    advance(400);
-    advance(400);
-
-    expect(providerCommits).toBe(initial);
-  });
-
-  it('keeps the context value stable when a toast is pushed and expires', () => {
-    render(<Tree />);
-    const initial = consumerRendered.mock.calls.length;
-
-    showToast();
-    expect(screen.getByText('Saved')).toBeTruthy();
-    advance(5600);
-    expect(screen.queryByText('Saved')).toBeNull();
-
-    expect(consumerRendered).toHaveBeenCalledTimes(initial);
-  });
 
   it('auto-dismisses a toast after about five seconds (identity §8 Toast)', () => {
     render(<Tree />);

@@ -9,11 +9,18 @@ const GREEK = /\p{Script=Greek}/u;
 
 const emergency = getItemsByCategory('phones').filter((item) => item.tags?.includes('emergency'));
 
-describe('emergency phones content (R3-L10, L. 5170/2025 list)', () => {
-  it('lists 112, 166, 199, 100, 108, 1056 and the Poison Centre', () => {
+// Owner decision of 2026-10-14: the taxi and hospital numbers are the Kalamata numbers the site already had; the taxi entry keeps its alternate numbers +30 27210 26565 and +30 27210 90999. The other names follow circular 19567/25-09-2025 (the corrected re-issue of 19231/19.09.2025).
+// TODO(owner): before launch confirm 1571 (astynomia.gr: 24h, EL/EN/FR/DE; read only as excerpts) against the sourceUrls in src/data/items/phones.json.
+describe('emergency phones content (R3-L10; list of circular 19567/25-09-2025)', () => {
+  it('lists 112, 166, 199, 100, 108, 1056, 1571, the Poison Centre, the hospital and the taxi', () => {
     const numbers = emergency.map((item) => telHref(item.phone));
-    for (const number of ['tel:112', 'tel:166', 'tel:199', 'tel:100', 'tel:108', 'tel:1056', 'tel:+302107793777']) {
+    for (const number of ['tel:112', 'tel:166', 'tel:199', 'tel:100', 'tel:108', 'tel:1056', 'tel:1571', 'tel:+302107793777']) {
       expect(numbers, number).toContain(number);
+    }
+    // The hospital and the taxi carry no 'emergency' tag, so they are checked across all phone items.
+    const allNumbers = getItemsByCategory('phones').map((item) => telHref(item.phone));
+    for (const number of ['tel:+302721363000', 'tel:+302721021112']) {
+      expect(allNumbers, number).toContain(number);
     }
   });
 

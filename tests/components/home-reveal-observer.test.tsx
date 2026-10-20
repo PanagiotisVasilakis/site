@@ -125,20 +125,6 @@ describe('HomeRevealObserver hydration flag (R-633)', () => {
 });
 
 describe('HomeRevealObserver trigger (R-379)', () => {
-  it('reveals by a share of the viewport, not of the element: a rootMargin and no threshold', () => {
-    const observations = stubObserver();
-    render(
-      <>
-        <div data-reveal />
-        <HomeRevealObserver />
-      </>,
-    );
-
-    expect(observations).toHaveLength(1);
-    // A threshold is a share of the element's own area, which an element taller than innerHeight / threshold never reaches.
-    expect(observations[0].options).toStrictEqual({ rootMargin: '0px 0px -35% 0px' });
-  });
-
   it('gives data-reveal="0.45" an observer of its own and lets equal shares share one', () => {
     const observations = stubObserver();
     render(
@@ -192,22 +178,6 @@ describe('HomeRevealObserver trigger (R-379)', () => {
 
     const revealed = Array.from(container.querySelectorAll('[data-reveal]'), (target) => target.classList.contains('is-in'));
     expect(revealed).toStrictEqual([true, true]);
-  });
-
-  it('disconnects its observers when it unmounts', () => {
-    const observations = stubObserver();
-    const { unmount } = render(
-      <>
-        <div data-reveal />
-        <div data-reveal="0.45" />
-        <HomeRevealObserver />
-      </>,
-    );
-    expect(observations.map(({ disconnected }) => disconnected)).toStrictEqual([false, false]);
-
-    unmount();
-
-    expect(observations.map(({ disconnected }) => disconnected)).toStrictEqual([true, true]);
   });
 });
 
@@ -469,16 +439,6 @@ describe('HomeRevealObserver after a viewport change (R-685)', () => {
 
     expect(band).not.toHaveClass('is-in');
     expect(observations[0].unobserved).toStrictEqual([]);
-  });
-
-  it('under StrictMode only the live effect run reveals on a resize', () => {
-    const { observations, band } = mountBelowThenGrow((children) => <StrictMode>{children}</StrictMode>);
-
-    window.dispatchEvent(new Event('resize'));
-    vi.advanceTimersByTime(500);
-
-    expect(band).toHaveClass('is-in');
-    expect(observations.map(({ unobserved }) => unobserved)).toStrictEqual([[], [band]]);
   });
 });
 

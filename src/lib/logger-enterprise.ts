@@ -68,6 +68,27 @@ const LOG_LEVELS: Record<LogLevel, number> = {
   error: 4,
 } as const;
 
+// LOG_MAX_METADATA_SIZE is read as a strict integer of at least 200 characters. Any other value, including
+// an unset one, keeps the default budget: the workers do not run the environment schema.
+const DEFAULT_MAX_METADATA_SIZE = 1000;
+const MIN_MAX_METADATA_SIZE = 200;
+
+function parseMaxMetadataSize(value: string | undefined): number {
+  if (value === undefined || !/^\d+$/.test(value)) return DEFAULT_MAX_METADATA_SIZE;
+  const size = Number(value);
+  return Number.isSafeInteger(size) && size >= MIN_MAX_METADATA_SIZE ? size : DEFAULT_MAX_METADATA_SIZE;
+}
+
+// Structured lines carry a cause as its name and message only. A cause is not sanitised, and it may be
+// circular or have no prototype, so an object is never converted with String().
+function reduceCause(cause: unknown): { name: string; message: string } | undefined {
+  if (cause === undefined || cause === null) return undefined;
+  if (cause instanceof Error) return { name: cause.name, message: cause.message };
+  if (typeof cause === 'string') return { name: 'StringError', message: cause };
+  if (typeof cause === 'object') return { name: 'UnknownError', message: Object.prototype.toString.call(cause) };
+  return { name: 'UnknownError', message: String(cause) };
+}
+
 class EnterpriseLogger {
   private config: LoggerConfig;
 
@@ -81,7 +102,7 @@ class EnterpriseLogger {
         : (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
       enableConsole: process.env.LOG_CONSOLE !== 'false',
       enableStructured: process.env.LOG_STRUCTURED === 'true',
-      maxMetadataSize: parseInt(process.env.LOG_MAX_METADATA_SIZE || '1000', 10),
+      maxMetadataSize: parseMaxMetadataSize(process.env.LOG_MAX_METADATA_SIZE),
     };
   }
 
@@ -122,6 +143,7 @@ class EnterpriseLogger {
       return {};
     }
 
+    // Only the current ancestor path is tracked (removed in the finally block): a repeated object is rendered again.
     const seen = new WeakSet<object>();
     const redactRecursively = (value: unknown, key = ''): unknown => {
       const lowerKey = key.toLowerCase();
@@ -130,22 +152,44 @@ class EnterpriseLogger {
         || SENSITIVE_FIELDS.some((field) => lowerKey.includes(field.toLowerCase()));
       if (isSensitive) return REDACTION_PLACEHOLDER;
       if (value instanceof Error) return { name: value.name, message: value.message };
+      // Checked before the falsy test: 0n is falsy, and JSON.stringify cannot encode a bigint.
+      if (typeof value === 'bigint') return value.toString();
+      if (value instanceof Date) return Number.isNaN(value.getTime()) ? 'Invalid Date' : value.toISOString();
+      if (value instanceof URL) return value.href;
       if (!value || typeof value !== 'object') return value;
       if (seen.has(value)) return '[CIRCULAR]';
       seen.add(value);
-      if (Array.isArray(value)) return value.map((item) => redactRecursively(item));
+      try {
+        if (value instanceof Map) {
+          // Entries keep their key names, so the redaction rules still hide the value of a sensitive key.
+          return Array.from(value, ([entryKey, entryValue]) => [
+            redactRecursively(entryKey),
+            redactRecursively(entryValue, typeof entryKey === 'string' ? entryKey : ''),
+          ]);
+        }
+        if (value instanceof Set) return Array.from(value, (item) => redactRecursively(item));
+        if (Array.isArray(value)) return value.map((item) => redactRecursively(item));
 
-      const result: Record<string, unknown> = {};
-      for (const [childKey, childValue] of Object.entries(value as Record<string, unknown>)) {
-        result[childKey] = redactRecursively(childValue, childKey);
+        const result: Record<string, unknown> = {};
+        for (const [childKey, childValue] of Object.entries(value as Record<string, unknown>)) {
+          result[childKey] = redactRecursively(childValue, childKey);
+        }
+        return result;
+      } finally {
+        seen.delete(value);
       }
-      return result;
     };
 
     const redacted = redactRecursively(metadata) as Record<string, unknown>;
     
     // Truncate if too large
-    const serialized = JSON.stringify(redacted);
+    let serialized: string;
+    try {
+      serialized = JSON.stringify(redacted);
+    } catch {
+      // A value JSON cannot encode (for example a toJSON that throws) must not make the log call throw.
+      return { _unserializable: true };
+    }
     if (serialized.length > this.config.maxMetadataSize) {
       const previewBudget = Math.max(0, this.config.maxMetadataSize - 120);
       return {
@@ -214,7 +258,11 @@ class EnterpriseLogger {
       const method = console[entry.level] || console.log;
 
       if (this.config.enableStructured) {
-        method(JSON.stringify(entry, null, 2));
+        // One line per entry; the cause is reduced to its name and message (see reduceCause).
+        const structured = entry.error
+          ? { ...entry, error: { ...entry.error, cause: reduceCause(entry.error.cause) } }
+          : entry;
+        method(JSON.stringify(structured));
       } else {
         const parts = [
           `[${entry.timestamp}]`,

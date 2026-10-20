@@ -37,7 +37,7 @@ function getGuestJwtSecret(): string {
 }
 
 function signGuestSession(
-  payload: Omit<GuestSessionPayload, 'type'> & { type?: 'guest' },
+  payload: Omit<GuestSessionPayload, 'type'>,
   expiresIn: NonNullable<SignOptions['expiresIn']> = '2h',
 ): string {
   return sign({ ...payload, type: 'guest' }, getGuestJwtSecret(), {

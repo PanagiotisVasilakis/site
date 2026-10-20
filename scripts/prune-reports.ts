@@ -6,7 +6,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const KEEP = Number(process.env.KEEP_REPORTS || 5);
+// Digits only: Number() alone accepts " " (0 would delete every report), "0x5" and "1e1".
+const rawKeep = process.env.KEEP_REPORTS || '5';
+const KEEP = /^\d+$/.test(rawKeep) ? Number(rawKeep) : Number.NaN;
+if (!Number.isInteger(KEEP) || KEEP < 0) {
+  console.error(`[prune] KEEP_REPORTS must be a whole number >= 0, got "${process.env.KEEP_REPORTS}"`);
+  process.exit(1);
+}
 const cwd = process.cwd();
 
 interface Group { pattern: RegExp; label: string; }

@@ -83,3 +83,7 @@ export async function withTestPrismaClient<T>(
     }
   });
 }
+
+export function utcDateOffset(now: Date, days: number): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + days));
+}

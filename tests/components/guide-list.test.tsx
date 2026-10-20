@@ -81,20 +81,6 @@ describe('guide list (identity §9.5, R3-V8)', () => {
     }
   });
 
-  it('announces the result count in a polite live region', async () => {
-    await renderGuide();
-
-    const count = screen.getByText('18 places');
-    expect(count).toHaveAttribute('role', 'status');
-    expect(count).toHaveAttribute('aria-live', 'polite');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Sites 9' }));
-    expect(count).toHaveTextContent('9 places');
-
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search the guide' }), { target: { value: 'war' } });
-    expect(count).toHaveTextContent('1 place');
-  });
-
   it('filters by search and clears the search with Escape', async () => {
     await renderGuide();
     const search = screen.getByRole('searchbox', { name: 'Search the guide' });

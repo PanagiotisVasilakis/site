@@ -122,7 +122,7 @@ export function footerStayLink(variant: FooterVariant, locale: string, t: Dictio
 
 /**
  * The marketing footer's lines under the wordmark (identity §1.2, §8 SiteFooter): the primary tagline and the
- * location line of the hero lede, both owner-approved R3-C1 copy. None in the slim stay footer.
+ * location line (home.heroTagline and home.heroFacts), both owner-approved R3-C1 copy. None in the slim stay footer.
  */
 export function footerBrandLines(variant: FooterVariant, t: Dictionary): { tagline: string; place: string } | null {
   return variant === 'marketing' ? { tagline: t.home.heroTagline, place: t.home.heroFacts } : null;

@@ -3,18 +3,18 @@ import Link from 'next/link';
 import { Icon } from '@/components/icons/Icon';
 import { Button } from '@/components/ui/Button';
 import { Section } from '@/components/ui/Section';
-import { AIRBNB_LISTING_URL } from '@/data/contact';
 import type { Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
-import { airbnbListingHref, isAirbnbListingUrl } from '@/lib/contactLinks';
+import { bookingComHref } from '@/lib/contactLinks';
 
 /**
- * identity §9.2 CTA: "See free dates" (primary), "Book on Airbnb" (secondary, only with a valid listing
- * URL, §1.4) and the contact link to the home contact section (plan V6).
+ * identity §9.2 CTA: "See free dates" (primary), then "Book on Booking.com" as a secondary button (only
+ * with a valid link, §1.4) and the contact link to the home contact section (plan V6).
  */
 export default function ApartmentCta({ locale }: { locale: Locale }) {
   const t = getDictionary(locale);
   const cta = t.house.cta;
+  const bookingHref = bookingComHref();
 
   return (
     <Section id="book" eyebrow={cta.eyebrow} title={cta.title} lead={cta.lead} className="apt-cta">
@@ -25,10 +25,10 @@ export default function ApartmentCta({ locale }: { locale: Locale }) {
             <Icon name="arrow-right" size={20} />
           </Link>
         </Button>
-        {isAirbnbListingUrl(AIRBNB_LISTING_URL) ? (
+        {bookingHref ? (
           <Button asChild variant="secondary">
-            <a href={airbnbListingHref(AIRBNB_LISTING_URL)} target="_blank" rel="noopener noreferrer">
-              {t.availability.booking.airbnb}
+            <a href={bookingHref} target="_blank" rel="noopener noreferrer">
+              {t.availability.booking.bookingCom}
               <Icon name="arrow-up-right" size={20} />{' '}
               <span className="sr-only">{t.availability.booking.opensInNewTab}</span>
             </a>

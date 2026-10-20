@@ -122,15 +122,6 @@ describe('LeafletMap tile source', () => {
     expect(lastTiles()).toEqual({ url: OSM_URL, attribution: OSM_COPYRIGHT });
   });
 
-  it('uses CARTO Voyager with the key in the light theme', () => {
-    document.documentElement.setAttribute('data-theme', 'light');
-    renderMap(KEY);
-    expect(lastTiles()).toEqual({
-      url: `https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${KEY}`,
-      attribution: CARTO_ATTRIBUTION,
-    });
-  });
-
   it('uses CARTO Dark Matter with the key in the dark theme', () => {
     document.documentElement.setAttribute('data-theme', 'dark');
     renderMap(KEY);

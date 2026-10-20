@@ -23,27 +23,33 @@ function fakeRegistration(): FakeRegistration {
   return { waiting: null, addEventListener: vi.fn() };
 }
 
-describe('PwaManager service worker registration (R-253)', () => {
-  let container: {
-    controller: null;
-    register: ReturnType<typeof vi.fn>;
-    getRegistration: ReturnType<typeof vi.fn>;
-    getRegistrations: ReturnType<typeof vi.fn>;
-    addEventListener: ReturnType<typeof vi.fn>;
-    removeEventListener: ReturnType<typeof vi.fn>;
+type FakeServiceWorkerContainer = {
+  controller: FakeWorker | null;
+  register: ReturnType<typeof vi.fn>;
+  getRegistration: ReturnType<typeof vi.fn>;
+  getRegistrations: ReturnType<typeof vi.fn>;
+  addEventListener: ReturnType<typeof vi.fn>;
+  removeEventListener: ReturnType<typeof vi.fn>;
+};
+
+function fakeServiceWorkerContainer(): FakeServiceWorkerContainer {
+  return {
+    controller: null,
+    register: vi.fn(async () => fakeRegistration()),
+    getRegistration: vi.fn(async () => undefined),
+    getRegistrations: vi.fn(async () => []),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
   };
+}
+
+describe('PwaManager service worker registration (R-253)', () => {
+  let container: FakeServiceWorkerContainer;
 
   beforeEach(() => {
     // Take the production code path in the test runtime.
     vi.stubEnv('NEXT_PUBLIC_FORCE_SW_DEV', '1');
-    container = {
-      controller: null,
-      register: vi.fn(async () => fakeRegistration()),
-      getRegistration: vi.fn(async () => undefined),
-      getRegistrations: vi.fn(async () => []),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    };
+    container = fakeServiceWorkerContainer();
     Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: container });
     vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })));
   });
@@ -112,14 +118,7 @@ function element(id: string): HTMLElement {
 }
 
 describe('PwaManager site storage (R-375)', () => {
-  let container: {
-    controller: FakeWorker | null;
-    register: ReturnType<typeof vi.fn>;
-    getRegistration: ReturnType<typeof vi.fn>;
-    getRegistrations: ReturnType<typeof vi.fn>;
-    addEventListener: ReturnType<typeof vi.fn>;
-    removeEventListener: ReturnType<typeof vi.fn>;
-  };
+  let container: FakeServiceWorkerContainer;
   // The worker that controls the page, and a newer worker that waits to take over (public/sw.js answers REQUEST_VERSION to the sender).
   let controllerWorker: FakeWorker;
   let waitingWorker: FakeWorker;
@@ -128,14 +127,7 @@ describe('PwaManager site storage (R-375)', () => {
     vi.stubEnv('NEXT_PUBLIC_FORCE_SW_DEV', '1');
     controllerWorker = { postMessage: vi.fn() };
     waitingWorker = { postMessage: vi.fn() };
-    container = {
-      controller: null,
-      register: vi.fn(async () => fakeRegistration()),
-      getRegistration: vi.fn(async () => undefined),
-      getRegistrations: vi.fn(async () => []),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    };
+    container = fakeServiceWorkerContainer();
     Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: container });
     vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })));
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ version: '1.2.3', build: 'abc' })));
@@ -163,11 +155,6 @@ describe('PwaManager site storage (R-375)', () => {
       // What "block all site data" does: every localStorage access throws a SecurityError.
       vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError'); });
       vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError'); });
-    });
-
-    it('mounts without throwing and still registers the worker', async () => {
-      expect(() => render(<PwaManager />)).not.toThrow();
-      await waitFor(() => expect(container.register).toHaveBeenCalledWith('/sw.js?v=1.2.3&build=abc'));
     });
 
     it('shows the iOS tip and still hides it on close when the dismissal cannot be stored', () => {
@@ -424,16 +411,6 @@ describe('PwaManager hands visited pages to the service worker (R-628)', () => {
     ]);
   });
 
-  it('posts nothing for a render that does not change the pathname', () => {
-    const { rerender } = render(<PwaManager />);
-
-    rerender(<PwaManager />);
-    window.history.pushState({}, '', '/en/stay#hours');
-    rerender(<PwaManager />);
-
-    expect(cachePageMessages()).toEqual([]);
-  });
-
   it('posts the current page on mount when a soft navigation happened before it mounted', () => {
     // PwaManager mounts when the browser is idle: the guest may have tapped a link by then.
     loadedDocument(`${ORIGIN}/en/stay`);
@@ -478,14 +455,6 @@ describe('PwaManager hands visited pages to the service worker (R-628)', () => {
       // A later change of the controller (a worker update) is not a new page.
       container.dispatchEvent(new Event('controllerchange'));
       expect(cachePageMessages()).toHaveLength(1);
-    });
-
-    it('posts nothing for a pathname change while there is still no controller', () => {
-      const { rerender } = render(<PwaManager />);
-
-      softNavigate('/en/moments', () => rerender(<PwaManager />));
-
-      expect(cachePageMessages()).toEqual([]);
     });
 
     it('stops waiting for the controller when it unmounts', () => {

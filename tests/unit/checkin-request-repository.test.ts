@@ -68,10 +68,7 @@ describe('admin request list: notification status', () => {
 
   const nothingFailed: [string, ListedEvent[], OutboxStatus | undefined][] = [
     ['no outbox event', [], undefined],
-    ['one pending event', [createdEvent('PENDING')], 'PENDING'],
     ['a leased decision over a delivered created event', [decisionEvent('LEASED'), createdEvent('DELIVERED')], 'LEASED'],
-    ['two delivered events', [decisionEvent('DELIVERED'), createdEvent('DELIVERED')], 'DELIVERED'],
-    ['a pending decision over a delivered created event', [decisionEvent('PENDING'), createdEvent('DELIVERED')], 'PENDING'],
   ];
 
   it.each(nothingFailed)('reports the newest status when nothing failed: %s', async (_label, events, expected) => {

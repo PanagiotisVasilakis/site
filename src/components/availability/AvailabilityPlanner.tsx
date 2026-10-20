@@ -1,36 +1,29 @@
 'use client';
 
-import clsx from 'clsx';
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type ThHTMLAttributes } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type CSSProperties, type ThHTMLAttributes } from 'react';
 import { DayButton, DayPicker, type ClassNames, type DayButtonProps, type Modifiers } from 'react-day-picker';
 
 import { Icon } from '@/components/icons/Icon';
 import { Callout } from '@/components/ui/Callout';
 import { IconButton } from '@/components/ui/IconButton';
-import { CLIMATE_FEE_SCHEDULE, MAX_STAY_NIGHTS } from '@/data/stayPolicy';
+import { MAX_STAY_NIGHTS } from '@/data/stayPolicy';
 import type { Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 import { eachNight, fromLocalDate, nightsBetween, toLocalDate, type IsoDate } from '@/lib/availability/calendarDate';
-import { formatCentsShort } from '@/lib/availability/money';
 import {
-  climateFeeGroups,
   isCheckInAllowed,
   minimumNightsFor,
-  quoteStay,
-  rateForNight,
   validateStay,
   type StayContext,
 } from '@/lib/availability/stayQuote';
 import type { PublicAvailability } from '@/lib/prisma-repositories/availabilityRepository';
 
-import QuoteBar from './QuoteBar';
 import StaySummary from './StaySummary';
 import { DAY_PICKER_LOCALES, fill, formatLongDate, formatStayDate, nightsLabel } from './format';
 import {
   EMPTY_SELECTION,
   bookedNights,
   checkOutWindow,
-  lowestNightlyPrice,
   nightCodeOn,
   readMonthFragment,
   readSelectionFragment,
@@ -65,7 +58,6 @@ const CALENDAR_CLASSES: Partial<ClassNames> = {
   range_start: 'cal__day--start',
   range_end: 'cal__day--end',
   range_middle: 'cal__day--middle',
-  footer: 'cal__footer',
 };
 
 const MODIFIER_CLASSES = {
@@ -75,29 +67,22 @@ const MODIFIER_CLASSES = {
 
 /** What a day cell shows under its date. */
 type DayCell = Readonly<{
-  /** The short nightly price of a free night, or null. */
-  price: string | null;
-  best: boolean;
   /** The label of a check-out-only day ("out"), or null. */
   out: string | null;
   /** Position of a chosen night or the check-out day in the stay (M20 light pass), or null. */
   stayIndex: number | null;
 }>;
 
-const NO_CELL: DayCell = { price: null, best: false, out: null, stayIndex: null };
+const NO_CELL: DayCell = { out: null, stayIndex: null };
 const DayCellContext = createContext<(date: Date) => DayCell>(() => NO_CELL);
 
-function PricedDayButton({ children, style, ...props }: DayButtonProps) {
+function StayDayButton({ children, style, ...props }: DayButtonProps) {
   const cell = useContext(DayCellContext)(props.day.date);
   const cellStyle = cell.stayIndex === null ? style : ({ ...style, '--i': cell.stayIndex } as CSSProperties);
   return (
     <DayButton {...props} style={cellStyle}>
       <span className="cal__date">{children}</span>
-      {cell.out !== null ? (
-        <span aria-hidden="true" className="cal__note">{cell.out}</span>
-      ) : cell.price !== null ? (
-        <span aria-hidden="true" className={clsx('cal__price', cell.best && 'cal__price--best')}>{cell.price}</span>
-      ) : null}
+      {cell.out !== null ? <span aria-hidden="true" className="cal__note">{cell.out}</span> : null}
     </DayButton>
   );
 }
@@ -130,7 +115,7 @@ type AvailabilityPlannerProps = {
 };
 
 /**
- * The calendar and the quote. Check-in and check-out follow the stay rules
+ * The calendar and the stay summary. Check-in and check-out follow the stay rules
  * (stayQuote); `today` comes from the server, never from the browser clock.
  * The selection is kept in the URL fragment only: no form, no request.
  */
@@ -141,7 +126,6 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
     () => ({ today, horizonEnd, blockedNights: bookedNights(today, nights), ratePeriods: rates }),
     [today, horizonEnd, nights, rates],
   );
-  const bestPrice = useMemo(() => lowestNightlyPrice(today, nights, rates), [today, nights, rates]);
   const totalMonths = monthsBetween(today, horizonEnd) + 1;
 
   const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION);
@@ -153,8 +137,6 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
   const [shownMonths, setShownMonths] = useState(STACK_STEP);
   const [turn, setTurn] = useState<Turn | null>(null);
   const [wideScreen, setWideScreen] = useState(false);
-  const [cardInView, setCardInView] = useState(true);
-  const cardRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const query = window.matchMedia(WIDE_SCREEN_QUERY);
@@ -162,18 +144,6 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
     update();
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
-  }, []);
-
-  // The QuoteBar shows only while the SummaryCard is out of view.
-  useEffect(() => {
-    const card = cardRef.current;
-    if (card === null || typeof IntersectionObserver === 'undefined') return;
-    const observer = new IntersectionObserver((entries) => {
-      const entry = entries[entries.length - 1];
-      if (entry) setCardInView(entry.isIntersecting);
-    });
-    observer.observe(card);
-    return () => observer.disconnect();
   }, []);
 
   // Applies the fragment of a shared or reloaded link, and of later hash
@@ -226,12 +196,6 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
   const startsNewStay = (day: IsoDate) =>
     checkOutDays !== null && day > checkOutDays.last && checkOutWindow(day, context) !== null;
 
-  const priceFor = useCallback((night: IsoDate): number | null => {
-    const code = nightCodeOn(night, today, nights);
-    if (code !== 'o' && code !== 'u') return null;
-    return rateForNight(night, rates)?.nightlyPriceCents ?? null;
-  }, [today, nights, rates]);
-
   const validation = selection.checkIn !== null && selection.checkOut !== null
     ? validateStay(selection.checkIn, selection.checkOut, context)
     : null;
@@ -239,15 +203,9 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
 
   const cellFor = (date: Date): DayCell => {
     const day = fromLocalDate(date);
-    const cents = priceFor(day);
     const out = checkOutDays !== null && day === checkOutDays.last && nightCodeOn(day, today, nights) === 'b' ? t.day.out : null;
     const stayIndex = stay !== undefined && day > stay.checkIn && day <= stay.checkOut ? nightsBetween(stay.checkIn, day) : null;
-    return {
-      price: cents === null ? null : formatCentsShort(cents, locale),
-      best: cents !== null && cents === bestPrice,
-      out,
-      stayIndex,
-    };
+    return { out, stayIndex };
   };
 
   const isDisabled = (date: Date): boolean => {
@@ -261,11 +219,6 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
 
   const modifiers = {
     booked: (date: Date) => nightCodeOn(fromLocalDate(date), today, nights) === 'b',
-    priceOnRequest: (date: Date) => {
-      const night = fromLocalDate(date);
-      const code = nightCodeOn(night, today, nights);
-      return (code === 'o' || code === 'u') && rateForNight(night, rates) === null;
-    },
     checkOutOnly: (date: Date) => {
       const day = fromLocalDate(date);
       return checkOutDays !== null && day === checkOutDays.last && nightCodeOn(day, today, nights) === 'b';
@@ -281,10 +234,7 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
   const labelDayButton = (date: Date, dayModifiers: Modifiers): string => {
     const parts = [formatLongDate(date, locale)];
     if (dayModifiers.today) parts.unshift(t.day.today);
-    const cents = priceFor(fromLocalDate(date));
     if (dayModifiers.booked) parts.push(t.day.booked);
-    else if (cents !== null) parts.push(fill(t.day.perNight, { price: formatCentsShort(cents, locale) }));
-    else if (dayModifiers.priceOnRequest) parts.push(t.day.priceOnRequest);
     if (dayModifiers.checkOutOnly) parts.push(t.day.checkOutOnly);
     if (dayModifiers.tooShort) parts.push(fill(t.prompts.minimumStay, { nights: nightsLabel(minimumNightsFor(fromLocalDate(date), rates), t.nights, locale) }));
     if (dayModifiers.selected) parts.push(t.day.selected);
@@ -300,8 +250,9 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
       } else if (inCheckOutWindow(day)) {
         select({ checkIn, checkOut: day });
       } else {
-        const crossed = day > checkIn ? eachNight(checkIn, day).find((night) => nightCodeOn(night, today, nights) === 'b') : undefined;
-        // Without a booked night in between, only the limit of MAX_STAY_NIGHTS can have ended the check-out days.
+        const firstBooked = day > checkIn ? eachNight(checkIn, day).find((night) => nightCodeOn(night, today, nights) === 'b') : undefined;
+        const crossed = firstBooked !== undefined && firstBooked === checkOutDays?.last ? firstBooked : undefined;
+        // A booked night ends the check-out days only when it is the last check-out day. Otherwise the limit of MAX_STAY_NIGHTS did.
         const pastMax = crossed === undefined && day > checkIn && nightsBetween(checkIn, day) > MAX_STAY_NIGHTS;
         select({ checkIn: day, checkOut: null }, crossed ?? null, pastMax);
       }
@@ -320,8 +271,6 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
     setMonth(next);
   };
 
-  const quote = validation?.ok ? quoteStay(validation.checkIn, validation.checkOut, rates, CLIMATE_FEE_SCHEDULE) : null;
-  const feeGroups = validation?.ok ? climateFeeGroups(validation.checkIn, validation.checkOut, CLIMATE_FEE_SCHEDULE) : [];
   const minimumNights = selection.checkIn === null ? 1 : minimumNightsFor(selection.checkIn, rates);
 
   // The live note inside the calendar (polite): what to do next, the minimum stay, the crossing rule and the stay limit.
@@ -359,13 +308,6 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
 
   const turnTo = (direction: 'next' | 'prev') => {
     handleMonthChange(new Date(shownMonth.getFullYear(), shownMonth.getMonth() + (direction === 'next' ? 1 : -1), 1));
-  };
-
-  const scrollToCard = () => {
-    const card = cardRef.current;
-    if (card === null) return;
-    card.scrollIntoView({ block: 'start' });
-    card.focus({ preventScroll: true });
   };
 
   return (
@@ -415,7 +357,7 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
               showOutsideDays={false}
               locale={DAY_PICKER_LOCALES[locale]}
               labels={{ labelDayButton }}
-              components={{ DayButton: PricedDayButton, Weekday: WeekdayHeader }}
+              components={{ DayButton: StayDayButton, Weekday: WeekdayHeader }}
               data-layout={wideScreen ? 'pair' : 'stack'}
               data-turn={turn?.direction}
               data-turn-parity={turn === null ? undefined : turn.count % 2}
@@ -436,12 +378,8 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
         <div className="cal-legend">
           <p className="cal-legend__title">{t.legendTitle}</p>
           <ul className="cal-legend__list">
-            <li className="cal-legend__item"><span aria-hidden="true" className="cal-legend__swatch cal-legend__swatch--free">€</span>{t.legend.free}</li>
-            {bestPrice === null ? null : (
-              <li className="cal-legend__item"><span aria-hidden="true" className="cal-legend__swatch cal-legend__swatch--best">€</span>{t.legend.best}</li>
-            )}
+            <li className="cal-legend__item"><span aria-hidden="true" className="cal-legend__swatch" />{t.legend.free}</li>
             <li className="cal-legend__item"><span aria-hidden="true" className="cal-legend__swatch cal-legend__swatch--booked" />{t.legend.booked}</li>
-            <li className="cal-legend__item"><span aria-hidden="true" className="cal-legend__swatch cal-legend__swatch--free" />{t.legend.priceOnRequest}</li>
             <li className="cal-legend__item"><span aria-hidden="true" className="cal-legend__swatch cal-legend__swatch--stay" />{t.legend.selected}</li>
           </ul>
         </div>
@@ -449,21 +387,14 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
 
       <div className="planner__summary">
         <StaySummary
-          ref={cardRef}
           locale={locale}
           checkIn={selection.checkIn}
           checkOut={selection.checkOut}
           validation={validation}
-          quote={quote}
-          feeGroups={feeGroups}
           minimumNights={minimumNights}
           stay={stay}
         />
       </div>
-
-      {quote !== null && stay !== undefined && !cardInView ? (
-        <QuoteBar locale={locale} quote={quote} stay={stay} onDetails={scrollToCard} />
-      ) : null}
     </div>
   );
 }

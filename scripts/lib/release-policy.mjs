@@ -351,7 +351,7 @@ function validatePackage(packageJson, errors) {
     for (const [label, pattern] of FORBIDDEN_DEPLOY_COMMANDS) {
       if (pattern.test(command)) errors.push(`${label} is forbidden in package script ${name}`);
     }
-    if (/^(?:deploy|release(?::deploy)?)(?::|$)/iu.test(name)) {
+    if (/^(?:deploy|release)(?::|$)/iu.test(name)) {
       errors.push(`automatic deployment-oriented package script ${name} is forbidden`);
     }
     if (/\b(?:migrate|db\s+push)\b/iu.test(command)
@@ -876,7 +876,6 @@ async function validateSecretScanning(root, errors) {
     'mode: 0o600',
     'await rm(reportPath, { force: true })',
     'classifyGeneratedArtifactFinding',
-    'git',
     'ls-files',
     'current-fixture-allowlist.json',
     'historical-incident-baseline.json',

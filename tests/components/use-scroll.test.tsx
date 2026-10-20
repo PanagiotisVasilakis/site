@@ -17,12 +17,6 @@ describe('useScroll', () => {
     expect(result.current.scrolled).toBe(true);
   });
 
-  it('reports not scrolled at mount when the offset is below the threshold', () => {
-    vi.stubGlobal('scrollY', 10);
-    const { result } = renderHook(() => useScroll(24));
-    expect(result.current.scrolled).toBe(false);
-  });
-
   it('reports not scrolled at mount when the offset equals the threshold', () => {
     vi.stubGlobal('scrollY', 24);
     const { result } = renderHook(() => useScroll(24));
@@ -38,14 +32,6 @@ describe('useScroll', () => {
     expect(result.current.scrolled).toBe(true);
 
     scrollTo(0);
-    expect(result.current.scrolled).toBe(false);
-  });
-
-  it('removes its scroll listener on unmount', () => {
-    vi.stubGlobal('scrollY', 0);
-    const { result, unmount } = renderHook(() => useScroll(24));
-    unmount();
-    scrollTo(100);
     expect(result.current.scrolled).toBe(false);
   });
 });

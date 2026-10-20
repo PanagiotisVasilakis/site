@@ -4,18 +4,16 @@ import Link from 'next/link';
 import AvailabilityPlanner from '@/components/availability/AvailabilityPlanner';
 import BookingOptions from '@/components/availability/BookingOptions';
 import NightsList from '@/components/availability/NightsList';
-import { describeMonths, fill } from '@/components/availability/format';
+import { fill } from '@/components/availability/format';
 import { Icon } from '@/components/icons/Icon';
+import { HostIdentity } from '@/components/shell/HostIdentity';
 import { Callout } from '@/components/ui/Callout';
 import { Section } from '@/components/ui/Section';
-import { AIRBNB_LISTING_URL, HOST_CONTACT } from '@/data/contact';
-import { CLIMATE_FEE_SCHEDULE, PROPERTY_TIME_ZONE } from '@/data/stayPolicy';
+import { HOST_CONTACT } from '@/data/contact';
+import { PROPERTY_TIME_ZONE } from '@/data/stayPolicy';
 import { normalizeLocale, type Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
-import { propertyToday } from '@/lib/availability/calendarDate';
-import { formatCentsShort } from '@/lib/availability/money';
-import { climateFeeRuleOn } from '@/lib/availability/stayQuote';
-import { isAirbnbListingUrl, telHref } from '@/lib/contactLinks';
+import { bookingComHref, telHref } from '@/lib/contactLinks';
 import { logger } from '@/lib/logger-enterprise';
 import {
   readPublicAvailability,
@@ -24,7 +22,7 @@ import {
 } from '@/lib/prisma-repositories/availabilityRepository';
 import { localizedAlternates, localizedOpenGraph } from '@/lib/seo';
 
-// Free nights and prices: the booking entry point (the old /book and
+// Free nights: the booking entry point (the old /book and
 // /booking-details paths redirect here in src/proxy.ts). Rendered per request.
 export const dynamic = 'force-dynamic';
 
@@ -56,19 +54,13 @@ function StatusNotice({ status, lastSyncedAt, calendarShown, locale }: {
     ? null
     : new Intl.DateTimeFormat(DATE_TIME_LOCALES[locale], { dateStyle: 'medium', timeStyle: 'short', timeZone: PROPERTY_TIME_ZONE })
       .format(new Date(lastSyncedAt));
-  // identity.md §9.3: a replaced calendar gets an info Callout (no prices are
-  // shown, so no text may say that they apply); a stale calendar a warning.
-  let notice: { variant: 'info' | 'warning'; text: string } | null = null;
-  if (!calendarShown) {
-    notice = { variant: 'info', text: status === 'not_configured' ? t.notConfigured : t.unavailable };
-  } else if (status === 'stale') {
-    notice = { variant: 'warning', text: t.stale };
-  }
+  // identity.md §9.3: a replaced calendar gets an info Callout.
+  const notice = calendarShown ? null : status === 'not_configured' ? t.notConfigured : t.unavailable;
   return (
     <>
       {notice === null ? null : (
-        <Callout variant={notice.variant} role="status">
-          <p className="ui-callout__text">{notice.text}</p>
+        <Callout variant="info" role="status">
+          <p className="ui-callout__text">{notice}</p>
         </Callout>
       )}
       {time === null ? null : <p className="avail-page__updated">{fill(t.lastUpdated, { time })}</p>}
@@ -77,13 +69,13 @@ function StatusNotice({ status, lastSyncedAt, calendarShown, locale }: {
 }
 
 /**
- * The calendar is shown only for a synced calendar (fresh or stale, §9.3) that
- * has something to show: a price or a known free or booked night. When the
- * calendar is not configured or unavailable it is replaced by the contact options.
+ * The calendar is shown only for a fresh calendar that has a known free or booked night. A stale or
+ * unconfigured calendar has every night unknown and the site shows no price, so there is nothing to show
+ * and it is replaced by the contact options. The lead and the how-to-book steps that refer to the calendar
+ * are then left out as well.
  */
 function calendarShown(availability: PublicAvailability): boolean {
-  if (availability.status !== 'fresh' && availability.status !== 'stale') return false;
-  return availability.rates.length > 0 || /[ob]/.test(availability.nights);
+  return availability.status === 'fresh' && /[ob]/.test(availability.nights);
 }
 
 export default async function AvailabilityPage({ params }: AvailabilityPageProps) {
@@ -100,16 +92,6 @@ export default async function AvailabilityPage({ params }: AvailabilityPageProps
     logger.error('Public availability could not be read');
   }
 
-  const feeRule = climateFeeRuleOn(availability?.today ?? propertyToday(PROPERTY_TIME_ZONE, now), CLIMATE_FEE_SCHEDULE);
-  const lowSeasonMonths = feeRule
-    ? Array.from({ length: 12 }, (_, index) => index + 1).filter((month) => !feeRule.highSeasonMonths.includes(month))
-    : [];
-  const feeRates = feeRule
-    ? [
-      { months: describeMonths(feeRule.highSeasonMonths, eff), cents: feeRule.highCents },
-      { months: describeMonths(lowSeasonMonths, eff), cents: feeRule.lowCents },
-    ].filter((rate) => rate.months !== '')
-    : [];
   const calendar = availability !== null && calendarShown(availability) ? availability : null;
 
   return (
@@ -120,7 +102,8 @@ export default async function AvailabilityPage({ params }: AvailabilityPageProps
           {t.backToApartment}
         </Link>
         <h1 className="avail-page__title">{t.title}</h1>
-        <p className="avail-page__lead">{t.intro}</p>
+        {calendar === null ? null : <p className="avail-page__lead">{t.intro}</p>}
+        <HostIdentity labels={getDictionary(eff).shell.identity} className="host-identity--page" />
       </header>
 
       <section aria-labelledby="availability-planner-title" className="avail-page__planner">
@@ -148,35 +131,9 @@ export default async function AvailabilityPage({ params }: AvailabilityPageProps
       <div className="avail-page__sections">
         <Section id="how-to-book" variant="plain" title={t.howToBookTitle}>
           <ul className="ui-section__list">
-            <li>{t.howToBook[0]}</li>
-            {isAirbnbListingUrl(AIRBNB_LISTING_URL) ? <li>{t.howToBookAirbnb}</li> : null}
+            {calendar === null ? null : <li>{t.howToBook[0]}</li>}
+            {calendar !== null && bookingComHref() ? <li>{t.howToBookBookingCom}</li> : null}
             {t.howToBook.slice(1).map((item) => <li key={item}>{item}</li>)}
-          </ul>
-        </Section>
-
-        <Section id="cancellation" variant="plain" title={t.cancellationTitle}>
-          <ul className="ui-section__list">
-            {t.cancellation.map((item) => <li key={item}>{item}</li>)}
-          </ul>
-        </Section>
-
-        <Section id="withdrawal" variant="plain" title={t.withdrawalTitle}>
-          <p>{t.withdrawal}</p>
-        </Section>
-
-        <Section id="climate-fee" variant="plain" title={t.climateFeeTitle}>
-          <p>{t.climateFeeIntro}</p>
-          <ul className="ui-section__list">
-            {feeRates.map((rate) => (
-              <li key={rate.months}>{fill(t.climateFeeRate, { months: rate.months, amount: formatCentsShort(rate.cents, eff) })}</li>
-            ))}
-          </ul>
-          <p>{t.climateFeeSummary}</p>
-        </Section>
-
-        <Section id="prices" variant="plain" title={t.pricesTitle}>
-          <ul className="ui-section__list">
-            {t.prices.map((item) => <li key={item}>{item}</li>)}
           </ul>
         </Section>
 

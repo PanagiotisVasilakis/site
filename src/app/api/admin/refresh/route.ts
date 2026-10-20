@@ -33,7 +33,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     jti: crypto.randomUUID(),
     session_id: sessionId,
     login_at: loginAt,
-    refreshed_at: Math.floor(Date.now() / 1000),
   };
   const ttlSeconds = Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
   const fresh = signAdmin(cleanPayload, ttlSeconds);

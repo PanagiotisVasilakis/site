@@ -49,17 +49,24 @@ function isOriginProxySecret(value) {
 // The two peppers key HMACs, so the placeholder words of .env.example must not pass in production.
 const PEPPER_PLACEHOLDER = /replace|changeme|placeholder|example/iu;
 
-// The Airbnb calendar export URL carries a secret token in its query string,
-// so validation messages must never echo the value.
-const AIRBNB_CALENDAR_HOSTS = new Set(['www.airbnb.com', 'airbnb.com', 'www.airbnb.gr', 'airbnb.gr']);
-const AIRBNB_CALENDAR_PATH = /^\/calendar\/ical\/\d+\.ics$/;
+// The Booking.com calendar export URL carries a secret token in its query string (`t`),
+// so validation messages must never echo the value. Each host serves the export at one path
+// only: ical.booking.com is the current extranet link, admin.booking.com the older one that
+// the extranet may still hand out (public guides; the owner's own link was not probed). A
+// link without a query cannot carry the token, so the query must not be empty; parameter
+// names and lengths are not checked.
+const BOOKING_CALENDAR_PATHS = new Map([
+  ['ical.booking.com', '/v1/export'],
+  ['admin.booking.com', '/hotel/hoteladmin/ical.html'],
+]);
 
 /**
- * An https Airbnb calendar export URL: no userinfo, default port, `/calendar/ical/<listing>.ics`.
+ * An https Booking.com calendar export URL: no userinfo, default port, the export path of its host
+ * and a non-empty query (the token).
  * @param {string} value
  * @returns {boolean}
  */
-export function isAirbnbCalendarUrl(value) {
+export function isBookingCalendarUrl(value) {
   let url;
   try {
     url = new URL(value);
@@ -70,8 +77,8 @@ export function isAirbnbCalendarUrl(value) {
     && url.username === ''
     && url.password === ''
     && url.port === ''
-    && AIRBNB_CALENDAR_HOSTS.has(url.hostname)
-    && AIRBNB_CALENDAR_PATH.test(url.pathname);
+    && BOOKING_CALENDAR_PATHS.get(url.hostname) === url.pathname
+    && url.search.length > 1;
 }
 
 export const runtimeEnvSchema = z.object({
@@ -102,9 +109,9 @@ export const runtimeEnvSchema = z.object({
   ALERT_WEBHOOK_URL: optionalEnv(z.url()),
   ALERT_WEBHOOK_TOKEN: optionalEnv(z.string().min(20)),
   ALERT_WEBHOOK_REQUIRED: z.enum(['0', '1']).optional().default('0'),
-  AIRBNB_ICAL_URL: optionalEnv(z.string().refine(
-    isAirbnbCalendarUrl,
-    'AIRBNB_ICAL_URL must be an https Airbnb calendar export URL (/calendar/ical/<listing id>.ics)',
+  BOOKING_ICAL_URL: optionalEnv(z.string().refine(
+    isBookingCalendarUrl,
+    'BOOKING_ICAL_URL must be an https Booking.com calendar export URL (ical.booking.com/v1/export or admin.booking.com/hotel/hoteladmin/ical.html, with its token in the query)',
   )),
   // Public CARTO basemaps key: sent to browsers in tile URLs, but never logged.
   CARTO_BASEMAPS_KEY: optionalEnv(z.string().regex(

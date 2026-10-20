@@ -282,12 +282,10 @@ export function buildGeneratedArtifactDispositionContext({
   }
 
   const validationFiles = [...artifactFiles];
-  for (const source of [prerenderPath]) {
-    validationFiles.push({
-      relative: normalizedRelative(repositoryRoot, source),
-      source,
-    });
-  }
+  validationFiles.push({
+    relative: normalizedRelative(repositoryRoot, prerenderPath),
+    source: prerenderPath,
+  });
   for (const entry of internalEntries) {
     assertExpectedOccurrences(validationFiles, entry.value, entry.paths);
   }
@@ -318,7 +316,7 @@ export function buildGeneratedArtifactDispositionContext({
   collectActionIds(serverReference.edge, actionIds);
   for (const identifier of actionIds) identifiers.set(identifier, 'next-action-id');
 
-  const gitCommit = spawnSync('git', ['rev-parse', 'HEAD'], {
+  const gitResult = spawnSync('git', ['rev-parse', 'HEAD'], {
     cwd: repositoryRoot,
     env: {
       PATH: environment.PATH ?? process.env.PATH,
@@ -326,7 +324,9 @@ export function buildGeneratedArtifactDispositionContext({
     },
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],
-  }).stdout.trim();
+  });
+  if (gitResult.error) throw new Error('git is required to identify the build commit.');
+  const gitCommit = String(gitResult.stdout ?? '').trim();
   if (UNPREFIXED_40_HEX.test(gitCommit)) identifiers.set(gitCommit, 'git-commit');
   const buildId = readFileSync(path.join(repositoryRoot, '.next/BUILD_ID'), 'utf8').trim();
   if (UNPREFIXED_40_HEX.test(buildId)) identifiers.set(buildId, 'next-build-id');

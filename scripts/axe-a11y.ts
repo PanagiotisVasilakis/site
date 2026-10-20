@@ -5,34 +5,21 @@
  */
 import puppeteer from 'puppeteer';
 import fs from 'node:fs';
+import { LOCAL_ONLY_ARGS, LOOPBACK_HOSTS, blockNonLocalRequests } from './lib/local-only-browser';
 
 // Load axe source
 import axePkg from 'axe-core';
 // axe-core types don't surface .source in ESM import; cast cautiously.
-const axeSource: string = (axePkg as unknown as { source?: string }).source || fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
+const axeSource = (axePkg as unknown as { source?: string }).source;
+if (!axeSource) throw new Error('axe-core exposes no source');
 
 const BASE = process.env.AXE_BASE || 'http://localhost:3000';
-const PATHS = (process.env.AXE_PATHS || '/en,/en/apartment,/en/favorites,/en/offline,/en/phones,/en/phones/emergency-112')
+const PATHS = (process.env.AXE_PATHS || '/en,/en/apartment,/en/favorites,/en/offline,/en/phones,/en/phones/emergency-112,/en/moments,/en/availability,/en/privacy,/el,/el/moments')
   .split(',')
   .map((value) => value.trim())
   .filter(Boolean);
+if (PATHS.length === 0) throw new Error('AXE_PATHS contains no path');
 const SETTLE_MS = Math.max(0, Number.parseInt(process.env.AXE_SETTLE_MS || '4000', 10) || 0);
-// Local only (same as audit-vitals.ts): dead proxy for every other host, host resolver limited to localhost,
-// and every request that is not to this machine is aborted (map tiles and other third parties never load).
-const LOCAL_ONLY_ARGS = [
-  '--proxy-server=http://127.0.0.1:9',
-  '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1',
-];
-const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
-
-function isLocalUrl(url: string) {
-  if (/^(data|blob|about):/.test(url)) return true;
-  try {
-    return LOOPBACK_HOSTS.has(new URL(url).hostname);
-  } catch {
-    return false;
-  }
-}
 
 if (!LOOPBACK_HOSTS.has(new URL(BASE).hostname)) {
   throw new Error(`AXE_BASE must be a loopback URL (got ${new URL(BASE).hostname})`);
@@ -52,23 +39,10 @@ process.on('uncaughtException', (err) => {
 
 (async () => {
   console.log('[axe-a11y] starting');
-  const browser = await puppeteer.launch({ headless: true, args: LOCAL_ONLY_ARGS });
+  const browser = await puppeteer.launch({ headless: true, executablePath: process.env.CHROME_PATH, args: LOCAL_ONLY_ARGS });
   const page = await browser.newPage();
   const blockedHosts = new Set<string>();
-  // With request interception on, navigations the service worker answers come back without a response;
-  // the audit checks rendered pages, not offline behaviour, so the service worker is bypassed.
-  await page.setBypassServiceWorker(true);
-  await page.setRequestInterception(true);
-  page.on('request', (request) => {
-    if (isLocalUrl(request.url())) {
-      void request.continue();
-      return;
-    }
-    const host = URL.canParse(request.url()) ? new URL(request.url()).host : 'an unparsable URL';
-    if (!blockedHosts.has(host)) console.log(`[axe-a11y] blocked non-loopback request to ${host}`);
-    blockedHosts.add(host);
-    void request.abort();
-  });
+  await blockNonLocalRequests(page, blockedHosts, 'axe-a11y');
   const allViolations: ViolationSummary[] = [];
   const errors: AuditError[] = [];
   const errorKeys = new Set<string>();

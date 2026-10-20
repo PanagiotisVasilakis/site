@@ -1,7 +1,7 @@
 import type { PrismaClient } from '@/generated/prisma/client';
 
 import type { DisposableDatabaseTarget } from '../../support/database-safety';
-import { withTestPrismaClient } from '../../support/fixtures';
+import { utcDateOffset, withTestPrismaClient } from '../../support/fixtures';
 
 export interface AuthPrincipalFixture {
   userId: string;
@@ -68,16 +68,6 @@ export interface AuthFixtureSeedOptions {
 
 export interface SafeAuthSnapshotScope {
   userId?: string;
-}
-
-function utcDateOffset(now: Date, days: number): Date {
-  const date = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-  ));
-  date.setUTCDate(date.getUTCDate() + days);
-  return date;
 }
 
 async function createPrincipal(
@@ -202,6 +192,7 @@ export async function resetAuthFixtures(
       prisma.booking.deleteMany(),
       prisma.user.deleteMany(),
       prisma.securityAuditEvent.deleteMany(),
+      prisma.rateLimit.deleteMany(),
     ]);
   }, 'cleanup');
 }

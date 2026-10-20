@@ -69,7 +69,7 @@ export default function AdminHomeClient() {
     {
       title: 'Availability & prices',
       value: 'Calendar',
-      body: 'Set seasonal nightly prices and check the Airbnb calendar sync.',
+      body: 'Set seasonal nightly prices and check the Booking.com calendar sync.',
       href: '/admin/availability',
       action: 'Open availability',
     },

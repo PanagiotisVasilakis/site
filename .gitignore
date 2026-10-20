@@ -50,17 +50,6 @@ yarn-error.log*
 # worker bundle output of tests/unit/build-workers.test.ts (left behind only by an aborted run)
 /tmp-build-workers-*/
 
-# generated local runtime data
-/analytics-data.json
-/analytics-data.json.tmp
-/analytics-ratelimit.json
-/analytics-ratelimit.json.tmp
-/analytics-backups/
-/data/*.db
-/data/*.db-*
-/data/*.sqlite
-/data/.*.sqlite
-
 # legacy raw SQL migration output; canonical migrations live in prisma/migrations/
 /migrations/
 

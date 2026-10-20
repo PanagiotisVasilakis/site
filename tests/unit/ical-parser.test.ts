@@ -3,29 +3,30 @@ import { describe, expect, it } from 'vitest';
 import { addDays, parseIsoDate, type IsoDate } from '@/lib/availability/calendarDate';
 import { IcalParseError, parseBlockedRanges, type IcalParseErrorCode } from '@/lib/availability/icalParser';
 
-// Synthetic fixtures shaped like an Airbnb "Export calendar" feed. Only the
-// shape is realistic: the UIDs, dates, reservation code and phone digits are
-// made up. HMSENTINEL and 4821 stand in for the personal data Airbnb puts in
-// DESCRIPTION (reservation URL, last 4 digits of the guest's phone).
+// Synthetic fixtures for an iCalendar export of booked and closed dates. Only the shape is
+// plausible: the UIDs, dates, reservation code and phone digits are made up, and nothing here
+// claims to match a real export. HMSENTINEL and 4821 stand in for personal data that a feed
+// could carry in DESCRIPTION (a reservation URL, the last 4 digits of a guest's phone): the
+// parser must drop all of it.
 const PII_SENTINELS = ['HMSENTINEL', '4821'];
 
 const CRLF = '\r\n';
 
-const AIRBNB_HEADER = [
+const FEED_HEADER = [
   'BEGIN:VCALENDAR',
-  'PRODID;X-RICAL-TZSOURCE=TZINFO:-//Airbnb Inc//Hosting Calendar 0.8.8//EN',
+  'PRODID:-//Example//Calendar export//EN',
   'CALSCALE:GREGORIAN',
   'VERSION:2.0',
 ];
-const FIRST_BODY_LINE = AIRBNB_HEADER.length + 1;
+const FIRST_BODY_LINE = FEED_HEADER.length + 1;
 
 const RESERVED_EVENT = [
   'BEGIN:VEVENT',
   'DTEND;VALUE=DATE:20261004',
   'DTSTART;VALUE=DATE:20261001',
-  'UID:1418fb94e984-4c7e1f0a9b2d8e3f5a6c7b8d9e0f1a2b@airbnb.com',
-  // Folded at 75 octets like the real export.
-  'DESCRIPTION:Reservation URL: https://www.airbnb.com/hosting/reservations/',
+  'UID:1418fb94e984-4c7e1f0a9b2d8e3f5a6c7b8d9e0f1a2b@example.test',
+  // Folded early (RFC 5545 section 3.1 allows up to 75 octets per line).
+  'DESCRIPTION:Reservation URL: https://example.test/hosting/reservations/',
   ' details/HMSENTINEL\\nPhone Number (Last 4 Digits): 4821',
   'SUMMARY:Reserved',
   'END:VEVENT',
@@ -35,13 +36,13 @@ const NOT_AVAILABLE_EVENT = [
   'BEGIN:VEVENT',
   'DTEND;VALUE=DATE:20261020',
   'DTSTART;VALUE=DATE:20261015',
-  'UID:7f3a9c2e1b4d-5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c@airbnb.com',
-  'SUMMARY:Airbnb (Not available)',
+  'UID:7f3a9c2e1b4d-5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c@example.test',
+  'SUMMARY:Not available',
   'END:VEVENT',
 ];
 
 function calendar(body: readonly string[], eol = CRLF): string {
-  return [...AIRBNB_HEADER, ...body, 'END:VCALENDAR'].join(eol) + eol;
+  return [...FEED_HEADER, ...body, 'END:VCALENDAR'].join(eol) + eol;
 }
 
 function vevent(...properties: string[]): string[] {
@@ -68,7 +69,7 @@ function parseError(text: string): IcalParseError {
   throw new Error('expected an IcalParseError');
 }
 
-describe('parseBlockedRanges: Airbnb export', () => {
+describe('parseBlockedRanges: calendar export', () => {
   const expected = [
     { start: '2026-10-01', end: '2026-10-04' },
     { start: '2026-10-15', end: '2026-10-20' },
@@ -87,7 +88,7 @@ describe('parseBlockedRanges: Airbnb export', () => {
   });
 
   it('accepts a last line without a line end and skips blank lines', () => {
-    const text = [...AIRBNB_HEADER, '', ...NOT_AVAILABLE_EVENT, '', 'END:VCALENDAR'].join(CRLF);
+    const text = [...FEED_HEADER, '', ...NOT_AVAILABLE_EVENT, '', 'END:VCALENDAR'].join(CRLF);
     expect(parseBlockedRanges(`${text}${CRLF}${CRLF}`)).toEqual([expected[1]]);
     expect(parseBlockedRanges(text)).toEqual([expected[1]]);
   });
@@ -175,7 +176,7 @@ describe('parseBlockedRanges: event dates', () => {
   });
 
   it('treats an event without DTEND or DURATION as one night (RFC 5545 section 3.6.1)', () => {
-    const text = calendar(vevent('DTSTART;VALUE=DATE:20261001', 'SUMMARY:Airbnb (Not available)'));
+    const text = calendar(vevent('DTSTART;VALUE=DATE:20261001', 'SUMMARY:Not available'));
     expect(parseBlockedRanges(text)).toEqual([{ start: '2026-10-01', end: '2026-10-02' }]);
   });
 
@@ -210,6 +211,7 @@ describe('parseBlockedRanges: event dates', () => {
     ['DTEND before DTSTART', ['DTSTART;VALUE=DATE:20261004', 'DTEND;VALUE=DATE:20261001']],
     ['DTEND equal to DTSTART', ['DTSTART;VALUE=DATE:20261001', 'DTEND;VALUE=DATE:20261001']],
     ['a zero duration', ['DTSTART;VALUE=DATE:20261001', 'DURATION:P0D']],
+    ['a cancelled event with DTEND before DTSTART', ['DTSTART;VALUE=DATE:20261004', 'DTEND;VALUE=DATE:20261001', 'STATUS:CANCELLED']],
   ])('rejects %s', (_label, properties) => {
     expect(parseError(calendar(vevent(...properties)))).toMatchObject({ code: 'invalid_range', line: FIRST_BODY_LINE });
   });
@@ -267,6 +269,8 @@ describe('parseBlockedRanges: event dates', () => {
   it('rejects an event without DTSTART', () => {
     const text = calendar(vevent('DTEND;VALUE=DATE:20261003', 'SUMMARY:Reserved'));
     expect(parseError(text)).toMatchObject({ code: 'invalid_event', line: FIRST_BODY_LINE });
+    // A cancelled event is validated before it is skipped.
+    expect(parseError(calendar(vevent('DTEND;VALUE=DATE:20261003', 'STATUS:CANCELLED')))).toMatchObject({ code: 'invalid_event', line: FIRST_BODY_LINE });
   });
 
   it.each([
@@ -337,7 +341,7 @@ describe('parseBlockedRanges: components', () => {
   });
 
   it('rejects a text that ends inside a component', () => {
-    const text = [...AIRBNB_HEADER, ...NOT_AVAILABLE_EVENT].join(CRLF);
+    const text = [...FEED_HEADER, ...NOT_AVAILABLE_EVENT].join(CRLF);
     const error = parseError(text);
     expect(error.code).toBe('unbalanced');
     expect(error.line).toBeUndefined();
@@ -429,7 +433,7 @@ describe('parseBlockedRanges: caps', () => {
   });
 
   it('accepts 50,000 physical lines and rejects one more, folded lines included', () => {
-    const fixedLines = AIRBNB_HEADER.length + 1;
+    const fixedLines = FEED_HEADER.length + 1;
     const atCap = calendar(Array<string>(MAX_LINES - fixedLines).fill('X-PAD:1'));
     expect(atCap.split(CRLF)).toHaveLength(MAX_LINES + 1);
     expect(parseBlockedRanges(atCap)).toEqual([]);

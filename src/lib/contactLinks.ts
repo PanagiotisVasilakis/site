@@ -1,5 +1,4 @@
-import { AIRBNB_DATE_PARAMS_VERIFIED } from '@/data/contact';
-import type { IsoDate } from '@/lib/availability/calendarDate';
+import { BOOKING_COM_LISTING_URL } from '@/data/contact';
 
 export function telHref(phone?: string): string | undefined {
   if (!phone) return undefined;
@@ -13,11 +12,11 @@ export function mapsHref(address?: string, lat?: number, lng?: number): string |
   return `https://maps.google.com/?q=${encodeURIComponent(address!)}`;
 }
 
-const AIRBNB_LISTING_HOSTS = new Set(['www.airbnb.com', 'airbnb.com', 'www.airbnb.gr', 'airbnb.gr']);
-const AIRBNB_LISTING_PATH = /^\/rooms\/[0-9]+$/;
+const BOOKING_COM_LISTING_HOSTS = new Set(['www.booking.com', 'booking.com']);
+const BOOKING_COM_LISTING_PATH = /^\/Share-[A-Za-z0-9_-]+$/;
 
-/** An https Airbnb listing URL: https://www.airbnb.com/rooms/<id> (also airbnb.gr), any query. */
-export function isAirbnbListingUrl(value: string): boolean {
+/** An https Booking.com listing share link: https://www.booking.com/Share-<token> (also booking.com), any query or hash. */
+export function isBookingComListingUrl(value: string): boolean {
   let url: URL;
   try {
     url = new URL(value);
@@ -28,18 +27,15 @@ export function isAirbnbListingUrl(value: string): boolean {
     && url.username === ''
     && url.password === ''
     && url.port === ''
-    && AIRBNB_LISTING_HOSTS.has(url.hostname)
-    && AIRBNB_LISTING_PATH.test(url.pathname);
+    && BOOKING_COM_LISTING_HOSTS.has(url.hostname)
+    && BOOKING_COM_LISTING_PATH.test(url.pathname);
 }
 
 /**
- * The listing link for the "Book on Airbnb" button: the listing URL unchanged, plus the stay
- * dates only once AIRBNB_DATE_PARAMS_VERIFIED is set. Check the URL with isAirbnbListingUrl first.
+ * The Booking.com listing link for the 'Book on Booking.com' button and the how-to-book step: the
+ * configured link while it passes isBookingComListingUrl, otherwise undefined (nothing is shown).
+ * It carries no stay dates: Booking.com date parameters are unverified.
  */
-export function airbnbListingHref(listingUrl: string, stay?: { checkIn: IsoDate; checkOut: IsoDate }): string {
-  if (!AIRBNB_DATE_PARAMS_VERIFIED || stay === undefined) return listingUrl;
-  const url = new URL(listingUrl);
-  url.searchParams.set('check_in', stay.checkIn);
-  url.searchParams.set('check_out', stay.checkOut);
-  return url.toString();
+export function bookingComHref(): string | undefined {
+  return isBookingComListingUrl(BOOKING_COM_LISTING_URL) ? BOOKING_COM_LISTING_URL : undefined;
 }

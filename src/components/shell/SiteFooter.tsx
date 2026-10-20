@@ -7,6 +7,7 @@ import { BrandMark } from '@/components/icons/BrandMark';
 import { Icon, type IconName } from '@/components/icons/Icon';
 import { normalizeLocale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
+import { HostIdentity } from './HostIdentity';
 import LanguageSwitch from './LanguageSwitch';
 import { MotionSwitch } from './MotionSwitch';
 import { ThemeSetting } from './ThemeSwitch';
@@ -22,7 +23,8 @@ const CONTACT_ICONS: Record<string, IconName> = { phone: 'phone', email: 'mail',
  * nav, contact (on the home page this block is the `#contact` target of every "Contact" link), "Your stay",
  * MotionSwitch, LanguageSwitch. Stay: the brand, MotionSwitch and LanguageSwitch only (no booking or
  * availability link, no tagline). Both also carry the theme Segmented (see the note at the prefs) and the
- * Privacy link (R3-L2). The address/legal identity waits for its data (R3-L1): no placeholder is rendered (§1.4).
+ * Privacy link (R3-L2). The host identity (ΑΜΑ, the host's name, address) comes from HOST_CONTACT in both variants:
+ * a blank field is skipped, no placeholder is rendered (§1.4).
  */
 export default function SiteFooter({ locale }: { locale: string }) {
   const pathname = usePathname() || `/${locale}`;
@@ -103,6 +105,7 @@ export default function SiteFooter({ locale }: { locale: string }) {
           <LanguageSwitch locale={locale} label={t.shell.language} />
         </div>
 
+        <HostIdentity labels={t.shell.identity} className="host-identity--footer" />
         <p className="site-footer__legal">
           {legal.map((link) => (
             <Link key={link.key} href={link.href} className="site-footer__link shell-link">{link.label}</Link>

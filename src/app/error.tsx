@@ -39,7 +39,7 @@ export default function GlobalError({ error, retry }: GlobalErrorProps) {
   }, [error]);
 
   return (
-    <main id="main-content" className="status-main" role="main">
+    <main id="main-content" className="status-main">
       <StatusPage title={t.errors.somethingWentWrong} lead={t.errors.unexpectedError}>
         <Button variant="primary" className="status-page__action" onClick={() => retry()}>{t.errors.tryAgain}</Button>
         <StatusLinks links={[{ href: `/${locale}`, label: t.cta.home }]} />

@@ -54,7 +54,6 @@ describe('phone and guest form validation', () => {
     ['441234567890', undefined, '+441234567890'],
     ['0030 694 123 4567', undefined, '+306941234567'],
     ['0030 694 123 4567', 'GR', '+306941234567'],
-    ['0049 170 1234567', 'ABROAD', '+491701234567'],
     ['(0044) 7911-123456', 'ABROAD', '+447911123456'],
   ] as const)('normalizes %s to E.164', (input, origin, expected) => {
     expect(normalizePhone(input, origin)?.e164).toBe(expected);

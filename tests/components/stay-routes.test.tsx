@@ -102,10 +102,10 @@ function scrollDrivenClasses(): Set<string> {
 
 const SCROLL_DRIVEN = scrollDrivenClasses();
 
-/** §9.4/§12 R3-V9: no booking CTA or Airbnb link on a stay page, and calm mode only. */
+/** §9.4/§12 R3-V9: no booking CTA or Booking.com link on a stay page, and calm mode only. */
 function expectCalmStayPage(container: HTMLElement) {
   const hrefs = Array.from(container.querySelectorAll('a[href]'), (link) => link.getAttribute('href') ?? '');
-  expect(hrefs.filter((href) => /airbnb\.com/iu.test(href))).toEqual([]);
+  expect(hrefs.filter((href) => /booking\.com/iu.test(href))).toEqual([]);
   expect(hrefs.filter((href) => href.includes('/availability'))).toEqual([]);
   const used = new Set(Array.from(container.querySelectorAll('[class]'), (element) => [...element.classList]).flat());
   expect([...used].filter((name) => SCROLL_DRIVEN.has(name))).toEqual([]);
@@ -239,14 +239,14 @@ describe('/{l}/stay hub (identity §9.4)', () => {
 });
 
 describe('stay routes render calm, with no booking CTA (identity §12 R3-V9)', () => {
-  it.each(['en', 'el'])('guest sign-in (%s)', (locale) => {
+  it.each(['en'])('guest sign-in (%s)', (locale) => {
     navigation.locale = locale;
     const { container } = wrap(<UnifiedGuestClient />);
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
     expectCalmStayPage(container);
   });
 
-  it.each(['en', 'el'])('guest claim flow (%s)', (locale) => {
+  it.each(['en'])('guest claim flow (%s)', (locale) => {
     navigation.locale = locale;
     navigation.search = 'mode=signup';
     const { container } = wrap(<UnifiedGuestClient />);

@@ -18,7 +18,6 @@ interface AdminAuthPayload {
   session_id?: string;
   jti?: string;
   login_at?: number;
-  refreshed_at?: number;
 }
 
 // Cache generated dev secret to persist across requests in same process

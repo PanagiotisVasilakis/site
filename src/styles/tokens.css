@@ -13,8 +13,6 @@
   /* Header bar: transparent like the original site (owner decision O43, 2026-09-30). Do not make it opaque;
      legibility over photos comes from the text halo in shell.css (.site-header--overlay). */
   --color-glass: rgb(255 255 255 / .12);
-  /* Floating bars over content (QuoteBar): near-opaque glass, so text stays legible over any cell. */
-  --color-glass-bar: rgb(246 240 230 / .84);
   --color-fg: #1C2528;
   --color-fg-muted: #57524C;
   --color-fg-on-photo: #FFF8EE;
@@ -52,15 +50,12 @@
   --color-warm-3: #24130E;
   --color-warm-muted: #F0D9C8;
   --color-cal-free-bg: var(--color-surface);
-  --color-cal-price: var(--color-fg-muted);
   --color-cal-booked-bg: var(--color-surface-sunken);
   --color-cal-booked-hatch: rgb(28 37 40 / .12);
   --color-cal-booked-fg: var(--color-fg-muted);
   --color-cal-selected-bg: var(--color-primary);
   --color-cal-selected-fg: var(--color-primary-fg);
   --color-cal-range-bg: var(--color-primary-tint);
-  --color-cal-best-bg: #E2E8CC;
-  --color-cal-best-fg: #3A4722;
   --color-viewer-bg: #0E1418;
   --color-map-sea: #0A4A5C;
   --color-map-land: #EFE6D6;
@@ -171,7 +166,6 @@
       --color-surface-sunken: #0D2129;
       --color-surface-raised: #163340;
       --color-glass: rgb(255 255 255 / .25);
-      --color-glass-bar: rgb(10 26 33 / .80);
       --color-fg: #F2EBDF;
       --color-fg-muted: #A9B6BA;
       --color-fg-on-photo: #FFF8EE;
@@ -209,8 +203,6 @@
       --color-warm-3: #140B08;
       --color-warm-muted: #F0D9C8;
       --color-cal-booked-hatch: rgb(242 235 223 / .10);
-      --color-cal-best-bg: #2A3A22;
-      --color-cal-best-fg: #D6E2A6;
       --color-viewer-bg: #0E1418;
       --color-map-sea: #07303B;
       --color-map-land: #1E3E48;
@@ -249,7 +241,6 @@
     --color-surface-sunken: #0D2129;
     --color-surface-raised: #163340;
     --color-glass: rgb(255 255 255 / .25);
-    --color-glass-bar: rgb(10 26 33 / .80);
     --color-fg: #F2EBDF;
     --color-fg-muted: #A9B6BA;
     --color-fg-on-photo: #FFF8EE;
@@ -287,8 +278,6 @@
     --color-warm-3: #140B08;
     --color-warm-muted: #F0D9C8;
     --color-cal-booked-hatch: rgb(242 235 223 / .10);
-    --color-cal-best-bg: #2A3A22;
-    --color-cal-best-fg: #D6E2A6;
     --color-viewer-bg: #0E1418;
     --color-map-sea: #07303B;
     --color-map-land: #1E3E48;

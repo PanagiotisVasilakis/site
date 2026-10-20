@@ -1,4 +1,4 @@
-// Calendar dates for availability and prices: ISO 'YYYY-MM-DD' strings with
+// Calendar dates for availability: ISO 'YYYY-MM-DD' strings with
 // no time and no zone. Arithmetic runs on UTC midnights, so DST never moves a
 // date. End dates are exclusive: a stay check-in..check-out covers the nights
 // check-in..check-out-1.

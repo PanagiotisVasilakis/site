@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Booking } from '@/lib/guestDataStore';
 
@@ -44,10 +44,6 @@ beforeEach(() => {
   guestStore.findUserById.mockResolvedValue(null);
 });
 
-afterEach(() => {
-  vi.useRealTimers();
-});
-
 describe('guest data export date handling', () => {
   it('matches bookings that start, end or span a searched date', async () => {
     const result = await guestDataExport.searchBookingsByDateRange('2030-07-14');
@@ -77,14 +73,5 @@ describe('guest data export date handling', () => {
     expect(guestStore.findBookingById).not.toHaveBeenCalled();
     expect(guestStore.findUserById).not.toHaveBeenCalled();
     expect(Object.keys(result[0].user ?? {}).sort()).toEqual(['createdAt', 'id', 'phone', 'updatedAt']);
-  });
-
-  it('counts a booking that starts today as active', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2030-07-14T12:00:00Z'));
-    guestStore.getAllBookings.mockResolvedValue([booking('starts-today', '2030-07-14', '2030-07-16')]);
-
-    const stats = await guestDataExport.getStatistics();
-    expect(stats.bookingsByStatus).toEqual({ active: 1 });
   });
 });

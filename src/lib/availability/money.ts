@@ -1,5 +1,6 @@
 // Money is integer cents in CURRENCY. Parsing and formatting work on digit
-// strings, never on floating-point euros.
+// strings, never on floating-point euros. The public site shows no price: only
+// the admin enters and reads the rate periods' prices.
 
 import { CURRENCY } from '@/data/stayPolicy';
 import type { Locale } from '@/i18n/config';
@@ -38,13 +39,4 @@ export function formatCents(cents: number, locale: Locale): string {
   return new Intl.NumberFormat(NUMBER_LOCALE[locale], { style: 'currency', currency: CURRENCY }).format(
     decimal as Intl.StringNumericLiteral,
   );
-}
-
-/** Like formatCents without the decimals of whole euros: 8000 -> '80 €' (el) or '€80' (en); 8550 -> '€85.50'. */
-export function formatCentsShort(cents: number, locale: Locale): string {
-  if (!Number.isSafeInteger(cents)) throw new RangeError('cents must be a safe integer');
-  if (cents % 100 !== 0) return formatCents(cents, locale);
-  // A safe integer divisible by 100 divides exactly.
-  return new Intl.NumberFormat(NUMBER_LOCALE[locale], { style: 'currency', currency: CURRENCY, maximumFractionDigits: 0 })
-    .format(cents / 100);
 }

@@ -16,9 +16,6 @@ export interface HomeDictionary {
     heroAlt: string;
     heroTagline: string;
     heroFacts: string;
-    /** `{price}` is the formatted lowest nightly price. */
-    heroPriceFrom: string;
-    heroPriceNone: string;
     heroScroll: string;
     /** FactStrip: six facts, never a price (identity §8). `sign` draws the value as a road sign. */
     facts: {
@@ -27,7 +24,7 @@ export interface HomeDictionary {
         seeDates: string;
     };
     intro: { eyebrow: string; title: string; titleEm: string; lead: string };
-    /** SeasonSwitch: the climate-fee seasons of src/data/stayPolicy.ts. */
+    /** SeasonSwitch: summer is April to October, winter is November to March (SUMMER_MONTHS in src/components/home/homeSeason.ts). */
     seasons: {
         label: string;
         summer: { label: string; link: string; cards: HighlightCard[] };
@@ -42,16 +39,11 @@ export interface HomeDictionary {
         allPhotos: string;
         items: Record<HomeRoomKey, { name: string; line: string }>;
     };
-    /** NightsTeaser (§8): the next 14 nights. `{date}` and `{count}` are replaced. */
+    /** NightsTeaser (§8): the next 14 nights, free or booked; the site shows no prices. */
     nights: {
         eyebrow: string;
         title: string;
-        listLabel: string;
-        lowestFrom: string;
-        legendBest: string;
         cta: string;
-        /** The stale note, chosen with Intl.PluralRules on the hours since the last sync. */
-        staleUpdated: { one: string; other: string };
     };
     /** Location band (§8 LocationRelief + DistanceList). The list is the source of truth; the map is illustrative. */
     location: {
@@ -82,8 +74,6 @@ export interface HomeDictionary {
         checkInOut: string;
         arrivalTime: string;
         parking: string;
-        climateFee: string;
-        cancellation: string;
         children: string;
     };
     /** BookBar (§8). `{date}` is the next free night. */
@@ -98,8 +88,6 @@ export const homeTranslations: Record<Locale, HomeDictionary> = {
         heroAlt: "The balcony: a table for four among plants, with rooftops, a pine and Mount Taygetos beyond.",
         heroTagline: "Slow days on a sunlit balcony in Kalamata.",
         heroFacts: "2nd floor · 50 m from Kalamata Town Hall",
-        heroPriceFrom: "from {price} / night",
-        heroPriceNone: "See prices & free dates",
         heroScroll: "Scroll",
         facts: {
             label: "Key facts",
@@ -166,14 +154,7 @@ export const homeTranslations: Record<Locale, HomeDictionary> = {
         nights: {
             eyebrow: "Availability",
             title: "The next 14 nights",
-            listLabel: "The next 14 nights and their prices",
-            lowestFrom: "First night at this price: {date}",
-            legendBest: "lowest price",
-            cta: "See availability & prices",
-            staleUpdated: {
-                one: "Calendar updated {count} hour ago, so booked nights are hidden for now. The prices are current.",
-                other: "Calendar updated {count} hours ago, so booked nights are hidden for now. The prices are current.",
-            },
+            cta: "See availability",
         },
         location: {
             eyebrow: "Location",
@@ -212,8 +193,6 @@ export const homeTranslations: Record<Locale, HomeDictionary> = {
             checkInOut: "How do check-in and check-out work?",
             arrivalTime: "Once you have signed in to your stay, you can ask for a different arrival time.",
             parking: "Is there parking?",
-            climateFee: "What is the climate resilience fee?",
-            cancellation: "Can I cancel?",
             children: "Is it suitable for children?",
         },
         bookBar: {
@@ -225,8 +204,6 @@ export const homeTranslations: Record<Locale, HomeDictionary> = {
         heroAlt: "Το μπαλκόνι: τραπέζι για τέσσερις ανάμεσα σε φυτά, με στέγες, ένα πεύκο και τον Ταΰγετο στο βάθος.",
         heroTagline: "Αργές μέρες σε ένα ηλιόλουστο μπαλκόνι στην Καλαμάτα.",
         heroFacts: "2ος όροφος · 50 μ. από το Δημαρχείο Καλαμάτας",
-        heroPriceFrom: "από {price} / νύχτα",
-        heroPriceNone: "Δείτε τιμές και ελεύθερες ημερομηνίες",
         heroScroll: "Κύλιση",
         facts: {
             label: "Βασικά στοιχεία",
@@ -293,14 +270,7 @@ export const homeTranslations: Record<Locale, HomeDictionary> = {
         nights: {
             eyebrow: "Διαθεσιμότητα",
             title: "Οι επόμενες 14 νύχτες",
-            listLabel: "Οι επόμενες 14 νύχτες και οι τιμές τους",
-            lowestFrom: "Πρώτη νύχτα σε αυτή την τιμή: {date}",
-            legendBest: "χαμηλότερη τιμή",
-            cta: "Δείτε διαθεσιμότητα και τιμές",
-            staleUpdated: {
-                one: "Το ημερολόγιο ενημερώθηκε πριν από {count} ώρα, γι' αυτό οι κρατημένες νύχτες δεν φαίνονται προς το παρόν. Οι τιμές ισχύουν.",
-                other: "Το ημερολόγιο ενημερώθηκε πριν από {count} ώρες, γι' αυτό οι κρατημένες νύχτες δεν φαίνονται προς το παρόν. Οι τιμές ισχύουν.",
-            },
+            cta: "Δείτε διαθεσιμότητα",
         },
         location: {
             eyebrow: "Τοποθεσία",
@@ -339,8 +309,6 @@ export const homeTranslations: Record<Locale, HomeDictionary> = {
             checkInOut: "Πώς γίνονται η άφιξη και η αναχώρηση;",
             arrivalTime: "Αφού συνδεθείτε στη διαμονή σας, μπορείτε να ζητήσετε διαφορετική ώρα άφιξης.",
             parking: "Υπάρχει πάρκινγκ;",
-            climateFee: "Τι είναι το τέλος ανθεκτικότητας στην κλιματική κρίση;",
-            cancellation: "Μπορώ να ακυρώσω;",
             children: "Είναι κατάλληλο για παιδιά;",
         },
         bookBar: {

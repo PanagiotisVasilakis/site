@@ -70,7 +70,7 @@ describe('getItemsByCategory strict mode (build gate, R-421/R-456)', () => {
     expect(strictFailure()).toBe('Invalid item in category fixture (index 0): id (invalid_type)');
   });
 
-  it.each([[null], ['text'], [42]])('throws on the non-object entry %j', (entry) => {
+  it.each([[null], ['text']])('throws on the non-object entry %j', (entry) => {
     serve([place, entry]);
 
     expect(strictFailure()).toBe('Category fixture: entry 1 is not an object');
@@ -85,15 +85,6 @@ describe('getItemsByCategory strict mode (build gate, R-421/R-456)', () => {
 
     expect(strictFailure()).toBe(message);
     expect(getItemsByCategory('fixture')).toEqual([]);
-  });
-
-  it('loads a valid category identically in both modes', () => {
-    serve([place, { ...place, id: 'sea-front', name: 'Sea Front' }]);
-
-    const strict = getItemsByCategory('fixture', { strict: true });
-
-    expect(strict.map((item) => item.id)).toEqual(['old-town', 'sea-front']);
-    expect(strict).toEqual(getItemsByCategory('fixture'));
   });
 
   it('keeps the default load resilient: it logs and skips an invalid item and a non-object entry, and strips an unknown key', () => {

@@ -90,7 +90,6 @@ async function issueRefreshedSession(
     || !rotated.old
     || !rotated.rec
     || !rotated.token
-    || !rotated.session
     || !rotated.sessionToken) {
     return { status: 'failed' };
   }

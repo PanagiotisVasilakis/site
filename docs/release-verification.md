@@ -17,7 +17,9 @@ npm run verify:release
 - dependencies installed from the committed `package-lock.json`;
 - the checksum-locked Gitleaks 8.30.1 binary selected through
   `GITLEAKS_BIN`, as documented in
-  [`security/secret-scanning.md`](security/secret-scanning.md);
+  [`security/secret-scanning.md`](security/secret-scanning.md). The lock lists
+  the `darwin-arm64` (Apple-silicon macOS) artifact only, so another platform
+  needs a reviewed lock addition first;
 - a local Docker daemon reachable through a Unix or Windows named-pipe socket,
   plus Docker Buildx;
 - enough local disk for the digest-pinned PostgreSQL image, disposable database,
@@ -231,10 +233,36 @@ small supply-chain review:
    documentation) in one reviewed diff, keeping the `node:22-alpine@sha256:`
    form, and confirm that a repository search finds no old digest left
    outside the `REVIEW.md` and `PROGRESS.md` journals.
-5. Run `npm run verify:release`, then `npm run docker:build`,
-   `npm run docker:scan` and `npm run smoke:image` before accepting the update.
-   The build fails closed if the pinned `dumb-init` apk version no longer
-   resolves on the new Alpine base.
+5. Run `npm run verify:release`, then the release image sequence in
+   [`scripts/README.md`](../scripts/README.md#production): `npm run docker:build`
+   with `NEXT_PUBLIC_SITE_URL=https://localhost:3002` and `npm run smoke:image`;
+   then `npm run docker:build` with the production `NEXT_PUBLIC_SITE_URL` and
+   `npm run docker:scan` on that last build. Accept the update only after all of
+   them pass. The build fails closed if the pinned `dumb-init` apk version no
+   longer resolves on the new Alpine base.
+
+## Controlled Nginx digest update
+
+The Nginx reference is the `repository@digest` in `deploy/nginx/image.lock.json`,
+and gate 7 (`npm run test:nginx-ingress`) builds its image reference from that
+file. The release policy requires the lock's `repository@digest` to equal the
+independent constant `EXPECTED_NGINX_IMAGE` in `scripts/lib/release-policy.mjs`,
+and its `mediaType` to be the OCI image index. The fixtures in
+`scripts/tests/release-policy.test.mjs` write `repository`, `digest` and
+`mediaType` the same way. A digest change is a separate, small supply-chain
+review, and it changes the lock (its `tag` and `verifiedAt` fields included),
+`EXPECTED_NGINX_IMAGE` and those fixtures in one reviewed diff, together with the
+runbook text "currently `nginx:<tag>`" in
+`docs/deployment/origin-ingress-runbook.md`:
+
+1. Inspect the official `nginx` tag with `docker buildx imagetools inspect` and
+   again with `--raw`; the SHA-256 of the raw bytes must equal the digest.
+2. Select the top-level multi-platform OCI-index digest, never an
+   architecture-specific child or a third-party mirror.
+3. Pull that exact `repository@digest` into the local Docker image store (gate 7
+   does not pull it), then run `npm run validate:release-policy`,
+   `npm run test:release-policy` and `npm run verify:release` before accepting the
+   update.
 
 ## Container image vulnerability scan
 
@@ -310,25 +338,94 @@ list`; the vulnerability data itself comes from the downloaded database.
 ## Restricted policy boundary
 
 `npm run validate:release-policy` is a static, repository-specific checker. It
-rejects any active `.github/workflows/**` file; `pull_request_target`; known
-Vercel, Wrangler/Pages, OpenNext, and GitHub Pages artifacts; direct retired
-platform dependencies and deployment scripts; an altered gate profile;
-deployment, push, publication, or persistent migration inside the local gate;
-tag-only PostgreSQL references; production-default database mutation; and
-commands that combine staging and production database credentials.
+checks these families and reports each failure by name:
 
-For `docker/Dockerfile.security` it checks only the `runner` stage: exactly one
-`USER 1001:1001`, no `ADD`, and a `RUN` that removes `npm` and `npx`. It does not
-model the copied files, their imports or the `workers` and `migrate` stages.
-That the three images start with everything they import is proven at run time
+- **Gate profile and deny-list:** the exact ordered gate profile. A gate command
+  that deploys, pushes, publishes or runs a persistent migration (Vercel,
+  Wrangler and Pages, Cloudflare Pages, GitHub Pages, git push, Docker registry,
+  Docker Compose and Buildx push, package publication, `prisma migrate`,
+  `migrate deploy`, `system:migrate`, `db:migrate`) is named before the profile
+  comparison.
+- **Packages and scripts:** the exact script profile; retired or unsafe scripts;
+  no npm `pre*` or `post*` lifecycle hook on the local release path; no automatic
+  deployment-oriented script; forbidden commands in package scripts; database
+  mutation that does not select production by default; no script that consumes
+  staging and production database credentials together; no retired deployment
+  dependency or alias.
+- **Active surfaces:** no active `.github/workflows/**` file and no
+  `pull_request_target`; no known Vercel, Wrangler/Pages, OpenNext or GitHub Pages
+  artifact and no other retired deployment artifact; no forbidden command pattern,
+  and no combined staging and production database credentials, in `scripts/`,
+  `deploy/`, `docker/`, `Dockerfile` and `docker-compose.yml`.
+- **PostgreSQL:** `docker-compose.yml` and `docker/docker-compose.prod.yml` must
+  name exactly the approved digest-pinned image (tag-only references are
+  rejected); the integration constants keep the approved tag and digest; the
+  hostile integration and synthetic production environments are the exact
+  reviewed values; `scripts/system-orchestrator.sh` is development-only.
+- **Trusted ingress:** the production Nginx markers (Cloudflare real IP and
+  origin pull, private identity headers overwritten, `server_tokens off`, loopback
+  upstream); no wildcard trusted proxy and no `$proxy_add_x_forwarded_for`; the
+  Cloudflare CIDR manifest and generated includes; the Nginx image lock against
+  `EXPECTED_NGINX_IMAGE` (OCI index media type); the origin-proxy shared secret in
+  the start-up schema; the application identity code (constant-time attestation
+  check, no public forwarding header as a candidate); the phrases of
+  `docs/deployment/origin-ingress-runbook.md`; no certificate or key file
+  (extensions key, pem, p12, pfx, crt) under `deploy/nginx`.
+- **Production Compose ports and mode:** every `ports:` entry of
+  `docker/docker-compose.prod.yml`, including flow-style and alias values, must be
+  a loopback short-syntax mapping (`127.0.0.1:` or `[::1]:`); `network_mode: host`
+  is forbidden; the `web`, `outbox` and `operations` services must each set
+  `NODE_ENV: production` in their own `environment:` block.
+- **Layered rate limiting:** the Nginx `auth_operations`, `public_writes` and
+  `broad_api` zones with dry-run and 429 status settings; readiness depends on the
+  PostgreSQL/schema check and on no external rate-limiting service; the PostgreSQL
+  limiter is atomic and fails closed with a generic 503; expired-row cleanup; the
+  nine phrases of `docs/security/layered-rate-limiting.md`; no external limiter
+  configuration.
+- **Secret scanning:** the Gitleaks lock equals the reviewed 8.30.1 artifact
+  (`darwin-arm64` only); the gate's restricted markers; the scanner configuration
+  (maintained defaults plus database-URL and private-key rules, no added allowlist,
+  no disabled rule, no global `.gitleaksignore`); exactly six IR-01 baseline
+  fingerprints; the value-exact fixture allowlist; Docker inputs that exclude
+  `.env` files and PEM keys; `docs/security/secret-scanning.md` must exist.
+- **Claim-token transport:** claim capabilities are not created or consumed through
+  URLs; claim consumption uses and clears only the server-controlled exchange
+  cookie; `Referrer-Policy: no-referrer` on the guest claim UI; the Nginx
+  configuration uses `$uri` and no `$request_uri`, and the `origin_safe` log format
+  is defined, used by the access log and free of forbidden variables; `no-store`
+  and `no-referrer` on admin claim issuance; `docs/security/claim-token-transport.md`.
+- **Runtime credentials:** the centralized credential readers for admin JWT, guest
+  JWT and admin login; no fixed development guest credential; no `NEXT_PUBLIC_*`
+  secret, token or key reference in the admin, guest and admin-login sources; the
+  retired names `JWT_SECRET`, `SESSION_SECRET`, `SECURITY_ENC_KEY_HEX` and
+  `SECURITY_ENC_KEY_HEX_PREVIOUS` are forbidden in the active configuration files
+  (among them `.env.example`, `scripts/README.md` and `SECURITY.md`);
+  `docs/security/runtime-credential-contract.md`.
+- **Verify implementation:** `scripts/verify-release.mjs` keeps its restricted
+  markers, spawns processes with argument vectors (no exec APIs) and contains no
+  deployment or migration command.
+- **Dockerfile:** every external `FROM` instruction of `docker/Dockerfile.security`
+  is `node:<major>-alpine@sha256:<64 hex>`, with an optional `AS` name, and all
+  stages share one digest (the Node digest); the `runner` stage has exactly one
+  `USER 1001:1001`, no `ADD`, and a `RUN` that removes `npm` and `npx`.
+
+The checks read these surfaces with text patterns and fixed markers. They do not
+model the files copied into the images, their imports, or the instructions of the
+`workers` and `migrate` stages beyond their `FROM` lines. That the three images
+start with everything they import is proven at run time
 by `npm run smoke:image`, a mandatory release step outside `verify:release`
 because it needs the locally built images (see the release sequence in
 [`scripts/README.md`](../scripts/README.md#production)).
 
-It intentionally scans active package/scripts/configuration surfaces and known
-deployment artifact locations, not natural-language documentation. It is not a general shell, YAML, Docker, or data-flow
-parser. A reviewed change could alter both policy and tests, so code review and
-operator discipline remain necessary.
+It intentionally scans active package, script, configuration and deployment
+surfaces and known deployment artifact locations. Natural-language documentation
+is not scanned in general; the documents named above are read only for their
+fixed phrases or required existence, and `SECURITY.md` and `scripts/README.md`
+are read for retired credential names. It is not a general shell, YAML, Docker,
+or data-flow parser. Calls built as an argument vector (for example
+`spawn('docker', ['push', image])`) are not visible to these text patterns, so a
+reviewer must read them directly. A reviewed change could alter both policy and
+tests, so code review and operator discipline remain necessary.
 
 Every internal npm gate uses `--ignore-scripts`, and the policy rejects `pre*`
 and `post*` hooks for the canonical command and mandatory gate scripts. The

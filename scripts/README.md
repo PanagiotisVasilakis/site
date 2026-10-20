@@ -74,7 +74,7 @@ Production additionally requires:
 If the check-in webhook URL is configured, its token is mandatory;
 production webhook URLs must use HTTPS.
 
-Optional `AIRBNB_ICAL_URL` is the Airbnb calendar export URL (`https://www.airbnb.com/calendar/ical/<listing id>.ics?s=<token>`), read server-side only by the calendar sync (see "Operational workers"); without it the availability page shows no calendar or prices, only a notice and the contact options. It is a secret (the `s` query parameter is a token): set it only in the production environment and never commit or log it. The schema accepts only https on the default port, no userinfo, the hosts `www.airbnb.com`, `airbnb.com`, `www.airbnb.gr`, `airbnb.gr`, and the path `/calendar/ical/<digits>.ics`.
+Optional `BOOKING_ICAL_URL` is the Booking.com calendar export URL (iCal), the only source of the availability calendar: the owner creates it in the Booking.com extranet with booked and closed dates and copies the link (public guides show `https://ical.booking.com/v1/export?t=<token>` and an older form `https://admin.booking.com/hotel/hoteladmin/ical.html?t=<token>`). It is read server-side only by the calendar sync (see "Operational workers"); without it the availability page shows no calendar, only a notice and the contact options. A reservation and a closed date are not told apart: both show as booked, and only dates are stored. It is a secret (the `t` query parameter is a token): set it only in the production environment (the root-owned runtime configuration file that `APP_ENV_FILE` names), never in `.env.local`, and never commit or log it. The schema accepts only https on the default port, no userinfo, a non-empty query, and exactly these host and path pairs: `ical.booking.com` with `/v1/export`, `admin.booking.com` with `/hotel/hoteladmin/ical.html`; the fetch applies the same check to the start URL and to every redirect. A set value that the schema rejects stops the web container at start-up (exit 78; the message names the variable and never the value), and `restart: unless-stopped` repeats that until the line is fixed. So print the shape of the link before adding it, on any computer with Node.js 22 and without writing the link to a file: `printf 'Paste the link and press Enter: '; read -rs U; printf '\n'; U="$U" node -e 'let u; try { u = new URL(process.env.U) } catch { console.log("not an absolute URL"); process.exit(1) } const P = { "ical.booking.com": "/v1/export", "admin.booking.com": "/hotel/hoteladmin/ical.html" }; const known = Object.hasOwn(P, u.host); console.log([u.protocol === "https:" ? "https:" : "other-protocol", known ? u.host : "other-host", known && P[u.host] === u.pathname ? u.pathname : "other-path", u.searchParams.get("t") ? "t" : "no-t", ...(u.username || u.password ? ["USERINFO"] : [])].join(" "))'; unset U` must print `https: ical.booking.com /v1/export t` or `https: admin.booking.com /hotel/hoteladmin/ical.html t`; any other output means that the link is not the expected export link: `other-protocol`, `other-host`, `other-path`, `USERINFO` or `not an absolute URL` would stop the web container at start-up, and `no-t` shows that the link has no non-empty `t` parameter, the token (the start-up check only requires a non-empty query). The command prints only fixed words: the protocol, the host and the path only when they are the expected ones (otherwise `other-protocol`, `other-host` or `other-path`), `t` or `no-t`, `USERINFO`, or `not an absolute URL`; it never prints any other part of the link. After the edit run `docker compose -f docker/docker-compose.prod.yml up -d --wait web`; if web does not become healthy, `docker compose -f docker/docker-compose.prod.yml logs --tail 20 web` names the rejected variable: delete the `BOOKING_ICAL_URL` line and run the same `up -d --wait web` again (the site then works without a calendar). Delete the retired calendar variable from the environment file: nothing reads it any more. Set `BOOKING_ICAL_URL` in production only after the privacy notice (`src/i18n/domains/legal.ts`) names Booking.com everywhere (its English recipients item 4 still names the former booking channel until it is replaced): `git grep -n -i 'air[b]nb' -- src/i18n/domains/legal.ts` must print nothing.
 
 Optional `CARTO_BASEMAPS_KEY` (https://carto.com/basemaps/apikey/) is read server-side at request time and sent to browsers in the map tile URLs (CARTO Voyager in light, Dark Matter in dark); without it the map uses the standard OpenStreetMap tiles in both themes. It is public by design but should not be logged; restrict it to the site domain in the CARTO dashboard.
 
@@ -98,6 +98,8 @@ npm run system:down
 `verify` requires all of the following: liveness, database-backed readiness, and a successfully served `/en` page. A `Ready` log line alone is not considered successful startup.
 
 Development may start a disposable Docker database when the configured database is unreachable. The production Docker image has no fallback database and fails closed.
+
+The orchestrator refuses a `DATABASE_URL` whose host is not `localhost`, `127.0.0.1` or `[::1]` unless `--allow-remote-db` is given, requires `DIRECT_URL` to be unset or equal to `DATABASE_URL` before it applies migrations, and never starts production services: it runs `npm run dev` and the development `docker-compose.yml` fallback.
 
 ## Local release verification
 
@@ -137,9 +139,11 @@ Committed design assets are regenerated with `npm run design:hero` (hero crops, 
 ## Production
 
 Production runs the immutable images built from `docker/Dockerfile.security`
-behind the host Nginx, as selected in
+behind the pinned Nginx container (host network), as selected in
 [the deployment target](../docs/architecture/deployment-target.md). The host
-orchestrator above is a development helper and cannot target production.
+orchestrator above is a development helper and cannot target production. The
+production compose file pins `NODE_ENV: production` on its `web`, `outbox` and
+`operations` services, overriding any `NODE_ENV` in the env file.
 Backups, the live ingress evidence and the release approval are still open gaps
 in that ADR; the mechanics below are what the repository provides.
 
@@ -251,6 +255,8 @@ columns disappear. A non-zero count needs an export or retention decision and
 explicit SQL first. After a refused run, mark it rolled back before retrying:
 `$C --profile ops run --rm migrate node node_modules/prisma/build/index.js migrate resolve --rolled-back <migration name>`.
 
+The migration `20261020120000_booking_calendar_source` re-keys the single `calendar_sync_state` row to `booking` and resets its cached snapshot (blocked nights, horizon, sync history; dates only). It refuses only on a hand-edited table (a row with another id, or both ids): check with `$C exec db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT id FROM calendar_sync_state;"` (one row expected) before `run --rm migrate`. The previous release cannot run on the migrated database (readiness answers 503 because the database schema is newer than the image, and that release reads the retired row id), so a bad release after this migration is fixed forward, and `web` and the `APP_IMAGE` of the root-owned `.env` that the timers read move to the new release right after `migrate`. Then set `BOOKING_ICAL_URL` (see "Required runtime configuration") and run the first sync: press "Sync now" in /admin/availability once; it must answer "Synced: N blocked nights" with N equal to the booked and closed nights of the next 365 nights in the extranet; one known reservation (its check-in night crossed out, its check-out day free) and one date closed by hand must show as booked on /en/availability and /el/availability; and an operations run about 30 minutes after the click must move "Last success" without a click. While the stored snapshot holds no night from today on, every run accepts an empty calendar, so N = 0 while the extranet has blocked dates means a wrong link or the wrong export option: delete `BOOKING_ICAL_URL` and run `docker compose -f docker/docker-compose.prod.yml up -d --wait web` again (web reads the variable only when its container is created) until the link is fixed. The scheduled operations run (every 5 minutes) can make this first sync on its own within 5 minutes after the variable is set, before "Sync now" and these checks, so do the checks right after setting it.
+
 **Worker schedule.** The workers are one-off services of the same Compose file;
 run them from host timers with single-flight and bounded execution, e.g. root's crontab:
 
@@ -267,7 +273,7 @@ failed. Cron does not inherit the operator shell, so `APP_IMAGE` and `APP_ENV_FI
 must be in the root-owned `.env`. `--no-deps` keeps a database outage from
 restarting `db` from a timer. The operations worker's `ALERT_WEBHOOK_URL` reports a
 failing outbox job, but nothing reports an operations job that fails or does not
-run; watch it from outside.
+run; watch it from outside. The availability calendar depends on this timer: the scheduled calendar sync and the stale-calendar alert both run only inside an operations run, so if the timer stops, the calendar stops updating and no alert opens. /admin/availability then marks the calendar stale three hours after the last success, and after 12 hours the public pages drop the calendar and show the contact options.
 
 **Production-image smoke (mandatory).** `npm run smoke:image` starts the three
 images of the checked-out commit with the same Compose file as an isolated
@@ -287,22 +293,25 @@ In production the workers are the `outbox` and `operations` services of
 `docker/docker-compose.prod.yml` (see the schedule above), built from
 `scripts/build-workers.mjs` into the `-workers` image.
 
-Manual development runs use `tsx`, which does not read `.env.local`, so export it
-into the shell first (the app and the orchestrator load it themselves):
+Manual development runs use `tsx`, which does not read `.env.local` by itself, so give
+it the file with `--env-file` (the app and the orchestrator load it themselves):
 
 ```bash
-set -a; . ./.env.local; set +a
-npm run outbox:drain
-npm run operations:check
+npx tsx --env-file=.env.local scripts/drain-outbox.ts
+npx tsx --env-file=.env.local scripts/run-operational-maintenance.ts
 ```
+
+`--env-file` reads only the file it names: it does not apply the
+`.env.development.local` and `.env` precedence of `next dev`, and a variable already
+set in the shell takes precedence over the file.
 
 Both exit when their run finishes: they disconnect Prisma explicitly, which is
 what lets the process exit (idle pool connections would otherwise keep it alive
 for up to 300 s).
 
-The outbox worker uses bounded attempts, exponential backoff, leases, abandoned-lease recovery, and a terminal `DEAD` state. The operations worker first syncs the Airbnb calendar when `AIRBNB_ICAL_URL` is set (a scheduled fetch at most every 30 minutes, backing off up to 45 minutes after repeated failures; the admin can also start one manually, at most once a minute), and only then evaluates database alert rules, retries failed alert notifications and applies retention, so the stale-calendar alert reads the state the same run leaves behind. A scheduled sync can fail with `empty_feed` (keeping the stored snapshot) when the calendar has no blocked nights from today on but the snapshot still has some; "Sync now" accepts a genuinely empty calendar. The "Stale availability calendar" alert opens after three hours without a successful sync. A missing required alert webhook makes the operations run fail. A `DEAD` event opens the "Dead outbox events" alert until it is handled: "Retry notification" (arrival requests) requeues it, and retention deletes it after 30 days. Events cancelled by a guest erasure are `DEAD` by design; they never open the alert and are deleted on the next operations run.
+The outbox worker uses bounded attempts, exponential backoff, leases, abandoned-lease recovery, and a terminal `DEAD` state. The operations worker first syncs the Booking.com calendar (reservations and closures alike) when `BOOKING_ICAL_URL` is set (a scheduled fetch at most every 30 minutes, backing off up to 45 minutes after repeated failures; the admin can also start one manually, at most once a minute), and only then evaluates database alert rules, retries failed alert notifications and applies retention, so the stale-calendar alert reads the state the same run leaves behind. A scheduled sync can fail with `empty_feed` (keeping the stored snapshot) when the calendar has no blocked nights from today on but the snapshot still has some; "Sync now" accepts a genuinely empty calendar. The "Stale availability calendar" alert opens after three hours without a successful sync. A missing required alert webhook makes the operations run fail. A `DEAD` event opens the "Dead outbox events" alert until it is handled: "Retry notification" (arrival requests) requeues it, and retention deletes it after 30 days. Events cancelled by a guest erasure are `DEAD` by design; they never open the alert and are deleted on the next operations run.
 
-Guest data retention (`GUEST_DATA_RETENTION_MONTHS` in `src/data/stayPolicy.ts`, 12 months after the booking end date; the accountant still has to confirm that tax retention needs nothing longer): each operations run clears the name, e-mail, phone and message of check-in requests whose booking ended that long ago, and erases, through the same audited path as the admin "Erase guest" action (privacy request with an automatic-retention note, `privacy.erasure.completed` audit event), up to 25 guest accounts whose every booking ended that long ago. Bookings stay, unlinked, with their platform reservation code. An erasure, by the admin or by retention, also sets the guest's pending arrival request to REJECTED; the request keeps its booking link, so the booking can receive a new request. Each erasure re-checks the cutoff inside its transaction, so a guest who claims a new booking between selection and erasure is skipped (counted as `guestErasuresSkipped`) and keeps the account. A failed erasure makes the run fail after the rest of the batch has been attempted.
+Guest data retention (`GUEST_DATA_RETENTION_MONTHS` in `src/data/stayPolicy.ts`, 12 months after the booking end date; confirmed by the owner on 2026-10-20): each operations run clears the name, e-mail, phone and message of check-in requests whose booking ended that long ago, and erases, through the same audited path as the admin "Erase guest" action (privacy request with an automatic-retention note, `privacy.erasure.completed` audit event), up to 25 guest accounts whose every booking ended that long ago. Bookings stay, unlinked, with their platform reservation code. An erasure, by the admin or by retention, also sets the guest's pending arrival request to REJECTED; the request keeps its booking link, so the booking can receive a new request. Each erasure re-checks the cutoff inside its transaction, so a guest who claims a new booking between selection and erasure is skipped (counted as `guestErasuresSkipped`) and keeps the account. A failed erasure makes the run fail after the rest of the batch has been attempted.
 
 ## Troubleshooting
 

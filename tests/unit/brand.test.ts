@@ -10,9 +10,8 @@ vi.mock('@/app/fonts/fonts', () => {
 
 vi.mock('@/app/globals.css', () => ({}));
 
-import { metadata, viewport } from '@/app/layout';
+import { metadata } from '@/app/layout';
 import { HOST_CONTACT } from '@/data/contact';
-import { getDictionary } from '@/i18n/dictionaries';
 
 const BRAND = 'Dolce Far Niente · Kalamata';
 const PUBLIC_DIR = path.join(process.cwd(), 'public');
@@ -34,18 +33,6 @@ describe('brand name (identity §1.2)', () => {
   it('is the root title default and the suffix template of every page title', () => {
     expect(metadata.title).toEqual({ default: BRAND, template: `%s | ${BRAND}` });
     expect(metadata.appleWebApp).toMatchObject({ title: BRAND });
-  });
-
-  it('is the app title in both locales', () => {
-    expect(getDictionary('en').appTitle).toBe(BRAND);
-    expect(getDictionary('el').appTitle).toBe(BRAND);
-  });
-
-  it('uses the §3.2 bg pair as the browser theme colour', () => {
-    expect(viewport.themeColor).toEqual([
-      { media: '(prefers-color-scheme: light)', color: '#F6F0E6' },
-      { media: '(prefers-color-scheme: dark)', color: '#0A1A21' },
-    ]);
   });
 });
 

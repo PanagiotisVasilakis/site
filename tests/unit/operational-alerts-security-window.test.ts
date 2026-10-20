@@ -51,7 +51,7 @@ describe('recent high-severity security events alert window', () => {
     vi.setSystemTime(NOW);
     vi.stubEnv('ALERT_WEBHOOK_URL', '');
     vi.stubEnv('ALERT_WEBHOOK_REQUIRED', '0');
-    vi.stubEnv('AIRBNB_ICAL_URL', '');
+    vi.stubEnv('BOOKING_ICAL_URL', '');
     // Every rule reads a healthy value.
     prismaMock.$transaction.mockResolvedValue([0, 0]);
     prismaMock.outboxEvent.findFirst.mockResolvedValue(null);

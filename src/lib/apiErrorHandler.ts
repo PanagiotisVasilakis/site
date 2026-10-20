@@ -313,8 +313,8 @@ export function withErrorHandler(
             },
           });
         }
-        // A handled 4xx is a client outcome, not an application warning. The
-        // status/code remain observable through counters and response logs.
+        // A handled 4xx is a client outcome, not an application warning. Its
+        // status and code are logged here at debug level; no counter records them.
         logger.debug('API client error', {
           method,
           url,

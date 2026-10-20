@@ -40,7 +40,7 @@ describe('guide entries (identity §8 GuideCard, §7.3)', () => {
 
     expect(sorted.map((entry) => entry.id)).toEqual([
       'police', 'fire-department', 'kalamata-hospital',
-      'emergency-112', 'ambulance-166', 'fire-service-199', 'police-100', 'coast-guard-108', 'child-sos-1056', 'poison-centre', 'taxi',
+      'emergency-112', 'ambulance-166', 'fire-service-199', 'police-100', 'coast-guard-108', 'child-sos-1056', 'poison-centre', 'tourist-police-1571', 'taxi',
     ]);
     // Without coordinates: the closest to the apartment.
     expect(nearestTo(sorted[3], entries, 2).map((entry) => entry.id)).toEqual(['police', 'fire-department']);

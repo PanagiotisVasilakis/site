@@ -10,7 +10,11 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { RELEASE_GATES } from '../lib/release-gates.mjs';
+import {
+  HOSTILE_INTEGRATION_ENVIRONMENT,
+  RELEASE_GATES,
+  SYNTHETIC_PRODUCTION_ENVIRONMENT,
+} from '../lib/release-gates.mjs';
 import {
   releasePolicyInternals,
   validateReleasePolicy,
@@ -741,6 +745,30 @@ test('rejects expansion of the current secret-fixture allowlist', async () => {
   });
 });
 
+test('rejects a tampered secret-scanner tool lock', async () => {
+  const lockName = 'config/secret-scanning/tool.lock.json';
+  for (const tamper of [
+    (lock) => { lock.checksumsFileSha256 = '0'.repeat(64); },
+    (lock) => { lock.artifacts['darwin-arm64'].binarySha256 = '0'.repeat(64); },
+    (lock) => { lock.version = '8.30.2'; },
+  ]) {
+    await withFixture(async (root) => {
+      const lockPath = path.join(root, lockName);
+      const lock = JSON.parse(await readFile(lockPath, 'utf8'));
+      tamper(lock);
+      await writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`, 'utf8');
+      assertRejected(
+        await validateReleasePolicy(root),
+        /secret scanner tool lock must match the reviewed Gitleaks 8\.30\.1 artifact/u,
+      );
+    });
+  }
+  await withFixture(async (root) => {
+    await writeRelative(root, lockName, '{"schemaVersion": 1,');
+    assertRejected(await validateReleasePolicy(root), /secret scanner tool lock must contain valid JSON/u);
+  });
+});
+
 test('rejects a global Gitleaks ignore file', async () => {
   await withFixture(async (root) => {
     await writeRelative(root, '.gitleaksignore', 'unreviewed-global-suppression\n');
@@ -813,6 +841,16 @@ for (const line of ['**/.env', '**/.env.*', '**/*.pem']) {
     });
   });
 }
+
+test('rejects a .dockerignore that drops the !.env.example exception', async () => {
+  await withFixture(async (root) => {
+    const ignorePath = path.join(root, '.dockerignore');
+    const lines = (await readFile(ignorePath, 'utf8')).split('\n');
+    assert.ok(lines.includes('!.env.example'), 'the fixture .dockerignore lacks !.env.example');
+    await writeFile(ignorePath, lines.filter((entry) => entry !== '!.env.example').join('\n'), 'utf8');
+    assertRejected(await validateReleasePolicy(root), /while retaining \.env\.example/u);
+  });
+});
 
 test('rejects an artifact scan that no longer rejects environment files', async () => {
   await withFixture(async (root) => {
@@ -948,6 +986,27 @@ test('rejects a GitHub Pages deployment path', async () => {
   });
 });
 
+test('rejects a retired deployment dependency and an alias of one', async () => {
+  await withFixture(async (root) => {
+    await mutatePackage(root, (packageJson) => {
+      packageJson.devDependencies.wrangler = '3.0.0';
+    });
+    assertRejected(
+      await validateReleasePolicy(root),
+      /retired deployment dependency wrangler is forbidden/u,
+    );
+  });
+  await withFixture(async (root) => {
+    await mutatePackage(root, (packageJson) => {
+      packageJson.dependencies['deploy-helper'] = 'npm:wrangler@3.0.0';
+    });
+    assertRejected(
+      await validateReleasePolicy(root),
+      /retired deployment dependency alias deploy-helper -> wrangler is forbidden/u,
+    );
+  });
+});
+
 // The push and publication forms of the toolchain in use. Each is checked as a package
 // script and as an active script file, and the full message is compared, so the label
 // that fires is the one named here.
@@ -999,6 +1058,16 @@ for (const [label, command, rule] of [
     });
   });
 }
+
+test('rejects a deploy command inside an active script file', async () => {
+  await withFixture(async (root) => {
+    await writeRelative(root, 'scripts/publish-preview.sh', '#!/usr/bin/env bash\nvercel deploy --prod\n');
+    assertRejected(
+      await validateReleasePolicy(root),
+      /scripts\/publish-preview\.sh: Vercel deployment command is forbidden in active scripts/u,
+    );
+  });
+});
 
 test('does not mistake a compose file name or a later command for a push', async () => {
   await withFixture(async (root) => {
@@ -1647,6 +1716,30 @@ test('rejects a persistent migration inserted into verify:release', async () => 
   });
 });
 
+test('rejects a verify-release spawn that sets shell: true', async () => {
+  await withFixture(async (root) => {
+    const verifyPath = path.join(root, 'scripts/verify-release.mjs');
+    const source = await readFile(verifyPath, 'utf8');
+    const mutated = source.replace('{ shell: false }', '{ shell: true }');
+    assert.notEqual(mutated, source, 'the verify-release mutation did not change the fixture');
+    await writeFile(verifyPath, mutated, 'utf8');
+    assertRejected(
+      await validateReleasePolicy(root),
+      /verify:release must retain restricted marker: shell: false/u,
+    );
+  });
+});
+
+test('rejects a 31st gate appended to the release profile', async () => {
+  await withFixture(async (root) => {
+    const gates = [...RELEASE_GATES, fixtureGate('unreviewed-extra')];
+    assertRejected(
+      await validateReleasePolicy(root, { gates }),
+      /release gate profile must contain exactly 30 gates/u,
+    );
+  });
+});
+
 test('reports a malformed gate entry instead of throwing', async () => {
   await withFixture(async (root) => {
     for (const malformed of [null, { id: RELEASE_GATES[0].id, command: 'node' }]) {
@@ -1696,6 +1789,9 @@ test('rejects hiding a persistent migration behind a mandatory gate script', asy
   });
 });
 
+// The names of .env.example assignments, read the way the orchestrator's key mask reads them.
+const ENV_EXAMPLE_NAME = /^[ \t]*(?:export )?([A-Za-z_][A-Za-z0-9_]*)[ \t]*=/gmu;
+
 test('release orchestrator executes every gate in order with restricted environments', async () => {
   const inheritedName = 'RELEASE_POLICY_TEST_SECRET';
   const previous = process.env[inheritedName];
@@ -1725,14 +1821,45 @@ test('release orchestrator executes every gate in order with restricted environm
     assert.equal(result.ok, true);
     assert.deepEqual(calls.map((call) => call.args.at(-1)), ['base', 'integration', 'production']);
     assert.ok(calls.every((call) => call.environment[inheritedName] === undefined));
+    // Every hostile DB/PG value of the integration profile also reaches the base gates,
+    // except the image, which only the integration gate receives (R-673).
+    for (const [name, value] of Object.entries(HOSTILE_INTEGRATION_ENVIRONMENT)) {
+      if (name !== 'INTEGRATION_POSTGRES_IMAGE') assert.equal(calls[0].environment[name], value, name);
+    }
     assert.equal(calls[0].environment.PGHOST, 'hostile.invalid');
-    assert.equal(calls[0].environment.ALERT_WEBHOOK_TOKEN, '');
+    assert.equal(calls[0].environment.NODE_ENV, 'test');
+    assert.equal(calls[0].environment.TZ, 'UTC');
+    assert.equal(calls[0].environment.NEXT_TELEMETRY_DISABLED, '1');
+    assert.equal(calls[0].environment.NPM_CONFIG_UPDATE_NOTIFIER, 'false');
+    assert.equal(calls[0].environment.PAGER, 'cat');
     assert.equal(calls[0].environment.GIT_PAGER, 'cat');
     assert.equal(calls[0].environment.GIT_TERMINAL_PROMPT, '0');
+    // The key mask blanks each name of .env.example that no fixed value sets. The names are
+    // read from that file, so the test does not depend on one particular name being present.
+    const envExample = await readFile(new URL('../../.env.example', import.meta.url), 'utf8');
+    const fixedNames = new Set([
+      ...Object.keys(HOSTILE_INTEGRATION_ENVIRONMENT),
+      ...Object.keys(SYNTHETIC_PRODUCTION_ENVIRONMENT),
+      'NODE_ENV',
+      'TZ',
+      'NEXT_TELEMETRY_DISABLED',
+      'NPM_CONFIG_UPDATE_NOTIFIER',
+      'PAGER',
+      'GIT_PAGER',
+      'GIT_TERMINAL_PROMPT',
+    ]);
+    const maskedNames = [...envExample.matchAll(ENV_EXAMPLE_NAME)]
+      .map((match) => match[1])
+      // Inside verify:release this very test runs with every .env.example name already blank, so a blank name counts as unset.
+      .filter((name) => !fixedNames.has(name) && (process.env[name] ?? '') === '');
+    assert.ok(maskedNames.length > 0, '.env.example must name keys that the key mask blanks');
+    for (const name of maskedNames) {
+      assert.equal(calls[0].environment[name], '', name);
+      assert.equal(calls[2].environment[name], '', name);
+    }
     assert.equal(calls[1].environment.INTEGRATION_POSTGRES_IMAGE, APPROVED_IMAGE);
     assert.equal(calls[2].environment.NODE_ENV, 'production');
     assert.equal(calls[2].environment.NEXT_PUBLIC_SITE_URL, 'https://release.example.invalid');
-    assert.equal(calls[2].environment.ALERT_WEBHOOK_TOKEN, '');
     assert.match(stdout.contents(), /PASSED: 3\/3 gates/u);
     assert.equal(stderr.contents(), '');
   } finally {
@@ -1775,6 +1902,26 @@ test('release orchestrator verifies orphan state after an integration failure', 
   assert.equal(result.ok, false);
   assert.deepEqual(calls, [
     'node --version integration',
+    'npm --ignore-scripts run check:integration-orphans',
+  ]);
+});
+
+test('release orchestrator verifies orphan state when a gate after a passed integration fails', async () => {
+  const calls = [];
+  const result = await runReleaseVerification({
+    gates: [fixtureGate('integration', 'integration'), fixtureGate('later')],
+    runner: async (command, args) => {
+      calls.push([command, ...args].join(' '));
+      if (args.at(-1) === 'later') throw new Error('synthetic later failure');
+    },
+    stdout: memoryWriter(),
+    stderr: memoryWriter(),
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.failedGate, 'later');
+  assert.deepEqual(calls, [
+    'node --version integration',
+    'node --version later',
     'npm --ignore-scripts run check:integration-orphans',
   ]);
 });

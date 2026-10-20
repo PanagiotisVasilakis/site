@@ -39,9 +39,6 @@ export interface HouseDictionary {
 }
 
 export interface LocationPanelDictionary {
-    apartmentTitle: string;
-    city: string;
-    blurb: string;
     nearby: string;
     locationDescription: string;
     locationTitle: string;
@@ -50,8 +47,6 @@ export interface LocationPanelDictionary {
         title: string;
         description: string;
     }>;
-    howToEnableMapTitle: string;
-    howToEnableSteps: string[];
 }
 
 // ============================================================================
@@ -71,7 +66,7 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
         cta: {
             eyebrow: "Availability",
             title: "See when it is free",
-            lead: "Free nights and their prices are on the availability calendar.",
+            lead: "Free nights are on the availability calendar.",
             seeDates: "See free dates",
             contact: "Questions? Contact us",
         },
@@ -139,7 +134,7 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
         cta: {
             eyebrow: "Διαθεσιμότητα",
             title: "Δείτε πότε είναι ελεύθερο",
-            lead: "Οι ελεύθερες νύχτες και οι τιμές τους βρίσκονται στο ημερολόγιο διαθεσιμότητας.",
+            lead: "Οι ελεύθερες νύχτες βρίσκονται στο ημερολόγιο διαθεσιμότητας.",
             seeDates: "Δείτε ελεύθερες ημερομηνίες",
             contact: "Ερωτήσεις; Επικοινωνήστε μαζί μας",
         },
@@ -199,9 +194,6 @@ export const houseTranslations: Record<Locale, HouseDictionary> = {
 
 export const locationPanelTranslations: Record<Locale, LocationPanelDictionary> = {
     en: {
-        apartmentTitle: "Two-bedroom apartment with views",
-        city: "Kalamata, Greece",
-        blurb: "A quiet street 50 m from the Town Hall, with views of the mountain and the sea.",
         nearby: "What's nearby?",
         locationDescription: "Museums, services and places near the apartment, in the Kalamata guide.",
         locationTitle: "Explore the neighbourhood",
@@ -214,17 +206,8 @@ export const locationPanelTranslations: Record<Locale, LocationPanelDictionary> 
             { icon: "beach", title: "Nearest beach", description: "5 min by car" },
             { icon: "bus", title: "Bus stop", description: "100 m · 3 min walk" },
         ],
-        howToEnableMapTitle: "How to use the interactive map:",
-        howToEnableSteps: [
-            "Make sure JavaScript is enabled in your browser",
-            "Pan or zoom the map to explore the neighborhood",
-            "Tap a marker to open details"
-        ]
     },
     el: {
-        apartmentTitle: "Διαμέρισμα δύο υπνοδωματίων με θέα",
-        city: "Καλαμάτα, Ελλάδα",
-        blurb: "Ήσυχος δρόμος 50 μ. από το Δημαρχείο, με θέα σε βουνό και θάλασσα.",
         nearby: "Τι υπάρχει κοντά;",
         locationDescription: "Μουσεία, υπηρεσίες και μέρη κοντά στο διαμέρισμα, στον οδηγό Καλαμάτας.",
         locationTitle: "Εξερευνήστε τη γειτονιά",
@@ -237,11 +220,5 @@ export const locationPanelTranslations: Record<Locale, LocationPanelDictionary> 
             { icon: "beach", title: "Κοντινότερη παραλία", description: "5 λεπτά με το αυτοκίνητο" },
             { icon: "bus", title: "Στάση λεωφορείου", description: "100 μ. · 3 λεπτά με τα πόδια" },
         ],
-        howToEnableMapTitle: "Πώς να χρησιμοποιήσετε τον διαδραστικό χάρτη:",
-        howToEnableSteps: [
-            "Βεβαιωθείτε ότι η JavaScript είναι ενεργοποιημένη στο πρόγραμμα περιήγησης",
-            "Μετακινήστε ή μεγεθύνετε τον χάρτη για να εξερευνήσετε τη γειτονιά",
-            "Πατήστε έναν δείκτη για να δείτε λεπτομέρειες"
-        ]
     },
 };

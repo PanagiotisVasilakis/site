@@ -145,8 +145,7 @@ async function main() {
     printSection('Recommended Environment Variable');
     console.log(`Use this before running audits:`);
     console.log(`export CHROME_PATH="${working.command}"`);
-    console.log('or');
-    console.log(`export RESPONSIVE_CHROME_PATH="${working.command}"`);
+    console.log('RESPONSIVE_CHROME_PATH is read by audit:responsive:ux only, where it takes precedence over CHROME_PATH.');
     process.exitCode = 0;
     return;
   }

@@ -15,17 +15,18 @@ import { CALENDAR_SYNC_STATE_ID } from '@/lib/availability/calendarSync';
 import type { RatePeriod } from '@/lib/availability/stayQuote';
 import { prisma } from '@/lib/prisma';
 
-// What the public availability page may show: the free and booked nights of
-// the horizon (from the Airbnb calendar sync) and the rate periods. Nothing
-// here identifies a guest or a booking: the sync stores dates only.
+// What the public availability page may show: the free and not available (booked
+// or closed) nights of the horizon (from the Booking.com calendar sync) and the
+// minimum stay of the rate periods. No price is read: the public site shows none.
+// Nothing here identifies a guest or a booking: the sync stores dates only.
 
 /**
  * fresh: the booked nights come from a sync at most CALENDAR_PUBLIC_STALE_HOURS old.
  * stale: the calendar is configured but that sync is older (or never happened).
- * not_configured: AIRBNB_ICAL_URL is unset.
+ * not_configured: BOOKING_ICAL_URL is unset.
  * unavailable: the page could not read this data at all (never returned here).
  * Only fresh data marks nights as open or booked; otherwise every night is unknown
- * and only the prices are quoted.
+ * and the page shows no calendar.
  */
 export type AvailabilityStatus = 'fresh' | 'stale' | 'unavailable' | 'not_configured';
 
@@ -39,10 +40,10 @@ export type PublicAvailability = Readonly<{
   lastSyncedAt: string | null;
   /**
    * One character per night from today to horizonEnd (exclusive):
-   * 'o' open, 'b' booked (blocked on Airbnb), 'u' unknown.
+   * 'o' open, 'b' not available (booked or closed on Booking.com), 'u' unknown.
    */
   nights: string;
-  /** The rate periods that share a night with [today, horizonEnd), by start date. */
+  /** The rate periods that share a night with [today, horizonEnd), by start date: dates and minimum stay only, never a price. */
   rates: readonly RatePeriod[];
 }>;
 
@@ -78,7 +79,7 @@ export async function readPublicAvailability(now: Date): Promise<PublicAvailabil
     prisma.ratePeriod.findMany({
       where: { startDate: { lt: toDbDate(horizonEnd) }, endDate: { gt: toDbDate(today) } },
       orderBy: { startDate: 'asc' },
-      select: { startDate: true, endDate: true, nightlyPriceCents: true, minimumNights: true },
+      select: { startDate: true, endDate: true, minimumNights: true },
     }),
   ]);
   if (!state) throw new Error('The calendar_sync_state row is missing');
@@ -86,11 +87,10 @@ export async function readPublicAvailability(now: Date): Promise<PublicAvailabil
   const rates = rows.map((row) => ({
     start: fromDbDate(row.startDate),
     end: fromDbDate(row.endDate),
-    nightlyPriceCents: row.nightlyPriceCents,
     minimumNights: row.minimumNights,
   }));
 
-  if (!process.env.AIRBNB_ICAL_URL) {
+  if (!process.env.BOOKING_ICAL_URL) {
     return { today, horizonEnd, status: 'not_configured', lastSyncedAt: null, nights: encodeNights(today, horizonEnd, null), rates };
   }
 

@@ -1,10 +1,10 @@
 import { Icon } from '@/components/icons/Icon';
 import { Button } from '@/components/ui';
-import { AIRBNB_LISTING_URL, HOST_CONTACT } from '@/data/contact';
+import { HOST_CONTACT } from '@/data/contact';
 import type { Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { IsoDate } from '@/lib/availability/calendarDate';
-import { airbnbListingHref, isAirbnbListingUrl, telHref } from '@/lib/contactLinks';
+import { bookingComHref, telHref } from '@/lib/contactLinks';
 import { whatsappHref } from '@/lib/whatsapp';
 
 import { fill, formatStayDate } from './format';
@@ -16,21 +16,22 @@ type BookingOptionsProps = {
 };
 
 /**
- * The ways to book: Airbnb (only with a valid listing URL), a call, or a
- * WhatsApp message. Plain links: nothing is sent to this site.
+ * The ways to book: the Booking.com listing link (the primary button; only while the link is valid), a
+ * call, or a WhatsApp message. Plain links: nothing is sent to this site.
  */
 export default function BookingOptions({ locale, stay }: BookingOptionsProps) {
   const t = getDictionary(locale).availability.booking;
+  const bookingHref = bookingComHref();
   const message = stay
     ? fill(t.whatsappMessage, { checkin: formatStayDate(stay.checkIn, locale), checkout: formatStayDate(stay.checkOut, locale) })
     : undefined;
 
   return (
     <div className="booking-options">
-      {isAirbnbListingUrl(AIRBNB_LISTING_URL) ? (
+      {bookingHref ? (
         <Button asChild variant="primary" block>
-          <a href={airbnbListingHref(AIRBNB_LISTING_URL, stay)} target="_blank" rel="noopener noreferrer">
-            {t.airbnb}
+          <a href={bookingHref} target="_blank" rel="noopener noreferrer">
+            {t.bookingCom}
             {' '}
             <span className="sr-only">{t.opensInNewTab}</span>
             <Icon name="arrow-up-right" size={18} />

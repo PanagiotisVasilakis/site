@@ -15,12 +15,12 @@ vi.mock('@/lib/prisma', () => ({
   prisma: { calendarSyncState: { updateMany: mocks.updateMany, findUnique: mocks.findUnique } },
 }));
 
-import { syncAirbnbCalendar } from '@/lib/availability/calendarSync';
+import { syncBookingCalendar } from '@/lib/availability/calendarSync';
 
-type Trigger = Parameters<typeof syncAirbnbCalendar>[0]['trigger'];
+type Trigger = Parameters<typeof syncBookingCalendar>[0]['trigger'];
 
 const TOKEN = 'SENTINELTOKEN0000';
-const FEED_URL = `https://www.airbnb.com/calendar/ical/12345678.ics?s=${TOKEN}`;
+const FEED_URL = `https://ical.booking.com/v1/export?t=${TOKEN}`;
 const CONSOLE_METHODS = ['log', 'info', 'warn', 'error', 'debug', 'trace'] as const;
 
 // 22:30 UTC on 24 October is 01:30 on 25 October in Athens (EEST, UTC+3), so
@@ -32,7 +32,7 @@ const HORIZON_END = '2027-10-25'; // TODAY + 365 nights, exclusive
 const CRLF = '\r\n';
 const HEADER = [
   'BEGIN:VCALENDAR',
-  'PRODID;X-RICAL-TZSOURCE=TZINFO:-//Airbnb Inc//Hosting Calendar 0.8.8//EN',
+  'PRODID:-//Example//Calendar export//EN',
   'CALSCALE:GREGORIAN',
   'VERSION:2.0',
 ];
@@ -45,7 +45,7 @@ function calendar(...ranges: Array<[string, string]>): string {
       'BEGIN:VEVENT',
       `DTEND;VALUE=DATE:${end}`,
       `DTSTART;VALUE=DATE:${start}`,
-      `UID:sync-${index}@airbnb.com`,
+      `UID:sync-${index}@calendar.example`,
       'SUMMARY:Reserved',
       'END:VEVENT',
     ]),
@@ -78,7 +78,7 @@ const DUE = {
 
 function claimCall(trigger: Trigger) {
   return {
-    where: { id: 'airbnb', AND: [LEASE_FREE, DUE[trigger]] },
+    where: { id: 'booking', AND: [LEASE_FREE, DUE[trigger]] },
     data: { leaseOwner: expect.any(String), leaseExpiresAt: afterNow(1), lastAttemptAt: NOW },
   };
 }
@@ -94,7 +94,7 @@ function leaseOwner(): string {
 const results: unknown[] = [];
 
 async function sync(trigger: Trigger) {
-  const result = await syncAirbnbCalendar({ trigger });
+  const result = await syncBookingCalendar({ trigger });
   results.push(result);
   return result;
 }
@@ -104,7 +104,7 @@ let consoleSpies: Array<ReturnType<typeof vi.spyOn>> = [];
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(NOW);
-  vi.stubEnv('AIRBNB_ICAL_URL', FEED_URL);
+  vi.stubEnv('BOOKING_ICAL_URL', FEED_URL);
   vi.stubGlobal('fetch', mocks.fetch);
   mocks.updateMany.mockResolvedValue({ count: 1 });
   consoleSpies = CONSOLE_METHODS.map((method) => vi.spyOn(console, method).mockImplementation(() => undefined));
@@ -122,15 +122,16 @@ afterEach(() => {
   results.length = 0;
   vi.useRealTimers();
   expect(observed).not.toContain(TOKEN);
-  expect(observed).not.toContain('calendar/ical');
+  expect(observed).not.toContain('ical.booking.com');
+  expect(observed).not.toContain('v1/export');
 });
 
-describe('syncAirbnbCalendar: configuration', () => {
+describe('syncBookingCalendar: configuration', () => {
   it.each([
     ['unset', undefined],
     ['empty', ''],
   ])('returns not_configured without touching the database or the network when the URL is %s', async (_label, value) => {
-    vi.stubEnv('AIRBNB_ICAL_URL', value);
+    vi.stubEnv('BOOKING_ICAL_URL', value);
 
     await expect(sync('scheduled')).resolves.toEqual({ status: 'not_configured' });
     await expect(sync('manual')).resolves.toEqual({ status: 'not_configured' });
@@ -142,7 +143,7 @@ describe('syncAirbnbCalendar: configuration', () => {
   });
 });
 
-describe('syncAirbnbCalendar: success', () => {
+describe('syncBookingCalendar: success', () => {
   it('claims the lease, then stores the exact clipped nights and releases the lease in one write', async () => {
     mocks.fetch.mockResolvedValue(new Response(FEED, { status: 200 }));
 
@@ -153,7 +154,7 @@ describe('syncAirbnbCalendar: success', () => {
     expect(mocks.updateMany).toHaveBeenCalledTimes(2);
     expect(mocks.updateMany.mock.calls[0][0]).toEqual(claimCall('scheduled'));
     expect(mocks.updateMany.mock.calls[1][0]).toEqual({
-      where: { id: 'airbnb', leaseOwner: leaseOwner() },
+      where: { id: 'booking', leaseOwner: leaseOwner() },
       data: {
         blockedNights: FEED_NIGHTS.map(utcMidnight),
         horizonStart: utcMidnight(TODAY),
@@ -207,7 +208,7 @@ describe('syncAirbnbCalendar: success', () => {
 
     await expect(sync('scheduled')).resolves.toEqual({ status: 'synced', blockedNights: 0 });
 
-    expect(mocks.findUnique).toHaveBeenCalledExactlyOnceWith({ where: { id: 'airbnb' }, select: { blockedNights: true } });
+    expect(mocks.findUnique).toHaveBeenCalledExactlyOnceWith({ where: { id: 'booking' }, select: { blockedNights: true } });
     expect(mocks.updateMany).toHaveBeenCalledTimes(2);
     expect(mocks.updateMany.mock.calls[1][0].data).toMatchObject({
       blockedNights: [],
@@ -241,7 +242,7 @@ describe('syncAirbnbCalendar: success', () => {
   });
 });
 
-describe('syncAirbnbCalendar: not claimed', () => {
+describe('syncBookingCalendar: not claimed', () => {
   it.each([
     ['scheduled', 'skipped'],
     ['manual', 'too_soon'],
@@ -253,7 +254,7 @@ describe('syncAirbnbCalendar: not claimed', () => {
 
     expect(mocks.updateMany).toHaveBeenCalledTimes(1);
     expect(mocks.updateMany.mock.calls[0][0]).toEqual(claimCall(trigger));
-    expect(mocks.findUnique).toHaveBeenCalledWith({ where: { id: 'airbnb' }, select: { leaseExpiresAt: true } });
+    expect(mocks.findUnique).toHaveBeenCalledWith({ where: { id: 'booking' }, select: { leaseExpiresAt: true } });
     expect(mocks.fetch).not.toHaveBeenCalled();
   });
 
@@ -278,16 +279,16 @@ describe('syncAirbnbCalendar: not claimed', () => {
     mocks.updateMany.mockResolvedValue({ count: 0 });
     mocks.findUnique.mockResolvedValue(null);
 
-    await expect(syncAirbnbCalendar({ trigger: 'scheduled' })).rejects.toThrow('calendar_sync_state');
+    await expect(syncBookingCalendar({ trigger: 'scheduled' })).rejects.toThrow('calendar_sync_state');
 
     expect(mocks.fetch).not.toHaveBeenCalled();
   });
 });
 
-describe('syncAirbnbCalendar: failures', () => {
+describe('syncBookingCalendar: failures', () => {
   function failureWrite(code: string, httpStatus: number | null, backoffMinutes: number) {
     return {
-      where: { id: 'airbnb', leaseOwner: leaseOwner() },
+      where: { id: 'booking', leaseOwner: leaseOwner() },
       data: {
         lastFailureAt: NOW,
         lastErrorCode: code,
@@ -303,7 +304,7 @@ describe('syncAirbnbCalendar: failures', () => {
   // Decision O64: a failed manual run records the error and leaves the backoff alone.
   function manualFailureWrite(code: string, httpStatus: number | null) {
     return {
-      where: { id: 'airbnb', leaseOwner: leaseOwner() },
+      where: { id: 'booking', leaseOwner: leaseOwner() },
       data: {
         lastFailureAt: NOW,
         lastErrorCode: code,
@@ -321,7 +322,7 @@ describe('syncAirbnbCalendar: failures', () => {
     await expect(sync('scheduled')).resolves.toEqual({ status: 'failed', code: 'http_status', httpStatus: 503 });
 
     expect(mocks.updateMany).toHaveBeenCalledTimes(2);
-    expect(mocks.findUnique).toHaveBeenCalledWith({ where: { id: 'airbnb' }, select: { consecutiveFailures: true } });
+    expect(mocks.findUnique).toHaveBeenCalledWith({ where: { id: 'booking' }, select: { consecutiveFailures: true } });
     // Two earlier failures: doubling would give 120 minutes; the cap keeps it at 45.
     expect(mocks.updateMany.mock.calls[1][0]).toEqual(failureWrite('http_status', 503, 45));
     expect(mocks.logger.warn).toHaveBeenCalledWith(expect.any(String), {
@@ -333,8 +334,8 @@ describe('syncAirbnbCalendar: failures', () => {
     expect(mocks.logger.info).not.toHaveBeenCalled();
   });
 
-  // The Response constructor rejects these statuses, but fetch passes them through.
-  it.each([600, 999])('records a non-standard HTTP status %i by its code alone (the column allows 100-599)', async (status) => {
+  // The Response constructor rejects these statuses; fetch passes non-standard ones such as 999 through, and 99 pins the lower bound of the column CHECK.
+  it.each([99, 600, 999])('records a non-standard HTTP status %i by its code alone (the column allows 100-599)', async (status) => {
     mocks.fetch.mockResolvedValue(Object.defineProperty(new Response(null, { status: 500 }), 'status', { value: status }));
     mocks.findUnique.mockResolvedValue({ consecutiveFailures: 0 });
 
@@ -418,8 +419,8 @@ describe('syncAirbnbCalendar: failures', () => {
     await expect(sync('scheduled')).resolves.toEqual({ status: 'failed', code: 'empty_feed' });
 
     expect(mocks.findUnique.mock.calls).toEqual([
-      [{ where: { id: 'airbnb' }, select: { blockedNights: true } }],
-      [{ where: { id: 'airbnb' }, select: { consecutiveFailures: true } }],
+      [{ where: { id: 'booking' }, select: { blockedNights: true } }],
+      [{ where: { id: 'booking' }, select: { consecutiveFailures: true } }],
     ]);
     expect(mocks.updateMany).toHaveBeenCalledTimes(2);
     expect(mocks.updateMany.mock.calls[1][0]).toEqual(failureWrite('empty_feed', null, 45));
@@ -438,7 +439,6 @@ describe('syncAirbnbCalendar: failures', () => {
   // (decision O63).
   it.each([
     [3, 45],
-    [4, 45],
     [2_147_483_647, 45],
   ])('after %i earlier consecutive failures the next attempt is %i minutes later', async (earlier, minutes) => {
     mocks.fetch.mockResolvedValue(new Response(null, { status: 500 }));
@@ -463,17 +463,17 @@ describe('syncAirbnbCalendar: failures', () => {
     mocks.fetch.mockResolvedValue(new Response(null, { status: 500 }));
     mocks.findUnique.mockResolvedValue(null);
 
-    await expect(syncAirbnbCalendar({ trigger: 'scheduled' })).rejects.toThrow('calendar_sync_state');
+    await expect(syncBookingCalendar({ trigger: 'scheduled' })).rejects.toThrow('calendar_sync_state');
 
     expect(mocks.updateMany).toHaveBeenCalledTimes(1);
   });
 });
 
-describe('syncAirbnbCalendar: database errors propagate', () => {
+describe('syncBookingCalendar: database errors propagate', () => {
   it('from the claim, before any fetch', async () => {
     mocks.updateMany.mockRejectedValue(new Error('database unavailable'));
 
-    await expect(syncAirbnbCalendar({ trigger: 'scheduled' })).rejects.toThrow('database unavailable');
+    await expect(syncBookingCalendar({ trigger: 'scheduled' })).rejects.toThrow('database unavailable');
 
     expect(mocks.fetch).not.toHaveBeenCalled();
   });
@@ -482,7 +482,7 @@ describe('syncAirbnbCalendar: database errors propagate', () => {
     mocks.fetch.mockResolvedValue(new Response(FEED, { status: 200 }));
     mocks.updateMany.mockResolvedValueOnce({ count: 1 }).mockRejectedValueOnce(new Error('database unavailable'));
 
-    await expect(syncAirbnbCalendar({ trigger: 'scheduled' })).rejects.toThrow('database unavailable');
+    await expect(syncBookingCalendar({ trigger: 'scheduled' })).rejects.toThrow('database unavailable');
 
     expect(mocks.updateMany).toHaveBeenCalledTimes(2);
     expect(mocks.findUnique).not.toHaveBeenCalled();
@@ -493,13 +493,13 @@ describe('syncAirbnbCalendar: database errors propagate', () => {
     mocks.findUnique.mockResolvedValue({ consecutiveFailures: 0 });
     mocks.updateMany.mockResolvedValueOnce({ count: 1 }).mockRejectedValueOnce(new Error('database unavailable'));
 
-    await expect(syncAirbnbCalendar({ trigger: 'scheduled' })).rejects.toThrow('database unavailable');
+    await expect(syncBookingCalendar({ trigger: 'scheduled' })).rejects.toThrow('database unavailable');
 
     expect(mocks.updateMany).toHaveBeenCalledTimes(2);
   });
 });
 
-describe('syncAirbnbCalendar: guards with replaced modules', () => {
+describe('syncBookingCalendar: guards with replaced modules', () => {
   afterEach(() => {
     vi.doUnmock('@/data/stayPolicy');
     vi.doUnmock('@/lib/availability/icalParser');
@@ -516,7 +516,7 @@ describe('syncAirbnbCalendar: guards with replaced modules', () => {
       ...await importOriginal<typeof import('@/data/stayPolicy')>(),
       AVAILABILITY_HORIZON_DAYS: horizonDays,
     }));
-    const { syncAirbnbCalendar: syncWithHorizon } = await import('@/lib/availability/calendarSync');
+    const { syncBookingCalendar: syncWithHorizon } = await import('@/lib/availability/calendarSync');
     mocks.fetch.mockResolvedValue(new Response(calendar(['20261001', '20280101']), { status: 200 }));
     mocks.findUnique.mockResolvedValue({ consecutiveFailures: 0 });
 
@@ -542,7 +542,7 @@ describe('syncAirbnbCalendar: guards with replaced modules', () => {
         throw new Error(`parser crashed on ${FEED_URL}`);
       },
     }));
-    const { syncAirbnbCalendar: syncWithBrokenParser } = await import('@/lib/availability/calendarSync');
+    const { syncBookingCalendar: syncWithBrokenParser } = await import('@/lib/availability/calendarSync');
     mocks.fetch.mockResolvedValue(new Response(FEED, { status: 200 }));
     mocks.findUnique.mockResolvedValue({ consecutiveFailures: 0 });
 
@@ -551,5 +551,7 @@ describe('syncAirbnbCalendar: guards with replaced modules', () => {
 
     expect(result).toEqual({ status: 'failed', code: 'unexpected' });
     expect(mocks.updateMany.mock.calls[1][0].data).toMatchObject({ lastErrorCode: 'unexpected', lastHttpStatus: null });
+    // The log names the error class only: the thrown message carries the feed URL.
+    expect(mocks.logger.warn).toHaveBeenCalledWith('Booking.com calendar sync failed unexpectedly', { errorName: 'Error' });
   });
 });

@@ -245,20 +245,21 @@ describe('admin availability & prices', () => {
     it('shows the calendar range with the last night, not the exclusive end', async () => {
       await renderLoaded();
 
-      const panel = screen.getByRole('region', { name: 'Airbnb calendar sync' });
+      const panel = screen.getByRole('region', { name: 'Booking.com calendar sync' });
       expect(within(panel).getByText('2026-09-28 to 2027-09-27')).toBeInTheDocument();
     });
 
     it('shows the sync state with times in Europe/Athens and no URL', async () => {
       await renderLoaded();
 
-      const panel = screen.getByRole('region', { name: 'Airbnb calendar sync' });
+      const panel = screen.getByRole('region', { name: 'Booking.com calendar sync' });
       // 09:00 UTC is 12:00 in Athens (EEST, UTC+3).
       expect(within(panel).getByText(/12:00/)).toBeInTheDocument();
       expect(within(panel).queryByText(/09:00/)).not.toBeInTheDocument();
       expect(within(panel).getByText('3')).toBeInTheDocument();
       expect(document.body.textContent).not.toMatch(/https?:\/\//);
-      expect(document.body.textContent?.toLowerCase()).not.toContain('airbnb.com');
+      expect(document.body.textContent?.toLowerCase()).not.toContain('ical.booking.com');
+      expect(document.body.textContent).not.toContain('v1/export');
     });
 
     it('clears a failed sync state load once a reload succeeds', async () => {
@@ -279,7 +280,7 @@ describe('admin availability & prices', () => {
       render(<AdminAvailabilityClient />);
 
       expect(await screen.findByText('Not configured')).toBeInTheDocument();
-      expect(screen.getByText('Set AIRBNB_ICAL_URL in the production environment')).toBeInTheDocument();
+      expect(screen.getByText('Set BOOKING_ICAL_URL in the production environment')).toBeInTheDocument();
     });
 
     it('warns when the calendar is stale and shows the last error', async () => {
@@ -318,7 +319,7 @@ describe('admin availability & prices', () => {
       [
         '502',
         () => failure(502, 'EXTERNAL_SERVICE_ERROR', 'The calendar sync failed', { code: 'http_status', httpStatus: 503 }),
-        'The Airbnb calendar could not be read (http_status, HTTP 503). The last good calendar is kept.',
+        'The Booking.com calendar could not be read (http_status, HTTP 503). The last good calendar is kept.',
       ],
     ])('describes a %s outcome in words', async (_label, response, message) => {
       routes['POST /api/admin/availability-sync'] = response;

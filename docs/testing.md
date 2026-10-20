@@ -8,12 +8,10 @@ The design goal is high-signal regression protection, not assertions against imp
 
 ## Test layers
 
-- `tests/unit`: pure formatting, validation, date/time, data, map, navigation, and adapter configuration; the availability domain (iCal fetch and parsing, calendar sync, stay quotes, money); SEO metadata and the sitemap; worker, retention and alert logic; and the design system's contrast table (`design-tokens.test.ts`) and motion gate (`motion-css-gate.test.ts`).
+- `tests/unit`: pure formatting, validation, date/time, data, map, navigation, and adapter configuration; the availability domain (iCal fetch and parsing, calendar sync, stay rules, money); SEO metadata and the sitemap; worker, retention and alert logic; and the design system's contrast table (`design-tokens.test.ts`) and motion gate (`motion-css-gate.test.ts`).
 - `tests/security`: environment fail-closed rules, JWT and database-session contracts, request-body limits, error sanitization, privacy hashing/redaction, trusted proxies, durable rate limiting, limiter failure responses, and portal refresh behavior.
 - `tests/components`: jsdom rendering and interaction tests for the public pages (home, apartment, availability planner, guide, privacy), the stay routes (including that they carry no booking call-to-action), guest sign-in and check-in, the admin, theme and motion switches, modal focus management, safe fallbacks, and request cancellation.
 - `tests/routes`: route contracts (liveness, admin bookings, claim grants, access reset, rate periods, availability sync and guests, check-in arrival requests, portal sign-in and refresh, CSP reports) and the client error-report round trip.
-
-Size on 2026-10-06: the default suite has 150 files and 1,787 tests (69 unit, 17 security, 44 component and 20 route files); the integration suite has 22 files and 121 tests.
 
 The default suite deliberately does not connect to PostgreSQL, webhooks,
 or another live service. Persistence and network boundaries are mocked at
@@ -87,7 +85,7 @@ The non-race matrix covers new and existing users with remember enabled and disa
 
 ## Portal booking eligibility policy
 
-Portal access uses booking calendar dates, not elapsed durations. `Booking.startDate` and `Booking.endDate` are PostgreSQL `DATE` columns surfaced by Prisma as UTC-midnight `Date` values, so the established portal convention is a UTC calendar date. `PROPERTY_TIME_ZONE` applies to property time-of-day behavior and does not redefine this authentication boundary.
+Portal access uses booking calendar dates, not elapsed durations. `Booking.startDate` and `Booking.endDate` are PostgreSQL `DATE` columns surfaced by Prisma as UTC-midnight `Date` values, so the established portal convention is a UTC calendar date. The property time zone (the `PROPERTY_TIME_ZONE` constant in `src/data/stayPolicy.ts`; the environment variable of that name is validated at startup but not read) applies to property time-of-day behavior and does not redefine this authentication boundary.
 
 The canonical inclusive temporal predicate is:
 

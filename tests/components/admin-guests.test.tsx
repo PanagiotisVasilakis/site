@@ -4,20 +4,16 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const recorded = vi.hoisted(() => ({ delays: [] as number[] }));
 const fetchMock = vi.hoisted(() => vi.fn());
 const warnMock = vi.hoisted(() => vi.fn());
 
-// MotionConfig exposes its reducedMotion setting; each booking card records its entry delay.
+// MotionConfig exposes its reducedMotion setting.
 vi.mock('framer-motion', () => ({
   MotionConfig: ({ children, reducedMotion }: { children: ReactNode; reducedMotion?: string }) => (
     <div data-testid="motion-config" data-reduced-motion={reducedMotion}>{children}</div>
   ),
   motion: {
-    div: ({ children, transition, className }: { children: ReactNode; transition?: { delay?: number }; className?: string }) => {
-      if (className?.includes('admin-card rounded-tile shadow p-6')) recorded.delays.push(transition?.delay ?? 0);
-      return <div className={className}>{children}</div>;
-    },
+    div: ({ children, className }: { children: ReactNode; className?: string }) => <div className={className}>{children}</div>,
   },
 }));
 vi.mock('@/lib/internalFetchClient', () => ({ default: fetchMock }));
@@ -154,12 +150,6 @@ describe('admin claim token copy', () => {
     expect(unhandled).toEqual([]);
   });
 
-  it('reports a failed copy when the clipboard API is missing', async () => {
-    fireEvent.click(await showToken());
-
-    expect(await screen.findByText('Copy failed, select the token')).toBeInTheDocument();
-  });
-
   it('confirms a successful copy', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(window.navigator, 'clipboard', { value: { writeText }, configurable: true });
@@ -236,33 +226,6 @@ describe('admin guests booking title', () => {
 
     expect(await screen.findByText('Booking HOST-REF-42')).toBeInTheDocument();
     expect(screen.queryByText(`Booking ${BOOKING_ID}`)).not.toBeInTheDocument();
-  });
-});
-
-describe('admin guests list animation', () => {
-  function booking(n: number) {
-    return {
-      booking: {
-        id: `78000000-0000-4000-8000-${String(n).padStart(12, '0')}`, source: 'ONSITE', provider: 'manual',
-        accessStatus: 'PENDING', startDate: '2030-06-01', endDate: '2030-06-05', createdAt: '2030-05-01T00:00:00.000Z',
-      },
-    };
-  }
-
-  it('caps the entry stagger so a long list is visible within half a second', async () => {
-    fetchMock.mockImplementation(async (url: string) => {
-      const data = url.includes('action=list')
-        ? { bookings: Array.from({ length: 40 }, (_, i) => booking(i + 1)) }
-        : url.includes('action=stats') ? { statistics: {} } : { requests: [] };
-      return new Response(JSON.stringify({ success: true, data }), { status: 200 });
-    });
-
-    render(<AdminGuestsPage />);
-    await screen.findAllByText(/^Booking 78000000/u);
-
-    const last40 = recorded.delays.slice(-40);
-    expect(last40).toHaveLength(40);
-    expect(Math.max(...last40)).toBeLessThanOrEqual(0.5);
   });
 });
 
@@ -364,5 +327,146 @@ describe('admin guests create booking', () => {
     fireEvent.change(screen.getByLabelText('Check-in'), { target: { value: '9999-12-31' } });
 
     expect(screen.getByLabelText('Check-out')).not.toHaveAttribute('min');
+  });
+});
+
+describe('admin guests guarded actions', () => {
+  const BOOKING_ID = '7b000000-0000-4000-8000-0000000000b1';
+  const USER_ID = '77000000-0000-4000-8000-0000000000b1';
+  const PHONE = '+306912345678';
+  const AUDIT_NOTE = 'Verified in person at check-in';
+
+  // The page calls the browser dialogs synchronously. Each test answers them itself, because
+  // mockReset is on and restoreMocks restores the spies after each test.
+  function answerDialogs(confirmAnswer: boolean, promptAnswer: string | null = null) {
+    return {
+      confirm: vi.spyOn(window, 'confirm').mockReturnValue(confirmAnswer),
+      prompt: vi.spyOn(window, 'prompt').mockReturnValue(promptAnswer),
+    };
+  }
+
+  // One claimed booking with a guest account, so both guarded buttons are rendered.
+  function mockClaimedBooking(dates: { startDate: string; endDate: string }) {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/access-reset')) {
+        return new Response(JSON.stringify({ success: true, data: { claimToken: 'reset-token-value', expiresAt: '2099-01-01T00:00:00.000Z' } }), { status: 200 });
+      }
+      if (url.includes('/erase')) {
+        return new Response(JSON.stringify({ success: true, data: {} }), { status: 200 });
+      }
+      const data = url.includes('action=list')
+        ? { bookings: [{
+          booking: { id: BOOKING_ID, source: 'ONSITE', provider: 'manual', accessStatus: 'VERIFIED', createdAt: '2030-05-01T00:00:00.000Z', ...dates },
+          user: { id: USER_ID, phone: PHONE },
+        }] }
+        : url.includes('action=stats') ? { statistics: {} } : { requests: [] };
+      return new Response(JSON.stringify({ success: true, data }), { status: 200 });
+    });
+  }
+
+  // The stay covers today (UTC), so the claim window is open.
+  function stayInClaimWindow() {
+    return { startDate: isoDate(0), endDate: isoDate(2) };
+  }
+
+  // Requests sent to a URL that contains the fragment, in call order.
+  function requestsTo(fragment: string) {
+    return fetchMock.mock.calls.filter(([url]) => String(url).includes(fragment));
+  }
+
+  it('clears the typed search text when the search type changes', async () => {
+    mockClaimedBooking(stayInClaimWindow());
+    render(<AdminGuestsPage />);
+    await screen.findByText(`Booking ${BOOKING_ID}`);
+
+    fireEvent.change(screen.getByPlaceholderText('ABC123'), { target: { value: 'HM123' } });
+    fireEvent.change(screen.getByDisplayValue('Booking Reference'), { target: { value: 'date' } });
+    expect(screen.getByPlaceholderText('2024-12-25')).toHaveValue('');
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+
+    expect(requestsTo('action=search')).toEqual([]);
+  });
+
+  it('does not erase when the confirmation is declined', async () => {
+    mockClaimedBooking(stayInClaimWindow());
+    const dialogs = answerDialogs(false, AUDIT_NOTE);
+    render(<AdminGuestsPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Erase guest' }));
+
+    expect(dialogs.confirm).toHaveBeenCalledWith(expect.stringContaining(PHONE));
+    expect(dialogs.prompt).not.toHaveBeenCalled();
+    expect(requestsTo('/erase')).toEqual([]);
+  });
+
+  it('does not erase when the audit note prompt is cancelled', async () => {
+    mockClaimedBooking(stayInClaimWindow());
+    answerDialogs(true, null);
+    render(<AdminGuestsPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Erase guest' }));
+
+    expect(requestsTo('/erase')).toEqual([]);
+  });
+
+  it('does not erase when the audit note is shorter than three characters', async () => {
+    mockClaimedBooking(stayInClaimWindow());
+    answerDialogs(true, 'ab');
+    render(<AdminGuestsPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Erase guest' }));
+
+    expect(requestsTo('/erase')).toEqual([]);
+  });
+
+  it('erases the guest with the confirmed, trimmed audit note', async () => {
+    mockClaimedBooking(stayInClaimWindow());
+    const dialogs = answerDialogs(true, `  ${AUDIT_NOTE}  `);
+    render(<AdminGuestsPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Erase guest' }));
+
+    expect(dialogs.prompt).toHaveBeenCalledWith(expect.stringContaining('how the request was verified'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(`/api/admin/guests/${USER_ID}/erase`, expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ confirm: true, auditNote: AUDIT_NOTE }),
+    })));
+  });
+
+  it('does not reset access when the confirmation is declined', async () => {
+    mockClaimedBooking(stayInClaimWindow());
+    const dialogs = answerDialogs(false);
+    render(<AdminGuestsPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Reset access' }));
+
+    expect(dialogs.confirm).toHaveBeenCalledWith(expect.stringContaining(PHONE));
+    expect(requestsTo('/access-reset')).toEqual([]);
+  });
+
+  it('resets access with a confirmed 30-minute request and shows the new claim token', async () => {
+    mockClaimedBooking(stayInClaimWindow());
+    answerDialogs(true);
+    render(<AdminGuestsPage />);
+
+    const reset = await screen.findByRole('button', { name: 'Reset access' });
+    expect(reset).toBeEnabled();
+    fireEvent.click(reset);
+
+    expect(await screen.findByText('reset-token-value')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(`/api/admin/bookings/${BOOKING_ID}/access-reset`, expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ confirm: true, ttlMinutes: 30 }),
+    }));
+  });
+
+  it.each([
+    ['ended before today', '2020-01-05', '2020-01-08'],
+    ['starts more than seven days ahead', isoDate(30), isoDate(33)],
+  ])('disables Reset access for a claimed booking that %s', async (_description, startDate, endDate) => {
+    mockClaimedBooking({ startDate, endDate });
+    render(<AdminGuestsPage />);
+
+    expect(await screen.findByRole('button', { name: 'Reset access' })).toBeDisabled();
   });
 });

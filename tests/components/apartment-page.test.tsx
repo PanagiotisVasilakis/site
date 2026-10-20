@@ -5,7 +5,7 @@ import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const contact = vi.hoisted(() => ({ airbnbUrl: '' }));
+const contact = vi.hoisted(() => ({ bookingUrl: '' }));
 const mocks = vi.hoisted(() => ({
   read: vi.fn(),
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
@@ -20,13 +20,15 @@ vi.mock('next/link', () => ({
 }));
 vi.mock('@/data/contact', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/data/contact')>()),
-  get AIRBNB_LISTING_URL() {
-    return contact.airbnbUrl;
+  get BOOKING_COM_LISTING_URL() {
+    return contact.bookingUrl;
   },
 }));
 
 import ApartmentPage from '@/app/[locale]/apartment/page';
 import FactStrip from '@/components/home/FactStrip';
+import { HOST_CONTACT } from '@/data/contact';
+import { getDictionary } from '@/i18n/dictionaries';
 import { addDays, type IsoDate } from '@/lib/availability/calendarDate';
 import type { PublicAvailability } from '@/lib/prisma-repositories/availabilityRepository';
 
@@ -39,7 +41,7 @@ function availability(overrides: Partial<PublicAvailability> = {}): PublicAvaila
     status: 'fresh',
     lastSyncedAt: new Date(Date.now() - 3_600_000).toISOString(),
     nights: `obb${'o'.repeat(362)}`,
-    rates: [{ start: TODAY, end: '2027-01-01' as IsoDate, nightlyPriceCents: 8500, minimumNights: 2 }],
+    rates: [],
     ...overrides,
   };
 }
@@ -58,7 +60,7 @@ async function renderPage(locale: 'en' | 'el') {
 }
 
 beforeEach(() => {
-  contact.airbnbUrl = '';
+  contact.bookingUrl = '';
   mocks.read.mockResolvedValue(availability());
 });
 
@@ -117,22 +119,7 @@ describe('apartment page (identity §9.2)', () => {
   });
 
   it.each([
-    ['en', 'Up close', 'Shells, wood and stone in the afternoon light'],
-    ['el', 'Από κοντά', 'Κοχύλια, ξύλο και πέτρα στο απογευματινό φως'],
-  ] as const)('closes the gallery (%s) with the details section: its own title and line, ten tiles', async (locale, title, line) => {
-    const { container } = await renderPage(locale);
-
-    const sections = [...container.querySelectorAll('section.apt-room')];
-    const details = sections[sections.length - 1] as HTMLElement;
-    expect(details.id).toBe('details');
-    expect(within(details).getByRole('heading', { level: 2 })).toHaveTextContent(title);
-    expect(details.querySelector('.apt-room__line')).toHaveTextContent(line);
-    expect(details.querySelectorAll('.apt-masonry img')).toHaveLength(10);
-  });
-
-  it.each([
     ['en', 'Parking', 'Free and private, outdoors at the property'],
-    ['el', 'Πάρκινγκ', 'Δωρεάν και ιδιωτικό, σε εξωτερικό χώρο του καταλύματος'],
   ] as const)('has a parking section (%s) before the details: its own title and line, one tile shown alone', async (locale, title, line) => {
     const { container } = await renderPage(locale);
 
@@ -190,26 +177,26 @@ describe('apartment page (identity §9.2)', () => {
     expect(container.querySelector(`a[href="/${locale}/phones"]`)).toBeNull();
   });
 
-  it('hides "Book on Airbnb" without a valid listing URL (identity §1.4)', async () => {
-    for (const url of ['', 'https://example.com/rooms/1', 'http://www.airbnb.com/rooms/1']) {
-      contact.airbnbUrl = url;
+  it('hides "Book on Booking.com" without a valid link (identity §1.4)', async () => {
+    for (const url of ['', 'https://example.com/Share-AiCapK', 'http://www.booking.com/Share-AiCapK']) {
+      contact.bookingUrl = url;
       const { container, unmount } = await renderPage('en');
-      expect(screen.queryByRole('link', { name: /Airbnb/ }), url).toBeNull();
-      expect(container.querySelector('a[href*="airbnb"]'), url).toBeNull();
+      expect(screen.queryByRole('link', { name: /Booking\.com/ }), url).toBeNull();
+      expect(screen.queryByText(/Book on Booking\.com/), url).toBeNull();
+      expect(container.querySelector('a[href*="booking.com"]'), url).toBeNull();
       unmount();
     }
   });
 
-  it('shows "Book on Airbnb" as the secondary CTA with a valid listing URL', async () => {
-    contact.airbnbUrl = 'https://www.airbnb.com/rooms/123456';
+  it('shows "Book on Booking.com" as the secondary CTA with a valid link', async () => {
+    contact.bookingUrl = 'https://www.booking.com/Share-AiCapK';
     const { container } = await renderPage('en');
 
-    const cta = container.querySelector('#book') as HTMLElement;
-    const airbnb = within(cta).getByRole('link', { name: /Book on Airbnb/ });
-    expect(airbnb).toHaveAttribute('href', 'https://www.airbnb.com/rooms/123456');
-    expect(airbnb).toHaveAttribute('target', '_blank');
-    expect(airbnb).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(airbnb.className).toContain('ui-btn--secondary');
+    const bookingLink = within(container.querySelector('#book') as HTMLElement).getByRole('link', { name: /Book on Booking\.com/ });
+    expect(bookingLink).toHaveAttribute('href', 'https://www.booking.com/Share-AiCapK');
+    expect(bookingLink).toHaveAttribute('target', '_blank');
+    expect(bookingLink).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(bookingLink.className).toContain('ui-btn--secondary');
   });
 
   // Owner decision O45 (2026-10-04): the sea view is confirmed by the owner, so the amenity lists it
@@ -235,6 +222,18 @@ describe('apartment page (identity §9.2)', () => {
 
     expect(apartmentFacts).toHaveLength(6);
     expect(apartmentFacts).toEqual(homeFacts);
+  });
+
+  it('shows the host identity in the apartment head (el), without a link', async () => {
+    const labels = getDictionary('el').shell.identity;
+    const { container } = await renderPage('el');
+    const head = container.querySelector('.apt-head') as HTMLElement;
+    const identity = head.querySelector('.host-identity') as HTMLElement;
+    expect(identity).not.toBeNull();
+    for (const text of [labels.registryLabel, labels.legalNameLabel, HOST_CONTACT.registrationNumber, HOST_CONTACT.legalName, HOST_CONTACT.address]) {
+      expect(within(identity).getByText(text)).toBeInTheDocument();
+    }
+    expect(within(head).queryByRole('link')).toBeNull();
   });
 
   it('has one h1 and amenity groups built from the apartment data', async () => {
@@ -406,27 +405,17 @@ function stubObserver() {
 
 describe('BookBar on the apartment page (identity §8, §9.2)', () => {
   it.each([
-    ['en', /^from €85 \/ night/, 'Free tonight', '/en/availability', 'Check dates'],
-    ['el', /^από .*85.* \/ νύχτα/, 'Ελεύθερο απόψε', '/el/availability', 'Δείτε ημερομηνίες'],
-  ] as const)('carries the lowest bookable price and tonight (%s), from the same source as home', async (locale, price, note, href, label) => {
+    ['el', 'Ελεύθερο απόψε', '/el/availability', 'Δείτε ημερομηνίες'],
+  ] as const)('carries tonight and the Check dates link (%s), from the same source as home, with no price', async (locale, note, href, label) => {
     const { container } = await renderPage(locale);
 
     const bar = container.querySelector('.bookbar') as HTMLElement;
     expect(bar).not.toBeNull();
-    expect(bar.textContent).toMatch(price);
     expect(bar).toHaveTextContent(note);
+    expect(bar.textContent).not.toContain('€');
     expect(within(bar).getByRole('link', { hidden: true })).toHaveAttribute('href', href);
     expect(within(bar).getByRole('link', { hidden: true })).toHaveTextContent(label);
     expect(mocks.read).toHaveBeenCalledTimes(1);
-  });
-
-  it('is not rendered without price data', async () => {
-    mocks.read.mockResolvedValue(availability({ rates: [] }));
-
-    const { container } = await renderPage('en');
-
-    expect(container.querySelector('.bookbar')).toBeNull();
-    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
   });
 
   it('is not rendered when the availability read fails, and logs no details', async () => {
@@ -437,7 +426,7 @@ describe('BookBar on the apartment page (identity §8, §9.2)', () => {
     expect(container.querySelector('.bookbar')).toBeNull();
     expect(container.querySelector('#book')).not.toBeNull();
     expect(mocks.logger.error).toHaveBeenCalledTimes(1);
-    expect(mocks.logger.error).toHaveBeenCalledWith('Apartment price could not be read');
+    expect(mocks.logger.error).toHaveBeenCalledWith('Apartment availability could not be read');
     expect(JSON.stringify(mocks.logger.error.mock.calls)).not.toContain('ECONNREFUSED');
   });
 

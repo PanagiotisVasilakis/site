@@ -313,11 +313,12 @@ model RatePeriod {
   @@map("rate_periods")
 }
 
-/// Result and lease of the Airbnb iCal sync: one row, id 'airbnb', seeded by the
+/// Result and lease of the Booking.com iCal sync: one row, id 'booking', seeded by the
 /// migration (update it, never create it). blockedNights holds the blocked nights
-/// (dates only) and is replaced wholesale on each successful sync. Raw-SQL
-/// constraints in the migration add_availability_calendar:
-/// calendar_sync_state_singleton_check (id = 'airbnb'), _blocked_nights_check
+/// (reservations and closures, dates only) and is replaced wholesale on each successful
+/// sync. Raw-SQL constraints in the migrations add_availability_calendar and
+/// booking_calendar_source (which re-keyed the row and reset its snapshot):
+/// calendar_sync_state_singleton_check (id = 'booking'), _blocked_nights_check
 /// (at most 400), _horizon_check (both null, or both set with end > start),
 /// _last_error_code_check (^[a-z_]{1,32}$), _last_http_status_check (100..599),
 /// _consecutive_failures_check (>= 0), _lease_check (owner and expiry both

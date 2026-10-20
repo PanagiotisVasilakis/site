@@ -35,6 +35,8 @@ describe.each(['en', 'el'] as const)('privacy notice /%s/privacy', (locale) => {
     for (const link of links) expect(link).toHaveAttribute('href', `mailto:${HOST_CONTACT.email}`);
     const controller = screen.getByRole('region', { name: t.controller.title });
     expect(within(controller).getByText(HOST_CONTACT.phone)).toBeInTheDocument();
+    expect(within(controller).getByText(t.controller.legalNameLabel)).toBeInTheDocument();
+    expect(within(controller).getByText(HOST_CONTACT.legalName)).toBeInTheDocument();
   });
 
   it('names every cookie and browser storage key it lists', async () => {

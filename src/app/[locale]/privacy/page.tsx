@@ -15,8 +15,8 @@ import { localizedAlternates, localizedOpenGraph } from '@/lib/seo';
 type PrivacyPageProps = { params: Promise<{ locale: string }> };
 
 /**
- * The controller's legal name and address come with R3-L1. They are optional here so that
- * adding them to HOST_CONTACT shows them without a layout change; until then they are omitted.
+ * The controller's name and address (R3-L1) are supplied in HOST_CONTACT (the address since 2026-10-14, the name since 2026-10-15).
+ * A row is shown when its value is present; without a value, its row is left out.
  */
 const CONTROLLER: Readonly<{ legalName?: string; address?: string; email: string; phone: string }> = HOST_CONTACT;
 

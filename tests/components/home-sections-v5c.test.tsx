@@ -46,9 +46,9 @@ function availability(overrides: Partial<PublicAvailability> = {}): PublicAvaila
     today: TODAY,
     horizonEnd: addDays(TODAY, 365),
     status: 'fresh',
-    lastSyncedAt: new Date(Date.now() - 14 * 3_600_000 - 60_000).toISOString(),
+    lastSyncedAt: '2026-10-18T06:00:00.000Z',
     nights: `obb${'o'.repeat(362)}`,
-    rates: [{ start: TODAY, end: '2027-01-01' as IsoDate, nightlyPriceCents: 8500, minimumNights: 2 }],
+    rates: [],
     ...overrides,
   };
 }
@@ -83,41 +83,31 @@ describe('home page order (identity §9.1 items 7-11)', () => {
 });
 
 describe('NightsTeaser (identity §8)', () => {
-  const strip = () => screen.getByRole('list', { name: 'The next 14 nights and their prices' });
+  const strip = () => screen.getByRole('list', { name: 'The next 14 nights' });
 
-  it('shows 14 nights from fresh data, booked nights named "booked" and no stale note', async () => {
+  it('shows 14 nights from fresh data, booked nights named "booked", and no price', async () => {
     const { container } = await renderHome();
 
     const cells = within(strip()).getAllByRole('listitem');
     expect(cells).toHaveLength(14);
-    expect(cells[0]).toHaveTextContent('Sunday 18 October, €85 per night, lowest price');
+    expect(cells[0]).toHaveTextContent('Sunday 18 October');
+    expect(cells[0]).not.toHaveClass('night--booked');
     expect(cells[1]).toHaveTextContent('Monday 19 October, booked');
-    expect(cells[1]).not.toHaveTextContent('€');
     expect(cells[1]).toHaveClass('night--booked');
-    expect(container.querySelector('#nights')).toHaveTextContent('First night at this price: Sun 18 Oct');
-    expect(container.querySelector('.teaser__stale')).toBeNull();
-    expect(screen.getByRole('link', { name: 'See availability & prices' })).toHaveAttribute('href', '/en/availability');
+    expect(container.querySelector('#nights')?.textContent).not.toMatch(/€|price/i);
+    expect(screen.getByRole('link', { name: 'See availability' })).toHaveAttribute('href', '/en/availability');
   });
 
   it('names booked nights in Greek', async () => {
     await renderHome('el');
 
-    const cells = within(screen.getByRole('list', { name: 'Οι επόμενες 14 νύχτες και οι τιμές τους' })).getAllByRole('listitem');
+    const cells = within(screen.getByRole('list', { name: 'Οι επόμενες 14 νύχτες' })).getAllByRole('listitem');
     expect(cells[1]).toHaveTextContent('Δευτέρα 19 Οκτωβρίου, κρατημένη');
   });
 
-  it('shows stale data with the hours since the last sync and no booked night', async () => {
-    mocks.read.mockResolvedValue(availability({ status: 'stale', nights: 'u'.repeat(365) }));
-
-    const { container } = await renderHome();
-
-    expect(container.querySelector('.teaser__stale')).toHaveTextContent('Calendar updated 14 hours ago, so booked nights are hidden for now. The prices are current.');
-    expect(within(strip()).getAllByRole('listitem')).toHaveLength(14);
-    expect(container.querySelectorAll('.night--booked')).toHaveLength(0);
-  });
-
   it.each([
-    ['not configured', () => mocks.read.mockResolvedValue(availability({ status: 'not_configured', nights: 'u'.repeat(365) }))],
+    ['stale', () => mocks.read.mockResolvedValue(availability({ status: 'stale', nights: 'u'.repeat(365) }))],
+    ['not configured',() => mocks.read.mockResolvedValue(availability({ status: 'not_configured', nights: 'u'.repeat(365) }))],
     ['unavailable', () => mocks.read.mockRejectedValue(new Error('connect ECONNREFUSED'))],
   ])('is hidden when the calendar is %s', async (_state, arrange) => {
     arrange();
@@ -130,17 +120,17 @@ describe('NightsTeaser (identity §8)', () => {
 });
 
 describe('BookBar on the home page (identity §8)', () => {
-  it('carries the "from" price and tonight', async () => {
+  it('carries tonight and the Check dates link, with no price', async () => {
     const { container } = await renderHome();
 
     const bar = container.querySelector('.bookbar');
-    expect(bar).toHaveTextContent('from €85 / night');
     expect(bar).toHaveTextContent('Free tonight');
+    expect(bar).not.toHaveTextContent('€');
     expect(within(bar as HTMLElement).getByRole('link', { hidden: true })).toHaveAttribute('href', '/en/availability');
   });
 
-  it('is not rendered without price data', async () => {
-    mocks.read.mockResolvedValue(availability({ rates: [] }));
+  it('is not rendered without a fresh calendar', async () => {
+    mocks.read.mockResolvedValue(availability({ status: 'stale', nights: 'u'.repeat(365) }));
 
     const { container } = await renderHome();
 
@@ -149,23 +139,20 @@ describe('BookBar on the home page (identity §8)', () => {
 });
 
 describe('FAQ (identity §8 FAQAccordion)', () => {
-  it('is an exclusive accordion with the first item open', () => {
-    const { container } = render(<FaqSection locale="en" today={TODAY} />);
+  it('is an exclusive accordion with the first item open, and no cancellation item', () => {
+    const { container } = render(<FaqSection locale="en" />);
 
     const items = Array.from(container.querySelectorAll('details'));
-    expect(items.length).toBe(5);
+    expect(items.length).toBe(3);
     expect(items.every((item) => item.getAttribute('name') === 'faq')).toBe(true);
-    expect(items.map((item) => item.open)).toEqual([true, false, false, false, false]);
+    expect(items.map((item) => item.open)).toEqual([true, false, false]);
     expect(items.map((item) => item.querySelector('summary')?.textContent)).toEqual([
       'How do check-in and check-out work?',
       'Is there parking?',
-      'What is the climate resilience fee?',
-      'Can I cancel?',
       'Is it suitable for children?',
     ]);
-    expect(items[2]).toHaveTextContent('April–October: €8 per night');
-    expect(items[2]).toHaveTextContent('November–March: €2 per night');
-    expect(items[3]).toHaveTextContent('Free cancellation up to 30 days before arrival');
+    expect(items[0]).toHaveTextContent('Arrival instructions are shared with you before check-in.');
+    expect(container).not.toHaveTextContent(/cancel/i);
   });
 });
 

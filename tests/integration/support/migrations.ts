@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
+import type { Client as PgClient } from 'pg';
 
 import {
   sanitizeDatabaseDiagnostics,
@@ -99,6 +100,7 @@ function runPrismaMigrateProcess(target: DisposableDatabaseTarget): Promise<Comm
     DATABASE_URL: target.databaseUrl,
     DIRECT_URL: target.databaseUrl,
     NO_COLOR: '1',
+    CHECKPOINT_DISABLE: '1',
     PRISMA_HIDE_UPDATE_MESSAGE: '1',
   };
 
@@ -242,5 +244,31 @@ export async function installMigrationFailureFixture(
 ): Promise<void> {
   await withVerifiedDisposableDatabase(target, 'failure-fixture', async (client) => {
     await client.query('CREATE TABLE users (id text PRIMARY KEY)');
+  });
+}
+
+// Sent as one simple-protocol query, so PostgreSQL runs the whole file as one
+// implicit transaction (the behaviour the migration's header relies on).
+export async function runMigrationFile(client: PgClient, migration: string): Promise<void> {
+  const migrationFile = path.join(REPOSITORY_ROOT, 'prisma/migrations', migration, 'migration.sql');
+  const sql = await readFile(migrationFile, 'utf8');
+  await client.query(sql);
+}
+
+// A scenario changes the migrated database only in `arrange` and always undoes
+// it in `restore`, so every test starts from the state the full chain leaves.
+export function withScenario<T>(
+  target: DisposableDatabaseTarget,
+  arrange: string,
+  restore: string,
+  action: (client: PgClient) => Promise<T>,
+): Promise<T> {
+  return withVerifiedDisposableDatabase(target, 'migration', async (client) => {
+    try {
+      await client.query(arrange);
+      return await action(client);
+    } finally {
+      await client.query(restore);
+    }
   });
 }

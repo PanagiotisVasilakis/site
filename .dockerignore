@@ -16,11 +16,6 @@ node_modules
 reports
 coverage
 artifacts
-analytics-backups
-analytics-data.json
-analytics-data.json.tmp
-analytics-ratelimit.json
-analytics-ratelimit.json.tmp
 axe-a11y-report*.json
 *.tsbuildinfo
 next-env.d.ts
@@ -34,11 +29,6 @@ next-env.d.ts
 **/.env.*
 **/*.pem
 !.env.example
-data/secure
-data/*.db
-data/*.db-*
-data/*.sqlite
-data/.*.sqlite
 src/generated/prisma
 public/version.json
 tmp

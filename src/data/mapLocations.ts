@@ -1,5 +1,4 @@
 import type { Locale } from '@/i18n/config';
-import { normalizeLocale } from '@/i18n/config';
 import { dedupeById } from '@/lib/collections';
 import { pickLocale } from '@/lib/localize';
 import { getApartmentContent } from '@/data/apartmentData';
@@ -218,7 +217,6 @@ function markerTypeForItem(item: CategoryMapItem, categorySlug: string): MapMark
   if (tags.has('park') || tags.has('outdoor') || tags.has('railway')) return 'park';
   if (tags.has('site') || tags.has('sightseeing') || tags.has('archaeology')) return 'sightseeing';
   if (tags.has('church') || tags.has('religion')) return 'church';
-  if (tags.has('museum') || tags.has('culture') || tags.has('history')) return 'attraction';
 
   return 'attraction';
 }
@@ -245,16 +243,15 @@ export function getApartmentMapLocation(
 
 function createMapLocationFromItem(
   { item, categorySlug, meta }: MapContentItem,
-  locale: Locale | string
+  locale: Locale
 ): MapLocation | null {
   if (!item.location || typeof item.location.lat !== 'number' || typeof item.location.lng !== 'number') {
     return null;
   }
 
-  const eff: Locale = normalizeLocale(locale);
-  const name = pickLocale(item, 'name', eff) ?? item.name;
-  const description = pickLocale(item, 'summary', eff) ?? pickLocale(item, 'description', eff);
-  const address = pickLocale(item, 'address', eff);
+  const name = pickLocale(item, 'name', locale) ?? item.name;
+  const description = pickLocale(item, 'summary', locale) ?? pickLocale(item, 'description', locale);
+  const address = pickLocale(item, 'address', locale);
   const phones = item.phones?.length ? item.phones : item.phone ? [item.phone] : undefined;
 
   return {
@@ -268,7 +265,7 @@ function createMapLocationFromItem(
     directionsUrl: item.directionsUrl ?? getDirectionsUrl([item.location.lng, item.location.lat]),
     coordinates: [item.location.lng, item.location.lat],
     markerType: markerTypeForItem(item, categorySlug),
-    href: `/${eff}/${categorySlug}/${item.slug || item.id}`,
+    href: `/${locale}/${categorySlug}/${item.slug || item.id}`,
     meta,
   };
 }

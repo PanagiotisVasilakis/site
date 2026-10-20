@@ -24,21 +24,19 @@
  */
 import puppeteer, { type Browser, type Page } from 'puppeteer';
 import { writeFile } from 'node:fs/promises';
+import { LOCAL_ONLY_ARGS } from './lib/local-only-browser';
 
 const BASE = process.env.VITALS_BASE || 'http://127.0.0.1:3000';
 const PATHS = (process.env.VITALS_PATHS || '/en,/en/apartment,/en/availability,/en/moments')
   .split(',')
   .map((value) => value.trim())
   .filter(Boolean);
+if (PATHS.length === 0) throw new Error('VITALS_PATHS contains no path');
 const RUNS = Math.max(1, Number.parseInt(process.env.VITALS_RUNS || '5', 10) || 5);
 const MOTION = process.env.VITALS_MOTION === 'reduce' ? 'reduce' : 'no-preference';
 
 const BUDGET = { lcpMs: 2500, cls: 0.05, inpMs: 200 } as const;
 const NETWORK = { download: (1.6 * 1000 * 1000) / 8, upload: (750 * 1000) / 8, latency: 150 };
-const LOCAL_ONLY_ARGS = [
-  '--proxy-server=http://127.0.0.1:9',
-  '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1',
-];
 
 /** One scripted interaction per route, in the order of §5.10 "interaction tests". */
 const INTERACTIONS: Array<{ match: RegExp; label: string; selectors: string[] }> = [
@@ -89,7 +87,7 @@ function installObservers() {
     cls: number;
     session: { value: number; first: number; last: number };
     longTasks: Array<{ start: number; duration: number }>;
-    events: Array<{ id: number; duration: number }>;
+    events: Array<{ duration: number }>;
   };
   const store: Store = {
     fcp: null,
@@ -136,7 +134,7 @@ function installObservers() {
     ['event', (entries) => {
       for (const entry of entries) {
         const event = entry as PerformanceEntry & { interactionId?: number };
-        if (event.interactionId) store.events.push({ id: event.interactionId, duration: event.duration });
+        if (event.interactionId) store.events.push({ duration: event.duration });
       }
     }, { durationThreshold: 16 }],
   ];
@@ -198,7 +196,7 @@ async function measure(browser: Browser, path: string): Promise<RunResult> {
       .reduce((sum, task) => sum + Math.max(0, task.duration - 50), 0);
 
     const interaction = await interact(page, path);
-    const events = await page.evaluate(() => (globalThis as unknown as { __vitals: { events: Array<{ id: number; duration: number }> } }).__vitals.events);
+    const events = await page.evaluate(() => (globalThis as unknown as { __vitals: { events: Array<{ duration: number }> } }).__vitals.events);
     const inpMs = events.length ? Math.max(...events.map((event) => event.duration)) : null;
     return {
       lcpMs: vitals.lcp,
@@ -220,7 +218,7 @@ const kb = (value: number | undefined) => `${((value ?? 0) / 1024).toFixed(1)} K
 (async () => {
   assertLoopback(BASE);
   console.log(`[vitals] base ${BASE}, runs ${RUNS}, motion ${MOTION}, CPU ×4, 1.6 Mbps / 750 kbps / 150 ms`);
-  const browser = await puppeteer.launch({ headless: true, args: LOCAL_ONLY_ARGS });
+  const browser = await puppeteer.launch({ headless: true, executablePath: process.env.CHROME_PATH, args: LOCAL_ONLY_ARGS });
   const report: Array<Record<string, unknown>> = [];
   let errors = 0;
   try {

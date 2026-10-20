@@ -315,7 +315,7 @@
   color: var(--color-fg-muted);
 }
 
-/* CTA: See free dates (primary), Book on Airbnb (secondary, only with a listing URL), contact link. */
+/* CTA: See free dates (primary), Book on Booking.com (secondary, only with a valid listing link), contact link. */
 .apt-cta .apt-cta__actions {
   display: flex;
   flex-wrap: wrap;

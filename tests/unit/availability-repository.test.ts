@@ -21,7 +21,7 @@ const NOW = new Date('2026-10-24T22:30:00.000Z');
 const TODAY = '2026-10-25';
 const HORIZON_END = '2027-10-25'; // TODAY + 365 nights, exclusive
 const HOUR_MS = 3_600_000;
-const FEED_URL = 'https://www.airbnb.com/calendar/ical/12345678.ics?s=token';
+const FEED_URL = 'https://ical.booking.com/v1/export?t=token';
 
 const utc = (date: string) => new Date(`${date}T00:00:00.000Z`);
 
@@ -36,32 +36,33 @@ function syncState(overrides: Record<string, unknown> = {}) {
   };
 }
 
+// Prisma returns only the selected columns; a row that still carried a price must not leak it into the public result.
 const rateRows = [
   { startDate: utc('2026-10-01'), endDate: utc('2026-11-01'), nightlyPriceCents: 8000, minimumNights: 2 },
   { startDate: utc('2026-11-01'), endDate: utc('2027-04-01'), nightlyPriceCents: 6500, minimumNights: 1 },
 ];
 
 beforeEach(() => {
-  vi.stubEnv('AIRBNB_ICAL_URL', FEED_URL);
+  vi.stubEnv('BOOKING_ICAL_URL', FEED_URL);
   mocks.findUnique.mockReturnValue(Promise.resolve(syncState()));
   mocks.findMany.mockReturnValue(Promise.resolve(rateRows));
   mocks.transaction.mockImplementation((operations: Promise<unknown>[]) => Promise.all(operations));
 });
 
 describe('readPublicAvailability', () => {
-  it('reads the sync state and the overlapping rate periods in one transaction', async () => {
+  it('reads the sync state and the overlapping rate periods in one transaction, without selecting the price', async () => {
     await readPublicAvailability(NOW);
 
     expect(mocks.transaction).toHaveBeenCalledTimes(1);
     expect(mocks.transaction.mock.calls[0][0]).toHaveLength(2);
     expect(mocks.findUnique).toHaveBeenCalledWith({
-      where: { id: 'airbnb' },
+      where: { id: 'booking' },
       select: { blockedNights: true, horizonStart: true, horizonEnd: true, lastSuccessAt: true },
     });
     expect(mocks.findMany).toHaveBeenCalledWith({
       where: { startDate: { lt: utc(HORIZON_END) }, endDate: { gt: utc(TODAY) } },
       orderBy: { startDate: 'asc' },
-      select: { startDate: true, endDate: true, nightlyPriceCents: true, minimumNights: true },
+      select: { startDate: true, endDate: true, minimumNights: true },
     });
   });
 
@@ -93,12 +94,12 @@ describe('readPublicAvailability', () => {
     expect(nights.slice(4)).toBe('u'.repeat(361));
   });
 
-  it('returns the rate periods as ISO dates with an exclusive end', async () => {
+  it('returns the rate periods as ISO dates with an exclusive end and a minimum stay, never a price', async () => {
     const { rates } = await readPublicAvailability(NOW);
 
-    expect(rates).toEqual([
-      { start: '2026-10-01', end: '2026-11-01', nightlyPriceCents: 8000, minimumNights: 2 },
-      { start: '2026-11-01', end: '2027-04-01', nightlyPriceCents: 6500, minimumNights: 1 },
+    expect(rates).toStrictEqual([
+      { start: '2026-10-01', end: '2026-11-01', minimumNights: 2 },
+      { start: '2026-11-01', end: '2027-04-01', minimumNights: 1 },
     ]);
   });
 
@@ -138,8 +139,8 @@ describe('readPublicAvailability', () => {
     expect(result.nights).toBe('u'.repeat(365));
   });
 
-  it('shows every night as unknown but still quotes prices when the calendar is not configured', async () => {
-    vi.stubEnv('AIRBNB_ICAL_URL', '');
+  it('shows every night as unknown but still returns the minimum-stay periods when the calendar is not configured', async () => {
+    vi.stubEnv('BOOKING_ICAL_URL', '');
 
     const result = await readPublicAvailability(NOW);
 

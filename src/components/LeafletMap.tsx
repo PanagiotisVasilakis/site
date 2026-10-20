@@ -186,7 +186,7 @@ export default function LeafletMap({
         return div;
       },
     });
-    map.addControl(new (LocateControl as unknown as { new(): L.Control })());
+    map.addControl(new LocateControl());
 
     const FitControl = (L.Control as unknown as ControlExtender).extend({
       options: { position: 'topleft' },
@@ -201,7 +201,7 @@ export default function LeafletMap({
         return div;
       },
     });
-    map.addControl(new (FitControl as unknown as { new(): L.Control })());
+    map.addControl(new FitControl());
 
     return () => {
       observer.disconnect();

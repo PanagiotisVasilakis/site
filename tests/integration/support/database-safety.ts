@@ -394,11 +394,18 @@ export async function withVerifiedDisposableDatabase<T>(
   }
 }
 
+function diagnosticText(value: unknown): string {
+  if (value instanceof AggregateError) {
+    return [value.message, ...value.errors.map(diagnosticText)].join(' | ');
+  }
+  return value instanceof Error ? value.message : String(value);
+}
+
 export function sanitizeDatabaseDiagnostics(
   value: unknown,
   secrets: readonly string[] = [],
 ): string {
-  let text = value instanceof Error ? value.message : String(value);
+  let text = diagnosticText(value);
   text = text.replace(/postgres(?:ql)?:\/\/[^\s"'`]+/gi, '[REDACTED_DATABASE_URL]');
   for (const secret of [...secrets].sort((left, right) => right.length - left.length)) {
     if (!secret) continue;

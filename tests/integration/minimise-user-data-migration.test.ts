@@ -1,16 +1,13 @@
-import { readFile } from 'node:fs/promises';
 import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import type { DisposableDatabaseTarget } from './support/database-safety';
 import { withVerifiedDisposableDatabase } from './support/database-safety';
 import { createIsolatedDatabase, dropIsolatedDatabase } from './support/database-lifecycle';
-import { applyMigrationsFromEmpty } from './support/migrations';
+import { applyMigrationsFromEmpty, runMigrationFile, withScenario } from './support/migrations';
 import { readDisposablePostgresRuntime } from './support/runtime';
 
 const MIGRATION = '20260930120000_minimise_user_data';
-// The integration runner starts Vitest with the repository root as cwd.
-const MIGRATION_FILE = `prisma/migrations/${MIGRATION}/migration.sql`;
 const ORIGIN_REFUSAL = 'Refusing to remove users.country_origin while users still hold a value';
 const EMAIL_REFUSAL = 'Refusing to remove users.email while users still hold an address';
 
@@ -22,26 +19,6 @@ let target: DisposableDatabaseTarget | undefined;
 function requireTarget(): DisposableDatabaseTarget {
   if (!target) throw new Error('User data minimisation database was not initialized.');
   return target;
-}
-
-// Sent as one simple-protocol query, so PostgreSQL runs the whole file as one
-// implicit transaction (the behaviour the migration's header relies on).
-async function runMigrationFile(client: PgClient): Promise<void> {
-  const sql = await readFile(MIGRATION_FILE, 'utf8');
-  await client.query(sql);
-}
-
-// A scenario changes the migrated database only in `arrange` and always undoes
-// it in `restore`, so every test starts from the state the full chain leaves.
-function withScenario<T>(arrange: string, restore: string, action: (client: PgClient) => Promise<T>): Promise<T> {
-  return withVerifiedDisposableDatabase(requireTarget(), 'migration', async (client) => {
-    try {
-      await client.query(arrange);
-      return await action(client);
-    } finally {
-      await client.query(restore);
-    }
-  });
 }
 
 async function removedObjects(client: PgClient) {
@@ -61,7 +38,8 @@ async function removedObjects(client: PgClient) {
 
 const NOTHING_LEFT = { columns: [], origin_index: null, email_index: null, origin_type: null };
 
-// Re-creates the pre-migration shape of the two columns as 000_init defined them.
+// Simplified pre-migration shape: country_origin is nullable here so that each guard can be tested alone;
+// 000_init defines it NOT NULL, so a real user row always trips the first guard.
 const ADD_COLUMNS = `CREATE TYPE "CountryOrigin" AS ENUM ('GR', 'ABROAD');
   ALTER TABLE users ADD COLUMN country_origin "CountryOrigin";
   CREATE INDEX idx_users_country_origin ON users (country_origin);
@@ -106,8 +84,8 @@ describe('minimise_user_data migration', () => {
   });
 
   it('refuses while a user still holds a country origin and leaves the user intact', async () => {
-    await withScenario(`${ADD_COLUMNS} ${insertUser(`'GR'`, 'NULL')};`, RESTORE, async (client) => {
-      await expect(runMigrationFile(client)).rejects.toMatchObject({ code: 'P0001', message: ORIGIN_REFUSAL });
+    await withScenario(requireTarget(), `${ADD_COLUMNS} ${insertUser(`'GR'`, 'NULL')};`, RESTORE, async (client) => {
+      await expect(runMigrationFile(client, MIGRATION)).rejects.toMatchObject({ code: 'P0001', message: ORIGIN_REFUSAL });
 
       const { rows } = await client.query<{ country_origin: string | null }>(
         'SELECT country_origin::text FROM users WHERE id = $1',
@@ -119,8 +97,8 @@ describe('minimise_user_data migration', () => {
   });
 
   it('refuses while a user still holds an email address and leaves the user intact', async () => {
-    await withScenario(`${ADD_COLUMNS} ${insertUser('NULL', `'legacy@example.invalid'`)};`, RESTORE, async (client) => {
-      await expect(runMigrationFile(client)).rejects.toMatchObject({ code: 'P0001', message: EMAIL_REFUSAL });
+    await withScenario(requireTarget(), `${ADD_COLUMNS} ${insertUser('NULL', `'legacy@example.invalid'`)};`, RESTORE, async (client) => {
+      await expect(runMigrationFile(client, MIGRATION)).rejects.toMatchObject({ code: 'P0001', message: EMAIL_REFUSAL });
 
       const { rows } = await client.query<{ email: string | null }>('SELECT email FROM users WHERE id = $1', [USER_ID]);
       expect(rows).toEqual([{ email: 'legacy@example.invalid' }]);
@@ -129,8 +107,8 @@ describe('minimise_user_data migration', () => {
   });
 
   it('drops leftover columns when no user holds a value and keeps the user', async () => {
-    await withScenario(`${ADD_COLUMNS} ${insertUser('NULL', 'NULL')};`, RESTORE, async (client) => {
-      await expect(runMigrationFile(client)).resolves.toBeUndefined();
+    await withScenario(requireTarget(), `${ADD_COLUMNS} ${insertUser('NULL', 'NULL')};`, RESTORE, async (client) => {
+      await expect(runMigrationFile(client, MIGRATION)).resolves.toBeUndefined();
 
       expect(await removedObjects(client)).toEqual(NOTHING_LEFT);
       const { rows } = await client.query<{ phone_e164: string }>('SELECT phone_e164 FROM users WHERE id = $1', [USER_ID]);
@@ -139,8 +117,8 @@ describe('minimise_user_data migration', () => {
   });
 
   it('drops leftover columns on an empty users table', async () => {
-    await withScenario(ADD_COLUMNS, RESTORE, async (client) => {
-      await expect(runMigrationFile(client)).resolves.toBeUndefined();
+    await withScenario(requireTarget(), ADD_COLUMNS, RESTORE, async (client) => {
+      await expect(runMigrationFile(client, MIGRATION)).resolves.toBeUndefined();
 
       expect(await removedObjects(client)).toEqual(NOTHING_LEFT);
     });
@@ -148,8 +126,8 @@ describe('minimise_user_data migration', () => {
 
   it('re-runs cleanly on the migrated database and changes nothing', async () => {
     await withVerifiedDisposableDatabase(requireTarget(), 'migration', async (client) => {
-      await expect(runMigrationFile(client)).resolves.toBeUndefined();
-      await expect(runMigrationFile(client)).resolves.toBeUndefined();
+      await expect(runMigrationFile(client, MIGRATION)).resolves.toBeUndefined();
+      await expect(runMigrationFile(client, MIGRATION)).resolves.toBeUndefined();
 
       expect(await removedObjects(client)).toEqual(NOTHING_LEFT);
     });

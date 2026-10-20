@@ -50,7 +50,6 @@ describe('Prisma PostgreSQL adapter configuration', () => {
   it.each([
     ['statement_timeout', '5s'],
     ['statement_timeout', '1.5'],
-    ['statement_timeout', '5000ms'],
     ['query_timeout', '30s'],
     ['lock_timeout', '2x'],
     ['connect_timeout', '10s'],

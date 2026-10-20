@@ -58,7 +58,6 @@ type RefreshTokenRotationResult =
 
 type RefreshGenerationContention = {
   status: 'generation_contended';
-  familyId: string;
   disposition: 'suspicious' | 'authoritative_recheck';
 };
 
@@ -374,7 +373,6 @@ async function rotate(
 
         return {
           status: 'generation_contended',
-          familyId: initial.familyId,
           disposition: initialGenerationActive ? 'suspicious' : 'authoritative_recheck',
         } as const;
       }

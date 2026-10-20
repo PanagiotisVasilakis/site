@@ -15,7 +15,7 @@ import { readDisposablePostgresRuntime } from '../support/runtime';
 
 const runtime = readDisposablePostgresRuntime();
 const managedEnvironment = [
-  'AIRBNB_ICAL_URL',
+  'BOOKING_ICAL_URL',
   'ALERT_WEBHOOK_REQUIRED',
   'ALERT_WEBHOOK_URL',
   'DATABASE_URL',
@@ -23,7 +23,7 @@ const managedEnvironment = [
 type ManagedEnvironmentName = typeof managedEnvironment[number];
 
 const TOKEN = 'SENTINELTOKEN0000';
-const FEED_URL = `https://www.airbnb.com/calendar/ical/12345678.ics?s=${TOKEN}`;
+const FEED_URL = `https://ical.booking.com/v1/export?t=${TOKEN}`;
 const STALE_RULE = 'Stale availability calendar';
 const CRLF = '\r\n';
 
@@ -44,7 +44,7 @@ function feed(today: IsoDate): string {
     'BEGIN:VEVENT',
     `DTEND;VALUE=DATE:${icalDate(addDays(today, end))}`,
     `DTSTART;VALUE=DATE:${icalDate(addDays(today, start))}`,
-    `UID:integration-${index}@airbnb.com`,
+    `UID:integration-${index}@calendar.example`,
     'SUMMARY:Reserved',
     'END:VEVENT',
   ]);
@@ -57,13 +57,13 @@ function expectedNights(today: IsoDate): Date[] {
 
 async function readState() {
   return withTestPrismaClient(requireTarget(), async (prisma) => prisma.calendarSyncState.findUniqueOrThrow({
-    where: { id: 'airbnb' },
+    where: { id: 'booking' },
   }));
 }
 
 async function updateState(data: { nextAttemptAt?: Date; lastSuccessAt?: Date }) {
   await withTestPrismaClient(requireTarget(), async (prisma) => {
-    await prisma.calendarSyncState.update({ where: { id: 'airbnb' }, data });
+    await prisma.calendarSyncState.update({ where: { id: 'booking' }, data });
   }, 'seed');
 }
 
@@ -74,14 +74,14 @@ async function openStaleAlerts() {
   }));
 }
 
-describe.sequential('Airbnb calendar sync on PostgreSQL', () => {
+describe.sequential('Booking.com calendar sync on PostgreSQL', () => {
   beforeAll(async () => {
     target = await createIsolatedDatabase(runtime, 'calendar_sync');
     await applyMigrationsFromEmpty(target);
     for (const name of managedEnvironment) originalEnvironment.set(name, process.env[name]);
     delete process.env.ALERT_WEBHOOK_URL;
     delete process.env.ALERT_WEBHOOK_REQUIRED;
-    process.env.AIRBNB_ICAL_URL = FEED_URL;
+    process.env.BOOKING_ICAL_URL = FEED_URL;
     process.env.DATABASE_URL = target.databaseUrl;
     applicationPrisma = (await import('@/lib/prisma')).prisma;
   });
@@ -94,7 +94,7 @@ describe.sequential('Airbnb calendar sync on PostgreSQL', () => {
           prisma.alertRule.deleteMany(),
           // Back to the state the migration seeds.
           prisma.calendarSyncState.update({
-            where: { id: 'airbnb' },
+            where: { id: 'booking' },
             data: {
               blockedNights: [],
               horizonStart: null,
@@ -132,19 +132,16 @@ describe.sequential('Airbnb calendar sync on PostgreSQL', () => {
 
   it('lets exactly one of two concurrent runs fetch and store the calendar', async () => {
     const today = propertyToday(PROPERTY_TIME_ZONE, new Date());
-    let release: () => void = () => undefined;
-    const released = new Promise<void>((resolve) => {
-      release = resolve;
-    });
+    const { promise: released, resolve: release } = Promise.withResolvers<void>();
     // The lease holder waits in the download until released, so the other run finishes first.
     const fetchMock = vi.fn(async () => {
       await released;
       return new Response(feed(today), { status: 200 });
     });
     vi.stubGlobal('fetch', fetchMock);
-    const { syncAirbnbCalendar } = await import('@/lib/availability/calendarSync');
+    const { syncBookingCalendar } = await import('@/lib/availability/calendarSync');
 
-    const runs = [syncAirbnbCalendar({ trigger: 'scheduled' }), syncAirbnbCalendar({ trigger: 'scheduled' })];
+    const runs = [syncBookingCalendar({ trigger: 'scheduled' }), syncBookingCalendar({ trigger: 'scheduled' })];
     await expect(Promise.race(runs)).resolves.toEqual({ status: 'busy' });
     release();
     const results = await Promise.all(runs);
@@ -172,21 +169,21 @@ describe.sequential('Airbnb calendar sync on PostgreSQL', () => {
     const today = propertyToday(PROPERTY_TIME_ZONE, new Date());
     const fetchMock = vi.fn<typeof fetch>();
     vi.stubGlobal('fetch', fetchMock);
-    const { syncAirbnbCalendar } = await import('@/lib/availability/calendarSync');
+    const { syncBookingCalendar } = await import('@/lib/availability/calendarSync');
 
     fetchMock.mockResolvedValueOnce(new Response(feed(today), { status: 200 }));
-    await expect(syncAirbnbCalendar({ trigger: 'scheduled' })).resolves.toEqual({ status: 'synced', blockedNights: 5 });
+    await expect(syncBookingCalendar({ trigger: 'scheduled' })).resolves.toEqual({ status: 'synced', blockedNights: 5 });
     const synced = await readState();
 
     await updateState({ nextAttemptAt: new Date(Date.now() - 60_000) });
     fetchMock.mockResolvedValueOnce(new Response('unavailable', { status: 503 }));
-    await expect(syncAirbnbCalendar({ trigger: 'scheduled' })).resolves.toEqual({ status: 'failed', code: 'http_status', httpStatus: 503 });
+    await expect(syncBookingCalendar({ trigger: 'scheduled' })).resolves.toEqual({ status: 'failed', code: 'http_status', httpStatus: 503 });
     const afterHttpFailure = await readState();
 
     await updateState({ nextAttemptAt: new Date(Date.now() - 60_000) });
     const dateTimeEvent = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'BEGIN:VEVENT', 'DTSTART:20301101T120000Z', 'END:VEVENT', 'END:VCALENDAR'].join(CRLF);
     fetchMock.mockResolvedValueOnce(new Response(dateTimeEvent, { status: 200 }));
-    await expect(syncAirbnbCalendar({ trigger: 'scheduled' })).resolves.toEqual({ status: 'failed', code: 'unsupported_value' });
+    await expect(syncBookingCalendar({ trigger: 'scheduled' })).resolves.toEqual({ status: 'failed', code: 'unsupported_value' });
     const afterParseFailure = await readState();
 
     expect(fetchMock).toHaveBeenCalledTimes(3);

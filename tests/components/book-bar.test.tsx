@@ -36,13 +36,13 @@ function stubObserver() {
   };
 }
 
-function renderPage(price: string | null = '€85') {
+function renderPage(note: string | null = 'Free tonight') {
   return render(
     <>
       <section data-hero>Hero</section>
       <p data-cta-watch>See free dates</p>
       <div data-cta-watch>Contact actions</div>
-      <BookBar fromText="from {price} / night" price={price} note="Free tonight" href="/en/availability" ctaLabel="Check dates" />
+      <BookBar note={note} href="/en/availability" ctaLabel="Check dates" />
     </>,
   );
 }
@@ -64,7 +64,7 @@ describe('BookBar visibility (identity §8)', () => {
 
     io.report(new Map([[hero, false]]));
     expect(shown(bar)).toBe(true);
-    expect(bar).toHaveTextContent('from €85 / nightFree tonight');
+    expect(bar).toHaveTextContent('Free tonight');
 
     io.report(new Map([[cta2, true]]));
     expect(shown(bar)).toBe(false);
@@ -79,7 +79,7 @@ describe('BookBar visibility (identity §8)', () => {
     expect(shown(bar)).toBe(false);
   });
 
-  it('renders nothing without price data', () => {
+  it('renders nothing without a note', () => {
     stubObserver();
     const { container } = renderPage(null);
 

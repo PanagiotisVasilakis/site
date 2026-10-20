@@ -105,9 +105,6 @@ function createPrismaClient(): PrismaClient {
 if (!globalThisWithPrisma.__prisma__) {
   if (process.env.DATABASE_URL) {
     globalThisWithPrisma.__prisma__ = createPrismaClient();
-  } else {
-    // Leave undefined during build/time when no DATABASE_URL is configured.
-    globalThisWithPrisma.__prisma__ = undefined as unknown as PrismaClient;
   }
 }
 
@@ -126,12 +123,12 @@ function getActivePrismaClient(): PrismaClient {
 export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
   get(_target, prop, receiver) {
     const client = getActivePrismaClient();
-    const value = Reflect.get(client as unknown as object, prop, receiver);
+    const value = Reflect.get(client, prop, receiver);
     return typeof value === 'function' ? value.bind(client) : value;
   },
   set(_target, prop, value) {
     const client = getActivePrismaClient();
-    Reflect.set(client as unknown as object, prop, value);
+    Reflect.set(client, prop, value);
     return true;
   },
 });

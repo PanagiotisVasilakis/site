@@ -7,7 +7,7 @@ import { redactSensitiveText } from '@/lib/redaction';
 
 const SERIALIZABLE_ATTEMPTS = 3;
 
-function privacySubjectDigest(kind: 'user' | 'booking', id: string): string {
+function privacySubjectDigest(kind: 'user', id: string): string {
   return crypto.createHash('sha256').update(`privacy-subject:v1:${kind}:${id}`).digest('hex');
 }
 
@@ -193,9 +193,10 @@ async function completeErasureRequest(requestId: string, auditNote: string, guar
         data: { revokedAt: new Date() },
       });
       // R-195 decision (a): externalReference is kept on erasure. It is the host's own
-      // platform reservation code (bookkeeping link to the Airbnb reservation, GDPR Art. 17(3)(b))
-      // and identifies no one by itself once userId is cleared. Tax retention period still to be
-      // confirmed by the accountant. Option (b), keeping TermsAcceptance, was NOT done: it is still
+      // platform reservation code (bookkeeping link to the Booking.com reservation, GDPR Art. 17(3)(b))
+      // and identifies no one by itself once userId is cleared. The code never deletes bookings: the
+      // 12-month retention that the owner confirmed on 2026-10-20 covers guest data only. Option (b),
+      // keeping TermsAcceptance, was NOT done: it is still
       // deleted with the user via onDelete: Cascade.
       await tx.booking.updateMany({
         where: { id: { in: bookingIds } },

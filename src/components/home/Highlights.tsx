@@ -2,7 +2,7 @@ import { Fragment } from 'react';
 
 import { Icon } from '@/components/icons/Icon';
 import { Section } from '@/components/ui/Section';
-import { CLIMATE_FEE_SCHEDULE, PROPERTY_TIME_ZONE } from '@/data/stayPolicy';
+import { PROPERTY_TIME_ZONE } from '@/data/stayPolicy';
 import type { Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 import { propertyToday } from '@/lib/availability/calendarDate';
@@ -17,7 +17,7 @@ import SeasonHighlights from './SeasonHighlights';
  */
 export default function Highlights({ locale, now }: { locale: Locale; now: Date }) {
   const t = getDictionary(locale).home;
-  const seasons = homeSeasonsOn(propertyToday(PROPERTY_TIME_ZONE, now), CLIMATE_FEE_SCHEDULE);
+  const seasons = homeSeasonsOn(propertyToday(PROPERTY_TIME_ZONE, now));
 
   const panel = (season: Season, firstMonth: string) => {
     const copy = t.seasons[season];
@@ -44,15 +44,13 @@ export default function Highlights({ locale, now }: { locale: Locale; now: Date 
       title={<>{t.intro.title} <em className="ui-section__em">{t.intro.titleEm}</em></>}
       lead={t.intro.lead}
     >
-      {seasons ? (
-        <SeasonHighlights
-          groupLabel={t.seasons.label}
-          listId="intro-highlights"
-          initial={seasons.current}
-          arrow={<Icon name="arrow-right" size={20} className="ui-btn__arrow" />}
-          panels={{ summer: panel('summer', seasons.firstMonth.summer), winter: panel('winter', seasons.firstMonth.winter) }}
-        />
-      ) : null}
+      <SeasonHighlights
+        groupLabel={t.seasons.label}
+        listId="intro-highlights"
+        initial={seasons.current}
+        arrow={<Icon name="arrow-right" size={20} className="ui-btn__arrow" />}
+        panels={{ summer: panel('summer', seasons.firstMonth.summer), winter: panel('winter', seasons.firstMonth.winter) }}
+      />
     </Section>
   );
 }

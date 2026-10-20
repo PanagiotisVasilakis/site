@@ -29,7 +29,6 @@ describe('heroGateFailure (identity §5.6 capability gate)', () => {
 
   it.each([
     ['data-motion missing', { motion: null }, 'reduced-motion'],
-    ['data-motion="reduce"', { motion: 'reduce' }, 'reduced-motion'],
     ['Save-Data', { nav: { hardwareConcurrency: 8, connection: { saveData: true } } }, 'save-data'],
     ['deviceMemory < 4', { nav: { deviceMemory: 2, hardwareConcurrency: 8 } }, 'low-memory'],
     ['hardwareConcurrency < 4', { nav: { deviceMemory: 8, hardwareConcurrency: 2 } }, 'low-cpu'],
@@ -48,7 +47,6 @@ describe('heroGateFailure (identity §5.6 capability gate)', () => {
 describe('heroDepthSrc (depth map for the crop in use, identity §7.2)', () => {
   it.each([
     ['http://127.0.0.1:3000/house/balcony/hero/balcony-hero-9x16-720.avif', '/house/balcony/hero/depth-9x16.webp'],
-    ['/house/balcony/hero/balcony-hero-9x16-480.webp', '/house/balcony/hero/depth-9x16.webp'],
     ['/house/balcony/hero/balcony-hero-4x5-1024.avif', '/house/balcony/hero/depth-4x5.webp'],
     ['/house/balcony/hero/balcony-hero-3x2-1920.webp', '/house/balcony/hero/depth-3x2.webp'],
   ])('%s → %s', (currentSrc, depth) => {

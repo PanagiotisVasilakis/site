@@ -59,4 +59,22 @@ describe('dictionary parity', () => {
     const el = strings(getDictionary('el'), '', new Map());
     expect([...en].filter(([path, text]) => names(text) !== names(el.get(path)))).toEqual([]);
   });
+
+  it('has no price, fee or cancellation wording on the public pages (owner decision of 2026-10-15)', () => {
+    // Matched without accents, so every Greek form counts (ακύρωση, ακυρώσω, τιμή, τιμών, ευρώ, σύνολο, συνολικό,
+    // επιστροφή, τέλος ανθεκτικότητας στην κλιματική κρίση). A total or subtotal counts, but not the {total}
+    // placeholder of the photo counter (house.viewer.counter); κλιματικ does not match κλιματισμός (air conditioning).
+    const wording = /€|\beuros?\b|\bprices?\b|\bfees?\b|cancel|per night|nightly|\b(?:sub)?totals?\b(?!\})|refund|τιμ(?:η|ης|ες|ων)(?!\p{L})|ευρω(?!π)|χρεωσ|ακυρ|ΤΑΚΚ|ανα νυχτα|τελος ανθεκτικ|κλιματικ|συνολ|επιστροφ/iu;
+    const found: string[] = [];
+    const walk = (value: unknown, path: string) => {
+      if (typeof value === 'string' && wording.test(value.normalize('NFD').replace(/\p{M}/gu, ''))) found.push(path);
+      else if (value && typeof value === 'object') for (const [key, entry] of Object.entries(value)) walk(entry, `${path}.${key}`);
+    };
+    for (const locale of ['en', 'el'] as const) {
+      const dictionary = getDictionary(locale);
+      for (const domain of ['availability', 'home', 'house', 'shell'] as const) walk(dictionary[domain], `${locale}.${domain}`);
+    }
+
+    expect(found).toEqual([]);
+  });
 });

@@ -4,12 +4,12 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const contact = vi.hoisted(() => ({ listingUrl: '' }));
+const contact = vi.hoisted(() => ({ bookingUrl: '' }));
 
 vi.mock('@/data/contact', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/data/contact')>()),
-  get AIRBNB_LISTING_URL() {
-    return contact.listingUrl;
+  get BOOKING_COM_LISTING_URL() {
+    return contact.bookingUrl;
   },
 }));
 
@@ -24,7 +24,7 @@ const HORIZON_END = addDays(TODAY, 365);
 const MID_MONTH = '2026-10-07' as IsoDate;
 const PAGE_PATH = '/en/availability';
 const WHATSAPP_BASE = 'https://wa.me/306955810051';
-const LISTING_URL = 'https://www.airbnb.com/rooms/12345678';
+const BOOKING_URL = 'https://www.booking.com/Share-AiCapK';
 const MAX_NIGHTS_NOTE = 'A stay can be at most 30 nights. For a longer stay, call us or send a WhatsApp message.';
 
 const t = getDictionary('en').availability;
@@ -44,10 +44,9 @@ function availability(overrides: Partial<PublicAvailability> = {}): PublicAvaila
     // 10 October is booked.
     nights: nightsWith({ '2026-10-10': 'b' }),
     rates: [
-      { start: '2026-10-01' as IsoDate, end: '2026-10-15' as IsoDate, nightlyPriceCents: 8000, minimumNights: 1 },
-      { start: '2026-10-15' as IsoDate, end: '2026-10-20' as IsoDate, nightlyPriceCents: 9500, minimumNights: 3 },
-      { start: '2026-10-20' as IsoDate, end: '2026-12-01' as IsoDate, nightlyPriceCents: 8000, minimumNights: 1 },
-      // No rate from 1 December: price on request.
+      { start: '2026-10-01' as IsoDate, end: '2026-10-15' as IsoDate, minimumNights: 1 },
+      { start: '2026-10-15' as IsoDate, end: '2026-10-20' as IsoDate, minimumNights: 3 },
+      { start: '2026-10-20' as IsoDate, end: '2026-12-01' as IsoDate, minimumNights: 1 },
     ],
     ...overrides,
   };
@@ -83,70 +82,32 @@ function day(container: HTMLElement, date: string): HTMLButtonElement {
   return button;
 }
 
-/** A controllable IntersectionObserver: `setVisible` reports the observed SummaryCard in or out of view. */
-function stubIntersectionObserver() {
-  const callbacks: Array<(entries: Array<{ isIntersecting: boolean }>) => void> = [];
-  vi.stubGlobal('IntersectionObserver', class {
-    constructor(callback: (entries: Array<{ isIntersecting: boolean }>) => void) {
-      callbacks.push(callback);
-    }
-    observe() {}
-    disconnect() {}
-  });
-  return { setVisible: (isIntersecting: boolean) => act(() => callbacks.forEach((callback) => callback([{ isIntersecting }]))) };
-}
-
 const summary = () => screen.getByRole('region', { name: t.summary.title });
 const calendarNote = () => {
   const note = document.querySelector<HTMLElement>('.cal-note');
   if (!note) throw new Error('No calendar note');
   return note;
 };
-const quoteBar = () => screen.queryByRole('complementary', { name: t.quoteBar.label });
 const whatsappLink = () => screen.getByRole('link', { name: `${t.booking.whatsapp} ${t.booking.opensInNewTab}` });
 
 beforeEach(() => {
-  contact.listingUrl = '';
+  contact.bookingUrl = '';
   window.history.replaceState(null, '', PAGE_PATH);
   vi.stubGlobal('fetch', fetchMock);
   stubViewport(false);
 });
 
 describe('AvailabilityPlanner', () => {
-  it('shows the nightly price on free days and none on booked days', () => {
+  it('shows no price on any day and names a booked day as booked', () => {
     const { container } = renderPlanner();
 
-    expect(day(container, '2026-10-09')).toHaveTextContent('€80');
-    expect(day(container, '2026-10-09')).toHaveAccessibleName(/^Friday, 9 October 2026, €80 per night$/);
-    expect(day(container, '2026-10-10')).not.toHaveTextContent('€');
+    expect(day(container, '2026-10-09')).toHaveAccessibleName(/^Friday, 9 October 2026$/);
     expect(day(container, '2026-10-10')).toHaveAccessibleName(/^Saturday, 10 October 2026, booked$/);
-    // The lowest of the two prices (€80, €95) carries the "best price" pill.
-    expect(day(container, '2026-10-09').querySelector('.cal__price')).toHaveClass('cal__price--best');
-    expect(day(container, '2026-10-16').querySelector('.cal__price')).not.toHaveClass('cal__price--best');
-  });
+    expect(container.querySelector('.cal__price')).toBeNull();
 
-  it('shows no "best price" pill when every night has the same price', () => {
-    const { container } = renderPlanner({
-      rates: [{ start: TODAY, end: '2026-12-01' as IsoDate, nightlyPriceCents: 8000, minimumNights: 1 }],
-    });
-
-    expect(day(container, '2026-10-09')).toHaveTextContent('€80');
-    expect(container.querySelector('.cal__price--best')).toBeNull();
-  });
-
-  it('gives the "best price" pill to the lowest price of the nights that are not booked', () => {
-    const { container } = renderPlanner({
-      rates: [
-        { start: '2026-10-01' as IsoDate, end: '2026-10-10' as IsoDate, nightlyPriceCents: 8000, minimumNights: 1 },
-        // The cheapest price is on the booked 10 October only.
-        { start: '2026-10-10' as IsoDate, end: '2026-10-11' as IsoDate, nightlyPriceCents: 6000, minimumNights: 1 },
-        { start: '2026-10-11' as IsoDate, end: '2026-10-15' as IsoDate, nightlyPriceCents: 8000, minimumNights: 1 },
-        { start: '2026-10-15' as IsoDate, end: '2026-10-20' as IsoDate, nightlyPriceCents: 9500, minimumNights: 3 },
-      ],
-    });
-
-    expect(day(container, '2026-10-09').querySelector('.cal__price')).toHaveClass('cal__price--best');
-    expect(day(container, '2026-10-16').querySelector('.cal__price')).not.toHaveClass('cal__price--best');
+    fireEvent.click(day(container, '2026-10-07'));
+    fireEvent.click(day(container, '2026-10-10'));
+    expect(container).not.toHaveTextContent('€');
   });
 
   it('does not let a booked day be a check-in, but lets it be the check-out', () => {
@@ -216,6 +177,23 @@ describe('AvailabilityPlanner', () => {
     expect(within(calendarNote()).queryByText(MAX_NIGHTS_NOTE)).not.toBeInTheDocument();
   });
 
+  it('explains the 30-night limit when a booked night lies beyond it', () => {
+    const { container } = renderPlanner({ nights: nightsWith({ '2026-12-20': 'b' }) });
+
+    fireEvent.click(day(container, '2026-11-02'));
+    // The limit ends the check-out days 30 nights on, on Wed 2 Dec 2026: the booked 20 December lies beyond that.
+    expect(within(calendarNote()).getByText('Now choose your check-out day, at the latest Wed 2 Dec 2026.')).toBeInTheDocument();
+
+    // 25 December can start a stay, so it becomes the new check-in. The limit is the reason, not 20 December.
+    fireEvent.click(day(container, '2026-12-25'));
+
+    expect(window.location.hash).toBe('#checkin=2026-12-25');
+    expect(within(calendarNote()).getByText(MAX_NIGHTS_NOTE)).toBeInTheDocument();
+    expect(calendarNote()).toHaveClass('ui-callout--warning');
+    expect(within(calendarNote()).queryByText(/is booked/)).not.toBeInTheDocument();
+    expect(within(calendarNote()).getByText('Now choose your check-out day, at the latest Sun 24 Jan 2027.')).toBeInTheDocument();
+  });
+
   it('drops the 30-night explanation when the fragment sets another check-in', () => {
     const { container } = renderPlanner();
 
@@ -245,7 +223,7 @@ describe('AvailabilityPlanner', () => {
     expect(within(summary()).getByText(t.summary.empty)).toBeInTheDocument();
   });
 
-  it('says in the accessible name why a free, priced night cannot start a stay', () => {
+  it('says in the accessible name why a free night cannot start a stay', () => {
     // The scenario above, on 7 October so that days before today are on screen too:
     // the nights start at 7 October, six characters on from the nights of TODAY.
     const { container } = renderPlanner({
@@ -257,13 +235,13 @@ describe('AvailabilityPlanner', () => {
     // 15 and 16 October need 3 nights, but 17 October is booked.
     expect(day(container, '2026-10-15')).toBeDisabled();
     expect(day(container, '2026-10-15'))
-      .toHaveAccessibleName('Thursday, 15 October 2026, €95 per night, Minimum stay from this check-in: 3 nights.');
+      .toHaveAccessibleName('Thursday, 15 October 2026, Minimum stay from this check-in: 3 nights.');
     expect(day(container, '2026-10-16')).toBeDisabled();
     expect(day(container, '2026-10-16'))
-      .toHaveAccessibleName('Friday, 16 October 2026, €95 per night, Minimum stay from this check-in: 3 nights.');
+      .toHaveAccessibleName('Friday, 16 October 2026, Minimum stay from this check-in: 3 nights.');
     // A night that can start a stay, the booked night and a past day carry no such sentence.
     expect(day(container, '2026-10-14')).toBeEnabled();
-    expect(day(container, '2026-10-14')).toHaveAccessibleName('Wednesday, 14 October 2026, €80 per night');
+    expect(day(container, '2026-10-14')).toHaveAccessibleName('Wednesday, 14 October 2026');
     expect(day(container, '2026-10-17')).toHaveAccessibleName('Saturday, 17 October 2026, booked');
     expect(day(container, '2026-10-06')).toBeDisabled();
     expect(day(container, '2026-10-06')).toHaveAccessibleName('Tuesday, 6 October 2026');
@@ -279,53 +257,6 @@ describe('AvailabilityPlanner', () => {
     expect(day(container, '2026-10-16')).toBeDisabled();
     expect(day(container, '2026-10-17')).toBeDisabled();
     expect(day(container, '2026-10-18')).toBeEnabled();
-  });
-
-  it('quotes 3 × €80 plus a €24 climate fee as €264', () => {
-    const { container } = renderPlanner();
-
-    fireEvent.click(day(container, '2026-10-07'));
-    fireEvent.click(day(container, '2026-10-10'));
-
-    const card = summary();
-    expect(within(card).getByText('3 nights × €80')).toBeInTheDocument();
-    expect(within(card).getByText(t.summary.climateFee).nextElementSibling).toHaveTextContent('€24');
-    expect(within(card).getByText(t.summary.total).nextElementSibling).toHaveTextContent('€264');
-  });
-
-  it('groups the climate fee by season: 29 Oct to 3 Nov is 3 × €8 and 2 × €2', () => {
-    window.history.replaceState(null, '', `${PAGE_PATH}#checkin=2026-10-29&checkout=2026-11-03`);
-    renderPlanner();
-
-    const card = summary();
-    expect(within(card).getByText('3 × €8 Apr–Oct')).toBeInTheDocument();
-    expect(within(card).getByText('2 × €2 Nov–Mar')).toBeInTheDocument();
-    expect(within(card).getByText(t.summary.climateFee).nextElementSibling).toHaveTextContent('€28');
-    expect(within(card).getByText('29 Oct – 3 Nov')).toBeInTheDocument();
-  });
-
-  it('groups nights by price and adds them up', () => {
-    window.history.replaceState(null, '', `${PAGE_PATH}#checkin=2026-10-13&checkout=2026-10-18`);
-    renderPlanner();
-
-    const card = summary();
-    expect(within(card).getByText('2 nights × €80')).toBeInTheDocument();
-    expect(within(card).getByText('3 nights × €95')).toBeInTheDocument();
-    expect(within(card).getByText(t.summary.subtotal).nextElementSibling).toHaveTextContent('€445');
-    expect(within(card).getByText(t.summary.total).nextElementSibling).toHaveTextContent('€485');
-  });
-
-  it('hides the total when a night has no price', () => {
-    window.history.replaceState(null, '', `${PAGE_PATH}#checkin=2026-11-29&checkout=2026-12-02`);
-    stubViewport(true); // November and December
-    const { container } = renderPlanner();
-
-    const card = summary();
-    expect(within(card).getByText(t.summary.priceOnRequest)).toBeInTheDocument();
-    expect(within(card).queryByText(t.summary.total)).not.toBeInTheDocument();
-    expect(within(card).queryByText(t.summary.subtotal)).not.toBeInTheDocument();
-    expect(day(container, '2026-12-01')).not.toHaveTextContent('€');
-    expect(day(container, '2026-12-01')).toHaveAccessibleName(/^Tuesday, 1 December 2026, price on request, selected$/);
   });
 
   it('pre-selects the stay from the URL fragment', () => {
@@ -351,7 +282,6 @@ describe('AvailabilityPlanner', () => {
     '#checkin=2026-10-12&checkout=2026-10-08',
     '#checkin=2026-10-12&checkout=2026-10-12',
     '#checkin=2026-10-07&checkout=soon',
-    '#checkout=2026-10-12',
     '#checkin=2026-10-10',
     '#contact',
   ])('ignores the fragment %s', (fragment) => {
@@ -372,19 +302,7 @@ describe('AvailabilityPlanner', () => {
     renderPlanner();
 
     expect(within(summary()).getByText(message)).toBeInTheDocument();
-    expect(within(summary()).queryByText(t.summary.total)).not.toBeInTheDocument();
     expect(whatsappLink()).toHaveAttribute('href', WHATSAPP_BASE);
-  });
-
-  it('follows a fragment changed after load', () => {
-    renderPlanner();
-
-    act(() => {
-      window.history.replaceState(null, '', `${PAGE_PATH}#checkin=2026-10-07&checkout=2026-10-10`);
-      window.dispatchEvent(new HashChangeEvent('hashchange'));
-    });
-
-    expect(within(summary()).getByText('3 nights')).toBeInTheDocument();
   });
 
   it('clears the selection and the fragment', () => {
@@ -436,45 +354,43 @@ describe('AvailabilityPlanner', () => {
     expect(screen.getByRole('link', { name: t.booking.call })).toHaveAttribute('href', 'tel:+306955810051');
   });
 
-  it('renders no Airbnb button while the listing URL is empty', () => {
+  it('renders no Booking.com button while the listing link is empty', () => {
     renderPlanner();
 
-    expect(screen.queryByRole('link', { name: /Airbnb/ })).not.toBeInTheDocument();
-    // The trust line does not say that payment happens on Airbnb.
+    expect(screen.queryByRole('link', { name: /Booking\.com/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(t.booking.bookingCom)).not.toBeInTheDocument();
     expect(within(summary()).getByText(t.summary.trust)).toBeInTheDocument();
-    expect(within(summary()).queryByText(t.summary.trustAirbnb)).not.toBeInTheDocument();
   });
 
-  it('links the Airbnb button to the plain listing URL once it is set', () => {
-    contact.listingUrl = LISTING_URL;
+  it('renders no Booking.com button for a URL that is not a Booking.com listing link', () => {
+    contact.bookingUrl = 'https://example.com/Share-AiCapK';
+    renderPlanner();
+
+    expect(screen.queryByRole('link', { name: /Booking\.com/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(t.booking.bookingCom)).not.toBeInTheDocument();
+  });
+
+  it('links the primary Booking.com button to the listing link once it is set', () => {
+    contact.bookingUrl = BOOKING_URL;
     const { container } = renderPlanner();
 
     fireEvent.click(day(container, '2026-10-07'));
     fireEvent.click(day(container, '2026-10-10'));
-
-    const airbnb = screen.getByRole('link', { name: `${t.booking.airbnb} ${t.booking.opensInNewTab}` });
-    expect(airbnb).toHaveAttribute('href', LISTING_URL);
-    expect(airbnb).toHaveAttribute('target', '_blank');
-    expect(airbnb).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(within(summary()).getByText(t.summary.trustAirbnb)).toBeInTheDocument();
-    expect(within(summary()).queryByText(t.summary.trust)).not.toBeInTheDocument();
+    const booking = within(summary()).getByRole('link', { name: `${t.booking.bookingCom} ${t.booking.opensInNewTab}` });
+    expect(booking).toHaveAttribute('href', BOOKING_URL);
+    expect(booking).toHaveAttribute('target', '_blank');
+    expect(booking).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(booking).toHaveClass('ui-btn--primary');
+    expect(within(summary()).getByText(t.summary.trust)).toBeInTheDocument();
   });
 
-  it('renders no Airbnb button for a URL that is not an Airbnb listing', () => {
-    contact.listingUrl = 'https://example.com/rooms/12345678';
-    renderPlanner();
-
-    expect(screen.queryByRole('link', { name: /Airbnb/ })).not.toBeInTheDocument();
-  });
-
-  it('lets every night be chosen when availability is unknown, with prices still shown', () => {
+  it('lets every night be chosen when availability is unknown', () => {
     const { container } = renderPlanner({ status: 'stale', nights: 'u'.repeat(365) });
 
     expect(day(container, '2026-10-10')).toBeEnabled();
-    expect(day(container, '2026-10-10')).toHaveTextContent('€80');
     fireEvent.click(day(container, '2026-10-08'));
     fireEvent.click(day(container, '2026-10-12'));
-    expect(within(summary()).getByText(t.summary.total).nextElementSibling).toHaveTextContent('€352');
+    expect(within(summary()).getByText('4 nights')).toBeInTheDocument();
   });
 
   it('stacks three months on narrow screens and adds three more up to the horizon', () => {
@@ -622,53 +538,6 @@ describe('AvailabilityPlanner', () => {
     expect(window.location.hash).toBe('#checkin=2026-10-15');
   });
 
-  it('shows the QuoteBar only for a complete stay while the SummaryCard is out of view', () => {
-    const observer = stubIntersectionObserver();
-    const { container } = renderPlanner();
-
-    observer.setVisible(false);
-    expect(quoteBar()).not.toBeInTheDocument();
-    fireEvent.click(day(container, '2026-10-07'));
-    observer.setVisible(false);
-    expect(quoteBar()).not.toBeInTheDocument();
-
-    fireEvent.click(day(container, '2026-10-10'));
-    observer.setVisible(false);
-    const bar = quoteBar();
-    expect(bar).toBeInTheDocument();
-    expect(bar).toHaveTextContent('€264 · 3 nights · total');
-    // Without an Airbnb listing the bar leads to the card.
-    const scrollIntoView = vi.fn();
-    Object.defineProperty(summary(), 'scrollIntoView', { value: scrollIntoView, configurable: true });
-    fireEvent.click(within(bar as HTMLElement).getByRole('button', { name: t.quoteBar.details }));
-    expect(scrollIntoView).toHaveBeenCalledTimes(1);
-
-    observer.setVisible(true);
-    expect(quoteBar()).not.toBeInTheDocument();
-  });
-
-  it('shows price on request in the QuoteBar when a night of the stay has no price', () => {
-    const observer = stubIntersectionObserver();
-    window.history.replaceState(null, '', `${PAGE_PATH}#checkin=2026-11-29&checkout=2026-12-02`);
-    renderPlanner();
-
-    observer.setVisible(false);
-    const bar = quoteBar();
-    expect(bar).toHaveTextContent('3 nights · price on request');
-    expect(bar).not.toHaveTextContent('€');
-  });
-
-  it('offers the Airbnb listing in the QuoteBar once the URL is set', () => {
-    contact.listingUrl = LISTING_URL;
-    const observer = stubIntersectionObserver();
-    window.history.replaceState(null, '', `${PAGE_PATH}#checkin=2026-10-07&checkout=2026-10-10`);
-    renderPlanner();
-
-    observer.setVisible(false);
-    expect(within(quoteBar() as HTMLElement).getByRole('link', { name: `${t.booking.airbnb} ${t.booking.opensInNewTab}` }))
-      .toHaveAttribute('href', LISTING_URL);
-  });
-
   it('renders no form and sends nothing to the server', () => {
     const { container } = renderPlanner();
 
@@ -680,26 +549,14 @@ describe('AvailabilityPlanner', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('opens the month of the fragment with no form and no request', () => {
-    window.history.replaceState(null, '', `${PAGE_PATH}#m=2027-06`);
-    const { container } = renderPlanner();
-
-    fireEvent.click(day(container, '2027-06-15'));
-
-    expect(window.location.hash).toBe('#checkin=2027-06-15');
-    expect(container.querySelector('form')).toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
   it('speaks Greek', () => {
     window.history.replaceState(null, '', `${PAGE_PATH}#checkin=2026-10-07&checkout=2026-10-10`);
     const { container } = render(<AvailabilityPlanner locale="el" availability={availability()} />);
     const el = getDictionary('el').availability;
 
     const card = screen.getByRole('region', { name: el.summary.title });
-    expect(within(card).getByText('3 νύχτες × 80 €')).toBeInTheDocument();
-    expect(within(card).getByText(el.summary.total).nextElementSibling).toHaveTextContent('264 €');
-    expect(day(container, '2026-10-09')).toHaveAccessibleName(/^Παρασκευή, 9 Οκτωβρίου 2026, 80\s€ ανά νύχτα, επιλεγμένη$/);
+    expect(within(card).getByText('3 νύχτες')).toBeInTheDocument();
+    expect(day(container, '2026-10-09')).toHaveAccessibleName(/^Παρασκευή, 9 Οκτωβρίου 2026, επιλεγμένη$/);
     const text = 'Γεια σας! Είναι ελεύθερο το διαμέρισμα από Τετ 7 Οκτ 2026 έως Σάβ 10 Οκτ 2026;';
     expect(screen.getByRole('link', { name: `${el.booking.whatsapp} ${el.booking.opensInNewTab}` }))
       .toHaveAttribute('href', `${WHATSAPP_BASE}?text=${encodeURIComponent(text)}`);

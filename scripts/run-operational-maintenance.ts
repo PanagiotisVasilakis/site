@@ -1,4 +1,4 @@
-import { syncAirbnbCalendar } from '@/lib/availability/calendarSync';
+import { syncBookingCalendar } from '@/lib/availability/calendarSync';
 import { evaluateOperationalAlerts, runRetention } from '@/lib/operationalMonitor';
 import { prisma } from '@/lib/prisma';
 
@@ -8,7 +8,7 @@ const errorMessage = (error: unknown) => (error instanceof Error ? error.message
 // step that is still running and the results of the other steps are still logged.
 async function main() {
   // The sync goes first: the stale-calendar alert rule must read the state this run leaves behind.
-  const [calendarStep] = await Promise.allSettled([syncAirbnbCalendar({ trigger: 'scheduled' })]);
+  const [calendarStep] = await Promise.allSettled([syncBookingCalendar({ trigger: 'scheduled' })]);
   const [alertsStep, retentionStep] = await Promise.allSettled([evaluateOperationalAlerts(), runRetention()]);
   const steps = [alertsStep, retentionStep, calendarStep];
   const [alerts, retention, calendar] = steps.map((step) => (

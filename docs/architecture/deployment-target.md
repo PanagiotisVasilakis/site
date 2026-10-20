@@ -190,11 +190,15 @@ blockers were re-checked against the repository on 2026-09-29 and remain open:
   itself. Cloudflare Universal SSL covers only the apex and first-level
   subdomains, so no web host may live on a deeper subdomain without its own
   certificate (see the origin ingress runbook preconditions);
-- owner-supplied release inputs (recorded 2026-10-06) are still open: the legal
-  identity (registration number, legal name, address) and the public Airbnb
-  listing URL (task R3-L1), and the accountant-confirmed climate resilience
-  fee, cancellation and withdrawal texts and tax retention period
-  (R3-L6/L7); see "Open owner inputs" in the [README](../../README.md).
+- owner-supplied release inputs (recorded 2026-10-06; the host address, ΑΜΑ and
+  Booking.com link supplied 2026-10-14; the host's name and the decisions that
+  the site shows no prices and no cancellation policy and that only Booking.com
+  is used for now supplied 2026-10-15; Booking.com as the only calendar source
+  and the sufficiency of 12 months of guest-data retention supplied 2026-10-20)
+  are still open only for: which Booking.com link to publish, the owner's
+  wording for Booking.com bookings, the Booking.com export URL in the
+  production environment and the last edit of the privacy notice (its English
+  calendar item); see "Open owner inputs" in the [README](../../README.md).
 
 Until every relevant gap is closed and verified, the selected architecture is
 **accepted but not production-ready**.

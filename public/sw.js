@@ -22,7 +22,6 @@ const CACHE_NAME = `${CACHE_PREFIX}${BUILD}`;
 const OFFLINE_PAGES = ['/offline', '/en/offline', '/el/offline'];
 // Precached best-effort next to the offline pages: a missing one never fails the install.
 const OFFLINE_ASSETS = [
-  '/app.webmanifest',
   '/favicon.ico',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
@@ -40,15 +39,12 @@ const PRIVATE_PAGE_PREFIXES = [
 
 // Never stored either: live pages (force-dynamic) that must not be shown stale
 // offline: the availability calendar (R-312), and home and apartment (R-460), which
-// carry the same live data (from-price, "Free tonight", the 14-night open/booked strip).
+// carry the same live data ("Free tonight", the 14-night open/booked strip).
 const LIVE_PAGE_PATHS = [
   '/en', '/el',
   '/en/apartment', '/el/apartment',
   '/en/availability', '/el/availability',
 ];
-
-// Internal fetch helper (keeps the internal-fetch lint rule satisfied).
-function fetchInternal(input, init) { return fetch(input, init); }
 
 function isPrivatePage(pathname) {
   return PRIVATE_PAGE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
@@ -124,7 +120,7 @@ self.addEventListener('install', (event) => {
     const cache = await caches.open(CACHE_NAME);
     // No cookies: /en/offline and /el/offline must not rewrite the visitor's `lang` cookie (src/proxy.ts).
     // The offline pages and their scripts are required: a failed install keeps the previous worker and cache, and
-    // PwaManager registers again on the next page load (R-647). The manifest and the icons are best-effort.
+    // PwaManager registers again on the next page load (R-647). The favicon and the icons are best-effort.
     await Promise.all(OFFLINE_PAGES.map((url) => cache.add(new Request(url, { credentials: 'omit' }))));
     await Promise.allSettled(OFFLINE_ASSETS.map((url) => cache.add(new Request(url, { credentials: 'omit' }))));
     await precacheOfflineSubresources(cache);
@@ -161,7 +157,7 @@ async function storePage(href) {
     const url = new URL(href);
     if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
     if (isNetworkOnlyPage(url.pathname) || OFFLINE_PAGES.includes(url.pathname)) return;
-    const response = await fetchInternal(new Request(url.href));
+    const response = await fetch(new Request(url.href));
     if (isStorable(response)) await (await caches.open(CACHE_NAME)).put(url.href, response);
   } catch { /* offline, an unusable URL or a failed cache write: the page is simply not kept */ }
 }
@@ -176,7 +172,7 @@ async function networkFirstPage(request, pathname, search) {
   const cache = await caches.open(CACHE_NAME);
   const isOfflinePage = OFFLINE_PAGES.includes(pathname);
   try {
-    const response = await fetchInternal(request);
+    const response = await fetch(request);
     // The offline pages stay as the install precached them (no cookies): a navigation never stores one, under any query.
     if (isStorable(response) && !isNetworkOnlyPage(pathname) && !isOfflinePage) {
       cache.put(request, response.clone()).catch(() => {});
@@ -208,7 +204,7 @@ async function cacheFirst(request) {
   const cache = await caches.open(CACHE_NAME);
   const cached = await cache.match(request);
   if (cached) return cached;
-  const response = await fetchInternal(request);
+  const response = await fetch(request);
   if (isStorable(response)) cache.put(request, response.clone()).catch(() => {});
   return response;
 }
@@ -216,7 +212,7 @@ async function cacheFirst(request) {
 async function staleWhileRevalidate(request) {
   const cache = await caches.open(CACHE_NAME);
   const cached = await cache.match(request);
-  const network = fetchInternal(request)
+  const network = fetch(request)
     .then((response) => {
       if (isStorable(response)) cache.put(request, response.clone()).catch(() => {});
       return response;

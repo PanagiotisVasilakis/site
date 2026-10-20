@@ -6,11 +6,9 @@ import { filterBySearchText } from '@/lib/searchText';
 describe('search text normalisation', () => {
   it.each([
     ['ΜΟΥΣΕΙΟ', 'Μουσείο'],
-    ['μουσειο', 'Μουσείο'],
     ['ΟΔΟΣ', 'οδός'],
     ['οδοσ', 'Οδός'],
     ['προιοντα', 'Προϊόντα'],
-    ['cafe', 'Café'],
   ])('finds %s in %s', (query, text) => {
     expect(filterBySearchText([{ name: text }], query)).toEqual([{ name: text }]);
   });

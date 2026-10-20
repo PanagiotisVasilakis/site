@@ -74,7 +74,7 @@ const RULES: RuleDefinition[] = [
   },
   {
     name: 'Stale availability calendar',
-    description: 'The Airbnb calendar has not synced successfully for more than three hours.',
+    description: 'The Booking.com calendar has not synced successfully for more than three hours.',
     metricName: 'availability.calendar.stale_minutes',
     comparison: 'gt',
     threshold: CALENDAR_STALE_ALERT_MINUTES,
@@ -82,7 +82,7 @@ const RULES: RuleDefinition[] = [
     severity: 'high',
     // 0 while no calendar is configured; a missing state row reads as the cap.
     read: async () => {
-      if (!process.env.AIRBNB_ICAL_URL) return 0;
+      if (!process.env.BOOKING_ICAL_URL) return 0;
       const state = await prisma.calendarSyncState.findUnique({
         where: { id: CALENDAR_SYNC_STATE_ID },
         select: { lastSuccessAt: true, createdAt: true },

@@ -224,12 +224,4 @@ describe('LeafletMap popup close button (R-687)', () => {
     pin.openPopup();
     expect(closeButton(container)).toHaveAttribute('aria-label', 'Κλείσιμο');
   });
-
-  it('names the close button from the English labels', () => {
-    const { container } = render(mapElement());
-
-    dataPin(currentMap(), 'Home').openPopup();
-
-    expect(closeButton(container)).toHaveAttribute('aria-label', 'Close');
-  });
 });

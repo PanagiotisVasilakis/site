@@ -349,8 +349,8 @@
   gap: 10px;
   margin: 0;
 }
-/* Marketing footer (§8 SiteFooter): under the wordmark, the primary tagline (§1.2) and the location line of the hero
-   lede. Display upright, not italic: on the Greek pages other than home the Greek display italic would be one more
+/* Marketing footer (§8 SiteFooter): under the wordmark, the primary tagline (§1.2) and the location line (home.heroFacts).
+   Display upright, not italic: on the Greek pages other than home the Greek display italic would be one more
    font file (§2.2). Static, no motion. */
 .site-footer__about {
   display: grid;
@@ -452,6 +452,36 @@
   .site-footer--stay .site-footer__inner { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: center; }
 }
 
+/* Host identity (registry number, legal name, address): text only, the same in the footer and the page heads.
+   Labels in the muted colour, values in the body colour, the registry value semibold. No motion. */
+.host-identity {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.host-identity__row {
+  display: grid;
+  gap: 2px;
+}
+.host-identity__label,
+.host-identity__value {
+  margin: 0;
+}
+.host-identity__label { color: var(--color-fg-muted); }
+.host-identity__value { color: var(--color-fg); }
+.host-identity__value--registry { font-weight: 600; }
+.host-identity--footer {
+  grid-column: 1 / -1;
+  font-size: var(--text-caption);
+  line-height: var(--text-caption--line-height);
+}
+.host-identity--page {
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
+}
+.apt-head .host-identity--page { margin-top: 20px; }
+
 /* MotionSwitch (footer and menu) */
 .motion-switch {
   display: flex;
@@ -517,23 +547,13 @@
   .bookbar { display: none; }
 }
 .bookbar .bookbar__text {
-  display: grid;
-  gap: 2px;
   min-width: 0;
   margin: 0;
   font-size: var(--text-caption);
+  font-weight: 600;
   line-height: 1.2;
-  color: var(--color-fg-muted);
-}
-.bookbar .bookbar__value {
-  margin: 0 .1em;
-  font-family: var(--font-display);
-  font-size: 1.5rem;
-  font-weight: 400;
-  font-variant-numeric: tabular-nums;
   color: var(--color-fg);
 }
-.bookbar .bookbar__note { font-size: .8125rem; color: var(--color-fg-muted); }
 /* The footer clears the bar (§8 SiteFooter). */
 @media (max-width: 1023.98px) {
   :root:has(.bookbar) .site-footer.site-footer { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }

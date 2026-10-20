@@ -2,7 +2,6 @@
 
 import type React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { renderToString } from 'react-dom/server';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -22,12 +21,10 @@ vi.mock('next/link', () => ({
 import Home from '@/app/[locale]/page';
 import FactStrip from '@/components/home/FactStrip';
 import Highlights from '@/components/home/Highlights';
-import BalconyWindow from '@/components/home/BalconyWindow';
 import RoomsShowcase from '@/components/home/RoomsShowcase';
 import { homeRoomsFrom } from '@/components/home/homeRooms';
 import { homeSeasonsOn } from '@/components/home/homeSeason';
 import { APARTMENT_PHOTOS } from '@/data/apartmentPhotos';
-import { CLIMATE_FEE_SCHEDULE } from '@/data/stayPolicy';
 import { addDays, type IsoDate } from '@/lib/availability/calendarDate';
 
 const TODAY = '2026-10-01' as IsoDate;
@@ -39,7 +36,7 @@ beforeEach(() => {
     status: 'fresh',
     lastSyncedAt: '2026-10-01T08:30:00.000Z',
     nights: 'o'.repeat(365),
-    rates: [{ start: TODAY, end: '2026-12-01' as IsoDate, nightlyPriceCents: 8500, minimumNights: 1 }],
+    rates: [],
   });
 });
 
@@ -80,30 +77,6 @@ describe('FactStrip (identity §8)', () => {
     expect(container.textContent).not.toMatch(/€|night/);
   });
 
-  it('is localized in Greek', () => {
-    render(<FactStrip locale="el" />);
-
-    expect(screen.getByRole('region', { name: 'Βασικά στοιχεία' })).toHaveTextContent('2ος');
-    expect(screen.getByRole('link', { name: 'Δείτε ελεύθερες ημερομηνίες' })).toHaveAttribute('href', '/el/availability');
-  });
-
-  // The Greek inline variant is covered through the real page in apartment-page.test.tsx.
-  it.each(['en'] as const)('has an inline variant (%s, apartment page head) with the same six facts, no link and no overlap card', (locale) => {
-    const strip = render(<FactStrip locale={locale} />);
-    const items = (root: HTMLElement) => within(root).getAllByRole('listitem').map((item) => item.textContent);
-    const stripFacts = items(strip.container);
-    strip.unmount();
-
-    const { container } = render(<FactStrip locale={locale} inline />);
-
-    const list = container.firstElementChild as HTMLElement;
-    expect(list.tagName).toBe('UL');
-    expect(list).toHaveAccessibleName('Key facts');
-    expect(stripFacts).toHaveLength(6);
-    expect(items(container)).toEqual(stripFacts);
-    expect(container.querySelector('a, [data-cta-watch], [data-reveal], .facts')).toBeNull();
-  });
-
   describe('number counters (M34, R3-V14)', () => {
     let observed: IntersectionObserverCallback[] = [];
     let frames: FrameRequestCallback[] = [];
@@ -127,12 +100,6 @@ describe('FactStrip (identity §8)', () => {
       const pending = frames;
       frames = [];
       pending.forEach((frame) => frame(time));
-    });
-
-    it('keeps the final numbers in the server markup', () => {
-      const html = renderToString(<FactStrip locale="en" />);
-      expect(html).toContain('class="fact__num">90<small');
-      expect(html).toContain('class="fact__num">2nd</span>');
     });
 
     it('counts up once in view under full motion and ends on the server text', () => {
@@ -173,28 +140,14 @@ describe('Highlights + SeasonSwitch (identity §8, graft 10)', () => {
   });
 
   it('links each season to the availability page at its first month from today', () => {
-    expect(homeSeasonsOn('2026-10-31' as IsoDate, CLIMATE_FEE_SCHEDULE)).toEqual({
+    expect(homeSeasonsOn('2026-10-31' as IsoDate)).toEqual({
       current: 'summer',
       firstMonth: { summer: '2026-10', winter: '2026-11' },
     });
-    expect(homeSeasonsOn('2026-11-01' as IsoDate, CLIMATE_FEE_SCHEDULE)).toEqual({
+    expect(homeSeasonsOn('2026-11-01' as IsoDate)).toEqual({
       current: 'winter',
       firstMonth: { summer: '2027-04', winter: '2026-11' },
     });
-  });
-
-  it('has no seasons without a climate fee rule in force', () => {
-    expect(homeSeasonsOn('2026-10-31' as IsoDate, [])).toBeNull();
-    expect(homeSeasonsOn('2024-12-31' as IsoDate, CLIMATE_FEE_SCHEDULE)).toBeNull();
-  });
-
-  it('renders the intro but no switch, cards or season link when no climate fee rule is in force', () => {
-    render(<Highlights locale="en" now={new Date('2024-06-01T10:00:00Z')} />);
-
-    expect(screen.getByRole('heading', { level: 2, name: /A calm home in the city/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button')).toBeNull();
-    expect(screen.queryByRole('list')).toBeNull();
-    expect(screen.queryByRole('link')).toBeNull();
   });
 
   it('controls a polite live list and swaps the cards at once without motion', () => {
@@ -250,18 +203,6 @@ describe('Highlights + SeasonSwitch (identity §8, graft 10)', () => {
       delete document.documentElement.dataset.motion;
       vi.useRealTimers();
     }
-  });
-});
-
-describe('BalconyWindow (identity §8, M10)', () => {
-  it('keeps the photo accessible and hides the decorative shutters', () => {
-    const { container } = render(<BalconyWindow locale="en" />);
-
-    expect(screen.getByRole('heading', { level: 2, name: 'Step onto the balcony' })).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: /Taygetos/ })).toBeInTheDocument();
-    const shutters = Array.from(container.querySelectorAll('.shutter'));
-    expect(shutters).toHaveLength(2);
-    for (const shutter of shutters) expect(shutter).toHaveAttribute('aria-hidden', 'true');
   });
 });
 

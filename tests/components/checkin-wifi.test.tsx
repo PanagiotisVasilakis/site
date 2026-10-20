@@ -11,7 +11,6 @@ vi.mock('next/dynamic', () => ({ default: () => function MapStub() { return null
 
 import CheckInInfo from '@/components/CheckInInfo';
 import { ToastProvider } from '@/components/Toast';
-import WifiAccessCard from '@/components/checkin/WifiAccessCard';
 
 function servePreferences(data: { wifi: { network: string; password: string } | null; wifiAvailableAt: string | null; checkInTime?: string }) {
   fetchMock.mockImplementation(async (url: string) => {
@@ -109,35 +108,6 @@ describe('check-in Wi-Fi copy toast (identity §9.8)', () => {
 
     expect(writeText).toHaveBeenCalledWith('p4ss-w0rd');
     await vi.waitFor(() => expect(container.querySelector('.ui-toasts')).toHaveTextContent('Wi-Fi details copied'));
-  });
-});
-
-describe('check-in Wi-Fi value wrapping', () => {
-  it('lets long network names and passwords wrap instead of overflowing the card', () => {
-    const network = 'N'.repeat(32);
-    const password = 'P'.repeat(63);
-    render(
-      <WifiAccessCard
-        title="Wi-Fi"
-        networkLabel="Network"
-        passwordLabel="Password"
-        network={network}
-        password={password}
-        unavailableLabel="Unavailable"
-        copyLabel="Copy"
-        copiedLabel="Copied"
-        copiedTarget={null}
-        onCopy={vi.fn()}
-        networkCopyLabel="Copy Wi-Fi network name"
-        passwordCopyLabel="Copy Wi-Fi password"
-      />,
-    );
-
-    for (const value of [network, password]) {
-      const span = screen.getByText(value);
-      expect(span).toHaveClass('break-all');
-      expect(span).not.toHaveClass('whitespace-nowrap');
-    }
   });
 });
 
@@ -314,22 +284,6 @@ describe('check-in Wi-Fi refetch at the disclosure time', () => {
     expect(screen.getByLabelText('Preferred arrival time')).toHaveValue('17:30');
     expect(screen.getByLabelText('Add a note')).toHaveValue('Flight lands late');
     expect(screen.getByRole('button', { name: 'Send request' })).toBeInTheDocument();
-    expect(reload).not.toHaveBeenCalled();
-  });
-
-  it('keeps the confirmation of a request sent after the disclosure time', async () => {
-    await renderPage(withheld(5_000), revealed(5_000));
-    fireEvent.click(screen.getByRole('button', { name: 'Request different arrival time' }));
-    await advance(10_000);
-    expect(screen.getAllByText('Guest-Net').length).toBeGreaterThan(0);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Send request' }));
-    await advance(0);
-
-    const confirmation = "Your request has been sent. We'll confirm availability as soon as possible.";
-    expect(within(document.getElementById('arrival')!).getByRole('status')).toHaveTextContent(confirmation);
-    await advance(60_000);
-    expect(screen.getByText(confirmation)).toBeInTheDocument();
     expect(reload).not.toHaveBeenCalled();
   });
 

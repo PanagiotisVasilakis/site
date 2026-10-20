@@ -11,14 +11,13 @@ import {
   GUEST_SESSION_TTL_SECONDS,
 } from '@/lib/guestSession';
 import { hashSensitive } from '@/lib/crypto';
-import { logger } from '@/lib/logger-enterprise';
 import crypto from 'node:crypto';
 import { phoneLookupCandidates } from '@/lib/phone';
 
 export type User = UserRecord;
 export type Booking = BookingRecord;
 
-export type GuestRefreshTokenRec = PrismaGuestRefreshTokenRec;
+type GuestRefreshTokenRec = PrismaGuestRefreshTokenRec;
 
 export const guestStore = {
   // Users
@@ -55,32 +54,27 @@ export const guestStore = {
       ip_hint?: string;
     },
   ): Promise<{ rec: GuestRefreshTokenRec; token: string }> {
-    try {
-      const rawSecret = crypto.randomBytes(32).toString('base64url');
-      const { hash, salt } = hashSensitive(rawSecret);
-      const family_id = opts?.family_id || crypto.randomUUID();
-      
-      const rec = await refreshTokenRepository.create(
-        user_id,
-        opts.session_id,
-        hash,
-        salt,
-        family_id,
-        Date.now() + ttlDays * 24 * 60 * 60 * 1000,
-        {
-          deviceHint: opts?.device_hint,
-          ipHint: opts?.ip_hint
-        }
-      );
+    const rawSecret = crypto.randomBytes(32).toString('base64url');
+    const { hash, salt } = hashSensitive(rawSecret);
+    const family_id = opts?.family_id || crypto.randomUUID();
 
-      // New token format enables O(1) verification: <token-id>.<secret>
-      const token = `${rec.id}.${rawSecret}`;
-      
-      return { rec, token };
-    } catch (error) {
-      logger.error('guestStore: failed to issue refresh token', error);
-      throw error;
-    }
+    const rec = await refreshTokenRepository.create(
+      user_id,
+      opts.session_id,
+      hash,
+      salt,
+      family_id,
+      Date.now() + ttlDays * 24 * 60 * 60 * 1000,
+      {
+        deviceHint: opts?.device_hint,
+        ipHint: opts?.ip_hint
+      }
+    );
+
+    // New token format enables O(1) verification: <token-id>.<secret>
+    const token = `${rec.id}.${rawSecret}`;
+
+    return { rec, token };
   },
   
   async verifyRefreshToken(token: string): Promise<GuestRefreshTokenRec | undefined> {
@@ -107,39 +101,34 @@ export const guestStore = {
     session?: RefreshSessionRecord;
     sessionToken?: string;
   }> {
-    try {
-      const now = Date.now();
-      const replacementId = crypto.randomUUID();
-      const rawSecret = crypto.randomBytes(32).toString('base64url');
-      const { hash, salt } = hashSensitive(rawSecret);
-      const result = await refreshTokenRepository.rotate(oldToken, {
-        id: replacementId,
-        tokenHash: hash,
-        salt,
-        tokenExpiresAt: now + ttlDays * 24 * 60 * 60 * 1000,
-        sessionExpiresAt: new Date(now + GUEST_SESSION_TTL_SECONDS * 1000),
-        deviceHash: context?.device_hint,
-        ipHash: context?.ip_hint,
-        presentedSession: context.presented_session,
-        createSessionToken: createGuestSessionToken,
-      });
+    const now = Date.now();
+    const replacementId = crypto.randomUUID();
+    const rawSecret = crypto.randomBytes(32).toString('base64url');
+    const { hash, salt } = hashSensitive(rawSecret);
+    const result = await refreshTokenRepository.rotate(oldToken, {
+      id: replacementId,
+      tokenHash: hash,
+      salt,
+      tokenExpiresAt: now + ttlDays * 24 * 60 * 60 * 1000,
+      sessionExpiresAt: new Date(now + GUEST_SESSION_TTL_SECONDS * 1000),
+      deviceHash: context?.device_hint,
+      ipHash: context?.ip_hint,
+      presentedSession: context.presented_session,
+      createSessionToken: createGuestSessionToken,
+    });
 
-      if (result.status !== 'rotated') {
-        return { status: result.status };
-      }
-
-      return {
-        status: 'rotated',
-        old: result.old,
-        rec: result.rec,
-        token: `${result.rec.id}.${rawSecret}`,
-        session: result.session,
-        sessionToken: result.sessionToken,
-      };
-    } catch (error) {
-      logger.error('guestStore: failed to rotate refresh token', error);
-      throw error;
+    if (result.status !== 'rotated') {
+      return { status: result.status };
     }
+
+    return {
+      status: 'rotated',
+      old: result.old,
+      rec: result.rec,
+      token: `${result.rec.id}.${rawSecret}`,
+      session: result.session,
+      sessionToken: result.sessionToken,
+    };
   },
   
   // Admin helpers - get all data for export/analysis

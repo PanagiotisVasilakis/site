@@ -10,7 +10,7 @@ import {
   createIsolatedDatabase,
   dropIsolatedDatabase,
 } from '../support/database-lifecycle';
-import { withTestPrismaClient } from '../support/fixtures';
+import { utcDateOffset, withTestPrismaClient } from '../support/fixtures';
 import { applyMigrationsFromEmpty } from '../support/migrations';
 import { readDisposablePostgresRuntime } from '../support/runtime';
 
@@ -54,10 +54,6 @@ function requireTarget(): DisposableDatabaseTarget {
 
 function tokenDigest(token: string): string {
   return createHmac('sha256', CLAIM_TOKEN_PEPPER).update(token, 'utf8').digest('hex');
-}
-
-function utcDateOffset(now: Date, days: number): Date {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + days));
 }
 
 function setApplicationEnvironment(databaseUrl: string): void {

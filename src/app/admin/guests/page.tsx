@@ -45,8 +45,6 @@ interface Statistics {
   totalBookings: number
   totalUsers: number
   totalClaimedBookings: number
-  bookingsBySource: Record<string, number>
-  bookingsByStatus: Record<string, number>
 }
 
 // Same calendar-date window the claim exchange enforces (UTC DATE values).
@@ -184,14 +182,14 @@ export default function GuestDataViewer() {
     }
   }
 
-  const issueClaimGrant = async (bookingId: string, channel: 'REMOTE' | 'ONSITE' = 'REMOTE') => {
+  const issueClaimGrant = async (bookingId: string) => {
     setActionBusy(true)
     setError('')
     try {
       const response = await internalFetch(`/api/admin/bookings/${bookingId}/claim-grants`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ channel, ttlMinutes: 30 }),
+        body: JSON.stringify({ channel: 'REMOTE', ttlMinutes: 30 }),
       })
       const data = await response.json()
       if (!response.ok || !data.success) throw new Error(data.error?.message || 'Claim grant failed')
@@ -468,7 +466,10 @@ export default function GuestDataViewer() {
           <div className="flex flex-col sm:flex-row gap-4">
             <select
               value={searchType}
-              onChange={(e) => setSearchType(e.target.value as 'reference' | 'phone' | 'date')}
+              onChange={(e) => {
+                setSearchType(e.target.value as 'reference' | 'phone' | 'date')
+                setSearchQuery('')
+              }}
               className="admin-input px-4 py-2 rounded-tile"
             >
               <option value="reference">Booking Reference</option>

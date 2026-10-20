@@ -22,6 +22,7 @@
 import path from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
 import puppeteer, { type Browser, type Page } from 'puppeteer';
+import { LOCAL_ONLY_ARGS, LOOPBACK_HOSTS, blockNonLocalRequests } from './lib/local-only-browser';
 
 type DeviceKind = 'phone' | 'desktop';
 type Severity = 'pass' | 'minor' | 'major' | 'critical';
@@ -105,40 +106,6 @@ const WAIT_IDLE_TIMEOUT_MS = 12000;
 const SHOULD_CAPTURE_SCREENSHOTS = process.env.RESPONSIVE_SCREENSHOTS !== '0';
 const FAIL_ON_ISSUES = process.env.RESPONSIVE_UX_FAIL_ON_ISSUES === '1';
 const CHROME_PATH = process.env.RESPONSIVE_CHROME_PATH || process.env.CHROME_PATH;
-// Local only (same as audit-vitals.ts): dead proxy for every other host, host resolver limited to localhost,
-// and every request that is not to this machine is aborted (map tiles and other third parties never load).
-const LOCAL_ONLY_ARGS = [
-  '--proxy-server=http://127.0.0.1:9',
-  '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1',
-];
-const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
-
-function isLocalUrl(url: string) {
-  if (/^(data|blob|about):/.test(url)) return true;
-  try {
-    return LOOPBACK_HOSTS.has(new URL(url).hostname);
-  } catch {
-    return false;
-  }
-}
-
-/** Aborts every request of the page that is not to this machine; logs each blocked host once. */
-async function blockNonLocalRequests(page: Page, blockedHosts: Set<string>) {
-  // With request interception on, navigations the service worker answers come back without a response;
-  // the audit checks rendered pages, not offline behaviour, so the service worker is bypassed.
-  await page.setBypassServiceWorker(true);
-  await page.setRequestInterception(true);
-  page.on('request', (request) => {
-    if (isLocalUrl(request.url())) {
-      void request.continue();
-      return;
-    }
-    const host = URL.canParse(request.url()) ? new URL(request.url()).host : 'an unparsable URL';
-    if (!blockedHosts.has(host)) console.log(`[responsive-ux] blocked non-loopback request to ${host}`);
-    blockedHosts.add(host);
-    void request.abort();
-  });
-}
 
 const VIEWPORTS: ViewportPreset[] = [
   {
@@ -759,7 +726,7 @@ async function runAudit() {
   try {
     for (const viewport of viewports) {
       const page = await browser.newPage();
-      await blockNonLocalRequests(page, blockedHosts);
+      await blockNonLocalRequests(page, blockedHosts, 'responsive-ux');
       await page.setViewport({
         width: viewport.width,
         height: viewport.height,

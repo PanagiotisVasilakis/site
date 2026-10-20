@@ -102,7 +102,7 @@ export const legalTranslations: Record<Locale, LegalDictionary> = {
             metaTitle: "Privacy notice", // legal review
             metaDescription: "Which personal data this site processes, why, for how long, who else receives it, and which cookies and browser storage it uses.", // legal review
             title: "Privacy notice", // legal review
-            intro: "This notice explains which personal data this website processes, for what purpose, for how long, and what your rights are. It covers the public guide, the availability page and the guest portal (check-in). The site takes no bookings: you book on Airbnb or directly with the host.", // legal review
+            intro: "This notice explains which personal data this website processes, for what purpose, for how long, and what your rights are. It covers the public guide, the availability page and the guest portal (check-in). The site takes no bookings: you book on Booking.com or directly with the host.", // legal review
             controller: {
                 title: "Who is responsible", // legal review
                 intro: "The controller of your personal data is the host of the apartment:", // legal review
@@ -166,7 +166,7 @@ export const legalTranslations: Record<Locale, LegalDictionary> = {
                     },
                     {
                         title: "Links to other sites", // legal review
-                        text: "Links to Instagram, WhatsApp, Google Maps, Airbnb and other sites only take you there; from then on their own privacy policies apply. Nothing is loaded from them before you follow a link.", // legal review
+                        text: "Links to Instagram, WhatsApp, Google Maps, Booking.com and other sites only take you there; from then on their own privacy policies apply. Nothing is loaded from them before you follow a link.", // legal review
                     },
                 ],
             },
@@ -235,7 +235,7 @@ export const legalTranslations: Record<Locale, LegalDictionary> = {
             metaTitle: "Ενημέρωση για την προστασία δεδομένων", // legal review
             metaDescription: "Ποια προσωπικά δεδομένα επεξεργάζεται ο ιστότοπος, γιατί, για πόσο, ποιοι άλλοι τα λαμβάνουν και ποια cookies και αποθήκευση του browser χρησιμοποιεί.", // legal review
             title: "Ενημέρωση για την προστασία δεδομένων", // legal review
-            intro: "Η ενημέρωση αυτή εξηγεί ποια προσωπικά δεδομένα επεξεργάζεται ο ιστότοπος, για ποιο σκοπό, για πόσο διάστημα και ποια δικαιώματα έχετε. Αφορά τον δημόσιο οδηγό, τη σελίδα διαθεσιμότητας και την πύλη επισκεπτών (check-in). Ο ιστότοπος δεν δέχεται κρατήσεις: κάνετε κράτηση στο Airbnb ή απευθείας με τον οικοδεσπότη.", // legal review
+            intro: "Η ενημέρωση αυτή εξηγεί ποια προσωπικά δεδομένα επεξεργάζεται ο ιστότοπος, για ποιο σκοπό, για πόσο διάστημα και ποια δικαιώματα έχετε. Αφορά τον δημόσιο οδηγό, τη σελίδα διαθεσιμότητας και την πύλη επισκεπτών (check-in). Ο ιστότοπος δεν δέχεται κρατήσεις: κάνετε κράτηση στο Booking.com ή απευθείας με τον οικοδεσπότη.", // legal review
             controller: {
                 title: "Υπεύθυνος επεξεργασίας", // legal review
                 intro: "Υπεύθυνος επεξεργασίας των προσωπικών σας δεδομένων είναι ο οικοδεσπότης του διαμερίσματος:", // legal review
@@ -286,8 +286,8 @@ export const legalTranslations: Record<Locale, LegalDictionary> = {
                         text: "Οι εικόνες του χάρτη φορτώνονται απευθείας από την CARTO (basemaps.cartocdn.com) ή, όταν η CARTO δεν έχει ρυθμιστεί, από το OpenStreetMap Foundation (tile.openstreetmap.org). Όταν μια σελίδα δείχνει χάρτη, ο browser σας ζητά αυτές τις εικόνες από τον πάροχο, ο οποίος λαμβάνει τη διεύθυνση IP σας, τα συνήθη στοιχεία που στέλνει ο browser με κάθε αίτημα, τη διεύθυνση του ιστότοπού μας και τις συντεταγμένες της περιοχής του χάρτη που προβάλλεται.", // legal review
                     },
                     {
-                        title: "Airbnb", // legal review
-                        text: "Ο διακομιστής μας κατεβάζει από το Airbnb το ημερολόγιο του διαμερίσματος και κρατά μόνο ποιες νύχτες είναι κλεισμένες. Τίποτα για εσάς ή για άλλους επισκέπτες δεν αποστέλλεται στο Airbnb.", // legal review
+                        title: "Booking.com", // legal review
+                        text: "Ο διακομιστής μας κατεβάζει από το Booking.com το ημερολόγιο του διαμερίσματος και κρατά μόνο ποιες νύχτες είναι κλεισμένες. Τίποτα για εσάς ή για άλλους επισκέπτες δεν αποστέλλεται στο Booking.com.", // legal review
                     },
                     {
                         title: "Ειδοποιήσεις άφιξης", // legal review
@@ -299,7 +299,7 @@ export const legalTranslations: Record<Locale, LegalDictionary> = {
                     },
                     {
                         title: "Σύνδεσμοι προς άλλους ιστότοπους", // legal review
-                        text: "Οι σύνδεσμοι προς Instagram, WhatsApp, Google Maps, Airbnb και άλλους ιστότοπους απλώς σας μεταφέρουν εκεί. Από εκεί και πέρα ισχύουν οι δικές τους πολιτικές απορρήτου. Τίποτα δεν φορτώνεται από αυτούς πριν ακολουθήσετε έναν σύνδεσμο.", // legal review
+                        text: "Οι σύνδεσμοι προς Instagram, WhatsApp, Google Maps, Booking.com και άλλους ιστότοπους απλώς σας μεταφέρουν εκεί. Από εκεί και πέρα ισχύουν οι δικές τους πολιτικές απορρήτου. Τίποτα δεν φορτώνεται από αυτούς πριν ακολουθήσετε έναν σύνδεσμο.", // legal review
                     },
                 ],
             },

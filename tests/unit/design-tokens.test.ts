@@ -158,16 +158,10 @@ const LIGHT: Row[] = [
   // (.site-header--overlay in shell.css), measured on the rendered page, not from the tint.
   ['fg on header glass over bg', 'fg', 'glass@bg', 4.5, 13.99],
   ['cal: date on free cell', 'fg', 'cal-free-bg', 4.5, 15.15],
-  ['cal: price on free cell', 'cal-price', 'cal-free-bg', 4.5, 7.5],
-  ['cal: selected text / cal: price on selected cell (R3-V7)', 'cal-selected-fg', 'cal-selected-bg', 4.5, 6.21],
+  ['cal: selected text', 'cal-selected-fg', 'cal-selected-bg', 4.5, 6.21],
   ['cal: date on range', 'fg', 'cal-range-bg@surface', 4.5, 12.72],
-  ['cal: price on range', 'cal-price', 'cal-range-bg@surface', 4.5, 6.29],
-  ['cal: best pill', 'cal-best-fg', 'cal-best-bg', 4.5, 7.91],
   ['cal: booked text on darkest hatch stripe / cal: "out" label on booked hatch (R3-V7)', 'cal-booked-fg', 'cal-booked-hatch@cal-booked-bg', 4.5, 4.9],
   ['cal: booked text on sunken', 'cal-booked-fg', 'cal-booked-bg', 4.5, 6.13],
-  ['cal: price on hovered cell (R3-V7)', 'cal-price', 'surface-sunken', 4.5, 6.13],
-  ['QuoteBar: fg on glass-bar over bg (R3-V7)', 'fg', 'glass-bar@bg', 4.5, 13.78],
-  ['QuoteBar: fg on glass-bar over a primary cell (R3-V7)', 'fg', 'glass-bar@primary', 4.5, 10.97],
   ['UI: highlight icon (primary-text) on its primary-tint disc over surface (R3-V5)', 'primary-text', 'primary-tint@surface', 3, 5.98],
   ['fg-muted on worst grain speck (8 % ink)', 'fg-muted', 'fg*0.08@bg', 4.5, 5.87],
   ['primary-text on worst grain speck', 'primary-text', 'fg*0.08@bg', 4.5, 5.57],
@@ -186,8 +180,6 @@ const LIGHT: Row[] = [
   ['UI: band-focus vs warm-1 (focus ring on the warm section, R3-V5)', 'band-focus', 'warm-1', 3, 4.84],
   ['bookbar: fg on surface-raised .9 over black', 'fg', 'surface-raised*0.9@#000000', 4.5, 12.46],
   ['bookbar: fg on surface-raised .9 over white', 'fg', 'surface-raised*0.9@#FFFFFF', 4.5, 15.62],
-  ['bookbar: fg-muted on surface-raised .9 over black', 'fg-muted', 'surface-raised*0.9@#000000', 4.5, 6.17],
-  ['bookbar: fg-muted on surface-raised .9 over white', 'fg-muted', 'surface-raised*0.9@#FFFFFF', 4.5, 7.73],
   ['decorative only: sun on bg (never text)', 'sun', 'bg', null, 1.76],
   // R3-V6 apartment page and GalleryLightbox
   ['UI: lightbox focus ring (band-focus) on viewer-bg', 'band-focus', 'viewer-bg', 3, 10.09],
@@ -236,16 +228,10 @@ const DARK: Row[] = [
   ['warm-muted on warm-1', 'warm-muted', 'warm-1', 4.5, 8.48],
   ['fg on header glass over bg', 'fg', 'glass@bg', 4.5, 6.67],
   ['cal: date on free cell', 'fg', 'cal-free-bg', 4.5, 13.37],
-  ['cal: price on free cell', 'cal-price', 'cal-free-bg', 4.5, 7.61],
-  ['cal: selected text / cal: price on selected cell (R3-V7)', 'cal-selected-fg', 'cal-selected-bg', 4.5, 7.9],
+  ['cal: selected text', 'cal-selected-fg', 'cal-selected-bg', 4.5, 7.9],
   ['cal: date on range', 'fg', 'cal-range-bg@surface', 4.5, 10.2],
-  ['cal: price on range', 'cal-price', 'cal-range-bg@surface', 4.5, 5.8],
-  ['cal: best pill', 'cal-best-fg', 'cal-best-bg', 4.5, 8.85],
   ['cal: booked text on lightest hatch stripe / cal: "out" label on booked hatch (R3-V7)', 'cal-booked-fg', 'cal-booked-hatch@cal-booked-bg', 4.5, 6.11],
   ['cal: booked text on sunken', 'cal-booked-fg', 'cal-booked-bg', 4.5, 7.96],
-  ['cal: price on hovered cell (R3-V7)', 'cal-price', 'surface-sunken', 4.5, 7.96],
-  ['QuoteBar: fg on glass-bar over bg (R3-V7)', 'fg', 'glass-bar@bg', 4.5, 14.99],
-  ['QuoteBar: fg on glass-bar over a primary cell (R3-V7)', 'fg', 'glass-bar@primary', 4.5, 10.64],
   ['UI: highlight icon (primary-text) on its primary-tint disc over surface (R3-V5)', 'primary-text', 'primary-tint@surface', 3, 6.04],
   ['fg-muted on worst grain speck (8 % paper)', 'fg-muted', 'fg*0.08@bg', 4.5, 7.03],
   ['UI: focus ring vs bg', 'focus', 'bg', 3, 10.12],
@@ -264,8 +250,6 @@ const DARK: Row[] = [
   ['UI: band-focus vs warm-1 (focus ring on the warm section, R3-V5)', 'band-focus', 'warm-1', 3, 6.57],
   ['bookbar: fg on surface-raised .9 over black', 'fg', 'surface-raised*0.9@#000000', 4.5, 11.99],
   ['bookbar: fg on surface-raised .9 over white', 'fg', 'surface-raised*0.9@#FFFFFF', 4.5, 8.25],
-  ['bookbar: fg-muted on surface-raised .9 over black', 'fg-muted', 'surface-raised*0.9@#000000', 4.5, 6.82],
-  ['bookbar: fg-muted on surface-raised .9 over white', 'fg-muted', 'surface-raised*0.9@#FFFFFF', 4.5, 4.69],
   // R3-V9 in-stay pages: the stay hub's half sun behind the H1, the portal tile, the check-in rule icon.
   ['stay hub H1 (fg, d1 large text) over the half-sun rays (sun .5 over bg; the lead sits below the sun) (R3-V9)', 'fg', 'sun*0.5@bg', 3, 4.4],
   ['UI: portal tile icon (band-accent) on band-line over band-bg (R3-V9)', 'band-accent', 'band-line@band-bg', 3, 4.5],
@@ -276,7 +260,7 @@ const DARK: Row[] = [
 // "both" rows: photo scrims and paper map pins, identical in the two themes.
 const BOTH: Row[] = [
   ['hero H1 on scrim .58 over the brightest sky pixel (large text)', 'fg-on-photo', `scrim*0.58@${SKY}`, 3, 4.48],
-  ['hero lede, price and CTA on scrim .80 over pure white', 'fg-on-photo', `scrim*0.80@${WHITE}`, 4.5, 9.42],
+  ['hero CTA on scrim .80 over pure white', 'fg-on-photo', `scrim*0.80@${WHITE}`, 4.5, 9.42],
   ['hero eyebrow on scrim .80 over pure white', 'fg-on-photo-accent', `scrim*0.80@${WHITE}`, 4.5, 7.99],
   ['room and gallery caption on scrim .62 over pure white', 'fg-on-photo', `scrim*0.62@${WHITE}`, 4.5, 4.9],
   ['map pin text on pin paper', 'pin-fg', 'pin-bg', 4.5, 15.15],
@@ -328,8 +312,8 @@ describe('design tokens: dark mode architecture (identity §3.1)', () => {
 });
 
 describe('design tokens: G-CONTRAST (identity §3.3)', () => {
-  it('covers all 162 documented rows', () => {
-    expect([...LIGHT, ...DARK, ...BOTH].flatMap(([pair]) => pair.split(' / ')).length).toBe(162);
+  it('covers all 144 documented rows', () => {
+    expect([...LIGHT, ...DARK, ...BOTH].flatMap(([pair]) => pair.split(' / ')).length).toBe(144);
   });
 
   it.each(CASES)('%s: %s', (mode, _pair, fg, bg, min, documented) => {

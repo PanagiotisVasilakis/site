@@ -196,41 +196,51 @@ describe('runtime environment fail-closed policy', () => {
   });
 
   it.each([
-    ['plain http', 'http://www.airbnb.com/calendar/ical/12345678.ics?s=fixture'],
-    ['a non-Airbnb host', 'https://calendar.example/calendar/ical/12345678.ics?s=fixture'],
-    ['a look-alike Airbnb host', 'https://www.airbnb.com.evil.example/calendar/ical/12345678.ics?s=fixture'],
-    ['userinfo', 'https://user:pass@www.airbnb.com/calendar/ical/12345678.ics?s=fixture'],
-    ['a non-default port', 'https://www.airbnb.com:8443/calendar/ical/12345678.ics?s=fixture'],
-    ['a non-export path', 'https://www.airbnb.com/calendar/ical/12345678.ics/extra?s=fixture'],
-    ['a non-numeric listing', 'https://www.airbnb.com/calendar/ical/listing.ics?s=fixture'],
-    ['an unparsable value', 'airbnb calendar s=fixture'],
-  ])('rejects an AIRBNB_ICAL_URL with %s without echoing it', (_label, value) => {
-    const result = runtimeEnvSchema.safeParse(productionEnv({ AIRBNB_ICAL_URL: value }));
+    ['plain http', 'http://ical.booking.com/v1/export?t=fixture'],
+    ['a non-Booking.com host', 'https://calendar.example/v1/export?t=fixture'],
+    ['a look-alike Booking.com host', 'https://ical.booking.com.evil.example/v1/export?t=fixture'],
+    ['the public Booking.com host', 'https://www.booking.com/v1/export?t=fixture'],
+    ['userinfo', 'https://user:pass@ical.booking.com/v1/export?t=fixture'],
+    ['a non-default port', 'https://ical.booking.com:8443/v1/export?t=fixture'],
+    ['a longer path', 'https://ical.booking.com/v1/export/extra?t=fixture'],
+    ['another path', 'https://ical.booking.com/v1/other?t=fixture'],
+    ['the older host with the current path', 'https://admin.booking.com/v1/export?t=fixture'],
+    ['the current host with the older path', 'https://ical.booking.com/hotel/hoteladmin/ical.html?t=fixture'],
+    ['no query (no token)', 'https://ical.booking.com/v1/export'],
+    ['a trailing slash after the export path', 'https://ical.booking.com/v1/export/?t=fixture'],
+    ['a trailing slash after the older export path', 'https://admin.booking.com/hotel/hoteladmin/ical.html/?t=fixture'],
+    ['a username without a password', 'https://user@ical.booking.com/v1/export?t=fixture'],
+    ['a password without a username', 'https://:pass@ical.booking.com/v1/export?t=fixture'],
+    ['a trailing dot after the host', 'https://ical.booking.com./v1/export?t=fixture'],
+    ['a bare question mark (empty query)', 'https://ical.booking.com/v1/export?'],
+    ['a host that only ends in booking.com', 'https://evilbooking.com/v1/export?t=fixture'],
+    ['an unparsable value', 'booking calendar t=fixture'],
+  ])('rejects a BOOKING_ICAL_URL with %s without echoing it', (_label, value) => {
+    const result = runtimeEnvSchema.safeParse(productionEnv({ BOOKING_ICAL_URL: value }));
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues.map(({ path }) => path[0])).toEqual(['AIRBNB_ICAL_URL']);
-      expect(JSON.stringify(result.error.issues)).not.toContain('s=fixture');
+      expect(result.error.issues.map(({ path }) => path[0])).toEqual(['BOOKING_ICAL_URL']);
+      expect(JSON.stringify(result.error.issues)).not.toContain('t=fixture');
     }
   });
 
   it.each([
-    'https://www.airbnb.com/calendar/ical/12345678.ics?s=fixture',
-    'https://airbnb.com/calendar/ical/12345678.ics',
-    'https://www.airbnb.gr/calendar/ical/12345678.ics?s=fixture',
-    'https://airbnb.gr:443/calendar/ical/12345678.ics?s=fixture',
-  ])('accepts the Airbnb calendar export URL %s', (value) => {
-    const result = runtimeEnvSchema.safeParse(productionEnv({ AIRBNB_ICAL_URL: value }));
+    'https://ical.booking.com/v1/export?t=fixture',
+    'https://admin.booking.com/hotel/hoteladmin/ical.html?t=fixture',
+    'https://ical.booking.com:443/v1/export?t=fixture&lang=en',
+  ])('accepts the Booking.com calendar export URL %s', (value) => {
+    const result = runtimeEnvSchema.safeParse(productionEnv({ BOOKING_ICAL_URL: value }));
     expect(result.success).toBe(true);
-    if (result.success) expect(result.data.AIRBNB_ICAL_URL).toBe(value);
+    if (result.success) expect(result.data.BOOKING_ICAL_URL).toBe(value);
   });
 
   it.each([
     ['empty', ''],
     ['unset', undefined],
-  ])('treats an %s AIRBNB_ICAL_URL as not configured', (_label, value) => {
-    const result = runtimeEnvSchema.safeParse(productionEnv({ AIRBNB_ICAL_URL: value }));
+  ])('treats an %s BOOKING_ICAL_URL as not configured', (_label, value) => {
+    const result = runtimeEnvSchema.safeParse(productionEnv({ BOOKING_ICAL_URL: value }));
     expect(result.success).toBe(true);
-    if (result.success) expect(result.data.AIRBNB_ICAL_URL).toBeUndefined();
+    if (result.success) expect(result.data.BOOKING_ICAL_URL).toBeUndefined();
   });
 
   it.each(['fixtureCartoKey_0123', 'abcd-EFGH', 'a'.repeat(128)])('accepts the CARTO basemaps key format %#', (value) => {

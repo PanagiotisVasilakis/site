@@ -71,12 +71,6 @@ interface BoundAuthorizationChain {
   refreshToken: string;
 }
 
-interface Deferred<T> {
-  promise: Promise<T>;
-  resolve: (value: T | PromiseLike<T>) => void;
-  reject: (reason?: unknown) => void;
-}
-
 interface LockActivity {
   pid: number;
   waitEventType: string | null;
@@ -89,16 +83,6 @@ let target: DisposableDatabaseTarget | undefined;
 let applicationPrisma: PrismaClient | undefined;
 let databaseReady = false;
 const originalEnvironment = new Map<ManagedEnvironmentName, string | undefined>();
-
-function createDeferred<T>(): Deferred<T> {
-  let resolve!: Deferred<T>['resolve'];
-  let reject!: Deferred<T>['reject'];
-  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
-    resolve = resolvePromise;
-    reject = rejectPromise;
-  });
-  return { promise, resolve, reject };
-}
 
 async function withBoundedWait<T>(promise: Promise<T>, label: string): Promise<T> {
   let timeout: NodeJS.Timeout | undefined;
@@ -366,8 +350,8 @@ async function executeRouteOverlap(
 }> {
   return withTestPrismaClient(authTarget, async (blocker) => (
     withTestPrismaClient(authTarget, async (monitor) => {
-      const blockerReady = createDeferred<number>();
-      const releaseBlocker = createDeferred<void>();
+      const blockerReady = Promise.withResolvers<number>();
+      const releaseBlocker = Promise.withResolvers<void>();
       let winnerPromise: Promise<RefreshResponse> | undefined;
       let loserPromise: Promise<RefreshResponse> | undefined;
 
@@ -909,13 +893,16 @@ describe.sequential('refresh authorization generation regressions', () => {
     });
   });
 
-  it('waits out a different-context overlap, revokes the winner graph, and returns 401', async () => {
+  it.each([
+    ['waits out a different-context overlap, revokes the winner graph, and returns 401', 'different-context'],
+    ['rejects same-context overlap with an invalid session binding instead of returning 409', 'invalid-binding'],
+  ] as const)('%s', async (_title, mode) => {
     const authTarget = requireTarget();
     await seedRevokedSessionEligibilityFixture(authTarget, new Date());
     const modules = await loadAuthModules();
     const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
 
-    const overlap = await executeRouteOverlap(authTarget, modules, chain, 'different-context');
+    const overlap = await executeRouteOverlap(authTarget, modules, chain, mode);
     const winner = safeIssuedCookieEvidence(overlap.winnerResponse, modules.sessionModule);
     const loser = await safeFailureEvidence(overlap.loserResponse, modules.sessionModule);
     const winnerSession = modules.sessionModule.parseGuestSession(
@@ -954,52 +941,7 @@ describe.sequential('refresh authorization generation regressions', () => {
     });
   });
 
-  it('rejects same-context overlap with an invalid session binding instead of returning 409', async () => {
-    const authTarget = requireTarget();
-    await seedRevokedSessionEligibilityFixture(authTarget, new Date());
-    const modules = await loadAuthModules();
-    const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
-
-    const overlap = await executeRouteOverlap(authTarget, modules, chain, 'invalid-binding');
-    const winner = safeIssuedCookieEvidence(overlap.winnerResponse, modules.sessionModule);
-    const loser = await safeFailureEvidence(overlap.loserResponse, modules.sessionModule);
-    const winnerSession = modules.sessionModule.parseGuestSession(
-      overlap.winnerResponse.cookies.get('guest_session')?.value,
-    );
-    const winnerRefresh = overlap.winnerResponse.cookies.get('guest_rt')?.value;
-    const winnerCredentialsValidAfter = {
-      session: Boolean(await modules.sessionModule.verifyGuestSessionAccess(winnerSession)),
-      refresh: Boolean(winnerRefresh && await modules.guestStore.verifyRefreshToken(winnerRefresh)),
-    };
-    const after = await safeAuthStateSnapshot(authTarget, new Date());
-
-    expect({ winner, loser, winnerCredentialsValidAfter, after }).toEqual({
-      winner: {
-        status: 200,
-        sessionCookieSet: true,
-        refreshCookieSet: true,
-        generationPaired: true,
-      },
-      loser: EXPECTED_UNAUTHORIZED,
-      winnerCredentialsValidAfter: { session: false, refresh: false },
-      after: {
-        users: 1,
-        bookings: 1,
-        sessions: { total: 2, active: 0, expired: 0, revoked: 2 },
-        refreshFamilies: { total: 1, active: 0, expired: 0, revoked: 1 },
-        refreshTokens: {
-          total: 2,
-          active: 0,
-          expired: 0,
-          revoked: 2,
-          descendants: 1,
-          activeDescendants: 0,
-        },
-      },
-    });
-  });
-
-  it('rejects a malformed short-session cookie and revokes only its refresh chain', async () => {
+  it('rejects a malformed short-session cookie and revokes the presented refresh chain', async () => {
     const authTarget = requireTarget();
     await seedRevokedSessionEligibilityFixture(authTarget, new Date());
     const modules = await loadAuthModules();
@@ -1026,7 +968,7 @@ describe.sequential('refresh authorization generation regressions', () => {
     });
   });
 
-  it('rejects a session cookie belonging to another user without touching that user', async () => {
+  it('rejects a session cookie of another user and leaves that user unchanged', async () => {
     const authTarget = requireTarget();
     await seedAuthEligibilityFixtures(authTarget, new Date(), {
       includeIsolatedPrincipal: true,
@@ -1074,7 +1016,7 @@ describe.sequential('refresh authorization generation regressions', () => {
     });
   });
 
-  it('rejects a session cookie bound to another booking without revoking that session', async () => {
+  it('rejects a session cookie of another booking and leaves that session active', async () => {
     const authTarget = requireTarget();
     await seedAuthEligibilityFixtures(authTarget, new Date(), {
       includeAlternateBooking: true,
@@ -1175,13 +1117,29 @@ describe.sequential('refresh authorization generation regressions', () => {
     const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
     await expect(modules.guestStore.revokeRefreshFamily(chain.refreshToken)).resolves.toBe(true);
     const before = await safeAuthStateSnapshot(authTarget, new Date());
+    const readFamilyReason = () => withTestPrismaClient(authTarget, (prisma) => (
+      prisma.refreshTokenFamily.findUniqueOrThrow({
+        where: { id: REVOKED_SESSION_FIXTURE.familyId },
+        select: { revocationReason: true },
+      })
+    ));
+    const reasonBefore = await readFamilyReason();
 
     const response = await performRefresh(modules, chain.refreshToken, chain.sessionToken);
     const failure = await safeFailureEvidence(response, modules.sessionModule);
     const after = await safeAuthStateSnapshot(authTarget, new Date());
+    const reasonAfter = await readFamilyReason();
+    const replayTheftSignals = await withTestPrismaClient(authTarget, (prisma) => (
+      prisma.securityAuditEvent.count({
+        where: { eventType: 'portal.refresh_token_replay' },
+      })
+    ));
 
     expect(failure).toEqual(EXPECTED_UNAUTHORIZED);
     expect(before).toEqual(after);
+    expect(reasonBefore).toEqual({ revocationReason: 'logout' });
+    expect(reasonAfter).toEqual(reasonBefore);
+    expect(replayTheftSignals).toBe(0);
     expect(after.sessions).toEqual({ total: 1, active: 0, expired: 0, revoked: 1 });
     expect(after.refreshFamilies).toEqual({ total: 1, active: 0, expired: 0, revoked: 1 });
     expect(after.refreshTokens).toEqual({
@@ -1222,6 +1180,36 @@ describe.sequential('refresh authorization generation regressions', () => {
       descendants: 0,
       activeDescendants: 0,
     });
+  });
+
+  it('rejects natural refresh-token expiry without revoking its family', async () => {
+    const authTarget = requireTarget();
+    await seedRevokedSessionEligibilityFixture(authTarget, new Date());
+    const modules = await loadAuthModules();
+    const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
+    await withTestPrismaClient(authTarget, async (prisma) => {
+      await prisma.refreshToken.update({
+        where: { id: chain.sessionId },
+        data: { expiresAt: new Date(Date.now() - 60_000) },
+      });
+    }, 'failure-fixture');
+    const before = await safeAuthStateSnapshot(authTarget, new Date());
+
+    const response = await performRefresh(modules, chain.refreshToken, chain.sessionToken);
+    const failure = await safeFailureEvidence(response, modules.sessionModule);
+    const after = await safeAuthStateSnapshot(authTarget, new Date());
+
+    expect(failure).toEqual(EXPECTED_UNAUTHORIZED);
+    expect(after).toEqual(before);
+    expect(after.refreshTokens).toEqual({
+      total: 1,
+      active: 0,
+      expired: 1,
+      revoked: 0,
+      descendants: 0,
+      activeDescendants: 0,
+    });
+    expect(after.refreshFamilies).toEqual({ total: 1, active: 1, expired: 0, revoked: 0 });
   });
 
   it('keeps repeated rejected refresh attempts idempotent and non-enumerating', async () => {

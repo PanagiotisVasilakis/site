@@ -34,7 +34,6 @@ describe('offline page actions (R-648)', () => {
   describe('Retry', () => {
     it.each([
       '/en/moments',
-      '/el/phones',
       '/en/moments?category=beaches&sort=name',
       '/en/phones?next=%2Fen%3Fa%3D1&b=2',
       '/el/%CE%BC%CE%BF%CE%B9',

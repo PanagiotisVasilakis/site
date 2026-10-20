@@ -12,7 +12,7 @@ import {
   createIsolatedDatabase,
   dropIsolatedDatabase,
 } from '../support/database-lifecycle';
-import { withTestPrismaClient } from '../support/fixtures';
+import { utcDateOffset, withTestPrismaClient } from '../support/fixtures';
 import { applyMigrationsFromEmpty } from '../support/migrations';
 import { readDisposablePostgresRuntime } from '../support/runtime';
 
@@ -25,12 +25,6 @@ type OverlapKind =
   | 'different-context'
   | 'different-context-owner-rollback'
   | 'completed-replay-contention';
-
-interface Deferred<T> {
-  promise: Promise<T>;
-  resolve: (value: T | PromiseLike<T>) => void;
-  reject: (reason?: unknown) => void;
-}
 
 interface DatabaseLockObservation {
   pid: number;
@@ -197,30 +191,10 @@ const SECONDARY_FAMILY_ID = 'pr02d-overlap-secondary-same-user-family';
 
 let originalSecurityPepper: string | undefined;
 
-function createDeferred<T>(): Deferred<T> {
-  let resolve!: Deferred<T>['resolve'];
-  let reject!: Deferred<T>['reject'];
-  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
-    resolve = resolvePromise;
-    reject = rejectPromise;
-  });
-  return { promise, resolve, reject };
-}
-
 function hashSecret(secret: string, salt: string): string {
   return createHash('sha256')
     .update(`${TEST_SECURITY_PEPPER}:${salt}:${secret}`)
     .digest('hex');
-}
-
-function utcDateOffset(now: Date, days: number): Date {
-  const date = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-  ));
-  date.setUTCDate(date.getUTCDate() + days);
-  return date;
 }
 
 function safeRotationEvidence(result: RotationResult): SafeRotationEvidence {
@@ -446,6 +420,31 @@ async function advancePrimaryFamilyToGenerationNPlusOne(
   }, 'seed');
 }
 
+async function readUserLockObservations(
+  monitor: PrismaClient,
+): Promise<DatabaseLockObservation[]> {
+  return monitor.$queryRaw<DatabaseLockObservation[]>`
+    SELECT
+      activity."pid" AS "pid",
+      activity."wait_event_type" AS "waitEventType",
+      activity."wait_event" AS "waitEvent",
+      pg_blocking_pids(activity."pid") AS "blockingPids",
+      EXISTS (
+        SELECT 1
+        FROM "pg_locks" AS held_lock
+        WHERE held_lock."pid" = activity."pid"
+          AND held_lock."locktype" = 'advisory'
+          AND held_lock."granted"
+      ) AS "advisoryGranted"
+    FROM "pg_stat_activity" AS activity
+    WHERE activity."datname" = current_database()
+      AND activity."pid" <> pg_backend_pid()
+      AND activity."state" = 'active'
+      AND activity."query" LIKE '%"users"%'
+      AND activity."query" ~* 'FOR[[:space:]]+UPDATE'
+  `;
+}
+
 async function waitForUserLockOwner(
   monitor: PrismaClient,
   blockerPid: number,
@@ -453,26 +452,7 @@ async function waitForUserLockOwner(
 ): Promise<DatabaseLockObservation> {
   const deadline = Date.now() + DATABASE_OBSERVATION_TIMEOUT_MS;
   while (Date.now() < deadline) {
-    const rows = await monitor.$queryRaw<DatabaseLockObservation[]>`
-      SELECT
-        activity."pid" AS "pid",
-        activity."wait_event_type" AS "waitEventType",
-        activity."wait_event" AS "waitEvent",
-        pg_blocking_pids(activity."pid") AS "blockingPids",
-        EXISTS (
-          SELECT 1
-          FROM "pg_locks" AS held_lock
-          WHERE held_lock."pid" = activity."pid"
-            AND held_lock."locktype" = 'advisory'
-            AND held_lock."granted"
-        ) AS "advisoryGranted"
-      FROM "pg_stat_activity" AS activity
-      WHERE activity."datname" = current_database()
-        AND activity."pid" <> pg_backend_pid()
-        AND activity."state" = 'active'
-        AND activity."query" LIKE '%"users"%'
-        AND activity."query" ~* 'FOR[[:space:]]+UPDATE'
-    `;
+    const rows = await readUserLockObservations(monitor);
     const owner = rows.find((row) => row.waitEventType === 'Lock'
       && (row.blockingPids.includes(blockerPid)
         || (excludedPid !== undefined && row.blockingPids.includes(excludedPid)))
@@ -493,26 +473,7 @@ async function waitForUserLockContender(
 ): Promise<DatabaseLockObservation> {
   const deadline = Date.now() + DATABASE_OBSERVATION_TIMEOUT_MS;
   while (Date.now() < deadline) {
-    const rows = await monitor.$queryRaw<DatabaseLockObservation[]>`
-      SELECT
-        activity."pid" AS "pid",
-        activity."wait_event_type" AS "waitEventType",
-        activity."wait_event" AS "waitEvent",
-        pg_blocking_pids(activity."pid") AS "blockingPids",
-        EXISTS (
-          SELECT 1
-          FROM "pg_locks" AS held_lock
-          WHERE held_lock."pid" = activity."pid"
-            AND held_lock."locktype" = 'advisory'
-            AND held_lock."granted"
-        ) AS "advisoryGranted"
-      FROM "pg_stat_activity" AS activity
-      WHERE activity."datname" = current_database()
-        AND activity."pid" <> pg_backend_pid()
-        AND activity."state" = 'active'
-        AND activity."query" LIKE '%"users"%'
-        AND activity."query" ~* 'FOR[[:space:]]+UPDATE'
-    `;
+    const rows = await readUserLockObservations(monitor);
     const contender = rows.find((row) => row.waitEventType === 'Lock'
       && row.pid !== ownerPid
       && (row.blockingPids.includes(blockerPid) || row.blockingPids.includes(ownerPid))
@@ -761,8 +722,8 @@ async function executeOverlap(
           const ownerRepository = createRefreshTokenRepository(ownerClient);
           const contenderRepository = createRefreshTokenRepository(contenderClient);
           const monitorRepository = createRefreshTokenRepository(monitorClient);
-          const blockerReady = createDeferred<number>();
-          const releaseBlocker = createDeferred<void>();
+          const blockerReady = Promise.withResolvers<number>();
+          const releaseBlocker = Promise.withResolvers<void>();
           let ownerPromise: Promise<RotationResult> | undefined;
           let contenderPromise: Promise<RotationResult> | undefined;
           let completedRotationCommit: CompletedRotationCommitWitness | undefined;
@@ -941,8 +902,8 @@ async function executeFamilyIsolation(
             const secondaryRepository = createRefreshTokenRepository(secondaryClient);
             const isolatedRepository = createRefreshTokenRepository(isolatedClient);
             const monitorRepository = createRefreshTokenRepository(monitorClient);
-            const blockerReady = createDeferred<number>();
-            const releaseBlocker = createDeferred<void>();
+            const blockerReady = Promise.withResolvers<number>();
+            const releaseBlocker = Promise.withResolvers<void>();
             let primaryPromise: Promise<RotationResult> | undefined;
             let secondaryPromise: Promise<RotationResult> | undefined;
             let isolatedPromise: Promise<RotationResult> | undefined;
@@ -1096,8 +1057,8 @@ async function executeGenerationIsolation(
       withTestPrismaClient(target, async (monitorClient) => {
         const rotationRepository = createRefreshTokenRepository(rotationClient);
         const monitorRepository = createRefreshTokenRepository(monitorClient);
-        const markerReady = createDeferred<number>();
-        const releaseMarker = createDeferred<void>();
+        const markerReady = Promise.withResolvers<number>();
+        const releaseMarker = Promise.withResolvers<void>();
         let rotationPromise: Promise<RotationResult> | undefined;
 
         const markerPromise = markerClient.$transaction(async (tx) => {
@@ -1199,8 +1160,8 @@ async function executeContendedCompletedReplay(
       withTestPrismaClient(target, async (monitorClient) => {
         const contenderRepository = createRefreshTokenRepository(contenderClient);
         const monitorRepository = createRefreshTokenRepository(monitorClient);
-        const markerReady = createDeferred<number>();
-        const releaseMarker = createDeferred<void>();
+        const markerReady = Promise.withResolvers<number>();
+        const releaseMarker = Promise.withResolvers<void>();
         let contenderPromise: Promise<RotationResult> | undefined;
 
         // A plain transaction, not a rotating owner, holds the already-rotated
@@ -1300,8 +1261,8 @@ async function executeRollbackThenRetry(
           const ownerRepository = createRefreshTokenRepository(ownerClient);
           const retryRepository = createRefreshTokenRepository(retryClient);
           const monitorRepository = createRefreshTokenRepository(monitorClient);
-          const blockerReady = createDeferred<number>();
-          const releaseBlocker = createDeferred<void>();
+          const blockerReady = Promise.withResolvers<number>();
+          const releaseBlocker = Promise.withResolvers<void>();
           let ownerPromise: Promise<RotationResult> | undefined;
           let retryPromise: Promise<RotationResult> | undefined;
 

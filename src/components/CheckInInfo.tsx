@@ -326,7 +326,6 @@ export default function CheckInInfo({
   const panel = t.checkinInfo.panel;
   const ui = {
     guideLabel: t.house.guideTitle,
-    heroTitle: panel.heroTitle,
     quickActions: panel.quickActions,
     copyWifi: panel.copyWifi,
     openMaps: panel.openMaps,

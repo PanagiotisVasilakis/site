@@ -154,23 +154,31 @@ test('credential-bearing database URL fails', async () => {
   );
 });
 
-test('Airbnb calendar export URL with a token fails', async () => {
-  const token = ['Synthetic9Airbnb', '7Calendar3Only'].join('');
+test('Booking.com calendar export URL with a token fails', async () => {
+  const token = ['Synthetic9Booking', '7Calendar3Only'].join('');
+  // Eight characters: the shortest token the rule reports.
+  const floorToken = ['Fx9Kq', '2Zt'].join('');
   const urls = [
-    ['https://www.airbnb', '.com/calendar/ical/', '12345678', '.ics?s=', token].join(''),
-    ['https://airbnb', '.gr/calendar/ical/', '12345678', '.ics?t=1&s=', token].join(''),
+    ['https://ical.booking', '.com/v1/export?t=', token].join(''),
+    ['https://admin.booking', '.com/hotel/hoteladmin/ical.html?x=1&t=', token].join(''),
+    ['https://ical.booking', '.com/v1/export?t=', floorToken].join(''),
   ];
-  const result = await scanFixture(urls.map((url) => `AIRBNB_ICAL_URL=${url}\n`).join(''));
-  const matches = result.unexpected.filter((finding) => finding.rule === 'airbnb-calendar-export-token');
-  assert.equal(matches.length, 2);
-  assert.ok(matches.every((finding) => finding.valueSha256 === createHash('sha256').update(token).digest('hex')));
+  const result = await scanFixture(urls.map((url) => `BOOKING_ICAL_URL=${url}\n`).join(''));
+  const matches = result.unexpected.filter((finding) => finding.rule === 'booking-calendar-export-token');
+  const sha256 = (value) => createHash('sha256').update(value).digest('hex');
+  assert.equal(matches.length, 3);
+  assert.deepEqual(
+    matches.map((finding) => finding.valueSha256).sort(),
+    [sha256(token), sha256(token), sha256(floorToken)].sort(),
+  );
 });
 
-test('Airbnb calendar URL placeholders and short test tokens pass', async () => {
-  const prefix = ['https://www.airbnb', '.com/calendar/ical/'].join('');
+test('Booking.com calendar URL placeholders and short test tokens pass', async () => {
+  // 'fixture' has seven characters, one under the floor of the rule.
+  const prefix = ['https://ical.booking', '.com/v1/export?t='].join('');
   const result = await scanFixture([
-    `${prefix}<listing id>.ics?s=<token>`,
-    `${prefix}12345678.ics?s=fixture`,
+    `${prefix}<token>`,
+    `${prefix}fixture`,
     '',
   ].join('\n'));
   assert.deepEqual(result.unexpected, []);
@@ -858,6 +866,18 @@ test('unknown Next version fails closed', async () => {
   );
 });
 
+test('build identification without a git binary fails with a named error', async () => {
+  const emptyBinDirectory = await mkdtemp(path.join(os.tmpdir(), 'secret-scanning-no-git-'));
+  try {
+    await assert.rejects(
+      withGeneratedArtifactPolicy({ environment: { PATH: emptyBinDirectory } }, async () => {}),
+      /git is required to identify the build commit\./u,
+    );
+  } finally {
+    await rm(emptyBinDirectory, { recursive: true, force: true });
+  }
+});
+
 test('an extra same-value occurrence in an approved file fails closed', async () => {
   await assert.rejects(
     withGeneratedArtifactPolicy({ duplicateServerKey: true }, async () => {}),
@@ -991,6 +1011,39 @@ test('repeated known occurrences cannot conceal an unmatched identifier', async 
     });
     assert.ok(known);
     assert.equal(unknown, null);
+  });
+});
+
+test('a framework commit URL repeated in one source map remains actionable', async () => {
+  await withGeneratedArtifactPolicy({}, async ({ context, artifactContents }) => {
+    const relativePath = '.next/server/chunks/ssr/framework.js.map';
+    const commitUrl = `https://github.com/vercel/next.js/commit/${FRAMEWORK_IDENTIFIER}`;
+    const repeated = JSON.stringify({
+      version: 3,
+      sources: [
+        '../../../../node_modules/next/src/client/app-dir/link.tsx',
+        '../../../../node_modules/next/src/client/app-dir/router.tsx',
+      ],
+      sourcesContent: [`* @see ${commitUrl} */`, `* @see ${commitUrl} */`],
+      names: [],
+      mappings: '',
+    });
+    const single = classifyFixture(context, {
+      rule: 'sourcegraph-access-token',
+      secret: FRAMEWORK_IDENTIFIER,
+      relativePath,
+      source: artifactContents.get(relativePath),
+    });
+    assert.equal(
+      single.classification,
+      GENERATED_ARTIFACT_CLASSIFICATIONS.IDENTIFIER_CLASSIFICATION,
+    );
+    assert.equal(classifyFixture(context, {
+      rule: 'sourcegraph-access-token',
+      secret: FRAMEWORK_IDENTIFIER,
+      relativePath,
+      source: repeated,
+    }), null);
   });
 });
 

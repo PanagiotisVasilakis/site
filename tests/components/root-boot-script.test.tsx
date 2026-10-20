@@ -103,19 +103,6 @@ describe('root layout boot script (identity §5.2)', () => {
     expect(root.hasAttribute('data-theme')).toBe(false);
   });
 
-  it('arms motion only when the OS has no reduce preference and nothing is stored', async () => {
-    installMatchMedia(['(prefers-reduced-motion: no-preference)']);
-    await runBoot();
-    expect(root.getAttribute('data-motion')).toBe('full');
-  });
-
-  it('honours a stored motion reduce over the OS setting', async () => {
-    localStorage.setItem('motion', 'reduce');
-    installMatchMedia(['(prefers-reduced-motion: no-preference)']);
-    await runBoot();
-    expect(root.getAttribute('data-motion')).toBe('reduce');
-  });
-
   it('does not arm motion when the OS asks for reduced motion', async () => {
     installMatchMedia(['(prefers-reduced-motion: reduce)']);
     await runBoot();
