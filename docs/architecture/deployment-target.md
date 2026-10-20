@@ -197,8 +197,9 @@ blockers were re-checked against the repository on 2026-09-29 and remain open:
   and the sufficiency of 12 months of guest-data retention supplied 2026-10-20)
   are still open only for: which Booking.com link to publish, the owner's
   wording for Booking.com bookings, the Booking.com export URL in the
-  production environment and the last edit of the privacy notice (its English
-  calendar item); see "Open owner inputs" in the [README](../../README.md).
+  production environment and the legal questions on the privacy notice (which
+  names Booking.com everywhere since 2026-10-21); see "Open owner inputs" in
+  the [README](../../README.md).
 
 Until every relevant gap is closed and verified, the selected architecture is
 **accepted but not production-ready**.

@@ -1,6 +1,6 @@
 # Review 5: the delta since f7958fa, the areas Review 4 never read, and a cleanup inventory (2026-10-12 to 2026-10-13)
 
-Repository: `qr-city-guide` @ `main` `b82684c` plus the uncommitted work of 2026-10-12 (the Parking section, the guide-filters CSS fix F0 and one corrected line of `CLAUDE.md`). IDs continue at R-627 and run to R-881 (255 findings: 157 from the review, 17 found during the fix phase, 16 from the cleanup of 2026-10-13, R-801 to R-816, each a deletion of unused or redundant code, several of them reopened Review 4 declines, and 43 found afterwards by the cleanup follow-up and the deferred waves, R-817 to R-859, and 22 found by the Booking.com feed project of 2026-10-20, R-860 to R-881). The findings are in the section `# Review 5 findings` at the end of this file; Review 4 (R-375 to R-626) follows this block unchanged.
+Repository: `qr-city-guide` @ `main` `b82684c` plus the uncommitted work of 2026-10-12 (the Parking section, the guide-filters CSS fix F0 and one corrected line of `CLAUDE.md`). IDs continue at R-627 and run to R-884 (258 findings: 157 from the review, 17 found during the fix phase, 16 from the cleanup of 2026-10-13, R-801 to R-816, each a deletion of unused or redundant code, several of them reopened Review 4 declines, and 43 found afterwards by the cleanup follow-up and the deferred waves, R-817 to R-859, and 22 found by the Booking.com feed project of 2026-10-20, R-860 to R-881, and 3 found by its verifiers on 2026-10-21, R-882 to R-884). The findings are in the section `# Review 5 findings` at the end of this file; Review 4 (R-375 to R-626) follows this block unchanged.
 
 **Why this review.** Review 4 reviewed commit `f7958fa` (a 551-file commit). Four commits followed: the Review 4 follow-up `64a953c` (120 findings fixed in 60 tasks, checked by per-task gates and verifiers only), `9d4784f` (KineticBand and ContactBand removed), `20846fe` (the photo set) and `b82684c` (balcony photos, the 'Your stay' navigation link, the 1320 px nav breakpoint, the reveal-at-load fix). One of those fixes (R-379) had already produced a user-visible defect that the owner found on 2026-10-12. On the same day the owner asked for a serious deep review under the agreed rules and for the deletion of all unused and redundant code.
 
@@ -15,22 +15,22 @@ Repository: `qr-city-guide` @ `main` `b82684c` plus the uncommitted work of 2026
 | Critical | 0 |
 | High | 1 |
 | Medium | 10 |
-| Low | 150 |
-| Nit | 94 |
+| Low | 152 |
+| Nit | 95 |
 
-Status: CONFIRMED 234, SUSPECTED 21. 0 Critical. Outcome (2026-10-13 to 2026-10-20, ledger of `resolve.mjs ledger`): 172 FIXED (129 of R-627 to R-800 including the High R-627 measured in Chrome and its six Mediums R-628 to R-633, 16 of the cleanup R-801 to R-816, 27 of the findings R-817 and later including the four Mediums R-858, R-866, R-878, R-881), 18 DECLINED with a written reason (12 of R-627 to R-800, 2 of R-817 to R-859, 4 of R-860 to R-881), 65 DEFERRED-OWNER (33 of R-627 to R-800, 30 of R-817 to R-859, 2 of R-860 to R-881; the reason is written in each Resolution line): R-644, R-645, R-735, R-748, R-753 and R-762 need the owner's own input; R-877 and R-879 wait for the owner's wording; the others are findings that decision D13 specified, that the fix phase found, or that the follow-up and deferred waves found and that by rule were not fixed inside the task that found them, and part of them were not scheduled because the owner asked on 2026-10-13 to watch the consumption (resumable on request: `.runtime/review5/fix/decision-D13.json`). Every finding ends FIXED, DECLINED or DEFERRED-OWNER: none is OPEN.
+Status: CONFIRMED 237, SUSPECTED 21. 0 Critical. Outcome (2026-10-13 to 2026-10-21, ledger of `resolve.mjs ledger`): 173 FIXED (129 of R-627 to R-800 including the High R-627 measured in Chrome and its six Mediums R-628 to R-633, 16 of the cleanup R-801 to R-816, 28 of the findings R-817 and later including the four Mediums R-858, R-866, R-878, R-881), 18 DECLINED with a written reason (12 of R-627 to R-800, 2 of R-817 to R-859, 4 of R-860 to R-884), 67 DEFERRED-OWNER (33 of R-627 to R-800, 30 of R-817 to R-859, 4 of R-860 to R-884; the reason is written in each Resolution line): R-644, R-645, R-735, R-748, R-753 and R-762 need the owner's own input; R-877, R-879 and R-882 wait for the owner's wording and R-883 for the owner's yes to one more test assertion; the others are findings that decision D13 specified, that the fix phase found, or that the follow-up and deferred waves found and that by rule were not fixed inside the task that found them, and part of them were not scheduled because the owner asked on 2026-10-13 to watch the consumption (resumable on request: `.runtime/review5/fix/decision-D13.json`). Every finding ends FIXED, DECLINED or DEFERRED-OWNER: none is OPEN.
 
 | Category | Count |
 |---|---|
-| Tests | 70 |
+| Tests | 71 |
 | Bug | 35 |
-| Maintainability | 48 |
+| Maintainability | 49 |
 | Error handling | 20 |
 | Logic | 18 |
 | Security | 17 |
 | Redundant | 15 |
 | Unused | 17 |
-| Legal | 4 |
+| Legal | 5 |
 | Legacy | 5 |
 | Concurrency | 2 |
 | Performance | 2 |
@@ -18247,6 +18247,9 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 | R-879 | Low | CONFIRMED | Logic | In the release state the apartment CTA lead and the 'See free dates' / 'Check dates' CTAs still point to a calendar that is not shown |
 | R-880 | Nit | CONFIRMED | Maintainability | The screen-reader-only heading 'Choose your dates' still labels the planner region when no calendar is shown |
 | R-881 | Medium | CONFIRMED | Tests | The orchestrator test of the release policy cannot pass as a gate of verify:release, because the key mask has already blanked the names that it expects to be unset |
+| R-882 | Low | CONFIRMED | Legal | The English and Greek calendar items of the privacy notice word the stored nights differently |
+| R-883 | Nit | CONFIRMED | Tests | No test pins that the privacy notice names Booking.com and not the former channel |
+| R-884 | Low | CONFIRMED | Maintainability | A live architecture document and the README header still described the privacy-notice edit as open after it was applied |
 
 ### R-627: Guide filter block is wider than a phone viewport: the List/Map toggle and the last category chips sit off-screen and cannot be reached at 360-700 px (outside the unit's files, found while testing the shell with reduced motion)
 - Severity: High
@@ -22158,6 +22161,7 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Found by: HD2 verifier (host data task, T4)
 - Resolution: DEFERRED-OWNER (new, found during the host data task of 2026-10-14; by rule not fixed inside the task that found it).
 - Resolution update (2026-10-20): the owner's decision 1 makes the notice wrong in more places, and the owner's standing permission of the same day ("do not ask again, I give you from now on the permission to make whatever change is needed") overrides decision O82 for the mechanical channel-name replacements. The lead applied A1, A4, A5, A6+A7 and A8 in src/i18n/domains/legal.ts (the English and Greek introductions, the English and Greek links items and the Greek calendar item: Airbnb -> Booking.com, the `// legal review` markers kept, nothing else; i18n parity, privacy page, storage inventory and guest terms tests: 37 passed; the hashed guest terms do not contain the notice, so no version bump; independent verifier wf_b6c19a30-6a5). A2+A3 (the English recipients item 4, lines 156-157) was DENIED by the auto-mode classifier ('dangerous', no explanation) and is NOT applied; it was not retried or worked around. The exact edit is `.runtime/hostdata/pending/legal-A2-A3-remaining.patch` (`patch -p1` from the repository root, or two lines by hand). The finding stays DEFERRED-OWNER until the owner applies it; BOOKING_ICAL_URL stays unset in production until then (gate: `git grep -n -i 'air[b]nb' -- src/i18n/domains/legal.ts` prints nothing). Open for the owner or a lawyer, no text proposed: whether Booking.com must be listed as a recipient at all (GDPR Art. 13(1)(e)), its role as controller and as source of the booking data (Art. 14), international transfers, the tax retention of the unlinked booking rows, the controller entry.
+- Resolution update (2026-10-21): the owner answered "do them" to the report that listed the blocked edit, so the lead applied A2+A3 (the English recipients item 4, lines 156-157: former channel -> Booking.com, "booked or closed") with the Edit tool; the classifier raised no objection this time. Evidence: the diff against the owner's commit 7fd2e21 is exactly the two lines of `.runtime/hostdata/pending/legal-A2-A3-remaining.patch` and nothing else; `git grep -n -i 'air[b]nb' -- src/i18n/domains/legal.ts` prints nothing; default suite 168 files / 2335 tests, typecheck and eslint with both configs exit 0. Independent verifiers (wf_224a4d12-f35, PASS-WITH-NOTES): the text is true of the code (a plain GET without cookies, body or headers, started only by the operations worker or the admin route; only dates and error codes are stored), the privacy notice is no input of the guest-terms hash (no version bump), and no live mention of the former channel remains outside records and tests that assert its absence. New findings R-882 to R-884. The finding stays DEFERRED-OWNER for the five legal questions only.
 
 ### R-844: formatPercent has an untested RangeError branch in an enforced coverage module, and no test pins the shipped VAT_RATE_PERCENT
 - Severity: Nit
@@ -22768,3 +22772,51 @@ The index lists every finding (R-627 to R-783); the blocks follow in the same or
 - Fix risk: None: a name that the host environment sets to a real value is still left out of the assertion.
 - Found by: lead (first run of npm run verify:release after Review 5, Booking.com feed project)
 - Resolution: FIXED by FD-RL-A (2026-10-20, Haiku 5.5 max, patch R5-FD-RL-A.patch). Evidence: the lead's reproduction before the fix (blanked environment: 1 failed; plain: passed); after the fix both runs give 145 of 145; npm run verify:release PASSED 30/30 gates (185.9 s) on the final tree, with the default suite 168 files / 2335 tests, coverage 93.75 / 87.96 / 95.91 / 94.86, integration 24 files / 137 tests, build and artifact secret scan.
+
+### R-882: The English and Greek calendar items of the privacy notice word the stored nights differently
+- Severity: Low
+- Category: Legal
+- Status: CONFIRMED
+- Location: src/i18n/domains/legal.ts:157 (English 'booked or closed') and :290 (Greek 'κλεισμένες')
+- Evidence:
+  ```
+  EN: `keeps only which nights are booked or closed.` EL: `κρατά μόνο ποιες νύχτες είναι κλεισμένες.` The code treats booked and closed events alike (both block their nights and show as booked; SUMMARY is never read), so the English wording is the complete one.
+  ```
+- Problem: The English item (decision A2+A3, applied on 2026-10-21) says 'booked or closed'; the Greek item (decision A8, channel name only) says only 'κλεισμένες', which a reader can take as 'booked'. The i18n parity test cannot see a difference in meaning.
+- Impact: No privacy statement is wrong (the Greek verb covers both senses and no personal data is involved); the two locales are not literal equivalents of each other.
+- Fix: The owner's or a lawyer's call on the Greek legal draft: extend the Greek (for example 'κλεισμένες ή μη διαθέσιμες') or drop 'or closed' from the English; keep the `// legal review` marker.
+- Fix risk: None for the code; the Greek text is a legal draft.
+- Found by: verifiers wf_224a4d12-f35 (legal-text and documents lenses, 2026-10-21)
+- Resolution: DEFERRED-OWNER (the wording of the Greek legal draft is the owner's or a lawyer's; no text was changed).
+
+### R-883: No test pins that the privacy notice names Booking.com and not the former channel
+- Severity: Nit
+- Category: Tests
+- Status: CONFIRMED
+- Location: tests/components/privacy-page.test.tsx:23 and :61; CLAUDE.md (gate sentence of 'Availability and booking'); scripts/README.md:77
+- Evidence:
+  ```
+  The privacy-page test asserts the section titles only. The production gate is the manual command `git grep -n -i 'air[b]nb' -- src/i18n/domains/legal.ts` named in CLAUDE.md and scripts/README.md.
+  ```
+- Problem: A later edit of the legal draft could bring the former channel back with a green suite; the only guard is a manual grep before BOOKING_ICAL_URL is set.
+- Impact: Low: it needs a careless edit of the legal draft, and the manual gate exists.
+- Fix: One assertion in the existing privacy-page test: the serialized legal.privacy dictionary of both locales contains 'Booking.com' and does not match /air[b]nb/i (no new test file).
+- Fix risk: None; the owner asked on 2026-10-13 to cut default-suite tests (O36/O46), so it waits for the owner's yes.
+- Found by: verifier wf_224a4d12-f35 (legal-text lens, 2026-10-21)
+- Resolution: DEFERRED-OWNER (economy: it adds a default-suite assertion).
+
+### R-884: A live architecture document and the README header still described the privacy-notice edit as open after it was applied
+- Severity: Low
+- Category: Maintainability
+- Status: CONFIRMED
+- Location: docs/architecture/deployment-target.md:198-201; README.md:56
+- Evidence:
+  ```
+  `are still open only for: ... the last edit of the privacy notice (its English calendar item)` (deployment-target.md:198-201). The lead's own sweep (patterns 'recipients item', 'still names', 'former booking channel') had missed this phrase.
+  ```
+- Problem: The document disagreed with CLAUDE.md and README.md, which already said that the notice names Booking.com everywhere; the README header still carried the date 2026-10-20 above a statement of 2026-10-21.
+- Impact: A reader could think that the edit still blocks BOOKING_ICAL_URL.
+- Fix: deployment-target.md now says 'the legal questions on the privacy notice (which names Booking.com everywhere since 2026-10-21)'; the README header date is 2026-10-21; PROGRESS.md has a RESUME FROM of 2026-10-21 and marks the one of 2026-10-20 as superseded.
+- Fix risk: None (text only).
+- Found by: verifier wf_224a4d12-f35 (documents lens, 2026-10-21)
+- Resolution: FIXED by the lead (2026-10-21). Evidence: a search of README.md, CLAUDE.md, scripts/README.md, docs, SECURITY.md, .env.example, config, docker, src, tests and scripts for 'English calendar', 'calendar item', 'last edit', 'recipients item', 'item 4', 'still names', 'former booking channel' finds no stale statement.

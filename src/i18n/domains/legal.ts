@@ -153,8 +153,8 @@ export const legalTranslations: Record<Locale, LegalDictionary> = {
                         text: "Map images load directly from CARTO (basemaps.cartocdn.com) or, where CARTO is not configured, from the OpenStreetMap Foundation (tile.openstreetmap.org). When a page shows a map, your browser requests these images from the provider, which receives your IP address, the standard data your browser sends with a request, the address of our site and the coordinates of the map area shown.", // legal review
                     },
                     {
-                        title: "Airbnb", // legal review
-                        text: "Our server downloads the apartment's calendar from Airbnb and keeps only which nights are booked. Nothing about you or any other visitor is sent to Airbnb.", // legal review
+                        title: "Booking.com", // legal review
+                        text: "Our server downloads the apartment's calendar from Booking.com and keeps only which nights are booked or closed. Nothing about you or any other visitor is sent to Booking.com.", // legal review
                     },
                     {
                         title: "Arrival notifications", // legal review
