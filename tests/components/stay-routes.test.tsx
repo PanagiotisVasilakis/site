@@ -2,7 +2,7 @@
 
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -58,6 +58,11 @@ import { getItemsByCategory, pickLocale } from '@/lib/data';
 
 const wrap = (node: ReactNode) => render(<ToastProvider>{node}</ToastProvider>);
 const params = (locale: string) => ({ params: Promise.resolve({ locale }) });
+
+// src/lib/favorites.ts reads localStorage once per module instance and then follows `storage` events,
+// as a write from another tab does. Dispatching one makes the store re-read localStorage whether or
+// not an earlier test has already initialised it, so no test depends on the order.
+const syncFavorites = () => act(() => { window.dispatchEvent(new StorageEvent('storage', { key: 'favorites:v1' })); });
 
 // Every stylesheet under src/styles (literal paths; the listing test below keeps the list complete).
 const STYLESHEETS: Array<[file: string, css: string]> = [
@@ -121,6 +126,7 @@ beforeEach(() => {
   preferences.checkOutTime = '11:00';
   phonesOrder.nonEmergencyFirst = false;
   window.localStorage.clear();
+  syncFavorites();
   fetchMock.mockImplementation(async (url: string) => new Response(JSON.stringify({
     success: true,
     data: url === '/api/check-in/preferences'
@@ -157,6 +163,7 @@ describe('/{l}/stay hub (identity §9.4)', () => {
     expect(known).toHaveLength(2);
     window.localStorage.setItem('favorites:v1', JSON.stringify([...known, 'moments:removed-place']));
     const { container } = wrap(await StayPage(params('en')));
+    syncFavorites();
 
     expect(screen.getByRole('heading', { level: 1, name: 'Welcome home.' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Sign in to your stay/u })).toHaveAttribute('href', '/en/guest');

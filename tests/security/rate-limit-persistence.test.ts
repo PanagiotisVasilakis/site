@@ -139,6 +139,38 @@ describe('durable sensitive-operation rate limiting', () => {
     }
   });
 
+  it.each([
+    ['one address, no identifier', () => ({ ip: '203.0.113.10', identifier: undefined })],
+    ['one address, changing identifiers', (n: number) => ({ ip: '203.0.113.10', identifier: `account${n}@example.test` })],
+    ['one identifier, changing addresses', (n: number) => ({ ip: `203.0.113.${10 + n}`, identifier: 'account@example.test' })],
+  ])('allows exactly `limit` attempts in a window and denies the next one: %s', async (_label, attempt) => {
+    // Stand-in for the upsert: one counter per limiter key, like a rate_limits row inside its window.
+    const counters = new Map<string, number>();
+    const resetTime = new Date(Date.now() + 60_000);
+    queryRaw.mockImplementation(async (_sql: unknown, key: string) => {
+      const count = (counters.get(key) ?? 0) + 1;
+      counters.set(key, count);
+      return [{ count, reset_time: resetTime }];
+    });
+
+    const decisions: Array<{ allowed: boolean; remaining: number }> = [];
+    for (let n = 1; n <= 5; n += 1) {
+      const { ip, identifier } = attempt(n);
+      const { allowed, remaining } = await checkSensitiveRateLimit(request(ip), {
+        scope: 'portal-signin', identifier, limit: 3, windowMs: 60_000,
+      });
+      decisions.push({ allowed, remaining });
+    }
+
+    expect(decisions).toEqual([
+      { allowed: true, remaining: 2 },
+      { allowed: true, remaining: 1 },
+      { allowed: true, remaining: 0 },
+      { allowed: false, remaining: 0 },
+      { allowed: false, remaining: 0 },
+    ]);
+  });
+
   it('denies when any dimension exceeds the limit and returns the strictest reset', async () => {
     const firstReset = new Date(Date.now() + 30_000);
     const secondReset = new Date(Date.now() + 60_000);

@@ -71,6 +71,7 @@ export default defineConfig({
         'src/lib/prisma-repositories/availabilityRepository.ts',
         'src/lib/prisma-repositories/checkInRequestRepository.ts',
         'src/lib/prisma-repositories/ratePeriodRepository.ts',
+        'src/lib/prisma-repositories/refreshTokenRepository.ts',
         'src/lib/privacyService.ts',
         'src/lib/redaction.ts',
         'src/lib/runtime-env-schema.js',

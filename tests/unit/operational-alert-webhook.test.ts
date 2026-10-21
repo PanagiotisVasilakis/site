@@ -19,26 +19,76 @@ vi.mock('@/lib/prisma', () => ({ prisma: prismaMock }));
 
 import { evaluateOperationalAlerts } from '@/lib/operationalMonitor';
 
+function arrangeDeadOutboxBreach() {
+  // Keeps the calendar staleness rule at 0 whatever the shell exports.
+  vi.stubEnv('BOOKING_ICAL_URL', '');
+  prismaMock.alertRule.upsert.mockImplementation(async ({ create }: { create: Record<string, unknown> }) => ({ ...create, enabled: true }));
+  // One DEAD outbox event that was not cancelled by an erasure: only the
+  // "Dead outbox events" rule breaches.
+  prismaMock.$transaction.mockResolvedValue([1, 0]);
+  prismaMock.outboxEvent.findFirst.mockResolvedValue(null);
+  prismaMock.securityAuditEvent.count.mockResolvedValue(0);
+  prismaMock.alert.findFirst.mockResolvedValue(null);
+  prismaMock.alert.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
+    ...data,
+    openedAt: new Date('2030-06-01T12:00:00.000Z'),
+    notificationDeliveredAt: null,
+  }));
+  prismaMock.alert.update.mockImplementation(async ({ where, data }) => ({ id: where.id, ...data }));
+}
+
+describe('operational alert webhook request', () => {
+  const TOKEN = 'request-alert-token';
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    arrangeDeadOutboxBreach();
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubEnv('ALERT_WEBHOOK_URL', 'https://alerts.example.test/hook');
+    fetchMock.mockResolvedValue(new Response('', { status: 200 }));
+  });
+
+  it('authenticates the alert with the bearer token and posts it as JSON', async () => {
+    vi.stubEnv('ALERT_WEBHOOK_TOKEN', TOKEN);
+
+    await expect(evaluateOperationalAlerts()).resolves.toMatchObject({ opened: 1 });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit & { headers: Record<string, string> }];
+    expect(init.method).toBe('POST');
+    expect(init.headers).toEqual({ 'content-type': 'application/json', authorization: `Bearer ${TOKEN}` });
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      event: 'operational_alert.opened',
+      alert: { name: 'Dead outbox events', metric: 'outbox.dead.count', severity: 'critical', value: 1, threshold: 0 },
+    });
+  });
+
+  it('sends no authorization header while ALERT_WEBHOOK_TOKEN is empty', async () => {
+    vi.stubEnv('ALERT_WEBHOOK_TOKEN', '');
+
+    await expect(evaluateOperationalAlerts()).resolves.toMatchObject({ opened: 1 });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit & { headers: Record<string, string> }];
+    expect(init.headers).toEqual({ 'content-type': 'application/json' });
+  });
+
+  it('bounds the webhook call with a 5 second timeout', async () => {
+    const signal = new AbortController().signal;
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(signal);
+
+    await expect(evaluateOperationalAlerts()).resolves.toMatchObject({ opened: 1 });
+
+    expect(timeout).toHaveBeenCalledExactlyOnceWith(5_000);
+    expect((fetchMock.mock.calls[0][1] as RequestInit).signal).toBe(signal);
+  });
+});
+
 describe('operational alert webhook redirects', () => {
   const TOKEN = 'redirect-alert-token';
   let receiver: Awaited<ReturnType<typeof startRedirectingReceiver>> | undefined;
 
   beforeEach(() => {
-    // Keeps the calendar staleness rule at 0 whatever the shell exports.
-    vi.stubEnv('BOOKING_ICAL_URL', '');
-    prismaMock.alertRule.upsert.mockImplementation(async ({ create }: { create: Record<string, unknown> }) => ({ ...create, enabled: true }));
-    // One DEAD outbox event that was not cancelled by an erasure: only the
-    // "Dead outbox events" rule breaches.
-    prismaMock.$transaction.mockResolvedValue([1, 0]);
-    prismaMock.outboxEvent.findFirst.mockResolvedValue(null);
-    prismaMock.securityAuditEvent.count.mockResolvedValue(0);
-    prismaMock.alert.findFirst.mockResolvedValue(null);
-    prismaMock.alert.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
-      ...data,
-      openedAt: new Date('2030-06-01T12:00:00.000Z'),
-      notificationDeliveredAt: null,
-    }));
-    prismaMock.alert.update.mockImplementation(async ({ where, data }) => ({ id: where.id, ...data }));
+    arrangeDeadOutboxBreach();
   });
   afterEach(async () => {
     await receiver?.close();

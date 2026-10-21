@@ -194,6 +194,54 @@ describe('check-in outbox delivery state machine', () => {
   });
 
   it.each([
+    // 2^(attempt - 1) minutes up to the cap, then 60 minutes: the next try is never more than an hour away.
+    [6, 32],
+    [7, 60],
+    [9, 60],
+  ])('caps the backoff at 60 minutes: attempt %i waits %i minutes', async (attempt, minutes) => {
+    seed({ attemptCount: attempt - 1 });
+    fetchMock.mockResolvedValue(new Response('', { status: 503 }));
+
+    await expect(deliverOutboxEvent(EVENT_ID)).resolves.toBe(false);
+
+    expect(event()).toMatchObject({ status: 'PENDING', attemptCount: attempt, leaseOwner: null, lastError: 'Webhook responded with 503' });
+    expect((event().nextAttemptAt as Date).getTime()).toBe(NOW.getTime() + minutes * 60_000);
+  });
+
+  it('retries through the ninth attempt, goes DEAD on the tenth and never claims a DEAD event again', async () => {
+    seed({ attemptCount: 8 });
+    fetchMock.mockResolvedValue(new Response('', { status: 503 }));
+
+    await deliverOutboxEvent(EVENT_ID);
+    expect(event()).toMatchObject({ status: 'PENDING', attemptCount: 9 });
+
+    // Due again once the capped hour has passed.
+    vi.setSystemTime(new Date(NOW.getTime() + 61 * 60_000));
+    await deliverOutboxEvent(EVENT_ID);
+    expect(event()).toMatchObject({ status: 'DEAD', attemptCount: 10, leaseOwner: null, leaseExpiresAt: null, deliveredAt: null });
+
+    // A later drain, long after the last scheduled time, leaves it for the operator.
+    fetchMock.mockClear();
+    vi.setSystemTime(new Date(NOW.getTime() + 48 * 60 * 60_000));
+    await expect(drainOutbox(10)).resolves.toEqual({ attempted: 0, delivered: 0 });
+    await expect(deliverOutboxEvent(EVENT_ID)).resolves.toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(event()).toMatchObject({ status: 'DEAD', attemptCount: 10 });
+  });
+
+  it('bounds the webhook call with a 5 second timeout', async () => {
+    seed();
+    const signal = new AbortController().signal;
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(signal);
+    fetchMock.mockResolvedValue(new Response('', { status: 200 }));
+
+    await expect(deliverOutboxEvent(EVENT_ID)).resolves.toBe(true);
+
+    expect(timeout).toHaveBeenCalledExactlyOnceWith(5_000);
+    expect((fetchMock.mock.calls[0][1] as RequestInit).signal).toBe(signal);
+  });
+
+  it.each([
     ['an http:// URL', 'http://hooks.example.test/check-in', 'Webhook destination must use HTTPS in production'],
     ['an unparsable URL', 'hooks.example.test/check-in', 'Invalid URL'],
   ])('refuses %s in production without sending and keeps the event for retry', async (_label, url, lastError) => {

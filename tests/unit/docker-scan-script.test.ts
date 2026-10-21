@@ -3,6 +3,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import path from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { enterScratchDir, leaveScratchDir } from './support/scratch-dir';
+
 // Approved in PROGRESS.md O33: the official Trivy 0.69.3 image by its multi-platform index digest
 // (published before the 0.69.4-0.69.6 compromise, GHSA-69fq-xp46-6x23).
 const TRIVY_IMAGE = 'aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c';
@@ -50,45 +52,48 @@ exit 0
 
 const BASH = execFileSync('/bin/sh', ['-c', 'command -v bash'], { encoding: 'utf8' }).trim();
 
-// Fixed, git-ignored scratch directory. The bin directories are written once for the file
-// (the first exec of a newly written script is slow on some hosts); TMP and the stub's
-// records are recreated for every test.
-const WORK = path.resolve('.runtime/docker-scan-test');
-const BIN = path.join(WORK, 'bin');
-const DOCKER_BIN = path.join(WORK, 'docker-bin');
-const TRIVY_BIN = path.join(WORK, 'trivy-bin');
-const TMP = path.join(WORK, 'tmp');
-const LOG = path.join(WORK, 'docker.log');
-const MODES = path.join(WORK, 'modes.txt');
-const TRIVY_LOG = path.join(WORK, 'trivy.log');
+// A scratch directory of its own per file and run (mkdtemp), entered as the cwd, so overlapping
+// vitest runs do not delete each other's stubs. The test addresses its files by these constant
+// relative names; the script and the stubs get the absolute paths from `absolute`. The bin
+// directories are written once for the file (the first exec of a newly written script is slow on
+// some hosts); TMP_DIR and the stub's records are recreated for every test.
+const BIN_DIR = 'bin';
+const DOCKER_BIN_DIR = 'docker-bin';
+const TRIVY_BIN_DIR = 'trivy-bin';
+const TMP_DIR = 'tmp';
+const DOCKER_LOG = 'docker.log';
+const MODES_FILE = 'modes.txt';
+const TRIVY_LOG = 'trivy.log';
+let WORK = '';
+const absolute = (name: string) => path.join(WORK, name);
 
-// The script's PATH is BIN alone (plus DOCKER_BIN or TRIVY_BIN, which hold only their stub, when a
-// test wants Docker or a host Trivy), so neither a host Trivy nor the real Docker CLI can be
-// found. These wrappers expose only the system tools the script and the stubs need.
+// The script's PATH is BIN_DIR alone (plus DOCKER_BIN_DIR or TRIVY_BIN_DIR, which hold only their
+// stub, when a test wants Docker or a host Trivy), so neither a host Trivy nor the real Docker CLI
+// can be found. These wrappers expose only the system tools the script and the stubs need.
 const TOOL_WRAPPER = '#!/bin/sh\nexport PATH=/usr/bin:/bin\nexec "${0##*/}" "$@"\n';
 
 beforeAll(() => {
-  rmSync(WORK, { recursive: true, force: true });
-  mkdirSync(BIN, { recursive: true });
-  mkdirSync(DOCKER_BIN);
-  mkdirSync(TRIVY_BIN);
-  writeFileSync(path.join(BIN, 'mktemp'), TOOL_WRAPPER, { mode: 0o755 });
-  writeFileSync(path.join(BIN, 'rm'), TOOL_WRAPPER, { mode: 0o755 });
-  writeFileSync(path.join(BIN, 'chmod'), TOOL_WRAPPER, { mode: 0o755 });
-  writeFileSync(path.join(BIN, 'ls'), TOOL_WRAPPER, { mode: 0o755 });
-  writeFileSync(path.join(DOCKER_BIN, 'docker'), DOCKER_STUB, { mode: 0o755 });
-  writeFileSync(path.join(TRIVY_BIN, 'trivy'), TRIVY_STUB, { mode: 0o755 });
+  WORK = enterScratchDir('docker-scan-test');
+  mkdirSync(BIN_DIR);
+  mkdirSync(DOCKER_BIN_DIR);
+  mkdirSync(TRIVY_BIN_DIR);
+  writeFileSync(path.join(BIN_DIR, 'mktemp'), TOOL_WRAPPER, { mode: 0o755 });
+  writeFileSync(path.join(BIN_DIR, 'rm'), TOOL_WRAPPER, { mode: 0o755 });
+  writeFileSync(path.join(BIN_DIR, 'chmod'), TOOL_WRAPPER, { mode: 0o755 });
+  writeFileSync(path.join(BIN_DIR, 'ls'), TOOL_WRAPPER, { mode: 0o755 });
+  writeFileSync(path.join(DOCKER_BIN_DIR, 'docker'), DOCKER_STUB, { mode: 0o755 });
+  writeFileSync(path.join(TRIVY_BIN_DIR, 'trivy'), TRIVY_STUB, { mode: 0o755 });
 });
 
 beforeEach(() => {
-  rmSync(TMP, { recursive: true, force: true });
-  rmSync(LOG, { force: true });
-  rmSync(MODES, { force: true });
+  rmSync(TMP_DIR, { recursive: true, force: true });
+  rmSync(DOCKER_LOG, { force: true });
+  rmSync(MODES_FILE, { force: true });
   rmSync(TRIVY_LOG, { force: true });
-  mkdirSync(TMP);
+  mkdirSync(TMP_DIR);
 });
 
-afterAll(() => rmSync(WORK, { recursive: true, force: true }));
+afterAll(() => leaveScratchDir(WORK));
 
 function runScan(
   scanner: string,
@@ -102,19 +107,23 @@ function runScan(
   const result = spawnSync(BASH, [SCRIPT, IMAGE_REF], {
     env: {
       ...process.env,
-      PATH: [...(hostTrivy ? [TRIVY_BIN] : []), ...(docker ? [DOCKER_BIN] : []), BIN].join(':'),
-      TMPDIR: TMP,
+      PATH: [
+        ...(hostTrivy ? [absolute(TRIVY_BIN_DIR)] : []),
+        ...(docker ? [absolute(DOCKER_BIN_DIR)] : []),
+        absolute(BIN_DIR),
+      ].join(':'),
+      TMPDIR: absolute(TMP_DIR),
       DOCKER_SCAN_SCANNER: scanner,
-      DOCKER_STUB_LOG: LOG,
-      DOCKER_STUB_MODES: MODES,
+      DOCKER_STUB_LOG: absolute(DOCKER_LOG),
+      DOCKER_STUB_MODES: absolute(MODES_FILE),
       DOCKER_STUB_RUN_EXIT: String(runExit),
       DOCKER_STUB_INFO_EXIT: String(infoExit),
-      TRIVY_STUB_LOG: TRIVY_LOG,
+      TRIVY_STUB_LOG: absolute(TRIVY_LOG),
     },
     encoding: 'utf8',
   });
-  const calls = existsSync(LOG)
-    ? readFileSync(LOG, 'utf8').split('@@\n').filter(Boolean).map((call) => call.replace(/\n$/u, '').split('\n'))
+  const calls = existsSync(DOCKER_LOG)
+    ? readFileSync(DOCKER_LOG, 'utf8').split('@@\n').filter(Boolean).map((call) => call.replace(/\n$/u, '').split('\n'))
     : [];
   const trivyArgs = existsSync(TRIVY_LOG) ? readFileSync(TRIVY_LOG, 'utf8').split('\n').filter(Boolean) : [];
   return { status: result.status, stderr: result.stderr, calls, trivyArgs };
@@ -141,11 +150,11 @@ describe('docker:scan script (scripts/docker-scan.sh)', () => {
     const [, save, run] = calls;
     const [tarball] = valuesOf(save, '--output', '-o');
     expect(path.basename(tarball)).toBe('image.tar');
-    expect(path.dirname(path.dirname(tarball))).toBe(TMP);
+    expect(path.dirname(path.dirname(tarball))).toBe(absolute(TMP_DIR));
     expect(save.at(-1)).toBe(IMAGE_REF);
     // Private directory; the file itself is readable by the container's root, which has no
     // CAP_DAC_OVERRIDE (--cap-drop ALL) and does not own it on a Linux host.
-    expect(readFileSync(MODES, 'utf8')).toMatch(/^drwx------\S* -rw-r--r--\S*\n$/u);
+    expect(readFileSync(MODES_FILE, 'utf8')).toMatch(/^drwx------\S* -rw-r--r--\S*\n$/u);
 
     expect(valuesOf(run, '-v', '--volume')).toEqual([
       `${tarball}:/scan/image.tar:ro`,
@@ -168,7 +177,7 @@ describe('docker:scan script (scripts/docker-scan.sh)', () => {
     expect(trivyArgs).toEqual(expect.arrayContaining(['--skip-version-check', '--disable-telemetry', '--offline-scan']));
 
     // The tarball and its private directory are removed on exit.
-    expect(readdirSync(TMP)).toEqual([]);
+    expect(readdirSync(TMP_DIR)).toEqual([]);
   });
 
   it('fails when Trivy reports HIGH or CRITICAL findings and still removes the tarball', () => {
@@ -176,7 +185,7 @@ describe('docker:scan script (scripts/docker-scan.sh)', () => {
 
     expect(status).toBe(1);
     expect(calls.map((call) => call[0])).toEqual(['info', 'save', 'run']);
-    expect(readdirSync(TMP)).toEqual([]);
+    expect(readdirSync(TMP_DIR)).toEqual([]);
   });
 
   it('prefers the Trivy container over Docker Scout in auto mode when no host Trivy exists', () => {

@@ -1,18 +1,24 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-// Fixed, git-ignored scratch directory: the script reads `.env.local` in its cwd.
-const WORK_DIR = '.runtime/check-pepper-test';
+import { enterScratchDir, leaveScratchDir } from './support/scratch-dir';
+
+const SCRIPT = path.resolve('scripts/check-pepper.js');
+const ENV_FILE = '.env.local';
+
+// A scratch directory of its own per test, entered as the cwd: the script reads `.env.local` there.
+let workDir = '';
 
 function run(envFile: string): { status: number | null; stderr: string } {
-  fs.writeFileSync(`${WORK_DIR}/.env.local`, envFile);
+  fs.writeFileSync(ENV_FILE, envFile);
   const childEnv: NodeJS.ProcessEnv = { ...process.env };
   delete childEnv.SECURITY_PEPPER;
   delete childEnv.CLAIM_TOKEN_PEPPER;
-  const result = spawnSync(process.execPath, ['../../scripts/check-pepper.js'], {
-    cwd: WORK_DIR,
+  const result = spawnSync(process.execPath, [SCRIPT], {
+    cwd: workDir,
     env: childEnv,
     encoding: 'utf8',
   });
@@ -21,11 +27,10 @@ function run(envFile: string): { status: number | null; stderr: string } {
 
 describe('check-pepper predev warning', () => {
   beforeEach(() => {
-    fs.rmSync(WORK_DIR, { recursive: true, force: true });
-    fs.mkdirSync(WORK_DIR, { recursive: true });
+    workDir = enterScratchDir('check-pepper-test');
   });
   afterEach(() => {
-    fs.rmSync(WORK_DIR, { recursive: true, force: true });
+    leaveScratchDir(workDir);
   });
 
   it('treats an empty SECURITY_PEPPER followed by other lines as missing', () => {
