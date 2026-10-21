@@ -971,7 +971,8 @@ Screenshot proof in the mockup: `home-390-reduced.png`, `availability-390-reduce
 - **Text over photos** only on the scrim: the hero content scrim is attached to the text block (`.hero__content::before`: 0 → .58 at 150 px → .80 at 150 px + 30 % → .90). Room and gallery captions use `transparent 35 % → .62 at 62 % → .88`.
 - **Formats:** AVIF + WebP `<source>`s with pre-generated sizes via `<picture>` for hero crops. Everything else uses `next/image` with correct `sizes`. `alt` text is localized and descriptive; decorative duplicates get `alt=""`.
 - **Loading:** only the LCP image uses `loading="eager"` and `fetchPriority="high"`; everything else is lazy. There is no separate `<link rel="preload">` for the art-directed hero, because the SSR `<picture>` is discovered by the preload scanner and `ReactDOM.preload` has no `media` option.
-- **File size:** `check:image-assets` (512 KB cap) still applies. Recompress the heavy guide images: `archaeological-museum-hero.jpg` 293 KB, `railway-museum-hero.jpg` 278 KB, `taxi-hero.webp` 362 KB. Target ≤ 120 KB.
+- **File size:** `check:image-assets` (512 KB cap) still applies. Target ≤ 120 KB per guide photo.
+- **Guide photos need a recorded licence.** A guide item shows a `heroImage` only together with a `heroImageCredit` (author, license, sourceUrl, optional licenseUrl); the strict content gate (`scripts/validate-content.ts`, run by `npm run build`) fails otherwise, and the detail page prints the credit under the photo. The project's own artwork (`PROJECT_ARTWORK_HERO_IMAGES` in `src/data/schemas.ts`) is exempt. The former museum, taxi, police, fire and hospital photos were removed because their source and licence were not recorded (some carried a Street View watermark); those items use the illustrated tile until a licensed photo (Wikimedia Commons CC BY / CC BY-SA / CC0, with the credit filled in) is added.
 
 ### 7.2 Hero crops and depth maps
 
@@ -1030,7 +1031,7 @@ The owner's photos of 2026-08-01 also show the building and its entrance, the dr
 Until then:
 
 - Use the illustrated relief map and typographic sections.
-- Do not use `phones/taxi-hero.webp` (the only seafront picture) as a view image. Its source is unrecorded and it is not the view from the apartment.
+- Do not use a guide photo as a view image: none of them is the view from the apartment, and the former seafront picture (`phones/taxi-hero.webp`) was removed because its source was unrecorded.
 
 ---
 

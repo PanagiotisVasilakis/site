@@ -21,7 +21,12 @@ npm run verify:release
   the `darwin-arm64` (Apple-silicon macOS) artifact only, so another platform
   needs a reviewed lock addition first;
 - a local Docker daemon reachable through a Unix or Windows named-pipe socket,
-  plus Docker Buildx;
+  plus Docker Buildx. The release images (outside `verify:release`) are
+  `linux/amd64`, the production platform, although the release host is an
+  Apple-silicon Mac: `npm run docker:build` builds that platform by default and
+  fails when a tag reports another one, so the build and the production-image
+  smoke run under emulation and are much slower than a native run (see
+  [Release images: platform and identity](#release-images-platform-and-identity));
 - enough local disk for the digest-pinned PostgreSQL image, disposable database,
   coverage output, and Next.js build;
 - the digest-pinned Nginx image from `deploy/nginx/image.lock.json`
@@ -235,7 +240,8 @@ small supply-chain review:
    outside the `REVIEW.md` and `PROGRESS.md` journals.
 5. Run `npm run verify:release`, then the release image sequence in
    [`scripts/README.md`](../scripts/README.md#production): `npm run docker:build`
-   with `NEXT_PUBLIC_SITE_URL=https://localhost:3002` and `npm run smoke:image`;
+   with `NEXT_PUBLIC_SITE_URL=https://localhost:3002` and
+   `DOCKER_DEFAULT_PLATFORM=linux/amd64 npm run smoke:image`;
    then `npm run docker:build` with the production `NEXT_PUBLIC_SITE_URL` and
    `npm run docker:scan` on that last build. Accept the update only after all of
    them pass. The build fails closed if the pinned `dumb-init` apk version no
@@ -263,6 +269,41 @@ runbook text "currently `nginx:<tag>`" in
    does not pull it), then run `npm run validate:release-policy`,
    `npm run test:release-policy` and `npm run verify:release` before accepting the
    update.
+
+## Release images: platform and identity
+
+None of this is part of `verify:release`; the commands are in
+[`scripts/README.md`](../scripts/README.md#production).
+
+- **Platform.** The ADR fixes the production platform at `linux/amd64`
+  ([`architecture/deployment-target.md`](architecture/deployment-target.md)), while
+  the release host (the Gitleaks lock holds `darwin-arm64` only) is `arm64`. A
+  native build would ship arm64 images that fail on the VPS with `exec format
+  error` at the first `migrate`. `npm run docker:build` therefore passes
+  `--platform linux/amd64` unless `DOCKER_BUILD_PLATFORM` overrides it, prints the
+  platform and the image ID of each tag, and exits 1 when `docker image inspect
+  --format '{{.Os}}/{{.Architecture}}'` of the web, `-workers` or `-migrate` tag
+  differs from the requested platform. It also rejects a `NEXT_PUBLIC_SITE_URL`
+  that is not a bare https origin. An override other than `linux/amd64` prints a
+  warning; such images are never scanned, saved or shipped.
+- **Smoke.** `DOCKER_DEFAULT_PLATFORM=linux/amd64 npm run smoke:image` runs the
+  amd64 images (emulated on Apple silicon, so slow). The accepted result is one
+  complete run without a `FAIL`; a timeout `FAIL` is re-run once, and the same check
+  timing out again, or any other `FAIL`, is investigated as a defect (never repeat
+  the run until it goes green).
+- **Identity on the VPS.** After `docker load`,
+  `docker image inspect --format '{{.Architecture}} {{.Id}}'` of the three tags must
+  read `amd64` and the IDs that `docker:build` printed for the scanned images;
+  otherwise the deployment stops.
+- **Image optimizer (R-753).** The smoke never checks the response of
+  `/_next/image`. After `up -d --wait web`, a request for
+  `/_next/image?url=%2Fhouse%2Fbalcony%2Fbalcony_2.jpeg&w=640&q=75` with
+  `Accept: image/webp` (no identity header: the proxy does not run for `/_next/*`)
+  must answer `content-type: image/webp`; `image/jpeg` is the silent fallback of a
+  sharp or libvips that cannot load, and the release is not ready.
+- **Timers.** `docker/.env` is the single source of the `APP_IMAGE` that the
+  operator and the cron-run workers read; after each release the create events of
+  the next `outbox` and `operations` runs must name the new `-workers` tag.
 
 ## Container image vulnerability scan
 

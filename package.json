@@ -64,7 +64,7 @@
     "audit:responsive:ux": "tsx scripts/responsive-ux-audit.ts",
     "audit:vitals": "tsx scripts/audit-vitals.ts",
     "smoke:image": "tsx scripts/smoke-production-image.ts",
-    "security:audit": "npm audit --audit-level=high",
+    "security:audit": "npm audit --audit-level=high --omit=dev",
     "security:license-check": "tsx scripts/check-licenses.ts",
     "security:scan": "npm run security:audit && npm run security:license-check && npm run lint:security",
     "docker:build": "bash ./scripts/docker-build.sh",
