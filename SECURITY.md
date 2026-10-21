@@ -55,10 +55,28 @@ git clone --mirror <repository-url> site-cleanup.git
 cd site-cleanup.git
 git filter-repo --invert-paths \
   --path .env.production \
-  --path .env.staging
+  --path .env.staging \
+  --path .env.test
 # Review the rewritten repository before an explicitly approved force-push.
 ```
 
 After an approved history rewrite, invalidate open pull-request branches that
 retain the old objects and require contributors to replace existing clones.
 Credential rotation must happen before any history rewrite.
+
+## Known exposure in this repository's Git history
+
+The history contains three committed environment files, `.env.production`,
+`.env.staging` and `.env.test`, each with one database connection string for a
+Neon project. They were added in commit `b5a5c86` (2026-05-20) and removed from
+the tree in commit `610ffed` (2026-07-10); removing them did not remove them from
+history. The sanitized disposition is in
+[`docs/security/secret-scanning.md`](docs/security/secret-scanning.md): the
+operator reported on 2026-07-28 that the Neon project had been deleted, and this
+repository cannot prove that.
+
+The owner must confirm the retirement in the Neon provider console: the project and
+its roles are deleted, or every credential is revoked. Record the date here:
+`<OWNER: confirmed on (date)>`. Until then treat the historical values as live. Never
+copy them out of history, and keep them out of this repository, its issues and any
+chat. This note deliberately names no value.
