@@ -1,3 +1,5 @@
+// The production start-up check (runtime-env-schema.js) only lets a bare https origin through, so
+// stripping one trailing slash is all the normalisation this needs.
 const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 export const siteUrl = (configuredSiteUrl.startsWith('http') ? configuredSiteUrl : `https://${configuredSiteUrl}`).replace(/\/$/, '');
 

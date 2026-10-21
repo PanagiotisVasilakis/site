@@ -46,8 +46,27 @@ function isOriginProxySecret(value) {
     && !/^(?:deadbeef|changeme|placeholder)/iu.test(value);
 }
 
-// The two peppers key HMACs, so the placeholder words of .env.example must not pass in production.
-const PEPPER_PLACEHOLDER = /replace|changeme|placeholder|example/iu;
+// The placeholder words of .env.example must not pass in production: the two peppers key HMACs, and
+// the two Wi-Fi values are shown to guests as the real network.
+const PLACEHOLDER_WORDS = /replace|changeme|placeholder|example/iu;
+
+// site.ts strips one trailing slash and prefixes every canonical, hreflang, OG, sitemap and JSON-LD
+// URL with the rest, so the value must be a bare origin: scheme://host[:port] in the canonical form
+// that URL.origin prints (lowercase, punycode host, no default port), and no path, query, fragment,
+// userinfo or whitespace. The comparison runs on the raw string, not on its parsed parts, because
+// URL drops an empty `?`, `#` or userinfo.
+function isBareOrigin(value) {
+  const candidate = value.endsWith('/') ? value.slice(0, -1) : value;
+  return URL.canParse(candidate) && new URL(candidate).origin === candidate;
+}
+
+// z.url() trims the value it checks and hands the trimmed copy on, which would hide the whitespace
+// that site.ts reads verbatim from the environment. A plain string keeps the raw value for the
+// production shape check in the object refine below.
+const siteUrlEnv = (name) => optionalEnv(z.string().refine(
+  (value) => urlProtocol(value) !== null,
+  `${name} must be a valid URL`,
+));
 
 // The Booking.com calendar export URL carries a secret token in its query string (`t`),
 // so validation messages must never echo the value. Each host serves the export at one path
@@ -97,8 +116,8 @@ export const runtimeEnvSchema = z.object({
 
 
   ALLOWED_ORIGINS: z.string().optional(),
-  NEXT_PUBLIC_SITE_URL: optionalEnv(z.url()),
-  BUILD_SITE_URL: optionalEnv(z.url()),
+  NEXT_PUBLIC_SITE_URL: siteUrlEnv('NEXT_PUBLIC_SITE_URL'),
+  BUILD_SITE_URL: siteUrlEnv('BUILD_SITE_URL'),
   ORIGIN_PROXY_SHARED_SECRET: optionalEnv(z.string().refine(
     isOriginProxySecret,
     'ORIGIN_PROXY_SHARED_SECRET must be a non-placeholder 64-character hexadecimal secret',
@@ -151,7 +170,7 @@ export const runtimeEnvSchema = z.object({
     for (const name of ['SECURITY_PEPPER', 'CLAIM_TOKEN_PEPPER']) {
       const value = env[name];
       if (!value) continue;
-      if (hasRepeatedPattern(value) || PEPPER_PLACEHOLDER.test(value)) {
+      if (hasRepeatedPattern(value) || PLACEHOLDER_WORDS.test(value)) {
         context.addIssue({ code: 'custom', path: [name], message: `${name} must not be placeholder-like or patterned` });
       }
       const reused = ACTIVE_RUNTIME_CREDENTIAL_NAMES.find((other) => env[other] === value);
@@ -159,14 +178,32 @@ export const runtimeEnvSchema = z.object({
         context.addIssue({ code: 'custom', path: [name], message: `${name} must differ from ${reused}` });
       }
     }
+    // Only the placeholder words: a real network name or password may be short or patterned.
+    for (const name of ['GUEST_WIFI_NETWORK', 'GUEST_WIFI_PASSWORD']) {
+      const value = env[name];
+      if (value && PLACEHOLDER_WORDS.test(value)) {
+        context.addIssue({ code: 'custom', path: [name], message: `${name} must not be a placeholder value` });
+      }
+    }
   }
   if (env.NODE_ENV === 'production' && !env.NEXT_PUBLIC_SITE_URL) {
     context.addIssue({ code: 'custom', path: ['NEXT_PUBLIC_SITE_URL'], message: 'NEXT_PUBLIC_SITE_URL is required in production' });
   }
-  if (env.NODE_ENV === 'production' && env.NEXT_PUBLIC_SITE_URL) {
-    const protocol = urlProtocol(env.NEXT_PUBLIC_SITE_URL);
-    if (protocol !== null && protocol !== 'https:') {
-      context.addIssue({ code: 'custom', path: ['NEXT_PUBLIC_SITE_URL'], message: 'NEXT_PUBLIC_SITE_URL must use HTTPS in production' });
+  if (env.NODE_ENV === 'production') {
+    for (const name of ['NEXT_PUBLIC_SITE_URL', 'BUILD_SITE_URL']) {
+      const value = env[name];
+      // An unparsable value is already reported by the field itself.
+      if (!value || urlProtocol(value) === null) continue;
+      if (urlProtocol(value) !== 'https:') {
+        context.addIssue({ code: 'custom', path: [name], message: `${name} must use HTTPS in production` });
+      }
+      if (!isBareOrigin(value)) {
+        context.addIssue({
+          code: 'custom',
+          path: [name],
+          message: `${name} must be a bare origin (scheme://host[:port] with a lowercase host, punycode xn-- for non-ASCII names and no :443, without path, query, fragment, credentials or whitespace)`,
+        });
+      }
     }
   }
   if (env.BUILD_SITE_URL && env.NEXT_PUBLIC_SITE_URL !== env.BUILD_SITE_URL) {
