@@ -19,6 +19,7 @@ const MAX_REPORT_BYTES = 16 * 1_024;
 // Browsers always add `referrer`, `disposition` and `status-code` to report-uri
 // bodies (and `script-sample` with 'report-sample'), so the schema bounds them
 // instead of rejecting the report. Other unknown keys are stripped, never stored.
+// `original-policy` is bounded as well but not stored: it repeats the one static policy.
 const cspReportSchema = z.object({
   'document-uri': z.string().max(2_000).optional(),
   referrer: z.string().max(2_000).optional(),
@@ -44,12 +45,6 @@ export async function POST(request: NextRequest) {
       scope: 'csp-report', limit: 30, windowMs: 60_000,
     });
     if (!decision.allowed) return NextResponse.json({ error: 'Too many reports' }, { status: 429 });
-    // The limit above is per client address. This one is shared by all clients,
-    // so many attested addresses together cannot grow the audit table unbounded.
-    const globalDecision = await checkSensitiveRateLimit(request, {
-      scope: 'csp-report-global', identifier: 'global', limit: 500, windowMs: 3_600_000,
-    });
-    if (!globalDecision.allowed) return NextResponse.json({ error: 'Too many reports' }, { status: 429 });
 
     const raw = await readJsonBody(
       request,
@@ -61,6 +56,19 @@ export async function POST(request: NextRequest) {
       : raw;
     const parsed = cspReportSchema.safeParse(candidate);
     if (!parsed.success) return NextResponse.json({ error: 'Invalid CSP report' }, { status: 400 });
+    // A report that names no directive carries nothing to act on. It is answered like an
+    // accepted one, so that no browser retries it, but it is neither stored nor counted.
+    if (!parsed.data['violated-directive'] && !parsed.data['effective-directive']) {
+      return new NextResponse(null, { status: 204 });
+    }
+
+    // The limit above is per client address. This one is shared by all clients and counts
+    // only reports that store a row, so malformed ones cannot use up the budget and many
+    // attested addresses together cannot grow the audit table unbounded.
+    const globalDecision = await checkSensitiveRateLimit(request, {
+      scope: 'csp-report-global', identifier: 'global', limit: 100, windowMs: 3_600_000,
+    });
+    if (!globalDecision.allowed) return NextResponse.json({ error: 'Too many reports' }, { status: 429 });
 
     const clientInfo = {
       ip: getClientIp(request),

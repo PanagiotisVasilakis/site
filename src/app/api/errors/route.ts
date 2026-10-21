@@ -26,9 +26,10 @@ const errorReportSchema = z.object({
   category: z.string().regex(/^[a-zA-Z0-9_-]{1,50}$/).optional(),
 }).strict();
 
-function redact(value: string): string {
-  return redactSensitiveText(value, 2_000);
-}
+// One row per accepted report and no dedupe: the schema bounds what is accepted, these bound what is stored.
+const STORED_MESSAGE_CHARS = 200;
+const STORED_STACK_CHARS = 600;
+const STORED_FILE_CHARS = 120;
 
 export const POST = withErrorHandler(async (request: NextRequest, { signal }) => {
   const decision = await checkSensitiveRateLimit(request, {
@@ -38,25 +39,28 @@ export const POST = withErrorHandler(async (request: NextRequest, { signal }) =>
   });
   signal.throwIfAborted();
   if (!decision.allowed) throw new ApiError(ApiErrorCode.RATE_LIMITED, 'Too many error reports');
-  // The limit above is per client address. This one is shared by all clients,
-  // so many attested addresses together cannot grow the audit table unbounded.
+  // The body is validated before the shared budget is spent: a malformed request
+  // writes no row, so it must not use up the budget that legitimate reports need.
+  const report = await validateRequestBody(errorReportSchema, 16 * 1_024)(request);
+  signal.throwIfAborted();
+  // The limit above is per client address. This one is shared by all clients and
+  // counts only requests that store a row, so many attested addresses together
+  // cannot grow the audit table unbounded.
   const globalDecision = await checkSensitiveRateLimit(request, {
     scope: 'client-error-report-global',
     identifier: 'global',
-    limit: 500,
+    limit: 100,
     windowMs: 3_600_000,
   });
   signal.throwIfAborted();
   if (!globalDecision.allowed) throw new ApiError(ApiErrorCode.RATE_LIMITED, 'Too many error reports');
 
-  const report = await validateRequestBody(errorReportSchema, 16 * 1_024)(request);
-  signal.throwIfAborted();
   const clientIp = getClientIp(request);
   const reportUrl = new URL(report.context.url);
   const path = reportUrl.pathname.slice(0, 512);
   const correlationId = logger.getContext()?.correlationId;
   const stack = report.error.stack
-    ? redact(report.error.stack.split('\n').slice(0, 5).join('\n')).slice(0, 2_000)
+    ? redactSensitiveText(report.error.stack.split('\n').slice(0, 5).join('\n'), STORED_STACK_CHARS)
     : undefined;
 
   const { prisma } = await import('@/lib/prisma');
@@ -70,10 +74,12 @@ export const POST = withErrorHandler(async (request: NextRequest, { signal }) =>
       ipHash: clientIp === 'unknown' ? null : privacyHmac(clientIp, 'security-event-ip:v1'),
       path,
       details: {
-        name: redact(report.error.name),
-        message: redact(report.error.message),
+        name: redactSensitiveText(report.error.name, 100),
+        message: redactSensitiveText(report.error.message, STORED_MESSAGE_CHARS),
         stack,
-        fileName: report.error.fileName ? redact(report.error.fileName).split('?')[0] : undefined,
+        fileName: report.error.fileName
+          ? redactSensitiveText(report.error.fileName, STORED_FILE_CHARS).split('?')[0]
+          : undefined,
         lineNumber: report.error.lineNumber,
         columnNumber: report.error.columnNumber,
         buildVersion: report.context.buildVersion,

@@ -11,20 +11,30 @@ import type { SecurityEvent } from '@/lib/security-config';
 import { isSensitiveFieldName, redactSensitiveText } from '@/lib/redaction';
 import { privacyHmac } from '@/lib/privacyHash';
 
+// A row is stored per accepted CSP report, so the fields that can be long are cut to what identifies the violation.
+const STORED_DIRECTIVE_CHARS = 100;
+const STORED_URL_CHARS = 256;
+
 function redactText(value: string): string {
   return redactSensitiveText(value, 500);
 }
 
 function sanitizeValue(value: unknown, depth = 0): unknown {
+  // An absent field stays absent: it is never stored as the text "undefined".
+  if (value === undefined) return undefined;
   if (depth > 2) return '[TRUNCATED]';
   if (typeof value === 'string') return redactText(value);
   if (typeof value === 'number' || typeof value === 'boolean' || value === null) return value;
-  if (Array.isArray(value)) return value.slice(0, 20).map((entry) => sanitizeValue(entry, depth + 1));
+  // JSON has no undefined; an array slot keeps its position as null.
+  if (Array.isArray(value)) return value.slice(0, 20).map((entry) => sanitizeValue(entry, depth + 1) ?? null);
   if (typeof value === 'object' && value) {
-    return Object.fromEntries(Object.entries(value).slice(0, 30).map(([key, entry]) => [
-      key.slice(0, 100),
-      isSensitiveFieldName(key) ? '[REDACTED]' : sanitizeValue(entry, depth + 1),
-    ]));
+    return Object.fromEntries(Object.entries(value)
+      .filter(([, entry]) => entry !== undefined)
+      .slice(0, 30)
+      .map(([key, entry]) => [
+        key.slice(0, 100),
+        isSensitiveFieldName(key) ? '[REDACTED]' : sanitizeValue(entry, depth + 1),
+      ]));
   }
   return String(value).slice(0, 200);
 }
@@ -50,7 +60,7 @@ function reportUrlWithoutQuery(rawUrl: string | undefined): string | undefined {
   if (scheme !== 'http' && scheme !== 'https') return `${scheme}:`;
   try {
     const parsed = new URL(rawUrl);
-    return `${parsed.origin}${parsed.pathname}`.slice(0, 512);
+    return `${parsed.origin}${parsed.pathname}`.slice(0, STORED_URL_CHARS);
   } catch {
     return 'invalid';
   }
@@ -136,7 +146,6 @@ type CspReport = {
   'violated-directive'?: string;
   'effective-directive'?: string;
   'blocked-uri'?: string;
-  'original-policy'?: string;
   disposition?: 'enforce' | 'report';
   'status-code'?: number;
   'source-file'?: string;
@@ -149,20 +158,22 @@ export async function handleCSPViolation(
   violationReport: CspReport, 
   request: { ip?: string }
 ): Promise<void> {
+  const violatedDirective = violationReport['violated-directive']?.slice(0, STORED_DIRECTIVE_CHARS);
+  const effectiveDirective = violationReport['effective-directive']?.slice(0, STORED_DIRECTIVE_CHARS);
   const event: SecurityEvent = {
     type: 'csp_violation',
     severity: 'medium',
     timestamp: new Date().toISOString(),
     ip: request.ip || 'unknown',
     url: violationReport['document-uri'] || 'unknown',
-    // `referrer` and `script-sample` are accepted by the route but never stored.
+    // `referrer`, `script-sample` and `original-policy` (the one static policy) are accepted by the
+    // route but never stored; the effective directive only when it adds to the violated one.
     details: {
-      violatedDirective: violationReport['violated-directive'],
-      effectiveDirective: violationReport['effective-directive'],
+      violatedDirective,
+      effectiveDirective: effectiveDirective === violatedDirective ? undefined : effectiveDirective,
       disposition: violationReport.disposition,
       statusCode: violationReport['status-code'],
       blockedURI: reportUrlWithoutQuery(violationReport['blocked-uri']),
-      originalPolicy: violationReport['original-policy'],
       sourceFile: reportUrlWithoutQuery(violationReport['source-file']),
       lineNumber: violationReport['line-number'],
       columnNumber: violationReport['column-number'],

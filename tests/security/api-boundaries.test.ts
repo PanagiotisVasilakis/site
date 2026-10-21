@@ -202,6 +202,16 @@ describe('security header builders', () => {
     expect(buildCSPDirective(directives)).not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
   });
 
+  it.each(['production', 'development'])('blocks plugin content with object-src none in %s', (nodeEnv) => {
+    vi.stubEnv('NODE_ENV', nodeEnv);
+    const { directives } = getSecurityConfig().csp;
+    expect(directives.objectSrc).toEqual(["'none'"]);
+    const policy = buildCSPDirective(directives, 'abc123').split('; ');
+    expect(policy).toContain("object-src 'none'");
+    // The map tiles (OpenStreetMap, CARTO) are cross-origin images: img-src stays open to https.
+    expect(policy).toContain("img-src 'self' data: https: blob:");
+  });
+
   it('lists no unsafe-inline script source in production (nonces cover inline scripts)', () => {
     vi.stubEnv('NODE_ENV', 'production');
     const { csp } = getSecurityConfig();

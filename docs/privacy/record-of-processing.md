@@ -143,7 +143,8 @@ recipients, transfers, retention as implemented, and the security measures (sect
 - **Legal basis in the notice**: legitimate interest in keeping the site and the account secure
   (Article 6(1)(f)).
 - **Recipients**: hosting provider.
-- **Retention (as implemented)**: security events 90 days; counters until their window ends (deleted by
+- **Retention (as implemented)**: security events 90 days, except client error reports and content-security-policy
+  reports (`client.error`, `csp_violation`), which are deleted after 14 days; counters until their window ends (deleted by
   the next operations run); families 30 days after absolute expiry.
 
 ### P7. Handling privacy requests
@@ -241,7 +242,7 @@ running `runRetention` on a seeded PostgreSQL 16 database. The operations worker
 | Refresh tokens | deleted 30 days after `expires_at` | `runRetention` |
 | Refresh token families | deleted 30 days after `absolute_expires_at` | `runRetention` |
 | Access links (`booking_claim_grants`) | deleted 30 days after `expires_at` | `runRetention` |
-| Security events | deleted 90 days after `occurred_at` | `runRetention` |
+| Security events | deleted 90 days after `occurred_at`; client error reports and content-security-policy reports 14 days | `runRetention` |
 | Outbox rows | delivered: 30 days after delivery; dead: 30 days after the last update; cancelled by an erasure: at the next run | `runRetention` |
 | Admin sessions | deleted 90 days after `absolute_expires_at` | `runRetention` |
 | Rate-limit counters | deleted when `reset_time` has passed | `runRetention` |

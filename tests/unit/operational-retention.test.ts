@@ -87,8 +87,36 @@ describe('operational retention', () => {
     expect(prismaMock.session.deleteMany).toHaveBeenCalledWith({ where: { expiresAt: { lt: new Date('2030-07-07T00:00:00Z') } } });
     expect(prismaMock.refreshToken.deleteMany).toHaveBeenCalledWith({ where: { expiresAt: { lt: new Date('2030-06-14T00:00:00Z') } } });
     expect(prismaMock.refreshTokenFamily.deleteMany).toHaveBeenCalledWith({ where: { absoluteExpiresAt: { lt: new Date('2030-06-14T00:00:00Z') } } });
-    expect(prismaMock.securityAuditEvent.deleteMany).toHaveBeenCalledWith({ where: { occurredAt: { lt: new Date('2030-04-15T00:00:00Z') } } });
+    expect(prismaMock.securityAuditEvent.deleteMany).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { occurredAt: { lt: new Date('2030-04-15T00:00:00Z') } },
+          { eventType: { in: ['client.error', 'csp_violation'] }, occurredAt: { lt: new Date('2030-06-30T00:00:00Z') } },
+        ],
+      },
+    });
     expect(prismaMock.outboxEvent.deleteMany).toHaveBeenCalledWith({ where: { status: 'DELIVERED', deliveredAt: { lt: new Date('2030-06-14T00:00:00Z') } } });
+  });
+
+  it('removes unauthenticated client error and CSP reports after 14 days and every other security event after 90 days', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-07-14T00:00:00Z'));
+
+    const result = await runRetention();
+
+    // One delete: the 14-day rule names exactly the two report types, so audit events of
+    // every other type (sign-in, privacy, erasure) are only reached by the 90-day branch.
+    expect(prismaMock.securityAuditEvent.deleteMany).toHaveBeenCalledTimes(1);
+    const { where } = prismaMock.securityAuditEvent.deleteMany.mock.calls[0][0] as {
+      where: { OR: Array<{ eventType?: { in: string[] }; occurredAt: { lt: Date } }> };
+    };
+    const [general, reports] = where.OR;
+    expect(general).toEqual({ occurredAt: { lt: new Date('2030-04-15T00:00:00Z') } });
+    expect(general).not.toHaveProperty('eventType');
+    expect(reports.eventType).toEqual({ in: ['client.error', 'csp_violation'] });
+    expect(reports.occurredAt.lt).toEqual(new Date('2030-06-30T00:00:00Z'));
+    // Still one operation, so the positions of the later counts are unchanged.
+    expect(result.securityEvents).toBe(5);
   });
 
   it('redacts check-in request contact data 12 months after the booking ended', async () => {

@@ -18,6 +18,7 @@ export interface SecurityConfig {
       fontSrc: SourceList;
       connectSrc: SourceList;
       frameSrc: SourceList;
+      objectSrc: SourceList;
       manifestSrc: SourceList;
       workerSrc: SourceList;
       frameAncestors: SourceList;
@@ -80,6 +81,7 @@ const developmentConfig: SecurityConfig = {
       fontSrc: ["'self'", "data:"],
       connectSrc: ["'self'", "wss:", "ws:"],
       frameSrc: ["'self'"],
+      objectSrc: ["'none'"],
       manifestSrc: ["'self'"],
       workerSrc: ["'self'", "blob:"],
       frameAncestors: ["'none'"],
@@ -133,6 +135,7 @@ const productionConfig: SecurityConfig = {
       fontSrc: ["'self'", "data:"],
       connectSrc: ["'self'"],
       frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
       manifestSrc: ["'self'"],
       workerSrc: ["'self'", "blob:"],
       frameAncestors: ["'none'"],

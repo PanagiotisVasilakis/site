@@ -225,6 +225,11 @@ export async function evaluateOperationalAlerts(): Promise<{ opened: number; res
   return { opened, resolved, evaluated: RULES.length };
 }
 
+// Reports that any browser can send before authentication, one row each. They are kept for two
+// weeks, enough to see a regression after a deploy; every other event type is kept for 90 days.
+const CLIENT_REPORT_EVENT_TYPES = ['client.error', 'csp_violation'];
+const CLIENT_REPORT_RETENTION_DAYS = 14;
+
 // Guests erased per operations run (every 5 minutes), so one run stays short.
 const RETENTION_ERASURE_BATCH = 25;
 const RETENTION_ERASURE_NOTE =
@@ -244,7 +249,14 @@ export async function runRetention(): Promise<Record<string, number>> {
     prisma.refreshToken.deleteMany({ where: { expiresAt: { lt: days(30) } } }),
     prisma.refreshTokenFamily.deleteMany({ where: { absoluteExpiresAt: { lt: days(30) } } }),
     prisma.bookingClaimGrant.deleteMany({ where: { expiresAt: { lt: days(30) } } }),
-    prisma.securityAuditEvent.deleteMany({ where: { occurredAt: { lt: days(90) } } }),
+    prisma.securityAuditEvent.deleteMany({
+      where: {
+        OR: [
+          { occurredAt: { lt: days(90) } },
+          { eventType: { in: CLIENT_REPORT_EVENT_TYPES }, occurredAt: { lt: days(CLIENT_REPORT_RETENTION_DAYS) } },
+        ],
+      },
+    }),
     prisma.outboxEvent.deleteMany({ where: { status: 'DELIVERED', deliveredAt: { lt: days(30) } } }),
     // Erasure-cancelled events at once; failed deliveries after 30 days (until
     // then the admin can retry them).
