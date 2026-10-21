@@ -71,6 +71,7 @@ Owner inputs (status on 2026-10-21):
 - [Selected deployment target](docs/architecture/deployment-target.md)
 - [Release verification](docs/release-verification.md)
 - [Production-image smoke](docs/deployment/production-image-smoke.md)
+- Launch and operation of the VPS: [day-0 runbook](docs/deployment/day-0-runbook.md), [backup and restore](docs/deployment/backup-and-restore.md), [monitoring and alerting](docs/deployment/monitoring-and-alerting.md), [Cloudflare checklist](docs/deployment/cloudflare-checklist.md); the host scripts and env templates are in [deploy/host/](deploy/host/README.md)
 - [Trusted ingress contract](docs/security/trusted-ingress.md) and [origin runbook](docs/deployment/origin-ingress-runbook.md)
 - [Layered rate-limiting contract](docs/security/layered-rate-limiting.md)
 - [Booking claim-token transport](docs/security/claim-token-transport.md)

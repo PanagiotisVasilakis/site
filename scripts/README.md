@@ -473,6 +473,8 @@ run them from host timers with single-flight and bounded execution, e.g. root's 
 */5 * * * * cd /opt/qr-city-guide && flock -n /run/lock/qr-operations.lock timeout 280 docker compose -f docker/docker-compose.prod.yml --profile ops run --rm --no-deps operations
 ```
 
+`deploy/host/run-worker.sh` wraps exactly this (single-flight lock, time limit, journald output, optional heartbeat) and `deploy/host/backup.sh` does the same for the nightly encrypted dump; the day-0 runbook (`docs/deployment/day-0-runbook.md`) installs both. The lines above stay the plain-cron reference.
+
 Each run prints one JSON line (or a `failed` event on stderr and exit 1). Cron
 mails that output or drops it; append `2>&1 | logger -t qr-<worker>` (or use
 systemd timers) to get it into journald. `| logger` hides the job's exit status
