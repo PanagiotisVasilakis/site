@@ -78,6 +78,7 @@ Owner inputs (status on 2026-10-21):
 - [Runtime credential contract](docs/security/runtime-credential-contract.md)
 - [Privacy operating documents](docs/privacy/README.md): [data subject requests](docs/privacy/dsar-runbook.md), [breach runbook](docs/privacy/breach-runbook.md), [record of processing](docs/privacy/record-of-processing.md), [processors](docs/privacy/processors.md), [proposed notice changes](docs/privacy/proposed-notice-changes.md)
 - [Host handbook](docs/operations/host-handbook.md)
+- [Adding a licensed guide photo](docs/operations/guide-photos.md)
 - [Setup and runtime](scripts/README.md)
 - [Visual identity and design system](docs/design/identity.md)
 - [Testing strategy](docs/testing.md)
