@@ -13,7 +13,10 @@ const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[
 
 const requestSchema = z.object({
   requestedTime: z.string().regex(timePattern, 'Requested time must be in HH:MM format'),
-  message: z.string().trim().max(500, 'Message must be 500 characters or fewer').optional(),
+  message: z.string().trim().max(500, 'Message must be 500 characters or fewer')
+    // JSON can carry U+0000 as \u0000, but PostgreSQL text rejects it (SQLSTATE 22021), which would surface as a 500.
+    .refine((value) => !value.includes('\u0000'), 'Message must not contain null characters')
+    .optional(),
 }).strict();
 
 export const dynamic = 'force-dynamic';

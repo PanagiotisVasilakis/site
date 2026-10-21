@@ -128,6 +128,37 @@ describe('arrival-time request route', () => {
     expect(mocks.deliverOutboxEvent).not.toHaveBeenCalled();
   });
 
+  // JSON carries U+0000 as \u0000 and PostgreSQL text rejects it (SQLSTATE 22021): it must stop at validation, not become a 500.
+  it.each([
+    ['inside the message', { requestedTime: '17:00', message: 'Late\u0000 flight' }, 'message'],
+    ['alone as the message', { requestedTime: '17:00', message: '\u0000' }, 'message'],
+    ['after the requested time', { requestedTime: '17:00\u0000', message: 'Late flight' }, 'requestedTime'],
+  ])('answers 422 for a NUL character %s and stores nothing', async (_name, body, path) => {
+    const error = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+
+    const response = await post(body);
+
+    expect(response.status).toBe(422);
+    expect((await response.json()).error.details.validationErrors).toEqual([expect.objectContaining({ path })]);
+    expect(mocks.findBooking).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.deliverOutboxEvent).not.toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it('keeps accepting a multi-line message with other punctuation and control characters', async () => {
+    mocks.create.mockResolvedValue({ request: record('17:00'), notificationEventId: 'event-1', created: true });
+    mocks.deliverOutboxEvent.mockResolvedValue(true);
+
+    const response = await post({ requestedTime: '17:00', message: 'Late flight\n\tWe land at 16:40 – thanks! Σας ευχαριστούμε' });
+
+    expect(response.status).toBe(201);
+    expect(mocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Late flight\n\tWe land at 16:40 – thanks! Σας ευχαριστούμε' }),
+      expect.anything(),
+    );
+  });
+
   it('returns the latest request of the verified guest', async () => {
     mocks.findLatestForGuest.mockResolvedValue(record('18:15'));
 

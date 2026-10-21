@@ -11,6 +11,12 @@ const MAX_REDIRECTS = 2;
 const FETCH_TIMEOUT_MS = 10_000;
 const MAX_BODY_BYTES = 1_048_576; // 1 MiB, the parser's input cap
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+// Static and anonymous: no URL, contact data or secret. Node's default User-Agent is just "node", which a
+// bot filter in front of the export may answer with a 403 or an HTML challenge instead of the calendar.
+const REQUEST_HEADERS = {
+  'User-Agent': 'qr-city-guide-calendar-sync/1',
+  Accept: 'text/calendar, text/plain;q=0.8, */*;q=0.1',
+};
 
 export type CalendarFetchErrorCode =
   | 'invalid_url'
@@ -102,6 +108,7 @@ async function fetchFollowingAllowedRedirects(start: URL, signal: AbortSignal): 
       method: 'GET',
       redirect: 'manual',
       credentials: 'omit',
+      headers: REQUEST_HEADERS,
       signal,
     });
     if (REDIRECT_STATUSES.has(response.status)) {

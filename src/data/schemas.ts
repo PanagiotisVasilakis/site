@@ -16,6 +16,28 @@ export const CategorySchema = z.object({
 
 export type Category = z.infer<typeof CategorySchema>;
 
+// z.url() accepts every scheme, javascript: and data: included, and these fields are rendered as href attributes.
+const httpUrl = z.url({ protocol: /^https?$/ });
+
+/**
+ * Where a guide photo comes from and under which licence it may be shown. Every third-party heroImage needs
+ * one: the strict content gate (src/lib/data.ts, run by the build) fails without it, so a photo with no
+ * recorded right cannot reach the site again, and the detail page prints it, which CC BY and CC BY-SA require.
+ */
+export const HeroImageCreditSchema = z.object({
+  author: z.string().min(1),
+  /** The licence as its source states it: "CC BY-SA 4.0", "CC0", "Public domain", "Own photo". */
+  license: z.string().min(1),
+  /** The page that shows the photo with its author and licence (for example the Wikimedia Commons file page). */
+  sourceUrl: httpUrl,
+  licenseUrl: httpUrl.optional(),
+}).strict();
+
+export type HeroImageCredit = z.infer<typeof HeroImageCreditSchema>;
+
+/** Illustrations drawn for this site: no third party holds rights in them, so they need no credit. */
+export const PROJECT_ARTWORK_HERO_IMAGES: ReadonlySet<string> = new Set(['/phones/sos-hero.webp']);
+
 export const ItemSchema = z.object({
   id: z.string(),
   categoryId: z.string(),
@@ -39,13 +61,14 @@ export const ItemSchema = z.object({
   location: z
     .object({ lat: z.number(), lng: z.number() })
     .optional(),
-  website: z.url().optional(),
-  directionsUrl: z.url().optional(),
-  sourceUrls: z.array(z.url()).optional(),
+  website: httpUrl.optional(),
+  directionsUrl: httpUrl.optional(),
+  sourceUrls: z.array(httpUrl).optional(),
   tags: z.array(z.string()).optional(),
   image: z.string().optional(),
   heroImage: z.string().optional(),
   heroImagePosition: z.string().optional(),
+  heroImageCredit: HeroImageCreditSchema.optional(),
   slug: z.string().optional(),
 });
 

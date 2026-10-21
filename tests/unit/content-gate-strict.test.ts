@@ -7,6 +7,9 @@ import { getItem, getItemsByCategory, toSlug } from '@/lib/data';
 import { logger } from '@/lib/logger-enterprise';
 import { validateLocalization } from '@/lib/validation';
 
+// Built from parts: lint:security's no-script-url flags a string literal that starts with the scheme.
+const SCRIPT_LINK = `${'javascript'}:alert(1)`;
+
 const place = {
   id: 'old-town',
   categoryId: 'fixture',
@@ -43,6 +46,19 @@ describe('getItemsByCategory strict mode (build gate, R-421/R-456)', () => {
 
     expect(message).toBe('Invalid item in category fixture (index 1, id "bad-link"): website (invalid_format)');
     expect(message).not.toContain('example.gr');
+  });
+
+  it.each([
+    ['website', { website: SCRIPT_LINK }, 'website'],
+    ['directionsUrl', { directionsUrl: 'data:text/html,<script>alert(1)</script>' }, 'directionsUrl'],
+    ['sourceUrls', { sourceUrls: ['https://example.com/a', SCRIPT_LINK] }, 'sourceUrls.1'],
+  ])('throws on a non-http %s link and names its field but not the value', (_field, link, issuePath) => {
+    serve([place, { ...place, id: 'bad-link', name: 'Bad Link', ...link }]);
+
+    const message = strictFailure();
+
+    expect(message).toBe(`Invalid item in category fixture (index 1, id "bad-link"): ${issuePath} (invalid_format)`);
+    expect(message).not.toContain('alert');
   });
 
   it('throws on a misspelled key and names the key but not its value', () => {
@@ -107,6 +123,20 @@ describe('getItemsByCategory strict mode (build gate, R-421/R-456)', () => {
   });
 });
 
+describe('getItemsByCategory with a non-http link in the default load', () => {
+  it('skips the item and logs the field, so the link never reaches a page', () => {
+    const warn = silenceLogger();
+    serve([place, { ...place, id: 'js-link', name: 'Js Link', directionsUrl: SCRIPT_LINK }]);
+
+    const items = getItemsByCategory('fixture');
+
+    expect(items.map((item) => item.id)).toEqual(['old-town']);
+    expect(warn).toHaveBeenCalledWith('Invalid item skipped in category data', {
+      issues: [expect.objectContaining({ path: ['directionsUrl'], code: 'invalid_format' })],
+    });
+  });
+});
+
 describe('item slugs (decision O50, R-446)', () => {
   const pinned = { ...place, slug: 'pinned-old-town' };
   const derived = { ...place, id: 'plain', name: 'Plain Name' };
@@ -129,6 +159,44 @@ describe('item slugs (decision O50, R-446)', () => {
     serve([{ ...place, id: 'greek-only', name: 'Παλιά πόλη' }]);
 
     expect(getItemsByCategory('fixture', { strict: true }).map((item) => item.slug)).toEqual(['']);
+  });
+});
+
+describe('guide photo provenance (strict build gate)', () => {
+  const credit = {
+    author: 'A. Photographer',
+    license: 'CC BY-SA 4.0',
+    sourceUrl: 'https://commons.wikimedia.org/wiki/File:Old_Town.jpg',
+  };
+
+  it('throws on a hero image without a credit and names the category, item and the missing credit but not the path', () => {
+    serve([place, { ...place, id: 'no-credit', name: 'No Credit', heroImage: '/moments/secret-path.jpg' }]);
+
+    const message = strictFailure();
+
+    expect(message).toBe('Invalid item in category fixture (index 1, id "no-credit"): heroImage needs heroImageCredit (author, license, sourceUrl)');
+    expect(message).not.toContain('secret-path');
+  });
+
+  it('accepts a hero image with a complete credit and the project artwork without one', () => {
+    serve([
+      { ...place, heroImage: '/moments/old-town.jpg', heroImageCredit: credit },
+      { ...place, id: 'sos', name: 'SOS', heroImage: '/phones/sos-hero.webp' },
+    ]);
+
+    expect(getItemsByCategory('fixture', { strict: true }).map((item) => item.id)).toEqual(['old-town', 'sos']);
+  });
+
+  it('throws on an incomplete credit', () => {
+    serve([{ ...place, heroImage: '/moments/old-town.jpg', heroImageCredit: { author: 'A. Photographer' } }]);
+
+    expect(strictFailure()).toContain('heroImageCredit.license');
+  });
+
+  it('still lists an item without a credit at run time, so a content slip never hides an emergency number', () => {
+    serve([{ ...place, heroImage: '/moments/old-town.jpg' }]);
+
+    expect(getItemsByCategory('fixture').map((item) => item.id)).toEqual(['old-town']);
   });
 });
 

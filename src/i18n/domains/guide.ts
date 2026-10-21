@@ -23,6 +23,7 @@ export interface GuideDictionary {
     saveNamed: string;
     opensMaps: string;
     opensWebsite: string;
+    photoCredit: string;
     distance: string;
     mapListLabel: string;
     mapNote: string;
@@ -65,6 +66,7 @@ export const guideTranslations: Record<Locale, GuideDictionary> = {
         saveNamed: "Save {name}",
         opensMaps: "(opens Google Maps)",
         opensWebsite: "(opens in a new tab)",
+        photoCredit: "Photo",
         distance: "{distance} from the apartment, in a straight line",
         mapListLabel: "Places on the map",
         mapNote: "The numbers on the map match this list. Distances are in a straight line.",
@@ -105,6 +107,7 @@ export const guideTranslations: Record<Locale, GuideDictionary> = {
         saveNamed: "Αποθήκευση: {name}",
         opensMaps: "(ανοίγει τους Χάρτες Google)",
         opensWebsite: "(ανοίγει σε νέα καρτέλα)",
+        photoCredit: "Φωτογραφία",
         distance: "{distance} από το διαμέρισμα, σε ευθεία γραμμή",
         mapListLabel: "Μέρη στον χάρτη",
         mapNote: "Οι αριθμοί στον χάρτη αντιστοιχούν σε αυτή τη λίστα. Οι αποστάσεις είναι σε ευθεία γραμμή.",

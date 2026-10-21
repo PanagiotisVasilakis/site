@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { ZodError } from "zod";
-import { ItemSchema, type Item } from "../data/schemas";
+import { ItemSchema, PROJECT_ARTWORK_HERO_IMAGES, type Item } from "../data/schemas";
 import { categories } from "../data/categories";
 import type { Locale } from "@/i18n/config";
 import { logger } from '@/lib/logger-enterprise';
@@ -71,6 +71,12 @@ export function getItemsByCategory(categoryId: string, { strict = false }: { str
     const slug = typeof pinned === "string" && pinned ? pinned : toSlug(name);
     const result = schema.safeParse({ ...(obj as object), slug });
     if (result.success) {
+      // Strict (build) only: at run time an item must still render, but no photo ships without a recorded right.
+      if (strict && result.data.heroImage && !result.data.heroImageCredit
+        && !PROJECT_ARTWORK_HERO_IMAGES.has(result.data.heroImage)) {
+        const id = typeof obj["id"] === "string" ? `, id ${JSON.stringify(obj["id"])}` : "";
+        throw new Error(`Invalid item in category ${categoryId} (index ${index}${id}): heroImage needs heroImageCredit (author, license, sourceUrl)`);
+      }
       items.push(result.data);
     } else if (strict) {
       const id = typeof obj["id"] === "string" ? `, id ${JSON.stringify(obj["id"])}` : "";

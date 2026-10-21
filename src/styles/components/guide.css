@@ -436,6 +436,14 @@
     box-shadow: none;
   }
 }
+.guide-detail .guide-detail__credit {
+  width: min(var(--container), 100% - 2 * var(--gutter));
+  margin: 10px auto 0;
+  font-size: var(--text-caption);
+  line-height: var(--text-caption--line-height);
+  color: var(--color-fg-muted);
+}
+.guide-detail .guide-detail__credit a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .guide-detail .guide-detail__main {
   display: grid;
   grid-template-areas: "head" "actions" "facts" "body";

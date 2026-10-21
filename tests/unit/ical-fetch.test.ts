@@ -16,6 +16,10 @@ const OLD_FEED_URL = `https://admin.booking.com/hotel/hoteladmin/ical.html?${SEN
 const CALENDAR = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n';
 const MAX_BYTES = 1_048_576;
 const CONSOLE_METHODS = ['log', 'info', 'warn', 'error', 'debug', 'trace'] as const;
+const REQUEST_HEADERS = {
+  'User-Agent': 'qr-city-guide-calendar-sync/1',
+  Accept: 'text/calendar, text/plain;q=0.8, */*;q=0.1',
+};
 
 function redirectTo(location: string | null, status = 302) {
   const headers = new Headers();
@@ -69,9 +73,22 @@ describe('fetchBookingCalendarText', () => {
       method: 'GET',
       redirect: 'manual',
       credentials: 'omit',
+      headers: REQUEST_HEADERS,
       signal: expect.any(AbortSignal),
     });
     expect(init?.signal?.aborted).toBe(false);
+  });
+
+  it('identifies itself with a static User-Agent and an Accept header that carry no URL, token or contact data', async () => {
+    mocks.fetch.mockResolvedValue(new Response(CALENDAR, { status: 200 }));
+
+    await fetchBookingCalendarText(FEED_URL);
+
+    const headers = new Headers(mocks.fetch.mock.calls[0][1]?.headers);
+    expect([...headers.keys()].sort()).toEqual(['accept', 'user-agent']);
+    expect(headers.get('user-agent')).toBe('qr-city-guide-calendar-sync/1');
+    expect(headers.get('accept')).toBe('text/calendar, text/plain;q=0.8, */*;q=0.1');
+    expect(inspect([...headers.values()])).not.toMatch(/SENTINEL|booking\.com|https?:|@/i);
   });
 
   it('reads a body of exactly 1 MiB', async () => {
@@ -282,7 +299,12 @@ describe('fetchBookingCalendarText', () => {
     expect(mocks.fetch).toHaveBeenCalledTimes(2);
     expect(mocks.fetch.mock.calls[0][0]).toBe(OLD_FEED_URL);
     expect(mocks.fetch.mock.calls[1][0]).toBe(next);
-    expect(mocks.fetch.mock.calls[1][1]).toEqual(expect.objectContaining({ method: 'GET', redirect: 'manual' }));
+    expect(mocks.fetch.mock.calls[1][1]).toEqual(expect.objectContaining({
+      method: 'GET',
+      redirect: 'manual',
+      credentials: 'omit',
+      headers: REQUEST_HEADERS,
+    }));
   });
 
   it('resolves a relative Location against the current URL', async () => {
