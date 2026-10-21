@@ -161,7 +161,8 @@ export default function GuestDataViewer() {
     }
   }
 
-  const exportBooking = async (bookingId: string) => {
+  // Everything stored about the guest of the booking (access and portability), not only the booking.
+  const exportGuestData = async (bookingId: string) => {
     try {
       const response = await internalFetch(`/api/admin/guests?action=export&bookingId=${bookingId}`)
       if (!response.ok) {
@@ -171,13 +172,13 @@ export default function GuestDataViewer() {
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `booking_${bookingId}_${Date.now()}.json`
+      a.download = `guest_data_${bookingId}_${Date.now()}.json`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
       window.URL.revokeObjectURL(url)
     } catch (error) {
-      console.error('Export booking failed', error)
+      console.error('Export guest data failed', error)
       setError('Export failed')
     }
   }
@@ -569,7 +570,7 @@ export default function GuestDataViewer() {
                       {new Date(booking.booking.startDate).toLocaleDateString(undefined, { timeZone: 'UTC' })} to {new Date(booking.booking.endDate).toLocaleDateString(undefined, { timeZone: 'UTC' })}
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Badge variant={booking.booking.accessStatus === 'VERIFIED' ? 'approved' : 'pending'}>
                       {booking.booking.accessStatus === 'VERIFIED' ? 'Claimed' : 'Unclaimed'}
                     </Badge>
@@ -585,10 +586,11 @@ export default function GuestDataViewer() {
                       </button>
                     )}
                     <button
-                      onClick={() => exportBooking(booking.booking.id)}
+                      onClick={() => exportGuestData(booking.booking.id)}
+                      title="Downloads one JSON file with all data stored about this guest: account, every booking, arrival requests, accepted terms, privacy requests and portal sign-ins"
                       className="admin-tone admin-tone--info px-3 py-1 rounded-full text-sm"
                     >
-                      Export
+                      Export all guest data
                     </button>
                     {booking.booking.accessStatus === 'VERIFIED' && booking.user && (
                       <button

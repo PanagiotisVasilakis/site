@@ -15,6 +15,7 @@ vi.mock('@/lib/portalAuthService', async (importOriginal) => ({
 import { POST } from '@/app/api/admin/bookings/[id]/claim-grants/route';
 
 const BOOKING_ID = '1826a63a-4b2f-405c-820a-4f5abf23c6cb';
+const ADMIN_SESSION_ID = '0f8d6a55-2f5e-4c43-9a5e-1d6d0f3f9b11';
 const ATTESTATION = 'b'.repeat(64);
 
 function issue(options: {
@@ -22,13 +23,19 @@ function issue(options: {
   id?: string;
   body?: unknown;
   headers?: Record<string, string>;
+  // null sends no admin cookie at all.
+  cookie?: string | null;
 }): Promise<Response> {
   const id = options.id ?? BOOKING_ID;
   // Route handlers see the server bind host in request.url (e.g. `next dev -H 0.0.0.0`).
   const url = options.url ?? `http://0.0.0.0:3000/api/admin/bookings/${id}/claim-grants`;
   const request = new NextRequest(url, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', cookie: 'admin_jwt=signed', ...options.headers },
+    headers: {
+      'content-type': 'application/json',
+      ...(options.cookie === null ? {} : { cookie: options.cookie ?? 'admin_jwt=signed' }),
+      ...options.headers,
+    },
     body: JSON.stringify(options.body ?? { channel: 'REMOTE' }),
   });
   return POST(request, { params: Promise.resolve({ id }) });
@@ -36,7 +43,7 @@ function issue(options: {
 
 describe('admin claim-grant issuance origin and id checks', () => {
   beforeEach(() => {
-    mocks.verifyAdminSession.mockResolvedValue({ session_id: '0f8d6a55-2f5e-4c43-9a5e-1d6d0f3f9b11' });
+    mocks.verifyAdminSession.mockResolvedValue({ session_id: ADMIN_SESSION_ID });
     mocks.issueBookingClaimGrant.mockResolvedValue({
       token: `claim_${'T'.repeat(43)}`,
       expiresAt: new Date('2030-01-01T00:30:00.000Z'),
@@ -113,5 +120,58 @@ describe('admin claim-grant issuance origin and id checks', () => {
 
     expect(response.status).toBe(201);
     expect(mocks.issueBookingClaimGrant).toHaveBeenCalledWith(expect.objectContaining({ channel: 'ONSITE', ttlMinutes: 30 }));
+  });
+});
+
+describe('admin claim-grant issuance authentication', () => {
+  const SAME_ORIGIN = { origin: 'http://localhost:3000', host: 'localhost:3000' };
+
+  beforeEach(() => {
+    mocks.verifyAdminSession.mockResolvedValue({ session_id: ADMIN_SESSION_ID });
+    mocks.issueBookingClaimGrant.mockResolvedValue({
+      token: `claim_${'T'.repeat(43)}`,
+      expiresAt: new Date('2030-01-01T00:30:00.000Z'),
+    });
+  });
+
+  it('issues a grant for the admin session that the cookie names', async () => {
+    const response = await issue({ headers: SAME_ORIGIN });
+
+    expect(response.status).toBe(201);
+    expect(mocks.verifyAdminSession).toHaveBeenCalledWith('signed');
+    expect(mocks.issueBookingClaimGrant).toHaveBeenCalledWith(expect.objectContaining({ adminSessionId: ADMIN_SESSION_ID }));
+  });
+
+  it('answers 401 without an admin cookie and issues nothing', async () => {
+    const response = await issue({ cookie: null, headers: SAME_ORIGIN });
+
+    expect(response.status).toBe(401);
+    expect(mocks.verifyAdminSession).not.toHaveBeenCalled();
+    expect(mocks.issueBookingClaimGrant).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a session that is forged, expired or revoked', null],
+    ['a session without an identifier', { type: 'admin', role: 'admin' }],
+  ])('answers 401 for %s and issues nothing', async (_label, session) => {
+    mocks.verifyAdminSession.mockResolvedValue(session);
+
+    const response = await issue({ headers: SAME_ORIGIN });
+
+    expect(response.status).toBe(401);
+    expect(mocks.verifyAdminSession).toHaveBeenCalledWith('signed');
+    expect(mocks.issueBookingClaimGrant).not.toHaveBeenCalled();
+  });
+
+  it('checks the session before the origin, the booking id and the body', async () => {
+    const response = await issue({
+      cookie: null,
+      id: 'not-a-uuid',
+      body: { channel: 'SMOKE_SIGNAL' },
+      headers: { origin: 'https://evil.example', host: 'localhost:3000' },
+    });
+
+    expect(response.status).toBe(401);
+    expect(mocks.issueBookingClaimGrant).not.toHaveBeenCalled();
   });
 });

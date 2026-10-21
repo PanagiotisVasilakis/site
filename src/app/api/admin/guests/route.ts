@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { guestDataExport } from '@/lib/guestDataExport';
 import { withErrorHandler } from '@/lib/apiErrorHandler';
 import { createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
+import { isSameOriginRequest } from '@/lib/net/sameOrigin';
 import { isAdminRequest } from '@/lib/rbac';
 
 interface QueryParams {
@@ -99,6 +100,11 @@ const handler = async (request: NextRequest) => {
       return createSuccessResponse({ statistics });
 
     case 'export':
+      // A full personal-data file: refuse a page of another origin even though the cookie is SameSite=Strict.
+      const exportOrigin = request.headers.get('origin');
+      if (exportOrigin && !isSameOriginRequest(exportOrigin, request)) {
+        throw new ApiError(ApiErrorCode.FORBIDDEN, 'Cross-origin admin export rejected');
+      }
       if (!params.bookingId) {
         throw new ApiError(
           ApiErrorCode.VALIDATION_ERROR,
@@ -108,7 +114,8 @@ const handler = async (request: NextRequest) => {
       if (!z.uuid().safeParse(params.bookingId).success) {
         throw new ApiError(ApiErrorCode.NOT_FOUND, 'Booking not found');
       }
-      const exportData = await guestDataExport.getBookingDetails(params.bookingId);
+      // Everything stored about the guest of this booking (access and portability), not only the booking.
+      const exportData = await guestDataExport.getCompleteGuestExport(params.bookingId);
       if (!exportData) {
         throw new ApiError(
           ApiErrorCode.NOT_FOUND,
@@ -119,7 +126,7 @@ const handler = async (request: NextRequest) => {
       // Return as downloadable JSON using NextResponse
       return NextResponse.json(exportData, {
         headers: {
-          'Content-Disposition': `attachment; filename="booking_${params.bookingId}_${Date.now()}.json"`,
+          'Content-Disposition': `attachment; filename="guest_data_${params.bookingId}_${Date.now()}.json"`,
           'Cache-Control': 'no-store',
         },
       });

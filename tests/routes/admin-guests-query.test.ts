@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   isAdminRequest: vi.fn(),
   getAllBookings: vi.fn(),
-  getBookingDetails: vi.fn(),
+  getCompleteGuestExport: vi.fn(),
   searchBookingsByDateRange: vi.fn(),
 }));
 
@@ -12,7 +12,7 @@ vi.mock('@/lib/rbac', () => ({ isAdminRequest: mocks.isAdminRequest }));
 vi.mock('@/lib/guestDataExport', () => ({
   guestDataExport: {
     getAllBookings: mocks.getAllBookings,
-    getBookingDetails: mocks.getBookingDetails,
+    getCompleteGuestExport: mocks.getCompleteGuestExport,
     searchBookingsByDateRange: mocks.searchBookingsByDateRange,
   },
 }));
@@ -21,9 +21,9 @@ import { GET } from '@/app/api/admin/guests/route';
 
 const BOOKING_ID = '4c939e37-ef9f-4fb2-8231-319896c89080';
 
-function get(query: string): Promise<Response> {
+function get(query: string, headers: Record<string, string> = {}): Promise<Response> {
   return GET(
-    new NextRequest(`http://localhost:3000/api/admin/guests?${query}`),
+    new NextRequest(`http://localhost:3000/api/admin/guests?${query}`, { headers }),
     { params: Promise.resolve({}) },
   );
 }
@@ -31,7 +31,7 @@ function get(query: string): Promise<Response> {
 describe('admin guests route query validation', () => {
   beforeEach(() => {
     mocks.isAdminRequest.mockResolvedValue(true);
-    mocks.getBookingDetails.mockResolvedValue({ id: BOOKING_ID });
+    mocks.getCompleteGuestExport.mockResolvedValue({ booking: { id: BOOKING_ID }, user: null, checkInRequests: [] });
     mocks.searchBookingsByDateRange.mockResolvedValue([]);
   });
 
@@ -39,26 +39,43 @@ describe('admin guests route query validation', () => {
     const response = await get('action=export&bookingId=not-a-uuid');
 
     expect(response.status).toBe(404);
-    expect(mocks.getBookingDetails).not.toHaveBeenCalled();
+    expect(mocks.getCompleteGuestExport).not.toHaveBeenCalled();
   });
 
-  it('exports a booking for a well-formed bookingId', async () => {
+  it('exports everything stored about the guest of a well-formed bookingId as a no-store download', async () => {
     const response = await get(`action=export&bookingId=${BOOKING_ID}`);
 
     expect(response.status).toBe(200);
-    expect(mocks.getBookingDetails).toHaveBeenCalledWith(BOOKING_ID);
-    expect(response.headers.get('content-disposition')).toContain(`booking_${BOOKING_ID}_`);
-    expect(response.headers.get('content-disposition')).toMatch(/^attachment;/);
+    expect(mocks.getCompleteGuestExport).toHaveBeenCalledWith(BOOKING_ID);
+    expect(response.headers.get('content-disposition')).toMatch(new RegExp(`^attachment; filename="guest_data_${BOOKING_ID}_\\d+\\.json"$`, 'u'));
     expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.json()).toEqual({ booking: { id: BOOKING_ID }, user: null, checkInRequests: [] });
   });
 
   it('answers 404 for a well-formed but unknown export bookingId', async () => {
-    mocks.getBookingDetails.mockResolvedValue(null);
+    mocks.getCompleteGuestExport.mockResolvedValue(null);
 
     const response = await get(`action=export&bookingId=${BOOKING_ID}`);
 
     expect(response.status).toBe(404);
-    expect(mocks.getBookingDetails).toHaveBeenCalledWith(BOOKING_ID);
+    expect(mocks.getCompleteGuestExport).toHaveBeenCalledWith(BOOKING_ID);
+  });
+
+  it('accepts an export requested by a page of the same origin', async () => {
+    const response = await get(`action=export&bookingId=${BOOKING_ID}`, { origin: 'http://localhost:3000', host: 'localhost:3000' });
+
+    expect(response.status).toBe(200);
+  });
+
+  it.each([
+    ['a foreign origin', { origin: 'https://evil.example', host: 'localhost:3000' }],
+    ['an opaque origin', { origin: 'null', host: 'localhost:3000' }],
+  ])('answers 403 to an export requested from %s without reading guest data', async (_label, headers) => {
+    const response = await get(`action=export&bookingId=${BOOKING_ID}`, headers);
+
+    expect(response.status).toBe(403);
+    expect(response.headers.get('content-disposition')).toBeNull();
+    expect(mocks.getCompleteGuestExport).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -69,7 +86,7 @@ describe('admin guests route query validation', () => {
     const response = await get(query);
 
     expect(response.status).toBe(422);
-    expect(mocks.getBookingDetails).not.toHaveBeenCalled();
+    expect(mocks.getCompleteGuestExport).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -105,7 +122,7 @@ describe('admin guests route query validation', () => {
       expect(response.status).toBe(401);
       expect(mocks.isAdminRequest).toHaveBeenCalledOnce();
       expect(mocks.getAllBookings).not.toHaveBeenCalled();
-      expect(mocks.getBookingDetails).not.toHaveBeenCalled();
+      expect(mocks.getCompleteGuestExport).not.toHaveBeenCalled();
     },
   );
 });

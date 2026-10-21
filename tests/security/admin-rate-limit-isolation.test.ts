@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   signAdmin: vi.fn(),
   queryRaw: vi.fn(),
   transaction: vi.fn(),
+  auditCreate: vi.fn(),
+  auditCreateMany: vi.fn(),
   logger: {
     setContext: vi.fn(),
     getContext: vi.fn(),
@@ -23,8 +25,12 @@ vi.mock('@/lib/auth/admin', () => ({
   signAdmin: mocks.signAdmin,
 }));
 
+// The sign-in audit events (tests/security/admin-login-audit.test.ts) go through securityAuditEvent.
 vi.mock('@/lib/prisma', () => ({
-  prisma: { $transaction: mocks.transaction },
+  prisma: {
+    $transaction: mocks.transaction,
+    securityAuditEvent: { create: mocks.auditCreate, createMany: mocks.auditCreateMany },
+  },
 }));
 
 vi.mock('@/lib/logger-enterprise', () => ({ logger: mocks.logger }));
@@ -135,6 +141,10 @@ describe('admin login source-budget isolation', () => {
       expect.stringMatching(/^sensitive:[a-f0-9]{64}$/u),
       expect.stringMatching(/^sensitive:[a-f0-9]{64}$/u),
     ]);
+    // The audit events add no limiter row (see the budgets above) and no error.
+    expect(mocks.auditCreate).toHaveBeenCalledTimes(6);
+    expect(mocks.auditCreateMany).toHaveBeenCalledTimes(1);
+    expect(mocks.logger.error).not.toHaveBeenCalled();
   });
 
   it('rejects attacker-supplied administrator hints identically, without a session or a hint-keyed budget', async () => {

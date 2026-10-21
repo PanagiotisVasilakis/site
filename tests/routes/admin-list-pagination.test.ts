@@ -2,12 +2,13 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  isAdminRequest: vi.fn(),
+  verifyAdminSession: vi.fn(),
   list: vi.fn(),
   getStatusCounts: vi.fn(),
 }));
 
-vi.mock('@/lib/rbac', () => ({ isAdminRequest: mocks.isAdminRequest }));
+// The session check is mocked and rbac.ts is not: its cookie handling is part of what these tests cover.
+vi.mock('@/lib/auth/admin', () => ({ verifyAdminSession: mocks.verifyAdminSession }));
 vi.mock('@/lib/prisma-repositories/checkInRequestRepository', () => ({
   checkInRequestRepository: { list: mocks.list, getStatusCounts: mocks.getStatusCounts },
 }));
@@ -17,8 +18,10 @@ import { toAdminListPage } from '@/lib/adminListPage';
 
 const id = (n: number) => `72000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
-function get(handler: typeof listCheckInRequests, path: string) {
-  return handler(new NextRequest(`http://localhost:3000${path}`), { params: Promise.resolve({}) });
+// A null cookie sends no admin cookie at all.
+function get(handler: typeof listCheckInRequests, path: string, options: { cookie?: string | null } = {}) {
+  const headers: Record<string, string> = options.cookie === null ? {} : { cookie: options.cookie ?? 'admin_jwt=signed' };
+  return handler(new NextRequest(`http://localhost:3000${path}`, { headers }), { params: Promise.resolve({}) });
 }
 
 describe('toAdminListPage', () => {
@@ -39,7 +42,7 @@ describe('toAdminListPage', () => {
 
 describe('admin check-in request list', () => {
   beforeEach(() => {
-    mocks.isAdminRequest.mockResolvedValue(true);
+    mocks.verifyAdminSession.mockResolvedValue({ session_id: '0f8d6a55-2f5e-4c43-9a5e-1d6d0f3f9b11' });
     mocks.getStatusCounts.mockResolvedValue({ pending: 3, approved: 150, rejected: 7, total: 160 });
     mocks.list.mockResolvedValue({ requests: [], nextCursor: id(9) });
   });
@@ -69,6 +72,41 @@ describe('admin check-in request list', () => {
     const response = await get(listCheckInRequests, `/api/admin/check-in-requests?${query}`);
 
     expect(response.status).toBe(422);
+    expect(mocks.list).not.toHaveBeenCalled();
+  });
+
+  it('verifies the session that the admin cookie carries', async () => {
+    await get(listCheckInRequests, '/api/admin/check-in-requests');
+
+    expect(mocks.verifyAdminSession).toHaveBeenCalledWith('signed');
+  });
+
+  it('answers 401 without an admin cookie and reads nothing', async () => {
+    const response = await get(listCheckInRequests, '/api/admin/check-in-requests?status=all', { cookie: null });
+
+    expect(response.status).toBe(401);
+    expect(mocks.verifyAdminSession).not.toHaveBeenCalled();
+    expect(mocks.list).not.toHaveBeenCalled();
+    expect(mocks.getStatusCounts).not.toHaveBeenCalled();
+  });
+
+  it('answers 401 for a session that is forged, expired or revoked and reads nothing', async () => {
+    mocks.verifyAdminSession.mockResolvedValue(null);
+
+    const response = await get(listCheckInRequests, '/api/admin/check-in-requests?status=all');
+
+    expect(response.status).toBe(401);
+    expect(mocks.verifyAdminSession).toHaveBeenCalledWith('signed');
+    expect(mocks.list).not.toHaveBeenCalled();
+    expect(mocks.getStatusCounts).not.toHaveBeenCalled();
+  });
+
+  it('checks the session before the query parameters', async () => {
+    mocks.verifyAdminSession.mockResolvedValue(null);
+
+    const response = await get(listCheckInRequests, '/api/admin/check-in-requests?status=bogus&limit=0&cursor=abc');
+
+    expect(response.status).toBe(401);
     expect(mocks.list).not.toHaveBeenCalled();
   });
 });
