@@ -69,6 +69,7 @@ const labels: LeafletMapLabels = {
   zoomIn: 'Zoom in',
   zoomOut: 'Zoom out',
   closePopup: 'Close',
+  mapRegion: 'Interactive map',
 };
 
 const OSM_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';

@@ -107,17 +107,31 @@
 /* Home starts with a full-bleed photo: the header floats over it (shellLinks HERO_ROUTES). */
 .site-header.site-header--overlay { margin-bottom: calc(-1 * (var(--header-h) + var(--header-offset))); }
 .site-header.is-scrolled { border-color: var(--color-border); box-shadow: var(--shadow-raised); }
-/* Over a photo the transparent bar cannot guarantee contrast (dark foliage behind dark text measures 2.3:1),
-   so text and icons get a soft halo in the page background colour (light halo in day, dark halo at night). */
-.site-header.site-header--overlay .site-brand,
-.site-header.site-header--overlay .site-nav__link {
+/* Over a photo the transparent bar cannot guarantee contrast (dark foliage behind dark text measures 2.3:1; the
+   wordmark, menu and theme icons 1.2-1.7:1), so text and icons get a soft halo in the page background colour
+   (light halo in day, dark halo at night). It belongs to EVERY header variant, not to the home hero alone
+   (--overlay is only the layout above): photos scroll under the sticky bar on the apartment and guide pages too.
+   Over the plain page the halo has the colour of the page and cannot be seen. */
+.site-header .site-brand,
+.site-header .site-nav__link,
+.site-header .site-header__account {
   text-shadow: 0 0 2px var(--color-bg), 0 0 5px var(--color-bg);
 }
-/* The wordmark box clips overflow (ellipsis); room for the halo inside the clip, same outer size. */
-.site-header.site-header--overlay .site-brand__text { padding: 3px 6px; margin: -3px -6px; }
-.site-header.site-header--overlay .site-brand svg,
-.site-header.site-header--overlay .ui-icon-btn svg {
+/* The wordmark box (.site-brand__name) clips overflow for the ellipsis, and a clip cuts the halo at the glyph edge
+   unless the box itself has room for it: padding inside the clip, cancelled by the margin, same outer size. */
+.site-header .site-brand__name { padding: 3px 6px; margin: -3px -6px; }
+.site-header .site-brand svg,
+.site-header .ui-icon-btn svg {
   filter: drop-shadow(0 0 2px var(--color-bg));
+}
+/* The focus ring is one solid colour (3 px, 3 px offset), which a photo behind the transparent bar can swallow.
+   The offset gap takes the page background colour, so the ring always has a contrasting edge on its inner side.
+   Not for the segmented items (the language switch): their pill is an opaque surface that already fills the gap, and
+   the gap shadow would replace the selected item's own rest shadow. */
+.site-header .shell-link:not(.ui-seg__item):focus-visible,
+.site-header .ui-icon-btn:focus-visible,
+.site-header .ui-btn:focus-visible {
+  box-shadow: 0 0 0 3px var(--color-bg);
 }
 /* fg-muted on the transparent bar is 3.81:1 at night; the place line uses fg in the header. */
 .site-header .site-brand .site-brand__place { color: var(--color-fg); }

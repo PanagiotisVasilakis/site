@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import L from 'leaflet';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -31,6 +31,7 @@ const labels: LeafletMapLabels = {
   zoomIn: 'Zoom in',
   zoomOut: 'Zoom out',
   closePopup: 'Close',
+  mapRegion: 'Interactive map',
 };
 
 // [longitude, latitude], under 2 km apart: the fit lands below the maximum zoom, so a zoom step is still possible.
@@ -76,6 +77,13 @@ function answerLocate(latitude: number, longitude: number) {
   onSuccess({ coords: { latitude, longitude } } as GeolocationPosition);
 }
 
+// The guest denies the browser's location permission: the callback sets component state, so it runs inside act.
+function denyLocate() {
+  const onError = getCurrentPosition.mock.lastCall?.[1];
+  if (!onError) throw new Error('Locate me did not ask for a position');
+  act(() => onError({ code: 1, message: 'denied' } as GeolocationPositionError));
+}
+
 // The data pins carry their place's name as the title; a marker without one is the guest's own position.
 function positionPins(map: L.Map) {
   const pins: L.Marker[] = [];
@@ -102,6 +110,7 @@ beforeEach(() => {
 
 afterEach(() => {
   Reflect.deleteProperty(navigator, 'geolocation');
+  document.documentElement.removeAttribute('data-motion');
 });
 
 // R-394: the two custom controls are plain buttons; Leaflet's own zoom buttons stop the events they receive, so a
@@ -223,5 +232,153 @@ describe('LeafletMap popup close button (R-687)', () => {
     pin.closePopup();
     pin.openPopup();
     expect(closeButton(container)).toHaveAttribute('aria-label', 'Κλείσιμο');
+  });
+});
+
+// FGM-06: the guest's position was drawn with the phone-handset pill of the police, fire and hospital pins.
+describe('LeafletMap position marker (FGM-06)', () => {
+  it('draws the position as a dot with its own marker, not as a place pin', () => {
+    render(mapElement());
+    const map = currentMap();
+
+    fireEvent.click(control('Locate me'));
+    answerLocate(37.03, 22.11);
+
+    const [pin] = positionPins(map);
+    const element = pin.getElement();
+    expect(element?.querySelector('.map-you')).not.toBeNull();
+    expect(element?.querySelector('.map-pin')).toBeNull();
+    expect(element?.querySelector('[data-type]')).toBeNull();
+    expect(element?.querySelector('svg')).toBeNull();
+    // The data pin for the police station keeps the phone pill.
+    expect(document.querySelector('.map-pin--place[data-type="service"] svg')).not.toBeNull();
+  });
+
+  it('keeps the position marker out of the accessibility tree and the tab order', () => {
+    render(mapElement());
+    const map = currentMap();
+
+    fireEvent.click(control('Locate me'));
+    answerLocate(37.03, 22.11);
+
+    const element = positionPins(map)[0].getElement();
+    expect(element?.querySelector('.map-you')).toHaveAttribute('aria-hidden', 'true');
+    expect(element).not.toHaveAttribute('tabindex');
+    expect(element).not.toHaveAttribute('role');
+    expect(element).not.toHaveAttribute('title');
+    expect(element).not.toHaveClass('leaflet-interactive');
+  });
+});
+
+// FGM-06: the permission-denied banner (role="alert") stayed until the next press of Locate me.
+describe('LeafletMap location message (FGM-06)', () => {
+  it('shows the message when the permission is denied and when the browser has no geolocation', () => {
+    render(mapElement());
+
+    fireEvent.click(control('Locate me'));
+    denyLocate();
+    expect(screen.getByRole('alert')).toHaveTextContent('Unavailable');
+
+    fireEvent.click(control('Locate me'));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    Reflect.deleteProperty(navigator, 'geolocation');
+    fireEvent.click(control('Locate me'));
+    expect(screen.getByRole('alert')).toHaveTextContent('Unavailable');
+  });
+
+  it('can be dismissed with its own button, and focus goes back to Locate me', () => {
+    const { container } = render(mapElement(13, greekLabels));
+    fireEvent.click(control('Locate me'));
+    denyLocate();
+    const banner = container.querySelector<HTMLElement>('.map-card__error');
+    expect(banner).not.toBeNull();
+
+    // The button sits next to the message, outside the live region, and is named in the page's language.
+    expect(within(screen.getByRole('alert')).queryByRole('button')).toBeNull();
+    fireEvent.click(within(banner as HTMLElement).getByRole('button', { name: 'Κλείσιμο' }));
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(container.querySelector('.map-card__error')).toBeNull();
+    expect(control('Locate me')).toHaveFocus();
+  });
+
+  it('does not bring a dismissed message back before the next failed answer', () => {
+    const { container } = render(mapElement());
+    fireEvent.click(control('Locate me'));
+    denyLocate();
+    fireEvent.click(within(container.querySelector<HTMLElement>('.map-card__error') as HTMLElement).getByRole('button', { name: 'Close' }));
+
+    fireEvent.click(control('Locate me'));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    denyLocate();
+    expect(screen.getByRole('alert')).toHaveTextContent('Unavailable');
+  });
+});
+
+// FGM-07: Leaflet animates zooms, popups, pins and the glide after a drag by default, for everyone.
+describe('LeafletMap animations follow the motion gate (FGM-07)', () => {
+  const animations = ['zoomAnimation', 'fadeAnimation', 'markerZoomAnimation', 'inertia'] as const;
+
+  it.each([[undefined], ['reduce']])('builds the map without Leaflet animations while motion is not armed (data-motion=%s)', (motion) => {
+    if (motion) document.documentElement.setAttribute('data-motion', motion);
+    render(mapElement());
+
+    const { options } = currentMap();
+    expect(animations.map((name) => options[name])).toEqual([false, false, false, false]);
+  });
+
+  it('builds the map with Leaflet animations while motion is armed (data-motion="full")', () => {
+    document.documentElement.setAttribute('data-motion', 'full');
+    render(mapElement());
+
+    const { options } = currentMap();
+    expect(animations.map((name) => options[name])).toEqual([true, true, true, true]);
+  });
+
+  it('jumps to the position and to the fitted markers without motion, and lets Leaflet animate with it', () => {
+    render(mapElement());
+    const map = currentMap();
+    const setView = vi.spyOn(map, 'setView');
+    const fitBounds = vi.spyOn(map, 'fitBounds');
+
+    // Leaflet adds its own keys (pan, zoom) to the options it is given, so the animate flag is read on its own.
+    const setViewAnimate = () => setView.mock.lastCall?.[2]?.animate;
+    const fitBoundsAnimate = () => fitBounds.mock.lastCall?.[1]?.animate;
+
+    fireEvent.click(control('Locate me'));
+    answerLocate(37.03, 22.11);
+    expect(setView).toHaveBeenLastCalledWith([37.03, 22.11], 15, expect.anything());
+    expect(setViewAnimate()).toBe(false);
+    fireEvent.click(control('Fit'));
+    expect(fitBoundsAnimate()).toBe(false);
+
+    // The preference is read at each move: it can change while the map is open.
+    document.documentElement.setAttribute('data-motion', 'full');
+    fireEvent.click(control('Locate me'));
+    answerLocate(37.031, 22.112);
+    expect(setView).toHaveBeenLastCalledWith([37.031, 22.112], 15, expect.anything());
+    expect(setViewAnimate()).toBeUndefined();
+    fireEvent.click(control('Fit'));
+    expect(fitBoundsAnimate()).toBeUndefined();
+  });
+});
+
+// FGM-07: Leaflet makes the map container focusable (tabindex 0), and a focusable element needs a role and a name.
+// The label is required by the type, so a caller cannot leave the map nameless; InteractiveMap's wiring is pinned in
+// interactive-map.test.tsx.
+describe('LeafletMap accessible name (FGM-07)', () => {
+  it('names the focusable map as a region', () => {
+    render(mapElement());
+
+    const region = screen.getByRole('region', { name: 'Interactive map' });
+    expect(region).toHaveClass('leaflet-container');
+    expect(region).toHaveAttribute('tabindex', '0');
+  });
+
+  it('names the map from the page language', () => {
+    render(mapElement(13, { ...labels, mapRegion: 'Διαδραστικός χάρτης' }));
+
+    expect(screen.getByRole('region', { name: 'Διαδραστικός χάρτης' })).toHaveClass('leaflet-container');
   });
 });

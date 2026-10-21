@@ -316,6 +316,42 @@ describe('AvailabilityPlanner', () => {
     expect(window.location.search).toBe('?x=1');
   });
 
+  // FGM-05 (WCAG 2.4.3): the button exists only while a check-in is chosen, so clearing removes the focused element
+  // and the browser would send focus back to the top of the page. It goes to the calendar instead.
+  it.each([
+    ['with a complete stay', '#checkin=2026-10-07&checkout=2026-10-10'],
+    ['with a check-in only', '#checkin=2026-10-07'],
+  ])('moves focus to the calendar when "Clear dates" is activated from the keyboard %s', async (_name, fragment) => {
+    window.history.replaceState(null, '', `${PAGE_PATH}${fragment}`);
+    const user = userEvent.setup();
+    renderPlanner();
+    const clear = screen.getByRole('button', { name: t.clearDates });
+    const calendar = screen.getByRole('group', { name: t.calendarLabel });
+
+    await user.tab();
+    while (document.activeElement !== clear) await user.tab();
+    await user.keyboard('{Enter}');
+
+    expect(screen.queryByRole('button', { name: t.clearDates })).not.toBeInTheDocument();
+    expect(within(summary()).getByText(t.summary.empty)).toBeInTheDocument();
+    expect(calendar).toHaveFocus();
+    expect(document.body).not.toHaveFocus();
+    // The calendar is a programmatic focus target only: it is no extra tab stop.
+    expect(calendar).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('keeps the calendar as the next step after clearing: Tab enters its first day', async () => {
+    window.history.replaceState(null, '', `${PAGE_PATH}#checkin=2026-10-07`);
+    const user = userEvent.setup();
+    renderPlanner();
+
+    fireEvent.click(screen.getByRole('button', { name: t.clearDates }));
+    await user.tab();
+
+    expect(document.activeElement?.tagName).toBe('BUTTON');
+    expect(screen.getByRole('group', { name: t.calendarLabel })).toContainElement(document.activeElement as HTMLElement);
+  });
+
   it('clears the selection when the check-in is chosen again', () => {
     const { container } = renderPlanner();
 

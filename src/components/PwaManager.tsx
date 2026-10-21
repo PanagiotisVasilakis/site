@@ -182,7 +182,6 @@ export default function PwaManager() {
         }
         const storedVersion = readStored(() => localStorage.getItem('app-version'));
         const storedBuild = readStored(() => localStorage.getItem('app-build'));
-        const shortNewBuild = newBuild ? newBuild.slice(0,8) : '';
         if (!storedVersion) {
           writeStored(() => localStorage.setItem('app-version', newVersion));
           if (newBuild) writeStored(() => localStorage.setItem('app-build', newBuild));
@@ -194,13 +193,13 @@ export default function PwaManager() {
         if (banner && (versionChanged || buildChanged)) {
           const span = banner.querySelector('span');
           if (span) {
-            const updateTpl = banner.getAttribute('data-t-update-fromto') || 'Update available: {old} → {new}';
-            const assetsTpl = banner.getAttribute('data-t-assets-fromto') || 'Assets updated: {old} → {new}';
+            // Plain messages (the layout puts the localized ones on the banner): version numbers and build hashes mean nothing to a guest.
+            const updateMessage = banner.getAttribute('data-t-update-fromto') || 'A new version is ready';
+            const assetsMessage = banner.getAttribute('data-t-assets-fromto') || 'An updated local guide is ready';
             if (versionChanged) {
-              span.textContent = updateTpl.replace('{old}', storedVersion || '').replace('{new}', newVersion || '');
+              span.textContent = updateMessage;
             } else if (buildChanged) {
-              const oldShort = storedBuild ? storedBuild.slice(0,8) : '';
-              span.textContent = assetsTpl.replace('{old}', oldShort || 'old').replace('{new}', shortNewBuild || '');
+              span.textContent = assetsMessage;
             }
           }
           banner.setAttribute('data-old-version', storedVersion);

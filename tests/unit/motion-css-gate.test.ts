@@ -149,3 +149,26 @@ describe('print and heading range of the motion gate (R-704, R-705)', () => {
     expect(ranges).toEqual(['entry 0% entry 100%']);
   });
 });
+
+// FGM-07: Leaflet's own stylesheet is not one of the design stylesheets, and its transitions (the popup fade, the glide
+// of the panes during a zoom) would run for everyone, reduced motion included. map.css switches each of them off
+// unless motion is armed; LeafletMap builds the map without its zoom, fade, marker-zoom and inertia animations by the same flag.
+const LEAFLET_RULES = rulesOf(['leaflet.css', readFileSync('node_modules/leaflet/dist/leaflet.css', 'utf8')]);
+const normalized = (selector: string) => selector.replace(/\s+/gu, ' ').trim();
+const selectorsOf = (rules: Rule[]) => rules.flatMap((rule) => rule.selector.split(',').map(normalized));
+
+describe("Leaflet's own transitions (identity §5.2, FGM-07)", () => {
+  const leafletTransitions = selectorsOf(LEAFLET_RULES.filter((rule) => declares(rule.body, /^transition$/u)));
+
+  it('finds the transitions of leaflet.css (sanity check)', () => {
+    expect(leafletTransitions).toEqual(expect.arrayContaining(['.leaflet-fade-anim .leaflet-popup', '.leaflet-zoom-anim .leaflet-zoom-animated']));
+  });
+
+  it('switches every one of them off in map.css while data-motion is not "full"', () => {
+    const off = new Set(selectorsOf(RULES.filter((rule) => rule.file === 'components/map.css'
+      && rule.atRules.length === 0
+      && valueOf(rule.body, 'transition') === 'none')));
+    const missing = leafletTransitions.filter((selector) => !off.has(`:root:not([data-motion="full"]) .map-card ${selector}`));
+    expect(missing).toEqual([]);
+  });
+});

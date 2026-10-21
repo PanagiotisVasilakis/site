@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type CSSProperties, type ThHTMLAttributes } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type ThHTMLAttributes } from 'react';
 import { DayButton, DayPicker, type ClassNames, type DayButtonProps, type Modifiers } from 'react-day-picker';
 
 import { Icon } from '@/components/icons/Icon';
@@ -137,6 +137,7 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
   const [shownMonths, setShownMonths] = useState(STACK_STEP);
   const [turn, setTurn] = useState<Turn | null>(null);
   const [wideScreen, setWideScreen] = useState(false);
+  const calendarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const query = window.matchMedia(WIDE_SCREEN_QUERY);
@@ -188,6 +189,13 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
     const { pathname, search } = window.location;
     window.history.replaceState(window.history.state, '', `${pathname}${search}${selectionFragment(next)}`);
   }, []);
+
+  // "Clear dates" exists only while a check-in is chosen, so activating it removes the focused button. Focus moves to
+  // the calendar first (WCAG 2.4.3): the next step is choosing a check-in there, and Tab enters its first day.
+  const clearDates = () => {
+    calendarRef.current?.focus({ preventScroll: true });
+    select(EMPTY_SELECTION);
+  };
 
   const choosingCheckOut = selection.checkIn !== null && selection.checkOut === null;
   const checkOutDays = choosingCheckOut && selection.checkIn !== null ? checkOutWindow(selection.checkIn, context) : null;
@@ -325,7 +333,7 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
             </div>
           ) : null}
           {selection.checkIn === null ? null : (
-            <button type="button" className="ui-btn ui-btn--ghost ui-btn--sm planner__clear" onClick={() => select(EMPTY_SELECTION)}>
+            <button type="button" className="ui-btn ui-btn--ghost ui-btn--sm planner__clear" onClick={clearDates}>
               {t.clearDates}
             </button>
           )}
@@ -335,7 +343,7 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
           {note.map((line) => <p key={line} className="ui-callout__text">{line}</p>)}
         </Callout>
 
-        <div role="group" aria-label={t.calendarLabel}>
+        <div ref={calendarRef} tabIndex={-1} role="group" aria-label={t.calendarLabel}>
           <DayCellContext.Provider value={cellFor}>
             <DayPicker
               mode="range"

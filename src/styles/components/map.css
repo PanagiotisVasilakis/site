@@ -3,7 +3,8 @@
    map toggle and never with the list (§9.5, §12 R3-V8). Colours come from tokens only: the dark theme
    switches them at token level, so there are no per-component dark selectors (the tile dimming is the
    --map-tile-filter token). Selectors carry two classes (0,2,0) so they beat leaflet.css (0,1,0 / 0,1,1).
-   Motion is gated (§5.2). */
+   Motion is gated (§5.2): the pins' animations below, and Leaflet's own zoom and fade options (LeafletMap) and
+   transitions (leaflet.css, switched off further down unless motion is armed). */
 
 .map-card {
   position: relative;
@@ -21,17 +22,61 @@
 }
 .map-card .leaflet-tile-pane { filter: var(--map-tile-filter); }
 
+/* The canvas is the focusable map (Leaflet gives it tabindex 0; arrow keys pan, + and - zoom). The card clips an
+   outline drawn outside the canvas and Leaflet's panes (z-index 200-700) cover one drawn inside it, so the keyboard
+   focus ring is a border on an overlay above the panes that lets every click through. */
+.map-card .map-card__canvas:focus-visible { outline: none; }
+.map-card .map-card__canvas:focus-visible::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1000;
+  border: 3px solid var(--color-focus);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* The message of a Locate me that failed: text and a close button (LeafletMap). */
 .map-card .map-card__error {
   position: absolute;
   right: 12px;
   bottom: 12px;
   left: 12px;
   z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   padding: 12px 14px;
   border-radius: var(--radius-tile);
   background: var(--color-danger-bg);
   color: var(--color-danger);
   font-size: var(--text-caption);
+}
+.map-card .map-card__error-text { flex: 1; margin: 0; }
+.map-card .map-card__error-close {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: -6px -8px -6px 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font: 400 1.375rem/1 var(--font-text);
+  cursor: pointer;
+}
+/* The ring takes the text colour (danger on danger-bg is a documented pair), 3 px like every focus ring. */
+.map-card .map-card__error-close:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 1px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .map-card .map-card__error-close:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+}
+@media (hover: none), (pointer: coarse) {
+  .map-card .map-card__error-close { width: 44px; height: 44px; margin: -12px -14px -12px 0; }
 }
 
 /* Controls: zoom, locate me, fit to markers */
@@ -132,6 +177,22 @@
   color: var(--color-pin-home-fg);
 }
 .map-card .map-pin__label { padding-right: 2px; }
+/* The guest's own position (Locate me): a dot with a paper ring and a soft halo in the accent colour, not a place
+   pin (it used to be the phone pill of the police and fire pins). The marker element is 0×0 at the coordinate and
+   the dot is centred on it. Decorative: aria-hidden, and the marker is neither interactive nor focusable. */
+.map-card .map-you {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 20px;
+  height: 20px;
+  box-sizing: border-box;
+  border: 3px solid var(--color-pin-bg);
+  border-radius: 50%;
+  background: var(--color-pin-fg);
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-accent) 24%, transparent), var(--shadow-rest);
+  translate: -50% -50%;
+}
 .map-card .leaflet-marker-icon:focus-visible { outline: none; }
 .map-card .leaflet-marker-icon:focus-visible .map-pin {
   outline: 3px solid var(--color-focus);
@@ -219,6 +280,16 @@
 .map-card .map-popup__contact:focus-visible {
   outline: 3px solid var(--color-focus);
   outline-offset: 2px;
+}
+
+/* Leaflet's own transitions (leaflet.css: the popup fade and the glide of the panes during a zoom) belong to the
+   motion gate like every other animation. LeafletMap builds the map without its zoom, fade, marker-zoom and inertia
+   animations unless motion is armed; this also stops them while a map built under armed motion stays open and the
+   visitor switches motion off, and it keeps them off when Leaflet adds a class of its own. tests/unit/
+   motion-css-gate.test.ts checks that every transition of leaflet.css is listed here. */
+:root:not([data-motion="full"]) .map-card .leaflet-fade-anim .leaflet-popup,
+:root:not([data-motion="full"]) .map-card .leaflet-zoom-anim .leaflet-zoom-animated {
+  transition: none;
 }
 
 /* Pins rise into place once (motion-gated). The individual `scale` property leaves `translate` alone. */

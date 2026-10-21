@@ -42,6 +42,7 @@ export default function InteractiveMap({
     zoomIn: mapT.zoomIn,
     zoomOut: mapT.zoomOut,
     closePopup: mapT.closePopup,
+    mapRegion: mapT.mapRegion,
   }), [mapT]);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [shouldRenderInteractive, setShouldRenderInteractive] = useState(false);
