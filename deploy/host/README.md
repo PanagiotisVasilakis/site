@@ -19,7 +19,7 @@ another one.
 | `run-worker.sh` | Runs `outbox` or `operations` from cron with single-flight, a time limit, journald output and an optional heartbeat | root's crontab |
 | `backup.sh` | Encrypted `pg_dump` and role dump, local pruning, optional off-site copy, optional heartbeat | root's crontab, and the operator before a migration |
 | `check-host.sh` | Free disk space, free memory and TLS file lifetime; prints one line per failed check | `run-worker.sh --name hostcheck`, for a heartbeat |
-| `logrotate-nginx.conf` | Rotation of the Nginx logs (`error.log` is kept 14 days, as the privacy notice states) | `/etc/logrotate.d/` |
+| `logrotate-nginx.conf` | Rotation of the Nginx logs (`error.log` is kept 14 days, as the privacy notice states; the directory `nginx/logs` must have mode `0711`, see the comments in the file) | `/etc/logrotate.d/` |
 
 ## The three env files
 
@@ -79,7 +79,9 @@ any other command the same way (the heartbeat setting is `HEALTHCHECK_URL_<NAME>
 
 The nightly run sends the failure ping (`<URL>/fail`) whenever it does not reach its end, also when
 it is killed (a reboot, a time limit). `BACKUP_TIMEOUT_SECONDS` limits each dump inside the database
-container as well, and a killed run ends its dump session, so no `pg_dump` outlives the script.
+container as well, and a run that is stopped (TERM, HUP, the time limit) ends its dump session. After a
+`kill -9` the dump session of that run is ended by the next run, so one `pg_dump` can outlive the script
+until then.
 `BACKUP_DIR` must be a directory of its own: an existing one has to belong to the user who runs the
 backup and be closed to everybody else (mode `0700`; the script never changes the mode of a
 directory it did not create), and system directories such as `/tmp` or `/var` are refused. `--check`

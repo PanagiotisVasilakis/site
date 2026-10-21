@@ -48,10 +48,16 @@
 #   QR_BASE_DIR, QR_HOST_ENV, QR_LOCK_DIR locations, for tests and non-standard layouts
 #
 # Exit status:
-#   0 success                          5 pre-flight failed (database, disk space, tools)
-#   2 usage error                      6 dump or encryption failed
-#   3 skipped, another run is active   7 off-site copy failed (the local copy exists)
-#   4 configuration error              8 pruning old copies failed (the backup itself succeeded)
+#   0 success                          5 pre-flight failed (database, disk space, a missing tool:
+#   2 usage error                        docker, flock, age, gpg or rclone)
+#   3 skipped, another run is active   6 dump or encryption failed (also: a dump that is empty or
+#   4 configuration error                implausibly small, although the command exited with 0)
+#                                      7 off-site copy failed (the local copy exists)
+#                                      8 pruning old copies failed (the backup itself succeeded)
+#
+# A set is the four files <name>.dump.<ext>, <name>.roles.sql.<ext> and their .sha256 files. Pruning
+# counts a set as one of the BACKUP_KEEP_MIN newest only when all four exist, are not empty and the
+# checksums match; a half-written or damaged set is kept (and reported) but never counted.
 #
 # Nothing secret is on a command line or in a log line: the log names files, sizes and durations.
 set -Eeuo pipefail
@@ -166,15 +172,21 @@ ping_heartbeat() {
   if [ "$status" -ne 0 ]; then log warning "heartbeat ping failed (curl exit status $status)"; fi
 }
 
-# stop_dump_session: ends the database session of a pg_dump or pg_dumpall that this run started.
-# Killing the docker CLI on the host does not stop the process inside the container, and a stuck
-# dump holds locks and a snapshot that can block the next migration. The dump session is found by
-# the application name that this run gave it (PGAPPNAME).
+# stop_dump_sessions PATTERN: ends the database sessions whose application name matches the SQL LIKE
+# pattern PATTERN (no quote characters in it). Killing the docker CLI on the host does not stop the
+# process inside the container, and a stuck dump holds locks and a snapshot that can block the next
+# migration. A dump session is found by the application name that its run gave it (PGAPPNAME).
+# The lock descriptor (9) is closed for the child, like for every command that could outlive the script.
+stop_dump_sessions() {
+  timeout --kill-after=5 20 "${compose[@]}" exec -T db psql -X -q -U "$pg_user" -d postgres \
+    -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name LIKE '$1' AND pid <> pg_backend_pid()" \
+    9>&- >/dev/null 2>&1 || true
+}
+
+# stop_dump_session: the session of the pg_dump or pg_dumpall that this run started.
 stop_dump_session() {
   [ -n "$dump_session" ] || return 0
-  timeout --kill-after=5 20 "${compose[@]}" exec -T db psql -X -q -U "$pg_user" -d postgres \
-    -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name = '$dump_session' AND pid <> pg_backend_pid()" \
-    >/dev/null 2>&1 || true
+  stop_dump_sessions "$dump_session"
 }
 
 # on_exit: removes the work files and decides which heartbeat to send. A run counts as a success
@@ -259,7 +271,7 @@ read_int timeout_s BACKUP_TIMEOUT_SECONDS 1800 10 86400
 encryption=$(setting BACKUP_ENCRYPTION age)
 case $encryption in
   age)
-    command -v age >/dev/null || die 4 "BACKUP_ENCRYPTION=age needs the age command (apt install age)"
+    command -v age >/dev/null || die 5 "BACKUP_ENCRYPTION=age needs the age command (apt install age)"
     recipients_file=$(setting BACKUP_AGE_RECIPIENTS_FILE "$base_dir/backup-recipients.txt")
     [ -f "$recipients_file" ] && [ -r "$recipients_file" ] \
       || die 4 "age recipients file not found: $recipients_file (see docs/deployment/backup-and-restore.md)"
@@ -273,7 +285,7 @@ case $encryption in
     ext=age
     ;;
   gpg)
-    command -v gpg >/dev/null || die 4 "BACKUP_ENCRYPTION=gpg needs the gpg command (apt install gnupg)"
+    command -v gpg >/dev/null || die 5 "BACKUP_ENCRYPTION=gpg needs the gpg command (apt install gnupg)"
     gpg_recipient=$(setting BACKUP_GPG_RECIPIENT)
     [[ $gpg_recipient =~ ^[A-Za-z0-9@._+-]{1,128}$ ]] || die 4 "BACKUP_GPG_RECIPIENT is missing or invalid"
     gnupg_home=$(setting GNUPGHOME)
@@ -293,7 +305,7 @@ rclone_retention_days=''
 if [ -n "$rclone_remote" ]; then
   [[ $rclone_remote =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*:[A-Za-z0-9_./-]*$ ]] \
     || die 4 "RCLONE_REMOTE must look like name:path (credentials belong in the rclone configuration file)"
-  command -v rclone >/dev/null || die 4 "RCLONE_REMOTE is set but the rclone command is not installed"
+  command -v rclone >/dev/null || die 5 "RCLONE_REMOTE is set but the rclone command is not installed"
   rclone_config=$(setting RCLONE_CONFIG)
   if [ -n "$rclone_config" ]; then export RCLONE_CONFIG=$rclone_config; fi
   rclone_retention_days=$(setting RCLONE_RETENTION_DAYS)
@@ -311,10 +323,17 @@ command -v flock >/dev/null || die 5 "flock is not installed"
 compose=(docker compose -f "$compose_file")
 
 # --- single flight ------------------------------------------------------------------------------
+# Descriptor 9 holds the lock for as long as any process keeps it open, so every command that could
+# outlive this script (the dump pipeline, rclone, the session cleanup) runs with 9>&-: after a
+# SIGKILL of the script the lock is then free at once and the next run is not skipped.
 exec 9>"$lock_dir/$tag.lock" || die 4 "cannot open the lock file in $lock_dir"
 if ! flock -n 9; then
   heartbeat_armed=0
-  log notice "skipped: another backup is still running"
+  if [ "$mode" = nightly ]; then
+    log notice "skipped: another backup is still running"
+  else
+    log warning "skipped: another backup is still running, so NO backup was taken: wait for it to finish and run this command again"
+  fi
   exit 3
 fi
 
@@ -335,7 +354,9 @@ else
   [ -w "$backup_dir" ] || die 5 "BACKUP_DIR is not writable: $backup_dir"
   work_dir=$backup_dir
   # The single-flight lock is held, so no other run owns these: leftovers of a run that was killed.
-  find "$backup_dir" -maxdepth 1 -type f \( -name '.stderr.*' -o -name '.selftest.*' -o -name 'qr-city-guide-*.partial' \) \
+  # find -H: BACKUP_DIR may itself be a symbolic link to the directory.
+  find -H "$backup_dir" -maxdepth 1 -type f \
+    \( -name '.stderr.*' -o -name '.selftest.*' -o -name '.size.*' -o -name 'qr-city-guide-*.partial' \) \
     -delete 2>/dev/null || true
 fi
 errfile=$(mktemp "$work_dir/.stderr.XXXXXX")
@@ -381,7 +402,7 @@ available_mb=$(df -Pm "$space_dir" | awk 'NR==2 { print $4 }')
 [ "$available_mb" -ge "$min_free_mb" ] \
   || die 5 "only ${available_mb} MB free in $space_dir (BACKUP_MIN_FREE_MB=$min_free_mb)"
 
-"${compose[@]}" exec -T db pg_isready -q -U "$pg_user" -d "$pg_db" 2>"$errfile" \
+timeout --kill-after=5 60 "${compose[@]}" exec -T db pg_isready -q -U "$pg_user" -d "$pg_db" 9>&- 2>"$errfile" \
   || { log_errfile; die 5 "the db container is not running or not ready (docker compose ps)"; }
 selftest_encryption || die 4 "the encryption self-test failed: check the recipients"
 
@@ -391,7 +412,7 @@ if [ "$mode" = check ]; then
   if [ "$backup_dir_exists" = 0 ]; then echo "    note: $backup_dir does not exist yet; the first backup creates it (mode 0700)"; fi
   if [ -n "$rclone_remote" ]; then
     echo "    off-site remote: ${rclone_remote%%:*}:"
-    if ! timeout --kill-after=10 "$timeout_s" rclone lsf --max-depth 1 "$rclone_remote" >/dev/null 2>"$errfile"; then
+    if ! timeout --kill-after=10 "$timeout_s" rclone lsf --max-depth 1 "$rclone_remote" 9>&- >/dev/null 2>"$errfile"; then
       log_errfile
       die 7 "cannot list the off-site remote (a write-only credential cannot be checked this way; run a real backup instead)"
     fi
@@ -413,6 +434,10 @@ if [ "$mode" = check ]; then
 fi
 
 # --- backup ------------------------------------------------------------------------------------------
+# A run that was killed without a chance to clean up (SIGKILL, the out-of-memory killer) can leave its
+# dump session behind. This run holds the lock, so no other backup is running: end such sessions.
+stop_dump_sessions 'qr-backup-%'
+
 started=$SECONDS
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
 kind=nightly
@@ -421,22 +446,38 @@ base_name=qr-city-guide-$stamp-$kind
 db_file=$backup_dir/$base_name.dump.$ext
 roles_file=$backup_dir/$base_name.roles.sql.$ext
 
-# write_encrypted DEST COMMAND...: runs the command in the db container and stores its output
-# encrypted. pipefail makes a failed dump fail the whole pipeline; the partial file is never kept.
-# The time limit is enforced inside the container by `timeout` (busybox, in the pinned postgres
-# image), because a timeout on the host only kills the docker CLI and leaves the dump running; the
-# host-side limit is a backstop that fires later. PGAPPNAME names the session, so that
-# stop_dump_session can end it when this script is killed.
+# The least a real dump has (bytes of plain text, before encryption). An empty database dumps to
+# about 0.8 KB, the schema of this application alone to about 50 KB, and the role dump of a server
+# with a single role to a few hundred bytes. A command that exits with 0 but writes less than this
+# (an empty stream, a truncated one) is a failure, not a backup.
+min_dump_bytes=4096
+min_roles_bytes=256
+
+# count_stream FILE: copies stdin to stdout; dd reports the number of bytes it copied in FILE.
+count_stream() {
+  dd bs=65536 iflag=fullblock 2>"$1"
+}
+
+# write_encrypted DEST MIN_BYTES COMMAND...: runs the command in the db container and stores its
+# output encrypted. pipefail makes a failed dump fail the whole pipeline; the partial file is never
+# kept, and it is renamed (after it has been flushed to disk) only when the whole pipeline succeeded
+# and the plain text had at least MIN_BYTES. The time limit is enforced inside the container by
+# `timeout` (busybox, in the pinned postgres image), because a timeout on the host only kills the
+# docker CLI and leaves the dump running; the host-side limit is a backstop that fires later.
+# PGAPPNAME names the session, so that stop_dump_session can end it when this script is killed.
 write_encrypted() {
-  local dest=$1
-  shift
-  local partial=$dest.partial
-  work_files+=("$partial")
+  local dest=$1 min_bytes=$2
+  shift 2
+  local partial=$dest.partial sizefile plain_bytes
+  sizefile=$(mktemp "$work_dir/.size.XXXXXX") || return 1
+  work_files+=("$partial" "$sizefile")
   rm -f -- "$partial"
   dump_session=qr-backup-$$
   local began=$SECONDS
   if ! timeout --kill-after=30 "$((timeout_s + 60))" "${compose[@]}" exec -T -e "PGAPPNAME=$dump_session" db \
-    timeout -k 10 "$timeout_s" "$@" 2>"$errfile" | encrypt_stream "$partial" 2>>"$errfile"; then
+    timeout -k 10 "$timeout_s" "$@" 9>&- 2>"$errfile" \
+    | count_stream "$sizefile" 9>&- \
+    | encrypt_stream "$partial" 9>&- 2>>"$errfile"; then
     log_errfile
     if [ $((SECONDS - began)) -ge "$timeout_s" ]; then
       log err "the command was stopped after ${timeout_s}s (BACKUP_TIMEOUT_SECONDS)"
@@ -445,28 +486,50 @@ write_encrypted() {
     return 1
   fi
   dump_session=''
+  plain_bytes=$(sed -n 's/^\([0-9][0-9]*\) bytes.*/\1/p' "$sizefile" | tail -n 1)
+  if ! [[ $plain_bytes =~ ^[0-9]+$ ]]; then
+    log err "cannot tell how much data the command produced"
+    return 1
+  fi
+  if [ "$plain_bytes" -lt "$min_bytes" ]; then
+    log err "the command produced only $plain_bytes bytes (at least $min_bytes are expected): not a usable backup"
+    return 1
+  fi
   verify_encrypted "$partial" || return 1
+  sync -- "$partial" 2>/dev/null || true
   mv -f -- "$partial" "$dest"
 }
 
+# write_checksum NAME: NAME.sha256 appears (flushed to disk) only when it is complete, like the files.
 write_checksum() {
-  (cd "$backup_dir" && sha256sum -- "$1" > "$1.sha256")
+  local name=$1
+  work_files+=("$backup_dir/$name.sha256.partial")
+  (
+    cd "$backup_dir" \
+      && sha256sum -- "$name" > "$name.sha256.partial" \
+      && { sync -- "$name.sha256.partial" 2>/dev/null || true; } \
+      && mv -f -- "$name.sha256.partial" "$name.sha256"
+  )
 }
 
-write_encrypted "$db_file" pg_dump -U "$pg_user" -d "$pg_db" -Fc --no-password --lock-wait-timeout=120s \
+write_encrypted "$db_file" "$min_dump_bytes" pg_dump -U "$pg_user" -d "$pg_db" -Fc --no-password --lock-wait-timeout=120s \
   || die 6 "the database dump or its encryption failed"
-write_checksum "${db_file##*/}"
-write_encrypted "$roles_file" pg_dumpall -U "$pg_user" --roles-only --no-password \
-  || die 6 "the role dump or its encryption failed (the database dump ${db_file##*/} was kept)"
-write_checksum "${roles_file##*/}"
+write_checksum "${db_file##*/}" || die 6 "cannot write the checksum of ${db_file##*/}"
+write_encrypted "$roles_file" "$min_roles_bytes" pg_dumpall -U "$pg_user" --roles-only --no-password \
+  || die 6 "the role dump or its encryption failed (the database dump ${db_file##*/} was kept, but the set is incomplete)"
+write_checksum "${roles_file##*/}" || die 6 "cannot write the checksum of ${roles_file##*/}"
+sync -- "$backup_dir" 2>/dev/null || true
 log info "backup written: ${db_file##*/} ($(stat -c %s "$db_file") bytes), ${roles_file##*/} ($(stat -c %s "$roles_file") bytes)"
 
 # --- off-site copy -----------------------------------------------------------------------------------
 offsite_status=0
 if [ -n "$rclone_remote" ]; then
+  # name: with an empty path gets the file name directly (name:file), otherwise name:path/file.
+  offsite_prefix=$rclone_remote
+  if [[ $offsite_prefix != *: ]]; then offsite_prefix=${offsite_prefix%/}/; fi
   for file in "$db_file" "$db_file.sha256" "$roles_file" "$roles_file.sha256"; do
     if ! timeout --kill-after=30 "$timeout_s" rclone copyto --immutable --checksum \
-      "$file" "${rclone_remote%/}/${file##*/}" 2>"$errfile"; then
+      "$file" "$offsite_prefix${file##*/}" 9>&- 2>"$errfile"; then
       log_errfile
       log err "off-site copy failed for ${file##*/}"
       offsite_status=7
@@ -477,7 +540,7 @@ if [ -n "$rclone_remote" ]; then
     log info "off-site copy done: ${rclone_remote%%:*}:"
     if [ -n "$rclone_retention_days" ]; then
       if ! timeout --kill-after=30 "$timeout_s" rclone delete --max-depth 1 --min-age "${rclone_retention_days}d" \
-        --include 'qr-city-guide-*' "$rclone_remote" 2>"$errfile"; then
+        --include 'qr-city-guide-*' "$rclone_remote" 9>&- 2>"$errfile"; then
         log_errfile
         log err "off-site pruning failed"
         offsite_status=7
@@ -488,26 +551,58 @@ fi
 
 # --- prune local copies --------------------------------------------------------------------------------
 prune_status=0
+
+# set_is_complete BASE EXT: the set BASE has its dump, its role dump and both checksum files, none of
+# them empty, and the checksums match. Only such a set is a backup that can be restored.
+set_is_complete() {
+  local base=$1 ext=$2 f
+  for f in "$base.dump.$ext" "$base.roles.sql.$ext"; do
+    [ -s "$backup_dir/$f" ] && [ -s "$backup_dir/$f.sha256" ] || return 1
+  done
+  (cd "$backup_dir" && sha256sum --check --status -- "$base.dump.$ext.sha256" "$base.roles.sql.$ext.sha256") >/dev/null 2>&1
+}
+
 prune_local() {
-  local cutoff now name stamp_part epoch seen=0 removed=0 base
+  local cutoff now name stamp_part epoch good=0 damaged=0 removed=0 base ext
   now=$(date -u +%s)
   cutoff=$((now - retention_days * 86400))
-  # Only files named like this script names them count as backup sets (the stamp is checked below);
-  # a stray file or a leftover .partial must not use up one of the keep_min places.
-  while IFS= read -r name; do
+  # Only files named like this script names them are backup sets (the stamp is checked below); a
+  # stray file or a leftover .partial is ignored. The newest sets come first, and only a complete,
+  # intact set is counted towards the BACKUP_KEEP_MIN that are always kept: a set that a power cut
+  # or a failed role dump left half-written, or that no longer matches its checksum, is kept (it
+  # may hold the only copy of something) but never takes the place of a good one. Older sets are
+  # then removed once they are past the retention time, complete or not. File names are read
+  # NUL-separated, so no file name can be mistaken for several, and the files of a set are removed by
+  # their exact names (no pattern that could match another set).
+  while IFS= read -r -d '' name; do
     stamp_part=${name#qr-city-guide-}
     stamp_part=${stamp_part%%-*}
     [[ $stamp_part =~ ^[0-9]{8}T[0-9]{6}Z$ ]] || continue
-    seen=$((seen + 1))
-    [ "$seen" -gt "$keep_min" ] || continue
     epoch=$(date -u -d "${stamp_part:0:4}-${stamp_part:4:2}-${stamp_part:6:2} ${stamp_part:9:2}:${stamp_part:11:2}:${stamp_part:13:2}" +%s 2>/dev/null) || continue
+    # A set from the future (the clock was wrong when it was made) would rank above every real one
+    # and push them out of the protected places: leave it alone, neither counted nor removed.
+    if [ "$epoch" -gt $((now + 86400)) ]; then
+      log warning "backup set ${name%.dump.*} is dated in the future (was the clock wrong?): ignored"
+      continue
+    fi
+    ext=${name##*.}
+    base=${name%.dump.*}
+    if [ "$good" -lt "$keep_min" ]; then
+      if set_is_complete "$base" "$ext"; then
+        good=$((good + 1))
+      else
+        damaged=$((damaged + 1))
+        log warning "backup set $base is incomplete or does not match its checksum: it is kept but not counted"
+      fi
+      continue
+    fi
     if [ "$epoch" -lt "$cutoff" ]; then
-      base=${name%.dump.*}
-      rm -f -- "$backup_dir/$base".dump.* "$backup_dir/$base".roles.sql.* || return 1
+      rm -f -- "$backup_dir/$base.dump.$ext" "$backup_dir/$base.dump.$ext.sha256" \
+        "$backup_dir/$base.roles.sql.$ext" "$backup_dir/$base.roles.sql.$ext.sha256" || return 1
       removed=$((removed + 1))
     fi
-  done < <(find "$backup_dir" -maxdepth 1 -type f \( -name 'qr-city-guide-*.dump.age' -o -name 'qr-city-guide-*.dump.gpg' \) -printf '%f\n' | sort -r)
-  log info "pruned $removed local backup set(s) older than ${retention_days} days (the newest $keep_min are always kept)"
+  done < <(find -H "$backup_dir" -maxdepth 1 -type f \( -name 'qr-city-guide-*.dump.age' -o -name 'qr-city-guide-*.dump.gpg' \) -printf '%f\0' | sort -z -r)
+  log info "pruned $removed local backup set(s) older than ${retention_days} days (the newest $keep_min complete sets are always kept; $good counted, $damaged damaged)"
 }
 prune_local || { log err "pruning old local backups failed"; prune_status=8; }
 

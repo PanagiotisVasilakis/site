@@ -7,7 +7,7 @@ This document is the procedure for that. The tool is [`deploy/host/backup.sh`](.
 the host is set up as in the [day-0 runbook](day-0-runbook.md).
 
 Status: the commands below follow `deploy/host/backup.sh`, `docker/docker-compose.prod.yml` and the
-migrations as they are in this repository at commit `ae1449d`; when a later release changes one of
+migrations as they are in the commit that contains this page; when a later release changes one of
 them, the script's header and this page change in the same commit. This page is a procedure, not
 evidence that a backup or a restore works on your host: the off-site copy depends on `rclone` and
 your storage account, which the repository cannot try, and only the restore drill below proves a
@@ -93,8 +93,11 @@ this page must not be read as saying that the requirement is met.
 4. **Decrypted files are as sensitive as the database.** Decrypt only on an encrypted disk, never copy
    a dump into a chat, an e-mail or a ticket, and delete the decrypted files and the scratch database
    when the drill is done.
-5. **A restore also restores old sessions.** Sessions and tokens that were revoked after the backup
-   come back as valid. The restore steps below delete them all; everybody signs in again.
+5. **A restore also restores old sessions and claim grants.** Sessions and tokens that were revoked
+   after the backup come back as valid, and so do claim grants (the one-time tokens that let a guest
+   claim a booking) that were used or revoked after it. The restore steps below delete the sessions and tokens and
+   revoke every open claim grant; everybody signs in again, and the host issues new claim grants for
+   guests who have not claimed their booking yet.
 
 ## Set up
 
@@ -160,36 +163,56 @@ system directories such as `/tmp`, `/var` or `/etc` are refused. A run logs `bac
   (`pg_dumpall --roles-only`) from the `db` container, as the bundled superuser over the local socket
   (a deviation from the deployment target, see above): no password, no published port, nothing
   secret on a command line. Both streams are encrypted while they are written, to a `.partial` file
-  that becomes the real file only when the whole pipeline succeeded. No plain text dump touches the
-  disk, and the script has no unencrypted mode.
+  that is flushed to disk and becomes the real file only when the whole pipeline succeeded. No plain
+  text dump touches the disk, and the script has no unencrypted mode. A stream of fewer than 4096
+  bytes (the role dump: 256) counts as a failure even when the command exited with 0: an empty
+  database dumps to about 0.8 KB and this application's schema alone to about 50 KB, so a smaller
+  dump is an empty stream, a truncated one or the wrong database.
 - Names the files `qr-city-guide-<UTC time>-<kind>.dump.age` and `...roles.sql.age`, each with a
-  `.sha256` file. The kind is `nightly`, or `pre-migrate-<label>` for the dump before a migration.
-  The files are `0600` in a `0700` directory.
+  `.sha256` file; together they are one set. The kind is `nightly`, or `pre-migrate-<label>` for the
+  dump before a migration. The files are `0600` in a `0700` directory. A `.sha256` file appears only
+  when it is complete, so a power cut leaves either a whole file or none.
 - Deletes local sets older than `BACKUP_RETENTION_DAYS`, except that the newest `BACKUP_KEEP_MIN`
-  (default 3) sets are never deleted, so a long outage of the backups cannot empty the directory.
-  Files whose name it does not recognize are never touched and do not count as a set. Leftovers of a
-  run that was killed (`.stderr.*`, `.selftest.*` and `*.partial` files) are removed at the next
-  start.
+  (default 3) complete sets are never deleted, so a long outage of the backups cannot empty the
+  directory. A set is complete when its dump, its role dump and both `.sha256` files exist, are not
+  empty and the checksums match (every run reads the newest sets once to check this). A
+  half-written or damaged set (a role dump that failed, a power cut, a changed file) is kept, reported
+  with a warning in the log and never counted, so it cannot take the place of a good one; it is
+  removed once it is past the retention time and enough good sets are newer. Sets dated more than a
+  day in the future (a wrong clock) are ignored with a warning. Files whose name it does not
+  recognize are never touched and do not count as a set. Leftovers of a run that was killed
+  (`.stderr.*`, `.selftest.*`, `.size.*` and `*.partial` files) are removed at the next start.
 - Copies the four new files to `RCLONE_REMOTE` when it is set (`rclone copyto --immutable
   --checksum`), and deletes off-site copies older than `RCLONE_RETENTION_DAYS` when that is set
   (only in the top level of the remote path, files named `qr-city-guide-*`).
 - Pings `HEALTHCHECK_URL` after a success and `<URL>/fail` after any failure (the nightly run
-  only). A run that is killed before it reaches its end (a reboot, a time limit, a lost session)
-  counts as a failure: it removes its partial files, ends its dump session in the database and sends
-  the failure ping.
+  only). A run that is stopped with `SIGTERM` or `SIGHUP` before it reaches its end (a reboot, a time
+  limit, a lost session) counts as a failure: it removes its partial files, ends its dump session in
+  the database and sends the failure ping. A run that is killed with `SIGKILL` (or by the
+  out-of-memory killer) cannot do that and sends nothing, which the monitor shows as a missed ping;
+  the next run ends the leftover dump session and removes the leftover files, and its lock is not
+  held by the leftovers. `Ctrl-C` in a terminal ends the run as soon as the running dump stops (a
+  dump that is writing stops at once; one that waits for a table lock stops at the latest after 120
+  seconds); `kill <pid>` ends it immediately.
 - Refuses to start with less than `BACKUP_MIN_FREE_MB` free (default 1024). Each dump and each
   transfer gets `BACKUP_TIMEOUT_SECONDS` (default 1800); the dump's limit is enforced inside the
   `db` container as well, so a stuck `pg_dump` does not outlive the script and keep its locks. A
   dump that cannot get its table locks within 120 seconds fails at once (a long-running migration
   or a stuck session then shows up as a failed backup, not as a hung one).
 
-The exit statuses are in [`deploy/host/README.md`](../../deploy/host/README.md). `3` means that another
-backup was running (nothing is sent), `7` that the local copy exists but the off-site copy failed.
-A nearly empty database (the schema only) produces a dump of some tens of kilobytes.
+The exit statuses are in [`deploy/host/README.md`](../../deploy/host/README.md) (the script's header
+has the same list; a missing `age`, `gpg` or `rclone` command is `5`, like a missing `docker`). `3`
+means that another backup was running (nothing is sent; a `--pre-migrate` run that exits `3` took no
+backup, so run it again once the other one has finished), `7` that the local copy exists but the
+off-site copy failed. A nearly empty database (the schema only) produces a dump of some tens of
+kilobytes (about 50 KB on the schema of this repository).
 
 **What the script cannot check.** It never has the private key, so it cannot decrypt what it wrote. It
-checks that the pipeline succeeded, that the file is not empty and that an age file has the age
-header. Only a restore proves a backup, which is why the drill below exists.
+checks that the pipeline succeeded, that the plain text had the minimum size above, that the encrypted
+file is not empty and that an age file has the age header, and it records and re-checks a SHA-256
+checksum of each file. It cannot tell a dump of the wrong database from the right one, or an
+encryption to a public key that nobody has the private key for. Only a restore proves a backup, which
+is why the drill below exists: do it again after every change of the recipients file.
 
 ### The role dump
 
@@ -222,8 +245,9 @@ Where: your own computer with Docker and `age`, or a temporary server, with a co
 production VPS: the private key must not be there.
 
 **Step 1. Fetch one backup set and check it.** Copy the newest `*.dump.age`, `*.roles.sql.age` and both
-`.sha256` files from the off-site storage (or with `scp` from `/opt/qr-city-guide/backups`) into one
-directory, then:
+`.sha256` files (`.gpg` instead of `.age` with gpg) from the off-site storage (or with `scp` from
+`/opt/qr-city-guide/backups`) into one directory. Take the newest set that has all four files: a set
+without its role dump, left by a failed run, cannot be used with the steps below. Then:
 
 ```sh
 sha256sum -c qr-city-guide-<time>-nightly.dump.age.sha256 qr-city-guide-<time>-nightly.roles.sql.age.sha256
@@ -258,6 +282,10 @@ age -d -i ~/qr-backup-key.txt qr-city-guide-<time>-nightly.roles.sql.age > roles
 age -d -i ~/qr-backup-key.txt qr-city-guide-<time>-nightly.dump.age > db.dump
 ```
 
+With `BACKUP_ENCRYPTION=gpg` the files end in `.gpg`, and the secret key is in the gpg keyring of this
+computer: `gpg --decrypt qr-city-guide-<time>-nightly.roles.sql.gpg > roles.sql`, and the same for the
+dump.
+
 **Step 4. Restore the roles, then the database.** The error for the bootstrap role is expected: the
 scratch server already has it. The database restore must print nothing.
 
@@ -271,13 +299,21 @@ The last statement matters: a restore does not set the database owner, and witho
 role cannot create objects in the restored database (the next migration that needs a new table would
 fail with `permission denied for schema public`).
 
+The role dump also sets the password of `qr_postgres` to the one it had when the backup was made, so
+in the drill the generated `POSTGRES_PASSWORD` stops working for logins over TCP (the commands here use
+the local socket in the container, which needs no password). In a real restore this is what you want:
+keep the `POSTGRES_PASSWORD` of the old `docker/.env`.
+
 **Step 5. Verify.**
 
 ```sh
 # the newest migration equals EXPECTED_MIGRATION in src/app/api/health/ready/route.ts of that release
 $D exec -T db psql -X -U qr_app -d qr_city_guide -c "SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY migration_name COLLATE \"C\" DESC LIMIT 1;"
-# row counts: compare with the same query on production (they differ only by the changes since the backup)
-$D exec -T db psql -X -U qr_app -d qr_city_guide -c "SELECT 'users' AS t, count(*) FROM users UNION ALL SELECT 'bookings', count(*) FROM bookings UNION ALL SELECT 'check_in_requests', count(*) FROM check_in_requests UNION ALL SELECT 'outbox_events', count(*) FROM outbox_events UNION ALL SELECT 'rate_periods', count(*) FROM rate_periods ORDER BY 1;"
+# row counts of every table (19 lines when this was written): run the same with $C on production and compare
+# (they differ only by the changes since the backup; a restore of a backup that was just made is identical)
+$D exec -T db psql -X -A -t -F ' ' -U qr_app -d qr_city_guide <<'SQL'
+SELECT format('SELECT %L, count(*) FROM public.%I', tablename, tablename) FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename \gexec
+SQL
 # ownership and privileges came back: every table owned by qr_migrator; qr_app may write rows but not create objects
 $D exec -T db psql -X -U qr_postgres -d qr_city_guide -c "SELECT tableowner, count(*) FROM pg_tables WHERE schemaname = 'public' GROUP BY 1;"
 $D exec -T db psql -X -U qr_app -d qr_city_guide -c "CREATE TABLE drill_probe(i int);"    # permission denied for schema public
@@ -313,8 +349,9 @@ including the `ALTER DATABASE ... OWNER TO qr_migrator` statement.
 **2. Migrate.** `$C --profile ops run --rm migrate`. With a backup of an older release it applies the
 migrations that came after it.
 
-**3. Delete every session and token**, so that nothing revoked after the backup comes back to life.
-Admins and guests sign in again.
+**3. Delete every session and token and revoke the open claim grants**, so that nothing revoked or
+used after the backup comes back to life. Admins and guests sign in again; issue new claim grants for
+guests who have not claimed their booking yet.
 
 ```sh
 $C exec -T db psql -X -v ON_ERROR_STOP=1 -U qr_app -d qr_city_guide <<'SQL'
@@ -323,6 +360,7 @@ DELETE FROM admin_sessions;
 DELETE FROM sessions;
 DELETE FROM refresh_tokens;
 DELETE FROM refresh_token_families;
+UPDATE booking_claim_grants SET revoked_at = now() WHERE consumed_at IS NULL AND revoked_at IS NULL;
 COMMIT;
 SQL
 ```

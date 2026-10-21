@@ -121,11 +121,12 @@ log() {
 # The heartbeat URL is a capability, so it never appears on a command line, in a log line or in an
 # error message: curl reads it from its configuration on stdin. Only https is accepted (plain
 # http only for the local host); a rejected setting is logged and the job still runs.
-heartbeat_url=$(setting "HEALTHCHECK_URL_$(printf '%s' "$name" | tr 'a-z-' 'A-Z_')")
+heartbeat_var=HEALTHCHECK_URL_$(printf '%s' "$name" | tr 'a-z-' 'A-Z_')
+heartbeat_url=$(setting "$heartbeat_var")
 if [ -n "$heartbeat_url" ]; then
   if [[ $heartbeat_url =~ [[:space:]\"\\] ]] \
     || ! [[ $heartbeat_url =~ ^(https://[^/?#]+|http://(127\.0\.0\.1|localhost|\[::1\])(:[0-9]+)?)([/?#].*)?$ ]]; then
-    log err "heartbeat URL ignored: HEALTHCHECK_URL_ setting for this job must be an https URL"
+    log err "heartbeat URL ignored: $heartbeat_var must be an https URL without spaces or quotes"
     heartbeat_url=''
   fi
 fi
@@ -168,6 +169,7 @@ fi
 
 if [ "$status" -eq 0 ]; then priority=info; else priority=err; fi
 head -c 65536 "$out" | logger -t "$tag" -p "user.$priority" 2>/dev/null || true
+if [ "$(wc -c < "$out")" -gt 65536 ]; then log warning "the output of the job was cut after 65536 bytes"; fi
 
 # Free the lock before the ping: a slow monitor must not make the next scheduled run skip.
 exec 9>&-
@@ -177,8 +179,18 @@ case $status in
     log info "ok after ${elapsed}s"
     ping_heartbeat ''
     ;;
-  124|137)
+  124)
     log err "timed out after ${timeout_s}s (exit status $status)"
+    ping_heartbeat /fail
+    ;;
+  137)
+    # timeout sends KILL after --kill-after, but an out-of-memory kill or a manual kill -9 ends
+    # with 137 too: only a run that used up its time limit is called a timeout.
+    if [ "$elapsed" -ge "$timeout_s" ]; then
+      log err "timed out after ${timeout_s}s and had to be killed (exit status $status)"
+    else
+      log err "killed by SIGKILL after ${elapsed}s (exit status $status), before the time limit of ${timeout_s}s"
+    fi
     ping_heartbeat /fail
     ;;
   *)

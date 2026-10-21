@@ -16,7 +16,8 @@ settings are in the [Cloudflare checklist](cloudflare-checklist.md), the backup 
 
 What this runbook is based on: the database, env-file, backup, worker and verification commands follow
 the repository sources (the compose file, `src/lib/runtime-env-schema.js`, the workers, the Nginx
-template and the migrations) as they are at commit `ae1449d`. The Netcup, Cloudflare and public-DNS
+template and the migrations) as they are at commit `e6f83b3`, the commit that adds this runbook. The
+Netcup, Cloudflare and public-DNS
 steps depend on accounts and dashboards that the repository cannot try, and the names of their menus
 change, so those steps name the setting and point to the provider's documentation. The architecture
 decision still requires dated operator evidence for them ([section 16](#16-evidence-to-keep)); this
@@ -71,6 +72,7 @@ Reboot if the kernel was updated (`[ -f /var/run/reboot-required ] && reboot`).
 Create the user you will log in as. It has a password only for `sudo`; SSH accepts keys only.
 
 ```sh
+apt install -y sudo                 # a minimal image may lack it, and the group "sudo" comes with the package
 adduser deploy                      # choose a long password and keep it in the password manager
 usermod -aG sudo deploy
 install -d -m 0700 -o deploy -g deploy /home/deploy/.ssh
@@ -159,7 +161,8 @@ mkdir -p /var/log/journal && systemctl restart systemd-journald      # keep work
 
 ```sh
 install -d -m 0755 /opt/qr-city-guide
-install -d -m 0700 /opt/qr-city-guide/nginx /opt/qr-city-guide/nginx/tls /opt/qr-city-guide/nginx/logs
+install -d -m 0700 /opt/qr-city-guide/nginx /opt/qr-city-guide/nginx/tls
+install -d -m 0711 /opt/qr-city-guide/nginx/logs
 install -d -m 0700 /opt/qr-city-guide/backups
 install -d -m 0755 /opt/qr-city-guide/docker
 install -d -m 0750 -o deploy -g deploy /opt/qr-city-guide/releases
@@ -172,7 +175,7 @@ install -d -m 0750 -o deploy -g deploy /opt/qr-city-guide/releases
   app.env                          root, 0600   runtime configuration (app.env.example)
   migrate.env                      root, 0600   migration role (migrate.env.example)
   deploy/nginx/, deploy/host/      release files
-  nginx/                           root, 0700   rendered config, includes/, tls/, logs/
+  nginx/                           root, 0700   rendered config, includes/, tls/, logs/ (0711)
   backups/                         root, 0700   encrypted backups
   backup-recipients.txt            root         public backup keys (not secret)
   releases/                        deploy       uploaded release archives
@@ -180,6 +183,13 @@ install -d -m 0750 -o deploy -g deploy /opt/qr-city-guide/releases
 
 Every env file is owned by root with mode `0600`: the images contain no configuration, and these
 files are the only place where the secrets are.
+
+`nginx/logs` is `0711` and not `0700` on purpose. When logrotate sends `USR1` (section 10), the Nginx
+worker processes, which run as the user `nginx`, reopen the log files by name; they cannot enter a
+root-only directory, would log `open() ... failed (13: Permission denied)` and would keep writing to
+the files that were rotated away (tested with the pinned image: the new `access.log` stayed empty
+and every later line went to the rotated file). The parent `nginx/` stays `0700`, so other users of
+the host still cannot reach the logs.
 
 ## 3. Release files
 
@@ -250,22 +260,32 @@ fill_secret docker/.env POSTGRES_PASSWORD
 Run this block once, on the unedited templates: it replaces whatever stands after `NAME=`, so a second
 run would silently change secrets that are already in use (and that you have already stored in the
 password manager). The function runs `printf` inside the shell, so no secret appears in the process
-list. Then print the two database role passwords, one for each env file, and copy each into its
-`<DB_PW>`:
+list. The two database role passwords are generated the same way, one for each env file, each in
+place of its `<DB_PW>` (the two differ, and section 5 reads them from the files, so you never copy
+them by hand):
 
 ```sh
-openssl rand -hex 32     # for qr_app: app.env
-openssl rand -hex 32     # for qr_migrator: migrate.env (a different value)
+fill_db_pw() {   # fill_db_pw FILE: a fresh 64-character hex password in place of <DB_PW> in FILE
+  local file=$1 value line
+  value=$(openssl rand -hex 32)
+  while IFS= read -r line || [ -n "$line" ]; do
+    printf '%s\n' "${line//<DB_PW>/$value}"
+  done < "$file" > "$file.new" && cat "$file.new" > "$file" && rm -f "$file.new"
+}
+fill_db_pw app.env          # qr_app
+fill_db_pw migrate.env      # qr_migrator
 ```
 
-Edit the three files (`nano app.env`) and replace the remaining placeholders: `<DB_PW>` in
-`app.env` and `migrate.env`, `<your-host.example>` (the canonical host, lowercase, exactly as at the
-image build), the Wi-Fi name and password, and in `docker/.env` the `APP_IMAGE` of the release. Read
-the comments in the templates for the optional webhooks. Rules that bite:
+Edit the three files (`nano app.env`) and replace the remaining placeholders: `<your-host.example>`
+(the canonical host, lowercase, exactly as at the image build), the Wi-Fi name and password, and in
+`docker/.env` the `APP_IMAGE` of the release. Read the comments in the templates for the optional
+webhooks. Rules that bite:
 
 - A value with `$`, `#`, a space or a backslash goes in single quotes. Docker Compose expands `$name`
   in unquoted and double-quoted values and treats an unquoted ` #` as a comment, so `ab$cd` becomes
-  `ab` without a warning. Single-quoted values are taken literally.
+  `ab` and the only trace is the warning `The "cd" variable is not set` (it quotes the text after the
+  `$`, so never paste it anywhere), while `config --quiet` still exits 0. Single-quoted values are
+  taken literally. The last command below catches this.
 - `DATABASE_URL` carries no `options` parameter, and its database name is `POSTGRES_DB`.
 - `ALLOWED_ORIGINS` stays empty, `LOG_STRUCTURED=true`, and `BUILD_SITE_URL` is not set.
 - Put the three files in the password manager now, then clear the screen (`clear`).
@@ -276,8 +296,12 @@ Check that nothing is left open, that the modes are right and that Compose accep
 grep -n '^[^#]*<' docker/.env app.env migrate.env       # must print nothing
 ls -l docker/.env app.env migrate.env                   # -rw------- root root
 C="docker compose -f docker/docker-compose.prod.yml"
-$C config --quiet && echo "compose configuration is valid"
+$C --profile ops config -q >/dev/null 2>&1 && echo config-ok   # must print config-ok
+$C --profile ops config -q 2>&1 | grep -c 'is not set'         # must print 0
 ```
+
+Both Compose commands need `--profile ops`: without it Compose leaves out the `migrate`, `outbox` and
+`operations` services and does not read `migrate.env` at all (a missing file or a `$` in it would pass).
 
 ## 5. Database and application
 
@@ -290,22 +314,37 @@ The first start pulls the digest-pinned PostgreSQL image and creates the superus
 
 **Create the two database roles.** Follow `scripts/README.md` ("Host layout"): the SQL block there
 creates `qr_migrator` and `qr_app`, makes `qr_migrator` the owner of the database and grants the
-application role its default privileges. Save that block into a file that only root can read, put the
-two passwords from `migrate.env` and `app.env` in the two `PASSWORD` places and the database name
-(`qr_city_guide`, `POSTGRES_DB`) in `ALTER DATABASE`, and run it through the socket of the `db`
-container, where no password is asked and nothing secret is on a command line:
+application role its default privileges. Save that block into a file that only root can read, write
+`<MIGRATOR_PW>` and `<APP_PW>` in place of its two `<from secret store>` and the database name
+(`qr_city_guide`, `POSTGRES_DB`) in place of `<POSTGRES_DB>` (twice), and run it through the socket of
+the `db` container, where no password is asked. The two passwords are taken from `migrate.env` and
+`app.env` by the shell, so they are neither shown nor on a command line (the `awk` program reads them
+from its environment):
 
 ```sh
 install -m 0600 /dev/null /root/roles.sql
-nano /root/roles.sql                         # paste the block, replace the placeholders
+nano /root/roles.sql                         # paste the block, replace the placeholders as described
 pg_user=$(sed -n 's/^POSTGRES_USER=//p' docker/.env); pg_db=$(sed -n 's/^POSTGRES_DB=//p' docker/.env)
-$C exec -T db psql -v ON_ERROR_STOP=1 -U "$pg_user" -d "$pg_db" < /root/roles.sql
-rm -f /root/roles.sql
+install -m 0600 /dev/null /root/roles.final.sql
+MIGRATOR_PW=$(sed -n 's|^DATABASE_URL=[a-z]*://qr_migrator:\([0-9a-f]\{64\}\)@.*|\1|p' migrate.env) \
+APP_PW=$(sed -n 's|^DATABASE_URL=[a-z]*://qr_app:\([0-9a-f]\{64\}\)@.*|\1|p' app.env) \
+  awk '{ gsub(/<MIGRATOR_PW>/, ENVIRON["MIGRATOR_PW"]); gsub(/<APP_PW>/, ENVIRON["APP_PW"]); print }' \
+  /root/roles.sql > /root/roles.final.sql
+grep -c -E "PASSWORD ''|<[A-Za-z_ ]+>" /root/roles.final.sql   # must print 0 (an empty password or a placeholder is left)
+$C exec -T db psql -v ON_ERROR_STOP=1 -U "$pg_user" -d "$pg_db" < /root/roles.final.sql
+rm -f /root/roles.sql /root/roles.final.sql
 ```
 
-Every statement must answer `CREATE ROLE`, `ALTER DATABASE` or `ALTER DEFAULT PRIVILEGES`. After the
-migration below, every table must be owned by `qr_migrator`, and the application role must be able to
-read and write rows but not create objects (section 11 checks both).
+Do not run the `psql` line when the `grep` prints anything but `0`. A statement that fails is written
+to the PostgreSQL log with its full text, password included (`$C logs db`, readable by root only; a
+statement that succeeds is not logged). So after a failure do not run the whole block again: the roles
+exist by then, and the first `CREATE ROLE` would fail and log a password once more. Remove the
+statements that succeeded from the file, fix the error, run the rest, and then discard the log with
+`$C up -d --force-recreate db` (the data stays in the volume). Every statement must answer
+`CREATE ROLE`, `ALTER DATABASE` or `ALTER DEFAULT PRIVILEGES`. After the migration below, every table
+must be owned by `qr_migrator`, and the application role must be able to read and write rows but not
+create objects (section 11 checks the owner and the refused `CREATE TABLE`; `scripts/README.md`, "Host
+layout", has the complete checks, including write access).
 
 **Migrate and start.** Take the first migration without a pre-migration backup (the database is
 empty); every later one starts with `backup.sh --pre-migrate` ([section 15](#15-later-releases)).
@@ -356,9 +395,12 @@ historical; the content is your CA. See "Preconditions" in the
 [origin ingress runbook](origin-ingress-runbook.md).
 
 1. Create a small CA and a client certificate, on a trusted computer or on the VPS (the CA key stays
-   with you; only the CA certificate goes to Nginx):
+   with you; only the CA certificate goes to Nginx). On the VPS use a directory of its own, never
+   `nginx/tls`: that directory is mounted into the Nginx container, so keys left there would be
+   visible inside it.
 
    ```sh
+   install -d -m 0700 /root/aop && cd /root/aop
    openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes -keyout aop-ca.key -out aop-ca.pem \
      -subj "/CN=qr-city-guide origin pull CA"
    openssl req -newkey rsa:2048 -nodes -keyout aop-client.key -out aop-client.csr \
@@ -376,7 +418,7 @@ historical; the content is your CA. See "Preconditions" in the
    this repository's. Do not switch on the plain toggle that uses Cloudflare's certificate.
 3. Install the CA certificate for Nginx: `cp aop-ca.pem /opt/qr-city-guide/nginx/tls/cloudflare-origin-pull-ca.pem`.
    Move `aop-ca.key`, `aop-client.key` and the CA serial file into the password manager and delete
-   them from the VPS.
+   them from the VPS (`cd / && rm -r /root/aop` if you used the directory of step 1).
 4. Write the expiry date of both certificates (`openssl x509 -enddate -noout -in <file>`) in your
    calendar, 60 days ahead of it. An expired client certificate makes Nginx refuse every request
    from Cloudflare. Rotation: "CIDR and credential rotation" in the origin ingress runbook.
@@ -398,7 +440,10 @@ deploy/host/render-nginx.sh
 The script takes the host name and the origin secret from `app.env` (the same file that the
 application reads, so the two cannot differ), writes `nginx/nginx.production.conf` (mode `0600`,
 because it contains the secret) and `nginx/includes/`, and checks the result with `nginx -t` in the
-pinned image. Nothing is installed when the check fails.
+pinned image. Nothing is installed when the check fails. The template also listens on `[::]:443`, so
+the kernel of the VPS must have IPv6 enabled: without it the check fails with "this machine has no
+IPv6 support" (seen on a kernel started with `ipv6.disable=1`), and the production Nginx would not
+start either, so enable IPv6 instead of using `--no-test`.
 
 Start the container as the "Run" section of the origin ingress runbook specifies: the pinned image
 with host networking and `--restart unless-stopped`. With the layout of this runbook:
@@ -468,6 +513,15 @@ SSH: use the SCP console to edit the SSH rule. If the panel cannot hold all the 
 rules into a host firewall instead; Docker's published ports bypass `ufw`, which is why the compose
 file publishes 3000 and 5432 on the loopback address only.
 
+Two cautions that this runbook could not check on a real Netcup server. The last rule closes
+everything else: find out in Netcup's documentation whether the panel firewall is stateful, and if it
+is not, also allow the replies to outgoing connections, or `apt`, `docker pull` and DNS stop working.
+And the panel has no automatic rollback that this runbook knows of (the SCP console is the way back).
+With a host firewall, schedule its removal before you switch it on, and cancel that only when a new
+SSH session from a second terminal works, for example (a generic systemd timer, untested here):
+`systemd-run --on-active=10m --unit=qr-firewall-rollback systemctl stop <firewall service>`, then
+`systemctl stop qr-firewall-rollback.timer` to cancel it.
+
 ## 10. Timers, backup and log rotation
 
 ```sh
@@ -478,12 +532,29 @@ grep -n 'notifempty' /etc/logrotate.conf                                 # shoul
 ```
 
 The privacy notice states that the web server's error log is kept for 14 days. The rule rotates it
-daily and keeps 13 files; a rule that skips empty files would stop the rotated files from ageing (see
+daily and keeps 13 rotated files besides the current one; a rule that skips empty files would stop the
+rotated files from ageing (see
 "Error log rotation" in the origin ingress runbook). Both stanzas of the file say `ifempty`, which
 overrides a global `notifempty`, so the `grep` is a second look and not the only protection: if it
 prints a line, remove that line anyway. `daily` means one rotation per run of the system's daily
 logrotate job, and the file has no size limit between two runs: a log that grows very fast is caught
 only by the disk check (monitoring and alerting, "Host checks"), not by logrotate.
+
+`logrotate -d` does not run the `postrotate` command, so it cannot show whether the rotation reaches
+the Nginx workers (they need the `0711` directory of section 2). Prove it once, now that the site
+answers: force one rotation on the VPS, send one request from your own computer, and look at the files.
+The first command does rotate the day-0 logs, which hold nothing worth keeping.
+
+```sh
+logrotate -f /etc/logrotate.d/qr-city-guide-nginx                     # on the VPS
+curl -sS -o /dev/null https://<canonical host>/api/health/live        # on your own computer
+ls -l /opt/qr-city-guide/nginx/logs                                   # on the VPS: access.log (new) and access.log.1
+wc -l /opt/qr-city-guide/nginx/logs/access.log                        # at least 1: the request went to the NEW file
+grep -c 'Permission denied' /opt/qr-city-guide/nginx/logs/error.log*  # 0 for every file
+```
+
+If `access.log` stays empty while `access.log.1` grows, or `Permission denied` shows up, the
+directory is not `0711` (`chmod 0711 /opt/qr-city-guide/nginx/logs`, then `docker kill -s USR1 origin-nginx`).
 
 Set up the backup first ([backup and restore](backup-and-restore.md), "Set up"): the age key pair, the
 recipients file, `deploy/host/backup.sh --check` and a first run of `deploy/host/backup.sh`. Then
@@ -495,23 +566,30 @@ guard rails described in [`deploy/host`](../../deploy/host/README.md):
 MAILTO=""
 * * * * *   /opt/qr-city-guide/deploy/host/run-worker.sh outbox
 */5 * * * * /opt/qr-city-guide/deploy/host/run-worker.sh operations
+*/15 * * * * /opt/qr-city-guide/deploy/host/run-worker.sh --name hostcheck --timeout 60 -- /opt/qr-city-guide/deploy/host/check-host.sh
 17 3 * * *  /opt/qr-city-guide/deploy/host/backup.sh
 ```
 
-Add the heartbeat URLs for the three jobs to `docker/.env`
+The `hostcheck` line watches free disk space, free memory and the lifetime of the TLS files
+([monitoring and alerting](monitoring-and-alerting.md), "Host checks").
+
+Add the heartbeat URLs for the four jobs (`HEALTHCHECK_URL_OUTBOX`, `HEALTHCHECK_URL_OPERATIONS`,
+`HEALTHCHECK_URL_HOSTCHECK` and `HEALTHCHECK_URL` for the backup) to `docker/.env`
 ([monitoring and alerting](monitoring-and-alerting.md), "Dead-man's switches"). Without them the host
 works, but nobody notices when a job stops.
 
 The workers read `APP_IMAGE` from `docker/.env` at every start. Check after the first minutes:
 
 ```sh
-journalctl -t qr-outbox -n 3 --no-pager
-journalctl -t qr-operations -n 3 --no-pager
+journalctl -t qr-outbox -n 8 --no-pager
+journalctl -t qr-operations -n 8 --no-pager
 ```
 
-The outbox lines are `{"worker":"outbox","attempted":0,"delivered":0,"at":"..."}`; the operations
-line has `alerts`, `retention` and `calendar` (`"status":"not_configured"` while `BOOKING_ICAL_URL` is
-empty). The first operations run creates the four alert rules.
+Each run leaves a few lines under its tag: Compose's `Container qr-outbox-run Creating` and `Created`,
+the worker's own line and the verdict (`ok after 1s`). The outbox line is
+`{"worker":"outbox","attempted":0,"delivered":0,"at":"..."}`; the operations line has `alerts`,
+`retention` and `calendar` (`"status":"not_configured"` while `BOOKING_ICAL_URL` is empty). The first
+operations run creates the four alert rules.
 
 ## 11. Post-deploy verification
 
@@ -664,23 +742,32 @@ The release sequence is in `scripts/README.md` ("Release sequence"). On this hos
 cd /opt/qr-city-guide
 # upload and load the images and extract the release files as in section 3, then:
 C="docker compose -f docker/docker-compose.prod.yml"
-export APP_IMAGE=villa-app:<new sha>
+cp -p docker/.env docker/.env.prev                        # the running release's file, for the rollback
 deploy/host/backup.sh --pre-migrate --label <new sha>      # must exit 0 (and copies off-site when configured)
 $C up -d --wait db
-$C --profile ops run --rm migrate
+APP_IMAGE=villa-app:<new sha> $C --profile ops run --rm migrate    # the prefix is for this one command; nothing is exported
 sed -i 's|^APP_IMAGE=.*|APP_IMAGE=villa-app:<new sha>|' docker/.env     # the cron jobs read this line
-unset APP_IMAGE
+$C --profile ops config --images | grep villa-app          # only <new sha> tags (web, -migrate, -workers)
 $C up -d --wait web
 deploy/host/render-nginx.sh && docker exec origin-nginx nginx -t && docker exec origin-nginx nginx -s reload
 ```
+
+Never `export APP_IMAGE` (or any other variable of `docker/.env`) in the shell: it overrides the file
+for that shell only, while the cron jobs keep reading the file and would run the previous worker image
+(`scripts/README.md`, "Host layout"). Run the `cp -p` once per release; if the sequence is repeated
+after `docker/.env` was edited, restore the file from `docker/.env.prev` first.
 
 The last line only matters when `deploy/nginx` changed in the release. Do not add `--no-test` to
 `render-nginx.sh` here: it would overwrite the live configuration before any test, and a broken file
 would take the ingress down at the next restart of the container or reboot. Without it, a failing
 check installs nothing, the running Nginx keeps its configuration, and the chain stops before the
-reload. Keep the previous release's
-images until the new `web` is healthy: rolling back means setting `APP_IMAGE` back and
-`$C up -d web`, and is possible only to a release that ran on the same schema (migrations are
+reload. A reload does not change the Nginx image: if `deploy/nginx/image.lock.json` changed (the
+"Controlled Nginx digest update" of [`docs/release-verification.md`](../release-verification.md)),
+recreate the container after the render, in a quiet hour: `docker rm -f origin-nginx`, then the
+`IMAGE=...` and `docker run` commands of section 7 (the configuration, includes, certificates and logs
+are on the host and stay). Keep the previous release's
+images until the new `web` is healthy: rolling back means `cp -p docker/.env.prev docker/.env` and
+`$C up -d --wait web`, and is possible only to a release that ran on the same schema (migrations are
 forward-only). Remove old tags with `docker image rm villa-app:<old sha> villa-app:<old sha>-workers
 villa-app:<old sha>-migrate` once you no longer need them.
 
