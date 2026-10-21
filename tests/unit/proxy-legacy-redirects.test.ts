@@ -27,6 +27,19 @@ describe('proxy redirects of the retired booking pages', () => {
     expect(response.headers.get('location')).toBe(`${ORIGIN}${target}`);
   });
 
+  // EP-05: only the cookie-dependent 302 is private/no-store; these 308s are the same for every visitor.
+  it.each(['/en/book', '/el/booking-details/', '/en/about', '/el/about/'])(
+    'leaves the permanent redirect of %s cacheable and sets no cookie',
+    async (path) => {
+      const response = await runProxy(path, 'lang=en');
+
+      expect(response.status).toBe(308);
+      expect(response.headers.get('cache-control')).toBeNull();
+      expect(response.headers.get('vary')).toBeNull();
+      expect(response.headers.get('set-cookie')).toBeNull();
+    },
+  );
+
   it('sends the same security headers on the redirect as on a page', async () => {
     const page = await runProxy('/en/availability');
     const response = await runProxy('/en/book');

@@ -53,6 +53,19 @@ function preferredLocale(header: string | null): string | null {
   return best?.locale ?? null;
 }
 
+/**
+ * A browser-level speculative fetch, not a visit: `Purpose: prefetch` or `Sec-Purpose: prefetch[;prerender]`.
+ * Next removes its own flight headers (`rsc`, `next-router-prefetch`, `next-router-segment-prefetch`, ...) from
+ * the request before the proxy runs, so a next/link prefetch looks like any other request here and cannot be
+ * recognised. A link to another locale must therefore not use next/link's default prefetch (LanguageSwitch sets
+ * `prefetch={false}`). A `prefetch;prerender` that the browser later activates does not store the language
+ * itself; the next real request of that page does.
+ */
+function isPrefetchRequest(req: NextRequest) {
+  return req.headers.get('purpose')?.trim().toLowerCase() === 'prefetch'
+    || (req.headers.get('sec-purpose')?.toLowerCase().includes('prefetch') ?? false);
+}
+
 /** A redirect that carries the security headers the proxy computed for the request. */
 function redirectWithSecurityHeaders(url: URL, status: 302 | 308, securityResponse: NextResponse) {
   const redirectResponse = NextResponse.redirect(url, status);
@@ -96,6 +109,10 @@ export async function proxy(req: NextRequest) {
 
   const cookieLocale = req.cookies.get("lang")?.value as string | undefined;
   const isValidCookie = cookieLocale ? (locales as readonly string[]).includes(cookieLocale) : false;
+  // A browser prefetch does not remember the language. next/link prefetches are invisible here (Next strips
+  // its headers), so the other-locale links (LanguageSwitch) opt out of prefetching: their prefetches would
+  // race with each other and overwrite the visitor's choice.
+  const mayWriteLangCookie = !isPrefetchRequest(req);
 
   if (!hasLocale(pathname)) {
     // An explicit choice (the cookie) wins; a first visit follows the browser's language preference.
@@ -114,22 +131,27 @@ export async function proxy(req: NextRequest) {
         url.pathname = `/${target}${pathname}`;
       }
     }
-    // Temporary locale selection redirect.
+    // Temporary locale selection redirect. It depends on the lang cookie and Accept-Language and may set a
+    // cookie, so no shared cache may store or reuse it (the permanent 308 redirects above stay cacheable).
     const redirectResponse = redirectWithSecurityHeaders(url, 302, response);
+    redirectResponse.headers.set('Cache-Control', 'private, no-store');
+    redirectResponse.headers.append('Vary', 'Accept-Language, Cookie');
 
-    redirectResponse.cookies.set("lang", target, {
-      path: "/",
-      maxAge: 60 * 60 * 24 * 365,
-      sameSite: "lax", // Allow cross-origin for language detection
-      secure: process.env.NODE_ENV === 'production'
-    });
+    if (mayWriteLangCookie) {
+      redirectResponse.cookies.set("lang", target, {
+        path: "/",
+        maxAge: 60 * 60 * 24 * 365,
+        sameSite: "lax", // Allow cross-origin for language detection
+        secure: process.env.NODE_ENV === 'production'
+      });
+    }
 
     return redirectResponse;
   }
 
   // When a locale is present in URL, ensure cookie matches it
   const current = pathname.split("/")[1] as string;
-  if ((locales as readonly string[]).includes(current) && cookieLocale !== current) {
+  if (mayWriteLangCookie && (locales as readonly string[]).includes(current) && cookieLocale !== current) {
     response.cookies.set("lang", current, {
       path: "/",
       maxAge: 60 * 60 * 24 * 365,
