@@ -86,7 +86,7 @@ until then.
 backup and be closed to everybody else (mode `0700`; the script never changes the mode of a
 directory it did not create), and system directories such as `/tmp` or `/var` are refused. `--check`
 creates no backup and changes nothing in that directory. The dump runs as the bundled PostgreSQL
-superuser, which is a deviation from the deployment target that the owner must accept (see
+superuser, a deviation from the deployment target that the owner accepted on 2026-10-22 (see
 [Deviation from the deployment target](../../docs/deployment/backup-and-restore.md#deviation-from-the-deployment-target)).
 
 | Exit status | Meaning |

@@ -47,22 +47,11 @@ templates), over the local socket inside the `db` container, with no password an
 The reason is the role dump: `pg_dumpall --roles-only` reads the password hashes from `pg_authid`,
 which only a superuser may read, and that dump is what brings the roles back with their passwords.
 
-This is a deviation from the sentence above, and nothing in the repository accepts it on the owner's
-behalf. Before launch the owner decides one of two things:
-
-1. **Accept it**, and record the acceptance with the other deployment evidence (day-0 runbook,
-   section 16). What the owner accepts: the nightly job runs as `root`, which holds the Docker
-   daemon and therefore reaches the database superuser anyway; the job adds no new route to it, but
-   it is not the separation the deployment target asks for.
-2. **Choose the least-privilege alternative**, which needs a change of the script and of the restore
-   steps and has not been built or tested here: a separate login role used only by the backup, with
-   `pg_read_all_data` (PostgreSQL 14 and later) and no other right, running `pg_dump` only; no role
-   dump at all, because the roles are recreated from the env files with the SQL block of
-   [`scripts/README.md`](../../scripts/README.md#production) ("Host layout"), and the restore creates
-   them before `pg_restore` instead of replaying `roles.sql`.
-
-Until one of the two is done, the backup role is an open deviation from the deployment target, and
-this page must not be read as saying that the requirement is met.
+**The owner accepted this deviation on 2026-10-22.** What was accepted: the nightly job runs as
+`root`, which holds the Docker daemon and therefore reaches the database superuser anyway; the job
+adds no new route to it, but it is not the separation the deployment target asks for. The
+least-privilege alternative (a backup-only login role with `pg_read_all_data` running `pg_dump` only,
+no role dump, roles recreated from the env files before `pg_restore`) was not built.
 
 ## Privacy
 
@@ -96,7 +85,7 @@ this page must not be read as saying that the requirement is met.
 5. **A restore also restores old sessions and claim grants.** Sessions and tokens that were revoked
    after the backup come back as valid, and so do claim grants (the one-time tokens that let a guest
    claim a booking) that were used or revoked after it. The restore steps below delete the sessions and tokens and
-   revoke every open claim grant; everybody signs in again, and the host issues new claim grants for
+   revoke every open claim grant (the owner chose this policy on 2026-10-22); everybody signs in again, and the host issues new claim grants for
    guests who have not claimed their booking yet.
 
 ## Set up

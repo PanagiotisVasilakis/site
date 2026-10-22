@@ -75,8 +75,8 @@ history. The sanitized disposition is in
 operator reported on 2026-07-28 that the Neon project had been deleted, and this
 repository cannot prove that.
 
-The owner must confirm the retirement in the Neon provider console: the project and
-its roles are deleted, or every credential is revoked. Record the date here:
-`<OWNER: confirmed on (date)>`. Until then treat the historical values as live. Never
-copy them out of history, and keep them out of this repository, its issues and any
-chat. This note deliberately names no value.
+On 2026-10-22 the owner confirmed that the project no longer uses Neon (production
+uses the bundled PostgreSQL on the VPS). The strings are still in the Git history:
+removing them needs a history rewrite and a force-push of every branch (see above),
+which has not been done. Never copy them out of history, and keep them out of this
+repository, its issues and any chat. This note deliberately names no value.
