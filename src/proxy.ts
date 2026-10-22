@@ -20,6 +20,12 @@ function isNonLocalizedRoute(pathname: string) {
   return NON_LOCALIZED_ROUTE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
+/** The first segment of an absolute path: `/EN/phones` and `/EN` give `EN`, `/` gives an empty string. */
+function firstPathSegment(pathname: string) {
+  const end = pathname.indexOf('/', 1);
+  return pathname.slice(1, end === -1 ? undefined : end);
+}
+
 // Booking pages replaced by /{locale}/availability (R3-F10).
 const RETIRED_BOOKING_PAGES = ['/book', '/booking-details'];
 
@@ -75,6 +81,36 @@ function redirectWithSecurityHeaders(url: URL, status: 302 | 308, securityRespon
   return redirectResponse;
 }
 
+/**
+ * A path whose percent-escapes cannot be decoded (`%zz`, a truncated `%A`, invalid UTF-8). Next's router throws a
+ * `DecodeError` for it after the proxy and, with no `/400` page in the App Router, answers a bare 500 without
+ * headers. `pathname` is the raw path, so the check only costs a decode when a `%` is present.
+ */
+function hasMalformedPercentEscape(pathname: string) {
+  if (!pathname.includes('%')) return false;
+  try {
+    decodeURIComponent(pathname);
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Ends the request at the proxy with a plain 400 that carries the security headers. The `x-middleware-*`
+ * headers are left out: they tell Next to carry on to the page, which is what this response prevents.
+ */
+function badRequestWithSecurityHeaders(securityResponse: NextResponse) {
+  const badRequest = new NextResponse('Bad Request', {
+    status: 400,
+    headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' },
+  });
+  securityResponse.headers.forEach((value, key) => {
+    if (!key.startsWith('x-middleware-')) badRequest.headers.set(key, value);
+  });
+  return badRequest;
+}
+
 const nonceSecurityMiddleware = createSecurityMiddleware();
 
 export async function proxy(req: NextRequest) {
@@ -82,6 +118,11 @@ export async function proxy(req: NextRequest) {
 
   // Apply security headers first
   const response = await nonceSecurityMiddleware(req);
+
+  // A response the security middleware already finished (a CORS rejection or preflight) never reaches Next's router.
+  if (response.headers.has('x-middleware-next') && hasMalformedPercentEscape(pathname)) {
+    return badRequestWithSecurityHeaders(response);
+  }
 
   // Add X-Robots-Tag for localized /check-in route (defense-in-depth)
   if (isLocalizedPage(pathname, '/check-in')) {
@@ -94,6 +135,16 @@ export async function proxy(req: NextRequest) {
   // Skip locale routing for API routes and root-level operational pages.
   if (pathname.startsWith("/api") || isNonLocalizedRoute(pathname)) {
     return response;
+  }
+
+  // A supported locale in another letter case (/EN/phones) is the page under that locale, not an unknown first
+  // segment: it moves permanently to the lowercase path, query kept, without choosing a language (no cookie).
+  const firstSegment = firstPathSegment(pathname);
+  const lowercaseSegment = firstSegment.toLowerCase();
+  if (firstSegment !== lowercaseSegment && (locales as readonly string[]).includes(lowercaseSegment)) {
+    const url = req.nextUrl.clone();
+    url.pathname = `/${lowercaseSegment}${pathname.slice(firstSegment.length + 1)}`;
+    return redirectWithSecurityHeaders(url, 308, response);
   }
 
   // A retired booking page moves permanently to the availability page; its
