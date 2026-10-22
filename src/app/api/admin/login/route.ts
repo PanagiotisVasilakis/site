@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createAdminSession, signAdmin } from '@/lib/auth/admin';
+import { ADMIN_LOGIN_RATE_LIMIT_SCOPE, refundAdminLoginAttempt } from '@/lib/auth/adminLoginBudget';
 import { logger } from '@/lib/logger-enterprise';
-import { withErrorHandler, validateRequestBody } from '@/lib/apiErrorHandler';
+import { ApiError, ApiErrorCode, withErrorHandler, validateRequestBody } from '@/lib/apiErrorHandler';
 import crypto from 'node:crypto';
 import { requireCanonicalClientIp } from '@/lib/net/clientIdentity';
 import { privacyHmac } from '@/lib/privacyHash';
@@ -14,6 +15,7 @@ const loginSchema = z.object({
   token: z.string().min(1, 'Token is required').max(512),
 }).strict();
 
+// The budget counts wrong tokens only: a correct one gives its attempt back (refundAdminLoginAttempt).
 const LOGIN_ATTEMPT_LIMIT = 5;
 const LOGIN_WINDOW_MS = 15 * 60_000;
 
@@ -50,8 +52,9 @@ function refusalEventId(windowEndsAt: Date): string {
  * submitted token, its length and any part of it are neither stored nor logged.
  *
  * The writes stay inside the rate-limited path. `succeeded` and `failed` are written only for an
- * attempt that the limiter let through: at most LOGIN_ATTEMPT_LIMIT per source (an IPv4 address or
- * an IPv6 /64) and LOGIN_WINDOW_MS. A refused attempt writes `rate_limited` only if its window has
+ * attempt that the limiter let through. `failed` is bounded by the limit: at most LOGIN_ATTEMPT_LIMIT
+ * per source (an IPv4 address or an IPv6 /64) and LOGIN_WINDOW_MS. `succeeded` is not, because a
+ * correct token is refunded (and it takes the administrator secret). A refused attempt writes `rate_limited` only if its window has
  * none yet: refusalEventId names it and `skipDuplicates` drops the repeats, so a window holds one
  * however many requests are refused, and the limiter table gets no extra row. Requests that end
  * before the limiter (login disabled, bad body, no client identity) write nothing. A flood from
@@ -92,6 +95,24 @@ async function recordLoginEvent(request: NextRequest, audit: LoginAudit): Promis
   }
 }
 
+/**
+ * The shared error envelope of every API route, with the Retry-After header that withErrorHandler
+ * cannot set (the same hand-built response as api/admin/availability-sync).
+ */
+function tooManyAttemptsResponse(windowEndsAt: Date): NextResponse {
+  const retryAfter = Math.max(1, Math.ceil((windowEndsAt.getTime() - Date.now()) / 1_000));
+  const correlationId = logger.getContext()?.correlationId;
+  const error = new ApiError(ApiErrorCode.RATE_LIMITED, 'Too many authentication attempts', { retryAfter }, correlationId);
+  return NextResponse.json(error.toJSON(), {
+    status: error.statusCode,
+    headers: {
+      'Retry-After': String(retryAfter),
+      'X-Error-Code': error.code,
+      ...(correlationId ? { 'X-Correlation-ID': correlationId } : {}),
+    },
+  });
+}
+
 export const POST = withErrorHandler(async (req: NextRequest) => {
   let secret: string | undefined;
   try {
@@ -107,13 +128,13 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const { token } = body;
 
   const rateLimit = await checkSensitiveRateLimit(req, {
-    scope: 'admin-login',
+    scope: ADMIN_LOGIN_RATE_LIMIT_SCOPE,
     limit: LOGIN_ATTEMPT_LIMIT,
     windowMs: LOGIN_WINDOW_MS,
   });
   if (!rateLimit.allowed) {
     await recordLoginEvent(req, { outcome: 'rate_limited', windowEndsAt: rateLimit.resetAt });
-    return NextResponse.json({ error: 'Too many authentication attempts' }, { status: 429 });
+    return tooManyAttemptsResponse(rateLimit.resetAt);
   }
 
   const supplied = Buffer.from(token);
@@ -122,6 +143,12 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     await recordLoginEvent(req, { outcome: 'failed', remainingAttempts: rateLimit.remaining });
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  // A correct token is not a guess: it gives its attempt back, so signing in never uses up the budget that
+  // wrong tokens are counted against. Best effort, as the sign-in has already succeeded.
+  await refundAdminLoginAttempt(req).catch((error: unknown) => {
+    logger.warn('admin_login.rate_limit_refund_failed', { error: error instanceof Error ? error.name : 'unknown' });
+  });
 
   const adminSession = await createAdminSession();
   // Generate JWT with unique identifier and clean payload

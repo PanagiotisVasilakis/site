@@ -35,7 +35,9 @@ state. They rely on the edge/proxy layers, safe caching, and bounded queries.
   limiter groups addresses this way. All dimensions are updated in one
   transaction. A successful guest sign-in gives back its phone-number attempt
   (`refundSensitiveIdentifierAttempt`), so only failed attempts count against
-  an account; the client-address dimension keeps counting every attempt.
+  an account; the client-address dimension keeps counting every attempt. A
+  correct administrator token gives back its attempt on the address row
+  (`refundAdminLoginAttempt`, see "Administrator login source isolation").
 
 Confirmed PostgreSQL saturation returns a generic `429`. A PostgreSQL limiter
 failure rolls back all limiter dimensions, returns a generic `503`, and must
@@ -63,16 +65,21 @@ public reads.
 Administrator login has no anonymous, globally enforcing bucket. Until named
 administrator identities exist, the authoritative budget is the privacy-HMAC
 key of the verified source (the full IPv4 address, or the IPv6 /64, see above):
-five attempts in a fixed fifteen-minute window. Saturating source A does not
+five attempts in a fixed fifteen-minute window. Only wrong tokens count: a
+correct token gives its attempt back (`refundAdminLoginAttempt` in
+`src/lib/auth/adminLoginBudget.ts`, a PostgreSQL update of the same row that
+never reopens a spent window), so an operator who signs in repeatedly is not
+locked out while every wrong guess keeps counting. Saturating source A does not
 consume source B's budget unless both are IPv6 addresses in one /64, while A's
-sixth attempt is still denied.
+sixth attempt is still denied with `429` in the shared API error envelope and a
+`Retry-After` header for the rest of the window.
 
 Public forwarding headers cannot select that source; the limiter requires the
 private canonical IP and a valid proxy attestation. Credentials and
 attacker-supplied administrator hints are never key material.
 
-Every administrator login attempt that the limiter admits, and the first refusal of
-each window, is stored as a security audit event (`security_audit_events`, path `/api/admin/login`, written by
+Every administrator login attempt that the limiter admits (a correct one included),
+and the first refusal of each window, is stored as a security audit event (`security_audit_events`, path `/api/admin/login`, written by
 `src/app/api/admin/login/route.ts`):
 
 | Event type | Severity | When | `details` |
@@ -88,9 +95,11 @@ any part of it are neither stored nor logged. A refusal is stored once per limit
 window and bucket, however many requests are refused: the event id derives from
 the end of the window, so the primary key drops the repeats and the limiter table
 gets no extra row (two buckets whose windows end in the same millisecond share one
-refusal event). A source therefore writes at most five admitted-attempt events
-and one refusal event per window; a flood from many sources is left to Cloudflare
-and Nginx, as for the guest sign-in limiter. A request that ends before the
+refusal event). A source therefore writes at most five `admin.login_failed`
+events and one refusal event per window. `admin.login_succeeded` events are not
+bounded by the limiter, because a correct token is refunded; they need the
+administrator secret. A flood from many sources is left to Cloudflare and Nginx,
+as for the guest sign-in limiter. A request that ends before the
 limiter (login disabled, invalid or oversized body, no attested client address,
 limiter store failure) writes no event. The write is best effort: a failure is
 logged (`Admin login audit event could not be stored`) and never changes the

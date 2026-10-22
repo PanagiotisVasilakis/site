@@ -62,6 +62,51 @@ function containsClaimToken(token: string): boolean {
   return length >= 32;
 }
 
+function isLocationBoundary(character: string): boolean {
+  return isWhitespace(character) || '()"\'`<>'.includes(character);
+}
+
+/** The `:line` or `:line:column` that ends a stack-frame location, or an empty string. */
+function trailingPosition(text: string): string {
+  let end = text.length;
+  for (let groups = 0; groups < 2; groups += 1) {
+    let start = end;
+    while (start > 0 && text[start - 1] >= '0' && text[start - 1] <= '9') start -= 1;
+    if (start === end || start === 0 || text[start - 1] !== ':') break;
+    end = start - 1;
+  }
+  return text.slice(end);
+}
+
+/**
+ * Removes the query string and the fragment from every URL or file location in a message, a stack
+ * trace or a file name (`https://host/app.js?token=x#y:10:20` becomes `https://host/app.js:10:20`):
+ * a query often carries a token, an address or a booking reference, and none of it is needed to find
+ * the code. A `?` or `#` counts only inside a word that looks like a location (it holds a `/` or a
+ * `.` before it), so "what?" and "#3" are left alone. A word ends at white space, a parenthesis or a quote.
+ */
+export function stripUrlQueryAndFragment(value: string): string {
+  let output = '';
+  let index = 0;
+  while (index < value.length) {
+    if (isLocationBoundary(value[index])) {
+      output += value[index];
+      index += 1;
+      continue;
+    }
+    let end = index + 1;
+    while (end < value.length && !isLocationBoundary(value[end])) end += 1;
+    const word = value.slice(index, end);
+    const cut = word.search(/[?#]/u);
+    const location = cut > 0 && /[/.]/u.test(word.slice(0, cut))
+      ? word.slice(0, cut) + trailingPosition(word.slice(cut))
+      : word;
+    output += location;
+    index = end;
+  }
+  return output;
+}
+
 /** Redact common credential and contact-data shapes without backtracking regular expressions. */
 export function redactSensitiveText(value: string, maxLength = 500): string {
   const phoneSafe = redactPhoneSequences(value.slice(0, Math.max(maxLength * 4, maxLength)));

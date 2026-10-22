@@ -327,6 +327,10 @@ export function withErrorHandler(
           'X-Correlation-ID': correlationId,
           'X-Error-Code': error.code,
         };
+        const retryAfter = error.details?.retryAfterSeconds;
+        if (error.statusCode === HttpStatusCodes.SERVICE_UNAVAILABLE && typeof retryAfter === 'number') {
+          headers['Retry-After'] = String(retryAfter);
+        }
 
         return NextResponse.json(
           error.toJSON(),

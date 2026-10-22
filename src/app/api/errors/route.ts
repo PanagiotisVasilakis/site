@@ -7,7 +7,8 @@ import { logger } from '@/lib/logger-enterprise';
 import { getClientIp } from '@/lib/net/getClientIp';
 import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
 import { privacyHmac } from '@/lib/privacyHash';
-import { redactSensitiveText } from '@/lib/redaction';
+import { redactSensitiveText, stripUrlQueryAndFragment } from '@/lib/redaction';
+import { stripUnsafeTextCharacters } from '@/lib/validation/freeText';
 
 const errorReportSchema = z.object({
   error: z.object({
@@ -30,6 +31,13 @@ const errorReportSchema = z.object({
 const STORED_MESSAGE_CHARS = 200;
 const STORED_STACK_CHARS = 600;
 const STORED_FILE_CHARS = 120;
+
+// A browser reports whatever its page produced, so every text is made storable the same way: control, zero-width and
+// bidi characters go (U+0000 would also make PostgreSQL reject the JSON column), the query string and fragment of any
+// URL go (a query can hold a token or a booking reference; the path locates the code), then known secrets are redacted.
+function storable(value: string, maxLength: number): string {
+  return redactSensitiveText(stripUrlQueryAndFragment(stripUnsafeTextCharacters(value)), maxLength);
+}
 
 export const POST = withErrorHandler(async (request: NextRequest, { signal }) => {
   const decision = await checkSensitiveRateLimit(request, {
@@ -60,7 +68,7 @@ export const POST = withErrorHandler(async (request: NextRequest, { signal }) =>
   const path = reportUrl.pathname.slice(0, 512);
   const correlationId = logger.getContext()?.correlationId;
   const stack = report.error.stack
-    ? redactSensitiveText(report.error.stack.split('\n').slice(0, 5).join('\n'), STORED_STACK_CHARS)
+    ? storable(report.error.stack.split('\n').slice(0, 5).join('\n'), STORED_STACK_CHARS)
     : undefined;
 
   const { prisma } = await import('@/lib/prisma');
@@ -74,15 +82,16 @@ export const POST = withErrorHandler(async (request: NextRequest, { signal }) =>
       ipHash: clientIp === 'unknown' ? null : privacyHmac(clientIp, 'security-event-ip:v1'),
       path,
       details: {
-        name: redactSensitiveText(report.error.name, 100),
-        message: redactSensitiveText(report.error.message, STORED_MESSAGE_CHARS),
+        name: storable(report.error.name, 100),
+        message: storable(report.error.message, STORED_MESSAGE_CHARS),
         stack,
+        // A file name is one location: everything from the first ? or # is dropped, even without a path before it.
         fileName: report.error.fileName
-          ? redactSensitiveText(report.error.fileName, STORED_FILE_CHARS).split('?')[0]
+          ? storable(report.error.fileName, STORED_FILE_CHARS).split(/[?#]/u)[0]
           : undefined,
         lineNumber: report.error.lineNumber,
         columnNumber: report.error.columnNumber,
-        buildVersion: report.context.buildVersion,
+        buildVersion: report.context.buildVersion && stripUnsafeTextCharacters(report.context.buildVersion),
         category: report.category,
       },
     },

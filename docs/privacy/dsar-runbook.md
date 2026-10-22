@@ -476,7 +476,8 @@ ledger entry (section 10).
 ### 7.6 Automatic erasure after the stay
 
 Nobody has to act on a stay that is over. Each run of the operations worker (every 5 minutes) clears
-the contact data of the arrival requests of bookings that ended more than 12 months ago
+the contact data of the arrival requests of bookings that ended more than 12 months ago, and of
+arrival requests without a booking that were created more than 12 months ago
 (`GUEST_DATA_RETENTION_MONTHS` in `src/data/stayPolicy.ts`, confirmed by the owner on 2026-10-20) and
 erases accounts whose bookings all ended more than 12 months ago, up to 25 accounts per run, through
 the same audited path as the button (the erasure record then says "Automatic retention: ..."). An

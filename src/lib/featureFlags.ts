@@ -1,3 +1,4 @@
+import { ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 import { logger } from '@/lib/logger-enterprise';
 
 export type FeatureFlags = {
@@ -32,16 +33,67 @@ function parseFlags(value: unknown): FeatureFlags {
   });
 }
 
-export async function getFeatureFlagsAsync(): Promise<FeatureFlags> {
+// A frozen database does not refuse the read, it never answers. The pool's 5 s connection timeout
+// only covers a request that needs a new connection; one that gets an idle connection waits for the
+// pool's 25 s query_timeout (prismaPgConfig.ts). The flag read is bounded here instead.
+const FLAG_READ_DEADLINE_MS = 3_000;
+const RETRY_AFTER_SECONDS = 5;
+
+/**
+ * The stored flags could not be read in time. Nothing is returned that could switch a feature on,
+ * and a request that consumes the flags inside withErrorHandler is answered 503 (temporarily
+ * unavailable), not as "feature switched off" (404). The retry hint is in `details`, which
+ * withErrorHandler also sends as the Retry-After header.
+ */
+export class FeatureFlagsUnavailableError extends ApiError {
+  constructor() {
+    super(ApiErrorCode.SERVICE_UNAVAILABLE, 'Service temporarily unavailable', { retryAfterSeconds: RETRY_AFTER_SECONDS });
+    this.name = 'FeatureFlagsUnavailableError';
+  }
+}
+
+async function readWithinDeadline<T>(read: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Feature flag read exceeded ${FLAG_READ_DEADLINE_MS} ms`)), FLAG_READ_DEADLINE_MS);
+  });
+  // A read that lost the race settles later (query_timeout); its failure is not unhandled.
+  read.catch(() => undefined);
   try {
+    return await Promise.race([read, deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * The effective flags. A missing row gives the defaults (both off in production). When the read
+ * fails or exceeds the deadline it throws FeatureFlagsUnavailableError: the features stay off,
+ * and the caller can tell "switched off" from "cannot tell". Pages that degrade instead of
+ * failing use getFeatureFlagsOrOff.
+ */
+export async function getFeatureFlagsAsync(): Promise<FeatureFlags> {
+  let row: { value: unknown } | null;
+  try {
+    // The deadline starts after the module is loaded: it bounds the database, not the first import.
     const { prisma } = await import('@/lib/prisma');
-    const row = await prisma.operationalSetting.findUnique({ where: { key: SETTING_KEY } });
-    return row ? parseFlags(row.value) : defaults();
+    row = await readWithinDeadline(Promise.resolve(prisma.operationalSetting.findUnique({ where: { key: SETTING_KEY } })));
   } catch (error) {
-    logger.error('Failed to read feature flags; using environment defaults (disabled in production)', {
+    logger.error('Failed to read feature flags; the features stay off and the request is answered as unavailable', {
       error: error instanceof Error ? error.message : String(error),
     });
-    return defaults();
+    throw new FeatureFlagsUnavailableError();
+  }
+  return row ? parseFlags(row.value) : defaults();
+}
+
+/** Both features off while the flags cannot be read, for a page that renders without them. */
+export async function getFeatureFlagsOrOff(): Promise<FeatureFlags> {
+  try {
+    return await getFeatureFlagsAsync();
+  } catch (error) {
+    if (error instanceof FeatureFlagsUnavailableError) return { portalEnabled: false, checkinEnabled: false };
+    throw error;
   }
 }
 

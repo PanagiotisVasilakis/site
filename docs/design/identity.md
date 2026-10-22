@@ -1134,7 +1134,7 @@ The mockup's `home-390-light.png` and `home-1440-light.png` show order and propo
 
 - H1 "Welcome home." / "Καλώς ήρθατε." (d1) with a decorative half-sun (sun rays at .5 opacity, behind the text), and a one-line lead.
 - Tiles grid: `repeat(2, minmax(0, 1fr))`, gap 12; at ≥ lg `repeat(4, minmax(0, 1fr))`, with the portal tile spanning 2×2.
-  1. **Portal** (band tile, full width on mobile): signed out, "Sign in to your stay" → `/{l}/guest`; signed in, "Open your check-in" → `/{l}/check-in`. Rendered only when the portal feature flag is on (`getFeatureFlagsAsync`).
+  1. **Portal** (band tile, full width on mobile): signed out, "Sign in to your stay" → `/{l}/guest`; signed in, "Open your check-in" → `/{l}/check-in`. Rendered only when the portal feature flag is on (`getFeatureFlagsOrOff`: while the flags cannot be read the hub still renders, with this tile off).
   2. **Wi-Fi** and 3. **Check-out**: `locked` until sign-in; after sign-in they link to the matching anchors of the check-in page.
   4. **House rules** (links to the rules section).
   5. **Important phones**: an SOS row "112, free from any phone" as a `tel:112` link, plus the next 2 numbers as `tel:` rows.

@@ -159,6 +159,43 @@ describe('arrival-time request route', () => {
     );
   });
 
+  // Invisible characters come from pasted text. Dropping them keeps the message the host reads (and the webhook
+  // carries) the same as the characters it contains; the rest of the text is stored as typed.
+  it.each([
+    ['a right-to-left override that disguises a file name', `Booking ${String.fromCodePoint(0x202e)}gpj.exe`, 'Booking gpj.exe'],
+    ['a bidi isolate pair', `Hello ${String.fromCodePoint(0x2067)}world${String.fromCodePoint(0x2069)}`, 'Hello world'],
+    ['zero-width spaces and joiners inside a word', `Lo${String.fromCodePoint(0x200b)}ck${String.fromCodePoint(0x200d)}box`, 'Lockbox'],
+    ['a byte order mark pasted from a file', `${String.fromCodePoint(0xfeff)}Late flight`, 'Late flight'],
+    ['direction marks around Greek text', `${String.fromCodePoint(0x200f)}Σας${String.fromCodePoint(0x200e)}`, 'Σας'],
+    ['C0 and C1 controls such as ESC, BEL, VT, FF, DEL and NEL', 'A\u001B[31mB\u0007C\u000BD\u000CE\u007FF\u0085G', 'A[31mBCDEFG'],
+    ['carriage returns of a Windows line break', 'First line\r\nSecond line', 'First line\nSecond line'],
+  ])('stores the message without %s', async (_name, message, stored) => {
+    mocks.create.mockResolvedValue({ request: record('17:00'), notificationEventId: 'event-1', created: true });
+    mocks.deliverOutboxEvent.mockResolvedValue(true);
+
+    const response = await post({ requestedTime: '17:00', message });
+
+    expect(response.status).toBe(201);
+    expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ message: stored }), expect.anything());
+  });
+
+  it('stores no message when nothing visible is left after the invisible characters go', async () => {
+    mocks.create.mockResolvedValue({ request: record('17:00'), notificationEventId: 'event-1', created: true });
+    mocks.deliverOutboxEvent.mockResolvedValue(true);
+
+    const response = await post({ requestedTime: '17:00', message: `  ${String.fromCodePoint(0x200b)}${String.fromCodePoint(0x202e)}\u0007 ` });
+
+    expect(response.status).toBe(201);
+    expect(mocks.create.mock.calls[0][0].message).toBeUndefined();
+  });
+
+  it('still counts the 500-character limit on what was sent', async () => {
+    const response = await post({ requestedTime: '17:00', message: `${'a'.repeat(499)}${String.fromCodePoint(0x200b)}b` });
+
+    expect(response.status).toBe(422);
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
   it('returns the latest request of the verified guest', async () => {
     mocks.findLatestForGuest.mockResolvedValue(record('18:15'));
 

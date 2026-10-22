@@ -8,6 +8,7 @@ import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 import { timePattern } from '@/lib/propertyTime';
 import { createPortalBookingEligibilityWindow } from '@/lib/portalBookingEligibility';
 import { logger } from '@/lib/logger-enterprise';
+import { stripUnsafeTextCharacters } from '@/lib/validation/freeText';
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -16,6 +17,9 @@ const requestSchema = z.object({
   message: z.string().trim().max(500, 'Message must be 500 characters or fewer')
     // JSON can carry U+0000 as \u0000, but PostgreSQL text rejects it (SQLSTATE 22021), which would surface as a 500.
     .refine((value) => !value.includes('\u0000'), 'Message must not contain null characters')
+    // Other control, zero-width and bidi characters are dropped, not refused: they come from pasted text,
+    // and the host reads this message and the webhook carries it (see freeText.ts).
+    .transform(stripUnsafeTextCharacters)
     .optional(),
 }).strict();
 

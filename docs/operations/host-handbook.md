@@ -85,7 +85,8 @@ inside it, and an open session stops working when it closes. After the check-out
 3. Paste the code (field "Booking claim token", Greek: «Κωδικός ενεργοποίησης κράτησης»).
 4. "Where are you traveling from?": **Greece** or **Abroad** (Ελλάδα, Εξωτερικό).
 5. The mobile number, in the form of section 3.5.
-6. A password of at least 8 characters. Accept the guest terms. Press **Continue** (Συνέχεια).
+6. A password of at least 8 characters and at most 72 bytes (accented and Greek letters count as 2), not one repeated
+   character, not a run such as 12345678 or abcdefgh, not the phone number. Accept the guest terms. Press **Continue** (Συνέχεια).
 7. The guest lands on the check-in page (or on the stay page if check-in is switched off). From then on: tab
    **Sign-in** with the number and the password, inside the access window.
 
@@ -100,8 +101,9 @@ English
 > Hello [name], here is your access code for the guest portal: [code]. It works once and for 30 minutes from now, so
 > please use it straight away. Open [site address]/en/guest, choose "Sign-up", paste the code, choose where you are
 > travelling from (Greece or Abroad), type your mobile number with the country code (for example +30 691 234 5678 or
-> +44 7911 123456, with no zero after the country code), choose a password of at least 8 characters, accept the terms and
-> press Continue. After that you sign in with your phone number and your password.
+> +44 7911 123456, with no zero after the country code), choose a password of at least 8 characters and at most 72 bytes
+> (accented and Greek letters count as 2; not one repeated character, not a run such as 12345678 or abcdefgh, and not your
+> phone number), accept the terms and press Continue. After that you sign in with your phone number and your password.
 
 Ελληνικά
 
@@ -109,7 +111,9 @@ English
 > τώρα, γι' αυτό χρησιμοποιήστε τον αμέσως. Ανοίξτε το <διεύθυνση ιστότοπου>/el/guest, επιλέξτε «Εγγραφή», επικολλήστε τον
 > κωδικό, επιλέξτε από πού ταξιδεύετε (Ελλάδα ή Εξωτερικό), γράψτε τον αριθμό κινητού σας μαζί με τον κωδικό χώρας (π.χ.
 > +30 691 234 5678 ή +44 7911 123456, χωρίς μηδέν μετά τον κωδικό χώρας), διαλέξτε κωδικό πρόσβασης τουλάχιστον 8
-> χαρακτήρων, αποδεχτείτε τους όρους και πατήστε «Συνέχεια». Μετά συνδέεστε με τον αριθμό κινητού και τον κωδικό σας.
+> χαρακτήρων και το πολύ 72 byte (οι τονισμένοι και οι ελληνικοί χαρακτήρες μετρούν ως 2· όχι έναν χαρακτήρα που
+> επαναλαμβάνεται, όχι ακολουθία όπως 12345678 ή abcdefgh, ούτε τον αριθμό τηλεφώνου σας), αποδεχτείτε τους όρους και
+> πατήστε «Συνέχεια». Μετά συνδέεστε με τον αριθμό κινητού και τον κωδικό σας.
 
 ### 3.5 Phone number formats
 
@@ -132,8 +136,10 @@ What to tell guests:
 - Write the number with `+` and the country code, then the number **without** the leading 0: `+30 691 234 5678`,
   `+44 7911 123456`. No `(0)`.
 - Choose **Greece** only for a Greek number. Choose **Abroad** for a foreign number written with `+` and the country code.
-- A number with a leading 0 is refused. The guest then sees the generic message of section 4.1: "We couldn't verify your
-  identity. Check your details and try again." Ask them for the international form.
+- A number with a leading 0 or an unrecognised format is refused before any attempt is counted: the guest sees the hint
+  "Start with + and the country code, e.g. +30 69… (without a leading 0)." (Greek: «Ξεκινήστε με + και τον κωδικό χώρας,
+  π.χ. +30 69… (χωρίς αρχικό 0).»), which is also printed under the phone field of both forms. Ask them for the
+  international form.
 
 What it means for you: when you search a guest by **Phone Number** in `/admin/guests`, the search reads the number as typed
 and, when it is a 10-digit number, also with `+30` in front. So typing `6912345678` finds whichever of the two forms is stored: a wrongly stored `+6912345678` is tried first, then
@@ -147,7 +153,9 @@ number without `+30`, and ask the guest which form they used.
 | Message the guest sees | Cause | What to do |
 | --- | --- | --- |
 | "This claim token is invalid, expired or already used. Ask your host for a new one." | The code is older than 30 minutes, was already used, was replaced by a newer code, was copied wrongly, or the booking is outside its window | **Issue claim** again and send the new code |
-| "We couldn't verify your identity. Check your details and try again." (at **Sign-up**) | The phone number is refused (leading 0 or an unrecognised format; a number shorter than 8 characters gets "Please fix the highlighted fields and try again." instead), or the number already has an account and the password is wrong | Check the number form (3.5). If the guest stayed before: 4.3 |
+| "Start with + and the country code, e.g. +30 69… (without a leading 0)." (at **Sign-up** and **Sign-in**) | The phone number has a leading 0 or an unrecognised format. Nothing was counted against the limits of 4.5 | Ask for the international form (3.5) |
+| "This password is too long. Use at most 72 bytes…" or "Choose a password that is harder to guess: not one repeated character, a run such as 12345678 or abcdefgh, or your phone number." (at **Sign-up**) | The new password breaks the rules of 3.4 | Ask the guest for another password |
+| "We couldn't verify your identity. Check your details and try again." (at **Sign-up**) | The number already has an account and the password is wrong | If the guest stayed before: 4.3 |
 | "This action cannot be completed due to a conflict. Try again or contact support." (at **Sign-up**) | The booking already belongs to an account with another phone number, for example after a **Reset access** the guest typed a different number than at the first sign-up | Ask for the number used the first time. If the number on the account is the wrong one: **Erase guest**, then **Issue claim** (4.4) |
 | "We couldn't sign you in. Check your phone number and password. Access opens about 7 days before check-in and closes shortly after the check-out date." (at **Sign-in**) | Wrong number or password, the booking was not claimed, or the access window is closed | Check each; 4.2 for a forgotten password |
 | "Too many attempts. Please wait up to an hour and try again." | A rate limit (4.5) | Wait; see 4.5 |
@@ -213,7 +221,7 @@ read scenario S4 of the breach runbook.
 | Guest sign-in | 5 attempts | the phone number, **and** the network address | 15 minutes from the first counted attempt |
 | Guest sign-up (claim) | 5 attempts | the access code (once the browser has exchanged it), **and** the network address | 1 hour |
 | Access code check | 20 attempts | the network address | 1 hour |
-| Admin login | 5 attempts | the network address | 15 minutes |
+| Admin login | 5 wrong tokens (a correct token gives its attempt back) | the network address | 15 minutes |
 | Session renewal | 60 requests | the network address | 15 minutes |
 
 - The sixth attempt in the window is refused. Further tries do not extend the window; it ends 15 minutes (or 1 hour)

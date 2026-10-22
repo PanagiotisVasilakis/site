@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   createAdminSession: vi.fn(),
   signAdmin: vi.fn(),
   queryRaw: vi.fn(),
+  executeRaw: vi.fn(),
   transaction: vi.fn(),
   auditCreate: vi.fn(),
   auditCreateMany: vi.fn(),
@@ -28,6 +29,7 @@ vi.mock('@/lib/auth/admin', () => ({
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     $transaction: mocks.transaction,
+    $executeRaw: mocks.executeRaw,
     securityAuditEvent: { create: mocks.auditCreate, createMany: mocks.auditCreateMany },
   },
 }));
@@ -111,6 +113,10 @@ describe('admin sign-in audit events', () => {
       if (!resets.has(key)) resets.set(key, resetAt);
       return [{ count: counts.get(key), reset_time: resets.get(key) }];
     });
+    mocks.executeRaw.mockImplementation(async (_query: TemplateStringsArray, key: string) => {
+      counts.set(key, Math.max(0, (counts.get(key) ?? 0) - 1));
+      return 1;
+    });
     mocks.transaction.mockImplementation(async (callback) => callback({ $queryRaw: mocks.queryRaw }));
     mocks.auditCreate.mockResolvedValue({});
     mocks.auditCreateMany.mockResolvedValue({ count: 1 });
@@ -168,7 +174,7 @@ describe('admin sign-in audit events', () => {
 
     for (const response of refused) {
       expect(response.status).toBe(429);
-      expect(await response.text()).toBe('{"error":"Too many authentication attempts"}');
+      expect((await response.json()).error).toMatchObject({ code: 'RATE_LIMITED', message: 'Too many authentication attempts' });
     }
     // A refusal never uses `create`: the id of the window's one event decides, and the database skips the duplicates.
     expect(mocks.auditCreate).toHaveBeenCalledTimes(5);

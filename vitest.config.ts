@@ -41,6 +41,7 @@ export default defineConfig({
         'src/components/shell/ThemeSwitch.tsx',
         'src/components/shell/shellLinks.ts',
         'src/lib/auth/admin.ts',
+        'src/lib/auth/adminLoginBudget.ts',
         'src/lib/apiErrorHandler.ts',
         'src/lib/availability/calendarDate.ts',
         'src/lib/availability/calendarSync.ts',
@@ -80,6 +81,8 @@ export default defineConfig({
         'src/lib/safeLocalPath.ts',
         'src/lib/site.ts',
         'src/lib/userFacingErrors.ts',
+        'src/lib/validation/freeText.ts',
+        'src/lib/validation/guestCredentials.ts',
       ],
       exclude: ['src/generated/**', '**/*.d.ts'],
       thresholds: {

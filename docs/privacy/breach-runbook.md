@@ -219,7 +219,7 @@ the CARTO dashboard.
 
 | Signal | Where | What it means | Limit |
 | --- | --- | --- | --- |
-| Alert "Recent high-severity security events" | the alert receiver (`ALERT_WEBHOOK_URL`) and the `alerts` table (query 5 below) | A refresh token was presented twice: a copy of a guest's sign-in cookie was probably used. The token family was revoked at once | The only security rule, and the only writer of high-severity events |
+| Alert "Recent high-severity security events" | the alert receiver (`ALERT_WEBHOOK_URL`) and the `alerts` table (query 5 below) | `portal.refresh_token_replay`: a refresh token was presented twice, so a copy of a guest's sign-in cookie was probably used. The token family was revoked at once. Check the event type first (query 4) | The only security rule. High-severity events have two writers: `portal.refresh_token_replay` and `operations.retention_step_failed` (an operations fault, not a breach: a retention step of the operations worker failed; `details.step` names it, see the [monitoring guide](../deployment/monitoring-and-alerting.md)) |
 | Alerts "Dead outbox events" and "Stale pending outbox" | same | Arrival notifications fail or wait: the receiver is down, or its token or address changed. Not a breach by itself | |
 | Alert "Stale availability calendar" | same | The calendar sync fails (for example the export link was replaced or revoked) | |
 | Security events | queries 3, 4 and 8 below | Claims, access resets and erasures that you did not make. Every admin login that reaches the rate limiter: `admin.login_succeeded` (low), `admin.login_failed` (medium) and, once per 15-minute window, `admin.login_rate_limited` (medium) | None of the admin events is high severity, so none of them opens an alert. Kept 90 days. A request that ends before the limiter writes no event (login disabled, invalid body, no attested client address) |
@@ -310,8 +310,10 @@ How to read them, and where the evidence stops:
 - **Query 3** shows claims (`portal.booking_claimed`), access resets (`portal.access_reset`) and
   erasures (`privacy.erasure.completed`). An erasure you did not make means data was destroyed.
   Claims carry a keyed hash of the IP address; the same hash on two claims means the same address.
-- **Query 4** is the only high-severity writer today: `portal.refresh_token_replay` (a refresh token
-  was presented twice, so a copy of a sign-in cookie was probably used; the family is revoked at once).
+- **Query 4** shows high-severity events. `portal.refresh_token_replay` (a refresh token
+  was presented twice, so a copy of a sign-in cookie was probably used; the family is revoked at once)
+  is the security one. `operations.retention_step_failed` is an operations fault (a retention step failed;
+  `details.step` and an error code, no personal data): it is not a breach and starts no clock.
 - **Query 7** answers "approximate number of data subjects and records" for the notification.
 - **Query 8** shows the outcomes of admin logins. `admin.login_succeeded` (low) has `details.adminSessionId`,
   the id of the admin session it created, the same id as in query 1. `admin.login_failed` (medium) has
@@ -496,7 +498,8 @@ bookings; change prices and minimum nights; start a calendar sync; and read the 
    env file. If the leak came from the server, treat it as S3.
 4. What the dump allows: phone numbers, stay dates and references and messages in the clear (section 6);
    password hashes that can be attacked offline. A weak password can be recovered; the portal accepts
-   8 characters and no complexity rule. The keyed values (access-link digests, IP and device hashes,
+   8 to 72 bytes and refuses one repeated character, a simple run such as 12345678 and the phone number;
+   there is no other complexity rule. The keyed values (access-link digests, IP and device hashes,
    rate-limit keys, refresh hashes) are useless without the peppers.
 5. Guests whose stay has ended cannot sign in (no eligible booking), but the password may be reused
    elsewhere: tell them to change it there. For guests in the access window, consider **Block all guest

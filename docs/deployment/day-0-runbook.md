@@ -608,8 +608,8 @@ curl -sSI http://$H/ | head -n 3                  # 301 to https:// (Always Use 
 **The ingress identity chain (the most important check).** A wrong admin token must answer `401`. A
 `503` here means that Nginx and the application disagree on `ORIGIN_PROXY_SHARED_SECRET`, or that a
 request reaches the application without passing Nginx. Do not repeat this more than twice: the admin
-login allows five attempts, successful or not, in 15 minutes from one address, and the sixth is
-answered `429` for the rest of the window.
+login allows five wrong tokens in 15 minutes from one address (a correct token gives its attempt
+back), and the sixth attempt is answered `429` with a `Retry-After` header until the window ends.
 
 ```sh
 curl -sS -i -X POST https://$H/api/admin/login -H 'Content-Type: application/json' \

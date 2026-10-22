@@ -11,6 +11,7 @@ import { normalizeLocale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 import { GUEST_TERMS_TEXT } from '@/lib/guestTermsText';
 import internalFetch from '@/lib/internalFetchClient';
+import { normalizePhone, phoneLookupCandidates } from '@/lib/phone';
 import { emitGuestSessionChanged } from '@/lib/sessionSignals';
 import { mapApiErrorToUI } from '@/lib/userFacingErrors';
 
@@ -105,8 +106,18 @@ export default function UnifiedGuestClient() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!valid || loading) return;
-    setLoading(true);
     setNotice(null);
+    // The readings the server applies (normalizePhone with the origin at claim time, the lookup candidates at
+    // sign-in). A number that neither can read, such as a national 0151 1234567, is answered here with the hint
+    // shown under the field, without a request that would spend the claim or sign-in budget.
+    const phoneReadable = mode === 'signup'
+      ? normalizePhone(phone.trim(), origin || undefined) !== null
+      : phoneLookupCandidates(phone.trim()).length > 0;
+    if (!phoneReadable) {
+      setSubmitError({ summary: dictionary.phoneHint });
+      return;
+    }
+    setLoading(true);
     setSubmitError(null);
 
     const endpoint = mode === 'signup' ? '/api/portal/claims' : '/api/portal/sessions';
@@ -259,6 +270,7 @@ export default function UnifiedGuestClient() {
                 inputMode="tel"
                 autoComplete="tel"
                 placeholder="+30 690 000 0000"
+                aria-describedby="guest-phone-hint"
                 className={inputClass}
                 value={phone}
                 onChange={(event) => setPhone(event.target.value)}
@@ -266,6 +278,9 @@ export default function UnifiedGuestClient() {
                 maxLength={32}
                 required
               />
+              <p id="guest-phone-hint" className="ui-field__hint">
+                {dictionary.phoneHint}
+              </p>
             </div>
 
             <div className="ui-field">
@@ -279,6 +294,7 @@ export default function UnifiedGuestClient() {
                   type={showPassword ? 'text' : 'password'}
                   autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
                   placeholder={dictionary.passwordPlaceholder}
+                  aria-describedby={mode === 'signup' ? 'guest-password-hint' : undefined}
                   className={inputClass}
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
@@ -296,6 +312,11 @@ export default function UnifiedGuestClient() {
                   {showPassword ? '−' : 'Aa'}
                 </button>
               </div>
+              {mode === 'signup' && (
+                <p id="guest-password-hint" className="ui-field__hint">
+                  {dictionary.passwordHintSignup}
+                </p>
+              )}
             </div>
 
             {mode === 'signup' && (

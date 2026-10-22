@@ -13,7 +13,23 @@ export type PortalBookingDateRange = Readonly<{
 /**
  * Booking dates are PostgreSQL DATE values surfaced by Prisma as UTC-midnight
  * Date objects. Keep the portal policy in that calendar-date convention so
- * elapsed hours and local/DST transitions cannot change a boundary result.
+ * elapsed hours and local/DST transitions cannot change a boundary result:
+ * "today" is the UTC calendar date of the captured clock.
+ *
+ * This is the documented reference for the whole authentication boundary
+ * (docs/testing.md); the property time zone (PROPERTY_TIME_ZONE in
+ * src/data/stayPolicy.ts, Europe/Athens; the environment variable of that name
+ * is validated at start-up and not read) governs times of day and the
+ * availability calendar, not this window. The day therefore changes at 00:00
+ * UTC, which is 03:00 in Kalamata in summer and 02:00 in winter: between local
+ * midnight and that hour the window still holds the previous date. Access
+ * after the check-out date ends, and the window before check-in opens, that
+ * many hours after local midnight. Every flow (claim, sign-in, refresh, session
+ * check, grant issuance, arrival requests, the admin pages) and the host's
+ * instructions share this reference; tests/unit/portal-booking-eligibility.test.ts
+ * pins it around Athens midnight. Moving it to the property zone would open
+ * the window earlier (wider on that side, narrower on the closing side), so it
+ * needs an owner decision and one change to all of them.
  */
 export function createPortalBookingEligibilityWindow(
   capturedNow: Date,

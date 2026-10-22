@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { PROPERTY_TIME_ZONE } from '@/data/stayPolicy';
+import { propertyToday } from '@/lib/availability/calendarDate';
 import {
   createPortalBookingEligibilityWindow,
   isPortalBookingEligible,
@@ -110,6 +112,55 @@ describe('portal booking temporal eligibility', () => {
       endDate: new Date(Number.NaN),
     }, window)).toBe(false);
     expect(() => createPortalBookingEligibilityWindow(new Date(Number.NaN))).toThrow(TypeError);
+  });
+});
+
+// The window is a UTC calendar-date policy (docs/testing.md), not a Kalamata one. These cases pin what that means for a
+// guest in Kalamata around local midnight, in summer (UTC+3) and winter (UTC+2), so that a change of the reference clock
+// is always a decision taken for every flow at once and never a side effect.
+describe('portal booking eligibility around midnight in the property time zone', () => {
+  it.each([
+    ['summer, one second before local midnight', '2030-06-15T20:59:59.000Z', '2030-06-15', '2030-06-15'],
+    ['summer, local midnight', '2030-06-15T21:00:00.000Z', '2030-06-16', '2030-06-15'],
+    ['summer, one second before 03:00 local', '2030-06-15T23:59:59.000Z', '2030-06-16', '2030-06-15'],
+    ['summer, 03:00 local, when the UTC date changes', '2030-06-16T00:00:00.000Z', '2030-06-16', '2030-06-16'],
+    ['winter, one second before local midnight', '2030-01-15T21:59:59.000Z', '2030-01-15', '2030-01-15'],
+    ['winter, local midnight', '2030-01-15T22:00:00.000Z', '2030-01-16', '2030-01-15'],
+    ['winter, one second before 02:00 local', '2030-01-15T23:59:59.000Z', '2030-01-16', '2030-01-15'],
+    ['winter, 02:00 local, when the UTC date changes', '2030-01-16T00:00:00.000Z', '2030-01-16', '2030-01-16'],
+    ['the evening before the spring clock change', '2030-03-30T22:00:00.000Z', '2030-03-31', '2030-03-30'],
+    ['the evening of the spring clock change, already UTC+3', '2030-03-31T21:00:00.000Z', '2030-04-01', '2030-03-31'],
+    ['the evening before the autumn clock change', '2030-10-26T21:00:00.000Z', '2030-10-27', '2030-10-26'],
+    ['the evening of the autumn clock change, back at UTC+2', '2030-10-27T22:00:00.000Z', '2030-10-28', '2030-10-27'],
+  ])('%s: Athens is on %s, the window\'s date is %s', (_label, instant, athensDate, windowDate) => {
+    const captured = new Date(instant);
+
+    expect(propertyToday(PROPERTY_TIME_ZONE, captured)).toBe(athensDate);
+    expect(createPortalBookingEligibilityWindow(captured).businessToday).toEqual(dateOnly(windowDate));
+  });
+
+  it('keeps access until the UTC date changes after the check-out date: 2 to 3 hours after local midnight, never longer', () => {
+    // The stay ends on 2030-06-15 (summer) and on 2030-01-15 (winter).
+    expect(eligibilityFor('2030-06-15T21:30:00.000Z', '2030-06-10', '2030-06-15')).toBe(true); // 00:30 on 06-16 in Kalamata
+    expect(eligibilityFor('2030-06-15T23:59:59.000Z', '2030-06-10', '2030-06-15')).toBe(true); // 02:59:59
+    expect(eligibilityFor('2030-06-16T00:00:00.000Z', '2030-06-10', '2030-06-15')).toBe(false); // 03:00
+    expect(eligibilityFor('2030-01-15T22:30:00.000Z', '2030-01-10', '2030-01-15')).toBe(true); // 00:30 on 01-16
+    expect(eligibilityFor('2030-01-15T23:59:59.000Z', '2030-01-10', '2030-01-15')).toBe(true); // 01:59:59
+    expect(eligibilityFor('2030-01-16T00:00:00.000Z', '2030-01-10', '2030-01-15')).toBe(false); // 02:00
+  });
+
+  it('opens the window before check-in when the UTC date reaches the seventh day: 2 to 3 hours after local midnight', () => {
+    // Check-in on 2030-06-22 (summer) and on 2030-01-22 (winter): the window opens on the 15th at 00:00 UTC.
+    expect(eligibilityFor('2030-06-14T23:59:59.000Z', '2030-06-22', '2030-06-25')).toBe(false); // 02:59:59 on 06-15 in Kalamata
+    expect(eligibilityFor('2030-06-15T00:00:00.000Z', '2030-06-22', '2030-06-25')).toBe(true); // 03:00
+    expect(eligibilityFor('2030-01-14T23:59:59.000Z', '2030-01-22', '2030-01-25')).toBe(false); // 01:59:59 on 01-15
+    expect(eligibilityFor('2030-01-15T00:00:00.000Z', '2030-01-22', '2030-01-25')).toBe(true); // 02:00
+  });
+
+  it('does not open earlier because Kalamata is already on the next date', () => {
+    // 2030-06-15T21:30Z is 00:30 on 06-16 in Kalamata, where a stay from 06-23 is exactly seven days away.
+    expect(eligibilityFor('2030-06-15T21:30:00.000Z', '2030-06-23', '2030-06-26')).toBe(false);
+    expect(eligibilityFor('2030-06-15T21:30:00.000Z', '2030-06-22', '2030-06-26')).toBe(true);
   });
 });
 

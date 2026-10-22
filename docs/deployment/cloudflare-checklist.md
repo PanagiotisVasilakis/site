@@ -189,7 +189,7 @@ Check from your own computer. Use a path that the application does not have: it 
 every request, so the status can only change because of the edge rule. Do not use a real route for
 this check: several of them have their own limit inside the application (the error-report route
 `/api/errors` answers `429` after 10 requests a minute from one address) and the admin login has a
-budget of five attempts, so their answers would look like a working edge rule when there is none.
+budget of five wrong tokens, so their answers would look like a working edge rule when there is none.
 
 ```sh
 for i in $(seq 1 60); do curl -s -o /dev/null -w '%{http_code}\n' -X POST https://H/api/ratelimit-probe; done | uniq -c
@@ -245,7 +245,8 @@ check in the documentation that a rule can be written that way on your plan.
 ## 9. Cloudflare Access for the admin (recommended second layer)
 
 The admin is protected by one static secret (`ADMIN_DASH_SECRET`) and the sign-in limit of the
-application (five attempts per 15 minutes per address, successful or not). Put an identity check in
+application (five wrong tokens per 15 minutes per address; a correct token gives its attempt back, and
+the sixth attempt gets `429` with a `Retry-After` header until the window ends). Put an identity check in
 front of it at the edge with Cloudflare Access: a self-hosted application on the canonical host that
 covers `/admin` and `/api/admin` and everything below them (Cloudflare's documentation has the path
 syntax and the Free plan's user limit), with a policy that allows only your own e-mail address(es)

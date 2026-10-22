@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 
 import { CALENDAR_STALE_ALERT_MINUTES, GUEST_DATA_RETENTION_MONTHS } from '@/data/stayPolicy';
 import { CALENDAR_SYNC_STATE_ID } from '@/lib/availability/calendarSync';
+import { logger } from '@/lib/logger-enterprise';
 import { prisma } from '@/lib/prisma';
 import { eraseGuestForRetention } from '@/lib/privacyService';
 
@@ -235,92 +236,145 @@ const RETENTION_ERASURE_BATCH = 25;
 const RETENTION_ERASURE_NOTE =
   `Automatic retention: every booking of this guest ended more than ${GUEST_DATA_RETENTION_MONTHS} months ago.`;
 
+// The contact data of a check-in request, redacted once its retention period is over (rows
+// already redacted are not rewritten). Same fields as a guest erasure clears.
+const CHECK_IN_CONTACT_PRESENT = [
+  { guestName: { not: null } },
+  { guestEmail: { not: null } },
+  { guestPhone: { not: null } },
+  { message: { not: null } },
+];
+const CHECK_IN_CONTACT_CLEARED = { guestName: null, guestEmail: null, guestPhone: null, message: null };
+
+// One event per failed retention step. Severity high feeds the "Recent high-severity security
+// events" alert rule, which is how a failing step reaches the alert webhook.
+const RETENTION_FAILURE_EVENT_TYPE = 'operations.retention_step_failed';
+
+type RetentionStepFailure = { step: string; error: Error };
+
+// Name or code only, never the message: a database error can quote a value of the failing row.
+function retentionFailureKind(error: unknown): string {
+  const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined;
+  return (typeof code === 'string' ? code : error instanceof Error ? error.name : 'unknown').slice(0, 64);
+}
+
+async function recordRetentionFailures(failures: RetentionStepFailure[]): Promise<void> {
+  for (const { step, error } of failures) {
+    logger.error('Retention step failed', { step, error: retentionFailureKind(error) });
+  }
+  try {
+    // One statement for all failed steps: while the database is unreachable this costs one
+    // more timeout, not one per step.
+    await prisma.securityAuditEvent.createMany({
+      data: failures.map(({ step, error }) => ({
+        id: crypto.randomUUID(),
+        eventType: RETENTION_FAILURE_EVENT_TYPE,
+        severity: 'high',
+        details: { step, error: retentionFailureKind(error) },
+      })),
+    });
+  } catch (error) {
+    // The run fails below either way, so the host heartbeat shows it without the event.
+    logger.error('Could not record the retention failures', { error: retentionFailureKind(error) });
+  }
+}
+
+/**
+ * Housekeeping deletes, check-in redaction and guest erasure. Every step is its own failure
+ * domain (its own statement, for the erasure one transaction per guest): a step that fails is
+ * recorded and the others still run, so a failing housekeeping delete never blocks the privacy
+ * steps. After the last step the run throws if any step failed, which fails the operations worker.
+ */
 export async function runRetention(): Promise<Record<string, number>> {
   const now = Date.now();
   const days = (value: number) => new Date(now - value * 86_400_000);
   const guestDataCutoff = new Date(now);
   guestDataCutoff.setUTCMonth(guestDataCutoff.getUTCMonth() - GUEST_DATA_RETENTION_MONTHS);
-  const [
-    rateLimits, sessions, tokens, families, grants, securityEvents, outbox, deadOutbox, adminSessions,
-    checkInRequestsRedacted,
-  ] = await prisma.$transaction([
-    prisma.rateLimit.deleteMany({ where: { resetTime: { lt: new Date() } } }),
-    prisma.session.deleteMany({ where: { expiresAt: { lt: days(7) } } }),
-    prisma.refreshToken.deleteMany({ where: { expiresAt: { lt: days(30) } } }),
-    prisma.refreshTokenFamily.deleteMany({ where: { absoluteExpiresAt: { lt: days(30) } } }),
-    prisma.bookingClaimGrant.deleteMany({ where: { expiresAt: { lt: days(30) } } }),
-    prisma.securityAuditEvent.deleteMany({
-      where: {
-        OR: [
-          { occurredAt: { lt: days(90) } },
-          { eventType: { in: CLIENT_REPORT_EVENT_TYPES }, occurredAt: { lt: days(CLIENT_REPORT_RETENTION_DAYS) } },
-        ],
-      },
-    }),
-    prisma.outboxEvent.deleteMany({ where: { status: 'DELIVERED', deliveredAt: { lt: days(30) } } }),
-    // Erasure-cancelled events at once; failed deliveries after 30 days (until
-    // then the admin can retry them).
-    prisma.outboxEvent.deleteMany({
-      where: { OR: [ERASURE_CANCELLED_OUTBOX, { status: 'DEAD', updatedAt: { lt: days(30) } }] },
-    }),
-    // Longer than claim-grant retention, so issued grants keep their admin-session link while they exist.
-    prisma.adminSession.deleteMany({ where: { absoluteExpiresAt: { lt: days(90) } } }),
-    // Same fields as a guest erasure clears; rows already redacted are not rewritten.
-    prisma.checkInRequest.updateMany({
-      where: {
-        booking: { endDate: { lt: guestDataCutoff } },
-        OR: [
-          { guestName: { not: null } },
-          { guestEmail: { not: null } },
-          { guestPhone: { not: null } },
-          { message: { not: null } },
-        ],
-      },
-      data: { guestName: null, guestEmail: null, guestPhone: null, message: null },
-    }),
-  ]);
+  const counts: Record<string, number> = {};
+  const failures: RetentionStepFailure[] = [];
 
-  // Accounts go through the same audited erasure as a manual one (privacy request,
-  // audit event, outbox cancellation, booking unlink). `some` keeps accounts without
-  // bookings out: `every` alone is true for them.
-  const expiredGuests = await prisma.user.findMany({
-    where: { bookings: { some: {}, every: { endDate: { lt: guestDataCutoff } } } },
-    select: { id: true },
-    orderBy: { createdAt: 'asc' },
-    take: RETENTION_ERASURE_BATCH,
-  });
-  let guestsErased = 0;
-  let guestErasuresSkipped = 0;
-  const erasureFailures: Error[] = [];
-  for (const guest of expiredGuests) {
+  const step = async (name: string, run: () => Promise<void>) => {
     try {
-      // The erasure re-checks the cutoff in its transaction: a guest who claimed a new
-      // booking after this findMany is skipped, not erased.
-      if (await eraseGuestForRetention(guest.id, RETENTION_ERASURE_NOTE, guestDataCutoff)) guestsErased += 1;
-      else guestErasuresSkipped += 1;
+      await run();
     } catch (error) {
-      erasureFailures.push(error instanceof Error ? error : new Error(String(error)));
+      failures.push({ step: name, error: error instanceof Error ? error : new Error(String(error)) });
     }
-  }
-  if (erasureFailures.length > 0) {
+  };
+  const countStep = (name: string, run: () => Promise<{ count: number }>) => step(name, async () => {
+    counts[name] = (await run()).count;
+  });
+
+  await countStep('rateLimits', () => prisma.rateLimit.deleteMany({ where: { resetTime: { lt: new Date() } } }));
+  await countStep('sessions', () => prisma.session.deleteMany({ where: { expiresAt: { lt: days(7) } } }));
+  await countStep('tokens', () => prisma.refreshToken.deleteMany({ where: { expiresAt: { lt: days(30) } } }));
+  await countStep('families', () => prisma.refreshTokenFamily.deleteMany({ where: { absoluteExpiresAt: { lt: days(30) } } }));
+  await countStep('grants', () => prisma.bookingClaimGrant.deleteMany({ where: { expiresAt: { lt: days(30) } } }));
+  await countStep('securityEvents', () => prisma.securityAuditEvent.deleteMany({
+    where: {
+      OR: [
+        { occurredAt: { lt: days(90) } },
+        { eventType: { in: CLIENT_REPORT_EVENT_TYPES }, occurredAt: { lt: days(CLIENT_REPORT_RETENTION_DAYS) } },
+      ],
+    },
+  }));
+  await countStep('outbox', () => prisma.outboxEvent.deleteMany({ where: { status: 'DELIVERED', deliveredAt: { lt: days(30) } } }));
+  // Erasure-cancelled events at once; failed deliveries after 30 days (until
+  // then the admin can retry them).
+  await countStep('deadOutbox', () => prisma.outboxEvent.deleteMany({
+    where: { OR: [ERASURE_CANCELLED_OUTBOX, { status: 'DEAD', updatedAt: { lt: days(30) } }] },
+  }));
+  // Longer than claim-grant retention, so issued grants keep their admin-session link while they exist.
+  await countStep('adminSessions', () => prisma.adminSession.deleteMany({ where: { absoluteExpiresAt: { lt: days(90) } } }));
+  await countStep('checkInRequestsRedacted', () => prisma.checkInRequest.updateMany({
+    where: { booking: { endDate: { lt: guestDataCutoff } }, OR: CHECK_IN_CONTACT_PRESENT },
+    data: CHECK_IN_CONTACT_CLEARED,
+  }));
+  // A request without a booking has no end date to count from: its age counts from its creation.
+  await countStep('bookinglessCheckInRequestsRedacted', () => prisma.checkInRequest.updateMany({
+    where: { bookingId: null, createdAt: { lt: guestDataCutoff }, OR: CHECK_IN_CONTACT_PRESENT },
+    data: CHECK_IN_CONTACT_CLEARED,
+  }));
+
+  await step('guestErasure', async () => {
+    // Accounts go through the same audited erasure as a manual one (privacy request,
+    // audit event, outbox cancellation, booking unlink). `some` keeps accounts without
+    // bookings out: `every` alone is true for them.
+    const expiredGuests = await prisma.user.findMany({
+      where: { bookings: { some: {}, every: { endDate: { lt: guestDataCutoff } } } },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+      take: RETENTION_ERASURE_BATCH,
+    });
+    let guestsErased = 0;
+    let guestErasuresSkipped = 0;
+    const erasureFailures: Error[] = [];
+    for (const guest of expiredGuests) {
+      try {
+        // The erasure re-checks the cutoff in its transaction: a guest who claimed a new
+        // booking after this findMany is skipped, not erased.
+        if (await eraseGuestForRetention(guest.id, RETENTION_ERASURE_NOTE, guestDataCutoff)) guestsErased += 1;
+        else guestErasuresSkipped += 1;
+      } catch (error) {
+        erasureFailures.push(error instanceof Error ? error : new Error(String(error)));
+      }
+    }
+    counts.guestsErased = guestsErased;
+    counts.guestErasuresSkipped = guestErasuresSkipped;
+    if (erasureFailures.length > 0) {
+      throw new AggregateError(
+        erasureFailures,
+        `${erasureFailures.length} retention guest erasure(s) failed: ${erasureFailures.map((error) => error.message).join('; ')}`,
+      );
+    }
+  });
+
+  if (failures.length > 0) {
+    await recordRetentionFailures(failures);
     throw new AggregateError(
-      erasureFailures,
-      `${erasureFailures.length} retention guest erasure(s) failed: ${erasureFailures.map((error) => error.message).join('; ')}`,
+      failures.map(({ error }) => error),
+      `${failures.length} retention step(s) failed: ${failures.map(({ step: name, error }) => `${name}: ${error.message}`).join('; ')}`,
     );
   }
 
-  return {
-    rateLimits: rateLimits.count,
-    sessions: sessions.count,
-    tokens: tokens.count,
-    families: families.count,
-    grants: grants.count,
-    securityEvents: securityEvents.count,
-    outbox: outbox.count,
-    deadOutbox: deadOutbox.count,
-    adminSessions: adminSessions.count,
-    checkInRequestsRedacted: checkInRequestsRedacted.count,
-    guestsErased,
-    guestErasuresSkipped,
-  };
+  return counts;
 }

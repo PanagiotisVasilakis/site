@@ -117,7 +117,8 @@ recipients, transfers, retention as implemented, and the security measures (sect
 - **Legal basis in the notice**: performance of the contract (Article 6(1)(b)).
 - **Recipients**: the notification service `<OWNER: name, see processors>`; hosting provider.
 - **Retention (as implemented)**: name, e-mail, phone and message are cleared when the booking ended more
-  than 12 months ago (or at an erasure). The row itself (requested time, decision, times, booking link) is
+  than 12 months ago, for a request without a booking when the request itself is more than 12 months old
+  (or at an erasure). The row itself (requested time, decision, times, booking link) is
   never deleted. Outbox rows: delivered 30 days after delivery, dead 30 days after the last update,
   cancelled by an erasure at the next operations run. **The copy in the notification service is outside
   the system and outside the notice's retention line**; the rule proposed in
@@ -132,7 +133,7 @@ recipients, transfers, retention as implemented, and the security measures (sect
   page path (no query string), details (sanitised: phone numbers, e-mail addresses and token shapes are
   masked, sensitive field names are blanked). Written events: client error reports (`client.error`, from
   the browser, with the error name, message and a short stack, redacted), content-security-policy
-  reports, claims, access resets, erasures, refresh-token replays and the outcomes of admin sign-ins
+  reports, claims, access resets, erasures, refresh-token replays, failed retention steps (`operations.retention_step_failed`, high, with the step name and an error code, no personal data) and the outcomes of admin sign-ins
   (`admin.login_succeeded`, low, with the id of the admin session; `admin.login_failed`, medium, with the
   attempts left; `admin.login_rate_limited`, medium, with the limit, the window and its end; each with the
   keyed address hash and the path `/api/admin/login`; the secret that was typed is not stored, nor its
@@ -237,6 +238,7 @@ running `runRetention` on a seeded PostgreSQL 16 database. The operations worker
 | Data | Rule | Where |
 | --- | --- | --- |
 | Name, e-mail, phone and message of an arrival request | cleared when the booking's end date is more than 12 calendar months ago | `runRetention`, update of `check_in_requests` |
+| Name, e-mail, phone and message of an arrival request without a booking | cleared when `created_at` is more than 12 calendar months ago | `runRetention`, update of `check_in_requests` |
 | Portal account (phone, password hash) with its sessions, tokens, families and terms acceptances | erased when every booking of the account ended more than 12 months ago; at most 25 accounts per run; the cutoff is checked again inside the erasure transaction, so an account with a newer booking is skipped | `eraseGuestForRetention` |
 | Sessions | deleted 7 days after `expires_at` | `runRetention` |
 | Refresh tokens | deleted 30 days after `expires_at` | `runRetention` |
