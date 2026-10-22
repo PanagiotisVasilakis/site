@@ -10,12 +10,7 @@ import { MAX_STAY_NIGHTS } from '@/data/stayPolicy';
 import type { Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 import { eachNight, fromLocalDate, nightsBetween, toLocalDate, type IsoDate } from '@/lib/availability/calendarDate';
-import {
-  isCheckInAllowed,
-  minimumNightsFor,
-  validateStay,
-  type StayContext,
-} from '@/lib/availability/stayQuote';
+import { minimumNightsFor, validateStay, type StayContext } from '@/lib/availability/stayQuote';
 import type { PublicAvailability } from '@/lib/prisma-repositories/availabilityRepository';
 
 import StaySummary from './StaySummary';
@@ -24,6 +19,8 @@ import {
   EMPTY_SELECTION,
   bookedNights,
   checkOutWindow,
+  hasTooShortNight,
+  isTooShortToStart,
   nightCodeOn,
   readMonthFragment,
   readSelectionFragment,
@@ -63,6 +60,7 @@ const CALENDAR_CLASSES: Partial<ClassNames> = {
 const MODIFIER_CLASSES = {
   booked: 'cal__day--booked',
   checkOutOnly: 'cal__day--out',
+  tooShort: 'cal__day--short',
 };
 
 /** What a day cell shows under its date. */
@@ -127,6 +125,7 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
     [today, horizonEnd, nights, rates],
   );
   const totalMonths = monthsBetween(today, horizonEnd) + 1;
+  const anyTooShort = useMemo(() => hasTooShortNight(context), [context]);
 
   const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION);
   /** The booked night crossed by the last choice, which made that day the new check-in. */
@@ -232,10 +231,14 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
       return checkOutDays !== null && day === checkOutDays.last && nightCodeOn(day, today, nights) === 'b';
     },
     // A night that is free but cannot start a stay because the minimum stay does not fit before the next booked
-    // night. It has no class (MODIFIER_CLASSES); the accessible name says why.
+    // night: a dashed outline instead of the past-day fade (calendar.css), and the accessible name says why.
+    // Not while a check-out is being chosen, and never on a night of the chosen stay (its last nights can be too
+    // short to start one, e.g. a check-out right before a booked night).
     tooShort: (date: Date) => {
+      if (choosingCheckOut) return false;
       const day = fromLocalDate(date);
-      return !choosingCheckOut && isCheckInAllowed(day, context.blockedNights, today, horizonEnd) && checkOutWindow(day, context) === null;
+      const inStay = selection.checkIn !== null && selection.checkOut !== null && day >= selection.checkIn && day <= selection.checkOut;
+      return !inStay && isTooShortToStart(day, context);
     },
   };
 
@@ -244,7 +247,7 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
     if (dayModifiers.today) parts.unshift(t.day.today);
     if (dayModifiers.booked) parts.push(t.day.booked);
     if (dayModifiers.checkOutOnly) parts.push(t.day.checkOutOnly);
-    if (dayModifiers.tooShort) parts.push(fill(t.prompts.minimumStay, { nights: nightsLabel(minimumNightsFor(fromLocalDate(date), rates), t.nights, locale) }));
+    if (dayModifiers.tooShort) parts.push(fill(t.day.tooShort, { nights: nightsLabel(minimumNightsFor(fromLocalDate(date), rates), t.nights, locale) }));
     if (dayModifiers.selected) parts.push(t.day.selected);
     return parts.join(', ');
   };
@@ -388,6 +391,9 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
           <ul className="cal-legend__list">
             <li className="cal-legend__item"><span aria-hidden="true" className="cal-legend__swatch" />{t.legend.free}</li>
             <li className="cal-legend__item"><span aria-hidden="true" className="cal-legend__swatch cal-legend__swatch--booked" />{t.legend.booked}</li>
+            {anyTooShort ? (
+              <li className="cal-legend__item"><span aria-hidden="true" className="cal-legend__swatch cal-legend__swatch--short" />{t.legend.tooShort}</li>
+            ) : null}
             <li className="cal-legend__item"><span aria-hidden="true" className="cal-legend__swatch cal-legend__swatch--stay" />{t.legend.selected}</li>
           </ul>
         </div>

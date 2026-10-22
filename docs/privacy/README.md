@@ -1,7 +1,7 @@
 # Privacy operating documents
 
 The documents the host needs to run the guest guide in line with GDPR, written against the code and the schema of
-2026-10-21 (the tree after commit `ae1449d`, with the admin login audit, the complete per-guest export and the
+2026-10-21 (the branch `claude/nice-turing-uidc0s` on 2026-10-22, with the admin login audit, the complete per-guest export and the
 start-up checks of the Wi-Fi values and the site URL merged). They are operating guides, not legal advice. Fields that
 only the owner can fill are marked `<OWNER: ...>`; questions for a lawyer are marked `<OWNER/lawyer: ...>`.
 

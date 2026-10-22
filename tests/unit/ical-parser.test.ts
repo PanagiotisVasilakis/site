@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { addDays, parseIsoDate, type IsoDate } from '@/lib/availability/calendarDate';
-import { IcalParseError, parseBlockedRanges, type IcalParseErrorCode } from '@/lib/availability/icalParser';
+import {
+  IcalParseError,
+  parseBlockedRanges,
+  type IcalParseErrorCode,
+  type IcalParseOptions,
+} from '@/lib/availability/icalParser';
 
 // Synthetic fixtures for an iCalendar export of booked and closed dates. Only the shape is
 // plausible: the UIDs, dates, reservation code and phone digits are made up, and nothing here
@@ -59,9 +64,9 @@ function icalDate(date: IsoDate): string {
   return date.replaceAll('-', '');
 }
 
-function parseError(text: string): IcalParseError {
+function parseError(text: string, options?: IcalParseOptions): IcalParseError {
   try {
-    parseBlockedRanges(text);
+    parseBlockedRanges(text, options);
   } catch (error) {
     if (error instanceof IcalParseError) return error;
     throw error;
@@ -211,7 +216,7 @@ describe('parseBlockedRanges: event dates', () => {
     ['DTEND before DTSTART', ['DTSTART;VALUE=DATE:20261004', 'DTEND;VALUE=DATE:20261001']],
     ['DTEND equal to DTSTART', ['DTSTART;VALUE=DATE:20261001', 'DTEND;VALUE=DATE:20261001']],
     ['a zero duration', ['DTSTART;VALUE=DATE:20261001', 'DURATION:P0D']],
-    ['a cancelled event with DTEND before DTSTART', ['DTSTART;VALUE=DATE:20261004', 'DTEND;VALUE=DATE:20261001', 'STATUS:CANCELLED']],
+    ['a confirmed event with DTEND before DTSTART', ['DTSTART;VALUE=DATE:20261004', 'DTEND;VALUE=DATE:20261001', 'STATUS:CONFIRMED']],
   ])('rejects %s', (_label, properties) => {
     expect(parseError(calendar(vevent(...properties)))).toMatchObject({ code: 'invalid_range', line: FIRST_BODY_LINE });
   });
@@ -269,8 +274,8 @@ describe('parseBlockedRanges: event dates', () => {
   it('rejects an event without DTSTART', () => {
     const text = calendar(vevent('DTEND;VALUE=DATE:20261003', 'SUMMARY:Reserved'));
     expect(parseError(text)).toMatchObject({ code: 'invalid_event', line: FIRST_BODY_LINE });
-    // A cancelled event is validated before it is skipped.
-    expect(parseError(calendar(vevent('DTEND;VALUE=DATE:20261003', 'STATUS:CANCELLED')))).toMatchObject({ code: 'invalid_event', line: FIRST_BODY_LINE });
+    // Only a cancelled event is set aside unvalidated; a tentative one still needs its DTSTART.
+    expect(parseError(calendar(vevent('DTEND;VALUE=DATE:20261003', 'STATUS:TENTATIVE')))).toMatchObject({ code: 'invalid_event', line: FIRST_BODY_LINE });
   });
 
   it.each([
@@ -308,6 +313,160 @@ describe('parseBlockedRanges: event dates', () => {
       { start: '2026-10-05', end: '2026-10-06' },
       { start: '2026-10-08', end: '2026-10-09' },
     ]);
+  });
+});
+
+describe('parseBlockedRanges: events that cannot block a night still ahead', () => {
+  // With `today`, an event that fails validation is set aside only when it lay wholly before 2026-10-23
+  // (today minus two days). A cancelled event is set aside whatever its dates.
+  const options = { today: iso('2026-10-25') };
+  const FUTURE_EVENT = vevent('DTSTART;VALUE=DATE:20261101', 'DTEND;VALUE=DATE:20261104');
+  const FUTURE_RANGE = { start: '2026-11-01', end: '2026-11-04' };
+
+  type Shape = { label: string; code: IcalParseErrorCode; properties: (start: string, end: string) => string[] };
+  // Each shape is rejected by the strict parser whatever its dates are.
+  const SHAPES: Shape[] = [
+    { label: 'DATE-TIME values', code: 'unsupported_value', properties: (start, end) => [`DTSTART:${start}T140000Z`, `DTEND:${end}T100000Z`] },
+    { label: 'a DATE-TIME start and no end', code: 'unsupported_value', properties: (start) => [`DTSTART:${start}T140000Z`] },
+    { label: 'an end before the start', code: 'invalid_range', properties: (start, end) => [`DTSTART;VALUE=DATE:${end}`, `DTEND;VALUE=DATE:${start}`] },
+    { label: 'a zero duration', code: 'invalid_range', properties: (start) => [`DTSTART;VALUE=DATE:${start}`, 'DURATION:P0D'] },
+    {
+      label: 'a repeated DTEND',
+      code: 'invalid_event',
+      properties: (start, end) => [`DTSTART;VALUE=DATE:${start}`, `DTEND;VALUE=DATE:${end}`, `DTEND;VALUE=DATE:${end}`],
+    },
+    {
+      label: 'a DTEND with a DURATION',
+      code: 'invalid_event',
+      properties: (start, end) => [`DTSTART;VALUE=DATE:${start}`, `DTEND;VALUE=DATE:${end}`, 'DURATION:P2D'],
+    },
+    {
+      label: 'a repeated STATUS',
+      code: 'invalid_event',
+      properties: (start, end) => [`DTSTART;VALUE=DATE:${start}`, `DTEND;VALUE=DATE:${end}`, 'STATUS:CONFIRMED', 'STATUS:CONFIRMED'],
+    },
+  ];
+  const malformed = (shape: Shape, start: string, end: string) => vevent(...shape.properties(start, end));
+
+  describe.each(SHAPES)('a malformed event with $label', (shape) => {
+    it.each([
+      ['years ago', '20250101', '20250104'],
+      ['three weeks ago', '20261001', '20261004'],
+    ])('is set aside when it lay wholly %s, while the strict parser still rejects it', (_label, start, end) => {
+      const text = calendar([...malformed(shape, start, end), ...FUTURE_EVENT]);
+      expect(parseBlockedRanges(text, options)).toEqual([FUTURE_RANGE]);
+      expect(parseError(text).code).toBe(shape.code);
+    });
+
+    it.each([
+      ['in the future', '20261101', '20261104'],
+      ['today', '20261025', '20261028'],
+      ['at the cutoff', '20261023', '20261026'],
+    ])('still fails the parse when it starts %s', (_label, start, end) => {
+      const text = calendar([...malformed(shape, start, end), ...FUTURE_EVENT]);
+      expect(parseError(text, options).code).toBe(shape.code);
+    });
+  });
+
+  it.each([
+    ['the day before the cutoff', '20261022', null],
+    ['the cutoff', '20261023', 'unsupported_value'],
+    ['yesterday', '20261024', 'unsupported_value'],
+    ['today', '20261025', 'unsupported_value'],
+    ['a later day', '20261201', 'unsupported_value'],
+  ] as const)('a malformed event that ends on %s', (_label, end, code) => {
+    const text = calendar([...vevent('DTSTART:20261015T140000Z', `DTEND:${end}T100000Z`), ...FUTURE_EVENT]);
+    if (code === null) {
+      expect(parseBlockedRanges(text, options)).toEqual([FUTURE_RANGE]);
+    } else {
+      expect(parseError(text, options).code).toBe(code);
+    }
+  });
+
+  it.each([
+    ['DATE-TIME values from the past into the future', ['DTSTART:20261020T140000Z', 'DTEND:20261030T100000Z'], 'unsupported_value'],
+    ['a DATE-TIME start that began long ago with a DATE end ahead', ['DTSTART:20250101T140000Z', 'DTEND;VALUE=DATE:20261030'], 'unsupported_value'],
+    ['a repeated DTEND, the second ahead', ['DTSTART;VALUE=DATE:20261020', 'DTEND;VALUE=DATE:20261022', 'DTEND;VALUE=DATE:20261030'], 'invalid_event'],
+    ['a DTEND with a DURATION that reaches ahead', ['DTSTART;VALUE=DATE:20261020', 'DTEND;VALUE=DATE:20261022', 'DURATION:P20D'], 'invalid_event'],
+  ] as const)('a malformed event under way today with %s fails the parse', (_label, properties, code) => {
+    expect(parseError(calendar([...vevent(...properties), ...FUTURE_EVENT]), options).code).toBe(code);
+  });
+
+  it.each<[string, string[], IcalParseErrorCode]>([
+    ['a recurrence rule', ['DTSTART;VALUE=DATE:20250101', 'DTEND;VALUE=DATE:20250104', 'RRULE:FREQ=WEEKLY'], 'unsupported_recurrence'],
+    ['a recurrence date', ['DTSTART;VALUE=DATE:20250101', 'DTEND;VALUE=DATE:20250104', 'RDATE;VALUE=DATE:20261201'], 'unsupported_recurrence'],
+    ['no DTSTART', ['DTEND;VALUE=DATE:20250104'], 'invalid_event'],
+    ['an end that is not a date', ['DTSTART;VALUE=DATE:20250101', 'DTEND;VALUE=DATE:soon'], 'invalid_date'],
+    ['a start that is not a date', ['DTSTART;VALUE=DATE:2025-01-01', 'DTEND;VALUE=DATE:20250104'], 'invalid_date'],
+    ['a period instead of a date', ['DTSTART;VALUE=PERIOD:20250101/20250104', 'DTEND;VALUE=DATE:20250104'], 'unsupported_value'],
+    ['a duration in months', ['DTSTART;VALUE=DATE:20250101', 'DURATION:P1M'], 'invalid_duration'],
+    ['a duration in hours', ['DTSTART;VALUE=DATE:20250101', 'DURATION:PT24H'], 'invalid_duration'],
+    ['a second start ahead', ['DTSTART;VALUE=DATE:20250101', 'DTSTART;VALUE=DATE:20261201', 'DTEND;VALUE=DATE:20250104'], 'invalid_event'],
+    ['a start ahead and an end in the past', ['DTSTART;VALUE=DATE:20261201', 'DTEND;VALUE=DATE:20250104'], 'invalid_range'],
+    ['a start on the last supported day and no end', ['DTSTART;VALUE=DATE:99991231'], 'invalid_range'],
+    ['a start on the last supported day and a duration', ['DTSTART;VALUE=DATE:99991231', 'DURATION:P1D'], 'invalid_duration'],
+  ])('an event in the past with %s is doubtful, so it still fails the parse', (_label, properties, code) => {
+    expect(parseError(calendar([...vevent(...properties), ...FUTURE_EVENT]), options).code).toBe(code);
+  });
+
+  it.each([
+    ['without DTSTART', ['DTEND;VALUE=DATE:20261103']],
+    ['with its end before its start', ['DTSTART;VALUE=DATE:20261104', 'DTEND;VALUE=DATE:20261101']],
+    ['with DATE-TIME values', ['DTSTART:20261101T140000Z', 'DTEND:20261104T100000Z']],
+    ['with a recurrence rule', ['DTSTART;VALUE=DATE:20261101', 'DTEND;VALUE=DATE:20261104', 'RRULE:FREQ=WEEKLY']],
+    ['with values that are not dates', ['DTSTART;VALUE=DATE:soon', 'DTEND;VALUE=DATE:later']],
+    ['with a duration in months', ['DTSTART;VALUE=DATE:20261101', 'DURATION:P1M']],
+    ['with a repeated DTEND', ['DTSTART;VALUE=DATE:20261101', 'DTEND;VALUE=DATE:20261104', 'DTEND;VALUE=DATE:20261105']],
+  ])('a cancelled event %s is set aside, with or without today', (_label, properties) => {
+    const text = calendar([...vevent('STATUS:CANCELLED', ...properties), ...FUTURE_EVENT]);
+    expect(parseBlockedRanges(text)).toEqual([FUTURE_RANGE]);
+    expect(parseBlockedRanges(text, options)).toEqual([FUTURE_RANGE]);
+    // Wherever STATUS stands, and however it is spelt.
+    const spelt = calendar([...vevent(...properties, 'status:Cancelled'), ...FUTURE_EVENT]);
+    expect(parseBlockedRanges(spelt, options)).toEqual([FUTURE_RANGE]);
+  });
+
+  it.each([
+    ['cancelled twice', ['STATUS:CANCELLED', 'STATUS:CANCELLED']],
+    ['cancelled and confirmed', ['STATUS:CANCELLED', 'STATUS:CONFIRMED']],
+    ['confirmed and cancelled', ['STATUS:CONFIRMED', 'STATUS:CANCELLED']],
+  ])('a future event whose STATUS is %s is a conflict, not a cancellation', (_label, statuses) => {
+    const text = calendar(vevent('DTSTART;VALUE=DATE:20261101', 'DTEND;VALUE=DATE:20261104', ...statuses));
+    expect(parseError(text, options).code).toBe('invalid_event');
+  });
+
+  it('keeps the line structure of a set-aside event strict', () => {
+    const pastNoColon = calendar(vevent('DTSTART:20250101T140000Z', 'X-NOTE no colon here'));
+    expect(parseError(pastNoColon, options)).toMatchObject({ code: 'malformed_line', line: FIRST_BODY_LINE + 2 });
+
+    const cancelledUnbalanced = calendar(['BEGIN:VEVENT', 'STATUS:CANCELLED', 'BEGIN:VALARM', 'END:VEVENT', 'END:VALARM']);
+    expect(parseError(cancelledUnbalanced, options)).toMatchObject({ code: 'unbalanced', line: FIRST_BODY_LINE + 3 });
+  });
+
+  it('reports the first event that must fail, after the ones set aside', () => {
+    const text = calendar([
+      ...vevent('DTSTART:20250101T140000Z'),
+      ...vevent('STATUS:CANCELLED'),
+      ...vevent('DTSTART:20261101T140000Z'),
+      ...vevent('DTSTART:20261201T140000Z'),
+    ]);
+    // The failing event begins at FIRST_BODY_LINE + 3 + 3; its DTSTART is the next line.
+    expect(parseError(text, options)).toMatchObject({ code: 'unsupported_value', line: FIRST_BODY_LINE + 7 });
+  });
+
+  it('returns no ranges for a feed of events that are all set aside', () => {
+    const text = calendar([
+      ...vevent('DTSTART:20250101T140000Z', 'DTEND:20250104T100000Z'),
+      ...vevent('DTSTART;VALUE=DATE:20250110', 'DURATION:P0D'),
+      ...vevent('STATUS:CANCELLED', 'DTSTART;VALUE=DATE:20261101', 'DTEND;VALUE=DATE:20261104'),
+      ...vevent('STATUS:CANCELLED', 'DTEND:soon'),
+    ]);
+    expect(parseBlockedRanges(text, options)).toEqual([]);
+  });
+
+  it('still returns an event in the past that validates', () => {
+    const text = calendar(vevent('DTSTART;VALUE=DATE:20250101', 'DTEND;VALUE=DATE:20250104'));
+    expect(parseBlockedRanges(text, options)).toEqual([{ start: '2025-01-01', end: '2025-01-04' }]);
   });
 });
 

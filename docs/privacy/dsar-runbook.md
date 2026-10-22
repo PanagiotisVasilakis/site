@@ -3,7 +3,7 @@
 How the host answers a request to access, port, erase, correct or restrict personal data
 within the one month that the privacy notice promises.
 
-- Verified against the code on 2026-10-21 (the tree after commit `ae1449d`, with the complete per-guest
+- Verified against the code on 2026-10-21 (the branch `claude/nice-turing-uidc0s` on 2026-10-22, with the complete per-guest
   export and the admin login audit merged). Every SQL statement below was run on PostgreSQL 16 after
   applying all migrations. The erasure and retention behaviour was checked by running the real code
   (`eraseGuestByAdmin`, `runRetention`) against that database, and so was the admin export

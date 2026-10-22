@@ -4,7 +4,7 @@ What to do when personal data may have been exposed, lost, changed or accessed b
 have it. Steps for this system under GDPR Articles 33 (notify the authority within 72 hours) and 34
 (tell the people concerned).
 
-- Verified against the code on 2026-10-21 (the tree after commit `ae1449d`, with the admin login audit and the
+- Verified against the code on 2026-10-21 (the branch `claude/nice-turing-uidc0s` on 2026-10-22, with the admin login audit and the
   complete per-guest export merged). The SQL statements were run on PostgreSQL 16 after applying all migrations.
 - An operating guide, not legal advice. Fields only the owner can fill are marked `<OWNER: ...>`;
   questions for a lawyer are marked `<OWNER/lawyer: ...>`.

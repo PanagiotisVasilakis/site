@@ -3,7 +3,7 @@
 The host's day-to-day procedures for the guest guide: bookings, access codes for guests, arrival requests, the
 Wi-Fi password, the switches, the admin login, and the Booking.com calendar.
 
-- Verified against the code on 2026-10-21 (the tree after commit `ae1449d`, with the admin login audit and the start-up
+- Verified against the code on 2026-10-21 (the branch `claude/nice-turing-uidc0s` on 2026-10-22, with the launch-readiness fixes, the admin login audit and the start-up
   checks of the Wi-Fi values merged). The returning-guest procedure (section 4.3) was run end to end on the real portal
   services against a PostgreSQL 16 database; the Docker Compose behaviour in section 6 was tested with Docker Compose
   v5.6.0; the start-up check of the Wi-Fi values was run on the real environment schema. Sources of every fact are

@@ -15,6 +15,16 @@
 // STATUS, a value that is not a valid DATE or DURATION, or an end on or
 // before its start or after the year 9999. A silently missed blocked night
 // is worse than a failed sync.
+//
+// Two kinds of event are set aside before their dates are validated, because
+// neither can block a night that is still to come: an event with exactly one
+// STATUS, CANCELLED (it blocks nothing, whatever its other properties say),
+// and, when the caller passes `today`, an event that lies wholly in the past.
+// The second is judged leniently from the raw values (a DATE-TIME counts by
+// its date) and only when every start, end and duration it has can be read:
+// a recurrence, a missing DTSTART or an unreadable value keeps the event
+// strict, and so does an end within PAST_GRACE_DAYS of today. The line
+// structure of every event stays strict either way.
 
 import { addDays, parseIsoDate, type IsoDate } from '@/lib/availability/calendarDate';
 
@@ -23,6 +33,11 @@ type BlockedRange = { start: IsoDate; end: IsoDate };
 const MAX_TEXT_BYTES = 1_048_576; // 1 MiB of UTF-8
 const MAX_LINES = 50_000; // physical lines, before unfolding
 const MAX_EVENTS = 5_000; // VEVENT components, cancelled ones included
+/**
+ * An event that fails validation is set aside as past only when it lay before today minus this many
+ * days: more than any UTC offset, so a DATE-TIME read by its date cannot hide a night that is still ahead.
+ */
+const PAST_GRACE_DAYS = 2;
 
 const NAME = /^[A-Za-z0-9-]+$/;
 const DATE_VALUE = /^[0-9]{8}$/;
@@ -80,7 +95,27 @@ export class IcalParseError extends Error {
 
 type ContentLine = { text: string; line: number };
 type Property = { name: string; params: Array<{ name: string; value: string }>; value: string };
-type EventState = { line: number; seen: Set<string>; start?: IsoDate; end?: IsoDate; days?: number; cancelled: boolean };
+type EventState = {
+  line: number;
+  seen: Set<string>;
+  start?: IsoDate;
+  end?: IsoDate;
+  days?: number;
+  /** The first problem with the event's own properties; thrown when the event is finished, unless it is set aside. */
+  problem?: IcalParseError;
+  /** Raw values of the properties that decide whether the event is cancelled or past; they never leave this file. */
+  starts: string[];
+  ends: string[];
+  durations: string[];
+  statuses: string[];
+  recurring: boolean;
+};
+
+/** What the parser may be told about the calendar it reads. */
+export type IcalParseOptions = Readonly<{
+  /** The property's calendar date today: an event that fails validation and lay wholly before it is set aside. */
+  today: IsoDate;
+}>;
 
 function contentLines(text: string): ContentLine[] {
   const physical = text.split(/\r?\n/);
@@ -150,13 +185,33 @@ function parseDate(property: Property, line: number): IsoDate {
   return date;
 }
 
-function parseDurationDays(value: string, line: number): number {
+function durationDays(value: string): number | null {
   const match = DURATION_VALUE.exec(value.toUpperCase());
-  if (match === null) throw new IcalParseError('invalid_duration', line);
-  return Number(match[1]) * (match[2] === 'W' ? 7 : 1);
+  return match === null ? null : Number(match[1]) * (match[2] === 'W' ? 7 : 1);
 }
 
+/** Keeps the raw value of a property that bears on whether the event is cancelled or past. */
+function recordEventProperty(event: EventState, property: Property): void {
+  if (RECURRENCE_PROPERTIES.has(property.name)) event.recurring = true;
+  else if (property.name === 'DTSTART') event.starts.push(property.value);
+  else if (property.name === 'DTEND') event.ends.push(property.value);
+  else if (property.name === 'DURATION') event.durations.push(property.value);
+  else if (property.name === 'STATUS') event.statuses.push(property.value);
+}
+
+/** Reads one property of an event. A problem is kept, not thrown: finishEvent decides whether the event still fails. */
 function readEventProperty(event: EventState, property: Property, line: number): void {
+  recordEventProperty(event, property);
+  if (event.problem !== undefined) return;
+  try {
+    validateEventProperty(event, property, line);
+  } catch (error) {
+    if (!(error instanceof IcalParseError)) throw error;
+    event.problem = error;
+  }
+}
+
+function validateEventProperty(event: EventState, property: Property, line: number): void {
   if (RECURRENCE_PROPERTIES.has(property.name)) throw new IcalParseError('unsupported_recurrence', line);
   if (!SINGLE_PROPERTIES.has(property.name)) return; // SUMMARY, DESCRIPTION, UID...: dropped unread
 
@@ -172,16 +227,17 @@ function readEventProperty(event: EventState, property: Property, line: number):
     case 'DTEND':
       event.end = parseDate(property, line);
       break;
-    case 'DURATION':
-      event.days = parseDurationDays(property.value, line);
+    case 'DURATION': {
+      const days = durationDays(property.value);
+      if (days === null) throw new IcalParseError('invalid_duration', line);
+      event.days = days;
       break;
-    case 'STATUS':
-      event.cancelled = property.value.toUpperCase() === 'CANCELLED';
-      break;
+    }
   }
 }
 
 function eventRange(event: EventState): BlockedRange {
+  if (event.problem !== undefined) throw event.problem;
   const { start, line } = event;
   if (start === undefined) throw new IcalParseError('invalid_event', line);
   let end = event.end;
@@ -195,6 +251,68 @@ function eventRange(event: EventState): BlockedRange {
   }
   if (end <= start) throw new IcalParseError('invalid_range', line);
   return { start, end };
+}
+
+/** Exactly one STATUS, and it is CANCELLED: a repeated STATUS is a conflict, not a cancellation. */
+function isCancelled(event: EventState): boolean {
+  return event.statuses.length === 1 && event.statuses[0].toUpperCase() === 'CANCELLED';
+}
+
+/** The date of a DATE value, or of a DATE-TIME value by its date; null for anything else. */
+function lenientDay(value: string): IsoDate | null {
+  if (!DATE_VALUE.test(value) && !DATE_TIME_VALUE.test(value)) return null;
+  return parseIsoDate(`${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`);
+}
+
+function lenientDays(values: readonly string[]): IsoDate[] | null {
+  const days: IsoDate[] = [];
+  for (const value of values) {
+    const day = lenientDay(value);
+    if (day === null) return null;
+    days.push(day);
+  }
+  return days;
+}
+
+/**
+ * True only when the event provably lay before `cutoff`: every start, every end and every start plus
+ * duration it carries (or its one day, when it has no end) is earlier. Anything doubtful says false:
+ * a recurrence, a missing DTSTART, a start, end or duration that cannot be read. False keeps the event
+ * strict, so a night that might still be ahead is never dropped.
+ */
+function endedBefore(event: EventState, cutoff: IsoDate): boolean {
+  if (event.recurring) return false;
+  const starts = lenientDays(event.starts);
+  const ends = lenientDays(event.ends);
+  if (starts === null || ends === null || starts.length === 0) return false;
+
+  const latestStart = starts.reduce((latest, day) => (day > latest ? day : latest));
+  const reached = [...starts, ...ends];
+  try {
+    for (const value of event.durations) {
+      const days = durationDays(value);
+      if (days === null) return false;
+      reached.push(addDays(latestStart, days));
+    }
+    if (ends.length === 0 && event.durations.length === 0) reached.push(addDays(latestStart, 1));
+  } catch {
+    return false;
+  }
+  return reached.every((day) => day < cutoff);
+}
+
+/**
+ * The nights a finished event blocks, or null when it blocks none: it is cancelled, or (with a cutoff) it
+ * fails validation but lay wholly before the cutoff. Otherwise throws the event's first problem.
+ */
+function finishEvent(event: EventState, cutoff: IsoDate | null): BlockedRange | null {
+  if (isCancelled(event)) return null;
+  try {
+    return eventRange(event);
+  } catch (error) {
+    if (error instanceof IcalParseError && cutoff !== null && endedBefore(event, cutoff)) return null;
+    throw error;
+  }
 }
 
 function mergeRanges(ranges: BlockedRange[]): BlockedRange[] {
@@ -214,15 +332,19 @@ function mergeRanges(ranges: BlockedRange[]): BlockedRange[] {
 /**
  * The blocked nights of an iCalendar text as ranges start..end (end
  * exclusive, like DTEND). Every VEVENT that is not STATUS:CANCELLED blocks its
- * nights. The result is sorted by start, and overlapping or adjacent ranges
- * are merged, so no two ranges touch. Components other than VEVENT are skipped
- * unread. Throws IcalParseError for the cases listed at the top of this file.
+ * nights; a cancelled event is set aside without validating its dates, and so
+ * is an event that fails validation but lay wholly before `options.today` minus
+ * PAST_GRACE_DAYS (see the top of this file). The result is sorted by start,
+ * and overlapping or adjacent ranges are merged, so no two ranges touch.
+ * Components other than VEVENT are skipped unread. Throws IcalParseError for
+ * the cases listed at the top of this file.
  */
-export function parseBlockedRanges(text: string): BlockedRange[] {
+export function parseBlockedRanges(text: string, options?: IcalParseOptions): BlockedRange[] {
   if (text.length > MAX_TEXT_BYTES || new TextEncoder().encode(text).byteLength > MAX_TEXT_BYTES) {
     throw new IcalParseError('too_large');
   }
   const body = text.startsWith('﻿') ? text.slice(1) : text;
+  const cutoff = options === undefined ? null : addDays(options.today, -PAST_GRACE_DAYS);
 
   const stack: string[] = [];
   const ranges: BlockedRange[] = [];
@@ -248,15 +370,15 @@ export function parseBlockedRanges(text: string): BlockedRange[] {
       if (component === 'VEVENT') {
         eventCount += 1;
         if (eventCount > MAX_EVENTS) throw new IcalParseError('too_many_events', line);
-        event = { line, seen: new Set(), cancelled: false };
+        event = { line, seen: new Set(), starts: [], ends: [], durations: [], statuses: [], recurring: false };
       }
       stack.push(component);
     } else if (property.name === 'END') {
       if (componentName(property, line) !== stack[stack.length - 1]) throw new IcalParseError('unbalanced', line);
       stack.pop();
       if (event !== null && stack.length === 1) {
-        const range = eventRange(event);
-        if (!event.cancelled) ranges.push(range);
+        const range = finishEvent(event, cutoff);
+        if (range !== null) ranges.push(range);
         event = null;
       }
       closed = stack.length === 0;

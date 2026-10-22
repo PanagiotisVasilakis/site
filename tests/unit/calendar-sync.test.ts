@@ -242,6 +242,84 @@ describe('syncBookingCalendar: success', () => {
   });
 });
 
+// AC-02: one malformed event in the past, or a cancelled one, must not fail the whole sync; a malformed event that
+// could affect today or later still does, because dropping it could show a booked night as free.
+describe('syncBookingCalendar: events the parser sets aside', () => {
+  /** A calendar of events given as their property lines. */
+  function feedOf(...events: string[][]): string {
+    return [...HEADER, ...events.flatMap((properties) => ['BEGIN:VEVENT', ...properties, 'END:VEVENT']), 'END:VCALENDAR'].join(CRLF) + CRLF;
+  }
+
+  const BOOKED_DECEMBER = ['DTSTART;VALUE=DATE:20261224', 'DTEND;VALUE=DATE:20261227'];
+  const DECEMBER_NIGHTS = ['2026-12-24', '2026-12-25', '2026-12-26'];
+  const PAST_MALFORMED = ['DTSTART:20250101T140000Z', 'DTEND:20250104T100000Z'];
+  const CANCELLED_MALFORMED = ['STATUS:CANCELLED', 'DTSTART;VALUE=DATE:20261201', 'DTEND;VALUE=DATE:20261101'];
+
+  it('stores the nights of the valid events when only past or cancelled events are malformed', async () => {
+    mocks.fetch.mockResolvedValue(new Response(feedOf(PAST_MALFORMED, CANCELLED_MALFORMED, BOOKED_DECEMBER), { status: 200 }));
+
+    await expect(sync('scheduled')).resolves.toEqual({ status: 'synced', blockedNights: DECEMBER_NIGHTS.length });
+
+    expect(mocks.updateMany).toHaveBeenCalledTimes(2);
+    expect(mocks.updateMany.mock.calls[1][0].data).toMatchObject({
+      blockedNights: DECEMBER_NIGHTS.map(utcMidnight),
+      lastSuccessAt: NOW,
+      consecutiveFailures: 0,
+      lastErrorCode: null,
+    });
+    expect(mocks.logger.warn).not.toHaveBeenCalled();
+  });
+
+  // 22 October is before the cutoff of 23 October (two days before the property's 25 October) but not before the
+  // 22 October cutoff that the UTC date, 24 October, would give.
+  it('judges the past by the date at the property, not the UTC date', async () => {
+    const endedOn22 = ['DTSTART:20261015T140000Z', 'DTEND:20261022T100000Z'];
+    mocks.fetch.mockResolvedValue(new Response(feedOf(endedOn22, BOOKED_DECEMBER), { status: 200 }));
+
+    await expect(sync('scheduled')).resolves.toEqual({ status: 'synced', blockedNights: DECEMBER_NIGHTS.length });
+  });
+
+  it.each([
+    ['a future event', ['DTSTART:20261101T140000Z', 'DTEND:20261104T100000Z'], 'unsupported_value'],
+    ['an event under way today', ['DTSTART:20261020T140000Z', 'DTEND:20261030T100000Z'], 'unsupported_value'],
+    ['an event that ended at the cutoff', ['DTSTART:20261015T140000Z', 'DTEND:20261023T100000Z'], 'unsupported_value'],
+    ['a future event with an end before its start', ['DTSTART;VALUE=DATE:20261104', 'DTEND;VALUE=DATE:20261101'], 'invalid_range'],
+    ['a recurring event from the past', ['DTSTART;VALUE=DATE:20250101', 'DTEND;VALUE=DATE:20250104', 'RRULE:FREQ=WEEKLY'], 'unsupported_recurrence'],
+  ])('still fails the sync for %s that does not validate, and keeps the stored nights', async (_label, event, code) => {
+    mocks.fetch.mockResolvedValue(new Response(feedOf(PAST_MALFORMED, BOOKED_DECEMBER, event), { status: 200 }));
+    mocks.findUnique.mockResolvedValue({ consecutiveFailures: 1 });
+
+    await expect(sync('scheduled')).resolves.toEqual({ status: 'failed', code });
+
+    expect(mocks.updateMany).toHaveBeenCalledTimes(2);
+    expect(mocks.updateMany.mock.calls[1][0].data).toMatchObject({
+      lastFailureAt: NOW,
+      lastErrorCode: code,
+      consecutiveFailures: { increment: 1 },
+      nextAttemptAt: afterNow(45),
+    });
+    expect(mocks.updateMany.mock.calls[1][0].data).not.toHaveProperty('blockedNights');
+    expect(mocks.logger.info).not.toHaveBeenCalled();
+  });
+
+  // The state machine is unchanged: a feed that holds nothing but set-aside events is an empty calendar.
+  it('treats a feed of set-aside events as empty: stored on a manual run, empty_feed on a scheduled run that would clear future nights', async () => {
+    const onlySetAside = feedOf(PAST_MALFORMED, CANCELLED_MALFORMED);
+    mocks.fetch.mockImplementation(async () => new Response(onlySetAside, { status: 200 }));
+
+    await expect(sync('manual')).resolves.toEqual({ status: 'synced', blockedNights: 0 });
+    expect(mocks.updateMany.mock.calls[1][0].data).toMatchObject({ blockedNights: [], lastErrorCode: null });
+
+    mocks.updateMany.mockClear();
+    mocks.findUnique
+      .mockResolvedValueOnce({ blockedNights: DECEMBER_NIGHTS.map(utcMidnight) })
+      .mockResolvedValueOnce({ consecutiveFailures: 0 });
+    await expect(sync('scheduled')).resolves.toEqual({ status: 'failed', code: 'empty_feed' });
+    expect(mocks.updateMany.mock.calls[1][0].data).toMatchObject({ lastErrorCode: 'empty_feed' });
+    expect(mocks.updateMany.mock.calls[1][0].data).not.toHaveProperty('blockedNights');
+  });
+});
+
 describe('syncBookingCalendar: not claimed', () => {
   it.each([
     ['scheduled', 'skipped'],

@@ -3,7 +3,7 @@
 A draft, pre-filled from `prisma/schema.prisma`, the code and the privacy notice
 (`src/i18n/domains/legal.ts`). The owner completes and signs it.
 
-- Status: **draft, 2026-10-21**, prepared against the code after commit `ae1449d` (with the admin login audit and
+- Status: **draft, 2026-10-21**, prepared against the code of the branch `claude/nice-turing-uidc0s` on 2026-10-22 (with the admin login audit and
   the complete per-guest export merged). Last reviewed by the owner:
   `<OWNER: date, name>`.
 - Fields only the owner can fill are marked `<OWNER: ...>`. Questions for a lawyer are marked
@@ -49,9 +49,10 @@ recipients, transfers, retention as implemented, and the security measures (sect
 - **Recipients**: hosting provider and Cloudflare (processors); the map providers (independent, P2).
 - **Transfers**: Cloudflare, Inc. (USA): EU-US Data Privacy Framework and standard contractual clauses, as
   the notice states.
-- **Retention**: Nginx error log 14 days (the notice; the rotation rule is in the
-  [origin runbook](../deployment/origin-ingress-runbook.md), and its installation on the live server is
-  not verified), Nginx access log: no rotation rule yet, `<OWNER: set one>`. Cloudflare's own logs:
+- **Retention**: Nginx error log 14 days (the notice; the rotation rule is
+  `deploy/host/logrotate-nginx.conf`, and its installation on the live server is not verified), Nginx
+  access log: the same file rotates it daily and keeps 7 files, so a line is gone after at most 8 days (not
+  stated in the notice yet). Cloudflare's own logs:
   `<OWNER: what the plan keeps>`. Container logs of the web and database services: rotated by size
   (5 files of 10 MB each per container), not by age.
 
@@ -194,8 +195,10 @@ recipients, transfers, retention as implemented, and the security measures (sect
 
 ### P11. Backups
 
-- **Status**: the architecture decision requires encrypted off-site backups; no backup process exists in the
-  repository yet. `<OWNER: provider, location, what is copied, encryption, retention, restore test>`
+- **Status**: the architecture decision requires encrypted off-site backups. The repository ships the script
+  (`deploy/host/backup.sh`: encrypted nightly dump of the whole database, 14 days of local copies by default) and
+  the restore procedure ([backup and restore](../deployment/backup-and-restore.md)); nothing is installed on the
+  live server yet. `<OWNER: provider of the off-site copy, location, retention there, date of the first restore test>`
 - **Effect on the rights of the guests**: an erasure reaches a backup only when the backup expires, and an
   erasure must be applied again after a restore ([data subject requests](dsar-runbook.md), section 10).
 - **Not in the privacy notice** (see [proposed notice changes](proposed-notice-changes.md) item c).
@@ -252,9 +255,9 @@ running `runRetention` on a seeded PostgreSQL 16 database. The operations worker
 | Arrival-request rows (without contact data) | never deleted | no job |
 | Erasure records (`privacy_requests`) | never deleted | no job |
 | Alerts and rules | never deleted (no personal data) | no job |
-| Nginx error log | 14 days (the notice; logrotate rule in the origin runbook) | host |
+| Nginx error log | 14 days (the notice; logrotate rule `deploy/host/logrotate-nginx.conf`) | host |
 | Container logs | by size, 5 files of 10 MB per container | Docker `json-file` |
-| Backups | `<OWNER: ...>` | backup process |
+| Backups | 14 days locally by default (`BACKUP_RETENTION_DAYS`), `<OWNER: off-site retention>` | `deploy/host/backup.sh` |
 | Copy in the notification service | no rule yet | `<OWNER: ...>` |
 | Records that tax law requires | as long as the law sets | the notice |
 

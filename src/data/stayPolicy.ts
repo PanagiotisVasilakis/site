@@ -36,7 +36,7 @@ export const CALENDAR_PUBLIC_STALE_HOURS = 12;
 /**
  * Guest personal data is kept for this many months after the stay (booking end date), then
  * runRetention redacts check-in request contact data and erases guest accounts whose every
- * booking ended that long ago. Owner default (Review 3, O27); confirmed by the owner on
- * 2026-10-20.
+ * booking ended that long ago (requests without a booking: counted from their creation). Owner
+ * default (Review 3, O27); confirmed by the owner on 2026-10-20.
  */
 export const GUEST_DATA_RETENTION_MONTHS = 12;

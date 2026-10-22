@@ -166,9 +166,17 @@
 /* Check-out only: the first booked night after the check-in stays clickable */
 .cal .cal__day--out .cal__btn { box-shadow: inset 0 0 0 1.5px var(--color-border-strong); }
 
+/* Free, but the minimum stay does not fit before the next booked night: not a check-in, yet not faded like a past day
+   and not hatched like a booked one. A dashed outline (border-control, 3:1 on the cell) and a muted date; the accessible
+   name says why ("…, free, but a stay must be at least 3 nights"). It carries no number and no price. */
+.cal .cal__day--short:not(.cal__day--selected) .cal__btn {
+  border: 1.5px dashed var(--color-border-control);
+  color: var(--color-fg-muted);
+}
+
 /* Past, beyond the horizon, or not a possible check-in/check-out now */
 .cal .cal__day--disabled .cal__btn { cursor: default; }
-.cal .cal__day--disabled:not(.cal__day--booked) .cal__btn { opacity: .45; }
+.cal .cal__day--disabled:not(.cal__day--booked):not(.cal__day--short) .cal__btn { opacity: .45; }
 
 /* Your stay: check-in and check-out in cal-selected (12 px outer radius), the nights between in cal-range */
 .cal .cal__day--middle .cal__btn {
@@ -217,6 +225,7 @@
     repeating-linear-gradient(135deg, var(--color-cal-booked-hatch) 0 1.5px, transparent 1.5px 7px),
     var(--color-cal-booked-bg);
 }
+.cal-legend .cal-legend__swatch--short { border: 1.5px dashed var(--color-border-control); }
 .cal-legend .cal-legend__swatch--stay { border-color: transparent; background: var(--color-cal-selected-bg); }
 
 /* SummaryCard: surface, radius-dialog, shadow-raised; sticky at ≥ lg (see .planner__summary) */

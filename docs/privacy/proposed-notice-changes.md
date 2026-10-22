@@ -2,7 +2,7 @@
 
 For the owner or a lawyer. **None of this is applied.** `src/i18n/domains/legal.ts` is unchanged by this
 work: it is owner and lawyer territory. Each item gives the current text with its line number in that file, what
-the code really does (checked on 2026-10-21 against the code after commit `ae1449d`), and a proposal in English and
+the code really does (checked on 2026-10-22 against the code of the branch `claude/nice-turing-uidc0s`), and a proposal in English and
 Greek.
 
 Every proposal is marked **proposal - needs owner/lawyer approval**. The legal references are from the
@@ -155,10 +155,11 @@ item for a backup provider.
   lines, the random ids of an account, a booking or a request. Field names such as `phone` or `email` are redacted by
   the logger. Request-shape and cross-origin violations are logged with a keyed hash of the address, not the address.
 - The Nginx access log (`origin_safe` format) has the request id, method, path, status, size, time and the Cloudflare ray
-  id: no address and no query string. The origin runbook says it "needs its own rotation rule before go-live"; there is
-  none yet. The error log can hold the address and the request line: 14 days if the logrotate rule of the runbook is
-  installed (not verified on a live server).
-- Backups: the architecture decision requires encrypted off-site backups; the repository has no backup process yet. A
+  id: no address and no query string. `deploy/host/logrotate-nginx.conf` rotates it daily and keeps 7 files (at most 8 days).
+  The error log can hold the address and the request line: 14 days if that logrotate rule is installed (not verified
+  on a live server).
+- Backups: the architecture decision requires encrypted off-site backups; the repository ships the script and the
+  restore procedure (`deploy/host/backup.sh`, 14 days of local copies by default) but nothing is installed yet. A
   restored backup brings back erased data (see the data subject requests runbook, section 10).
 
 ### Proposal - needs owner/lawyer approval

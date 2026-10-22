@@ -160,7 +160,10 @@ export async function syncBookingCalendar({ trigger }: { trigger: 'scheduled' | 
 
   let outcome: { nights: Date[] } | Failure;
   try {
-    const nights = blockedNightsWithin(parseBlockedRanges(await fetchBookingCalendarText(url)), today, horizonEnd);
+    // Cancelled events and events that ended before today are set aside even if their fields are malformed;
+    // any other event that does not validate still fails the run, so a doubtful night is never read as free.
+    const ranges = parseBlockedRanges(await fetchBookingCalendarText(url), { today });
+    const nights = blockedNightsWithin(ranges, today, horizonEnd);
     outcome = nights.length > MAX_STORED_NIGHTS ? { code: 'too_many_nights' } : { nights: nights.map(toDbDate) };
   } catch (error) {
     outcome = failureOf(error);

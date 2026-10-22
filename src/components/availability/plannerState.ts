@@ -45,6 +45,23 @@ export function checkOutWindow(checkIn: IsoDate, context: StayContext): { first:
 }
 
 /**
+ * A night that is free (not past, not booked, inside the horizon) but cannot start a stay, because the
+ * minimum stay of its rate period does not fit before the next booked night, the longest stay or the
+ * horizon end. The calendar styles and names such a night apart from a booked or a past one.
+ */
+export function isTooShortToStart(night: IsoDate, context: StayContext): boolean {
+  return isCheckInAllowed(night, context.blockedNights, context.today, context.horizonEnd) && checkOutWindow(night, context) === null;
+}
+
+/** Whether any night of the calendar is too short to start a stay (the legend explains that style only then). */
+export function hasTooShortNight(context: StayContext): boolean {
+  for (let night = context.today; night < context.horizonEnd; night = addDays(night, 1)) {
+    if (isTooShortToStart(night, context)) return true;
+  }
+  return false;
+}
+
+/**
  * The selection in a URL fragment: a valid check-in, optionally with a later
  * check-out. Anything else (bad dates, a check-out without check-in or not
  * after it, other fragments such as '#contact') is null and ignored.
