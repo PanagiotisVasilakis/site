@@ -558,3 +558,117 @@ describe('PwaManager hands visited pages to the service worker (R-628)', () => {
     expect(() => softNavigate('/en/moments', () => rerender(<PwaManager />))).not.toThrow();
   });
 });
+
+// PS-07: the fixed pills must leave the end of the page reachable. PwaManager publishes the space they take at the
+// bottom of the viewport as --pwa-banners-clear; shell.css reads it for the footer padding and the scroll padding.
+describe('PwaManager keeps the end of the page clear of the pills (PS-07)', () => {
+  const TIP_HEIGHT = 62;
+  let resizeCallbacks: Array<() => void>;
+  let disconnected: number;
+
+  const clearance = () => document.documentElement.style.getPropertyValue('--pwa-banners-clear');
+  const notifyResize = () => resizeCallbacks.forEach((callback) => callback());
+
+  // The pills' container as layout.tsx renders it, 56 px above the bottom edge (the viewport below sm).
+  function ShellWithPills({ bottom = '56px' }: { bottom?: string }) {
+    return (
+      <>
+        <PwaManager />
+        <div className="pwa-banners" style={{ bottom }}>
+          <div id="update-banner" className="hidden"><span>Update available</span></div>
+          <div id="ios-a2hs-tip" className="hidden">
+            <span>Add to Home Screen</span>
+            <button id="ios-tip-close" type="button">Close</button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_FORCE_SW_DEV', '1');
+    Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: fakeServiceWorkerContainer() });
+    Object.defineProperty(navigator, 'userAgent', { configurable: true, value: IPHONE_USER_AGENT });
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })));
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ version: '1.2.3', build: 'abc' })));
+    // jsdom has no layout: the container is TIP_HEIGHT tall exactly while the tip is displayed.
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function measure(this: HTMLElement) {
+      const tipShown = document.getElementById('ios-a2hs-tip')?.style.display === 'flex';
+      return { height: this.classList.contains('pwa-banners') && tipShown ? TIP_HEIGHT : 0 } as DOMRect;
+    });
+    resizeCallbacks = [];
+    disconnected = 0;
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) { resizeCallbacks.push(callback); }
+      observe() {}
+      disconnect() { disconnected += 1; }
+    });
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, 'serviceWorker');
+    Reflect.deleteProperty(navigator, 'userAgent');
+    document.documentElement.style.removeProperty('--pwa-banners-clear');
+  });
+
+  it('publishes the space of a shown tip: its distance from the bottom, its height and 8 px of air', () => {
+    render(<ShellWithPills />);
+
+    expect(clearance()).toBe(`${56 + TIP_HEIGHT + 8}px`);
+  });
+
+  it('publishes nothing while no pill is shown', () => {
+    Object.defineProperty(navigator, 'userAgent', { configurable: true, value: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/141.0 Mobile Safari/537.36' });
+    render(<ShellWithPills />);
+
+    expect(element('ios-a2hs-tip').style.display).toBe('');
+    expect(clearance()).toBe('');
+  });
+
+  it('gives the space back when the tip is closed, and keeps remembering the dismissal', () => {
+    render(<ShellWithPills />);
+    expect(clearance()).not.toBe('');
+
+    fireEvent.click(element('ios-tip-close'));
+    notifyResize();
+
+    expect(element('ios-a2hs-tip').style.display).toBe('none');
+    expect(clearance()).toBe('');
+    expect(localStorage.getItem('ios-a2hs-dismissed')).toBe('1');
+  });
+
+  it('follows the offset of the container when the breakpoint changes', () => {
+    const { rerender } = render(<ShellWithPills />);
+    expect(clearance()).toBe('126px');
+
+    // Above sm the network dot is gone and the pills drop to 8 px from the bottom.
+    rerender(<ShellWithPills bottom="8px" />);
+    window.dispatchEvent(new Event('resize'));
+
+    expect(clearance()).toBe(`${8 + TIP_HEIGHT + 8}px`);
+  });
+
+  it('still publishes once in a browser without ResizeObserver', () => {
+    vi.stubGlobal('ResizeObserver', undefined);
+    render(<ShellWithPills />);
+
+    expect(clearance()).toBe('126px');
+  });
+
+  it('removes the property and stops observing when it unmounts', () => {
+    const { unmount } = render(<ShellWithPills />);
+    expect(clearance()).not.toBe('');
+
+    unmount();
+
+    expect(clearance()).toBe('');
+    expect(disconnected).toBeGreaterThan(0);
+  });
+
+  it('does nothing without the pills container', () => {
+    render(<ShellWithPwaManager />);
+
+    expect(clearance()).toBe('');
+    expect(resizeCallbacks).toEqual([]);
+  });
+});

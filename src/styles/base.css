@@ -19,6 +19,10 @@
     --text-label--letter-spacing: .04em;
   }
 
+  /* A heading word wider than the screen (a large text size, WCAG 1.4.4; a long Greek word on a narrow phone)
+     breaks instead of running off the page. It changes nothing while every word fits. */
+  :is(h1, h2, h3, h4) { overflow-wrap: break-word; }
+
   /* §8 focus ring for any focusable without its own (components set theirs, often band-focus on bands and
      photos). Replaces the legacy blue ring of 05-primitives.css (R3-V12a). */
   :focus-visible {

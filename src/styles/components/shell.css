@@ -46,17 +46,41 @@
 /* PWA update banner and iOS add-to-home tip ([locale]/layout.tsx): toast-like pills at the bottom centre.
    .pwa-banners is the one fixed container (16 px gutters, flex column), so a narrow viewport gives each pill the
    full width and two shown pills stack instead of overlapping; it lets clicks through, the pills take them back.
-   No `display` on .pwa-banner: the `hidden` utility hides it until PwaManager sets an inline `display: flex`. */
+   No `display` on .pwa-banner: the `hidden` utility hides it until PwaManager sets an inline `display: flex`.
+   The fixed controls at the bottom edge keep clear of each other (PS-07):
+   - below sm (the Tailwind breakpoint that hides it) the network dot (stay.css .net-status; layout.tsx puts it
+     40 px high, 8 px from the left and the bottom) owns the bottom-left corner, so the pills sit 8 px above it;
+   - while the BookBar is shown (below lg) it moves right of the dot (below sm), the dot rides at its height and the
+     pills rise above it (--pills-lift, --dot-lift; M22 moves them together);
+   - PwaManager publishes --pwa-banners-clear while a pill shows: the page footer and the keyboard scroll padding
+     leave that much clear, so the last content is never under a pill (0 while both are hidden). The BookBar
+     publishes its height as --bookbar-h (the text wraps at larger text sizes). */
+:root {
+  --pwa-banners-bottom: 8px;
+  --pwa-banners-clear: 0px;
+  --pills-lift: 0px;
+  --dot-lift: 0px;
+}
+@media (max-width: 39.99rem) {
+  :root { --pwa-banners-bottom: 56px; }
+}
+@media (max-width: 1023.98px) {
+  :root:has(.bookbar.is-shown) {
+    --pills-lift: calc(var(--bookbar-h, 58px) + 20px - var(--pwa-banners-bottom));
+    --dot-lift: calc((var(--bookbar-h, 58px) - 40px) / 2 + 4px);
+  }
+}
 .pwa-banners {
   position: fixed;
   right: 16px;
-  bottom: calc(8px + env(safe-area-inset-bottom));
+  bottom: calc(var(--pwa-banners-bottom) + env(safe-area-inset-bottom));
   left: 16px;
   z-index: 50;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
+  translate: 0 calc(-1 * var(--pills-lift));
   pointer-events: none;
 }
 .pwa-banner {
@@ -84,7 +108,7 @@
   box-shadow: none;
 }
 
-/* SiteHeader: sticky glass pill, 56 px, 10 px from the top and the gutters */
+/* SiteHeader: sticky glass pill, at least 56 px (it grows with the text size, WCAG 1.4.4), 10 px from the top and the gutters */
 .site-header {
   position: sticky;
   top: var(--header-offset);
@@ -92,9 +116,9 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  height: var(--header-h);
+  min-height: var(--header-h);
   margin: var(--header-offset) var(--gutter) 0;
-  padding: 0 5px 0 10px;
+  padding: 4px 5px 4px 10px;
   /* Transparent bar like the original site (O43): a light tint + blur, the border appears only after scrolling. */
   border: 1px solid transparent;
   border-radius: var(--radius-control);
@@ -117,8 +141,9 @@
 .site-header .site-header__account {
   text-shadow: 0 0 2px var(--color-bg), 0 0 5px var(--color-bg);
 }
-/* The wordmark box (.site-brand__name) clips overflow for the ellipsis, and a clip cuts the halo at the glyph edge
-   unless the box itself has room for it: padding inside the clip, cancelled by the margin, same outer size. */
+/* The wordmark box (.site-brand__name) still clips overflow, and a clip cuts the halo at the glyph edge unless the box
+   itself has room for it: padding inside the clip, cancelled by the margin, same outer size. (The name wraps instead
+   of ending in an ellipsis, see below.) */
 .site-header .site-brand__name { padding: 3px 6px; margin: -3px -6px; }
 .site-header .site-brand svg,
 .site-header .ui-icon-btn svg {
@@ -158,6 +183,8 @@
   min-width: 0;
   line-height: 1.05;
 }
+/* The wordmark wraps when it does not fit (a larger text size, a screen narrower than 320 px) instead of ending in
+   an ellipsis: nothing is cut (WCAG 1.4.4) and the header pill grows (min-height). */
 .site-brand .site-brand__name,
 .site-footer .site-brand__name {
   overflow: hidden;
@@ -165,10 +192,14 @@
   font-size: 1.1875rem;
   font-style: italic;
   font-weight: 400;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: break-word;
   color: inherit;
 }
+/* In the header the wordmark and the place line grow with the text size only as far as the room beside the
+   buttons allows (two lines of the wordmark at 360 px, instead of the pill growing to 180 px): the viewport caps
+   are above the usual 19 px and 12 px from 224 px and 200 px wide up, so the usual size is unchanged. */
+.site-header .site-brand .site-brand__name { font-size: min(1.1875rem, 8.5vw); }
+.site-header .site-brand .site-brand__place { font-size: min(.75rem, 6vw); overflow-wrap: break-word; }
 .site-brand .site-brand__place {
   color: var(--color-fg-muted);
   font-size: .75rem;
@@ -222,7 +253,7 @@
    last) plus the tools does not fit the pill below that: at 1024 px the wordmark was cut by 99 px, and at 1280 px
    the fifth link cut it to "Dolce Far Ni…". Until 1320 px the menu button carries the nav. */
 @media (min-width: 1024px) {
-  .site-header { padding: 0 6px 0 16px; }
+  .site-header { padding: 4px 6px 4px 16px; }
 }
 @media (min-width: 1320px) {
   .site-nav { display: flex; gap: 24px; }
@@ -334,10 +365,13 @@
 }
 
 /* SiteFooter */
+/* The bottom padding clears the fixed controls: the network dot (48 px), and a shown PWA pill (--pwa-banners-clear,
+   published by PwaManager; 0 while there is none). */
 .site-footer {
   position: relative;
   margin-top: var(--space-section);
-  padding: 0 0 calc(48px + env(safe-area-inset-bottom));
+  padding: 0;
+  padding-bottom: max(calc(48px + env(safe-area-inset-bottom)), var(--pwa-banners-clear));
 }
 .site-footer.site-footer { color: var(--color-fg); }
 .site-footer__waves {
@@ -557,6 +591,10 @@
   visibility: hidden;
 }
 .bookbar.is-shown { visibility: visible; }
+/* Below sm the network dot owns the bottom-left corner (stay.css .net-status, 8 px + 40 px wide): the bar starts 8 px right of it. */
+@media (max-width: 39.99rem) {
+  .bookbar { left: 56px; }
+}
 @media (min-width: 1024px) {
   .bookbar { display: none; }
 }
@@ -568,13 +606,19 @@
   line-height: 1.2;
   color: var(--color-fg);
 }
-/* The footer clears the bar (§8 SiteFooter). */
+/* The footer clears the bar (§8 SiteFooter), and the PWA pills that sit above it (PS-07). */
 @media (max-width: 1023.98px) {
-  :root:has(.bookbar) .site-footer.site-footer { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  :root:has(.bookbar) .site-footer.site-footer {
+    padding-bottom: max(calc(96px + env(safe-area-inset-bottom)), calc(var(--pwa-banners-clear) + var(--bookbar-h, 58px) + 20px - var(--pwa-banners-bottom)));
+  }
   /* Keyboard focus scrolls a control above the shown bar, not under it (WCAG 2.4.11; R3-V13 keyboard pass
      found the footer controls fully covered on home and apartment). */
-  :root:has(.bookbar.is-shown) { scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  :root:has(.bookbar.is-shown) {
+    scroll-padding-bottom: max(calc(96px + env(safe-area-inset-bottom)), calc(var(--pwa-banners-clear) + var(--pills-lift)));
+  }
 }
+/* No bar and no network dot (sm and up, lg and up): a shown pill alone. */
+:root { scroll-padding-bottom: var(--pwa-banners-clear); }
 
 /* Motion (gated, §5.2): header shadow, M23 menu sheet entry via @starting-style, M22 BookBar slide */
 @media (prefers-reduced-motion: no-preference) {
@@ -586,6 +630,10 @@
     transform: none;
     transition: transform var(--dur-ui) var(--ease-glide), visibility 0s;
   }
+  /* The pills and the dot rise with the bar (M22), so they never overlap it while it slides. The dot's own rules are
+     in stay.css, which stays free of motion (calm mode); the bar only exists on Home and Apartment. */
+  :root[data-motion="full"] .pwa-banners,
+  :root[data-motion="full"] .net-status { transition: translate var(--dur-ui) var(--ease-glide); }
   :root[data-motion="full"] .site-header { transition: box-shadow var(--dur-ui) var(--ease-glide); }
   :root[data-motion="full"] .mobile-menu[open] { transition: translate var(--dur-ui) var(--ease-glide); }
   :root[data-motion="full"] .mobile-menu[open]::backdrop { transition: opacity var(--dur-ui) var(--ease-glide); }

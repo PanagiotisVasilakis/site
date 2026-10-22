@@ -595,6 +595,7 @@
 /* HostLetter (§8): a paper card, rotated −.8°, with grain and a drop cap. */
 .host.host {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   place-items: center;
   padding: var(--space-section) var(--gutter);
 }
