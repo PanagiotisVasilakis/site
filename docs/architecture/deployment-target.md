@@ -203,7 +203,7 @@ blockers were re-checked against the repository on 2026-09-29 and remain open:
   the site shows no prices and no cancellation policy and that only Booking.com
   is used for now supplied 2026-10-15; Booking.com as the only calendar source
   and the sufficiency of 12 months of guest-data retention supplied 2026-10-20)
-  are still open only for: which Booking.com link to publish, the owner's
+  are still open only for: the owner's
   wording for Booking.com bookings, the Booking.com export URL in the
   production environment and the legal questions on the privacy notice (which
   names Booking.com everywhere since 2026-10-21); see "Open owner inputs" in

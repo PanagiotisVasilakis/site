@@ -42,5 +42,5 @@ export const HOST_PROFILE: Readonly<{
  * (src/lib/contactLinks.ts) passes. It is public data, not a secret, and no stay dates are
  * appended to it.
  */
-// TODO (owner): confirm that this Share link is the one to publish. Only a https://www.booking.com/Share-<token> link (or the same on booking.com) passes isBookingComListingUrl; a canonical property URL also needs a change of that function and of tests/unit/contact-links.test.ts, otherwise the Booking.com button disappears from the home, apartment and availability pages. No stay dates are appended: Booking.com date parameters are unverified. This is a public link; never put it into BOOKING_ICAL_URL, which is a different, secret URL.
-export const BOOKING_COM_LISTING_URL: string = 'https://www.booking.com/Share-AiCapK';
+// Supplied by the owner on 2026-10-22. Only a https://www.booking.com/Share-<token> link (or the same on booking.com) passes isBookingComListingUrl. No stay dates are appended: Booking.com date parameters are unverified. This is a public link; never put it into BOOKING_ICAL_URL, which is a different, secret URL.
+export const BOOKING_COM_LISTING_URL: string = 'https://www.booking.com/Share-VOK8VS9';
