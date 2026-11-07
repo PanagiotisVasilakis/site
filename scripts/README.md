@@ -322,3 +322,4 @@ Guest data retention (`GUEST_DATA_RETENTION_MONTHS` in `src/data/stayPolicy.ts`,
   Nginx header overwrite, and private attestation contract; do not trust a
   public forwarding header directly.
 - Outbox backlog: inspect `outbox_events.last_error`, the destination URL/token, and the outbox service journal.
+- `next dev` or `next build` run by a coding agent (Claude Code) may send the installed Next version to `https://registry.npmjs.org/-/npm/v1/security/advisories/bulk` and stop once with an upgrade recommendation when an advisory applies (`experimental.agentUpgrade` defaults to `'security'` since Next 16.4.0; `next.config.ts` leaves it at the default). Retry the same command, or run the build from a plain shell. `verify:release` and Docker builds are not affected.

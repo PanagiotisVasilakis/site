@@ -94,8 +94,8 @@ be diagnosed without the orchestrator printing environment values.
 
 `package.json` `overrides` and their reasons:
 
-- No `next`-scoped override. `next@16.3.8` pins `postcss` 8.5.23 exactly (a
-  nested copy; GHSA-fxqj-rqcc-2cmp affects `<= 8.5.22`) and `sharp` `^0.35.4`
+- No `next`-scoped override. `next@16.4.5` pins `postcss` 8.5.23 exactly (a
+  nested copy; GHSA-fxqj-rqcc-2cmp affects `<= 8.5.22`) and `sharp` `^0.35.5`
   (dedupes to the root 0.35.5; GHSA-wq5f-xc86-pv6w is fixed in 0.35.5). A
   version-keyed override would only dedupe `postcss` and would silently stop
   applying on the next `next` bump. Whenever `next` is bumped, re-check with

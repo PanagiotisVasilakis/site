@@ -569,6 +569,9 @@ test('the versioned incident baseline remains exactly six fingerprints', async (
 const FRAMEWORK_IDENTIFIER = '1'.repeat(40);
 const ACTION_IDENTIFIER = '2'.repeat(40);
 const BUILD_IDENTIFIER = '3'.repeat(40);
+const PREVIEW_MODE_ID = '5'.repeat(32);
+const PREVIEW_MODE_SIGNING_KEY = '6'.repeat(64);
+const PREVIEW_MODE_ENCRYPTION_KEY = '7'.repeat(64);
 
 function fixtureKey(byte) {
   return Buffer.alloc(32, byte).toString('base64');
@@ -593,9 +596,10 @@ async function writeFixtureFile(root, relative, contents) {
 async function withGeneratedArtifactPolicy(options, callback) {
   return withFixture(async (root) => {
     const serverKey = options.serverKey ?? fixtureKey(4);
-    const previewModeId = options.previewModeId ?? '5'.repeat(32);
-    const previewModeSigningKey = options.previewModeSigningKey ?? '6'.repeat(64);
-    const previewModeEncryptionKey = options.previewModeEncryptionKey ?? '7'.repeat(64);
+    const previewModeId = options.previewModeId ?? PREVIEW_MODE_ID;
+    const previewModeSigningKey = options.previewModeSigningKey ?? PREVIEW_MODE_SIGNING_KEY;
+    const previewModeEncryptionKey = options.previewModeEncryptionKey ?? PREVIEW_MODE_ENCRYPTION_KEY;
+    const leakValue = options.leakValue ?? serverKey;
     const actionId = options.actionId === false ? null : ACTION_IDENTIFIER;
     const buildId = options.buildId ?? BUILD_IDENTIFIER;
     const nextVersion = options.nextVersion ?? GENERATED_ARTIFACT_CLASSIFICATIONS.SUPPORTED_NEXT_VERSION;
@@ -610,12 +614,20 @@ async function withGeneratedArtifactPolicy(options, callback) {
       previewModeSigningKey,
       previewModeEncryptionKey,
     };
+    // Next 16.4 repeats the preview keys in preview-props.json. The options below perturb one
+    // copy or one value at a time, so each negative test targets one production clause.
+    const previewPropsJson = JSON.stringify({ ...preview, ...options.previewPropsOverrides });
+    // JSON.parse keeps the last duplicate, so a repeated key is visible only in the text.
+    const duplicatedPreviewId = `,"previewModeId":${JSON.stringify(previewModeId)}`;
+    const previewPropsServer = options.previewPropsDuplicateKey
+      ? `${previewPropsJson.slice(0, -1)}${duplicatedPreviewId}}\n`
+      : `${previewPropsJson}\n`;
     const prerender = {
       version: 4,
       routes: {},
       dynamicRoutes: {},
       notFoundRoutes: [],
-      preview,
+      preview: { ...preview, ...options.prerenderPreviewOverrides },
     };
     const frameworkSource =
       `* @see https://github.com/vercel/next.js/commit/${FRAMEWORK_IDENTIFIER} */`;
@@ -670,6 +682,14 @@ async function withGeneratedArtifactPolicy(options, callback) {
         `${JSON.stringify(prerender)}\n`,
       ],
       [
+        '.next/server/preview-props.json',
+        previewPropsServer,
+      ],
+      [
+        '.next/standalone/.next/server/preview-props.json',
+        `${JSON.stringify({ ...preview, ...options.standalonePreviewPropsOverrides })}\n`,
+      ],
+      [
         options.artifactMapPath ?? '.next/server/chunks/ssr/framework.js.map',
         artifactSourceMap,
       ],
@@ -680,13 +700,13 @@ async function withGeneratedArtifactPolicy(options, callback) {
       [
         '.next/static/chunks/client.js',
         options.publicLeakPath === '.next/static'
-          ? `window.fixture=${JSON.stringify(serverKey)};`
+          ? `window.fixture=${JSON.stringify(leakValue)};`
           : 'window.fixture=true;',
       ],
       [
         'public/generated-client.js',
         options.publicLeakPath === 'public'
-          ? `window.fixture=${JSON.stringify(serverKey)};`
+          ? `window.fixture=${JSON.stringify(leakValue)};`
           : 'window.fixture=true;',
       ],
     ]);
@@ -767,6 +787,17 @@ test('valid supported Next internal fields receive framework dispositions', asyn
         'preview-mode-encryption-key',
       ],
     ];
+    // Next 16.4 also writes the preview keys into preview-props.json, on the server only.
+    for (const relativePath of [
+      '.next/server/preview-props.json',
+      '.next/standalone/.next/server/preview-props.json',
+    ]) {
+      cases.push(
+        [previewModeId, relativePath, 'preview-mode-id'],
+        [previewModeSigningKey, relativePath, 'preview-mode-signing-key'],
+        [previewModeEncryptionKey, relativePath, 'preview-mode-encryption-key'],
+      );
+    }
     for (const [secret, relativePath, semanticClass] of cases) {
       const result = classifyFixture(context, {
         rule: 'generic-api-key',
@@ -834,6 +865,73 @@ test('Next internal material in client or static output fails closed', async () 
       /outside its supported server contract/u,
     );
   }
+});
+
+test('preview keys in client or static output fail closed', async () => {
+  for (const leakValue of [
+    PREVIEW_MODE_ID,
+    PREVIEW_MODE_SIGNING_KEY,
+    PREVIEW_MODE_ENCRYPTION_KEY,
+  ]) {
+    for (const publicLeakPath of ['.next/static', 'public']) {
+      await assert.rejects(
+        withGeneratedArtifactPolicy({ publicLeakPath, leakValue }, async () => {}),
+        /outside its supported server contract/u,
+      );
+    }
+  }
+});
+
+test('preview-props with an extra key fails closed', async () => {
+  await assert.rejects(
+    withGeneratedArtifactPolicy({ previewPropsOverrides: { unexpected: true } }, async () => {}),
+    /preview-props manifest schema was invalid/u,
+  );
+});
+
+test('preview-props that differs from the prerender preview fails closed', async () => {
+  await assert.rejects(
+    withGeneratedArtifactPolicy({
+      previewPropsOverrides: { previewModeId: '8'.repeat(32) },
+    }, async () => {}),
+    /preview-props manifest schema was invalid/u,
+  );
+});
+
+test('the standalone preview-props with an extra key fails closed', async () => {
+  await assert.rejects(
+    withGeneratedArtifactPolicy({
+      standalonePreviewPropsOverrides: { unexpected: true },
+    }, async () => {}),
+    /preview-props manifest schema was invalid/u,
+  );
+});
+
+test('only the standalone preview-props differing from the server copy fails closed', async () => {
+  await assert.rejects(
+    withGeneratedArtifactPolicy({
+      previewPropsOverrides: { previewModeId: '8'.repeat(32) },
+      prerenderPreviewOverrides: { previewModeId: '8'.repeat(32) },
+    }, async () => {}),
+    /preview-props manifest schema was invalid/u,
+  );
+});
+
+test('both preview-props copies equal but different from the prerender preview fails closed', async () => {
+  await assert.rejects(
+    withGeneratedArtifactPolicy({
+      previewPropsOverrides: { previewModeId: '8'.repeat(32) },
+      standalonePreviewPropsOverrides: { previewModeId: '8'.repeat(32) },
+    }, async () => {}),
+    /preview-props manifest schema was invalid/u,
+  );
+});
+
+test('a preview key repeated inside preview-props.json fails closed', async () => {
+  await assert.rejects(
+    withGeneratedArtifactPolicy({ previewPropsDuplicateKey: true }, async () => {}),
+    /outside its supported server contract/u,
+  );
 });
 
 test('Next internal material equal to an active application credential fails closed', async () => {

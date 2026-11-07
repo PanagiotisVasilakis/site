@@ -849,7 +849,7 @@ It is ported from `.runtime/design/messinian-light/hero-gl.js`, which the tech r
 
 **React `<ViewTransition>`.**
 
-- It works in the Next 16.3.8 App Router with no configuration. Next vendors a React canary that exports it (CONFIRMED: `node_modules/next/dist/docs/01-app/02-guides/view-transitions.md:50`).
+- It works in the Next 16.4.5 App Router with no configuration. Next vendors a React canary that exports it (CONFIRMED: `node_modules/next/dist/docs/01-app/02-guides/view-transitions.md:50` for 'no configuration'; `node_modules/next/dist/compiled/react/cjs/react.production.js:395` and `:565` for the vendored React canary `19.3.0-canary-278794d7-20261002` and its `ViewTransition` export).
 - Wrappers live in `page.tsx`, not in layouts (same guide).
 - It is a canary API, so it is isolated in `src/components/motion/SharedElement.tsx`.
 
@@ -1217,7 +1217,7 @@ A single editorial column (65ch), H1 d1, lead, sections with d3 titles, body at 
 |---|---|---|
 | 3D hero | Hand-written WebGL (≤ 6 KB gz) | three.js ≈ 176 KB, R3F ≥ 233 KB, OGL 10–15 KB for no gain; the CSP blocks their WASM loaders and CDN defaults (§5.6) |
 | Scroll and 3D motion | CSS scroll-driven animations, CSS 3D, `@starting-style`, IntersectionObserver | 0 KB; runs on the compositor; GSAP and Lenis are rejected |
-| Page and element transitions | React `<ViewTransition>` (shipped with Next 16.3.8) + `document.startViewTransition` | 0 KB extra |
+| Page and element transitions | React `<ViewTransition>` (shipped with Next 16.4.5) + `document.startViewTransition` | 0 KB extra |
 | Lightbox gestures | Native scroll-snap inside `<dialog>` | 0 KB; native momentum; replaces the `framer-motion` usage on public routes |
 | Calendar | `react-day-picker` ^9.14.0 (**already installed**, planned by R3-F09) | Accessible grid and keyboard support already built in; skinned with tokens |
 | Map | `leaflet` ^1.9.4 (already installed) | Existing; restyle only |
@@ -1342,7 +1342,7 @@ public/house/balcony/hero/  crops + depth maps;  public/design/grain-*.webp;  pu
 - **Research (this workflow):** references, tech, fonts and assets research texts (§0 of the workflow input). Scratch files are in `.runtime/design/research/`.
 - **Winning mockup:** `.runtime/design/messinian-light/`: `DESIGN.md`, `styles.css`, `hero-gl.js`, `boot.js`, `tools/*`, `shots/*`.
 - **Graft mockups:** `.runtime/design/aegean-depth/` and `.runtime/design/kalamata-playful/`.
-- **Installed Next docs and source, read at 16.3.6 (CONFIRMED by reading; the pin is now 16.3.8):**
+- **Installed Next docs and source, read at 16.3.6 (CONFIRMED by reading; the pin is now 16.4.5):**
   - `node_modules/next/dist/docs/01-app/03-api-reference/02-components/font.md` (`declarations`, `preload`, `adjustFontFallback`, `variable`)
   - `node_modules/next/dist/compiled/@next/font/dist/local/{loader.js,get-fallback-metrics-from-font-file.js}`
   - `node_modules/next/dist/build/webpack/loaders/next-font-loader/postcss-next-font.js`
