@@ -1,7 +1,7 @@
 // The capability gate of the WebGL hero (docs/design/identity.md §5.6, loading step 3): a pure check
 // run after load and idle. Any reason returned aborts the living photograph; the photo stays.
 
-export type HeroGateReason = 'reduced-motion' | 'save-data' | 'low-memory' | 'low-cpu' | 'hidden' | 'not-in-view';
+type HeroGateReason ='reduced-motion' | 'save-data' | 'low-memory' | 'low-cpu' | 'hidden' | 'not-in-view';
 
 type GateNavigator = Readonly<{
   hardwareConcurrency?: number;

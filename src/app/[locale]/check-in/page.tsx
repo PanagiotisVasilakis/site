@@ -32,11 +32,11 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
     name: pickLocale(item, 'name', eff) ?? item.name,
     summary: pickLocale(item, 'summary', eff),
     slug: item.slug,
-      tags: item.tags,
+    tags: item.tags,
     location: item.location,
     phone: item.phone,
     phones: item.phones,
-      address: pickLocale(item, 'address', eff),
+    address: pickLocale(item, 'address', eff),
     website: item.website,
     directionsUrl: item.directionsUrl,
   });

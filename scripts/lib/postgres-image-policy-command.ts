@@ -4,23 +4,9 @@ import {
   type ExecFileOptionsWithStringEncoding,
 } from 'node:child_process';
 
-export const POSTGRES_IMAGE_POLICY_STAGES = [
-  'CONTEXT_INSPECT',
-  'OCI_INDEX_INSPECT',
-  'IMAGE_PULL',
-  'LOCAL_IMAGE_INSPECT',
-] as const;
+export type PostgresImagePolicyStage = 'CONTEXT_INSPECT' | 'OCI_INDEX_INSPECT' | 'IMAGE_PULL' | 'LOCAL_IMAGE_INSPECT';
 
-export type PostgresImagePolicyStage = typeof POSTGRES_IMAGE_POLICY_STAGES[number];
-
-export const POSTGRES_IMAGE_POLICY_FAILURE_CLASSES = [
-  'TIMEOUT',
-  'NONZERO_EXIT',
-  'SPAWN_FAILURE',
-] as const;
-
-export type PostgresImagePolicyFailureClass =
-  typeof POSTGRES_IMAGE_POLICY_FAILURE_CLASSES[number];
+export type PostgresImagePolicyFailureClass = 'TIMEOUT' | 'NONZERO_EXIT' | 'SPAWN_FAILURE';
 
 export const POSTGRES_IMAGE_POLICY_STAGE_TIMEOUT_MS = {
   CONTEXT_INSPECT: 30_000,

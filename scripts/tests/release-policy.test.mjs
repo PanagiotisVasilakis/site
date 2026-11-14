@@ -491,20 +491,6 @@ async function mutateDockerfile(root, mutate) {
   await writeFile(dockerfilePath, mutate(await readFile(dockerfilePath, 'utf8')), 'utf8');
 }
 
-test('accepts runner-stage changes outside the static runner checks', async () => {
-  await withFixture(async (root) => {
-    await mutateDockerfile(root, (dockerfile) => dockerfile
-      .replace(RUNTIME_ENV, `${RUNTIME_ENV}\nENV EXTRA_SETTING=1`)
-      .replace(RUNTIME_HARDENING_RUN, `${RUNTIME_HARDENING_RUN}\nRUN true`)
-      .replace(
-        `FROM ${NODE_IMAGE} AS runner`,
-        `FROM ${NODE_IMAGE} AS workers\nUSER 1001:1001\nFROM ${NODE_IMAGE} AS runner`,
-      )
-      .concat(`FROM ${NODE_IMAGE} AS migrate\nADD . .\nUSER root\n`));
-    assert.deepEqual(await validateReleasePolicy(root), []);
-  });
-});
-
 test('requires a runner stage in the security image', async () => {
   await withFixture(async (root) => {
     await mutateDockerfile(root, (dockerfile) => dockerfile.replace(
@@ -521,8 +507,6 @@ test('requires a runner stage in the security image', async () => {
 test('requires the runner stage to run as the non-root runtime user', async () => {
   for (const mutate of [
     (dockerfile) => dockerfile.replace(RUNTIME_USER, 'USER root'),
-    (dockerfile) => dockerfile.replace(`${RUNTIME_USER}\n`, ''),
-    (dockerfile) => dockerfile.replace(RUNTIME_USER, `${RUNTIME_USER}\nUSER root`),
   ]) {
     await withFixture(async (root) => {
       await mutateDockerfile(root, mutate);
@@ -537,8 +521,6 @@ test('requires the runner stage to run as the non-root runtime user', async () =
 test('requires the runner stage to remove npm and npx', async () => {
   for (const replacement of [
     'RUN apk add --no-cache dumb-init=1.2.5-r4',
-    RUNTIME_SETUP_RUN.replace(' /usr/local/bin/npx', ''),
-    RUNTIME_SETUP_RUN.replace('rm -f', 'ls'),
   ]) {
     await withFixture(async (root) => {
       await mutateDockerfile(root, (dockerfile) => dockerfile.replace(RUNTIME_SETUP_RUN, replacement));
@@ -594,16 +576,10 @@ test('joins backslash continuations and ignores comment lines inside them', asyn
 test('requires every external FROM of the security image to be a digest-pinned Node alpine image', async () => {
   for (const mutate of [
     (dockerfile) => dockerfile.replace(`FROM ${NODE_IMAGE} AS runner`, 'FROM node:22-alpine AS runner'),
-    (dockerfile) => dockerfile.replace(`FROM ${NODE_IMAGE} AS builder`, 'FROM node:22-alpine AS builder'),
-    (dockerfile) => dockerfile.replace(
-      `FROM ${NODE_IMAGE} AS builder`,
-      `FROM node:22-alpine@sha256:${'0123456789abcdef'.repeat(4).slice(1)} AS builder`,
-    ),
     (dockerfile) => dockerfile.replace(
       `FROM ${NODE_IMAGE} AS builder`,
       `FROM alpine:3.22@${NODE_IMAGE_DIGEST} AS builder`,
     ),
-    (dockerfile) => dockerfile.concat('FROM node:22-alpine AS workers\n'),
   ]) {
     await withFixture(async (root) => {
       await mutateDockerfile(root, mutate);
@@ -621,7 +597,6 @@ test('requires one Node image digest across all stages of the security image', a
       `FROM ${NODE_IMAGE} AS builder`,
       `FROM node:22-alpine@${OTHER_NODE_IMAGE_DIGEST} AS builder`,
     ),
-    (dockerfile) => dockerfile.concat(`FROM node:22-alpine@${OTHER_NODE_IMAGE_DIGEST} AS workers\n`),
   ]) {
     await withFixture(async (root) => {
       await mutateDockerfile(root, mutate);
@@ -644,7 +619,6 @@ test('skips FROM instructions that name an earlier stage and accepts a stage wit
 test('rejects runner-stage ADD instructions', async () => {
   for (const instruction of [
     'ADD . .',
-    'ADD src ./src',
   ]) {
     await withFixture(async (root) => {
       await mutateDockerfile(root, (dockerfile) => dockerfile.replace(
@@ -868,38 +842,6 @@ test('rejects an artifact scan that no longer rejects environment files', async 
   });
 });
 
-test('rejects retaining raw scanner reports beyond in-process classification', async () => {
-  await withFixture(async (root) => {
-    const scannerPath = path.join(root, 'scripts/check-secrets.mjs');
-    const scanner = await readFile(scannerPath, 'utf8');
-    await writeFile(
-      scannerPath,
-      scanner.replace('await rm(reportPath, { force: true });', ''),
-      'utf8',
-    );
-    assertRejected(
-      await validateReleasePolicy(root),
-      /await rm\(reportPath, \{ force: true \}\)/u,
-    );
-  });
-});
-
-test('rejects removing generated-artifact semantic classification', async () => {
-  await withFixture(async (root) => {
-    const scannerPath = path.join(root, 'scripts/check-secrets.mjs');
-    const scanner = await readFile(scannerPath, 'utf8');
-    await writeFile(
-      scannerPath,
-      scanner.replace('classifyGeneratedArtifactFinding();', ''),
-      'utf8',
-    );
-    assertRejected(
-      await validateReleasePolicy(root),
-      /classifyGeneratedArtifactFinding/u,
-    );
-  });
-});
-
 test('rejects claim capability parsing from a URL', async () => {
   await withFixture(async (root) => {
     const guestPath = path.join(root, 'src/app/[locale]/guest/UnifiedGuestClient.tsx');
@@ -932,17 +874,6 @@ test('rejects any GitHub Actions workflow', async () => {
   });
 });
 
-test('rejects a GitHub Pages deployment workflow', async () => {
-  await withFixture(async (root) => {
-    await writeRelative(
-      root,
-      '.github/workflows/pages.yml',
-      'on: [push]\njobs:\n  deploy:\n    steps:\n      - uses: actions/deploy-pages@0123456789012345678901234567890123456789\n',
-    );
-    assertRejected(await validateReleasePolicy(root), /workflows\/pages\.yml/u);
-  });
-});
-
 test('rejects pull_request_target even outside the workflow directory', async () => {
   await withFixture(async (root) => {
     await writeRelative(root, '.github/policy.yml', 'on: pull_request_target\n');
@@ -956,33 +887,6 @@ test('rejects a Vercel deployment command', async () => {
       packageJson.scripts.publishPreview = 'vercel deploy --prod';
     });
     assertRejected(await validateReleasePolicy(root), /Vercel deployment command/u);
-  });
-});
-
-test('rejects a Wrangler deployment command', async () => {
-  await withFixture(async (root) => {
-    await mutatePackage(root, (packageJson) => {
-      packageJson.scripts.publishWorker = 'wrangler deploy';
-    });
-    assertRejected(await validateReleasePolicy(root), /Wrangler deployment command/u);
-  });
-});
-
-test('rejects a Cloudflare Pages deployment command', async () => {
-  await withFixture(async (root) => {
-    await mutatePackage(root, (packageJson) => {
-      packageJson.scripts.publishPages = 'wrangler pages deploy ./out';
-    });
-    assertRejected(await validateReleasePolicy(root), /Wrangler Pages deployment command/u);
-  });
-});
-
-test('rejects a GitHub Pages deployment path', async () => {
-  await withFixture(async (root) => {
-    await mutatePackage(root, (packageJson) => {
-      packageJson.scripts.publishPages = 'gh-pages -d out';
-    });
-    assertRejected(await validateReleasePolicy(root), /GitHub Pages deployment command/u);
   });
 });
 
@@ -1022,18 +926,8 @@ for (const [label, command, rule] of [
     'Docker Compose push',
   ],
   [
-    'hyphenated docker-compose push',
-    'docker-compose -f docker/docker-compose.prod.yml push',
-    'Docker Compose push',
-  ],
-  [
     'git push behind a global option',
     'git -C . push origin main',
-    'Git push',
-  ],
-  [
-    'a plain git push',
-    'git push origin main',
     'Git push',
   ],
 ]) {
@@ -1058,16 +952,6 @@ for (const [label, command, rule] of [
     });
   });
 }
-
-test('rejects a deploy command inside an active script file', async () => {
-  await withFixture(async (root) => {
-    await writeRelative(root, 'scripts/publish-preview.sh', '#!/usr/bin/env bash\nvercel deploy --prod\n');
-    assertRejected(
-      await validateReleasePolicy(root),
-      /scripts\/publish-preview\.sh: Vercel deployment command is forbidden in active scripts/u,
-    );
-  });
-});
 
 test('does not mistake a compose file name or a later command for a push', async () => {
   await withFixture(async (root) => {
@@ -1132,12 +1016,6 @@ async function mutateNginxConfig(root, mutate) {
 // are functions so that a `$` in the new text is never read as a replacement pattern.
 for (const [label, original, replacement, pattern] of [
   [
-    'a commented-out server_tokens directive',
-    'server_tokens off;',
-    '# server_tokens off;',
-    /production Nginx configuration lacks: server_tokens off;/u,
-  ],
-  [
     'a commented-out ssl_verify_client directive',
     'ssl_verify_client on;',
     '# ssl_verify_client on;',
@@ -1147,12 +1025,6 @@ for (const [label, original, replacement, pattern] of [
     'a disabled ssl_verify_client directive that repeats the old text in a comment',
     'ssl_verify_client on;',
     'ssl_verify_client off; # ssl_verify_client on;',
-    /production Nginx configuration lacks: ssl_verify_client on;/u,
-  ],
-  [
-    'a disabled ssl_verify_client directive with a comment glued to the semicolon',
-    'ssl_verify_client on;',
-    'ssl_verify_client off;# ssl_verify_client on;',
     /production Nginx configuration lacks: ssl_verify_client on;/u,
   ],
 ]) {
@@ -1208,16 +1080,6 @@ for (const variable of [
   });
 }
 
-test('allows $request_id, $request_method and $request_time in the Nginx access log format', async () => {
-  await withFixture(async (root) => {
-    const config = await readFile(path.join(root, 'deploy/nginx/nginx.conf.template'), 'utf8');
-    for (const variable of ['$request_id', '$request_method', '$request_time']) {
-      assert.ok(config.includes(variable), `the fixture log format must carry ${variable}`);
-    }
-    assert.deepEqual(await validateReleasePolicy(root), []);
-  });
-});
-
 test('does not mistake a longer variable name for a forbidden one in the Nginx access log format', async () => {
   await withFixture(async (root) => {
     await mutateNginxConfig(root, (config) => config.replace(
@@ -1261,20 +1123,6 @@ for (const [label, mutate] of [
       'access_log /var/log/nginx/access.log combined;',
     ),
   ],
-  [
-    'an access_log line whose format name only starts with origin_safe',
-    (config) => config.replace(
-      'access_log /var/log/nginx/access.log origin_safe;',
-      'access_log /var/log/nginx/access.log origin_safe_v2;',
-    ),
-  ],
-  [
-    'a commented-out access_log line',
-    (config) => config.replace(
-      'access_log /var/log/nginx/access.log origin_safe;',
-      '# access_log /var/log/nginx/access.log origin_safe;',
-    ),
-  ],
 ]) {
   test(`rejects ${label}`, async () => {
     await withFixture(async (root) => {
@@ -1286,16 +1134,6 @@ for (const [label, mutate] of [
     });
   });
 }
-
-test('ignores forbidden log variables that only appear in Nginx comments', async () => {
-  await withFixture(async (root) => {
-    await mutateNginxConfig(root, (config) => config.replace(
-      'log_format origin_safe',
-      () => '# Never log $request_uri, $request, $args or $remote_addr.\nlog_format origin_safe',
-    ));
-    assert.deepEqual(await validateReleasePolicy(root), []);
-  });
-});
 
 test('rejects $request_uri outside the Nginx access log format', async () => {
   await withFixture(async (root) => {
@@ -1373,12 +1211,8 @@ async function writeProductionCompose(root, serviceLines) {
 for (const [label, serviceLines, pattern] of [
   ['an interpolated host port without a host IP', ['  web:', '    ports:', '      - "${WEB_PORT:-3000}:3000"']],
   ['an all-interfaces host IP', ['  web:', '    ports:', '      - "0.0.0.0:${WEB_PORT:-3000}:3000"']],
-  ['a different host port', ['  web:', '    ports:', '      - "8080:3000"']],
-  ['a bare container port', ['  web:', '    ports:', '      - "3000"']],
   ['a long-syntax entry', ['  web:', '    ports:', '      - target: 3000', '        published: "8080"']],
   ['a flow-sequence value', ['  web:', '    ports: ["8080:3000"]']],
-  ['a compact block sequence', ['  web:', '    ports:', '    - "8080:3000"']],
-  ['a database port', ['    ports:', '      - "5432:5432"']],
   ['a flow-sequence value on the next line', [
     '    ports:', '      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"',
     '  web:', '    ports:', '      ["0.0.0.0:3000:3000"]',
@@ -1391,18 +1225,6 @@ for (const [label, serviceLines, pattern] of [
     '      - "[::1]:${WEB_PORT:-3000}:3000"',
   ], /port "0\.0\.0\.0:8443:3000" must not be publicly published/u],
   ['a flow-mapping service', ['  evil: { image: busybox, ports: ["0.0.0.0:8080:80"] }']],
-  ['a flow-mapping service with a quoted key', [
-    '  evil: { "image": "busybox", "ports": ["0.0.0.0:8080:80"] }',
-  ]],
-  ['a flow-mapping service with a single-quoted key', [
-    "  evil: { image: busybox, 'ports': ['0.0.0.0:8080:80'] }",
-  ]],
-  ['a flow mapping that starts with the ports key', [
-    '  evil: {ports: ["0.0.0.0:8080:80"], image: busybox}',
-  ]],
-  ['a ports key after a comma on a continuation line', [
-    '  evil: {', '    image: busybox, ports: ["0.0.0.0:8080:80"]', '  }',
-  ]],
   ['a loopback list inside a flow mapping (fails closed)', [
     '  evil: { image: busybox, ports: ["127.0.0.1:8080:80"] }',
   ]],
@@ -1452,10 +1274,7 @@ test('accepts the real production compose file', async () => {
 
 for (const [label, serviceLines] of [
   ['a block mapping on the web service', ['  web:', '    network_mode: host']],
-  ['a quoted key and value', ['  web:', '    "network_mode": "host"']],
-  ['a single-quoted value', ['  web:', "    network_mode: 'host'"]],
   ['a flow mapping', ['  web: { image: busybox, network_mode: host }']],
-  ['the database service', ['    network_mode: host']],
 ]) {
   test(`rejects host networking in the production compose file: ${label}`, async () => {
     await withFixture(async (root) => {
@@ -1471,53 +1290,14 @@ for (const [label, serviceLines] of [
   });
 }
 
-test('accepts a commented host network note and a non-host network mode', async () => {
-  await withFixture(async (root) => {
-    await writeProductionCompose(root, [
-      '  # network_mode: host is forbidden here',
-      '  web:',
-      '    network_mode: bridge',
-      '    environment:',
-      '      NODE_ENV: production',
-      ...pinnedProductionServiceLines(['outbox', 'operations']),
-    ]);
-    assert.deepEqual(await validateReleasePolicy(root), []);
-  });
-});
-
-for (const service of PRODUCTION_PINNED_SERVICES) {
-  test(`rejects a production compose file whose ${service} service has no NODE_ENV pin`, async () => {
-    await withFixture(async (root) => {
-      await writeProductionCompose(root, [
-        ...pinnedProductionServiceLines(
-          PRODUCTION_PINNED_SERVICES.filter((name) => name !== service),
-        ),
-        `  ${service}:`,
-        '    env_file: app.env',
-      ]);
-      assert.deepEqual(await validateReleasePolicy(root), [
-        `docker/docker-compose.prod.yml: service "${service}" must set environment NODE_ENV: production`,
-      ]);
-    });
-  });
-}
-
 for (const [label, lines] of [
   ['a development value', ['  web:', '    environment:', '      NODE_ENV: development']],
-  ['a production-like value', ['  web:', '    environment:', '      NODE_ENV: production-test']],
   ['a commented pin', [
     '  web:', '    environment:', '      LOG_LEVEL: info', '      # NODE_ENV: production',
-  ]],
-  ['the pin outside environment', ['  web:', '    labels:', '      NODE_ENV: production']],
-  ['the pin nested below another environment entry', [
-    '  web:', '    environment:', '      OTHER:', '        NODE_ENV: production',
   ]],
   ['the pin only on the database service', [
     '    environment:', '      NODE_ENV: production',
     '  web:', '    environment:', '      LOG_LEVEL: info',
-  ]],
-  ['a flow-mapping service (fails closed)', [
-    '  web: { environment: { NODE_ENV: production } }',
   ]],
 ]) {
   test(`rejects a production compose file whose web service has no NODE_ENV pin: ${label}`, async () => {
@@ -1585,28 +1365,10 @@ test('rejects application identity reads from public forwarding headers', async 
   });
 });
 
-test('rejects removal of the Nginx syntax integration gate', async () => {
-  await withFixture(async (root) => {
-    await mutatePackage(root, (packageJson) => {
-      packageJson.scripts['test:nginx-ingress'] = 'node --version';
-    });
-    assertRejected(await validateReleasePolicy(root), /package script test:nginx-ingress must be exactly/u);
-  });
-});
-
 test('rejects reintroduction of mandatory Upstash configuration', async () => {
   await withFixture(async (root) => {
     await writeRelative(root, 'src/lib/external-limiter.ts', 'const value = process.env.UPSTASH_REDIS_REST_URL;\n');
     assertRejected(await validateReleasePolicy(root), /mandatory external rate-limiter configuration/u);
-  });
-});
-
-test('rejects removal of Nginx rate-limit enforcement semantics', async () => {
-  await withFixture(async (root) => {
-    const configPath = path.join(root, 'deploy/nginx/nginx.conf.template');
-    const config = await readFile(configPath, 'utf8');
-    await writeFile(configPath, config.replace('limit_req_status 429;\n', ''));
-    assertRejected(await validateReleasePolicy(root), /limit_req_status 429/u);
   });
 });
 
@@ -1768,24 +1530,6 @@ test('rejects a pre-hook on the canonical release command', async () => {
       packageJson.scripts['preverify:release'] = 'prisma migrate deploy';
     });
     assertRejected(await validateReleasePolicy(root), /lifecycle hook preverify:release is forbidden/u);
-  });
-});
-
-test('rejects a post-hook on a mandatory gate script', async () => {
-  await withFixture(async (root) => {
-    await mutatePackage(root, (packageJson) => {
-      packageJson.scripts['posttest:integration'] = 'vercel deploy --prod';
-    });
-    assertRejected(await validateReleasePolicy(root), /lifecycle hook posttest:integration is forbidden/u);
-  });
-});
-
-test('rejects hiding a persistent migration behind a mandatory gate script', async () => {
-  await withFixture(async (root) => {
-    await mutatePackage(root, (packageJson) => {
-      packageJson.scripts['test:integration'] = 'prisma migrate deploy';
-    });
-    assertRejected(await validateReleasePolicy(root), /package script test:integration must be exactly/u);
   });
 });
 

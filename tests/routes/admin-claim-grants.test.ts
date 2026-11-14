@@ -105,13 +105,13 @@ describe('admin claim-grant issuance origin and id checks', () => {
     expect(mocks.issueBookingClaimGrant).not.toHaveBeenCalled();
   });
 
-  it('still accepts the body the admin page sends (channel and ttlMinutes)', async () => {
+  it('still accepts the body the admin page sends (channel)', async () => {
     const response = await issue({
-      body: { channel: 'ONSITE', ttlMinutes: 30 },
+      body: { channel: 'ONSITE' },
       headers: { origin: 'http://localhost:3000', host: 'localhost:3000' },
     });
 
     expect(response.status).toBe(201);
-    expect(mocks.issueBookingClaimGrant).toHaveBeenCalledWith(expect.objectContaining({ channel: 'ONSITE', ttlMinutes: 30 }));
+    expect(mocks.issueBookingClaimGrant).toHaveBeenCalledWith(expect.objectContaining({ channel: 'ONSITE' }));
   });
 });

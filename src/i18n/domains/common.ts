@@ -4,14 +4,12 @@
  */
 
 import type { Locale } from '../config';
-import { BRAND_NAME } from '@/data/brand';
 
 // ============================================================================
 // Types
 // ============================================================================
 
 export interface CommonDictionary {
-    appTitle: string;
     skipLink: string;
     emptyState: string;
     updates: {
@@ -101,7 +99,6 @@ export interface CommonDictionary {
 
 export const commonTranslations: Record<Locale, CommonDictionary> = {
     en: {
-        appTitle: BRAND_NAME,
         skipLink: "Skip to content",
         emptyState: "No items yet.",
         ui: {
@@ -214,7 +211,6 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
         },
     },
     el: {
-        appTitle: BRAND_NAME,
         skipLink: "Μετάβαση στο περιεχόμενο",
         emptyState: "Δεν υπάρχουν στοιχεία ακόμη.",
         ui: {

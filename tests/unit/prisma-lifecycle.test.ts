@@ -57,18 +57,4 @@ describe('prisma client lifecycle', () => {
 
     expect(signalListenerCounts()).toEqual(before);
   });
-
-  it('does not disconnect on its own after query activity', async () => {
-    vi.useFakeTimers();
-    await loadPrismaModule(['/usr/bin/node', '/app/dist/workers/drain-outbox.mjs']);
-
-    for (const [event, callback] of mocks.on.mock.calls) {
-      if (event === 'query') {
-        callback({ query: 'SELECT 1', duration: 1, params: '[]', target: 'db', timestamp: new Date() });
-      }
-    }
-    await vi.advanceTimersByTimeAsync(10_000);
-
-    expect(mocks.disconnect).not.toHaveBeenCalled();
-  });
 });

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { EmptyPanel } from '@/components/ui/EmptyPanel';
-import { normalizeLocale } from '@/i18n/config';
+import type { Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 import { useFavorites } from '@/lib/favorites';
 import { GuideCard } from './GuideCard';
@@ -13,9 +13,8 @@ import type { GuideEntry } from './guideEntries';
  * identity §9.5 favourites: the saved GuideCards (the favourites store lives in this browser), or the
  * EmptyPanel "No favourites yet. Tap the heart on any place." with a link to the guide.
  */
-export default function FavoritesList({ entries, locale }: { entries: GuideEntry[]; locale: string }) {
-  const eff = normalizeLocale(locale);
-  const t = getDictionary(eff);
+export default function FavoritesList({ entries, locale }: { entries: GuideEntry[]; locale: Locale }) {
+  const t = getDictionary(locale);
   const { favorites } = useFavorites();
   const saved = useMemo(() => entries.filter((entry) => favorites.has(entry.favoriteId)), [entries, favorites]);
 
@@ -25,7 +24,7 @@ export default function FavoritesList({ entries, locale }: { entries: GuideEntry
         variant="panel"
         icon="heart"
         title={t.guide.favouritesEmptyTitle}
-        action={<Link href={`/${eff}/moments`} className="ui-btn ui-btn--secondary ui-btn--md">{t.guide.browseGuide}</Link>}
+        action={<Link href={`/${locale}/moments`} className="ui-btn ui-btn--secondary ui-btn--md">{t.guide.browseGuide}</Link>}
       >
         {t.guide.favouritesEmptyText}
       </EmptyPanel>
@@ -33,7 +32,7 @@ export default function FavoritesList({ entries, locale }: { entries: GuideEntry
   }
   return (
     <div className="guide-grid">
-      {saved.map((entry, index) => <GuideCard key={entry.favoriteId} entry={entry} locale={eff} index={index} />)}
+      {saved.map((entry, index) => <GuideCard key={entry.favoriteId} entry={entry} locale={locale} index={index} />)}
     </div>
   );
 }

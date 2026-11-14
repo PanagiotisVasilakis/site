@@ -1,3 +1,5 @@
+import { isMotionFull } from '@/lib/motion/motionPreference';
+
 const NAME = 'gallery-photo';
 
 /**
@@ -9,7 +11,7 @@ const NAME = 'gallery-photo';
  */
 export function morphPhoto(from: HTMLElement | null, to: () => HTMLElement | null, update: () => void): void {
   const root = document.documentElement;
-  if (root.getAttribute('data-motion') !== 'full' || typeof document.startViewTransition !== 'function') {
+  if (!isMotionFull() || typeof document.startViewTransition !== 'function') {
     update();
     return;
   }

@@ -32,7 +32,7 @@ npm run system:up
 npm run verify:release
 ```
 
-This repository-owned command is the mandatory local gate for a commit that may later become a production release. It includes static policy, integrity, test, lint, real disposable-PostgreSQL, and production-format build checks. It requires local Docker, performs no deployment or persistent migration, and is not centrally enforced. See [Release verification](docs/release-verification.md) and [Testing strategy](docs/testing.md). Optional browser audits remain available through `audit:a11y`, `audit:responsive:ux` and `audit:vitals`; they are advisory, run against a local server only, and refuse non-loopback URLs.
+This repository-owned command is the mandatory local gate for a commit that may later become a production release. It includes static policy, integrity, test, lint, real disposable-PostgreSQL, and production-format build checks. It requires local Docker, performs no deployment or persistent migration, and is not centrally enforced. See [Release verification](docs/release-verification.md) and [Testing strategy](docs/testing.md).
 
 ## Operations
 
@@ -53,12 +53,11 @@ The visual identity and its implementation spec are in [docs/design/identity.md]
 
 ## Open owner inputs
 
-Owner inputs (status on 2026-10-21):
+Status on 2026-10-21:
 
-- supplied by the owner on 2026-10-14: the address and ΑΜΑ (`HOST_CONTACT` in `src/data/contact.ts`) and the Booking.com listing link (`BOOKING_COM_LISTING_URL`);
-- supplied by the owner on 2026-10-15: the host's name, «Παναγιώτης Βασιλάκης / Panagiotis Vasilakis» (`HOST_CONTACT.legalName`: one string in both scripts, shown in the footer, in the apartment and availability page heads and in the controller list of the privacy notice; the owner typed it without accents, so the standard accented Greek spelling is used and awaits the owner's confirmation); that the nightly prices are final but are not published (the public site shows no price, total, fee line or cancellation policy, and the cancellation rule of 2026-10-14 is withdrawn); and that, for now, the owner uses only Booking.com. The host is a private individual and «Dolce Far Niente» is only the brand, so the ΑΦΜ and a ΓΕΜΗ number are deliberately not shown;
-- supplied by the owner on 2026-10-20: that Booking.com is the only channel on the site and the only calendar source (the Booking.com iCal export with booked and closed dates, `BOOKING_ICAL_URL`); that the hosts are the owner's mother, who writes the home letter, and the owner, so the feminine host texts stay and her name is not published (`HOST_PROFILE.name` stays empty); and that 12 months of guest-data retention are enough (`GUEST_DATA_RETENTION_MONTHS` = 12, unchanged);
 - still open: which Booking.com link to publish (the Share link in the code or the canonical property URL; only a `https://www.booking.com/Share-<token>` link, or the same on `booking.com`, passes `isBookingComListingUrl` in `src/lib/contactLinks.ts`, so a canonical property URL also needs a change of that function and of `tests/unit/contact-links.test.ts`, otherwise the Booking.com button disappears from the home, apartment and availability pages and the site shows no error), the owner's wording for Booking.com bookings (the "how to book" step makes no payment or confirmation claim until then), the Booking.com export URL (`BOOKING_ICAL_URL`: a secret that the owner creates in the Booking.com extranet with booked and closed dates and sets in the production environment; until it is set no calendar is shown) and the legal questions on the privacy notice. The privacy notice (`src/i18n/domains/legal.ts`) names Booking.com everywhere since 2026-10-21 (changed with the owner's permission; `git grep -n -i 'air[b]nb' -- src/i18n/domains/legal.ts` prints nothing). Whether the notice must list Booking.com as a recipient at all and as a source of the booking data, and what tax law needs for the unlinked booking rows, stay with the owner or a lawyer.
+- awaiting the owner's confirmation: the accented Greek spelling of the host's name (`HOST_CONTACT.legalName` in `src/data/contact.ts`; the owner typed it without accents);
+- settled and recorded where they apply: the host's name, address and ΑΜΑ, and that ΑΦΜ and ΓΕΜΗ are not shown (`HOST_CONTACT` in `src/data/contact.ts`); the Booking.com listing link (`BOOKING_COM_LISTING_URL`); no published price, total, fee line or cancellation policy; Booking.com as the only channel and the only calendar source (`BOOKING_ICAL_URL`); the hostess's name is not published (`HOST_PROFILE.name` stays empty); 12 months of guest-data retention (`GUEST_DATA_RETENTION_MONTHS`).
 
 ## Documentation
 

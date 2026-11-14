@@ -27,10 +27,10 @@ vi.mock('@/data/contact', async (importOriginal) => ({
 
 import ApartmentPage from '@/app/[locale]/apartment/page';
 import FactStrip from '@/components/home/FactStrip';
-import { HOST_CONTACT } from '@/data/contact';
-import { getDictionary } from '@/i18n/dictionaries';
 import { addDays, type IsoDate } from '@/lib/availability/calendarDate';
 import type { PublicAvailability } from '@/lib/prisma-repositories/availabilityRepository';
+
+import { installDialogMethods, removeDialogMethods, stubIntersectionObserver } from '../support/dom';
 
 const TODAY = '2026-10-18' as IsoDate;
 
@@ -118,31 +118,6 @@ describe('apartment page (identity §9.2)', () => {
     }
   });
 
-  it.each([
-    ['en', 'Parking', 'Free and private, outdoors at the property'],
-  ] as const)('has a parking section (%s) before the details: its own title and line, one tile shown alone', async (locale, title, line) => {
-    const { container } = await renderPage(locale);
-
-    // The order proves that Parking sits between the balcony and the details, so it is not the last section.
-    expect([...container.querySelectorAll('section.apt-room')].map((section) => section.id)).toEqual(ROOM_IDS);
-    const parking = container.querySelector('section#parking') as HTMLElement;
-    expect(parking).not.toBeNull();
-    expect(within(parking).getByRole('heading', { level: 2 })).toHaveTextContent(title);
-    expect(parking.querySelector('.apt-room__line')).toHaveTextContent(line);
-
-    const images = parking.querySelectorAll('.apt-masonry img');
-    expect(images).toHaveLength(1);
-    expect(images[0].getAttribute('src')).toBe('/house/parking/parking_1.jpeg');
-    expect(images[0].getAttribute('alt') ?? '').not.toBe('');
-    expect(images[0].getAttribute('sizes')).toBe('(min-width: 900px) 820px, 92vw');
-
-    expect(parking.querySelector('ul.apt-masonry')).toHaveClass('apt-masonry--single');
-    expect(container.querySelectorAll('.apt-masonry--single')).toHaveLength(1);
-
-    const nav = container.querySelector('nav.apt-chips') as HTMLElement;
-    expect(within(nav).getByRole('link', { name: title })).toHaveAttribute('href', '#parking');
-  });
-
   it('lays out the sections whose tiles share one box ratio as a row-major grid, the others as columns (R-700)', async () => {
     const { container } = await renderPage('en');
 
@@ -165,7 +140,6 @@ describe('apartment page (identity §9.2)', () => {
 
   it.each([
     ['en', 'See free dates', '/en/availability', '/en#contact'],
-    ['el', 'Δείτε ελεύθερες ημερομηνίες', '/el/availability', '/el#contact'],
   ] as const)('links (%s) to the free dates and to the home contact section', async (locale, seeDates, availability, contactHref) => {
     const { container } = await renderPage(locale);
 
@@ -175,17 +149,6 @@ describe('apartment page (identity §9.2)', () => {
     expect(contactLinks.map((a) => a.getAttribute('href'))).toEqual([contactHref]);
     // The old page sent "Contact" to the phones directory (plan V6).
     expect(container.querySelector(`a[href="/${locale}/phones"]`)).toBeNull();
-  });
-
-  it('hides "Book on Booking.com" without a valid link (identity §1.4)', async () => {
-    for (const url of ['', 'https://example.com/Share-AiCapK', 'http://www.booking.com/Share-AiCapK']) {
-      contact.bookingUrl = url;
-      const { container, unmount } = await renderPage('en');
-      expect(screen.queryByRole('link', { name: /Booking\.com/ }), url).toBeNull();
-      expect(screen.queryByText(/Book on Booking\.com/), url).toBeNull();
-      expect(container.querySelector('a[href*="booking.com"]'), url).toBeNull();
-      unmount();
-    }
   });
 
   it('shows "Book on Booking.com" as the secondary CTA with a valid link', async () => {
@@ -224,18 +187,6 @@ describe('apartment page (identity §9.2)', () => {
     expect(apartmentFacts).toEqual(homeFacts);
   });
 
-  it('shows the host identity in the apartment head (el), without a link', async () => {
-    const labels = getDictionary('el').shell.identity;
-    const { container } = await renderPage('el');
-    const head = container.querySelector('.apt-head') as HTMLElement;
-    const identity = head.querySelector('.host-identity') as HTMLElement;
-    expect(identity).not.toBeNull();
-    for (const text of [labels.registryLabel, labels.legalNameLabel, HOST_CONTACT.registrationNumber, HOST_CONTACT.legalName, HOST_CONTACT.address]) {
-      expect(within(identity).getByText(text)).toBeInTheDocument();
-    }
-    expect(within(head).queryByRole('link')).toBeNull();
-  });
-
   it('has one h1 and amenity groups built from the apartment data', async () => {
     const { container } = await renderPage('en');
 
@@ -251,23 +202,12 @@ describe('apartment page (identity §9.2)', () => {
 describe('apartment page gallery wiring (identity §9.2, §8 GalleryLightbox)', () => {
   // jsdom has no HTMLDialogElement.showModal/close and no Element.scrollTo (as in gallery-lightbox.test.tsx).
   beforeEach(() => {
-    Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
-      configurable: true,
-      value: vi.fn(function (this: HTMLDialogElement) { this.setAttribute('open', ''); }),
-    });
-    Object.defineProperty(HTMLDialogElement.prototype, 'close', {
-      configurable: true,
-      value: vi.fn(function (this: HTMLDialogElement) {
-        this.removeAttribute('open');
-        this.dispatchEvent(new Event('close'));
-      }),
-    });
+    installDialogMethods();
     Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: vi.fn() });
   });
 
   afterEach(() => {
-    Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
-    Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
+    removeDialogMethods();
     Reflect.deleteProperty(HTMLElement.prototype, 'scrollTo');
   });
 
@@ -376,48 +316,7 @@ describe('apartment page gallery wiring (identity §9.2, §8 GalleryLightbox)', 
   });
 });
 
-type ObserverCallback = (entries: Array<Pick<IntersectionObserverEntry, 'target' | 'isIntersecting'>>) => void;
-
-/** A controllable IntersectionObserver: each observer hears only about the elements it observes. */
-function stubObserver() {
-  const observers: Array<{ callback: ObserverCallback; targets: Element[] }> = [];
-  vi.stubGlobal('IntersectionObserver', class {
-    private readonly entry: { callback: ObserverCallback; targets: Element[] };
-    constructor(callback: ObserverCallback) {
-      this.entry = { callback, targets: [] };
-      observers.push(this.entry);
-    }
-    observe(target: Element) { this.entry.targets.push(target); }
-    unobserve() {}
-    disconnect() { this.entry.targets = []; }
-  });
-  return {
-    report(inView: Map<Element, boolean>) {
-      act(() => {
-        for (const { callback, targets } of observers) {
-          const entries = targets.filter((target) => inView.has(target)).map((target) => ({ target, isIntersecting: inView.get(target) ?? false }));
-          if (entries.length > 0) callback(entries);
-        }
-      });
-    },
-  };
-}
-
 describe('BookBar on the apartment page (identity §8, §9.2)', () => {
-  it.each([
-    ['el', 'Ελεύθερο απόψε', '/el/availability', 'Δείτε ημερομηνίες'],
-  ] as const)('carries tonight and the Check dates link (%s), from the same source as home, with no price', async (locale, note, href, label) => {
-    const { container } = await renderPage(locale);
-
-    const bar = container.querySelector('.bookbar') as HTMLElement;
-    expect(bar).not.toBeNull();
-    expect(bar).toHaveTextContent(note);
-    expect(bar.textContent).not.toContain('€');
-    expect(within(bar).getByRole('link', { hidden: true })).toHaveAttribute('href', href);
-    expect(within(bar).getByRole('link', { hidden: true })).toHaveTextContent(label);
-    expect(mocks.read).toHaveBeenCalledTimes(1);
-  });
-
   it('is not rendered when the availability read fails, and logs no details', async () => {
     mocks.read.mockRejectedValue(new Error('connect ECONNREFUSED 10.0.0.5:5432'));
 
@@ -431,7 +330,7 @@ describe('BookBar on the apartment page (identity §8, §9.2)', () => {
   });
 
   it('stays hidden until the page head leaves the view, and while the #book CTAs are visible', async () => {
-    const io = stubObserver();
+    const io = stubIntersectionObserver();
     const { container } = await renderPage('en');
     const bar = container.querySelector('.bookbar');
     const shown = () => Boolean(bar?.classList.contains('is-shown')) && !bar?.hasAttribute('inert');

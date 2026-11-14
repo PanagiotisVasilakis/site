@@ -62,11 +62,6 @@
   background: var(--color-band-accent);
   color: var(--color-band-accent-fg);
 }
-.ui-btn.ui-btn--outline-on-band {
-  background: transparent;
-  color: var(--color-band-fg);
-  border-color: rgb(246 239 228 / .45);
-}
 .ui-btn.ui-btn--link-arrow {
   min-height: 0;
   padding: 0;
@@ -79,8 +74,7 @@
   overflow: visible;
 }
 .ui-btn.ui-btn--glass:focus-visible,
-.ui-btn.ui-btn--on-band:focus-visible,
-.ui-btn.ui-btn--outline-on-band:focus-visible {
+.ui-btn.ui-btn--on-band:focus-visible {
   outline-color: var(--color-band-focus);
 }
 
@@ -89,7 +83,6 @@
   .ui-btn.ui-btn--secondary:hover { background: var(--color-bg); color: var(--color-accent-hover); }
   .ui-btn.ui-btn--ghost:hover { text-decoration: underline; text-underline-offset: .28em; }
   .ui-btn.ui-btn--glass:hover { background: rgb(255 248 238 / .22); }
-  .ui-btn.ui-btn--outline-on-band:hover { background: rgb(246 239 228 / .1); }
   .ui-btn.ui-btn--link-arrow:hover { color: var(--color-accent-hover); }
 }
 
@@ -255,25 +248,17 @@
   text-wrap: pretty;
 }
 
-/* Section `band` and `warm` variants: full-bleed backgrounds, content kept to the container by padding. */
-.ui-section.ui-section--band,
-.ui-section.ui-section--warm {
+/* Section `band` variant: full-bleed background, content kept to the container by padding. */
+.ui-section.ui-section--band {
   max-width: none;
   padding-inline: max(var(--gutter), calc((100% - var(--container)) / 2));
   color: var(--color-band-fg);
 }
 .ui-section.ui-section--band { background: var(--color-band-bg); }
-.ui-section.ui-section--warm {
-  background: radial-gradient(120% 140% at 85% 0%, var(--color-warm-1) 0%, var(--color-warm-2) 55%, var(--color-warm-3) 100%);
-}
 .ui-section--band .ui-section__head .ui-eyebrow,
-.ui-section--band .ui-section__head .ui-section__em,
-.ui-section--warm .ui-section__head .ui-section__em { color: var(--color-band-accent); }
-.ui-section--warm .ui-section__head .ui-eyebrow { color: var(--color-warm-muted); }
-.ui-section--band .ui-section__head .ui-section__title,
-.ui-section--warm .ui-section__head .ui-section__title { color: var(--color-band-fg); }
+.ui-section--band .ui-section__head .ui-section__em { color: var(--color-band-accent); }
+.ui-section--band .ui-section__head .ui-section__title { color: var(--color-band-fg); }
 .ui-section--band .ui-section__head .ui-section__lead { color: var(--color-band-muted); }
-.ui-section--warm .ui-section__head .ui-section__lead { color: var(--color-warm-muted); }
 
 /* Section `plain` variant (§9.3 information blocks, from R3-V7): d3 title, fg-muted body, 65ch, no page
    padding (it sits inside the page layout). Two classes (0,2,0) so it overrides the default rules above. */

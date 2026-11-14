@@ -2,11 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { refreshAdminSession, signAdmin, verifyAdminSession } from '@/lib/auth/admin';
 import { withErrorHandler } from '@/lib/apiErrorHandler';
 import { logger } from '@/lib/logger-enterprise';
-import crypto from 'node:crypto';
 
-// No body validation needed - reads from cookie
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  // Parse JWT token safely from cookie
   const jwt = req.cookies.get('admin_jwt')?.value;
     
   if (!jwt) {
@@ -29,16 +26,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return NextResponse.json({ error: 'Session expired' }, { status: 401 });
   }
 
-  const cleanPayload = {
-    jti: crypto.randomUUID(),
-    session_id: sessionId,
-    login_at: loginAt,
-  };
   const ttlSeconds = Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
-  const fresh = signAdmin(cleanPayload, ttlSeconds);
+  const fresh = signAdmin({ session_id: sessionId, login_at: loginAt }, ttlSeconds);
   const res = NextResponse.json({ success: true, expiresAt: expiresAt.toISOString() }, { status: 200 });
   
-  // Enhanced cookie security
   res.cookies.set('admin_jwt', fresh, {
     path: '/',
     httpOnly: true,

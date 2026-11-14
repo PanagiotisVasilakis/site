@@ -4,8 +4,7 @@ import type { PrivacyRequest } from '@/generated/prisma/client';
 
 import { prisma } from '@/lib/prisma';
 import { redactSensitiveText } from '@/lib/redaction';
-
-const SERIALIZABLE_ATTEMPTS = 3;
+import { retrySerializable } from '@/lib/serializableRetry';
 
 function privacySubjectDigest(kind: 'user', id: string): string {
   return crypto.createHash('sha256').update(`privacy-subject:v1:${kind}:${id}`).digest('hex');
@@ -22,14 +21,7 @@ export async function eraseGuestByAdmin(userId: string, auditNote: string) {
   if (!subject) throw new Error('ERASURE_SUBJECT_NOT_FOUND');
   const { request } = await createVerifiedErasureRequest(userId, auditNote);
   // Retry only the transaction: the request row is already committed and is reused, never created again.
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      return await completeErasureRequest(request.id, auditNote);
-    } catch (error) {
-      const conflict = error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034';
-      if (!conflict || attempt === SERIALIZABLE_ATTEMPTS) throw error;
-    }
-  }
+  return retrySerializable(() => completeErasureRequest(request.id, auditNote));
 }
 
 /**
@@ -45,26 +37,14 @@ export async function eraseGuestForRetention(userId: string, auditNote: string, 
   const { request, created } = await createVerifiedErasureRequest(userId, auditNote);
   // Retry only the transaction, as in eraseGuestByAdmin. The guard runs again on every attempt, so a
   // guest who claimed a booking meanwhile is skipped and the request created above is deleted.
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      const completed = await completeErasureRequest(request.id, auditNote, { bookingsEndedBefore, createdRequest: created });
-      return completed !== null;
-    } catch (error) {
-      const conflict = error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034';
-      if (!conflict || attempt === SERIALIZABLE_ATTEMPTS) throw error;
-    }
-  }
+  const completed = await retrySerializable(
+    () => completeErasureRequest(request.id, auditNote, { bookingsEndedBefore, createdRequest: created }),
+  );
+  return completed !== null;
 }
 
 async function createVerifiedErasureRequest(userId: string, auditNote: string) {
-  const existing = await prisma.privacyRequest.findFirst({
-    where: {
-      userId,
-      requestType: 'ERASURE',
-      status: { in: ['PENDING', 'VERIFIED'] },
-    },
-    orderBy: { requestedAt: 'desc' },
-  });
+  const existing = await findOpenErasureRequest(userId);
   if (existing) return { request: await ensureVerified(existing, auditNote), created: false };
 
   try {
@@ -81,14 +61,18 @@ async function createVerifiedErasureRequest(userId: string, auditNote: string) {
     return { request, created: true };
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      const raced = await prisma.privacyRequest.findFirst({
-        where: { userId, requestType: 'ERASURE', status: { in: ['PENDING', 'VERIFIED'] } },
-        orderBy: { requestedAt: 'desc' },
-      });
+      const raced = await findOpenErasureRequest(userId);
       if (raced) return { request: await ensureVerified(raced, auditNote), created: false };
     }
     throw error;
   }
+}
+
+function findOpenErasureRequest(userId: string) {
+  return prisma.privacyRequest.findFirst({
+    where: { userId, requestType: 'ERASURE', status: { in: ['PENDING', 'VERIFIED'] } },
+    orderBy: { requestedAt: 'desc' },
+  });
 }
 
 // The application writes only VERIFIED erasure requests; a PENDING row is legacy
@@ -141,15 +125,10 @@ async function completeErasureRequest(requestId: string, auditNote: string, guar
 
     const bookingIds = user.bookings.map((booking) => booking.id);
 
-    const checkInRequests = await tx.checkInRequest.findMany({
-      where: {
-        OR: [
-          { userId: user.id },
-          ...(bookingIds.length ? [{ bookingId: { in: bookingIds } }] : []),
-        ],
-      },
-      select: { id: true },
-    });
+    const guestCheckInWhere = {
+      OR: [{ userId: user.id }, ...(bookingIds.length ? [{ bookingId: { in: bookingIds } }] : [])],
+    };
+    const checkInRequests = await tx.checkInRequest.findMany({ where: guestCheckInWhere, select: { id: true } });
     const checkInRequestIds = checkInRequests.map((entry) => entry.id);
     if (checkInRequestIds.length) {
       const activeDeliveries = await tx.outboxEvent.count({
@@ -175,11 +154,12 @@ async function completeErasureRequest(requestId: string, auditNote: string, guar
       });
     }
 
+    await tx.checkInRequest.updateMany({
+      where: bookingIds.length ? guestCheckInWhere : { userId: user.id },
+      data: { userId: null, guestName: null, guestEmail: null, guestPhone: null, message: null },
+    });
+
     if (bookingIds.length) {
-      await tx.checkInRequest.updateMany({
-        where: { OR: [{ userId: user.id }, { bookingId: { in: bookingIds } }] },
-        data: { userId: null, guestName: null, guestEmail: null, guestPhone: null, message: null },
-      });
       // The erased bookings can be claimed again, and a booking holds at most one PENDING request
       // (check_in_requests_one_pending_per_booking). Close the erased guest's undecided requests so
       // they do not block the next claimant. REJECTED is the only terminal status; the booking link
@@ -192,12 +172,9 @@ async function completeErasureRequest(requestId: string, auditNote: string, guar
         where: { bookingId: { in: bookingIds }, revokedAt: null },
         data: { revokedAt: new Date() },
       });
-      // R-195 decision (a): externalReference is kept on erasure. It is the host's own
-      // platform reservation code (bookkeeping link to the Booking.com reservation, GDPR Art. 17(3)(b))
-      // and identifies no one by itself once userId is cleared. The code never deletes bookings: the
-      // 12-month retention that the owner confirmed on 2026-10-20 covers guest data only. Option (b),
-      // keeping TermsAcceptance, was NOT done: it is still
-      // deleted with the user via onDelete: Cascade.
+      // externalReference is kept on erasure: it is the host's own Booking.com reservation code (bookkeeping,
+      // GDPR Art. 17(3)(b)) and identifies no one by itself once userId is cleared. Bookings are never deleted.
+      // The user's TermsAcceptance rows are deleted with the user (onDelete: Cascade).
       await tx.booking.updateMany({
         where: { id: { in: bookingIds } },
         data: {
@@ -205,11 +182,6 @@ async function completeErasureRequest(requestId: string, auditNote: string, guar
           accessStatus: 'PENDING',
           claimedAt: null,
         },
-      });
-    } else {
-      await tx.checkInRequest.updateMany({
-        where: { userId: user.id },
-        data: { userId: null, guestName: null, guestEmail: null, guestPhone: null, message: null },
       });
     }
 

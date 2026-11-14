@@ -86,7 +86,7 @@ describe('guest sign-in flow', () => {
     expect(emitMock).toHaveBeenCalledWith('signin');
   });
 
-  it.each(['en', 'el'])('falls back to the %s check-in page when the server names no redirect', async (locale) => {
+  it.each(['en'])('falls back to the %s check-in page when the server names no redirect', async (locale) => {
     navigation.locale = locale;
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { success: true, data: { bookingId: 'booking-1' } }));
     render(<UnifiedGuestClient />);

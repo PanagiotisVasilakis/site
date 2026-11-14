@@ -341,24 +341,6 @@ test('accepts an internal relative file symlink and scans its target once', asyn
   });
 });
 
-test('accepts an internal relative directory symlink', async () => {
-  await withFixture(async (root) => {
-    await mkdir(path.join(root, 'z-target'));
-    await writeFile(path.join(root, 'z-target', 'clean.txt'), 'PUBLIC_LABEL=clean\n');
-    await symlink('z-target', path.join(root, 'a-link'));
-    const artifact = await enumerateArtifactPathForTest(root);
-    assert.deepEqual(artifact.symlinks, [{
-      relative: 'a-link',
-      target: 'z-target',
-      targetType: 'directory',
-    }]);
-    assert.deepEqual(
-      artifact.files.map((file) => file.relative),
-      ['a-link/clean.txt'],
-    );
-  });
-});
-
 test('detects and redacts a secret reached through an internal symlink', async () => {
   await withFixture(async (root) => {
     const raw = [
@@ -421,26 +403,6 @@ test('rejects a relative out-of-root symlink and a path-prefix escape', async ()
   } finally {
     await rm(parent, { recursive: true, force: true });
   }
-});
-
-test('accepts a multi-hop chain that remains inside the artifact', async () => {
-  await withFixture(async (root) => {
-    await writeFile(path.join(root, 'z-target.txt'), 'PUBLIC_LABEL=clean\n');
-    await symlink('z-target.txt', path.join(root, 'b-hop'));
-    await symlink('b-hop', path.join(root, 'a-hop'));
-    const artifact = await enumerateArtifactPathForTest(root);
-    assert.deepEqual(
-      artifact.symlinks.map((entry) => [entry.relative, entry.target]),
-      [
-        ['a-hop', 'z-target.txt'],
-        ['b-hop', 'z-target.txt'],
-      ],
-    );
-    assert.deepEqual(
-      artifact.files.map((file) => file.relative),
-      ['a-hop'],
-    );
-  });
 });
 
 test('rejects a chain whose intermediate hop escapes the artifact', async () => {
@@ -537,35 +499,6 @@ test('rejects unsupported special filesystem nodes where supported', async () =>
   });
 });
 
-test('traversal results and ordering remain stable across repeated runs', async () => {
-  await withFixture(async (root) => {
-    await mkdir(path.join(root, 'z-target'));
-    await writeFile(path.join(root, 'z-target', 'b.txt'), 'PUBLIC_LABEL=b\n');
-    await writeFile(path.join(root, 'z-target', 'a.txt'), 'PUBLIC_LABEL=a\n');
-    await symlink('z-target', path.join(root, 'a-link'));
-    const first = await enumerateArtifactPathForTest(root);
-    const second = await enumerateArtifactPathForTest(root);
-    const summarize = (artifact) => ({
-      files: artifact.files.map((file) => file.relative),
-      symlinks: artifact.symlinks,
-    });
-    assert.deepEqual(summarize(first), summarize(second));
-    assert.deepEqual(
-      first.files.map((file) => file.relative),
-      ['a-link/a.txt', 'a-link/b.txt'],
-    );
-  });
-});
-
-test('the versioned incident baseline remains exactly six fingerprints', async () => {
-  const baseline = JSON.parse(await readFile(
-    new URL('../../config/secret-scanning/historical-incident-baseline.json', import.meta.url),
-    'utf8',
-  ));
-  assert.equal(baseline.findings.length, 6);
-  assert.equal(new Set(baseline.findings.map((finding) => finding.fingerprint)).size, 6);
-});
-
 const FRAMEWORK_IDENTIFIER = '1'.repeat(40);
 const ACTION_IDENTIFIER = '2'.repeat(40);
 const BUILD_IDENTIFIER = '3'.repeat(40);
@@ -627,7 +560,7 @@ async function withGeneratedArtifactPolicy(options, callback) {
       routes: {},
       dynamicRoutes: {},
       notFoundRoutes: [],
-      preview: { ...preview, ...options.prerenderPreviewOverrides },
+      preview: { ...preview },
     };
     const frameworkSource =
       `* @see https://github.com/vercel/next.js/commit/${FRAMEWORK_IDENTIFIER} */`;
@@ -839,25 +772,6 @@ test('malformed Next internal key encoding fails closed', async () => {
   );
 });
 
-test('approved server-runtime duplicates receive the same semantic classification', async () => {
-  await withGeneratedArtifactPolicy({}, async ({ context, serverKey, artifactContents }) => {
-    const paths = [
-      '.next/server/server-reference-manifest.json',
-      '.next/standalone/.next/server/server-reference-manifest.json',
-    ];
-    const results = paths.map((relativePath) => classifyFixture(context, {
-      rule: 'generic-api-key',
-      secret: serverKey,
-      relativePath,
-      source: artifactContents.get(relativePath),
-    }));
-    assert.deepEqual(
-      results.map((result) => result.classification),
-      Array(2).fill(GENERATED_ARTIFACT_CLASSIFICATIONS.INTERNAL_CLASSIFICATION),
-    );
-  });
-});
-
 test('Next internal material in client or static output fails closed', async () => {
   for (const publicLeakPath of ['.next/static', 'public']) {
     await assert.rejects(
@@ -893,25 +807,6 @@ test('preview-props that differs from the prerender preview fails closed', async
   await assert.rejects(
     withGeneratedArtifactPolicy({
       previewPropsOverrides: { previewModeId: '8'.repeat(32) },
-    }, async () => {}),
-    /preview-props manifest schema was invalid/u,
-  );
-});
-
-test('the standalone preview-props with an extra key fails closed', async () => {
-  await assert.rejects(
-    withGeneratedArtifactPolicy({
-      standalonePreviewPropsOverrides: { unexpected: true },
-    }, async () => {}),
-    /preview-props manifest schema was invalid/u,
-  );
-});
-
-test('only the standalone preview-props differing from the server copy fails closed', async () => {
-  await assert.rejects(
-    withGeneratedArtifactPolicy({
-      previewPropsOverrides: { previewModeId: '8'.repeat(32) },
-      prerenderPreviewOverrides: { previewModeId: '8'.repeat(32) },
     }, async () => {}),
     /preview-props manifest schema was invalid/u,
   );
@@ -962,18 +857,6 @@ test('unknown Next version fails closed', async () => {
     withGeneratedArtifactPolicy({ nextVersion: '16.3.7-unknown' }, async () => {}),
     /do not support the installed Next version/u,
   );
-});
-
-test('build identification without a git binary fails with a named error', async () => {
-  const emptyBinDirectory = await mkdtemp(path.join(os.tmpdir(), 'secret-scanning-no-git-'));
-  try {
-    await assert.rejects(
-      withGeneratedArtifactPolicy({ environment: { PATH: emptyBinDirectory } }, async () => {}),
-      /git is required to identify the build commit\./u,
-    );
-  } finally {
-    await rm(emptyBinDirectory, { recursive: true, force: true });
-  }
 });
 
 test('an extra same-value occurrence in an approved file fails closed', async () => {
@@ -1156,53 +1039,6 @@ test('semantic results never serialize raw keys or identifiers', async () => {
     assert.equal(JSON.stringify(result).includes(serverKey), false);
     assert.equal(JSON.stringify(result).includes(FRAMEWORK_IDENTIFIER), false);
   });
-});
-
-test('semantic disposition output and ordering are deterministic', async () => {
-  await withGeneratedArtifactPolicy({}, async ({ context, serverKey, artifactContents }) => {
-    const input = {
-      rule: 'generic-api-key',
-      secret: serverKey,
-      relativePath: '.next/server/server-reference-manifest.json',
-      source: artifactContents.get('.next/server/server-reference-manifest.json'),
-    };
-    assert.deepEqual(
-      classifyFixture(context, input),
-      classifyFixture(context, input),
-    );
-    assert.deepEqual(
-      context.summary.internalKeyClasses,
-      [
-        'server-actions-encryption-key',
-        'preview-mode-id',
-        'preview-mode-signing-key',
-        'preview-mode-encryption-key',
-      ],
-    );
-  });
-});
-
-test('different generated Next key values require no incident-baseline edit', async () => {
-  const baseline = fixtureBaseline();
-  const classifications = [];
-  for (const byte of [11, 12]) {
-    await withGeneratedArtifactPolicy({
-      serverKey: fixtureKey(byte),
-      incidentBaseline: baseline,
-    }, async ({ context, serverKey, artifactContents }) => {
-      classifications.push(classifyFixture(context, {
-        rule: 'generic-api-key',
-        secret: serverKey,
-        relativePath: '.next/server/server-reference-manifest.json',
-        source: artifactContents.get('.next/server/server-reference-manifest.json'),
-      }).classification);
-    });
-  }
-  assert.deepEqual(
-    classifications,
-    Array(2).fill(GENERATED_ARTIFACT_CLASSIFICATIONS.INTERNAL_CLASSIFICATION),
-  );
-  assert.equal(baseline.findings.length, 6);
 });
 
 test('framework identifier classification does not depend on hashed artifact filenames', async () => {

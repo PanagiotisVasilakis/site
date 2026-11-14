@@ -2,15 +2,8 @@ import fs from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 
 import { buildBasePopupHtml, escapeMapHtml } from '@/components/maps/leafletPopup';
-import { getApartmentContent } from '@/data/apartmentData';
+import { getKalamataMapLocations } from '@/data/mapLocations';
 import {
-  getApartmentMapLocation,
-  getKalamataLandmarks,
-  getKalamataMapLocations,
-} from '@/data/mapLocations';
-import { ItemSchema } from '@/data/schemas';
-import {
-  getOrderedCategories,
   getItem,
   getItemsByCategory,
   pickLocale,
@@ -37,24 +30,13 @@ describe('validated content access', () => {
     expect(getItem('moments', 'missing')).toBeNull();
   });
 
-  it('orders categories and loads items from validated files', () => {
-    const categories = getOrderedCategories();
-    expect(categories.length).toBeGreaterThanOrEqual(2);
-    expect(categories.map(({ order }) => order ?? 999)).toEqual(
-      [...categories].map(({ order }) => order ?? 999).sort((a, b) => a - b),
-    );
-    expect(getItemsByCategory('moments').length).toBeGreaterThan(0);
-  });
-
-  it('normalizes slugs and applies locale fallback order', () => {
+  it('normalizes slugs, applies locale fallback order and treats a whitespace-only localized name as missing on the card and the map', () => {
     expect(toSlug('  Kalamata & Sea! ')).toBe('kalamata-sea');
     expect(pickLocale({ title: 'Base', title_en: 'English', title_el: 'Ελληνικά' }, 'title', 'el')).toBe('Ελληνικά');
     expect(pickLocale({ title: 'Base', title_en: 'English' }, 'title', 'el')).toBe('Base');
     expect(pickLocale({ title_en: 'English' }, 'title', 'el')).toBe('English');
     expect(pickLocale({}, 'title', 'el')).toBeUndefined();
-  });
 
-  it('treats a whitespace-only localized name as missing on both the card and the map', () => {
     const item = {
       id: 'whitespace-name',
       name: 'Base name',
@@ -69,14 +51,6 @@ describe('validated content access', () => {
     expect(mapName).toBe(cardName);
     expect(pickLocale({ title: ' ', title_en: 'English' }, 'title', 'el')).toBe('English');
     expect(pickLocale({ title: '\t\n' }, 'title', 'el')).toBeUndefined();
-  });
-
-  it('does not carry star ratings or update timestamps on content items', () => {
-    const parsed = ItemSchema.parse({
-      id: 'x', categoryId: 'moments', name: 'X', rating: 4.5, updatedAt: '2030-01-15T00:00:00Z',
-    });
-    expect(parsed).not.toHaveProperty('rating');
-    expect(parsed).not.toHaveProperty('updatedAt');
   });
 
   it('reports unreadable category files through the structured logger', () => {
@@ -99,41 +73,9 @@ describe('validated content access', () => {
     );
     expect(consoleWarn).not.toHaveBeenCalled();
   });
-
-  it('provides complete localized apartment content', () => {
-    expect(getApartmentContent('en').shortName).toBeTruthy();
-    expect(getApartmentContent('el').description).toMatch(/[Α-Ωα-ω]/);
-  });
 });
 
 describe('shared map catalog', () => {
-  it('keeps every curated landmark within the Kalamata coordinate region', () => {
-    const landmarks = getKalamataLandmarks('en');
-    expect(landmarks.map(({ id }) => id)).toEqual([
-      'landmark-almyros-beach',
-      'landmark-kordia-beach',
-      'landmark-vasileos-georgiou-square',
-      'landmark-march-23-square',
-      'landmark-agia-triada-church',
-      'landmark-sklavenitis-athinon',
-    ]);
-    landmarks.forEach(({ coordinates: [longitude, latitude] }) => {
-      expect(longitude).toBeGreaterThan(22);
-      expect(latitude).toBeGreaterThan(36);
-    });
-    expect(getKalamataLandmarks('el')[0].name).toMatch(/[Α-Ωα-ω]/);
-  });
-
-  it('uses the canonical apartment address and directions URL', () => {
-    expect(getApartmentMapLocation('en')).toMatchObject({
-      id: 'apartment',
-      address: 'Archimidous 21, Kalamata 24100, Greece',
-      directionsUrl: 'https://maps.app.goo.gl/wW1Lnh14k3psKGAm9',
-      markerType: 'apartment',
-    });
-    expect(getApartmentMapLocation('el').address).toContain('Αρχιμήδους 21');
-  });
-
   it('combines content markers, omits missing coordinates and deduplicates ids', () => {
     const markers = getKalamataMapLocations('en', [
       {

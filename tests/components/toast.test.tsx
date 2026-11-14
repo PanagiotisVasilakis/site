@@ -34,7 +34,7 @@ function advance(ms: number) {
 
 describe('ToastProvider', () => {
   beforeEach(() => {
-    vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
   });
   afterEach(() => vi.useRealTimers());
 

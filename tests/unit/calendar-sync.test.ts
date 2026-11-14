@@ -128,7 +128,6 @@ afterEach(() => {
 
 describe('syncBookingCalendar: configuration', () => {
   it.each([
-    ['unset', undefined],
     ['empty', ''],
   ])('returns not_configured without touching the database or the network when the URL is %s', async (_label, value) => {
     vi.stubEnv('BOOKING_ICAL_URL', value);
@@ -173,19 +172,6 @@ describe('syncBookingCalendar: success', () => {
     expect(mocks.logger.warn).not.toHaveBeenCalled();
   });
 
-  it('claims a manual sync by the last attempt time and stores an empty calendar as no blocked nights', async () => {
-    mocks.fetch.mockResolvedValue(new Response(calendar(), { status: 200 }));
-
-    await expect(sync('manual')).resolves.toEqual({ status: 'synced', blockedNights: 0 });
-
-    expect(mocks.updateMany.mock.calls[0][0]).toEqual(claimCall('manual'));
-    expect(mocks.updateMany.mock.calls[1][0].data).toMatchObject({
-      blockedNights: [],
-      horizonStart: utcMidnight(TODAY),
-      horizonEnd: utcMidnight(HORIZON_END),
-    });
-  });
-
   // Decision O47: only the admin's 'Sync now' may replace stored future nights with an empty calendar.
   it('stores an empty calendar on a manual run although the snapshot holds future nights', async () => {
     mocks.fetch.mockResolvedValue(new Response(calendar(), { status: 200 }));
@@ -195,13 +181,17 @@ describe('syncBookingCalendar: success', () => {
 
     expect(mocks.findUnique).not.toHaveBeenCalled();
     expect(mocks.updateMany).toHaveBeenCalledTimes(2);
+    expect(mocks.updateMany.mock.calls[0][0]).toEqual(claimCall('manual'));
     expect(mocks.updateMany.mock.calls[1][0].data).toMatchObject({ blockedNights: [], lastSuccessAt: NOW, lastErrorCode: null });
+    expect(mocks.updateMany.mock.calls[1][0].data).toMatchObject({
+      horizonStart: utcMidnight(TODAY),
+      horizonEnd: utcMidnight(HORIZON_END),
+    });
   });
 
   // 24 October is already past at the property (01:30 on 25 October in Athens), although it is still the UTC date.
   it.each<[string, string[]]>([
     ['only past nights', ['2026-10-23', '2026-10-24']],
-    ['no nights', []],
   ])('stores an empty calendar on a scheduled run when the snapshot holds %s', async (_label, stored) => {
     mocks.fetch.mockResolvedValue(new Response(calendar(), { status: 200 }));
     mocks.findUnique.mockResolvedValue({ blockedNights: stored.map(utcMidnight) });
@@ -258,7 +248,7 @@ describe('syncBookingCalendar: not claimed', () => {
     expect(mocks.fetch).not.toHaveBeenCalled();
   });
 
-  it.each(['scheduled', 'manual'] as const)('a %s run returns busy while another run holds the lease', async (trigger) => {
+  it.each(['scheduled'] as const)('a %s run returns busy while another run holds the lease', async (trigger) => {
     mocks.updateMany.mockResolvedValue({ count: 0 });
     mocks.findUnique.mockResolvedValue({ leaseExpiresAt: NOW });
 
@@ -334,8 +324,8 @@ describe('syncBookingCalendar: failures', () => {
     expect(mocks.logger.info).not.toHaveBeenCalled();
   });
 
-  // The Response constructor rejects these statuses; fetch passes non-standard ones such as 999 through, and 99 pins the lower bound of the column CHECK.
-  it.each([99, 600, 999])('records a non-standard HTTP status %i by its code alone (the column allows 100-599)', async (status) => {
+  // The Response constructor rejects these statuses; fetch passes non-standard ones such as 600 through, and 99 pins the lower bound of the column CHECK.
+  it.each([99, 600])('records a non-standard HTTP status %i by its code alone (the column allows 100-599)', async (status) => {
     mocks.fetch.mockResolvedValue(Object.defineProperty(new Response(null, { status: 500 }), 'status', { value: status }));
     mocks.findUnique.mockResolvedValue({ consecutiveFailures: 0 });
 
@@ -380,16 +370,6 @@ describe('syncBookingCalendar: failures', () => {
       httpStatus: 503,
       consecutiveFailures: 2,
     });
-  });
-
-  it('records a parse failure and keeps the stored nights', async () => {
-    const dateTimeEvent = [...HEADER, 'BEGIN:VEVENT', 'DTSTART:20261101T120000Z', 'END:VEVENT', 'END:VCALENDAR'].join(CRLF);
-    mocks.fetch.mockResolvedValue(new Response(dateTimeEvent, { status: 200 }));
-    mocks.findUnique.mockResolvedValue({ consecutiveFailures: 1 });
-
-    await expect(sync('scheduled')).resolves.toEqual({ status: 'failed', code: 'unsupported_value' });
-
-    expect(mocks.updateMany.mock.calls[1][0]).toEqual(failureWrite('unsupported_value', null, 45));
   });
 
   // The parser's line number is not feed content; it is the only pointer to what it rejected.

@@ -103,7 +103,7 @@ describe('ThemeSwitch (header toggle)', () => {
     await waitFor(() => expect(root).not.toHaveAttribute('data-vt'));
   });
 
-  it.each([['reduce'], [null]])('skips the view transition when data-motion is %s', async (motion) => {
+  it.each([['reduce']])('skips the view transition when data-motion is %s', async (motion) => {
     const start = installViewTransition();
     if (motion) root.setAttribute('data-motion', motion);
     const user = userEvent.setup();

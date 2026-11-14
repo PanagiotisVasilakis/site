@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 
 import { BRAND_NAME } from '@/data/brand';
 import { HOST_CONTACT } from '@/data/contact';
@@ -15,7 +15,7 @@ import { localizedAlternates, localizedOpenGraph } from '@/lib/seo';
 type PrivacyPageProps = { params: Promise<{ locale: string }> };
 
 /**
- * The controller's name and address (R3-L1) are supplied in HOST_CONTACT (the address since 2026-10-14, the name since 2026-10-15).
+ * The controller's name and address (R3-L1) are supplied in HOST_CONTACT.
  * A row is shown when its value is present; without a value, its row is left out.
  */
 const CONTROLLER: Readonly<{ legalName?: string; address?: string; email: string; phone: string }> = HOST_CONTACT;
@@ -54,6 +54,11 @@ export default async function PrivacyPage({ params }: PrivacyPageProps) {
   const t = dictionary.legal.privacy;
   const months = String(GUEST_DATA_RETENTION_MONTHS);
   const tel = telHref(CONTROLLER.phone);
+  const storageLists = [
+    { title: t.storage.cookiesTitle, entries: t.storage.cookies },
+    { title: t.storage.localStorageTitle, entries: t.storage.localStorage },
+    { title: t.storage.sessionStorageTitle, entries: t.storage.sessionStorage },
+  ];
 
   const controllerRows: Array<{ label: string; value: ReactNode }> = [
     { label: t.controller.brandLabel, value: BRAND_NAME },
@@ -133,33 +138,19 @@ export default async function PrivacyPage({ params }: PrivacyPageProps) {
 
       <Section id="storage" title={t.storage.title}>
         <p>{t.storage.intro}</p>
-        <h3 className="legal-page__subheading">{t.storage.cookiesTitle}</h3>
-        <dl className="legal-page__terms">
-          {Object.entries(t.storage.cookies).map(([name, purpose]) => (
-            <div key={name} className="legal-page__term">
-              <dt><code>{name}</code></dt>
-              <dd>{purpose}</dd>
-            </div>
-          ))}
-        </dl>
-        <h3 className="legal-page__subheading">{t.storage.localStorageTitle}</h3>
-        <dl className="legal-page__terms">
-          {Object.entries(t.storage.localStorage).map(([name, purpose]) => (
-            <div key={name} className="legal-page__term">
-              <dt><code>{name}</code></dt>
-              <dd>{purpose}</dd>
-            </div>
-          ))}
-        </dl>
-        <h3 className="legal-page__subheading">{t.storage.sessionStorageTitle}</h3>
-        <dl className="legal-page__terms">
-          {Object.entries(t.storage.sessionStorage).map(([name, purpose]) => (
-            <div key={name} className="legal-page__term">
-              <dt><code>{name}</code></dt>
-              <dd>{purpose}</dd>
-            </div>
-          ))}
-        </dl>
+        {storageLists.map(({ title, entries }) => (
+          <Fragment key={title}>
+            <h3 className="legal-page__subheading">{title}</h3>
+            <dl className="legal-page__terms">
+              {Object.entries(entries).map(([name, purpose]) => (
+                <div key={name} className="legal-page__term">
+                  <dt><code>{name}</code></dt>
+                  <dd>{purpose}</dd>
+                </div>
+              ))}
+            </dl>
+          </Fragment>
+        ))}
         <h3 className="legal-page__subheading">{t.storage.cacheTitle}</h3>
         <p>{t.storage.cache}</p>
       </Section>

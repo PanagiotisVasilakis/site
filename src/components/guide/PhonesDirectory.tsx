@@ -5,11 +5,8 @@ import { Icon } from '@/components/icons/Icon';
 import { Button } from '@/components/ui/Button';
 import { getDictionary, type Dictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
-import { telHref } from '@/lib/contactLinks';
+import { EMERGENCY_112_HREF, EMERGENCY_112_ID, telHref } from '@/lib/contactLinks';
 import type { GuideEntry } from './guideEntries';
-
-/** The 112 entry is the emergency band, not a row (§9.6). */
-const EMERGENCY_ID = 'emergency-112';
 
 type GroupKey = keyof Dictionary['guide']['phoneGroups'];
 
@@ -31,8 +28,8 @@ function groupOf(entry: GuideEntry): GroupKey {
  */
 export function PhonesDirectory({ entries, locale, title, lead }: { entries: GuideEntry[]; locale: Locale; title: string; lead?: string }) {
   const t = getDictionary(locale);
-  const emergency = entries.find((entry) => entry.id === EMERGENCY_ID);
-  const rows = entries.filter((entry) => entry.id !== EMERGENCY_ID);
+  const emergency = entries.find((entry) => entry.id === EMERGENCY_112_ID);
+  const rows = entries.filter((entry) => entry.id !== EMERGENCY_112_ID);
   const grouped = (['emergency', 'health', 'transport', 'other'] as const)
     .map((key) => ({ key, rows: rows.filter((entry) => groupOf(entry) === key) }))
     .filter((group) => group.rows.length > 0);
@@ -57,7 +54,7 @@ export function PhonesDirectory({ entries, locale, title, lead }: { entries: Gui
           {emergency?.summary ? <p className="sos-band__lead">{emergency.summary}</p> : null}
         </div>
         <Button asChild variant="on-band" size="lg">
-          <a href="tel:112">
+          <a href={EMERGENCY_112_HREF}>
             <Icon name="phone" size={22} />
             {t.guide.call112}
           </a>

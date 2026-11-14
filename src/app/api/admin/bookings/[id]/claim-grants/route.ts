@@ -10,7 +10,6 @@ export const dynamic = 'force-dynamic';
 
 const schema = z.object({
   channel: z.enum(['REMOTE', 'ONSITE']),
-  ttlMinutes: z.number().int().min(5).max(1440).optional(),
 }).strict();
 
 export const POST = withErrorHandler(async (
@@ -34,7 +33,6 @@ export const POST = withErrorHandler(async (
     const grant = await issueBookingClaimGrant({
       bookingId: id,
       channel: parsed.data.channel,
-      ttlMinutes: parsed.data.ttlMinutes,
       adminSessionId: admin.session_id,
     });
     const response = createSuccessResponse({

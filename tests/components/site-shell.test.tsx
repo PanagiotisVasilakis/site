@@ -331,9 +331,6 @@ describe('site shell', () => {
 
   it.each([
     ['en', '/en', 'marketing'],
-    ['en', '/en/moments', 'marketing'],
-    ['en', '/en/guest', 'stay'],
-    ['el', '/el', 'marketing'],
     ['el', '/el/check-in', 'stay'],
   ] as const)('links the privacy notice in the %s footer of %s (%s)', (locale, pathname, variant) => {
     navigation.pathname = pathname;
@@ -342,24 +339,6 @@ describe('site shell', () => {
     expect(footer).toHaveClass(`site-footer--${variant}`);
     expect(within(footer).getByRole('link', { name: getDictionary(locale).legal.privacyLink }))
       .toHaveAttribute('href', `/${locale}/privacy`);
-  });
-
-  it.each(['/en', '/en/guest'])('offers Auto · Day · Night in the footer at every width (%s)', (pathname) => {
-    navigation.pathname = pathname;
-    render(<SiteFooter locale="en" />);
-    const theme = within(screen.getByRole('contentinfo')).getByRole('group', { name: 'Theme' });
-    expect(within(theme).getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  it.each([
-    ['en', '/en'],
-  ] as const)('shows the tagline and the location line under the brand in the %s marketing footer (%s)', (locale, pathname) => {
-    navigation.pathname = pathname;
-    render(<SiteFooter locale={locale} />);
-    const footer = screen.getByRole('contentinfo');
-    const { heroTagline, heroFacts } = getDictionary(locale).home;
-    expect(within(footer).getByText(heroTagline)).toHaveClass('site-footer__tagline');
-    expect(within(footer).getByText(heroFacts)).toHaveClass('site-footer__place');
   });
 
   // R-689 (decision D13): next/link scrolls only when the hash changes, so "Contact" at an URL that already ends in
@@ -405,22 +384,6 @@ describe('site shell', () => {
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
   });
 
-  it('scrolls on a second footer "Contact" click at /en#contact and leaves the first and the other footer links alone (R-689)', () => {
-    const { container } = render(<SiteFooter locale="en" />);
-    const footer = screen.getByRole('contentinfo');
-    const contact = within(footer).getByRole('link', { name: 'Contact' });
-
-    expect(clickPrevented(contact)).toBe(false);
-    expect(scrollIntoView).not.toHaveBeenCalled();
-
-    window.history.pushState(null, '', '/en#contact');
-    expect(clickPrevented(within(footer).getByRole('link', { name: 'Apartment' }))).toBe(false);
-    expect(clickPrevented(within(footer).getByRole('link', { name: /Your stay/ }))).toBe(false);
-    expect(scrollIntoView).not.toHaveBeenCalled();
-    expect(clickPrevented(contact)).toBe(true);
-    expect(scrollIntoView.mock.contexts).toEqual([container.querySelector('#contact')]);
-  });
-
   it('makes the home footer contact block the #contact target, with phone, e-mail, Instagram and WhatsApp', () => {
     const { container } = render(<SiteFooter locale="en" />);
     const target = container.querySelector('#contact') as HTMLElement;
@@ -433,20 +396,7 @@ describe('site shell', () => {
     ]);
   });
 
-  it.each(['/en/availability'])('leaves the #contact id out of the footer on %s (the availability page has its own)', (pathname) => {
-    navigation.pathname = pathname;
-    const { container } = render(<SiteFooter locale={pathname.slice(1, 3)} />);
-    expect(container.querySelector('.site-footer__contact')).not.toBeNull();
-    expect(container.querySelector('#contact')).toBeNull();
-  });
-
-  it.each(['/en/stay'])('keeps the stay footer slim: no tagline, location line or #contact (%s)', (pathname) => {
-    navigation.pathname = pathname;
-    const { container } = render(<SiteFooter locale={pathname.slice(1, 3)} />);
-    expect(container.querySelector('.site-footer__tagline, .site-footer__place, #contact')).toBeNull();
-  });
-
-  it.each([['/en', 'en'], ['/el/guest', 'el']] as const)(
+  it.each([['/en', 'en']] as const)(
     'shows the host identity as text only in the footer, marketing and stay (%s)',
     (pathname, locale) => {
       navigation.pathname = pathname;

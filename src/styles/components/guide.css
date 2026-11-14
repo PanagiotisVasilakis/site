@@ -387,7 +387,7 @@
   color: var(--color-fg-muted);
 }
 
-/* The deferred map's placeholder (InteractiveMap, before Leaflet mounts; also the check-in map). */
+/* The deferred map's placeholder (ApartmentLocationMap, before Leaflet mounts; also the check-in map). */
 .map-placeholder {
   display: grid;
   place-items: center;

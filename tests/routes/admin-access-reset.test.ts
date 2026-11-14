@@ -39,7 +39,7 @@ describe('admin guest access reset route', () => {
   });
 
   it('returns the one-time token with no-store and no-referrer', async () => {
-    const response = await reset({ body: { confirm: true, ttlMinutes: 60 } });
+    const response = await reset();
 
     expect(response.status).toBe(201);
     expect(response.headers.get('cache-control')).toBe('no-store');
@@ -48,7 +48,7 @@ describe('admin guest access reset route', () => {
       success: true,
       data: { claimToken: TOKEN, expiresAt: '2030-01-01T00:30:00.000Z', channel: 'REMOTE' },
     });
-    expect(mocks.resetGuestAccess).toHaveBeenCalledWith({ bookingId: BOOKING_ID, ttlMinutes: 60, adminSessionId: ADMIN_SESSION_ID });
+    expect(mocks.resetGuestAccess).toHaveBeenCalledWith({ bookingId: BOOKING_ID, adminSessionId: ADMIN_SESSION_ID });
   });
 
   it.each([
@@ -86,7 +86,7 @@ describe('admin guest access reset route', () => {
     ['no confirmation', {}],
     ['confirm other than true', { confirm: 'yes' }],
     ['an unknown field', { confirm: true, userId: 'x' }],
-    ['a TTL above one day', { confirm: true, ttlMinutes: 1441 }],
+    ['the removed ttlMinutes option', { confirm: true, ttlMinutes: 30 }],
   ])('rejects %s with 422', async (_label, body) => {
     const response = await reset({ body });
 

@@ -196,15 +196,6 @@ describe('PwaManager site storage (R-375)', () => {
       expect(logger.error).not.toHaveBeenCalledWith('Update reload handler failed', expect.anything());
     });
 
-    it('handles the runtime version message of the worker without throwing', () => {
-      container.controller = controllerWorker;
-      render(<ShellWithPwaManager />);
-      const onMessage = workerMessageListener();
-
-      expect(() => onMessage(runtimeVersionMessage('1.2.3', 'abcdef0123456789', waitingWorker))).not.toThrow();
-      expect(() => onMessage(runtimeVersionMessage('1.2.3', 'abcdef0123456789', controllerWorker))).not.toThrow();
-    });
-
     it('shows the update banner for a new worker version although the dismissed version cannot be read', () => {
       // Only the lookup of the dismissed version is denied here; the stored version is still readable.
       vi.mocked(Storage.prototype.getItem).mockImplementation((key: string) => {
@@ -394,6 +385,18 @@ describe('PwaManager hands visited pages to the service worker (R-628)', () => {
   });
 
   it('posts nothing on mount when a worker controls the page that the browser loaded', () => {
+    const first = render(<PwaManager />);
+
+    expect(cachePageMessages()).toEqual([]);
+    first.unmount();
+
+    loadedDocument(`${ORIGIN}/en/stay#hours`);
+    const hashed = render(<PwaManager />);
+
+    expect(cachePageMessages()).toEqual([]);
+    hashed.unmount();
+
+    vi.spyOn(performance, 'getEntriesByType').mockReturnValue([]);
     render(<PwaManager />);
 
     expect(cachePageMessages()).toEqual([]);
@@ -420,22 +423,6 @@ describe('PwaManager hands visited pages to the service worker (R-628)', () => {
     render(<PwaManager />);
 
     expect(cachePageMessages()).toEqual([{ type: 'CACHE_PAGE', url: `${ORIGIN}/en/phones` }]);
-  });
-
-  it('does not take the hash of the loaded document for a different page', () => {
-    loadedDocument(`${ORIGIN}/en/stay#hours`);
-
-    render(<PwaManager />);
-
-    expect(cachePageMessages()).toEqual([]);
-  });
-
-  it('posts nothing on mount when the browser reports no navigation entry', () => {
-    vi.spyOn(performance, 'getEntriesByType').mockReturnValue([]);
-
-    render(<PwaManager />);
-
-    expect(cachePageMessages()).toEqual([]);
   });
 
   describe('when no worker controls the page at mount (first visit)', () => {

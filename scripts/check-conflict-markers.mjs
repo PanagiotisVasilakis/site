@@ -22,12 +22,15 @@ function isConflictMarker(line) {
   return suffix.length === 0 || suffix.startsWith(' ');
 }
 const failures = [];
+const unreadable = [];
 
 for (const file of candidate.stdout.split('\0').filter(Boolean)) {
   let content;
   try {
     content = readFileSync(file);
-  } catch {
+  } catch (error) {
+    if (error?.code === 'ENOENT') continue;
+    unreadable.push(`${file}: ${error?.code ?? 'read error'}`);
     continue;
   }
 
@@ -44,6 +47,14 @@ for (const file of candidate.stdout.split('\0').filter(Boolean)) {
 if (failures.length > 0) {
   console.error('Unresolved merge conflict markers found:');
   failures.forEach((failure) => console.error(`  ${failure}`));
+}
+
+if (unreadable.length > 0) {
+  console.error('Candidate files could not be read:');
+  unreadable.forEach((entry) => console.error(`  ${entry}`));
+}
+
+if (failures.length > 0 || unreadable.length > 0) {
   process.exit(1);
 }
 

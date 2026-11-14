@@ -6,6 +6,7 @@ import { IconButton } from '@/components/ui/IconButton';
 import { Segmented, segmentedItemClass } from '@/components/ui/Segmented';
 import type { ShellDictionary } from '@/i18n/domains/shell';
 import { logger } from '@/lib/logger-client';
+import { isMotionFull } from '@/lib/motion/motionPreference';
 
 /**
  * identity §5.2, §5.7, §8 ThemeSwitch. The DOM is the source of truth: `data-theme` on <html> is set only
@@ -82,7 +83,7 @@ function commitChoice(choice: ThemeChoice) {
  */
 function changeTheme(choice: ThemeChoice, origin: Element) {
   const root = document.documentElement;
-  if (root.getAttribute('data-motion') !== 'full' || typeof document.startViewTransition !== 'function') {
+  if (!isMotionFull() || typeof document.startViewTransition !== 'function') {
     commitChoice(choice);
     return;
   }
@@ -102,13 +103,12 @@ function useTheme(): { choice: ThemeChoice; theme: Theme } {
 type ThemeLabels = Pick<ShellDictionary, 'switchToNight' | 'switchToDay' | 'theme' | 'themeAuto' | 'themeDay' | 'themeNight'>;
 
 /** Header IconButton: toggles between day and night (a stored choice). */
-export function ThemeSwitch({ t, className }: { t: ThemeLabels; className?: string }) {
+export function ThemeSwitch({ t }: { t: ThemeLabels }) {
   const { theme } = useTheme();
   const dark = theme === 'dark';
   return (
     <IconButton
       label={dark ? t.switchToDay : t.switchToNight}
-      className={className}
       onClick={(event) => changeTheme(dark ? 'light' : 'dark', event.currentTarget)}
     >
       <Icon name={dark ? 'sun' : 'moon'} size={20} />
@@ -117,11 +117,11 @@ export function ThemeSwitch({ t, className }: { t: ThemeLabels; className?: stri
 }
 
 /** Menu Segmented: Auto · Day · Night. */
-export function ThemeSetting({ t, className }: { t: ThemeLabels; className?: string }) {
+export function ThemeSetting({ t }: { t: ThemeLabels }) {
   const { choice } = useTheme();
   const options: Array<[ThemeChoice, string]> = [['auto', t.themeAuto], ['light', t.themeDay], ['dark', t.themeNight]];
   return (
-    <Segmented label={t.theme} className={className}>
+    <Segmented label={t.theme}>
       {options.map(([value, label]) => (
         <button
           key={value}

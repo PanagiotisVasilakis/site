@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ApiError, ApiErrorCode, withErrorHandler, createSuccessResponse as success } from '@/lib/apiErrorHandler';
+import { ApiError, ApiErrorCode, withErrorHandler, createSuccessResponse } from '@/lib/apiErrorHandler';
 import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 import { guestStore } from '@/lib/guestDataStore';
 import {
@@ -11,18 +11,16 @@ import {
   GUEST_SESSION_COOKIE,
   parseGuestSessionBinding,
 } from '@/lib/guestSession';
-import { logger as elogger } from '@/lib/logger-enterprise';
+import { logger } from '@/lib/logger-enterprise';
 import { requestAuthContext } from '@/lib/portalAuthHttp';
 import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
 
-function applyAuthCookies(response: NextResponse, sessionJwt: string, refreshToken?: string): void {
+function applyAuthCookies(response: NextResponse, sessionJwt: string, refreshToken: string): void {
   const sessionCookie = createSessionCookie(sessionJwt);
   response.cookies.set(sessionCookie.name, sessionCookie.value, sessionCookie.options);
 
-  if (refreshToken) {
-    const refreshCookie = createRefreshCookie(refreshToken);
-    response.cookies.set(refreshCookie.name, refreshCookie.value, refreshCookie.options);
-  }
+  const refreshCookie = createRefreshCookie(refreshToken);
+  response.cookies.set(refreshCookie.name, refreshCookie.value, refreshCookie.options);
 }
 
 function clearAuthCookies(response: NextResponse): void {
@@ -73,29 +71,25 @@ async function issueRefreshedSession(
     ),
   });
   if (rotated.status === 'concurrent') {
-    elogger.info('refresh_token.concurrent', {
-      correlationId: elogger.getContext()?.correlationId,
+    logger.info('refresh_token.concurrent', {
+      correlationId: logger.getContext()?.correlationId,
     });
     return { status: 'concurrent' };
   }
 
   if (rotated.status === 'replayed') {
-    elogger.warn('refresh_token.replay_detected', {
-      correlationId: elogger.getContext()?.correlationId,
+    logger.warn('refresh_token.replay_detected', {
+      correlationId: logger.getContext()?.correlationId,
     });
     return { status: 'failed' };
   }
 
-  if (rotated.status !== 'rotated'
-    || !rotated.old
-    || !rotated.rec
-    || !rotated.token
-    || !rotated.sessionToken) {
+  if (rotated.status !== 'rotated') {
     return { status: 'failed' };
   }
 
-  elogger.info('refresh_token.rotated', {
-    correlationId: elogger.getContext()?.correlationId,
+  logger.info('refresh_token.rotated', {
+    correlationId: logger.getContext()?.correlationId,
     user_id: rotated.old.user_id,
     old_id: rotated.old.id,
     new_id: rotated.rec.id,
@@ -140,7 +134,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   if (refreshed.status === 'failed') {
     return unauthorizedResponse();
   }
-  const res = success({ refreshed: true });
+  const res = createSuccessResponse({ refreshed: true });
   applyAuthCookies(res, refreshed.jwt, refreshed.refreshToken);
   return res;
 });

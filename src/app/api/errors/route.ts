@@ -56,7 +56,7 @@ export const POST = withErrorHandler(async (request: NextRequest, { signal }) =>
   const path = reportUrl.pathname.slice(0, 512);
   const correlationId = logger.getContext()?.correlationId;
   const stack = report.error.stack
-    ? redact(report.error.stack.split('\n').slice(0, 5).join('\n')).slice(0, 2_000)
+    ? redact(report.error.stack.split('\n').slice(0, 5).join('\n'))
     : undefined;
 
   const { prisma } = await import('@/lib/prisma');

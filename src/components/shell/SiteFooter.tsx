@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
 import { BrandMark } from '@/components/icons/BrandMark';
 import { Icon, type IconName } from '@/components/icons/Icon';
+import { WORDMARK } from '@/data/brand';
 import { normalizeLocale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 import { HostIdentity } from './HostIdentity';
@@ -45,7 +46,7 @@ export default function SiteFooter({ locale }: { locale: string }) {
         <div className="site-footer__about">
           <p className="site-footer__brand">
             <BrandMark className="site-brand__mark" />
-            <span className="site-brand__name">Dolce Far Niente</span>
+            <span className="site-brand__name">{WORDMARK}</span>
           </p>
           {brandLines && (
             <>

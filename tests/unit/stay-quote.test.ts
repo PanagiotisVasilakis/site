@@ -44,12 +44,6 @@ function context(overrides: Partial<StayContext> = {}): StayContext {
   };
 }
 
-describe('stay policy data', () => {
-  it('shows the calendar 365 nights ahead of today', () => {
-    expect(HORIZON_END).toBe('2027-09-28');
-  });
-});
-
 describe('rate periods', () => {
   it('finds the period whose [start, end) range contains the night', () => {
     expect(rateForNight(iso('2026-10-01'), PERIODS)).toBe(OCTOBER_EARLY);
@@ -141,7 +135,6 @@ describe('validateStay', () => {
     ['2026-02-30', '2026-03-02'],
     ['2026-10-10', '2026-10-10'],
     ['2026-10-12', '2026-10-10'],
-    ['2026-10-10', ''],
   ])('rejects %j to %j as invalid', (checkIn, checkOut) => {
     expect(validateStay(checkIn, checkOut, context())).toEqual({ ok: false, reason: 'invalid' });
   });

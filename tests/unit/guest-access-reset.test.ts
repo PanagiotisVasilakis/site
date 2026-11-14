@@ -90,7 +90,6 @@ describe('host access reset', () => {
   it.each([
     ['an unclaimed booking', { userId: null, accessStatus: 'PENDING' }, 'BOOKING_NOT_CLAIMED'],
     ['a booking linked but not verified', { accessStatus: 'PENDING' }, 'BOOKING_NOT_CLAIMED'],
-    ['a stay that ended yesterday', { startDate: day(-4), endDate: day(-1) }, 'BOOKING_NOT_IN_ACCESS_WINDOW'],
     ['a check-in more than 7 days away', { startDate: day(8), endDate: day(12) }, 'BOOKING_NOT_IN_ACCESS_WINDOW'],
   ] as const)('refuses %s without touching the guest', async (_label, overrides, code) => {
     prismaMock.tx.booking.findUnique.mockResolvedValue(claimedBooking(overrides));

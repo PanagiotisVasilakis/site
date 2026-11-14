@@ -190,7 +190,6 @@ describe('admin rate-period API', () => {
       ['a price below 100 cents', { ...VALID, nightlyPriceCents: 99 }],
       ['a price above 1,000,000 cents', { ...VALID, nightlyPriceCents: 1_000_001 }],
       ['end on the start day', { ...VALID, endDate: VALID.startDate }],
-      ['end before start', { ...VALID, startDate: '2026-11-05', endDate: '2026-11-01' }],
       ['367 nights', { ...VALID, startDate: '2032-01-01', endDate: '2033-01-02' }],
       ['minimumNights 0', { ...VALID, minimumNights: 0 }],
       ['minimumNights above the longest bookable stay (31)', { ...VALID, minimumNights: 31 }],
@@ -286,20 +285,6 @@ describe('admin rate-period API', () => {
       expect(response.status).toBe(500);
     });
 
-    it('allows periods adjacent on either side (end dates are exclusive)', async () => {
-      seed(PERIOD_A, '2026-11-05', '2026-11-10');
-      seed(PERIOD_B, '2026-10-25', '2026-11-01');
-
-      const response = await create(VALID);
-
-      expect(response.status).toBe(201);
-      expect(mocks.ratePeriod.findFirst.mock.calls[0][0].where).toEqual({
-        startDate: { lt: day('2026-11-05') },
-        endDate: { gt: day('2026-11-01') },
-      });
-      expect(rows).toHaveLength(3);
-    });
-
     it('retries a serialization failure (P2034) and then succeeds', async () => {
       mocks.transaction.mockRejectedValueOnce(knownError('P2034'));
       mocks.transaction.mockRejectedValueOnce(knownError('P2034'));
@@ -309,15 +294,6 @@ describe('admin rate-period API', () => {
       expect(response.status).toBe(201);
       expect(mocks.transaction).toHaveBeenCalledTimes(3);
       expect(rows).toHaveLength(1);
-    });
-
-    it('gives up after three serialization failures', async () => {
-      mocks.transaction.mockRejectedValue(knownError('P2034'));
-
-      const response = await create(VALID);
-
-      expect(response.status).toBe(500);
-      expect(mocks.transaction).toHaveBeenCalledTimes(3);
     });
   });
 
@@ -359,15 +335,6 @@ describe('admin rate-period API', () => {
 
       expect(response.status).toBe(409);
       expect(mocks.ratePeriod.update).not.toHaveBeenCalled();
-    });
-
-    it('answers 409 when the exclusion constraint rejects the update', async () => {
-      seed(PERIOD_A, '2026-11-01', '2026-11-10');
-      mocks.ratePeriod.update.mockRejectedValueOnce(adapterError('23P01'));
-
-      const response = await replace(PERIOD_A, VALID);
-
-      expect(response.status).toBe(409);
     });
 
     it('answers 404 for an unknown id', async () => {

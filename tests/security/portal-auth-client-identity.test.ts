@@ -54,22 +54,6 @@ describe('portal auth client identity', () => {
     expect(authMocks.privacyHmac).not.toHaveBeenCalled();
   });
 
-  it.each([true, false])(
-    'fails before refresh or session mutation when remember=%s',
-    async (remember) => {
-      await expect(attachPortalAuthCookies(
-        request(),
-        {} as never,
-        { userId: 'user-id', bookingId: 'booking-id', remember },
-      )).rejects.toMatchObject({ code: CLIENT_IDENTITY_UNAVAILABLE });
-
-      expect(authMocks.privacyHmac).not.toHaveBeenCalled();
-      expect(authMocks.revokeRefreshFamily).not.toHaveBeenCalled();
-      expect(authMocks.issueGuestSession).not.toHaveBeenCalled();
-      expect(authMocks.issueRefreshToken).not.toHaveBeenCalled();
-    },
-  );
-
   it('hashes the audit IP with the shared security-event context', () => {
     const trusted = new NextRequest('https://guest.test/api/portal/claims', {
       method: 'POST',

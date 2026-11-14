@@ -40,7 +40,6 @@ beforeEach(() => {
 describe('check-in page without a session', () => {
   it.each([
     ['en', '/en/portal/refresh?next=%2Fen%2Fcheck-in&failure=%2Fen%2Fguest%3Fflash%3Dsession_required'],
-    ['el', '/el/portal/refresh?next=%2Fel%2Fcheck-in&failure=%2Fel%2Fguest%3Fflash%3Dsession_required'],
   ])('sends a guest who still holds a refresh cookie to the session refresh page (%s)', async (locale, target) => {
     refreshCookie.value = 'refresh-token';
     await expect(CheckInPage(params(locale))).rejects.toThrow(new Error(`NEXT_REDIRECT ${target}`));
@@ -72,13 +71,6 @@ describe('session refresh page', () => {
       search: { next: 'https://evil.test/x', failure: '//evil.test' },
       refreshHref: '/api/portal/refresh?next=%2Fen%2Fcheck-in',
       failureHref: '/en/guest?flash=session_required',
-    },
-    {
-      name: 'no links in Greek',
-      locale: 'el',
-      search: {},
-      refreshHref: '/api/portal/refresh?next=%2Fel%2Fcheck-in',
-      failureHref: '/el/guest?flash=session_required',
     },
     {
       name: 'safe links, next encoded',

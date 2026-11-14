@@ -55,8 +55,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     userId: safeUuid(session.user?.id),
   });
 
-  const correlationId = request.headers.get('x-correlation-id') ?? undefined;
-  return createSuccessResponse({ request: normalizeRequest(latest) }, undefined, correlationId);
+  return createSuccessResponse({ request: normalizeRequest(latest) });
 });
 
 export const POST = withErrorHandler(async (request: NextRequest) => {
@@ -108,7 +107,6 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     ? { status: 'skipped' as const, reason: 'webhook_not_configured' }
     : { status: delivered ? 'sent' as const : 'queued' as const };
 
-  const correlationId = request.headers.get('x-correlation-id') ?? undefined;
   // 201 for a new request; 200 when the pending request was kept (nothing was created).
-  return createSuccessResponse({ request: normalizeRequest(created.request), notification }, created.created ? 201 : 200, correlationId);
+  return createSuccessResponse({ request: normalizeRequest(created.request), notification }, created.created ? 201 : 200);
 });

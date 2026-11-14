@@ -61,7 +61,7 @@ export type NpmAuditRunner = (
   options: NpmAuditProcessOptions,
 ) => Promise<NpmAuditProcessResult>;
 
-export interface NpmAuditEvidence {
+interface NpmAuditEvidence {
   artifactPath: string;
   stderrArtifactPath: string;
   artifactSha256: string;

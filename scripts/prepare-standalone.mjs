@@ -1,6 +1,5 @@
 import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
-import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
 function replaceDirectory(source, destination) {
   if (!existsSync(source)) {
@@ -14,7 +13,8 @@ function replaceDirectory(source, destination) {
   cpSync(source, destination, { recursive: true, force: true });
 }
 
-function prepareStandalone(root = process.cwd()) {
+function prepareStandalone() {
+  const root = process.cwd();
   const standalone = join(root, '.next', 'standalone');
   if (!existsSync(join(standalone, 'server.js'))) {
     throw new Error('Standalone build not found. Run npm run build before npm start.');
@@ -37,10 +37,4 @@ function prepareStandalone(root = process.cwd()) {
   mkdirSync(join(standalone, '.next', 'cache', 'images'), { recursive: true });
 }
 
-const isMain = process.argv[1]
-  ? fileURLToPath(import.meta.url) === resolve(process.argv[1])
-  : false;
-
-if (isMain) {
-  prepareStandalone();
-}
+prepareStandalone();

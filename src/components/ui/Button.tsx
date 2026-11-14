@@ -11,7 +11,6 @@ const buttonVariants = cva('ui-btn', {
       ghost: 'ui-btn--ghost',
       glass: 'ui-btn--glass',
       'on-band': 'ui-btn--on-band',
-      'outline-on-band': 'ui-btn--outline-on-band',
       'link-arrow': 'ui-btn--link-arrow',
     },
     size: {
@@ -46,7 +45,7 @@ type ButtonAsChildProps = Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'c
   children: React.ReactElement<{ className?: string }>;
 };
 
-export type AppButtonProps = ButtonProps | ButtonAsChildProps;
+type AppButtonProps = ButtonProps | ButtonAsChildProps;
 
 export function Button({ className, asChild, variant, size, block, ...props }: AppButtonProps) {
   const classes = clsx(buttonVariants({ variant, size, block }), className);

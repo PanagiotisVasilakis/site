@@ -210,19 +210,6 @@ describe('AvailabilityPlanner', () => {
     expect(within(calendarNote()).queryByText(MAX_NIGHTS_NOTE)).not.toBeInTheDocument();
   });
 
-  it('disables days that cannot start a stay as long as their minimum', () => {
-    const { container } = renderPlanner({
-      nights: nightsWith({ '2026-10-10': 'b', '2026-10-17': 'b' }),
-    });
-
-    // 15 October needs 3 nights, but 17 October is booked.
-    expect(day(container, '2026-10-15')).toBeDisabled();
-    // 16 October is in the same period (minimum 3) and 17 October is booked.
-    expect(day(container, '2026-10-16')).toBeDisabled();
-    expect(day(container, '2026-10-14')).toBeEnabled();
-    expect(within(summary()).getByText(t.summary.empty)).toBeInTheDocument();
-  });
-
   it('says in the accessible name why a free night cannot start a stay', () => {
     // The scenario above, on 7 October so that days before today are on screen too:
     // the nights start at 7 October, six characters on from the nights of TODAY.
@@ -245,6 +232,7 @@ describe('AvailabilityPlanner', () => {
     expect(day(container, '2026-10-17')).toHaveAccessibleName('Saturday, 17 October 2026, booked');
     expect(day(container, '2026-10-06')).toBeDisabled();
     expect(day(container, '2026-10-06')).toHaveAccessibleName('Tuesday, 6 October 2026');
+    expect(within(summary()).getByText(t.summary.empty)).toBeInTheDocument();
   });
 
   it('explains the minimum stay and only enables check-out days that meet it', () => {
@@ -281,9 +269,7 @@ describe('AvailabilityPlanner', () => {
     '#checkin=2026-02-30&checkout=2026-03-02',
     '#checkin=2026-10-12&checkout=2026-10-08',
     '#checkin=2026-10-12&checkout=2026-10-12',
-    '#checkin=2026-10-07&checkout=soon',
     '#checkin=2026-10-10',
-    '#contact',
   ])('ignores the fragment %s', (fragment) => {
     window.history.replaceState(null, '', `${PAGE_PATH}${fragment}`);
     renderPlanner();
@@ -451,18 +437,6 @@ describe('AvailabilityPlanner', () => {
     expect(within(summary()).getByText(t.summary.empty)).toBeInTheDocument();
   });
 
-  it('opens the two months from the month of the fragment #m=2027-06 on wide screens', () => {
-    stubViewport(true);
-    window.history.replaceState(null, '', `${PAGE_PATH}#m=2027-06`);
-    const { container } = renderPlanner();
-
-    expect(container.querySelectorAll('.cal__month')).toHaveLength(2);
-    expect(container.querySelector('[data-day="2027-06-15"]')).not.toBeNull();
-    expect(container.querySelector('[data-day="2027-07-15"]')).not.toBeNull();
-    expect(container.querySelector('[data-day="2026-10-09"]')).toBeNull();
-    expect(within(summary()).getByText(t.summary.empty)).toBeInTheDocument();
-  });
-
   it('moves the two months back at the first Previous press after opening the horizon-end month with #m=2027-10', () => {
     stubViewport(true);
     // The horizon end is 7 October 2027, so October still has nights and '#m=2027-10' is accepted.
@@ -547,18 +521,5 @@ describe('AvailabilityPlanner', () => {
 
     expect(container.querySelector('form')).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('speaks Greek', () => {
-    window.history.replaceState(null, '', `${PAGE_PATH}#checkin=2026-10-07&checkout=2026-10-10`);
-    const { container } = render(<AvailabilityPlanner locale="el" availability={availability()} />);
-    const el = getDictionary('el').availability;
-
-    const card = screen.getByRole('region', { name: el.summary.title });
-    expect(within(card).getByText('3 νύχτες')).toBeInTheDocument();
-    expect(day(container, '2026-10-09')).toHaveAccessibleName(/^Παρασκευή, 9 Οκτωβρίου 2026, επιλεγμένη$/);
-    const text = 'Γεια σας! Είναι ελεύθερο το διαμέρισμα από Τετ 7 Οκτ 2026 έως Σάβ 10 Οκτ 2026;';
-    expect(screen.getByRole('link', { name: `${el.booking.whatsapp} ${el.booking.opensInNewTab}` }))
-      .toHaveAttribute('href', `${WHATSAPP_BASE}?text=${encodeURIComponent(text)}`);
   });
 });

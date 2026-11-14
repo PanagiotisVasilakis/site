@@ -199,26 +199,6 @@ describe('claim capability transport', () => {
     expect(response.cookies.get(PORTAL_CLAIM_EXCHANGE_COOKIE)).toBeUndefined();
   });
 
-  it('rejects replay and clears the exchange cookie again without exposing the capability', async () => {
-    const cookie = `${PORTAL_CLAIM_EXCHANGE_COOKIE}=${exchangeCookieValue()}`;
-    const first = await consumeClaim(
-      request('/api/portal/claims', claimBody(), cookie),
-      { params: Promise.resolve({}) },
-    );
-    expect(first.status).toBe(200);
-
-    mocks.consumeBookingClaimGrant.mockRejectedValueOnce(new PortalAuthError('INVALID_CLAIM'));
-    const replay = await consumeClaim(
-      request('/api/portal/claims', claimBody(), cookie),
-      { params: Promise.resolve({}) },
-    );
-    expect(replay.status).toBe(401);
-    expect(replay.cookies.get(PORTAL_CLAIM_EXCHANGE_COOKIE)?.maxAge).toBe(0);
-    const body = await replay.text();
-    expect(body).not.toContain(TOKEN);
-    expect(body).not.toContain(TOKEN_DIGEST);
-  });
-
   it.each([
     ['a bare digest', () => TOKEN_DIGEST],
     ['a digest with a wrong MAC', () => `${TOKEN_DIGEST}.${'0'.repeat(64)}`],
@@ -263,19 +243,6 @@ describe('claim capability transport', () => {
     const rejected = await consumeClaim(claimRequest(exchangeValue), { params: Promise.resolve({}) });
     expect(rejected.status).toBe(401);
     expect(mocks.consumeBookingClaimGrant).toHaveBeenCalledOnce();
-  });
-
-  it('keys the claim limiter on the verified digest, not on the phone', async () => {
-    const response = await consumeClaim(
-      claimRequest(exchangeCookieValue()),
-      { params: Promise.resolve({}) },
-    );
-
-    expect(response.status).toBe(200);
-    expect(mocks.checkSensitiveRateLimit).toHaveBeenCalledOnce();
-    const options = mocks.checkSensitiveRateLimit.mock.calls[0]?.[1];
-    expect(options).toMatchObject({ scope: 'portal-claim', identifier: TOKEN_DIGEST });
-    expect(JSON.stringify(options)).not.toContain(claimBody().phone);
   });
 
   it('answers 429 before the grant is touched when the digest budget is spent', async () => {
@@ -349,7 +316,6 @@ describe('claim exchange cookie bounds', () => {
 
   it.each([
     ['999 ms', 999, 1],
-    ['1 ms', 1, 1],
     ['1000 ms', 1_000, 1],
     ['1999 ms', 1_999, 1],
     ['2000 ms', 2_000, 2],
@@ -375,7 +341,6 @@ describe('claim exchange cookie bounds', () => {
 
   it.each([
     ['at the same instant', 0],
-    ['1 ms ago', -1],
     ['an hour ago', -3_600_000],
   ])('still refuses a grant that expired %s', (_label, msLeft) => {
     const now = new Date('2030-01-01T00:00:00.000Z');

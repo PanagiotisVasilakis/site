@@ -15,7 +15,6 @@ const currentNextPhase = process.env.NEXT_PHASE;
 const isBuildPhase = currentNextPhase === 'phase-production-build' || currentNextPhase === 'phase-export';
 const shouldLogDevWarnings = !isBuildPhase;
 
-// Env keys: keep short, documented names
 const PEPPER = getPepper();
 
 function isRuntimeProduction(): boolean {
@@ -25,12 +24,7 @@ function isRuntimeProduction(): boolean {
 
   // During `next build`, Next.js sets NEXT_PHASE=phase-production-build.
   // In that phase we allow fallbacks so the build can complete without production secrets.
-  const nextPhase = process.env.NEXT_PHASE;
-  if (nextPhase === 'phase-production-build' || nextPhase === 'phase-export') {
-    return false;
-  }
-
-  return true;
+  return !isBuildPhase;
 }
 
 function getPepper(): string {

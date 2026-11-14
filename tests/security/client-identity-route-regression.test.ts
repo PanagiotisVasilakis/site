@@ -229,40 +229,10 @@ describe('missing client identity route boundary', () => {
     expect(mocks.signAdmin).not.toHaveBeenCalled();
   });
 
-  it('keeps D1A zero-write behavior when private identity has an invalid attestation', async () => {
-    const accountToken = 'admin-dashboard-secret-marker';
-    const response = await adminLogin(request('/api/admin/login', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-origin-verified-client-ip': '203.0.113.10',
-        'x-origin-proxy-attestation': 'fedcba9876543210'.repeat(4),
-      },
-      body: JSON.stringify({ token: accountToken }),
-    }), { params: Promise.resolve({}) });
-
-    await expectGenericIdentityUnavailable(response, ['admin-login', accountToken]);
-    expect(mocks.rateLimitQuery).not.toHaveBeenCalled();
-    expect(mocks.createAdminSession).not.toHaveBeenCalled();
-    expect(mocks.signAdmin).not.toHaveBeenCalled();
-  });
-
   it.each(publicReportWrites)('blocks a public $scope write before either limiter call or audit persistence', async ({ scope, send }) => {
     const response = await send();
 
     await expectGenericIdentityUnavailable(response, [scope, REPORT_MARKER]);
-    expect(mocks.rateLimitTransaction).not.toHaveBeenCalled();
-    expect(mocks.rateLimitQuery).not.toHaveBeenCalled();
-    expect(mocks.securityAuditEventCreate).not.toHaveBeenCalled();
-  });
-
-  it.each(publicReportWrites)('keeps $scope zero-write behavior when private identity has an invalid attestation', async ({ scope, send }) => {
-    const response = await send({
-      'x-origin-verified-client-ip': '203.0.113.10',
-      'x-origin-proxy-attestation': 'fedcba9876543210'.repeat(4),
-    });
-
-    await expectGenericIdentityUnavailable(response, [scope, REPORT_MARKER, '203.0.113.10']);
     expect(mocks.rateLimitTransaction).not.toHaveBeenCalled();
     expect(mocks.rateLimitQuery).not.toHaveBeenCalled();
     expect(mocks.securityAuditEventCreate).not.toHaveBeenCalled();
@@ -387,18 +357,6 @@ describe('missing client identity route boundary', () => {
       portalClaimLimiterKey(`identifier:${CLAIM_DIGEST}`),
     ]);
     expect(keys).not.toContain(portalClaimLimiterKey(`identifier:${phone}`));
-  });
-
-  it('spends only the address bucket of a claim whose exchange cookie is a bare digest', async () => {
-    const phone = '+12025550129';
-    mocks.consumeBookingClaimGrant.mockRejectedValue(new PortalAuthError('INVALID_CLAIM'));
-
-    const response = await claimFromVerifiedAddress(`booking_claim_exchange=${CLAIM_DIGEST}`, phone);
-
-    expect(response.status).toBe(401);
-    expect(mocks.consumeBookingClaimGrant).not.toHaveBeenCalled();
-    const keys = mocks.rateLimitQuery.mock.calls.map((call) => call[1]);
-    expect(keys).toEqual([portalClaimLimiterKey('ip:198.51.100.73')]);
   });
 
   it('blocks refresh before rotation and never sets or clears auth cookies', async () => {

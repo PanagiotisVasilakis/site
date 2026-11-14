@@ -1,9 +1,11 @@
 import type { IconName } from '@/components/icons/Icon';
+import { categories } from '@/data/categories';
 import { APARTMENT_LOCATION } from '@/data/mapLocations';
 import type { Category, Item } from '@/data/schemas';
 import type { Locale } from '@/i18n/config';
 import type { Dictionary } from '@/i18n/dictionaries';
 import { mapsHref } from '@/lib/contactLinks';
+import { getItemsByCategory } from '@/lib/data';
 import { pickLocale } from '@/lib/localize';
 
 /**
@@ -78,6 +80,11 @@ export function favoriteIdOf(category: Pick<Category, 'slug'>, item: Pick<Item, 
   return `${category.slug}:${item.id}`;
 }
 
+/** Every favourites id that still resolves to a place; the Saved counts ignore any other stored id. */
+export function knownFavoriteIds(): string[] {
+  return categories.flatMap((category) => getItemsByCategory(category.id).map((item) => favoriteIdOf(category, item)));
+}
+
 export function toGuideEntry(item: Item, category: Category, locale: Locale, t: Dictionary): GuideEntry {
   const tags = item.tags ?? [];
   const slug = item.slug ?? item.id;
@@ -112,7 +119,7 @@ export function toGuideEntry(item: Item, category: Category, locale: Locale, t: 
     phones: [...new Set([item.phone, ...(item.phones ?? [])].filter((value): value is string => Boolean(value)))],
     website: item.website,
     // Without coordinates, search the place name instead of the address: addresses can be descriptive
-    // ("Near Charavgi, …", R-366). No address and no coordinates still means no Directions link.
+    // ("Near Charavgi, …"). No address and no coordinates still means no Directions link.
     directionsUrl: item.directionsUrl
       ?? mapsHref(address ? `${name}, Messinia, Greece` : undefined, item.location?.lat, item.location?.lng),
     location: item.location,

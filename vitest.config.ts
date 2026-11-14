@@ -76,6 +76,7 @@ export default defineConfig({
         'src/lib/runtime-env-schema.js',
         'src/lib/security-config.ts',
         'src/lib/sensitiveRateLimit.ts',
+        'src/lib/serializableRetry.ts',
         'src/lib/safeLocalPath.ts',
         'src/lib/site.ts',
         'src/lib/userFacingErrors.ts',

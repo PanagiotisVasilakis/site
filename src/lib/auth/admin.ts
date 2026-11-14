@@ -16,7 +16,6 @@ interface AdminAuthPayload {
   iat?: number;
   exp?: number;
   session_id?: string;
-  jti?: string;
   login_at?: number;
 }
 

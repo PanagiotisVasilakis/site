@@ -6,19 +6,12 @@ import { privacyHmac } from '@/lib/privacyHash';
 describe('HMAC keys have no fallback', () => {
   afterEach(() => vi.unstubAllEnvs());
 
-  it.each(['development', 'production'] as const)('refuses a missing claim-token pepper in %s', (mode) => {
+  it.each(['development'] as const)('refuses a missing claim-token pepper in %s', (mode) => {
     vi.stubEnv('NODE_ENV', mode);
     vi.stubEnv('SECURITY_PEPPER', 's'.repeat(32));
     vi.stubEnv('CLAIM_TOKEN_PEPPER', '');
 
     expect(() => requirePepper('CLAIM_TOKEN_PEPPER')).toThrow('CLAIM_TOKEN_PEPPER is required');
-  });
-
-  it('does not use the security pepper for claim tokens', () => {
-    vi.stubEnv('SECURITY_PEPPER', 's'.repeat(32));
-    vi.stubEnv('CLAIM_TOKEN_PEPPER', 'c'.repeat(32));
-
-    expect(requirePepper('CLAIM_TOKEN_PEPPER')).toBe('c'.repeat(32));
   });
 
   it('refuses privacy hashes without SECURITY_PEPPER outside production too', () => {

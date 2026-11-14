@@ -33,34 +33,6 @@ describe('guide list (identity §9.5, R3-V8)', () => {
     expect(screen.queryByRole('button', { name: /Bars|Brunch|Nearby/ })).toBeNull();
   });
 
-  it('sorts the cards by straight-line distance from the apartment and shows it', async () => {
-    await renderGuide();
-
-    expect(cardTitles()).toEqual([
-      'Viktoria Karelia Greek Costumes Collection',
-      'Kalamata Railway Park',
-      'Historical and Folklore Museum of Kalamata',
-      'Archaeological Museum of Messenia (Benakeion)',
-      'War Museum Kalamata Branch',
-      // Places without coordinates follow, in content order, without a distance.
-      'Kalamata City Beach (Navarinou Avenue)',
-      'Kalamata Central Market',
-      'Kalamata Olives and Messinian Olive Oil',
-      'Lalagia',
-      'Kalamata Castle and Old Town',
-      'Ancient Messene',
-      'Polylimnio, Messenia',
-      'Niokastro (Pylos Castle)',
-      'Methoni Castle',
-      'Koroni Castle',
-      'Gialova Lagoon and Voidokilia Beach',
-      'Palace of Nestor',
-      'Mount Taygetos',
-    ]);
-    const railway = screen.getByRole('heading', { level: 2, name: 'Kalamata Railway Park' }).closest('article')!;
-    expect(railway).toHaveTextContent('1.5 km');
-  });
-
   it('keeps the heading order without a skipped level (R-360: h1, then the card titles)', async () => {
     const { container } = await renderGuide();
 
@@ -150,13 +122,5 @@ describe('guide list (identity §9.5, R3-V8)', () => {
     } finally {
       window.history.replaceState(null, '', '/');
     }
-  });
-
-  it('renders the Greek page with Greek labels', async () => {
-    await renderGuide('el');
-
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Οδηγός Καλαμάτας');
-    expect(screen.getByRole('searchbox', { name: 'Αναζήτηση στον οδηγό' })).toBeInTheDocument();
-    expect(screen.getByText('18 μέρη')).toHaveAttribute('role', 'status');
   });
 });

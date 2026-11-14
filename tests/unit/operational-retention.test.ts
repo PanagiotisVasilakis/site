@@ -34,7 +34,7 @@ afterEach(() => {
 });
 
 describe('operational retention', () => {
-  it('removes administrator sessions 90 days after their absolute expiry', async () => {
+  it('removes each retained record class after its published period', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-07-14T00:00:00Z'));
 
@@ -45,14 +45,6 @@ describe('operational retention', () => {
     });
     // The mocked transaction reports each operation's position as its count.
     expect(result.adminSessions).toBe(8);
-  });
-
-  it('removes erasure-cancelled DEAD events at once and other DEAD events after 30 days', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2030-07-14T00:00:00Z'));
-
-    const result = await runRetention();
-
     expect(prismaMock.outboxEvent.deleteMany).toHaveBeenCalledWith({
       where: {
         OR: [
@@ -62,27 +54,11 @@ describe('operational retention', () => {
       },
     });
     expect(result.deadOutbox).toBe(7);
-  });
-
-  it('removes every claim grant 30 days after expiry, including never-used ones', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2030-07-14T00:00:00Z'));
-
-    const result = await runRetention();
-
     expect(prismaMock.bookingClaimGrant.deleteMany).toHaveBeenCalledTimes(1);
     expect(prismaMock.bookingClaimGrant.deleteMany).toHaveBeenCalledWith({
       where: { expiresAt: { lt: new Date('2030-06-14T00:00:00Z') } },
     });
     expect(result.grants).toBe(4);
-  });
-
-  it('removes expired limiter counters, sessions, refresh tokens, refresh families and security events after the published periods', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2030-07-14T00:00:00Z'));
-
-    await runRetention();
-
     expect(prismaMock.rateLimit.deleteMany).toHaveBeenCalledWith({ where: { resetTime: { lt: new Date('2030-07-14T00:00:00Z') } } });
     expect(prismaMock.session.deleteMany).toHaveBeenCalledWith({ where: { expiresAt: { lt: new Date('2030-07-07T00:00:00Z') } } });
     expect(prismaMock.refreshToken.deleteMany).toHaveBeenCalledWith({ where: { expiresAt: { lt: new Date('2030-06-14T00:00:00Z') } } });

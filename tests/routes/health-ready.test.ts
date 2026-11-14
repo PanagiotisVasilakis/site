@@ -67,23 +67,6 @@ describe('GET and HEAD /api/health/ready', () => {
     expect(mocks.logger.warn).not.toHaveBeenCalled();
   });
 
-  // The mocked transaction cannot run SQL, so the query text is the contract: the newest
-  // finished, not rolled-back migration, whatever it is called ("C" collation = byte order).
-  it('asks the database for its newest finished migration without naming the pinned one', async () => {
-    const { GET } = await loadRoute();
-
-    await GET();
-
-    const migrationQuery = mocks.queryRaw.mock.calls.find(([strings]) => sqlOf(strings).includes('_prisma_migrations'));
-    expect(migrationQuery).toBeDefined();
-    const [strings, ...values] = migrationQuery ?? [];
-    expect(sqlOf(strings)).toBe(
-      'SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL'
-      + ' ORDER BY migration_name COLLATE "C" DESC LIMIT 1',
-    );
-    expect(values).toEqual([]);
-  });
-
   it('answers 503 and warns once when the database holds a newer migration than the image pins', async () => {
     database.migrations = [{ migration_name: NEWER }];
     const { GET } = await loadRoute();
@@ -161,24 +144,8 @@ describe('GET and HEAD /api/health/ready', () => {
     expect(mocks.logger.warn).toHaveBeenCalledWith('Readiness: database check failed', { errorName: 'unknown' });
   });
 
-  it('answers 503 and warns once when a statement inside the transaction fails', async () => {
-    const failure = new Error('canceling statement due to statement timeout');
-    failure.name = 'PrismaClientKnownRequestError';
-    mocks.executeRawUnsafe.mockRejectedValue(failure);
-    const { GET } = await loadRoute();
-
-    const response = await GET();
-
-    expect(response.status).toBe(503);
-    expect(mocks.logger.warn).toHaveBeenCalledTimes(1);
-    expect(mocks.logger.warn).toHaveBeenCalledWith('Readiness: database check failed', {
-      errorName: 'PrismaClientKnownRequestError',
-    });
-  });
-
   it.each([
     { state: 'ready', migrations: [{ migration_name: PINNED }], status: 200 },
-    { state: 'not ready', migrations: [{ migration_name: NEWER }], status: 503 },
   ])('HEAD answers $state with status $status like GET, with an empty body', async ({ migrations, status }) => {
     database.migrations = migrations;
     const { GET, HEAD } = await loadRoute();

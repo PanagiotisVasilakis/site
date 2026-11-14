@@ -53,12 +53,11 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     checkInRequestRepository.getStatusCounts(),
   ]);
 
-  const correlationId = request.headers.get('x-correlation-id') ?? undefined;
   return createSuccessResponse({
     requests: requests.map(serializeRequest),
     summary,
     // Rows matching the filter, not only this page.
     total: filter === 'all' ? summary.total : summary[filter],
     nextCursor,
-  }, undefined, correlationId);
+  });
 });

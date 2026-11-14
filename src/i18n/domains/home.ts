@@ -6,7 +6,7 @@
  */
 
 import type { Locale } from '../config';
-import type { IconName } from '@/components/icons/iconNames';
+import type { IconName } from '@/components/icons/Icon';
 
 export type HomeRoomKey = 'living' | 'kitchen' | 'bedroom1' | 'bedroom2' | 'bathroom' | 'balcony';
 

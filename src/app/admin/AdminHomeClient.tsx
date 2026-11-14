@@ -1,60 +1,48 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
-import internalFetch from '@/lib/internalFetchClient';
-import { Badge, Button, MetricCard, Surface } from '@/components/ui';
-
-type Summary = {
-  pending: number;
-  approved: number;
-  rejected: number;
-  total: number;
-};
-
-type LoadState = 'idle' | 'loading' | 'ready' | 'error';
-
-const emptySummary: Summary = {
-  pending: 0,
-  approved: 0,
-  rejected: 0,
-  total: 0,
-};
+import { useEffect, useState } from 'react';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { MetricCard } from '@/components/ui/MetricCard';
+import { Surface } from '@/components/ui/Surface';
+import { adminRequest, emptySummary, type Summary } from '@/app/admin/adminApi';
 
 export default function AdminHomeClient() {
   const [summary, setSummary] = useState<Summary>(emptySummary);
-  const [state, setState] = useState<LoadState>('idle');
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     const loadSummary = async () => {
-      setState('loading');
+      setLoading(true);
       setError('');
       try {
-        const response = await internalFetch('/api/admin/check-in-requests?status=all&limit=1');
-        const data = await response.json().catch(() => null);
-        if (!response.ok || !data?.success) {
-          setError(data?.error?.message || 'Unable to load admin dashboard data');
-          setState('error');
+        const result = await adminRequest<{ summary?: Summary } | undefined>(
+          'Unable to load admin dashboard data',
+          '/api/admin/check-in-requests?status=all&limit=1',
+        );
+        if (!result.ok) {
+          setError(result.message);
           return;
         }
 
-        setSummary(data.data?.summary ?? emptySummary);
-        setState('ready');
+        setSummary(result.data?.summary ?? emptySummary);
       } catch (err) {
         console.error('Failed to load admin dashboard data', err);
         setError('Unable to load admin dashboard data');
-        setState('error');
+      } finally {
+        setLoading(false);
       }
     };
 
     loadSummary();
   }, []);
 
-  const cards = useMemo(() => ([
+  const cards = [
     {
       title: 'Pending arrival requests',
-      value: state === 'loading' ? '...' : String(summary.pending),
+      value: loading ? '...' : String(summary.pending),
       body: 'Review guest arrival-time requests and confirm availability.',
       href: '/admin/requests',
       action: 'Open requests',
@@ -80,7 +68,7 @@ export default function AdminHomeClient() {
       href: '/admin/settings',
       action: 'Open settings',
     },
-  ]), [state, summary.pending]);
+  ];
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -116,7 +104,7 @@ export default function AdminHomeClient() {
           ['Rejected', summary.rejected],
           ['Total', summary.total],
         ].map(([label, value]) => (
-          <MetricCard key={label} label={label} value={state === 'loading' ? '...' : value} />
+          <MetricCard key={label} label={label} value={loading ? '...' : value} />
         ))}
       </section>
 

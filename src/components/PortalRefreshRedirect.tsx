@@ -3,13 +3,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/icons/Icon';
 import { StatusPage } from '@/components/stay/StatusPage';
-import { normalizeLocale } from '@/i18n/config';
+import type { Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 import { refreshPortalSession } from '@/lib/portalRefreshClient';
 import { toSafeLocalPath } from '@/lib/safeLocalPath';
 
 type PortalRefreshRedirectProps = {
-  locale: string;
+  locale: Locale;
   refreshHref: string;
   failureHref: string;
 };
@@ -22,7 +22,7 @@ export default function PortalRefreshRedirect({
   refreshHref,
   failureHref,
 }: PortalRefreshRedirectProps) {
-  const t = getDictionary(normalizeLocale(locale)).stay.refresh;
+  const t = getDictionary(locale).stay.refresh;
   const navigationStarted = useRef(false);
   const [stillWorking, setStillWorking] = useState(false);
   const safeFailureLink = toSafeLocalPath(failureHref) ?? '/';
@@ -56,21 +56,18 @@ export default function PortalRefreshRedirect({
     };
   }, [failureHref, refreshHref]);
 
+  const manualLink = (
+    <a className="ui-btn ui-btn--link-arrow status-page__link" href={safeFailureLink}>
+      {t.signIn}
+      <Icon name="arrow-right" size={18} className="ui-btn__arrow" />
+    </a>
+  );
+
   return (
     <StatusPage title={t.title} lead={stillWorking ? t.stillWorking : t.lead} role="status">
-      {stillWorking ? (
-        <a className="ui-btn ui-btn--link-arrow status-page__link" href={safeFailureLink}>
-          {t.signIn}
-          <Icon name="arrow-right" size={18} className="ui-btn__arrow" />
-        </a>
-      ) : (
+      {stillWorking ? manualLink : (
         // Without client code neither the refresh nor the timer runs, so the manual link is there from the start.
-        <noscript>
-          <a className="ui-btn ui-btn--link-arrow status-page__link" href={safeFailureLink}>
-            {t.signIn}
-            <Icon name="arrow-right" size={18} className="ui-btn__arrow" />
-          </a>
-        </noscript>
+        <noscript>{manualLink}</noscript>
       )}
     </StatusPage>
   );

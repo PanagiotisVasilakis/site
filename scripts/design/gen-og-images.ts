@@ -20,10 +20,10 @@ import { mkdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import puppeteer from 'puppeteer';
 import sharp from 'sharp';
+import { BAND_ACCENT, BAND_FG, MARK, recolourMark } from './mark';
 
 const ROOT = process.cwd();
 const SOURCE = path.join(ROOT, 'public/house/balcony/balcony_1.jpeg');
-const MARK = path.join(ROOT, 'public/brand/mark.svg');
 const FONTS = path.join(ROOT, 'src/app/fonts');
 const OUT_DIR = path.join(ROOT, 'public/og');
 
@@ -32,9 +32,7 @@ const HEIGHT = 630;
 const MAX_BYTES = 300 * 1024;
 const MIN_TEXT_CONTRAST = 4.5;
 
-// identity §3.2 band tokens (light): text band-fg, label band-accent; the scrim colour of §7.1.
-const BAND_FG = '#F6EFE4';
-const BAND_ACCENT = '#F2B27A';
+// The scrim colour of identity §7.1.
 const SCRIM = '8 22 28';
 
 type Locale = 'en' | 'el';
@@ -76,13 +74,8 @@ function scrimSvg(): Buffer {
 
 /** mark.svg with the band colours of the app icons (sun band-accent, waves band-fg). */
 async function markSvg(): Promise<Buffer> {
-  const svg = await readFile(MARK, 'utf8');
-  for (const colour of ['#F0A95B', '#0D5568']) {
-    if (!svg.includes(colour)) throw new Error(`mark.svg no longer uses ${colour}`);
-  }
-  const recoloured = svg.split('#F0A95B').join(BAND_ACCENT).split('#0D5568').join(BAND_FG)
-    .replace('<svg ', `<svg width="${MARK_BOX.width}" height="${MARK_BOX.height}" `);
-  return Buffer.from(recoloured);
+  const svg = recolourMark(await readFile(MARK, 'utf8'));
+  return Buffer.from(svg.replace('<svg ', `<svg width="${MARK_BOX.width}" height="${MARK_BOX.height}" `));
 }
 
 async function fontFace(family: string, file: string, style: 'normal' | 'italic'): Promise<string> {

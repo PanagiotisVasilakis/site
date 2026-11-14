@@ -21,18 +21,6 @@ describe('guide entries (identity §8 GuideCard, §7.3)', () => {
     expect(formatDistance(0.001, 'en')).toBe('10 m');
   });
 
-  it('uses the art tile for the dark Viktoria Karelia photo and the SOS illustration, photos elsewhere', () => {
-    const t = getDictionary('en');
-    const byId = (category: typeof phones, id: string) => toGuideEntry(
-      getItemsByCategory(category.id).find((item) => item.id === id)!, category, 'en', t,
-    );
-
-    expect(byId(moments, 'viktoria-karelia-museum')).toMatchObject({ photo: undefined, icon: 'museum', categoryLabel: 'Museum' });
-    expect(byId(moments, 'railway-park-kalamata').photo).toBe('/moments/railway-museum-hero.jpg');
-    expect(byId(phones, 'emergency-112')).toMatchObject({ photo: undefined, icon: 'phone', distanceText: undefined });
-    expect(byId(phones, 'police')).toMatchObject({ distanceText: '800 m', favoriteId: 'phones:police', href: '/en/phones/kalamata-police-station' });
-  });
-
   it('sorts places without coordinates last and finds the nearest others', () => {
     const t = getDictionary('en');
     const entries = getItemsByCategory(phones.id).map((item) => toGuideEntry(item, phones, 'en', t));

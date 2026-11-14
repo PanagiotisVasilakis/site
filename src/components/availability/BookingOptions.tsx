@@ -1,5 +1,5 @@
 import { Icon } from '@/components/icons/Icon';
-import { Button } from '@/components/ui';
+import { Button } from '@/components/ui/Button';
 import { HOST_CONTACT } from '@/data/contact';
 import type { Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';

@@ -18,7 +18,7 @@ describe('check-in location highlights', () => {
   beforeEach(() => {
     fetchMock.mockImplementation(async (url: string) => {
       const body = url === '/api/check-in/preferences'
-        ? { checkInTime: '15:00', checkOutTime: '11:00', canEdit: false, wifi: null, wifiAvailableAt: null }
+        ? { checkInTime: '15:00', checkOutTime: '11:00', wifi: null, wifiAvailableAt: null }
         : { request: null };
       return new Response(JSON.stringify({ success: true, data: body }), { status: 200 });
     });

@@ -2,33 +2,26 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import internalFetch from '@/lib/internalFetchClient';
-import { Badge, EmptyPanel, MetricCard, Surface } from '@/components/ui';
+import { Badge } from '@/components/ui/Badge';
+import { EmptyPanel } from '@/components/ui/EmptyPanel';
+import { MetricCard } from '@/components/ui/MetricCard';
+import { Surface } from '@/components/ui/Surface';
+import {
+  adminRequest,
+  emptySummary,
+  type CheckInRequest,
+  type RequestStatus,
+  type Summary,
+} from '@/app/admin/adminApi';
 
-type RequestStatus = 'pending' | 'approved' | 'rejected';
 type RequestFilter = RequestStatus | 'all';
 type Feedback = { type: 'success' | 'error'; message: string } | null;
 
-type CheckInRequest = {
-  id: string;
-  bookingId?: string;
-  userId?: string;
-  guestName?: string;
-  guestEmail?: string;
-  guestPhone?: string;
-  requestedTime: string;
-  message?: string;
-  status: RequestStatus;
-  notificationStatus?: 'pending' | 'leased' | 'delivered' | 'dead' | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type Summary = {
-  pending: number;
-  approved: number;
-  rejected: number;
-  total: number;
+type RequestsPage = {
+  requests?: CheckInRequest[];
+  summary?: Summary;
+  total?: number;
+  nextCursor?: string | null;
 };
 
 const filters: Array<{ value: RequestFilter; label: string }> = [
@@ -37,13 +30,6 @@ const filters: Array<{ value: RequestFilter; label: string }> = [
   { value: 'rejected', label: 'Rejected' },
   { value: 'all', label: 'All' },
 ];
-
-const emptySummary: Summary = {
-  pending: 0,
-  approved: 0,
-  rejected: 0,
-  total: 0,
-};
 
 function formatDateTime(value: string): string {
   try {
@@ -93,27 +79,25 @@ export default function AdminRequestsClient() {
     setLoading(true);
     if (clearFeedback) setFeedback(null);
     try {
-      const response = await internalFetch(`/api/admin/check-in-requests?status=${nextFilter}`, {
-        signal: controller.signal,
-      });
-      const data = await response.json().catch(() => null);
+      const result = await adminRequest<RequestsPage | undefined>(
+        'Unable to load arrival requests',
+        `/api/admin/check-in-requests?status=${nextFilter}`,
+        { signal: controller.signal },
+      );
       if (version !== loadVersionRef.current) return;
-      if (!response.ok || !data?.success) {
+      if (!result.ok) {
         setRequests([]);
         setSummary(emptySummary);
         setNextCursor(null);
-        setFeedback({
-          type: 'error',
-          message: data?.error?.message || 'Unable to load arrival requests',
-        });
+        setFeedback({ type: 'error', message: result.message });
         return;
       }
 
-      const loaded: CheckInRequest[] = data.data?.requests ?? [];
+      const loaded: CheckInRequest[] = result.data?.requests ?? [];
       setRequests(loaded);
-      setSummary(data.data?.summary ?? emptySummary);
-      setTotal(data.data?.total ?? loaded.length);
-      setNextCursor(data.data?.nextCursor ?? null);
+      setSummary(result.data?.summary ?? emptySummary);
+      setTotal(result.data?.total ?? loaded.length);
+      setNextCursor(result.data?.nextCursor ?? null);
     } catch (error) {
       if (controller.signal.aborted || version !== loadVersionRef.current) return;
       console.error('Failed to load arrival requests', error);
@@ -149,23 +133,23 @@ export default function AdminRequestsClient() {
     const version = loadVersionRef.current;
     setLoadingMore(true);
     try {
-      const response = await internalFetch(
+      const result = await adminRequest<RequestsPage | undefined>(
+        'Unable to load more requests',
         `/api/admin/check-in-requests?status=${filterRef.current}&cursor=${encodeURIComponent(nextCursor)}`,
       );
-      const data = await response.json().catch(() => null);
       if (version !== loadVersionRef.current) return;
-      if (!response.ok || !data?.success) {
-        setFeedback({ type: 'error', message: data?.error?.message || 'Unable to load more requests' });
+      if (!result.ok) {
+        setFeedback({ type: 'error', message: result.message });
         return;
       }
-      const more: CheckInRequest[] = data.data?.requests ?? [];
+      const more: CheckInRequest[] = result.data?.requests ?? [];
       setRequests((current) => {
         const known = new Set(current.map((request) => request.id));
         return [...current, ...more.filter((request) => !known.has(request.id))];
       });
-      setSummary(data.data?.summary ?? emptySummary);
-      setTotal(data.data?.total ?? 0);
-      setNextCursor(data.data?.nextCursor ?? null);
+      setSummary(result.data?.summary ?? emptySummary);
+      setTotal(result.data?.total ?? 0);
+      setNextCursor(result.data?.nextCursor ?? null);
     } catch (error) {
       if (version !== loadVersionRef.current) return;
       console.error('Failed to load more arrival requests', error);
@@ -185,14 +169,13 @@ export default function AdminRequestsClient() {
     setActionId(requestId);
     setFeedback(null);
     try {
-      const response = await internalFetch(`/api/admin/check-in-requests/${requestId}`, {
+      const result = await adminRequest('Unable to retry the notification', `/api/admin/check-in-requests/${requestId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'retry_delivery' }),
       });
-      const data = await response.json().catch(() => null);
-      if (!response.ok || !data?.success) {
-        setFeedback({ type: 'error', message: data?.error?.message || 'Unable to retry the notification' });
+      if (!result.ok) {
+        setFeedback({ type: 'error', message: result.message });
         return;
       }
       await loadRequests(filterRef.current, false);
@@ -209,25 +192,25 @@ export default function AdminRequestsClient() {
     setActionId(requestId);
     setFeedback(null);
     try {
-      const response = await internalFetch(`/api/admin/check-in-requests/${requestId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-      const data = await response.json().catch(() => null);
+      const result = await adminRequest<{ notification?: { status?: string } } | undefined>(
+        `Unable to ${status} request`,
+        `/api/admin/check-in-requests/${requestId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status }),
+        },
+      );
 
-      if (!response.ok || !data?.success) {
-        setFeedback({
-          type: 'error',
-          message: data?.error?.message || `Unable to ${status} request`,
-        });
+      if (!result.ok) {
+        setFeedback({ type: 'error', message: result.message });
         return;
       }
 
       await loadRequests(filterRef.current, false);
       setFeedback({
         type: 'success',
-        message: `Request ${status}. Notification ${data.data?.notification?.status ?? 'skipped'}.`,
+        message: `Request ${status}. Notification ${result.data?.notification?.status ?? 'skipped'}.`,
       });
     } catch (error) {
       console.error('Failed to update request status', error);

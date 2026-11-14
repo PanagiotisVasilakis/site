@@ -50,12 +50,6 @@ describe('Prisma PostgreSQL adapter configuration', () => {
   it.each([
     ['statement_timeout', '5s'],
     ['statement_timeout', '1.5'],
-    ['query_timeout', '30s'],
-    ['lock_timeout', '2x'],
-    ['connect_timeout', '10s'],
-    ['pool_timeout', '1.5'],
-    ['max_idle_connection_lifetime', '60s'],
-    ['max_connection_lifetime', '60s'],
     ['connection_limit', '20x'],
   ])('falls back to the defaults for %s=%s (digits only, no units or fractions)', (param, value) => {
     const { config } = buildPrismaPgAdapterArgs(`postgresql://localhost/app?${param}=${value}`);

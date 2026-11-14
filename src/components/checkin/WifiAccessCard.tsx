@@ -1,8 +1,6 @@
 type WifiCopyTarget = 'network' | 'password';
 
 interface WifiAccessCardProps {
-  /** Omitted when the card sits under its own section heading (check-in page, identity §9.8). */
-  title?: string;
   networkLabel: string;
   passwordLabel: string;
   network: string;
@@ -31,7 +29,6 @@ function CopyIcon({ copied }: { copied: boolean }) {
 }
 
 export default function WifiAccessCard({
-  title,
   networkLabel,
   passwordLabel,
   network,
@@ -64,7 +61,6 @@ export default function WifiAccessCard({
 
   return (
     <div className="wifi-card">
-      {title ? <h3 className="checkin-title">{title}</h3> : null}
       <dl className="checkin-card checkin-divided wifi-card__list">
         {items.map((item) => (
           <div key={item.target} className="wifi-card__row">

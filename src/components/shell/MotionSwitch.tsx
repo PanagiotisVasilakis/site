@@ -1,7 +1,6 @@
 "use client";
 
 import { useId, useSyncExternalStore } from 'react';
-import clsx from 'clsx';
 import { Icon } from '@/components/icons/Icon';
 import type { ShellDictionary } from '@/i18n/domains/shell';
 import { MOTION_KEY, applyMotionPreference } from '@/lib/motion/motionPreference';
@@ -58,13 +57,13 @@ function setStoredReduce(reduce: boolean) {
 
 type MotionLabels = Pick<ShellDictionary, 'reduceMotion' | 'allowMotion' | 'motionReducedByDevice'>;
 
-export function MotionSwitch({ t, className }: { t: MotionLabels; className?: string }) {
+export function MotionSwitch({ t }: { t: MotionLabels }) {
   const noteId = useId();
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const reduced = snapshot[0] === '1';
   const osReduces = snapshot[1] === '1';
   return (
-    <div className={clsx('motion-switch', className)}>
+    <div className="motion-switch">
       <button
         type="button"
         className="motion-switch__button"

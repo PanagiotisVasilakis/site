@@ -1,11 +1,4 @@
 // The apartment page photo set (identity §7.3): 42 marketing photos per section (six rooms, the parking, then the details), in order, with the crops.
-// Retired from public/ on 2026-10-11 (the owner keeps the files): living_1 (old entrance decor, now living_10),
-// living_2 (branded packaging), bathroom_2 (toilet signs) and bathroom_8 (medicines). Removed earlier: living_3
-// (branded packaging), living_1_booking, bedroom_4, bedroom_2_2, bedroom_2_4 and bathroom_5 (duplicates), bathroom_1
-// (soft). living_9, living_10, living_11, bedroom_5, balcony_2, balcony_3, balcony_4, balcony_5 and details_1 to details_10
-// are the owner's photos of 2026-08-01, cut to 2:3. balcony_4 and balcony_5 (IMG_6251, IMG_6256) were added on 2026-10-12 at the
-// owner request; balcony_4 is cut to 3:2. parking_1 (IMG_6211, taken on 2026-08-01) was added on 2026-10-12 at the owner request,
-// cut to 3:2 to the left of the entrance: no door, house plate or sticker is in the frame.
 
 /**
  * Section keys: the six rooms (linked from the home room cards), then the parking and details sections ('Parking' and 'Up close', no home cards).

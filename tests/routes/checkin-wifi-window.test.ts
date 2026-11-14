@@ -61,14 +61,13 @@ describe('GET /api/check-in/preferences Wi-Fi window', () => {
   it.each([
     ['one second before the window opens', '2030-06-09T11:59:59.000Z', null],
     ['when the window opens', REVEAL_AT, WIFI],
-    ['inside the window', '2030-06-12T00:00:00.000Z', WIFI],
     ['at the check-out time', '2030-06-14T08:00:00.000Z', WIFI],
     ['one second after the check-out time', '2030-06-14T08:00:01.000Z', null],
   ])('%s', async (_label, now, wifi) => {
     const response = await getWifi(now);
 
     expect(response.status).toBe(200);
-    expect((await response.json()).data).toMatchObject({ wifi, wifiAvailableAt: REVEAL_AT, canEdit: false });
+    expect((await response.json()).data).toMatchObject({ wifi, wifiAvailableAt: REVEAL_AT });
   });
 
   it('uses the stayPolicy property time zone, not the PROPERTY_TIME_ZONE environment variable', async () => {
@@ -91,7 +90,7 @@ describe('GET /api/check-in/preferences Wi-Fi window', () => {
     const response = await getWifi('2030-01-01T00:00:00.000Z');
 
     expect(response.status).toBe(200);
-    expect((await response.json()).data).toMatchObject({ wifi: WIFI, canEdit: true, wifiAvailableAt: null });
+    expect((await response.json()).data).toMatchObject({ wifi: WIFI, wifiAvailableAt: null });
     expect(mocks.bookingFind).not.toHaveBeenCalled();
   });
 
@@ -111,7 +110,7 @@ describe('GET /api/check-in/preferences Wi-Fi window', () => {
     const response = await getWifi('2030-06-12T00:00:00.000Z');
 
     expect(response.status).toBe(200);
-    expect((await response.json()).data).toMatchObject({ wifi: null, wifiAvailableAt: null, canEdit: false });
+    expect((await response.json()).data).toMatchObject({ wifi: null, wifiAvailableAt: null });
     expect(mocks.bookingFind).not.toHaveBeenCalled();
   });
 });

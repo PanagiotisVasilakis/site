@@ -1,11 +1,11 @@
 "use client";
-import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
 import { Icon } from '@/components/icons/Icon';
 
-type Toast = { id: number; message: string; expires: number };
+type Toast = { id: number; message: string };
 
 interface ToastContextValue {
   push: (message: string) => void;
@@ -22,18 +22,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const locale: Locale = pathname?.startsWith('/el') ? 'el' : 'en';
   const dismissLabel = getDictionary(locale).updates.dismiss;
   const push = useCallback((message: string) => {
-    setToasts(ts => [...ts, { id: Date.now() + Math.random(), message, expires: Date.now() + TOAST_MS }]);
-  }, []);
-  // GC
-  useEffect(() => {
-    const t = setInterval(() => {
-      const now = Date.now();
-      setToasts(ts => {
-        const next = ts.filter(t => t.expires > now);
-        return next.length === ts.length ? ts : next;
-      });
-    }, 400);
-    return () => clearInterval(t);
+    const id = Date.now() + Math.random();
+    setToasts(ts => [...ts, { id, message }]);
+    setTimeout(() => setToasts(ts => ts.filter(x => x.id !== id)), TOAST_MS);
   }, []);
   const value = useMemo(() => ({ push }), [push]);
   return (

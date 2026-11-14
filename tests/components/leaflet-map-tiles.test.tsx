@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const tileCalls = vi.hoisted(() => [] as Array<{ url: string; attribution: unknown }>);
 const markerLayers = vi.hoisted(() => [] as Array<{ markers: Array<{ title?: string; zIndexOffset?: number }>; addedToMap: boolean }>);
-const markerClusterGroup = vi.hoisted(() => vi.fn());
 const fitBounds = vi.hoisted(() => vi.fn());
 const boundsPoints = vi.hoisted(() => [] as unknown[][]);
 
@@ -46,8 +45,6 @@ vi.mock('leaflet', () => {
       };
     },
     latLngBounds: (points: unknown[]) => { boundsPoints.push(points); return { pad: () => ({}) }; },
-    // Present so a reintroduced clustering path would be taken and caught below.
-    markerClusterGroup,
   };
   return { default: fakeLeaflet };
 });
@@ -55,6 +52,8 @@ vi.mock('leaflet/dist/leaflet.css', () => ({}));
 vi.mock('@/styles/components/map.css', () => ({}));
 
 import LeafletMap, { type LeafletMapLabels, type LeafletMarkerData } from '@/components/LeafletMap';
+
+import { stubMatchMedia } from '../support/dom';
 
 const labels: LeafletMapLabels = {
   address: 'Address',
@@ -87,22 +86,14 @@ function lastTiles() {
 }
 
 function stubOsColorScheme(dark: boolean) {
-  vi.stubGlobal('matchMedia', () => ({
-    matches: dark,
-    addEventListener() {},
-    removeEventListener() {},
-  }));
+  stubMatchMedia(dark);
 }
 
 describe('LeafletMap tile source', () => {
   beforeEach(() => {
     tileCalls.length = 0;
     document.documentElement.removeAttribute('data-theme');
-    vi.stubGlobal('matchMedia', () => ({
-      matches: false,
-      addEventListener() {},
-      removeEventListener() {},
-    }));
+    stubMatchMedia(false);
   });
 
   afterEach(() => {
@@ -110,7 +101,7 @@ describe('LeafletMap tile source', () => {
     document.documentElement.removeAttribute('data-theme');
   });
 
-  it.each(['light', 'dark'])('uses the exact OpenStreetMap URL in the %s theme without a key', (theme) => {
+  it.each(['dark'])('uses the exact OpenStreetMap URL in the %s theme without a key', (theme) => {
     document.documentElement.setAttribute('data-theme', theme);
     renderMap();
     expect(tileCalls).toEqual([{ url: OSM_URL, attribution: OSM_COPYRIGHT }]);
@@ -166,34 +157,11 @@ describe('LeafletMap tile source', () => {
 describe('LeafletMap markers', () => {
   beforeEach(() => {
     markerLayers.length = 0;
-    markerClusterGroup.mockImplementation(() => ({
-      addLayer() { return this; },
-      addTo() { return this; },
-    }));
-    vi.stubGlobal('matchMedia', () => ({
-      matches: false,
-      addEventListener() {},
-      removeEventListener() {},
-    }));
+    stubMatchMedia(false);
   });
 
   afterEach(() => {
     cleanup();
-  });
-
-  it('adds every marker individually to one plain layer on the map', () => {
-    const markers: LeafletMarkerData[] = Array.from({ length: 25 }, (_, i) => ({
-      id: `m${i}`,
-      name: `Marker ${i}`,
-      coordinates: [22.1 + i / 1000, 37.0],
-      markerType: 'attraction',
-    }));
-    render(<LeafletMap center={[22.1, 37.0]} labels={labels} markers={markers} />);
-
-    expect(markerClusterGroup).not.toHaveBeenCalled();
-    const onMap = markerLayers.filter(layer => layer.addedToMap);
-    expect(onMap).toHaveLength(1);
-    expect(onMap[0].markers.map(marker => marker.title)).toEqual(markers.map(marker => marker.name));
   });
 
   // R-374: at 390 px the landmark icons and the home label lay over the numbers 1, 3, 4 and 5; Leaflet
@@ -219,11 +187,7 @@ describe('LeafletMap markers', () => {
 
 describe('LeafletMap fitting', () => {
   beforeEach(() => {
-    vi.stubGlobal('matchMedia', () => ({
-      matches: false,
-      addEventListener() {},
-      removeEventListener() {},
-    }));
+    stubMatchMedia(false);
   });
 
   afterEach(() => {

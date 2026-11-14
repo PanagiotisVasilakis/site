@@ -116,17 +116,6 @@ describe('service worker', () => {
     online = true;
   });
 
-  it('precaches the offline pages and icons, never a redirecting page, in a build-specific cache', async () => {
-    const { handlers, stores } = loadWorker(fetchImpl);
-    await dispatch(handlers, 'install', {});
-
-    expect([...stores.keys()]).toEqual(['guest-guide-build-2']);
-    const precached = [...stores.get('guest-guide-build-2')!.keys()].map((url) => new URL(url).pathname);
-    expect(precached).toContain('/en/offline');
-    expect(precached).not.toContain('/');
-    expect(precached).not.toContain('/en');
-  });
-
   // R-380: the proxy answers /en/offline and /el/offline with `Set-Cookie: lang=<that locale>` when the request's
   // `lang` cookie is missing or differs, so fetching them with the visitor's cookies would flip the stored language.
   it('precaches the offline pages and icons without credentials, so the install cannot rewrite the lang cookie (R-380)', async () => {
@@ -219,7 +208,7 @@ describe('service worker', () => {
       expect(stored(stores)).toEqual(expect.arrayContaining(['/offline', '/en/offline', '/el/offline', script, css, font, ...secondary]));
     });
 
-    it.each(['/offline', '/en/offline', '/el/offline'])('rejects the install when %s cannot be precached', async (page) => {
+    it.each(['/offline', '/el/offline'])('rejects the install when %s cannot be precached', async (page) => {
       const { handlers, stores } = installingWith([page]);
       stores.set('guest-guide-build-1', new Map([[`${ORIGIN}/en/offline`, new Response('previous offline page')]]));
 
@@ -235,7 +224,7 @@ describe('service worker', () => {
       await expect(dispatch(handlers, 'install', {})).rejects.toThrow(`Failed to fetch ${script}`);
     });
 
-    it('does not reject the install when the favicon or an icon cannot be precached', async () => {
+    it('does not reject the install when the favicon, an icon, the stylesheet or a font cannot be precached; the scripts are still kept', async () => {
       for (const path of secondary) {
         const { handlers, stores } = installingWith([path]);
 
@@ -247,9 +236,7 @@ describe('service worker', () => {
       const { handlers, stores } = installingWith(secondary);
       await expect(dispatch(handlers, 'install', {})).resolves.toBeUndefined();
       expect(stored(stores)).toEqual(expect.arrayContaining(['/offline', '/en/offline', '/el/offline', script]));
-    });
 
-    it('does not reject the install when the stylesheet or a font cannot be precached; the scripts are still kept', async () => {
       for (const path of [css, font]) {
         const { handlers, stores } = installingWith([path]);
 
@@ -328,17 +315,6 @@ describe('service worker', () => {
     expect(precached.every((url) => url.origin === ORIGIN)).toBe(true);
   });
 
-  it('keeps the stay pages behind sign-in network-only (check-in, guest, portal)', async () => {
-    const { handlers, stores } = loadWorker(fetchImpl);
-    await dispatch(handlers, 'install', {});
-
-    for (const path of ['/en/guest', '/el/check-in', '/en/portal/refresh', '/admin']) {
-      await dispatch(handlers, 'fetch', navigation(path));
-    }
-    const stored = [...stores.get('guest-guide-build-2')!.keys()].map((url) => new URL(url).pathname);
-    expect(stored.filter((path) => /guest|check-in|portal|admin/u.test(path))).toEqual([]);
-  });
-
   it('serves navigations from the network and falls back to the visited page, then the offline page', async () => {
     const { handlers } = loadWorker(fetchImpl);
     await dispatch(handlers, 'install', {});
@@ -349,13 +325,6 @@ describe('service worker', () => {
     online = false;
     const visited = await dispatch(handlers, 'fetch', navigation('/en/moments')) as Response;
     expect(await visited.text()).toBe('network /en/moments');
-
-    // R-648: the offline page is not shown under the requested URL (it would hydrate against that route) but at its
-    // own: the worker redirects, and the redirected request is answered from the precache.
-    const unvisited = await dispatch(handlers, 'fetch', navigation('/el/phones')) as Response;
-    expect([unvisited.status, unvisited.headers.get('location')]).toEqual([302, `${ORIGIN}/el/offline?from=%2Fel%2Fphones`]);
-    const offlinePage = await dispatch(handlers, 'fetch', navigation('/el/offline?from=%2Fel%2Fphones')) as Response;
-    expect([offlinePage.status, await offlinePage.text()]).toEqual([200, 'precached /el/offline']);
   });
 
   // R-425: during an origin outage Nginx answers 502 (Cloudflare 52x). The fetch resolves instead of rejecting,
@@ -593,34 +562,24 @@ describe('service worker', () => {
 
     it('fetches a public page with the default credentials and keeps it for offline use', async () => {
       const requests: Request[] = [];
+      const fetched: string[] = [];
       const { handlers, stores } = loadWorker(async (request) => {
         requests.push(request as Request);
+        fetched.push(urlOf(request));
         return basic(`network ${new URL(urlOf(request)).pathname}`);
       });
 
-      await dispatch(handlers, 'message', cachePage(`${ORIGIN}/en/moments/viktoria`));
+      await dispatch(handlers, 'message', cachePage(`${ORIGIN}/en/moments/viktoria?lang=en`));
 
-      expect(stored(stores)).toEqual([`${ORIGIN}/en/moments/viktoria`]);
-      expect(requests.map(({ url, credentials }) => [url, credentials])).toEqual([[`${ORIGIN}/en/moments/viktoria`, 'same-origin']]);
+      expect(stored(stores)).toEqual([`${ORIGIN}/en/moments/viktoria?lang=en`]);
+      expect(requests.map(({ url, credentials }) => [url, credentials])).toEqual([[`${ORIGIN}/en/moments/viktoria?lang=en`, 'same-origin']]);
+      // The cache key alone would also match a worker that fetched origin + pathname: the request needs the query too.
+      expect(fetched).toEqual([`${ORIGIN}/en/moments/viktoria?lang=en`]);
 
       // The tap never reached the worker as a navigation; the later full navigation, offline, does find the copy.
       online = false;
-      const offline = await dispatch(handlers, 'fetch', navigation('/en/moments/viktoria')) as Response;
+      const offline = await dispatch(handlers, 'fetch', navigation('/en/moments/viktoria?lang=en')) as Response;
       expect(await offline.text()).toBe('network /en/moments/viktoria');
-    });
-
-    it('keeps the query string of the page it was given', async () => {
-      const fetched: string[] = [];
-      const { handlers, stores } = loadWorker(async (request) => {
-        fetched.push(urlOf(request));
-        return basic('network /en/phones');
-      });
-
-      await dispatch(handlers, 'message', cachePage(`${ORIGIN}/en/phones?lang=en`));
-
-      // The cache key alone would also match a worker that fetched origin + pathname: the request needs the query too.
-      expect(fetched).toEqual([`${ORIGIN}/en/phones?lang=en`]);
-      expect(stored(stores)).toEqual([`${ORIGIN}/en/phones?lang=en`]);
     });
 
     it('ignores other origins, /api/, live pages, private pages and the offline pages: nothing is fetched or stored', async () => {

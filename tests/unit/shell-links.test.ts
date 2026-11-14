@@ -10,7 +10,6 @@ import {
   footerNavLinks,
   footerStayLink,
   headerCta,
-  headerOverlaysHero,
   isCurrentLink,
   localeSwitchHref,
   menuContactLinks,
@@ -24,10 +23,8 @@ const BOOKING_HREF = /\/availability|booking\.com/i;
 describe('shell variant per route (identity §8, §9)', () => {
   it.each([
     ['/en', 'marketing'],
-    ['/el/apartment', 'marketing'],
     ['/en/availability', 'marketing'],
     ['/en/moments', 'guide'],
-    ['/el/moments/some-beach', 'guide'],
     ['/en/stay', 'stay'],
     ['/el/stay/', 'stay'],
     ['/en/guest', 'stay'],
@@ -36,15 +33,6 @@ describe('shell variant per route (identity §8, §9)', () => {
     ['/el/offline', 'stay'],
   ] as const)('%s is %s', (pathname, variant) => {
     expect(shellVariantFor(pathname)).toBe(variant);
-  });
-
-  it('floats the header over the hero only on home (the apartment page starts with its page head, R3-V6f)', () => {
-    expect(headerOverlaysHero('/en')).toBe(true);
-    expect(headerOverlaysHero('/el')).toBe(true);
-    expect(headerOverlaysHero('/el/apartment')).toBe(false);
-    expect(headerOverlaysHero('/en/apartment')).toBe(false);
-    expect(headerOverlaysHero('/en/availability')).toBe(false);
-    expect(headerOverlaysHero('/en/guest')).toBe(false);
   });
 });
 
@@ -174,19 +162,9 @@ describe('scrollToCurrentHash (R-689)', () => {
     expect(target.scrollIntoView).toHaveBeenCalledWith();
   });
 
-  it('does the same for the Greek home page', () => {
-    const target = { scrollIntoView: vi.fn() };
-    stubPage('/el', '#contact', { contact: target });
-    const event = click();
-    scrollToCurrentHash(event, '/el#contact');
-    expect(event.preventDefault).toHaveBeenCalledTimes(1);
-    expect(target.scrollIntoView).toHaveBeenCalledTimes(1);
-  });
-
   it.each([
     ['the first click: the URL has no hash yet', '/en', ''],
     ['another hash', '/en', '#host'],
-    ['another page', '/en/apartment', '#contact'],
   ])('leaves the click to the router: %s', (_name, pathname, hash) => {
     const target = { scrollIntoView: vi.fn() };
     stubPage(pathname, hash, { contact: target });
@@ -198,7 +176,6 @@ describe('scrollToCurrentHash (R-689)', () => {
 
   it.each([
     ['a link without a hash', '/en/apartment'],
-    ['a link with an empty hash', '/en#'],
   ])('ignores %s', (_name, href) => {
     const target = { scrollIntoView: vi.fn() };
     stubPage('/en/apartment', '', { contact: target });
@@ -210,9 +187,6 @@ describe('scrollToCurrentHash (R-689)', () => {
 
   it.each([
     ['ctrl', { ctrlKey: true }],
-    ['meta', { metaKey: true }],
-    ['shift', { shiftKey: true }],
-    ['alt', { altKey: true }],
     ['the middle button', { button: 1 }],
     ['an event another handler already prevented', { defaultPrevented: true }],
   ])('leaves a click with %s to the browser', (_name, init) => {

@@ -1,5 +1,5 @@
 // Lightweight cross-tab/session-change signaling for guest sessions
-// Use both BroadcastChannel (modern) and localStorage fallback (storage event)
+// BroadcastChannel (modern) carries the signal; the storage event (localStorage) is the fallback for browsers without BroadcastChannel
 
 const CHANNEL_NAME = 'guest-session';
 const STORAGE_KEY = 'guest_session_changed';
@@ -44,9 +44,15 @@ export function onGuestSessionChange(cb: (info: SessionChange) => void): () => v
       };
     }
   } catch {}
-  try { window.addEventListener('storage', storageHandler); } catch {}
+  // Only without a channel: a live channel already delivers each change, and the storage event would repeat it.
+  const useStorage = bc === null;
+  if (useStorage) {
+    try { window.addEventListener('storage', storageHandler); } catch {}
+  }
   return () => {
     try { if (bc) { bc.onmessage = null; bc.close(); } } catch {}
-    try { window.removeEventListener('storage', storageHandler); } catch {}
+    if (useStorage) {
+      try { window.removeEventListener('storage', storageHandler); } catch {}
+    }
   };
 }

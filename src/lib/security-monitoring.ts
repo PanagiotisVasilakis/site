@@ -11,13 +11,9 @@ import type { SecurityEvent } from '@/lib/security-config';
 import { isSensitiveFieldName, redactSensitiveText } from '@/lib/redaction';
 import { privacyHmac } from '@/lib/privacyHash';
 
-function redactText(value: string): string {
-  return redactSensitiveText(value, 500);
-}
-
 function sanitizeValue(value: unknown, depth = 0): unknown {
   if (depth > 2) return '[TRUNCATED]';
-  if (typeof value === 'string') return redactText(value);
+  if (typeof value === 'string') return redactSensitiveText(value);
   if (typeof value === 'number' || typeof value === 'boolean' || value === null) return value;
   if (Array.isArray(value)) return value.slice(0, 20).map((entry) => sanitizeValue(entry, depth + 1));
   if (typeof value === 'object' && value) {
@@ -110,7 +106,6 @@ export function logSecurityDiagnostic(event: SecurityEvent): void {
   });
 }
 
-// Convenience function for recording events
 async function recordSecurityEvent(event: SecurityEvent): Promise<void> {
   const sanitized = sanitizeEvent(event);
   logger.debug('Security event', {

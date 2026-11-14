@@ -179,7 +179,6 @@ async function main(): Promise<number> {
     `ORIGIN_PROXY_SHARED_SECRET=${secrets.originProxySharedSecret}`,
     'GUEST_WIFI_NETWORK=smoke-guest-network',
     `GUEST_WIFI_PASSWORD=${hex(12)}`,
-    'PROPERTY_TIME_ZONE=Europe/Athens',
     `NEXT_PUBLIC_SITE_URL=https://localhost:${WEB_PORT}`,
     `ALLOWED_ORIGINS=https://localhost:${WEB_PORT}`,
     'LOG_LEVEL=info',
@@ -405,7 +404,7 @@ async function main(): Promise<number> {
     }, { fatal: true });
     let claimToken = '';
     await check('admin issues a claim grant (201)', async () => {
-      const response = await call(admin, 'POST', `/api/admin/bookings/${bookingId}/claim-grants`, { channel: 'ONSITE', ttlMinutes: 30 });
+      const response = await call(admin, 'POST', `/api/admin/bookings/${bookingId}/claim-grants`, { channel: 'ONSITE' });
       assert(response.status === 201, `status ${response.status}`);
       claimToken = (await json<{ data: { claimToken: string } }>(response)).data.claimToken;
       assert(claimToken.length >= 32, 'no claim token');

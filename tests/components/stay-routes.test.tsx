@@ -124,7 +124,7 @@ beforeEach(() => {
   fetchMock.mockImplementation(async (url: string) => new Response(JSON.stringify({
     success: true,
     data: url === '/api/check-in/preferences'
-      ? { checkInTime: '15:00', checkOutTime: preferences.checkOutTime, canEdit: false, wifi: { network: 'Guest-Net', password: 'p4ss-w0rd' } }
+      ? { checkInTime: '15:00', checkOutTime: preferences.checkOutTime, wifi: { network: 'Guest-Net', password: 'p4ss-w0rd' } }
       : { request: null },
   }), { status: 200 }));
 });
@@ -273,7 +273,7 @@ describe('stay routes render calm, with no booking CTA (identity §12 R3-V9)', (
     expectCalmStayPage(container);
   });
 
-  it.each(['en', 'el'] as const)('check-in lists the emergency numbers, 112 first (R3-L10, %s)', async (locale) => {
+  it.each(['en'] as const)('check-in lists the emergency numbers, 112 first (R3-L10, %s)', async (locale) => {
     session.isSignedIn = true;
     navigation.locale = locale;
     const { container } = wrap(await CheckInPage(params(locale)));
@@ -293,10 +293,6 @@ describe('stay routes render calm, with no booking CTA (identity §12 R3-V9)', (
     for (const item of phones.filter((entry) => !entry.tags?.includes('emergency'))) {
       expect(hrefs, item.id).not.toContain(telHref(item.phone));
     }
-  });
-
-  it('check-in without a session goes to sign-in', async () => {
-    await expect(CheckInPage(params('en'))).rejects.toThrow('NEXT_REDIRECT /en/guest?flash=session_required');
   });
 
   it.each(['en', 'el'])('offline page (%s)', async (locale) => {

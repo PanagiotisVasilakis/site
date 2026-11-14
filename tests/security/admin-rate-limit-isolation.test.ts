@@ -172,29 +172,27 @@ describe('admin login source-budget isolation', () => {
     for (const key of counts.keys()) expect(sourceKeys).toContain(key);
   });
 
-  it('answers 413 for a login body over 4 KiB without issuing a session', async () => {
-    const result = await login(adminRequest(SOURCE_A, 'x'.repeat(4 * 1_024)));
+  it('answers 413 for a login body over 4 KiB, 422 for a token over 512 characters, and still checks a token of exactly 512', async () => {
+    const oversizedBody = await login(adminRequest(SOURCE_A, 'x'.repeat(4 * 1_024)));
 
-    expect(result.response.status).toBe(413);
-    expect(result.response.headers.get('set-cookie')).toBeNull();
+    expect(oversizedBody.response.status).toBe(413);
+    expect(oversizedBody.response.headers.get('set-cookie')).toBeNull();
     expect(mocks.createAdminSession).not.toHaveBeenCalled();
     expect(mocks.signAdmin).not.toHaveBeenCalled();
-  });
 
-  it('answers 422 for a token longer than the longest production credential', async () => {
-    const result = await login(adminRequest(SOURCE_A, 'x'.repeat(513)));
+    // 513 characters: longer than the longest production credential (512).
+    const oversizedToken = await login(adminRequest(SOURCE_A, 'x'.repeat(513)));
 
-    expect(result.response.status).toBe(422);
-    expect(result.response.headers.get('set-cookie')).toBeNull();
+    expect(oversizedToken.response.status).toBe(422);
+    expect(oversizedToken.response.headers.get('set-cookie')).toBeNull();
     expect(mocks.createAdminSession).not.toHaveBeenCalled();
     expect(mocks.signAdmin).not.toHaveBeenCalled();
-  });
 
-  it('still checks a token of exactly 512 characters, the longest production credential', async () => {
-    const result = await login(adminRequest(SOURCE_A, 'x'.repeat(512)));
+    const longestToken = await login(adminRequest(SOURCE_A, 'x'.repeat(512)));
 
-    expect(result.response.status).toBe(401);
+    expect(longestToken.response.status).toBe(401);
     expect(mocks.createAdminSession).not.toHaveBeenCalled();
+    expect(mocks.signAdmin).not.toHaveBeenCalled();
   });
 
   it('fails closed before session issuance when the limiter store fails', async () => {

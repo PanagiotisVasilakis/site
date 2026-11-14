@@ -8,18 +8,15 @@ export default function ErrorSummary({
   details,
   onRetry,
   supportHref,
-  locale = 'en',
+  locale,
 }: {
   summary: string;
   details?: string[];
   onRetry?: () => void;
   supportHref?: string;
-  locale?: string;
+  locale: Locale;
 }) {
-  const t = getDictionary(locale as Locale);
-  const resolvedTitle = t.errors.title;
-  const tryAgainLabel = t.errors.tryAgain;
-  const contactSupportLabel = t.errors.contactSupport;
+  const t = getDictionary(locale);
   const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     // Move focus to the error summary so SR announces it
@@ -34,7 +31,7 @@ export default function ErrorSummary({
       tabIndex={-1}
       className="ui-callout ui-callout--danger error-summary"
     >
-      <div className="error-summary__title">{resolvedTitle}</div>
+      <div className="error-summary__title">{t.errors.title}</div>
       <div>{summary}</div>
       {details && details.length > 0 ? (
         <ul className="error-summary__details">
@@ -45,9 +42,9 @@ export default function ErrorSummary({
       ) : null}
       <div className="error-summary__actions">
         {onRetry ? (
-          <button type="button" className="ui-btn ui-btn--secondary ui-btn--sm" onClick={onRetry}>{tryAgainLabel}</button>
+          <button type="button" className="ui-btn ui-btn--secondary ui-btn--sm" onClick={onRetry}>{t.errors.tryAgain}</button>
         ) : null}
-        <a className="ui-btn ui-btn--secondary ui-btn--sm" href={supportHref ?? `/${locale}#contact`}>{contactSupportLabel}</a>
+        <a className="ui-btn ui-btn--secondary ui-btn--sm" href={supportHref ?? `/${locale}#contact`}>{t.errors.contactSupport}</a>
       </div>
     </div>
   );

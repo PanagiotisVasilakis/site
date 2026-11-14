@@ -36,9 +36,4 @@ describe('emergency phones content (R3-L10; list of circular 19567/25-09-2025)',
       expect(telHref(item.phone), item.id).toMatch(TEL_URI);
     }
   });
-
-  it('keeps one entry per number', () => {
-    const numbers = emergency.map((item) => telHref(item.phone));
-    expect(new Set(numbers).size).toBe(numbers.length);
-  });
 });

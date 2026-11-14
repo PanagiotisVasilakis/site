@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useState, type SubmitEvent } from 'react';
 import { CALENDAR_STALE_ALERT_MINUTES, DEFAULT_MINIMUM_NIGHTS, MAX_STAY_NIGHTS, PROPERTY_TIME_ZONE } from '@/data/stayPolicy';
 import { addDays, parseIsoDate } from '@/lib/availability/calendarDate';
 import { formatCents, parseEuroInputToCents } from '@/lib/availability/money';
 import internalFetch from '@/lib/internalFetchClient';
-import { Badge, Surface } from '@/components/ui';
+import { Badge } from '@/components/ui/Badge';
+import { Surface } from '@/components/ui/Surface';
 
 // Rate periods are edited as first night + LAST night (inclusive); the API
 // stores an exclusive end date (the check-out day), so the last night is sent
@@ -27,11 +28,9 @@ type SyncState = {
   lastFailureAt: string | null;
   lastErrorCode: string | null;
   lastHttpStatus: number | null;
-  consecutiveFailures: number;
   nights: number;
   horizonStart: string | null;
   horizonEnd: string | null;
-  nextAttemptAt: string;
   stale: boolean;
 };
 
@@ -190,7 +189,7 @@ export default function AdminAvailabilityClient() {
     setForm(emptyForm);
   }
 
-  async function save(event: FormEvent) {
+  async function save(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const validated = validate(form);
     if (!validated.ok) {

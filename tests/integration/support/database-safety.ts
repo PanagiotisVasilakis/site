@@ -75,7 +75,7 @@ interface DatabaseFingerprintRow {
   database_comment: string | null;
 }
 
-export interface SafetyDependencies {
+interface SafetyDependencies {
   inspectContainer?: (runtime: DisposablePostgresRuntime) => Promise<DockerInspectRecord>;
   connect?: (target: DisposableDatabaseTarget) => Promise<PgClient>;
 }

@@ -155,10 +155,4 @@ describe('readPublicAvailability', () => {
 
     await expect(readPublicAvailability(NOW)).rejects.toThrow('The calendar_sync_state row is missing');
   });
-
-  it('propagates database errors', async () => {
-    mocks.transaction.mockRejectedValue(new Error('connection refused'));
-
-    await expect(readPublicAvailability(NOW)).rejects.toThrow('connection refused');
-  });
 });

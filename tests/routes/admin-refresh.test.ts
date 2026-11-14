@@ -37,7 +37,9 @@ describe('admin session refresh route', () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it('returns the new server-side expiry and a cookie that lasts until it', async () => {
+  it('returns the new server-side expiry and a Secure cookie that lasts until it, in production', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('ADMIN_JWT_SECRET', PRODUCTION_JWT_SECRET);
     mocks.refreshAdminSession.mockResolvedValue(new Date(NOW.getTime() + 2 * 60 * 60_000));
 
     const response = await refresh();
@@ -46,16 +48,6 @@ describe('admin session refresh route', () => {
     expect(await response.json()).toEqual({ success: true, expiresAt: '2030-03-01T12:00:00.000Z' });
     expect(response.cookies.get('admin_jwt')?.maxAge).toBe(7200);
     expect(response.cookies.get('admin_jwt')).toMatchObject({ httpOnly: true, sameSite: 'strict', path: '/' });
-  });
-
-  it('marks the refreshed cookie Secure in production', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('ADMIN_JWT_SECRET', PRODUCTION_JWT_SECRET);
-    mocks.refreshAdminSession.mockResolvedValue(new Date(NOW.getTime() + 2 * 60 * 60_000));
-
-    const response = await refresh();
-
-    expect(response.status).toBe(200);
     expect(response.cookies.get('admin_jwt')).toMatchObject({ httpOnly: true, sameSite: 'strict', path: '/', secure: true });
   });
 

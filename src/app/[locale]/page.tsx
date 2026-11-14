@@ -16,19 +16,7 @@ import AvailabilityBookBar from '@/components/shell/AvailabilityBookBar';
 import { headers } from 'next/headers';
 import { serializeJsonLd } from '@/lib/jsonLd';
 import { localizedAlternates, localizedOpenGraph, organizationJsonLd } from '@/lib/seo';
-import { logger } from '@/lib/logger-enterprise';
-import { readPublicAvailability, type PublicAvailability } from '@/lib/prisma-repositories/availabilityRepository';
-
-/** The availability data for the 14-night teaser and the BookBar (identity §1.4), or null. */
-async function homeAvailability(now: Date): Promise<PublicAvailability | null> {
-  try {
-    return await readPublicAvailability(now);
-  } catch {
-    // No details: the error may carry connection data. The page then shows no teaser and no BookBar.
-    logger.error('Home availability could not be read');
-    return null;
-  }
-}
+import { readAvailabilityOrNull } from '@/lib/availability/readAvailabilityOrNull';
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
@@ -46,7 +34,8 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   const nonce = (await headers()).get('x-nonce') ?? undefined;
   const eff = normalizeLocale(locale);
   const now = new Date();
-  const availability = await homeAvailability(now);
+  // The data for the 14-night teaser and the BookBar (identity §1.4); null: the page shows neither.
+  const availability = await readAvailabilityOrNull(now, 'Home availability could not be read');
   const teaser = availability ? nightsTeaserFrom(availability) : null;
 
   return (

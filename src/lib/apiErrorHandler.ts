@@ -1,8 +1,3 @@
-/**
- * Enterprise-grade API error handling middleware
- * Features: Structured error responses, correlation tracking, validation
- */
-
 import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from './logger-enterprise';
@@ -19,39 +14,21 @@ import { logSecurityDiagnostic } from './security-monitoring';
 // Public error-code enum for route handlers
 export { ErrorCodes as ApiErrorCode };
 
-// Standard HTTP status codes
-const HttpStatusCodes = {
-  OK: 200,
-  BAD_REQUEST: 400,
-  UNAUTHORIZED: 401,
-  FORBIDDEN: 403,
-  NOT_FOUND: 404,
-  CONFLICT: 409,
-  PAYLOAD_TOO_LARGE: 413,
-  UNSUPPORTED_MEDIA_TYPE: 415,
-  UNPROCESSABLE_ENTITY: 422,
-  TOO_MANY_REQUESTS: 429,
-  INTERNAL_SERVER_ERROR: 500,
-  BAD_GATEWAY: 502,
-  SERVICE_UNAVAILABLE: 503,
-  GATEWAY_TIMEOUT: 504,
-} as const;
-
 // Error code to HTTP status mapping
 const ERROR_STATUS_MAP: Record<ApiErrorCode, number> = {
-  [ErrorCodes.BAD_REQUEST]: HttpStatusCodes.BAD_REQUEST,
-  [ErrorCodes.UNAUTHORIZED]: HttpStatusCodes.UNAUTHORIZED,
-  [ErrorCodes.FORBIDDEN]: HttpStatusCodes.FORBIDDEN,
-  [ErrorCodes.NOT_FOUND]: HttpStatusCodes.NOT_FOUND,
-  [ErrorCodes.CONFLICT]: HttpStatusCodes.CONFLICT,
-  [ErrorCodes.VALIDATION_ERROR]: HttpStatusCodes.UNPROCESSABLE_ENTITY,
-  [ErrorCodes.RATE_LIMITED]: HttpStatusCodes.TOO_MANY_REQUESTS,
-  [ErrorCodes.PAYLOAD_TOO_LARGE]: HttpStatusCodes.PAYLOAD_TOO_LARGE,
-  [ErrorCodes.UNSUPPORTED_MEDIA_TYPE]: HttpStatusCodes.UNSUPPORTED_MEDIA_TYPE,
-  [ErrorCodes.INTERNAL_ERROR]: HttpStatusCodes.INTERNAL_SERVER_ERROR,
-  [ErrorCodes.SERVICE_UNAVAILABLE]: HttpStatusCodes.SERVICE_UNAVAILABLE,
-  [ErrorCodes.GATEWAY_TIMEOUT]: HttpStatusCodes.GATEWAY_TIMEOUT,
-  [ErrorCodes.EXTERNAL_SERVICE_ERROR]: HttpStatusCodes.BAD_GATEWAY,
+  [ErrorCodes.BAD_REQUEST]: 400,
+  [ErrorCodes.UNAUTHORIZED]: 401,
+  [ErrorCodes.FORBIDDEN]: 403,
+  [ErrorCodes.NOT_FOUND]: 404,
+  [ErrorCodes.CONFLICT]: 409,
+  [ErrorCodes.VALIDATION_ERROR]: 422,
+  [ErrorCodes.RATE_LIMITED]: 429,
+  [ErrorCodes.PAYLOAD_TOO_LARGE]: 413,
+  [ErrorCodes.UNSUPPORTED_MEDIA_TYPE]: 415,
+  [ErrorCodes.INTERNAL_ERROR]: 500,
+  [ErrorCodes.SERVICE_UNAVAILABLE]: 503,
+  [ErrorCodes.GATEWAY_TIMEOUT]: 504,
+  [ErrorCodes.EXTERNAL_SERVICE_ERROR]: 502,
 };
 
 // Structured API error class
@@ -75,9 +52,7 @@ export class ApiError extends Error {
     this.correlationId = correlationId;
 
     // Maintain proper stack trace
-    if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, ApiError);
-    }
+    Error.captureStackTrace(this, ApiError);
   }
 
   toJSON() {
@@ -96,7 +71,7 @@ export class ApiError extends Error {
 // Validation error for Zod schema failures
 export class ValidationError extends ApiError {
   constructor(
-    issues: z.ZodIssue[],
+    issues: z.core.$ZodIssue[],
     correlationId?: string
   ) {
     const details = {
@@ -104,7 +79,7 @@ export class ValidationError extends ApiError {
         path: issue.path.join('.'),
         message: issue.message,
         code: issue.code,
-  expected: (issue as unknown as { expected?: unknown }).expected,
+        expected: (issue as unknown as { expected?: unknown }).expected,
       })),
     };
 
@@ -133,14 +108,7 @@ class TimeoutError extends ApiError {
 interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
-  error?: {
-    code: string;
-    message: string;
-    details?: Record<string, unknown>;
-    correlationId?: string;
-    timestamp: string;
-  };
-  meta?: {
+  meta: {
     correlationId: string;
     timestamp: string;
     version: string;
@@ -161,7 +129,7 @@ interface ApiRouteHandlerContext {
 
 // API route handler type compatible with Next.js route handlers. The wrapper
 // enriches Next's context with a cooperative cancellation signal.
-export type ApiRouteHandler = (
+type ApiRouteHandler = (
   request: NextRequest,
   context: ApiRouteHandlerContext,
 ) => Promise<NextResponse> | NextResponse;
@@ -173,7 +141,7 @@ type WrappedApiRouteHandler = (
 ) => Promise<NextResponse>;
 
 // Error handling middleware configuration
-export interface ErrorHandlerConfig {
+interface ErrorHandlerConfig {
   maxRequestBodySize?: number;
   requestTimeoutMs?: number;
 }
@@ -300,7 +268,7 @@ export function withErrorHandler(
       // Handle known API errors
       if (error instanceof ApiError) {
         if (error.code === ErrorCodes.UNSUPPORTED_MEDIA_TYPE || error.code === ErrorCodes.PAYLOAD_TOO_LARGE) {
-          // Request-shape violations are logged, never persisted (O11).
+          // Request-shape violations are logged, never persisted.
           logSecurityDiagnostic({
             type: 'api_security_violation',
             severity: 'medium',
@@ -323,18 +291,7 @@ export function withErrorHandler(
           duration: Math.round(duration * 100) / 100,
         });
 
-        const headers: Record<string, string> = {
-          'X-Correlation-ID': correlationId,
-          'X-Error-Code': error.code,
-        };
-
-        return NextResponse.json(
-          error.toJSON(),
-          { 
-            status: error.statusCode,
-            headers,
-          }
-        );
+        return createErrorResponse(error, correlationId);
       }
 
       // Handle Zod validation errors
@@ -347,16 +304,7 @@ export function withErrorHandler(
           duration: Math.round(duration * 100) / 100,
         });
 
-        return NextResponse.json(
-          validationError.toJSON(),
-          { 
-            status: validationError.statusCode,
-            headers: {
-              'X-Correlation-ID': correlationId,
-              'X-Error-Code': validationError.code,
-            },
-          }
-        );
+        return createErrorResponse(validationError, correlationId);
       }
 
       // Handle unexpected errors
@@ -373,16 +321,7 @@ export function withErrorHandler(
         duration: Math.round(duration * 100) / 100,
       }, error instanceof Error ? error : new Error(String(error)));
 
-      return NextResponse.json(
-        internalError.toJSON(),
-        { 
-          status: internalError.statusCode,
-          headers: {
-            'X-Correlation-ID': correlationId,
-            'X-Error-Code': internalError.code,
-          },
-        }
-      );
+      return createErrorResponse(internalError, correlationId);
     }
   };
 }
@@ -392,23 +331,24 @@ export function withErrorHandler(
  */
 export function createSuccessResponse<T>(
   data: T,
-  status: number = HttpStatusCodes.OK,
-  correlationId?: string
+  status: number = 200,
+  requestCorrelationId?: string
 ): NextResponse {
+  const correlationId = requestCorrelationId || generateCorrelationId();
   const response: ApiResponse<T> = {
     success: true,
     data,
     meta: {
-      correlationId: correlationId || generateCorrelationId(),
+      correlationId,
       timestamp: new Date().toISOString(),
       version: '1.0',
     },
   };
 
-  return NextResponse.json(response, { 
+  return NextResponse.json(response, {
     status,
     headers: {
-      'X-Correlation-ID': response.meta?.correlationId || '',
+      'X-Correlation-ID': correlationId,
       'Cache-Control': 'no-store',
     },
   });
@@ -477,7 +417,7 @@ export async function readJsonBody(
   }
 }
 
-export function validateRequestBody<T>(schema: z.ZodSchema<T>, maxBytes = DEFAULT_CONFIG.maxRequestBodySize) {
+export function validateRequestBody<T>(schema: z.ZodType<T>, maxBytes = DEFAULT_CONFIG.maxRequestBodySize) {
   return async (request: NextRequest): Promise<T> => {
     const correlationId = logger.getContext()?.correlationId;
     
@@ -503,6 +443,16 @@ export function validateRequestBody<T>(schema: z.ZodSchema<T>, maxBytes = DEFAUL
 /**
  * Helper functions
  */
+function createErrorResponse(error: ApiError, correlationId: string): NextResponse {
+  return NextResponse.json(error.toJSON(), {
+    status: error.statusCode,
+    headers: {
+      'X-Correlation-ID': correlationId,
+      'X-Error-Code': error.code,
+    },
+  });
+}
+
 function generateCorrelationId(): string {
   return crypto.randomUUID();
 }

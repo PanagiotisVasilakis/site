@@ -6,6 +6,10 @@ export function telHref(phone?: string): string | undefined {
   return `tel:${digits}`;
 }
 
+/** The 112 content entry (src/data/items/phones.json) and its link: 112 is shown apart from the other phones. */
+export const EMERGENCY_112_ID = 'emergency-112';
+export const EMERGENCY_112_HREF = 'tel:112';
+
 export function mapsHref(address?: string, lat?: number, lng?: number): string | undefined {
   if (!address && (lat == null || lng == null)) return undefined;
   if (lat != null && lng != null) return `https://maps.google.com/?q=${lat},${lng}`;

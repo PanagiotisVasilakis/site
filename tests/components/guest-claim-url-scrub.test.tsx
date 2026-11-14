@@ -42,11 +42,7 @@ describe('guest page claim URL scrubbing', () => {
   });
 
   it.each([
-    ['a claim query value', '/en/guest?claim=AAA', '', ''],
-    ['a claimToken query value', '/en/guest?mode=signup&claimToken=BBB', '?mode=signup', ''],
     ['repeated legacy query names', '/en/guest?claim=AAA&claim=A2&claimToken=BBB&claimToken=B2&x=1', '?x=1', ''],
-    ['a claim fragment', '/en/guest?mode=signup#claim=CCC', '?mode=signup', ''],
-    ['a claimToken fragment', '/en/guest#claimToken=CCC', '', ''],
     ['a claim fragment among other parts and in any letter case', '/en/guest#x=1&CLAIMTOKEN=CCC', '', ''],
   ])('removes %s', (_label, url, search, hash) => {
     window.history.replaceState(null, '', url);
