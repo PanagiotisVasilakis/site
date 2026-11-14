@@ -40,6 +40,7 @@ export default function ApartmentLocationMap({
     directions: mapT.directions,
     website: mapT.website,
     details: mapT.viewDetails,
+    mapRegion: mapT.mapRegion,
     home: mapT.home,
     locateMe: mapT.locateMe,
     locationUnavailable: mapT.locationUnavailable,

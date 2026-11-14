@@ -2,18 +2,11 @@ import fs from "node:fs";
 import path from "node:path";
 import type { ZodError } from "zod";
 import { ItemSchema, PROJECT_ARTWORK_HERO_IMAGES, type Item } from "../data/schemas";
-import { categories } from "../data/categories";
 import type { Locale } from "@/i18n/config";
 import { logger } from '@/lib/logger-enterprise';
 import { pickLocale } from '@/lib/localize';
 
 const dataRoot = path.join(process.cwd(), "src", "data", "items");
-
-export function getOrderedCategories(): typeof categories {
-  return categories
-    .slice()
-    .sort((a,b) => (a.order ?? 999) - (b.order ?? 999));
-}
 
 // Names what is wrong with an item by issue path and code only, never by value; an unknown key is named by its own path.
 function describeIssues(issues: ZodError["issues"]): string {

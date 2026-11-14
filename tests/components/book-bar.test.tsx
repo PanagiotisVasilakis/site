@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type React from 'react';
-import { render } from '@testing-library/react';
+import { act, render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/link', () => ({
@@ -87,7 +87,7 @@ describe('BookBar height (PS-07)', () => {
   }
 
   it('publishes its height as --bookbar-h, follows a resize and removes it on unmount', () => {
-    stubObserver();
+    stubIntersectionObserver();
     const ro = stubResizeObserver();
     let height = 58;
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() => ({ height }) as DOMRect);
@@ -105,7 +105,7 @@ describe('BookBar height (PS-07)', () => {
   });
 
   it('publishes nothing without a bar', () => {
-    stubObserver();
+    stubIntersectionObserver();
     stubResizeObserver();
     renderPage(null);
 
@@ -113,7 +113,7 @@ describe('BookBar height (PS-07)', () => {
   });
 
   it('publishes nothing without ResizeObserver; the stylesheet falls back to the one-line height', () => {
-    stubObserver();
+    stubIntersectionObserver();
     vi.stubGlobal('ResizeObserver', undefined);
     renderPage();
 
