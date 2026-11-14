@@ -1,5 +1,5 @@
 import { LEGACY_CLAIM_QUERY_PARAMS } from '@/components/guest/guestValidation';
-import { locales } from '@/i18n/config';
+import { isLocale } from '@/i18n/config';
 import type { Dictionary } from '@/i18n/dictionaries';
 import { HOST_CONTACT } from '@/data/contact';
 import { telHref } from '@/lib/contactLinks';
@@ -30,7 +30,7 @@ const HERO_ROUTES = new Set(['']);
 
 function firstSegment(pathname: string): string {
   const parts = pathname.split('/').filter(Boolean);
-  if (parts.length > 0 && (locales as readonly string[]).includes(parts[0])) parts.shift();
+  if (parts.length > 0 && isLocale(parts[0])) parts.shift();
   return parts[0] ?? '';
 }
 
@@ -186,7 +186,7 @@ export function scrollToCurrentHash(event: LinkClick, href: string): void {
  */
 export function localeSwitchHref(pathname: string, target: string, search = '', hash = ''): string {
   const parts = pathname.split('/').filter(Boolean);
-  if (parts.length > 0 && (locales as readonly string[]).includes(parts[0])) parts[0] = target;
+  if (parts.length > 0 && isLocale(parts[0])) parts[0] = target;
   else parts.unshift(target);
   const params = new URLSearchParams(search);
   LEGACY_CLAIM_QUERY_PARAMS.forEach((name) => params.delete(name));

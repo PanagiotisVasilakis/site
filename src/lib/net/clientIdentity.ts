@@ -10,7 +10,7 @@ import {
 } from '@/lib/net/getClientIp';
 
 const CLIENT_IDENTITY_UNAVAILABLE = 'CLIENT_IDENTITY_UNAVAILABLE' as const;
-export type ClientIdentityUnavailableReason =
+type ClientIdentityUnavailableReason =
   | 'missing'
   | 'sentinel'
   | 'malformed'
@@ -70,13 +70,6 @@ export function createClientIdentityUnavailableResponse(error?: unknown): NextRe
   });
 }
 
-
-function configuredRawSource(
-  request: NextRequest,
-): string | null {
-  return request.headers.get(VERIFIED_CLIENT_IP_HEADER);
-}
-
 function unavailableReason(value: string | null): ClientIdentityUnavailableReason {
   if (value === null || value === '') return 'missing';
   if (value.toLowerCase() === 'unknown') return 'sentinel';
@@ -89,7 +82,7 @@ function unavailableReason(value: string | null): ClientIdentityUnavailableReaso
 export function requireCanonicalClientIp(
   request: NextRequest,
 ): string {
-  const rawSource = configuredRawSource(request);
+  const rawSource = request.headers.get(VERIFIED_CLIENT_IP_HEADER);
   const attestation = request.headers.get(ORIGIN_PROXY_ATTESTATION_HEADER);
   if (attestation === null || attestation === '') {
     throw new ClientIdentityUnavailableError('missing');

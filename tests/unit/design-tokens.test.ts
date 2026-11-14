@@ -152,8 +152,6 @@ const LIGHT: Row[] = [
   ['band-muted on band-bg', 'band-muted', 'band-bg', 4.5, 7.91],
   ['band-accent on band-bg', 'band-accent', 'band-bg', 4.5, 7.23],
   ['band-accent-fg on band-accent', 'band-accent-fg', 'band-accent', 4.5, 9.63],
-  ['band-fg on warm-1', 'band-fg', 'warm-1', 4.5, 7.79],
-  ['warm-muted on warm-1', 'warm-muted', 'warm-1', 4.5, 6.55],
   // O43: transparent header bar. Over the page it sits on bg; over photos legibility comes from the text halo
   // (every header variant, shell.css; tests/unit/shell-header-css.test.ts), measured on the rendered page, not from the tint.
   ['fg on header glass over bg', 'fg', 'glass@bg', 4.5, 13.99],
@@ -176,8 +174,6 @@ const LIGHT: Row[] = [
   ['map popup meta (olive) on surface-raised (R3-V8)', 'olive', 'surface-raised', 4.5, 7.04],
   ['map popup links (accent) on surface-raised (R3-V8)', 'accent', 'surface-raised', 4.5, 8.35],
   ['UI: phone row icon (primary-text) on its primary-tint disc over bg (R3-V8) / UI: amenity icon (primary-text) on its primary-tint disc over bg', 'primary-text', 'primary-tint@bg', 3, 5.47],
-  ['warm section title accent (band-accent) on warm-1 (R3-V5)', 'band-accent', 'warm-1', 4.5, 4.84],
-  ['UI: band-focus vs warm-1 (focus ring on the warm section, R3-V5)', 'band-focus', 'warm-1', 3, 4.84],
   ['bookbar: fg on surface-raised .9 over black', 'fg', 'surface-raised*0.9@#000000', 4.5, 12.46],
   ['bookbar: fg on surface-raised .9 over white', 'fg', 'surface-raised*0.9@#FFFFFF', 4.5, 15.62],
   ['decorative only: sun on bg (never text)', 'sun', 'bg', null, 1.76],
@@ -224,8 +220,6 @@ const DARK: Row[] = [
   ['band-muted on band-bg', 'band-muted', 'band-bg', 4.5, 7.33],
   ['band-accent on band-bg', 'band-accent', 'band-bg', 4.5, 7.95],
   ['band-accent-fg on band-accent', 'band-accent-fg', 'band-accent', 4.5, 10.09],
-  ['band-fg on warm-1', 'band-fg', 'warm-1', 4.5, 9.72],
-  ['warm-muted on warm-1', 'warm-muted', 'warm-1', 4.5, 8.48],
   ['fg on header glass over bg', 'fg', 'glass@bg', 4.5, 6.67],
   ['cal: date on free cell', 'fg', 'cal-free-bg', 4.5, 13.37],
   ['cal: selected text', 'cal-selected-fg', 'cal-selected-bg', 4.5, 7.9],
@@ -246,8 +240,6 @@ const DARK: Row[] = [
   ['UI: phone row icon (primary-text) on its primary-tint disc over bg (R3-V8) / UI: amenity icon (primary-text) on its primary-tint disc over bg', 'primary-text', 'primary-tint@bg', 3, 6.83],
   // R3-V6 apartment page and GalleryLightbox
   ['UI: lightbox focus ring (band-focus) on viewer-bg', 'band-focus', 'viewer-bg', 3, 10.58],
-  ['warm section title accent (band-accent) on warm-1 (R3-V5)', 'band-accent', 'warm-1', 4.5, 6.57],
-  ['UI: band-focus vs warm-1 (focus ring on the warm section, R3-V5)', 'band-focus', 'warm-1', 3, 6.57],
   ['bookbar: fg on surface-raised .9 over black', 'fg', 'surface-raised*0.9@#000000', 4.5, 11.99],
   ['bookbar: fg on surface-raised .9 over white', 'fg', 'surface-raised*0.9@#FFFFFF', 4.5, 8.25],
   // R3-V9 in-stay pages: the stay hub's half sun behind the H1, the portal tile, the check-in rule icon.
@@ -278,21 +270,14 @@ const CASES: Array<[mode: 'light' | 'dark', ...row: Row]> = [
 ];
 
 describe('design tokens: dark mode architecture (identity §3.1)', () => {
-  it('defines the dark overrides in @layer base, for the OS preference and the explicit choice', () => {
-    const { css } = parseTokens();
+  it('defines the dark overrides in @layer base for the OS preference and the explicit choice, keeps both blocks identical, and gives every --color-* token a dark value', () => {
+    const { css, theme, darkMedia, darkAttr } = parseTokens();
     expect(css).toMatch(/@layer base\s*\{\s*@media \(prefers-color-scheme: dark\)\s*\{\s*:root:not\(\[data-theme="light"\]\)\s*\{/);
     expect(css).toMatch(/:root\[data-theme="dark"\]\s*\{/);
     expect(css).not.toMatch(/light-dark\(/);
-  });
-
-  it('keeps the two dark blocks identical, including color-scheme', () => {
-    const { darkMedia, darkAttr } = parseTokens();
     expect(darkAttr).toEqual(darkMedia);
     expect(darkMedia).toContainEqual(['color-scheme', 'dark']);
-  });
 
-  it('gives every --color-* token a dark value (redefined, or an alias of a redefined token)', () => {
-    const { theme, darkMedia } = parseTokens();
     const themeNames = new Set(theme.map(([name]) => name));
     const darkNames = new Set(darkMedia.map(([name]) => name));
     const missing = theme
@@ -312,14 +297,26 @@ describe('design tokens: dark mode architecture (identity §3.1)', () => {
 });
 
 describe('design tokens: G-CONTRAST (identity §3.3)', () => {
-  it('covers all 144 documented rows', () => {
-    expect([...LIGHT, ...DARK, ...BOTH].flatMap(([pair]) => pair.split(' / ')).length).toBe(144);
+  it('covers all 136 documented rows', () => {
+    expect([...LIGHT, ...DARK, ...BOTH].flatMap(([pair]) => pair.split(' / ')).length).toBe(136);
   });
 
-  it.each(CASES)('%s: %s', (mode, _pair, fg, bg, min, documented) => {
-    const map = tokenMap(mode);
-    const ratio = contrast(resolveSpec(map, fg), resolveSpec(map, bg));
-    expect(ratio.toFixed(2)).toBe(documented.toFixed(2));
-    if (min !== null) expect(ratio).toBeGreaterThanOrEqual(min);
+  it('meets every documented row in light, dark and both modes, naming each failing pair', () => {
+    const maps = { light: tokenMap('light'), dark: tokenMap('dark') };
+    const failures: Array<{ mode: 'light' | 'dark'; pair: string; ratio: string; documented: string; min: number | null }> = [];
+    for (const [mode, pair, fg, bg, min, documented] of CASES) {
+      const map = maps[mode];
+      try {
+        const ratio = contrast(resolveSpec(map, fg), resolveSpec(map, bg));
+        // Same two checks as the old per-row tests; `!(ratio >= min)` also fails on NaN, as toBeGreaterThanOrEqual did.
+        if (ratio.toFixed(2) !== documented.toFixed(2) || (min !== null && !(ratio >= min))) {
+          failures.push({ mode, pair, ratio: ratio.toFixed(2), documented: documented.toFixed(2), min });
+        }
+      } catch (error) {
+        // An unresolvable token fails only its own pair, so the other pairs are still checked and listed.
+        failures.push({ mode, pair, ratio: String(error), documented: documented.toFixed(2), min });
+      }
+    }
+    expect(failures).toEqual([]);
   });
 });

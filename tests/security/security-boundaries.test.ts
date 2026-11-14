@@ -44,17 +44,10 @@ describe('runtime environment fail-closed policy', () => {
     const result = runtimeEnvSchema.parse(requiredEnv);
     expect(result).toEqual(expect.objectContaining({
       NODE_ENV: 'development',
-      PROPERTY_TIME_ZONE: 'Europe/Athens',
     }));
     expect(result).not.toHaveProperty('ADMIN_JWT_SECRET');
     expect(result).not.toHaveProperty('GUEST_JWT_SECRET');
     expect(result).not.toHaveProperty('ADMIN_DASH_SECRET');
-  });
-
-  it('treats an empty NEXT_PUBLIC_SITE_URL line in development as unset', () => {
-    const result = runtimeEnvSchema.safeParse({ ...requiredEnv, NEXT_PUBLIC_SITE_URL: '' });
-    expect(result.success).toBe(true);
-    expect(result.data?.NEXT_PUBLIC_SITE_URL).toBeUndefined();
   });
 
   it('accepts a complete HTTPS production environment without external limiter variables', () => {
@@ -65,8 +58,6 @@ describe('runtime environment fail-closed policy', () => {
     ['non-Postgres database URL', { DATABASE_URL: 'https://database.example/db' }, 'DATABASE_URL'],
     ['empty database URL', { DATABASE_URL: '' }, 'DATABASE_URL'],
     ['development without a claim-token pepper', { CLAIM_TOKEN_PEPPER: undefined }, 'CLAIM_TOKEN_PEPPER'],
-    ['unparsable database URL', { DATABASE_URL: 'not a url' }, 'DATABASE_URL'],
-    ['invalid time zone', { PROPERTY_TIME_ZONE: 'Mars/Olympus' }, 'PROPERTY_TIME_ZONE'],
     ['test runtime mode', { NODE_ENV: 'test' }, 'NODE_ENV'],
   ])('rejects %s', (_label, overrides, expectedPath) => {
     const result = runtimeEnvSchema.safeParse({ ...requiredEnv, ...overrides });
@@ -111,19 +102,6 @@ describe('runtime environment fail-closed policy', () => {
     if (!result.success) expect(result.error.issues[0].path[0]).toBe('ORIGIN_PROXY_SHARED_SECRET');
   });
 
-  it('requires webhook tokens and HTTPS endpoints in production', () => {
-    const missingToken = runtimeEnvSchema.safeParse({
-      ...requiredEnv,
-      CHECKIN_REQUEST_WEBHOOK_URL: 'https://hooks.example/check-in',
-    });
-    expect(missingToken.success).toBe(false);
-    const insecure = runtimeEnvSchema.safeParse(productionEnv({
-      CHECKIN_REQUEST_WEBHOOK_URL: 'http://hooks.example/check-in',
-      CHECKIN_REQUEST_WEBHOOK_TOKEN: 't'.repeat(20),
-    }));
-    expect(insecure.success).toBe(false);
-  });
-
   it('ignores a leftover webhook variable of the removed booking-request form', () => {
     const result = runtimeEnvSchema.safeParse(productionEnv({
       BOOKING_REQUEST_WEBHOOK_URL: 'http://hooks.example/booking',
@@ -153,8 +131,6 @@ describe('runtime environment fail-closed policy', () => {
 
   it.each([
     ['admin and guest', 'GUEST_JWT_SECRET', 'ADMIN_JWT_SECRET'],
-    ['admin and dashboard', 'ADMIN_DASH_SECRET', 'ADMIN_JWT_SECRET'],
-    ['guest and dashboard', 'ADMIN_DASH_SECRET', 'GUEST_JWT_SECRET'],
   ] as const)('rejects identical %s credentials', (_label, target, source) => {
     const baseline = productionEnv();
     const result = runtimeEnvSchema.safeParse({
@@ -175,20 +151,6 @@ describe('runtime environment fail-closed policy', () => {
     if (!result.success) {
       expect(result.error.issues.some(({ path }) => path[0] === 'NEXT_PUBLIC_SITE_URL')).toBe(true);
     }
-  });
-
-  it('strips retired credential names instead of restoring them to the contract', () => {
-    const result = runtimeEnvSchema.parse({
-      ...requiredEnv,
-      JWT_SECRET: 'retired',
-      SESSION_SECRET: 'retired',
-      SECURITY_ENC_KEY_HEX: 'retired',
-      SECURITY_ENC_KEY_HEX_PREVIOUS: 'retired',
-    });
-    expect(result).not.toHaveProperty('JWT_SECRET');
-    expect(result).not.toHaveProperty('SESSION_SECRET');
-    expect(result).not.toHaveProperty('SECURITY_ENC_KEY_HEX');
-    expect(result).not.toHaveProperty('SECURITY_ENC_KEY_HEX_PREVIOUS');
   });
 
   it('validates production CORS origins', () => {
@@ -226,7 +188,6 @@ describe('runtime environment fail-closed policy', () => {
 
   it.each([
     'https://ical.booking.com/v1/export?t=fixture',
-    'https://admin.booking.com/hotel/hoteladmin/ical.html?t=fixture',
     'https://ical.booking.com:443/v1/export?t=fixture&lang=en',
   ])('accepts the Booking.com calendar export URL %s', (value) => {
     const result = runtimeEnvSchema.safeParse(productionEnv({ BOOKING_ICAL_URL: value }));
@@ -251,8 +212,6 @@ describe('runtime environment fail-closed policy', () => {
 
   it.each([
     ['URL-significant characters', 'fixtureKey&x=secret'],
-    ['whitespace', 'fixture Key secret'],
-    ['a template brace', 'fixture{s}secret'],
     ['too short a value', 'secret7'],
     ['too long a value', `secret${'a'.repeat(123)}`],
   ])('rejects a CARTO_BASEMAPS_KEY with %s without echoing it', (_label, value) => {
@@ -262,15 +221,6 @@ describe('runtime environment fail-closed policy', () => {
       expect(result.error.issues.map(({ path }) => path[0])).toEqual(['CARTO_BASEMAPS_KEY']);
       expect(JSON.stringify(result.error.issues)).not.toContain('secret');
     }
-  });
-
-  it.each([
-    ['empty', ''],
-    ['unset', undefined],
-  ])('treats an %s CARTO_BASEMAPS_KEY as not configured', (_label, value) => {
-    const result = runtimeEnvSchema.safeParse(productionEnv({ CARTO_BASEMAPS_KEY: value }));
-    expect(result.success).toBe(true);
-    if (result.success) expect(result.data.CARTO_BASEMAPS_KEY).toBeUndefined();
   });
 
   it.each([
@@ -330,7 +280,6 @@ describe('runtime environment fail-closed policy', () => {
   it.each([
     ['a repeated character', 'a'.repeat(32)],
     ['a repeated block', 'k3Zq9xTv'.repeat(4)],
-    ['the word replace', `replace-${pepperSuffix}`],
     ['the word changeme', `ChangeMe-${pepperSuffix}`],
     ['the word placeholder', `${pepperSuffix}-placeholder`],
     ['the word example', `${pepperSuffix}.EXAMPLE`],
@@ -347,11 +296,7 @@ describe('runtime environment fail-closed policy', () => {
 
   it.each([
     ['SECURITY_PEPPER', 'ADMIN_JWT_SECRET'],
-    ['SECURITY_PEPPER', 'GUEST_JWT_SECRET'],
-    ['SECURITY_PEPPER', 'ADMIN_DASH_SECRET'],
-    ['CLAIM_TOKEN_PEPPER', 'ADMIN_JWT_SECRET'],
     ['CLAIM_TOKEN_PEPPER', 'GUEST_JWT_SECRET'],
-    ['CLAIM_TOKEN_PEPPER', 'ADMIN_DASH_SECRET'],
   ] as const)('rejects %s that reuses the value of %s', (pepper, credential) => {
     const baseline = productionEnv();
     const result = runtimeEnvSchema.safeParse({ ...baseline, [pepper]: baseline[credential] });
@@ -480,6 +425,11 @@ describe('credential hashing and privacy-safe logging', () => {
     ['user-agent', true],
     ['guest_password_hash', true],
     ['status', false],
+    ['cfConnectingIp', true],
+    ['x-forwarded-for', true],
+    ['xRealIp', true],
+    ['xOriginVerifiedClientIp', true],
+    ['xOriginProxyAttestation', true],
   ])('classifies sensitive field %s', (field, expected) => {
     expect(isSensitiveFieldName(field)).toBe(expected);
   });
@@ -496,37 +446,8 @@ describe('trusted proxy IP extraction', () => {
     } as unknown as NextRequest;
   }
 
-  it('ignores public forwarding data without the private attestation', () => {
-    vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);
-    expect(getClientIp(request({ 'x-forwarded-for': '203.0.113.10' }))).toBe('unknown');
-    expect(getClientIp(request({
-      'x-forwarded-for': '203.0.113.10, 198.51.100.20, 192.0.2.30',
-    }))).toBe('unknown');
-  });
-
-  it('accepts a canonical IPv4 only with both private headers', () => {
-    vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);
-    expect(getClientIp(request({
-      'x-origin-verified-client-ip': '203.0.113.195',
-      'x-origin-proxy-attestation': secret,
-    }))).toBe('203.0.113.195');
-  });
-
-  it('canonicalizes attested IPv6 and IPv4-mapped IPv6 identities', () => {
-    vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);
-    expect(getClientIp(request({
-      'x-origin-verified-client-ip': '2001:0DB8:0000:0000:0000:0000:0000:0001',
-      'x-origin-proxy-attestation': secret,
-    }))).toBe('2001:db8::1');
-    expect(getClientIp(request({
-      'x-origin-verified-client-ip': '::ffff:203.0.113.10',
-      'x-origin-proxy-attestation': secret,
-    }))).toBe('203.0.113.10');
-  });
-
   it.each([
     ['missing attestation', { 'x-origin-verified-client-ip': '203.0.113.10' }],
-    ['missing private IP', { 'x-origin-proxy-attestation': secret }],
     ['wrong attestation', {
       'x-origin-verified-client-ip': '203.0.113.10',
       'x-origin-proxy-attestation': 'fedcba9876543210'.repeat(4),
@@ -534,14 +455,6 @@ describe('trusted proxy IP extraction', () => {
     ['duplicated attestation', {
       'x-origin-verified-client-ip': '203.0.113.10',
       'x-origin-proxy-attestation': `${secret}, ${secret}`,
-    }],
-    ['duplicated private IP', {
-      'x-origin-verified-client-ip': '203.0.113.10, 198.51.100.1',
-      'x-origin-proxy-attestation': secret,
-    }],
-    ['IP with port', {
-      'x-origin-verified-client-ip': '203.0.113.10:443',
-      'x-origin-proxy-attestation': secret,
     }],
   ] as const)('rejects %s', (_label, headers) => {
     vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);

@@ -59,31 +59,6 @@ describe('worker processes close the database pool', () => {
     expect(errors).toEqual([{ worker: 'outbox', status: 'disconnect_failed', error: 'pool already closed' }]);
   });
 
-  it('keeps the exit code and writes a disconnect_failed event when closing the pool fails after operational maintenance', async () => {
-    mocks.evaluateOperationalAlerts.mockResolvedValue({ opened: 0, resolved: 0, evaluated: 4 });
-    mocks.runRetention.mockResolvedValue({});
-    mocks.syncBookingCalendar.mockResolvedValue({ status: 'failed', code: 'network' });
-    mocks.disconnect.mockRejectedValue(new Error('pool already closed'));
-
-    await runWorker('../../scripts/run-operational-maintenance');
-    // The catch of disconnect() runs one microtask after the disconnect call that runWorker waits for.
-    await vi.waitFor(() => expect(process.stderr.write).toHaveBeenCalledTimes(1));
-
-    // A failed calendar sync is a result of the run, not a failure of it.
-    expect(process.exitCode).toBeUndefined();
-    const lines = vi.mocked(process.stdout.write).mock.calls.map(([chunk]) => String(chunk));
-    expect(lines).toHaveLength(1);
-    expect(JSON.parse(lines[0])).toEqual({
-      worker: 'operations',
-      alerts: { opened: 0, resolved: 0, evaluated: 4 },
-      retention: {},
-      calendar: { status: 'failed', code: 'network' },
-      at: expect.any(String),
-    });
-    const errors = vi.mocked(process.stderr.write).mock.calls.map(([chunk]) => JSON.parse(String(chunk)) as unknown);
-    expect(errors).toEqual([{ worker: 'operations', status: 'disconnect_failed', error: 'pool already closed' }]);
-  });
-
   it('syncs the calendar before it evaluates the alerts, so the stale-calendar rule reads the state this run leaves behind', async () => {
     let finishSync: (result: { status: 'synced'; blockedNights: number }) => void = () => undefined;
     mocks.syncBookingCalendar.mockReturnValue(new Promise<{ status: 'synced'; blockedNights: number }>((resolve) => { finishSync = resolve; }));

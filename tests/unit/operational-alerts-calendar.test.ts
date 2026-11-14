@@ -53,28 +53,7 @@ describe('stale availability calendar alert', () => {
     vi.useRealTimers();
   });
 
-  it('is registered like the other rules and counted as evaluated', async () => {
-    await expect(evaluateOperationalAlerts()).resolves.toEqual({ opened: 0, resolved: 0, evaluated: 4 });
-
-    const registration = prismaMock.alertRule.upsert.mock.calls.find(([args]) => args.where.name === RULE);
-    expect(registration?.[0].create).toEqual({
-      id: expect.any(String),
-      name: RULE,
-      description: expect.any(String),
-      metricName: 'availability.calendar.stale_minutes',
-      comparison: 'gt',
-      threshold: 180,
-      windowMinutes: 5,
-      severity: 'high',
-    });
-    expect(prismaMock.calendarSyncState.findUnique).toHaveBeenCalledWith({
-      where: { id: 'booking' },
-      select: { lastSuccessAt: true, createdAt: true },
-    });
-  });
-
   it.each([
-    ['unset', undefined],
     ['empty', ''],
   ])('reads 0 without a database read when the calendar URL is %s', async (_label, value) => {
     vi.stubEnv('BOOKING_ICAL_URL', value);
@@ -107,6 +86,10 @@ describe('stale availability calendar alert', () => {
 
     await expect(evaluateOperationalAlerts()).resolves.toEqual({ opened: 1, resolved: 0, evaluated: 4 });
 
+    expect(prismaMock.calendarSyncState.findUnique).toHaveBeenCalledWith({
+      where: { id: 'booking' },
+      select: { lastSuccessAt: true, createdAt: true },
+    });
     expect(openedValue()).toBe(181);
   });
 

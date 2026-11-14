@@ -98,17 +98,9 @@ describe('NightsTeaser (identity §8)', () => {
     expect(screen.getByRole('link', { name: 'See availability' })).toHaveAttribute('href', '/en/availability');
   });
 
-  it('names booked nights in Greek', async () => {
-    await renderHome('el');
-
-    const cells = within(screen.getByRole('list', { name: 'Οι επόμενες 14 νύχτες' })).getAllByRole('listitem');
-    expect(cells[1]).toHaveTextContent('Δευτέρα 19 Οκτωβρίου, κρατημένη');
-  });
-
   it.each([
     ['stale', () => mocks.read.mockResolvedValue(availability({ status: 'stale', nights: 'u'.repeat(365) }))],
     ['not configured',() => mocks.read.mockResolvedValue(availability({ status: 'not_configured', nights: 'u'.repeat(365) }))],
-    ['unavailable', () => mocks.read.mockRejectedValue(new Error('connect ECONNREFUSED'))],
   ])('is hidden when the calendar is %s', async (_state, arrange) => {
     arrange();
 

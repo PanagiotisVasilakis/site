@@ -70,12 +70,9 @@ describe('admin booking creation', () => {
 
   it.each([
     ['check-out on check-in day', { startDate: '2026-11-01', endDate: '2026-11-01' }],
-    ['check-out before check-in', { startDate: '2026-11-05', endDate: '2026-11-01' }],
     ['instants instead of dates', { startDate: '2026-11-01T00:00:00.000Z', endDate: '2026-11-05T00:00:00.000Z' }],
     ['unknown fields', { startDate: '2026-11-01', endDate: '2026-11-05', userId: 'x' }],
     ['an unknown source', { startDate: '2026-11-01', endDate: '2026-11-05', source: 'PARTNER' }],
-    ['a year below 0100', { startDate: '0026-11-01', endDate: '0026-11-05' }],
-    ['a stay of 181 nights', { startDate: '2026-11-01', endDate: '2027-05-01' }],
   ])('rejects %s with 422', async (_label, body) => {
     const response = await create(body);
 

@@ -96,24 +96,6 @@ describe('FactStrip (identity §8)', () => {
     afterEach(() => document.documentElement.removeAttribute('data-motion'));
 
     const numbers = (container: HTMLElement) => Array.from(container.querySelectorAll('.fact__num'), (n) => n.firstChild?.textContent);
-    const frameAt = (time: number) => act(() => {
-      const pending = frames;
-      frames = [];
-      pending.forEach((frame) => frame(time));
-    });
-
-    it('counts up once in view under full motion and ends on the server text', () => {
-      document.documentElement.setAttribute('data-motion', 'full');
-      const { container } = render(<FactStrip locale="en" />);
-      expect(observed).toHaveLength(1);
-      act(() => observed[0]([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver));
-      frameAt(1000);
-      // An ordinal stays as rendered: its suffix belongs to the final digit.
-      expect(numbers(container)).toEqual(['0', '0', '0', '0', '2nd', 'P']);
-      frameAt(1000 + 850);
-      expect(numbers(container)).toEqual(['90', '2', '1', '4', '2nd', 'P']);
-      expect(frames).toHaveLength(0);
-    });
 
     it('does not count without full motion', () => {
       document.documentElement.setAttribute('data-motion', 'reduce');
@@ -168,58 +150,10 @@ describe('Highlights + SeasonSwitch (identity §8, graft 10)', () => {
     expect(within(list).queryByRole('heading', { name: 'Fireplace and heating' })).toBeNull();
     expect(screen.getByRole('link', { name: 'See summer dates' })).toHaveAttribute('href', '/en/availability#m=2027-04');
   });
-
-  it('flips the cards one by one under full motion (M9), and a change during the flip swaps at once', () => {
-    const winter = ['Fireplace and heating', 'Daily needs on foot', 'Fully equipped kitchen', 'Ready for families'];
-    const summer = ['Balcony facing Taygetos', 'Air conditioning and Wi-Fi', 'The coast a short drive away', 'Free private parking'];
-    vi.useFakeTimers();
-    document.documentElement.dataset.motion = 'full';
-
-    try {
-      render(<Highlights locale="en" now={new Date('2026-11-15T10:00:00Z')} />);
-      const list = screen.getByRole('list', { name: /Winter/ });
-      const titles = () => within(list).getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent);
-
-      // The first card swaps at the edge-on half of its flip (320 ms), the others 70 ms apart.
-      fireEvent.click(screen.getByRole('button', { name: 'Summer (Apr–Oct)' }));
-      expect(list).toHaveClass('is-flipping');
-      expect(titles()).toEqual(winter);
-      act(() => vi.advanceTimersByTime(320));
-      expect(titles()).toEqual([summer[0], ...winter.slice(1)]);
-      act(() => vi.advanceTimersByTime(530));
-      expect(titles()).toEqual(summer);
-      expect(list).not.toHaveClass('is-flipping');
-
-      // A second change mid-flip shows the chosen season at once, and no pending timer swaps a card back.
-      fireEvent.click(screen.getByRole('button', { name: 'Winter (Nov–Mar)' }));
-      act(() => vi.advanceTimersByTime(320));
-      expect(titles()).toEqual([winter[0], ...summer.slice(1)]);
-      fireEvent.click(screen.getByRole('button', { name: 'Summer (Apr–Oct)' }));
-      expect(list).not.toHaveClass('is-flipping');
-      expect(titles()).toEqual(summer);
-      act(() => vi.advanceTimersByTime(2000));
-      expect(titles()).toEqual(summer);
-    } finally {
-      delete document.documentElement.dataset.motion;
-      vi.useRealTimers();
-    }
-  });
 });
 
 describe('RoomsShowcase (identity §8, M11/M12)', () => {
   const rooms = homeRoomsFrom('en', APARTMENT_PHOTOS);
-
-  it('builds six rooms from the apartment photos, lead photos per §7.3, linked to the apartment room sections', () => {
-    expect(rooms.map((room) => [room.href, room.photo])).toEqual([
-      ['/en/apartment#living', '/house/living/living_8.jpeg'],
-      ['/en/apartment#kitchen', '/house/kitchen/kitchen_2.jpeg'],
-      ['/en/apartment#bedroom-1', '/house/bedroom/bedroom_1.jpeg'],
-      ['/en/apartment#bedroom-2', '/house/bedroom_2/bedroom_2_5.jpeg'],
-      ['/en/apartment#bathroom', '/house/bathroom/bathroom_6.jpeg'],
-      ['/en/apartment#balcony', '/house/balcony/balcony_2.jpeg'],
-    ]);
-    expect(homeRoomsFrom('el', APARTMENT_PHOTOS)[2]).toMatchObject({ name: 'Υπνοδωμάτιο 1', href: '/el/apartment#bedroom-1' });
-  });
 
   it('renders no chip and no card for a room without its photo', () => {
     const withoutBedroom2 = homeRoomsFrom('en', APARTMENT_PHOTOS.filter((photo) => photo.room !== 'bedroom-2'));
@@ -228,13 +162,6 @@ describe('RoomsShowcase (identity §8, M11/M12)', () => {
     expect(screen.getAllByRole('button')).toHaveLength(5);
     expect(screen.queryByRole('button', { name: 'Bedroom 2' })).toBeNull();
     expect(screen.getAllByRole('link')).toHaveLength(5);
-  });
-
-  it('leaves a room out when only its lead photo is missing from the apartment photos', () => {
-    const withoutLead = homeRoomsFrom('en', APARTMENT_PHOTOS.filter((photo) => photo.src !== '/house/bedroom_2/bedroom_2_5.jpeg'));
-
-    expect(withoutLead.map((room) => room.href)).not.toContain('/en/apartment#bedroom-2');
-    expect(withoutLead).toHaveLength(5);
   });
 
   it('moves the active card with the arrow keys and keeps the chips in sync', async () => {

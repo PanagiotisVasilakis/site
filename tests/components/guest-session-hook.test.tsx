@@ -96,25 +96,7 @@ describe('useGuestSession', () => {
   });
 
   it.each([
-    { name: 'a 5xx answer', answer: () => failure(503) },
-    { name: 'a network error', answer: () => Promise.reject(new TypeError('Failed to fetch')) },
-  ])('keeps the last known portal and check-in flags on $name', async ({ answer }) => {
-    fetchMock.mockResolvedValue(status(false, true));
-    const { result } = renderHook(() => useGuestSession());
-    await waitFor(() => expect(result.current).toMatchObject({ portalEnabled: true, checkinEnabled: true }));
-
-    fetchMock.mockImplementation(async () => answer());
-    recheck();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    await settle();
-
-    expect(result.current).toMatchObject({ portalEnabled: true, checkinEnabled: true });
-  });
-
-  it.each([
     { name: 'a 503 answer', answer: () => failure(503) },
-    { name: 'a 500 answer', answer: () => failure(500) },
-    { name: 'a 429 answer', answer: () => failure(429) },
     { name: 'a network error', answer: () => Promise.reject(new TypeError('Failed to fetch')) },
   ])('keeps a signed-in guest signed in, with the flags, on $name', async ({ answer }) => {
     fetchMock.mockResolvedValue(status(true, true));

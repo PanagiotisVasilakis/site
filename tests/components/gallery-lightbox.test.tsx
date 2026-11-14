@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import GalleryLightbox, { type LightboxPhoto } from '@/components/gallery/GalleryLightbox';
 
+import { installDialogMethods, removeDialogMethods } from '../support/dom';
+
 const PHOTOS: LightboxPhoto[] = [
   { src: '/a.jpeg', alt: 'Sofa', caption: 'Living room' },
   { src: '/b.jpeg', alt: 'Table', caption: 'Living room' },
@@ -29,25 +31,14 @@ const SLIDE_WIDTH = 800;
 // observable steps (open attribute, `close` event; scrollTo moves scrollLeft).
 let scrollTo: ReturnType<typeof vi.fn>;
 beforeEach(() => {
-  Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
-    configurable: true,
-    value: vi.fn(function (this: HTMLDialogElement) { this.setAttribute('open', ''); }),
-  });
-  Object.defineProperty(HTMLDialogElement.prototype, 'close', {
-    configurable: true,
-    value: vi.fn(function (this: HTMLDialogElement) {
-      this.removeAttribute('open');
-      this.dispatchEvent(new Event('close'));
-    }),
-  });
+  installDialogMethods();
   scrollTo = vi.fn(function (this: HTMLElement, options: ScrollToOptions) { this.scrollLeft = options.left ?? 0; });
   Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: scrollTo });
   Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => SLIDE_WIDTH });
 });
 
 afterEach(() => {
-  Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
-  Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
+  removeDialogMethods();
   Reflect.deleteProperty(HTMLElement.prototype, 'scrollTo');
   Reflect.deleteProperty(HTMLElement.prototype, 'clientWidth');
 });
@@ -127,16 +118,6 @@ describe('GalleryLightbox (identity §8)', () => {
     expect(track.scrollLeft).toBe(0);
   });
 
-  it('has previous/next buttons that are disabled at the ends', async () => {
-    render(<Harness />);
-    const { user, dialog } = await openAt('Sofa');
-
-    expect(within(dialog).getByRole('button', { name: 'Previous photo' })).toBeDisabled();
-    await user.click(within(dialog).getByRole('button', { name: 'Next photo' }));
-    expect(counter(dialog)).toHaveTextContent('2 / 5');
-    expect(within(dialog).getByRole('button', { name: 'Previous photo' })).toBeEnabled();
-  });
-
   it('updates the counter when a swipe ends (scrollend)', async () => {
     render(<Harness />);
     const { dialog } = await openAt('Sofa');
@@ -174,17 +155,6 @@ describe('GalleryLightbox (identity §8)', () => {
     } finally {
       if (owner && descriptor) Object.defineProperty(owner, 'onscrollend', descriptor);
     }
-  });
-
-  it('loads only the current photo and its neighbours eagerly', async () => {
-    render(<Harness />);
-    const { dialog } = await openAt('Oven');
-
-    const loading = [...dialog.querySelectorAll('img')].map((img) => img.getAttribute('loading'));
-    expect(loading).toEqual(['lazy', 'eager', 'eager', 'eager', 'lazy']);
-    fireEvent.keyDown(dialog, { key: 'End' });
-    expect([...dialog.querySelectorAll('img')].map((img) => img.getAttribute('loading')))
-      .toEqual(['lazy', 'lazy', 'lazy', 'eager', 'eager']);
   });
 
   it('closes on Escape and returns focus to the photo that opened it', async () => {

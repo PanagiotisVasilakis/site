@@ -9,8 +9,7 @@ import FactStrip from '@/components/home/FactStrip';
 import AvailabilityBookBar from '@/components/shell/AvailabilityBookBar';
 import { HostIdentity } from '@/components/shell/HostIdentity';
 import type { Metadata } from 'next';
-import { logger } from '@/lib/logger-enterprise';
-import { readPublicAvailability, type PublicAvailability } from '@/lib/prisma-repositories/availabilityRepository';
+import { readAvailabilityOrNull } from '@/lib/availability/readAvailabilityOrNull';
 import { localizedAlternates, localizedOpenGraph } from '@/lib/seo';
 
 // The BookBar's free-night note comes from the availability read: rendered per request, like home and availability.
@@ -40,17 +39,6 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   };
 }
 
-/** The availability data for the BookBar's free-night note (identity §1.4, §8), or null. */
-async function apartmentAvailability(now: Date): Promise<PublicAvailability | null> {
-  try {
-    return await readPublicAvailability(now);
-  } catch {
-    // No details: the error may carry connection data. The page then shows no BookBar.
-    logger.error('Apartment availability could not be read');
-    return null;
-  }
-}
-
 /** identity §9.2: page head, lead photo, room chips and galleries, amenities, CTA, BookBar (§8). */
 export default async function ApartmentPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -59,7 +47,8 @@ export default async function ApartmentPage({ params }: { params: Promise<{ loca
   const ht = t.house;
   const rooms = APARTMENT_ROOMS.map((key) => ({ key, ...(key === 'parking' || key === 'details' ? ht[key] : t.home.rooms.items[ROOM_COPY[key]]) }));
   const photos = APARTMENT_PHOTOS.map((photo) => ({ ...photo, alt: ht.photoAlts[photo.id] }));
-  const availability = await apartmentAvailability(new Date());
+  // The data for the BookBar's free-night note (identity §1.4, §8); null: the page shows no BookBar.
+  const availability = await readAvailabilityOrNull(new Date(), 'Apartment availability could not be read');
 
   return (
     <div className="apt">

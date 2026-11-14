@@ -7,18 +7,17 @@ type SectionProps = {
   eyebrow?: string;
   lead?: string;
   /**
-   * `band` (deep sea) and `warm` (terracotta gradient) are full-bleed; `default` sits on bg.
+   * `band` (deep sea) is full-bleed; `default` sits on bg.
    * `plain` is the §9.3 information block: a `d3` title and a `fg-muted` body of at most 65ch.
    */
-  variant?: 'default' | 'band' | 'warm' | 'plain';
+  variant?: 'default' | 'band' | 'plain';
   className?: string;
   children: React.ReactNode;
 };
 
 /**
  * identity §8 Section: head = Eyebrow + Title (`d2`) + Lead, then the content (styles in
- * src/styles/components/ui.css). The head is never inside a transformed element. The sunken variant
- * arrives with its first consumer.
+ * src/styles/components/ui.css). The head is never inside a transformed element.
  */
 export function Section({ id, title, eyebrow, lead, variant = 'default', className, children }: SectionProps) {
   return (

@@ -24,27 +24,19 @@ describe('dictionary parity', () => {
     expect(en.filter((path) => !el.includes(path))).toEqual([]);
   });
 
-  it('has no empty strings', () => {
+  it('has no empty strings and only NFC-normalized strings (the Greek font subset has no combining tonos)', () => {
     const empty: string[] = [];
+    const denormalized: string[] = [];
     const walk = (value: unknown, path: string) => {
-      if (typeof value === 'string' && value.trim() === '') empty.push(path);
-      else if (value && typeof value === 'object') for (const [key, entry] of Object.entries(value)) walk(entry, `${path}.${key}`);
+      if (typeof value === 'string') {
+        if (value.trim() === '') empty.push(path);
+        if (value !== value.normalize('NFC')) denormalized.push(path);
+      } else if (value && typeof value === 'object') for (const [key, entry] of Object.entries(value)) walk(entry, `${path}.${key}`);
     };
     walk(getDictionary('en'), 'en');
     walk(getDictionary('el'), 'el');
 
     expect(empty).toEqual([]);
-  });
-
-  it('has only NFC-normalized strings (the Greek font subset has no combining tonos)', () => {
-    const denormalized: string[] = [];
-    const walk = (value: unknown, path: string) => {
-      if (typeof value === 'string' && value !== value.normalize('NFC')) denormalized.push(path);
-      else if (value && typeof value === 'object') for (const [key, entry] of Object.entries(value)) walk(entry, `${path}.${key}`);
-    };
-    walk(getDictionary('en'), 'en');
-    walk(getDictionary('el'), 'el');
-
     expect(denormalized).toEqual([]);
   });
 

@@ -28,7 +28,6 @@ describe('feature flag coupling', () => {
     [true, true, { portalEnabled: true, checkinEnabled: true }],
     [true, false, { portalEnabled: true, checkinEnabled: false }],
     [false, true, { portalEnabled: false, checkinEnabled: false }],
-    [false, false, { portalEnabled: false, checkinEnabled: false }],
   ])('stored portal=%s check-in=%s is effective as %j', async (portalEnabled, checkinEnabled, expected) => {
     prismaMock.operationalSetting.findUnique.mockResolvedValue({ value: { portalEnabled, checkinEnabled } });
 

@@ -33,17 +33,15 @@ describe('check-pepper predev warning', () => {
     leaveScratchDir(workDir);
   });
 
-  it('treats an empty SECURITY_PEPPER followed by other lines as missing', () => {
+  it('treats an empty SECURITY_PEPPER or CLAIM_TOKEN_PEPPER followed by other lines as missing', () => {
     const { status, stderr } = run('SECURITY_PEPPER=\nCLAIM_TOKEN_PEPPER=def\nFOO=bar\n');
 
     expect(status).toBe(0);
     expect(stderr).toContain('SECURITY_PEPPER not found');
-  });
 
-  it('treats an empty CLAIM_TOKEN_PEPPER followed by other lines as missing', () => {
-    const { stderr } = run('CLAIM_TOKEN_PEPPER=\nSECURITY_PEPPER=abc\n');
+    const second = run('CLAIM_TOKEN_PEPPER=\nSECURITY_PEPPER=abc\n');
 
-    expect(stderr).toContain('CLAIM_TOKEN_PEPPER not found');
+    expect(second.stderr).toContain('CLAIM_TOKEN_PEPPER not found');
   });
 
   it('accepts non-empty values', () => {

@@ -18,7 +18,7 @@ const REQUEST_HEADERS = {
   Accept: 'text/calendar, text/plain;q=0.8, */*;q=0.1',
 };
 
-export type CalendarFetchErrorCode =
+type CalendarFetchErrorCode =
   | 'invalid_url'
   | 'timeout'
   | 'network'
@@ -131,24 +131,16 @@ function isTimeoutError(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'name' in error && error.name === 'TimeoutError';
 }
 
-/**
- * Downloads the calendar export as text. Throws CalendarFetchError, or the
- * caller's own abort reason when `options.signal` aborts first.
- */
-export async function fetchBookingCalendarText(
-  url: string,
-  options: { signal?: AbortSignal } = {},
-): Promise<string> {
+/** Downloads the calendar export as text. Throws CalendarFetchError. */
+export async function fetchBookingCalendarText(url: string): Promise<string> {
   if (!isBookingCalendarUrl(url)) throw new CalendarFetchError('invalid_url');
 
-  const timeout = AbortSignal.timeout(FETCH_TIMEOUT_MS);
-  const signal = options.signal ? AbortSignal.any([timeout, options.signal]) : timeout;
+  const signal = AbortSignal.timeout(FETCH_TIMEOUT_MS);
   try {
     return await fetchFollowingAllowedRedirects(new URL(url), signal);
   } catch (error) {
     if (error instanceof CalendarFetchError) throw error;
-    if (timeout.aborted) throw new CalendarFetchError('timeout');
-    if (options.signal?.aborted) throw options.signal.reason;
+    if (signal.aborted) throw new CalendarFetchError('timeout');
     // Upstream errors are replaced, never wrapped: their text can hold the URL.
     throw new CalendarFetchError(isTimeoutError(error) ? 'timeout' : 'network');
   }

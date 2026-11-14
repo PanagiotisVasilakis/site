@@ -14,12 +14,8 @@ import { PROPERTY_TIME_ZONE } from '@/data/stayPolicy';
 import { normalizeLocale, type Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 import { bookingComHref, telHref } from '@/lib/contactLinks';
-import { logger } from '@/lib/logger-enterprise';
-import {
-  readPublicAvailability,
-  type AvailabilityStatus,
-  type PublicAvailability,
-} from '@/lib/prisma-repositories/availabilityRepository';
+import { readAvailabilityOrNull } from '@/lib/availability/readAvailabilityOrNull';
+import type { AvailabilityStatus, PublicAvailability } from '@/lib/prisma-repositories/availabilityRepository';
 import { localizedAlternates, localizedOpenGraph } from '@/lib/seo';
 
 // Free nights: the booking entry point (the old /book and
@@ -82,15 +78,8 @@ export default async function AvailabilityPage({ params }: AvailabilityPageProps
   const { locale } = await params;
   const eff = normalizeLocale(locale);
   const t = getDictionary(eff).availability;
-  const now = new Date();
-
-  let availability: PublicAvailability | null = null;
-  try {
-    availability = await readPublicAvailability(now);
-  } catch {
-    // No details: the error may carry connection data. The page still offers the contact options.
-    logger.error('Public availability could not be read');
-  }
+  // null: the page still offers the contact options.
+  const availability = await readAvailabilityOrNull(new Date(), 'Public availability could not be read');
 
   const calendar = availability !== null && calendarShown(availability) ? availability : null;
 

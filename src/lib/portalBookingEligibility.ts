@@ -5,7 +5,7 @@ export type PortalBookingEligibilityWindow = Readonly<{
   inclusiveMaximumStartDate: Date;
 }>;
 
-export type PortalBookingDateRange = Readonly<{
+type PortalBookingDateRange = Readonly<{
   startDate: Date;
   endDate: Date;
 }>;

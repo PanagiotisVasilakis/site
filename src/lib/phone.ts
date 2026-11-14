@@ -22,8 +22,7 @@ export function normalizePhone(input: string, origin?: Origin): { e164: string }
   // Greek local auto-prefix (+30) for 10-digit locals
   if (origin === 'GR' && /^[1-9]\d{9}$/.test(raw)) {
     // Basic local sanity: no leading 0 (it falls through to the international rules and is rejected); don't overfit
-    const prefixed = `+30${raw}`;
-    return isE164(prefixed) ? { e164: prefixed } : null;
+    return { e164: `+30${raw}` };
   }
 
   // Already in international form

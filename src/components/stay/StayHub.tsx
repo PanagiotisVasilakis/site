@@ -1,16 +1,12 @@
 import Link from 'next/link';
-import { favoriteIdOf } from '@/components/guide/guideEntries';
+import { knownFavoriteIds } from '@/components/guide/guideEntries';
 import { Icon } from '@/components/icons/Icon';
-import { categories } from '@/data/categories';
 import type { Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
-import { telHref } from '@/lib/contactLinks';
+import { EMERGENCY_112_HREF, EMERGENCY_112_ID, telHref } from '@/lib/contactLinks';
 import { getItemsByCategory, pickLocale } from '@/lib/data';
 import { FavouritesTile, StaySessionTiles } from './StaySessionTiles';
 import { StayTile } from './StayTile';
-
-/** The 112 entry is the SOS row; the next two emergency numbers follow it (§9.4 tile 5, R3-L10). */
-const EMERGENCY_ID = 'emergency-112';
 
 /** Decorative half sun behind the H1 (§9.4): rays at .5 opacity. */
 function HalfSun() {
@@ -40,10 +36,8 @@ export function StayHub({ locale, portalEnabled, checkinEnabled }: { locale: Loc
   const t = getDictionary(locale);
   const hub = t.stay.hub;
   const phones = getItemsByCategory('phones')
-    .filter((item) => item.tags?.includes('emergency') && item.id !== EMERGENCY_ID && item.phone)
+    .filter((item) => item.tags?.includes('emergency') && item.id !== EMERGENCY_112_ID && item.phone)
     .slice(0, 2);
-  // The favourites count covers only ids that still resolve to a place, like the guide's Saved count.
-  const knownFavoriteIds = categories.flatMap((c) => getItemsByCategory(c.id).map((item) => favoriteIdOf(c, item)));
 
   return (
     <div className="stay-page stay-hub">
@@ -59,7 +53,7 @@ export function StayHub({ locale, portalEnabled, checkinEnabled }: { locale: Loc
         <StayTile icon="phone" title={t.guide.phonesTitle} className="stay-tile--phones">
           <ul className="stay-phones">
             <li>
-              <a href="tel:112" className="stay-phones__row stay-phones__row--sos shell-link">
+              <a href={EMERGENCY_112_HREF} className="stay-phones__row stay-phones__row--sos shell-link">
                 <span className="stay-phones__sos">112</span>
                 <span className="stay-phones__name">{hub.sosLabel}</span>
               </a>
@@ -95,7 +89,7 @@ export function StayHub({ locale, portalEnabled, checkinEnabled }: { locale: Loc
           </form>
         </StayTile>
 
-        <FavouritesTile locale={locale} favoriteIds={knownFavoriteIds} />
+        <FavouritesTile locale={locale} favoriteIds={knownFavoriteIds()} />
       </div>
     </div>
   );

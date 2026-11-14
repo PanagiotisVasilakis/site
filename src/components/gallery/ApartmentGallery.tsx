@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { flushSync } from 'react-dom';
 
 import type { ApartmentRoomKey, PhotoCrop } from '@/data/apartmentPhotos';
+import { isMotionFull } from '@/lib/motion/motionPreference';
 import GalleryLightbox, { lightboxSlide, type LightboxLabels, type LightboxPhoto } from './GalleryLightbox';
 import { morphPhoto } from './photoMorph';
 
@@ -93,7 +94,7 @@ export default function ApartmentGallery({ rooms, photos, leadId, labels }: Apar
       const row = chipsRef.current;
       const chip = row?.querySelector<HTMLElement>(`[data-room="${first.key}"]`);
       if (row && chip) {
-        const behavior = document.documentElement.getAttribute('data-motion') === 'full' ? 'smooth' : 'instant';
+        const behavior = isMotionFull() ? 'smooth' : 'instant';
         row.scrollTo({ left: chip.offsetLeft - (row.clientWidth - chip.offsetWidth) / 2, behavior });
       }
     }, { rootMargin: '-140px 0px -55% 0px' });

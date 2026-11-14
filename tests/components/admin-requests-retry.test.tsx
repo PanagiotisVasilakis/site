@@ -28,7 +28,7 @@ function list(notificationStatus: string | null) {
 describe('admin arrival requests: failed notifications', () => {
   beforeEach(() => {
     let retried = false;
-    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+    fetchMock.mockImplementation(async (_url: string, init?: RequestInit) => {
       if (init?.method === 'PATCH') {
         retried = true;
         return new Response(JSON.stringify({ success: true, data: { notification: { status: 'queued' } } }), { status: 200 });

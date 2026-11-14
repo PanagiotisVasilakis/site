@@ -49,14 +49,6 @@ describe('admin layout shell (identity §9.12)', () => {
     expect(screen.getAllByRole('link')).toHaveLength(1);
   });
 
-  it('puts the header and the page inside the admin-scoped plain background wrapper', async () => {
-    await renderLayout();
-
-    const shell = screen.getByRole('banner').parentElement;
-    expect(shell).toHaveClass('admin-shell');
-    expect(shell).toContainElement(screen.getByText('Admin page body'));
-  });
-
   it('keeps the session manager: signed out it receives no expiry, signed in the session expiry', async () => {
     await renderLayout();
     expect(screen.getByTestId('session-manager')).toHaveAttribute('data-expires-at', '');

@@ -2,7 +2,7 @@ import { userRepository, type UserRecord } from '@/lib/prisma-repositories/userR
 import { bookingRepository, type BookingRecord } from '@/lib/prisma-repositories/bookingRepository';
 import {
   refreshTokenRepository,
-  type GuestRefreshTokenRec as PrismaGuestRefreshTokenRec,
+  type GuestRefreshTokenRec,
   type RefreshSessionBinding,
   type RefreshSessionRecord,
 } from '@/lib/prisma-repositories/refreshTokenRepository';
@@ -16,8 +16,6 @@ import { phoneLookupCandidates } from '@/lib/phone';
 
 export type User = UserRecord;
 export type Booking = BookingRecord;
-
-type GuestRefreshTokenRec = PrismaGuestRefreshTokenRec;
 
 export const guestStore = {
   // Users
@@ -56,7 +54,7 @@ export const guestStore = {
   ): Promise<{ rec: GuestRefreshTokenRec; token: string }> {
     const rawSecret = crypto.randomBytes(32).toString('base64url');
     const { hash, salt } = hashSensitive(rawSecret);
-    const family_id = opts?.family_id || crypto.randomUUID();
+    const family_id = opts.family_id || crypto.randomUUID();
 
     const rec = await refreshTokenRepository.create(
       user_id,
@@ -66,8 +64,8 @@ export const guestStore = {
       family_id,
       Date.now() + ttlDays * 24 * 60 * 60 * 1000,
       {
-        deviceHint: opts?.device_hint,
-        ipHint: opts?.ip_hint
+        deviceHint: opts.device_hint,
+        ipHint: opts.ip_hint
       }
     );
 
@@ -93,14 +91,17 @@ export const guestStore = {
       ip_hint?: string;
       presented_session: RefreshSessionBinding;
     },
-  ): Promise<{
-    status: 'rotated' | 'invalid' | 'concurrent' | 'replayed';
-    old?: GuestRefreshTokenRec;
-    rec?: GuestRefreshTokenRec;
-    token?: string;
-    session?: RefreshSessionRecord;
-    sessionToken?: string;
-  }> {
+  ): Promise<
+    | { status: 'invalid' | 'concurrent' | 'replayed' }
+    | {
+      status: 'rotated';
+      old: GuestRefreshTokenRec;
+      rec: GuestRefreshTokenRec;
+      token: string;
+      session: RefreshSessionRecord;
+      sessionToken: string;
+    }
+  > {
     const now = Date.now();
     const replacementId = crypto.randomUUID();
     const rawSecret = crypto.randomBytes(32).toString('base64url');
@@ -111,8 +112,8 @@ export const guestStore = {
       salt,
       tokenExpiresAt: now + ttlDays * 24 * 60 * 60 * 1000,
       sessionExpiresAt: new Date(now + GUEST_SESSION_TTL_SECONDS * 1000),
-      deviceHash: context?.device_hint,
-      ipHash: context?.ip_hint,
+      deviceHash: context.device_hint,
+      ipHash: context.ip_hint,
       presentedSession: context.presented_session,
       createSessionToken: createGuestSessionToken,
     });

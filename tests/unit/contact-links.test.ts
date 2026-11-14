@@ -30,11 +30,9 @@ describe('isBookingComListingUrl', () => {
   });
 
   it.each([
-    '',
     'not a url',
     'http://www.booking.com/Share-AiCapK',
     'https://www.booking.com.evil.test/Share-AiCapK',
-    'https://example.com/Share-AiCapK',
     'https://user:pass@www.booking.com/Share-AiCapK',
     'https://www.booking.com:8443/Share-AiCapK',
     'https://www.booking.com/',

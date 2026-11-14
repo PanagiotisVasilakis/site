@@ -293,8 +293,8 @@ async function runSecurityValidation(): Promise<void> {
 const isMain = process.argv[1] ? fileURLToPath(import.meta.url) === process.argv[1] : false;
 
 if (isMain) {
-  runSecurityValidation().catch(() => {
-    console.error('Security validation failed');
+  runSecurityValidation().catch((error) => {
+    console.error('Security validation failed:', error instanceof Error ? error.message : String(error));
     process.exit(1);
   });
 }

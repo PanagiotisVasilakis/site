@@ -20,15 +20,11 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
+import { MARK, recolourMark } from './mark';
 
 const ROOT = process.cwd();
-const MARK = path.join(ROOT, 'public/brand/mark.svg');
 
 const BAND_BG = '#0C3440';
-const RECOLOUR: ReadonlyArray<readonly [string, string]> = [
-  ['#F0A95B', '#F2B27A'], // sun → band-accent
-  ['#0D5568', '#F6EFE4'], // waves → band-fg
-];
 
 // The mark's view box in mark.svg is "4 13 32 20" (32 × 20 units, centre 20,23).
 const MARK_WIDTH = 32;
@@ -38,12 +34,7 @@ async function markContent(): Promise<string> {
   const svg = await readFile(MARK, 'utf8');
   const inner = /<svg\b[^>]*>([\s\S]*)<\/svg>/.exec(svg)?.[1];
   if (!inner) throw new Error(`No <svg> element in ${MARK}`);
-  let recoloured = inner;
-  for (const [from, to] of RECOLOUR) {
-    if (!recoloured.includes(from)) throw new Error(`mark.svg no longer uses ${from}`);
-    recoloured = recoloured.split(from).join(to);
-  }
-  return recoloured;
+  return recolourMark(inner);
 }
 
 /** An icon SVG: the mark at `markShare` of the icon width, centred on a band-bg square. */

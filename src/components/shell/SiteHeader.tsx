@@ -9,6 +9,7 @@ import { Icon } from '@/components/icons/Icon';
 import { useToast } from '@/components/Toast';
 import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
+import { WORDMARK } from '@/data/brand';
 import { useGuestSession } from '@/hooks/useGuestSession';
 import { useScroll } from '@/hooks/useScroll';
 import { normalizeLocale } from '@/i18n/config';
@@ -21,9 +22,6 @@ import { ThemeSwitch } from './ThemeSwitch';
 import {
   brandHref, headerCta, headerOverlaysHero, isCurrentLink, navLinks, scrollToCurrentHash, shellVariantFor,
 } from './shellLinks';
-
-/** The wordmark (identity §1.2): the brand in every locale; the place label below it is localized. */
-const WORDMARK = 'Dolce Far Niente';
 
 /**
  * identity §8 SiteHeader: a sticky glass pill with the brand, the nav (≥ 1320 px), the language and theme

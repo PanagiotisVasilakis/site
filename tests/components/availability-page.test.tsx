@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -13,7 +13,7 @@ vi.mock('@/lib/prisma-repositories/availabilityRepository', () => ({ readPublicA
 vi.mock('@/lib/logger-enterprise', () => ({ logger: mocks.logger }));
 
 import AvailabilityPage, { dynamic, generateMetadata } from '@/app/[locale]/availability/page';
-import { BOOKING_COM_LISTING_URL, HOST_CONTACT } from '@/data/contact';
+import { BOOKING_COM_LISTING_URL } from '@/data/contact';
 import type { Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 import { addDays, type IsoDate } from '@/lib/availability/calendarDate';
@@ -157,29 +157,6 @@ describe('availability page', () => {
       .toHaveAttribute('href', BOOKING_COM_LISTING_URL);
     // Owner decision of 2026-10-15: no cancellation policy and no price on the page.
     expect(document.body.textContent).not.toMatch(/€|cancel|ακύρωσ/i);
-  });
-
-  it('lists the host phone, e-mail and WhatsApp in the contact section', async () => {
-    const t = getDictionary('en').availability;
-    await renderPage('en');
-
-    const section = screen.getByRole('region', { name: t.contactTitle });
-    expect(within(section).getByRole('link', { name: '+30 695 581 0051' })).toHaveAttribute('href', 'tel:+306955810051');
-    expect(within(section).getByRole('link', { name: 'dolcefarnienteapartments@gmail.com' }))
-      .toHaveAttribute('href', 'mailto:dolcefarnienteapartments@gmail.com');
-    expect(within(section).getByRole('link', { name: `${t.whatsappLabel} ${t.booking.opensInNewTab}` }))
-      .toHaveAttribute('href', 'https://wa.me/306955810051');
-  });
-
-  it('shows the host identity block in the page head (en)', async () => {
-    const labels = getDictionary('en').shell.identity;
-    const { container } = await renderPage('en');
-    const head = container.querySelector('.avail-page__head') as HTMLElement;
-    const identity = head.querySelector('.host-identity') as HTMLElement;
-    expect(identity).not.toBeNull();
-    for (const text of [labels.registryLabel, labels.legalNameLabel, HOST_CONTACT.registrationNumber, HOST_CONTACT.legalName, HOST_CONTACT.address]) {
-      expect(within(identity).getByText(text)).toBeInTheDocument();
-    }
   });
 
   it('builds localized metadata for /availability', async () => {

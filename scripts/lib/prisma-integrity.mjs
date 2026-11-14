@@ -362,8 +362,8 @@ function compareManifestToCurrentState(manifest, current) {
   }
 }
 
-export function checkPrismaIntegrity(repositoryRoot = process.cwd(), manifestPath) {
-  const resolvedManifestPath = manifestPath ?? path.join(repositoryRoot, MANIFEST_RELATIVE_PATH);
+export function checkPrismaIntegrity(repositoryRoot = process.cwd()) {
+  const resolvedManifestPath = path.join(repositoryRoot, MANIFEST_RELATIVE_PATH);
   assertRegularFile(resolvedManifestPath, 'Prisma integrity manifest');
   const manifest = parsePrismaIntegrityManifest(readFileSync(resolvedManifestPath));
   const current = calculatePrismaIntegrity(repositoryRoot);
@@ -371,8 +371,8 @@ export function checkPrismaIntegrity(repositoryRoot = process.cwd(), manifestPat
   return { manifest, current };
 }
 
-export function writePrismaIntegrityManifest(repositoryRoot = process.cwd(), manifestPath) {
-  const resolvedManifestPath = manifestPath ?? path.join(repositoryRoot, MANIFEST_RELATIVE_PATH);
+export function writePrismaIntegrityManifest(repositoryRoot = process.cwd()) {
+  const resolvedManifestPath = path.join(repositoryRoot, MANIFEST_RELATIVE_PATH);
   const manifest = buildPrismaIntegrityManifest(repositoryRoot);
   const temporaryPath = `${resolvedManifestPath}.tmp-${process.pid}`;
   try {

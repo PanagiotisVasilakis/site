@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { ICON_NAMES } from "@/components/icons/iconNames";
 
 export const CategorySchema = z.object({
   id: z.string(),
@@ -10,8 +9,6 @@ export const CategorySchema = z.object({
   description: z.string().optional(),
   description_en: z.string().optional(),
   description_el: z.string().optional(),
-  icon: z.enum(ICON_NAMES).optional(),
-  order: z.number().optional(),
 });
 
 export type Category = z.infer<typeof CategorySchema>;

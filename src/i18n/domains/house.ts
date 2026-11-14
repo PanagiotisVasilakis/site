@@ -6,7 +6,7 @@
 
 import type { Locale } from '../config';
 import type { ApartmentPhotoId } from '@/data/apartmentPhotos';
-import type { IconName } from '@/components/icons/iconNames';
+import type { IconName } from '@/components/icons/Icon';
 
 // ============================================================================
 // Types

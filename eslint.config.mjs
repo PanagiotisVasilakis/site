@@ -3,7 +3,7 @@ import nextTypescript from "eslint-config-next/typescript";
 import internalFetchRule from "./scripts/eslint-rules/internal-fetch.js";
 
 const eslintConfig = [
-  { ignores: ["**/node_modules/**", "**/.next/**", "**/coverage/**", "out/**", "build/**", "dist/**", "next-env.d.ts", "**/reports/**", ".runtime/**"] },
+  { ignores: ["**/node_modules/**", "**/.next/**", "**/coverage/**", "out/**", "build/**", "dist/**", "next-env.d.ts", ".runtime/**"] },
   ...nextCoreWebVitals,
   ...nextTypescript,
   {

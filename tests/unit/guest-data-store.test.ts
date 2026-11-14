@@ -62,16 +62,13 @@ beforeEach(() => {
 });
 
 describe('guestStore admin reads', () => {
-  it('returns the current bookings on every call', async () => {
+  it('returns the current bookings and users on every call', async () => {
     m.bookingGetAll.mockResolvedValueOnce([booking('first')]).mockResolvedValueOnce([booking('second')]);
+    m.userGetAll.mockResolvedValueOnce([user('first')]).mockResolvedValueOnce([user('second')]);
 
     expect(await guestStore.getAllBookings()).toEqual([booking('first')]);
     expect(await guestStore.getAllBookings()).toEqual([booking('second')]);
     expect(m.bookingGetAll).toHaveBeenCalledTimes(2);
-  });
-
-  it('returns the current users on every call', async () => {
-    m.userGetAll.mockResolvedValueOnce([user('first')]).mockResolvedValueOnce([user('second')]);
 
     expect(await guestStore.getAllUsers()).toEqual([user('first')]);
     expect(await guestStore.getAllUsers()).toEqual([user('second')]);
@@ -86,14 +83,6 @@ describe('guestStore.findUserByPhone', () => {
 
     expect(await guestStore.findUserByPhone('691 234 5678')).toEqual(guest);
     expect(m.userFindByPhone.mock.calls).toEqual([['+6912345678'], ['+306912345678']]);
-  });
-
-  it('looks up the +30 form once', async () => {
-    const guest = user('international');
-    m.userFindByPhone.mockResolvedValue(guest);
-
-    expect(await guestStore.findUserByPhone('+306912345678')).toEqual(guest);
-    expect(m.userFindByPhone.mock.calls).toEqual([['+306912345678']]);
   });
 
   it('does not repeat the +30 lookup when no guest has that number', async () => {

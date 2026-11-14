@@ -46,7 +46,6 @@ const EXPECTED_SYNTHETIC_PRODUCTION_ENVIRONMENT = Object.freeze({
   CLAIM_TOKEN_PEPPER: 'release-only-claim-token-pepper-0000',
   GUEST_WIFI_NETWORK: 'RELEASE-SYNTHETIC-NETWORK',
   GUEST_WIFI_PASSWORD: 'release-only-password',
-  PROPERTY_TIME_ZONE: 'Europe/Athens',
   ALLOWED_ORIGINS: 'https://release.example.invalid',
   NEXT_TELEMETRY_DISABLED: '1',
   NEXT_PUBLIC_SITE_URL: 'https://release.example.invalid',

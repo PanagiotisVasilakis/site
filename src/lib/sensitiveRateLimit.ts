@@ -4,7 +4,7 @@ import { requireCanonicalClientIp } from '@/lib/net/clientIdentity';
 import { normalizePhone } from '@/lib/phone';
 import { privacyHmac } from '@/lib/privacyHash';
 
-export interface RateLimitDecision {
+interface RateLimitDecision {
   allowed: boolean;
   limit: number;
   remaining: number;

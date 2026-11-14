@@ -36,7 +36,7 @@ export const ALTERNATE_BOOKING_FIXTURE = {
   externalReference: 'alternate-session-booking-003',
 } as const;
 
-export interface SafeAuthStateSnapshot {
+interface SafeAuthStateSnapshot {
   users: number;
   bookings: number;
   sessions: {
@@ -61,12 +61,12 @@ export interface SafeAuthStateSnapshot {
   };
 }
 
-export interface AuthFixtureSeedOptions {
+interface AuthFixtureSeedOptions {
   includeAlternateBooking?: boolean;
   includeIsolatedPrincipal?: boolean;
 }
 
-export interface SafeAuthSnapshotScope {
+interface SafeAuthSnapshotScope {
   userId?: string;
 }
 

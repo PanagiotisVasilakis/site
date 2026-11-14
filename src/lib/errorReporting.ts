@@ -86,15 +86,16 @@ class ErrorReporter {
       };
 
       const location = options.location;
+      const fromStack = this.extractLocationFromStack(error.stack);
       const report: ErrorReport = {
         error: {
           name: truncate(error.name, 100) || error.name,
           message: truncate(error.message, 500) || error.message,
           // The server keeps the first 5 lines and rejects stacks over 2,000 characters.
           stack: truncate(error.stack?.split('\n').slice(0, 5).join('\n'), 2000),
-          fileName: truncate(location?.fileName ?? this.extractFileFromStack(error.stack), 200),
-          lineNumber: location?.lineNumber ?? this.extractLineFromStack(error.stack),
-          columnNumber: location?.columnNumber ?? this.extractColumnFromStack(error.stack),
+          fileName: truncate(location?.fileName ?? fromStack.fileName, 200),
+          lineNumber: location?.lineNumber ?? fromStack.lineNumber,
+          columnNumber: location?.columnNumber ?? fromStack.columnNumber,
         },
         context: boundedContext,
         category: truncate(options.category, 50),
@@ -120,22 +121,13 @@ class ErrorReporter {
     }
   }
 
-  private extractFileFromStack(stack?: string): string | undefined {
-    if (!stack) return undefined;
-    const match = stack.match(/at.*\((.+):\d+:\d+\)/);
-    return match?.[1];
-  }
-
-  private extractLineFromStack(stack?: string): number | undefined {
-    if (!stack) return undefined;
-    const match = stack.match(/at.*\(.+:(\d+):\d+\)/);
-    return match ? parseInt(match[1], 10) : undefined;
-  }
-
-  private extractColumnFromStack(stack?: string): number | undefined {
-    if (!stack) return undefined;
-    const match = stack.match(/at.*\(.+:\d+:(\d+)\)/);
-    return match ? parseInt(match[1], 10) : undefined;
+  private extractLocationFromStack(stack?: string): ErrorLocation {
+    const match = stack?.match(/at.*\((.+):(\d+):(\d+)\)/);
+    return {
+      fileName: match?.[1],
+      lineNumber: match ? parseInt(match[2], 10) : undefined,
+      columnNumber: match ? parseInt(match[3], 10) : undefined,
+    };
   }
 }
 

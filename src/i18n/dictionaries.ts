@@ -1,15 +1,7 @@
-/**
- * Unified Dictionary - Combines all domain translations.
- * 
- * This file merges domain-specific translations into the single Dictionary type
- * used by the app, while keeping translations organized by feature.
- * 
- * @see ./domains/ for individual domain files
- */
+/** The app's Dictionary: the domain translations of ./domains merged per locale. */
 
 import type { Locale } from "./config";
 
-// Import domain types
 import type {
   CommonDictionary,
   HouseDictionary,
@@ -25,7 +17,6 @@ import type {
   StayDictionary
 } from './domains';
 
-// Import domain translations
 import { commonTranslations } from './domains/common';
 import { houseTranslations, locationPanelTranslations } from './domains/house';
 import { checkinTranslations, checkinInfoTranslations } from './domains/checkin';
@@ -37,13 +28,6 @@ import { legalTranslations } from './domains/legal';
 import { guideTranslations } from './domains/guide';
 import { stayTranslations } from './domains/stay';
 
-// ============================================================================
-// Combined Dictionary Type
-// ============================================================================
-
-/**
- * Full dictionary type combining all domains.
- */
 export type Dictionary = CommonDictionary & {
   house: HouseDictionary;
   locationPanel: LocationPanelDictionary;
@@ -58,18 +42,9 @@ export type Dictionary = CommonDictionary & {
   stay: StayDictionary;
 };
 
-// ============================================================================
-// Dictionary Merger
-// ============================================================================
-
-/**
- * Merges all domain translations for a given locale.
- */
 function mergeDictionary(locale: Locale): Dictionary {
   return {
-    // Common domain (spread at top level)
     ...commonTranslations[locale],
-    // Feature domains (nested)
     house: houseTranslations[locale],
     locationPanel: locationPanelTranslations[locale],
     checkin: checkinTranslations[locale],
@@ -102,10 +77,6 @@ const dictionaries: Record<Locale, Dictionary> = deepFreeze({
   en: mergeDictionary('en'),
   el: mergeDictionary('el'),
 });
-
-// ============================================================================
-// Public API
-// ============================================================================
 
 /**
  * Gets the dictionary for a given locale.

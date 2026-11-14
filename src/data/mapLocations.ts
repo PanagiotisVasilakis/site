@@ -3,6 +3,7 @@ import { dedupeById } from '@/lib/collections';
 import { pickLocale } from '@/lib/localize';
 import { getApartmentContent } from '@/data/apartmentData';
 import { HOST_CONTACT } from '@/data/contact';
+import type { Item } from '@/data/schemas';
 
 export const APARTMENT_LOCATION: [number, number] = [22.094364, 37.040635];
 
@@ -41,28 +42,29 @@ export interface MapLocation {
   meta?: string;
 }
 
-export interface CategoryMapItem {
-  id: string;
-  name: string;
-  name_en?: string;
-  name_el?: string;
-  summary?: string;
-  summary_en?: string;
-  summary_el?: string;
-  description?: string;
-  description_en?: string;
-  description_el?: string;
-  address?: string;
-  address_en?: string;
-  address_el?: string;
-  phone?: string;
-  phones?: string[];
-  website?: string;
-  directionsUrl?: string;
-  tags?: string[];
-  location?: { lat: number; lng: number };
-  slug?: string;
-}
+export type CategoryMapItem = Pick<
+  Item,
+  | 'id'
+  | 'name'
+  | 'name_en'
+  | 'name_el'
+  | 'summary'
+  | 'summary_en'
+  | 'summary_el'
+  | 'description'
+  | 'description_en'
+  | 'description_el'
+  | 'address'
+  | 'address_en'
+  | 'address_el'
+  | 'phone'
+  | 'phones'
+  | 'website'
+  | 'directionsUrl'
+  | 'tags'
+  | 'location'
+  | 'slug'
+>;
 
 export interface MapContentItem {
   item: CategoryMapItem;

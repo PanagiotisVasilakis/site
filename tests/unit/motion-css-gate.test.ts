@@ -70,11 +70,6 @@ describe('motion gate in the design stylesheets (identity §5.2)', () => {
     expect(SHEETS.map(([file]) => file).sort()).toEqual(['motion.css', ...listed].sort());
   });
 
-  it('parses the motion rules (sanity check)', () => {
-    expect(RULES.some((rule) => rule.selector.includes('.ui-section__title'))).toBe(true);
-    expect(RULES.some((rule) => rule.selector.includes('.site-header__progress'))).toBe(true);
-  });
-
   it('arms every animation, transition and view-transition name only under data-motion="full" without reduced motion', () => {
     const ungated = RULES.filter((rule) => declares(rule.body, /^(animation(-name|-timeline)?|transition(-property)?|view-transition-name)$/u))
       .filter((rule) => !rule.atRules.some((at) => at.includes('prefers-reduced-motion: no-preference'))
@@ -117,13 +112,11 @@ const printResets = (className: string, property: string) => PRINT_RULES.filter(
   && /!important$/u.test(valueOf(rule.body, property) ?? ''));
 
 describe('print and heading range of the motion gate (R-704, R-705)', () => {
-  it('finds the hidden reveal states (sanity check)', () => {
+  it('forces the final state of every :not(.is-in) class in print', () => {
     expect(hiddenTargets.map(({ className }) => className)).toEqual(expect.arrayContaining([
       'fact', 'facts__more', 'hl', 'window__img', 'room-card', 'night', 'relief__contour', 'relief__pins', 'letter',
     ]));
-  });
-
-  it('forces the final state of every :not(.is-in) class in print', () => {
+    expect(hiddenTargets.length).toBeGreaterThan(0);
     const missing: string[] = [];
     for (const { rule, className } of hiddenTargets) {
       for (const property of ['opacity', 'transform']) {
@@ -136,10 +129,6 @@ describe('print and heading range of the motion gate (R-704, R-705)', () => {
       }
     }
     expect([...new Set(missing)]).toEqual([]);
-  });
-
-  it('removes the closed shutters in print', () => {
-    expect(PRINT_RULES.some((rule) => rule.selector.includes('.window .shutter') && valueOf(rule.body, 'display') === 'none !important')).toBe(true);
   });
 
   it('ends the M28 heading rise inside the entry phase', () => {

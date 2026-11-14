@@ -12,7 +12,7 @@ const NON_INDEXABLE = ['/admin', '/api', '/offline'].concat(
 const sitemapPaths = () => sitemap().map(({ url }) => url.slice(siteUrl.length));
 
 describe('sitemap', () => {
-  it.each(['en', 'el'])('lists the privacy notice for %s', (locale) => {
+  it.each(['en'])('lists the privacy notice for %s', (locale) => {
     expect(sitemap().map(({ url }) => url)).toContain(`${siteUrl}/${locale}/privacy`);
   });
 

@@ -1,5 +1,4 @@
 import { prisma } from '@/lib/prisma';
-import { logger } from '@/lib/logger-enterprise';
 
 // The admin read model needs these columns only.
 const bookingSelect = {
@@ -29,39 +28,24 @@ export type BookingRecord = {
 };
 
 async function findByReference(reference: string): Promise<BookingRecord | undefined> {
-  try {
-    const bookings = await prisma.booking.findMany({
-      where: { externalReference: reference },
-      orderBy: { createdAt: 'desc' },
-      take: 2,
-      select: bookingSelect,
-    });
-    if (bookings.length > 1) {
-      throw new Error('AMBIGUOUS_BOOKING_REFERENCE');
-    }
-    return bookings[0];
-  } catch (error) {
-    logger.error('bookingRepository(prisma): findByReference failed', error);
-    throw error;
+  const bookings = await prisma.booking.findMany({
+    where: { externalReference: reference },
+    orderBy: { createdAt: 'desc' },
+    take: 2,
+    select: bookingSelect,
+  });
+  if (bookings.length > 1) {
+    throw new Error('AMBIGUOUS_BOOKING_REFERENCE');
   }
+  return bookings[0];
 }
 
 async function findById(id: string): Promise<BookingRecord | undefined> {
-  try {
-    return (await prisma.booking.findUnique({ where: { id }, select: bookingSelect })) ?? undefined;
-  } catch (error) {
-    logger.error('bookingRepository(prisma): findById failed', error);
-    throw error;
-  }
+  return (await prisma.booking.findUnique({ where: { id }, select: bookingSelect })) ?? undefined;
 }
 
 async function getAll(): Promise<BookingRecord[]> {
-  try {
-    return await prisma.booking.findMany({ orderBy: { createdAt: 'desc' }, select: bookingSelect });
-  } catch (error) {
-    logger.error('bookingRepository(prisma): getAll failed', error);
-    throw error;
-  }
+  return await prisma.booking.findMany({ orderBy: { createdAt: 'desc' }, select: bookingSelect });
 }
 
 export const bookingRepository = {

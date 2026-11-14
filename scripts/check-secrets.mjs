@@ -56,11 +56,11 @@ async function readJson(filePath) {
   return JSON.parse(await readFile(filePath, 'utf8'));
 }
 
-function run(command, args, options = {}) {
+function run(command, args) {
   return spawnSync(command, args, {
-    cwd: options.cwd ?? REPOSITORY_ROOT,
+    cwd: REPOSITORY_ROOT,
     encoding: 'utf8',
-    env: options.env ?? process.env,
+    env: process.env,
     maxBuffer: 16 * 1_024 * 1_024,
     stdio: ['ignore', 'pipe', 'pipe'],
   });

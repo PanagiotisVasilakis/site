@@ -1,7 +1,7 @@
 import type { PrismaPg } from '@prisma/adapter-pg';
 
-export type PrismaPgConfig = ConstructorParameters<typeof PrismaPg>[0];
-export type PrismaPgOptions = NonNullable<ConstructorParameters<typeof PrismaPg>[1]>;
+type PrismaPgConfig = ConstructorParameters<typeof PrismaPg>[0];
+type PrismaPgOptions = NonNullable<ConstructorParameters<typeof PrismaPg>[1]>;
 
 const DEFAULT_CONNECTION_TIMEOUT_MS = 5_000;
 const DEFAULT_IDLE_TIMEOUT_MS = 300_000;

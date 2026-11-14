@@ -17,7 +17,8 @@ export function isGuestFormValid(
     acceptTerms: boolean;
   },
 ): boolean {
-  const credentialsValid = values.phone.trim().length >= 8 && values.password.length >= 8;
+  // Zod counts code points, not UTF-16 units; match the server's password minimum.
+  const credentialsValid = values.phone.trim().length >= 8 && [...values.password].length >= 8;
   if (mode === 'signin') return credentialsValid;
   return credentialsValid
     && values.origin !== ''

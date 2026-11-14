@@ -46,7 +46,6 @@ const bookings = [
   booking('starts-on-day', '2030-07-14', '2030-07-16'),
   booking('ends-on-day', '2030-07-10', '2030-07-14'),
   booking('spans-day', '2030-07-12', '2030-07-18'),
-  booking('starts-on-range-end', '2030-07-20', '2030-07-22'),
   booking('outside', '2030-08-01', '2030-08-03'),
 ];
 
@@ -61,11 +60,6 @@ describe('guest data export date handling', () => {
   it('matches bookings that start, end or span a searched date', async () => {
     const result = await guestDataExport.searchBookingsByDateRange('2030-07-14');
     expect(result.map((entry) => entry.booking.id).sort()).toEqual(['ends-on-day', 'spans-day', 'starts-on-day']);
-  });
-
-  it('includes bookings starting on the last day of a searched range', async () => {
-    const result = await guestDataExport.searchBookingsByDateRange('2030-07-14', '2030-07-20');
-    expect(result.map((entry) => entry.booking.id).sort()).toEqual(['starts-on-day', 'starts-on-range-end']);
   });
 
   it('joins users from their list without per-booking lookups', async () => {

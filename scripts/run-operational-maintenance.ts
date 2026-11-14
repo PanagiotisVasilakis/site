@@ -1,6 +1,6 @@
 import { syncBookingCalendar } from '@/lib/availability/calendarSync';
 import { evaluateOperationalAlerts, runRetention } from '@/lib/operationalMonitor';
-import { prisma } from '@/lib/prisma';
+import { runWorker } from './lib/run-worker';
 
 const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -21,23 +21,4 @@ async function main() {
   }
 }
 
-// Close the pool explicitly: this is what lets the run exit, since idle pg
-// connections would otherwise keep the process alive for up to 300 s.
-async function disconnect() {
-  // No client was created: src/lib/prisma.ts only builds one when DATABASE_URL is set.
-  if (!process.env.DATABASE_URL) return;
-  try {
-    await prisma.$disconnect();
-  } catch (error) {
-    process.stderr.write(`${JSON.stringify({ worker: 'operations', status: 'disconnect_failed', error: error instanceof Error ? error.message : String(error) })}\n`);
-  }
-}
-
-void main().catch((error) => {
-  process.stderr.write(`${JSON.stringify({
-    worker: 'operations',
-    status: 'failed',
-    error: error instanceof Error ? error.message : String(error),
-  })}\n`);
-  process.exitCode = 1;
-}).finally(disconnect);
+runWorker('operations', main);

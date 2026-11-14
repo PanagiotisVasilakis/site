@@ -11,13 +11,14 @@ import {
   createPortalBookingEligibilityWindow,
   isPortalBookingTemporallyEligible,
   portalBookingTemporalWhere,
+  type PortalBookingEligibilityWindow,
 } from '@/lib/portalBookingEligibility';
+import { retrySerializable } from '@/lib/serializableRetry';
 
 const CLAIM_TOKEN_TTL_MINUTES = 30;
 const BCRYPT_ROUNDS = 12;
-const SERIALIZABLE_ATTEMPTS = 3;
 
-export type PortalAuthFailureCode =
+type PortalAuthFailureCode =
   | 'INVALID_CLAIM'
   | 'BOOKING_ALREADY_CLAIMED'
   | 'INVALID_CREDENTIALS'
@@ -36,23 +37,19 @@ function digestClaimToken(rawToken: string): string {
   return crypto.createHmac('sha256', requirePepper('CLAIM_TOKEN_PEPPER')).update(rawToken, 'utf8').digest('hex');
 }
 
-function isSerializationConflict(error: unknown): boolean {
-  return typeof error === 'object'
-    && error !== null
-    && 'code' in error
-    && error.code === 'P2034';
+function newClaimToken(): { token: string; tokenDigest: string; expiresAt: Date } {
+  const token = `claim_${crypto.randomBytes(32).toString('base64url')}`;
+  const tokenDigest = digestClaimToken(token);
+  const expiresAt = new Date(Date.now() + CLAIM_TOKEN_TTL_MINUTES * 60_000);
+  return { token, tokenDigest, expiresAt };
 }
 
 export async function issueBookingClaimGrant(input: {
   bookingId: string;
   channel: 'REMOTE' | 'ONSITE';
   adminSessionId: string;
-  ttlMinutes?: number;
 }): Promise<{ token: string; expiresAt: Date }> {
-  const ttlMinutes = Math.min(Math.max(input.ttlMinutes ?? CLAIM_TOKEN_TTL_MINUTES, 5), 24 * 60);
-  const token = `claim_${crypto.randomBytes(32).toString('base64url')}`;
-  const tokenDigest = digestClaimToken(token);
-  const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
+  const { token, tokenDigest, expiresAt } = newClaimToken();
   const now = new Date();
 
   await prisma.$transaction(async (tx) => {
@@ -115,12 +112,8 @@ async function replaceOpenClaimGrant(
 export async function resetGuestAccess(input: {
   bookingId: string;
   adminSessionId: string;
-  ttlMinutes?: number;
 }): Promise<{ token: string; expiresAt: Date }> {
-  const ttlMinutes = Math.min(Math.max(input.ttlMinutes ?? CLAIM_TOKEN_TTL_MINUTES, 5), 24 * 60);
-  const token = `claim_${crypto.randomBytes(32).toString('base64url')}`;
-  const tokenDigest = digestClaimToken(token);
-  const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
+  const { token, tokenDigest, expiresAt } = newClaimToken();
   const now = new Date();
 
   await prisma.$transaction(async (tx) => {
@@ -160,6 +153,20 @@ export async function resetGuestAccess(input: {
   return { token, expiresAt };
 }
 
+type ClaimGrantWithBooking = Prisma.BookingClaimGrantGetPayload<{ include: { booking: true } }>;
+
+function isUsableClaimGrant(
+  grant: ClaimGrantWithBooking | null,
+  now: Date,
+  eligibilityWindow: PortalBookingEligibilityWindow,
+): grant is ClaimGrantWithBooking {
+  return !!grant
+    && !grant.consumedAt
+    && !grant.revokedAt
+    && !(grant.expiresAt <= now)
+    && isPortalBookingTemporallyEligible(grant.booking, eligibilityWindow);
+}
+
 export async function prepareBookingClaimExchange(
   rawToken: string,
 ): Promise<{ tokenDigest: string; expiresAt: Date }> {
@@ -170,11 +177,7 @@ export async function prepareBookingClaimExchange(
     where: { tokenDigest },
     include: { booking: true },
   });
-  if (!grant
-    || grant.consumedAt
-    || grant.revokedAt
-    || grant.expiresAt <= now
-    || !isPortalBookingTemporallyEligible(grant.booking, eligibilityWindow)) {
+  if (!isUsableClaimGrant(grant, now, eligibilityWindow)) {
     throw new PortalAuthError('INVALID_CLAIM');
   }
   return { tokenDigest, expiresAt: grant.expiresAt };
@@ -202,11 +205,7 @@ export async function consumeBookingClaimGrant(input: {
       where: { tokenDigest },
       include: { booking: true },
     });
-    if (!grant
-      || grant.consumedAt
-      || grant.revokedAt
-      || grant.expiresAt <= now
-      || !isPortalBookingTemporallyEligible(grant.booking, eligibilityWindow)) {
+    if (!isUsableClaimGrant(grant, now, eligibilityWindow)) {
       throw new PortalAuthError('INVALID_CLAIM');
     }
 
@@ -241,10 +240,6 @@ export async function consumeBookingClaimGrant(input: {
           passwordHash: newPasswordHash,
         },
       });
-    }
-
-    if (grant.booking.userId && grant.booking.userId !== userId) {
-      throw new PortalAuthError('BOOKING_ALREADY_CLAIMED');
     }
 
     const consumed = await tx.bookingClaimGrant.updateMany({
@@ -303,14 +298,7 @@ export async function consumeBookingClaimGrant(input: {
     return { userId, bookingId: grant.bookingId };
   }, { isolationLevel: 'Serializable' });
 
-  for (let attempt = 1; attempt <= SERIALIZABLE_ATTEMPTS; attempt += 1) {
-    try {
-      return await consume();
-    } catch (error) {
-      if (!isSerializationConflict(error) || attempt === SERIALIZABLE_ATTEMPTS) throw error;
-    }
-  }
-  throw new Error('Unreachable claim transaction state');
+  return retrySerializable(consume);
 }
 
 // Stands in for the stored hash of an unknown or password-less account, so that sign-in does the

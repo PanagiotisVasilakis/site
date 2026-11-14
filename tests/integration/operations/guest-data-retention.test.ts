@@ -161,7 +161,7 @@ describe.sequential('guest data retention on PostgreSQL', () => {
             `+30690000000${MIXED_GUEST}`, 'Synthetic message'],
         ]);
 
-      // Same result as a manual erasure: booking kept and unlinked, reference kept (R-195 (a)),
+      // Same result as a manual erasure: booking kept and unlinked, reference kept,
       // terms acceptance removed with the user, undelivered event cancelled, audit trail written.
       expect(await prisma.booking.findUnique({
         where: { id: id(EXPIRED_BOOKING) },

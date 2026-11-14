@@ -15,7 +15,7 @@ import { ToastProvider } from '@/components/Toast';
 function servePreferences(data: { wifi: { network: string; password: string } | null; wifiAvailableAt: string | null; checkInTime?: string }) {
   fetchMock.mockImplementation(async (url: string) => {
     const body = url === '/api/check-in/preferences'
-      ? { checkInTime: '15:00', checkOutTime: '11:00', canEdit: false, ...data }
+      ? { checkInTime: '15:00', checkOutTime: '11:00', ...data }
       : { request: null };
     return new Response(JSON.stringify({ success: true, data: body }), { status: 200 });
   });
@@ -87,27 +87,9 @@ describe('check-in Wi-Fi copy', () => {
     await vi.waitFor(() => expect(warnMock).toHaveBeenCalledWith('Clipboard copy failed', expect.anything()));
     expect(writeText).toHaveBeenCalledWith('Guest-Net');
     expect(button).toHaveTextContent(/^Copy$/u);
-    // R-363: the guest is told the copy failed and what to do instead (the R-303 pattern).
+    // The guest is told the copy failed and what to do instead.
     await vi.waitFor(() => expect(container.querySelector('.ui-toasts')).toHaveTextContent('Copy failed. Select the Wi-Fi details and copy them.'));
     expect(unhandled).toEqual([]);
-  });
-});
-
-describe('check-in Wi-Fi copy toast (identity §9.8)', () => {
-  afterEach(() => {
-    Reflect.deleteProperty(window.navigator, 'clipboard');
-  });
-
-  it('confirms a successful copy with a toast', async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(window.navigator, 'clipboard', { value: { writeText }, configurable: true });
-    servePreferences({ wifi: { network: 'Guest-Net', password: 'p4ss-w0rd' }, wifiAvailableAt: '2000-01-01T12:00:00.000Z' });
-    const { container } = render(<ToastProvider><CheckInInfo locale="en" /></ToastProvider>);
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Copy Wi-Fi password' }));
-
-    expect(writeText).toHaveBeenCalledWith('p4ss-w0rd');
-    await vi.waitFor(() => expect(container.querySelector('.ui-toasts')).toHaveTextContent('Wi-Fi details copied'));
   });
 });
 
@@ -143,7 +125,7 @@ describe('check-in Wi-Fi refetch at the disclosure time', () => {
         call += 1;
         if ('fail' in step) throw new TypeError('Failed to fetch');
         if ('status' in step) return new Response(JSON.stringify({ error: { message: 'Authentication required' } }), { status: step.status });
-        const body = { checkOutTime: '11:00', canEdit: false, ...step.prefs };
+        const body = { checkOutTime: '11:00', ...step.prefs };
         return new Response(JSON.stringify({ success: true, data: body }), { status: 200 });
       }
       if (url === '/api/check-in/arrival-request' && init?.method === 'POST') {

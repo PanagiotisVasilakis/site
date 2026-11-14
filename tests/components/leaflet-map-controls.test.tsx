@@ -9,6 +9,8 @@ vi.mock('@/styles/components/map.css', () => ({}));
 
 import LeafletMap, { type LeafletMapLabels, type LeafletMarkerData } from '@/components/LeafletMap';
 
+import { stubMatchMedia } from '../support/dom';
+
 // R-394 and R-398 are about how Leaflet routes DOM events and keeps layers. The other map tests replace Leaflet with
 // a fake, which would only repeat the component's own assumptions, so these run the real library in jsdom.
 
@@ -95,11 +97,7 @@ function positionPins(map: L.Map) {
 
 beforeEach(() => {
   maps.length = 0;
-  vi.stubGlobal('matchMedia', () => ({
-    matches: false,
-    addEventListener() {},
-    removeEventListener() {},
-  }));
+  stubMatchMedia(false);
   // jsdom has no layout: without a frame a fit has no room and a zoom change cannot be seen.
   vi.spyOn(Element.prototype, 'clientWidth', 'get').mockReturnValue(400);
   vi.spyOn(Element.prototype, 'clientHeight', 'get').mockReturnValue(400);

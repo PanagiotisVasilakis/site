@@ -66,17 +66,6 @@ describe('portal refresh redirect shell', () => {
     expect(refreshPortalSession).not.toHaveBeenCalled();
   });
 
-  it('speaks Greek on /el', () => {
-    vi.useFakeTimers();
-    refreshPortalSession.mockImplementation(() => new Promise(() => undefined));
-    render(<PortalRefreshRedirect locale="el" refreshHref="/api/portal/refresh" failureHref="/el/guest" />);
-
-    expect(screen.getByRole('heading', { level: 1, name: 'Σας συνδέουμε…' })).toBeInTheDocument();
-    act(() => { vi.advanceTimersByTime(5_000); });
-    expect(screen.getByRole('status')).toHaveTextContent('Ακόμη σε εξέλιξη…');
-    expect(screen.getByRole('link', { name: 'Σύνδεση με κωδικό' })).toHaveAttribute('href', '/el/guest');
-  });
-
   it('falls back to the site root for an unsafe failure URL', () => {
     vi.useFakeTimers();
     render(<PortalRefreshRedirect

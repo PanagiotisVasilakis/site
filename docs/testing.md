@@ -85,7 +85,7 @@ The non-race matrix covers new and existing users with remember enabled and disa
 
 ## Portal booking eligibility policy
 
-Portal access uses booking calendar dates, not elapsed durations. `Booking.startDate` and `Booking.endDate` are PostgreSQL `DATE` columns surfaced by Prisma as UTC-midnight `Date` values, so the established portal convention is a UTC calendar date. The property time zone (the `PROPERTY_TIME_ZONE` constant in `src/data/stayPolicy.ts`; the environment variable of that name is validated at startup but not read) applies to property time-of-day behavior and does not redefine this authentication boundary.
+Portal access uses booking calendar dates, not elapsed durations. `Booking.startDate` and `Booking.endDate` are PostgreSQL `DATE` columns surfaced by Prisma as UTC-midnight `Date` values, so the established portal convention is a UTC calendar date. The property time zone (the `PROPERTY_TIME_ZONE` constant in `src/data/stayPolicy.ts`) applies to property time-of-day behavior and does not redefine this authentication boundary.
 
 The canonical inclusive temporal predicate is:
 

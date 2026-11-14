@@ -59,7 +59,7 @@ The authoritative schema is `src/lib/runtime-env-schema.js`; `scripts/start-stan
 
 - `DATABASE_URL`, without an `options` query parameter: the application pins every database session to `TimeZone=UTC` through the PostgreSQL `options` startup parameter (`src/lib/prismaPgConfig.ts`), and node-postgres lets an `options` value in the URL replace that pin
 - independently generated `ADMIN_JWT_SECRET`, `ADMIN_DASH_SECRET`, and
-  `GUEST_JWT_SECRET`
+  `GUEST_JWT_SECRET` (the schema requires them only when `NODE_ENV` is `production`)
 - `SECURITY_PEPPER` (at least 16 characters) and `CLAIM_TOKEN_PEPPER` (at least 32 characters); use `openssl rand -hex 32` for both (`npm run ensure-pepper` generates 64 hex characters for each locally). Neither falls back to the other or to a built-in value
 - in production, start-up also rejects (exit 78) a `SECURITY_PEPPER` or `CLAIM_TOKEN_PEPPER` that is a repeated pattern, contains `replace`, `changeme`, `placeholder` or `example` (any case), or equals `ADMIN_JWT_SECRET`, `GUEST_JWT_SECRET` or `ADMIN_DASH_SECRET`; the two peppers are not compared with each other
 - `GUEST_WIFI_NETWORK`, `GUEST_WIFI_PASSWORD`
@@ -131,8 +131,6 @@ API. `test:integration` is the isolated exception: it owns a digest-pinned
 disposable PostgreSQL container and synthetic databases. `verify:release`
 never targets a persistent environment. See [Testing strategy](../docs/testing.md)
 and [Release verification](../docs/release-verification.md).
-
-Optional browser audits are manual, advisory commands: `audit:a11y` (axe), `audit:responsive:ux` and `audit:vitals` (LCP, CLS, TBT and an INP proxy on a throttled mobile profile, for a local production build). They are local-only: each refuses a non-loopback base URL, and its headless browser can reach no other host.
 
 Committed design assets are regenerated with `npm run design:hero` (hero crops, depth maps, grain tiles), `npm run design:og` (the Open Graph cards in `public/og/`) and `npm run design:icons` (app icons and favicon); see `docs/design/identity.md`.
 
@@ -535,3 +533,4 @@ Guest data retention (`GUEST_DATA_RETENTION_MONTHS` in `src/data/stayPolicy.ts`,
   Nginx header overwrite, and private attestation contract; do not trust a
   public forwarding header directly.
 - Outbox backlog: inspect `outbox_events.last_error`, the destination URL/token, and the outbox service journal.
+- `next dev` or `next build` run by a coding agent (Claude Code) may send the installed Next version to `https://registry.npmjs.org/-/npm/v1/security/advisories/bulk` and stop once with an upgrade recommendation when an advisory applies (`experimental.agentUpgrade` defaults to `'security'` since Next 16.4.0; `next.config.ts` leaves it at the default). Retry the same command, or run the build from a plain shell. `verify:release` and Docker builds are not affected.

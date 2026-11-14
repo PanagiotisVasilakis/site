@@ -1,8 +1,3 @@
-/**
- * Enterprise-grade structured logging system
- * Features: Correlation IDs, Error context, Sanitization
- */
-
 import { AsyncLocalStorage } from 'node:async_hooks';
 import crypto from 'node:crypto';
 
@@ -44,18 +39,10 @@ interface LoggerConfig {
 }
 
 const SENSITIVE_FIELDS = [
-  'password',
-  'token',
-  'secret',
   'key',
-  'authorization',
-  'cookie',
   'session',
   'attestation',
   'forwarded',
-  'connecting-ip',
-  'real-ip',
-  'verified-client-ip',
 ];
 
 const REDACTION_PLACEHOLDER = '[REDACTED]';
@@ -110,15 +97,8 @@ class EnterpriseLogger {
    * Set correlation context for the current async execution
    */
   setContext(context: Partial<LogContext>): void {
-    const existing = asyncLocalStorage.getStore() || { correlationId: this.generateCorrelationId() };
+    const existing = asyncLocalStorage.getStore() || { correlationId: crypto.randomUUID() };
     asyncLocalStorage.enterWith({ ...existing, ...context });
-  }
-
-  /**
-   * Generate unique correlation ID
-   */
-  private generateCorrelationId(): string {
-    return crypto.randomUUID();
   }
 
   /**
@@ -149,7 +129,7 @@ class EnterpriseLogger {
       const lowerKey = key.toLowerCase();
       // Union of the shared classifier and this list: a key that was redacted before stays redacted.
       const isSensitive = isSensitiveFieldName(key)
-        || SENSITIVE_FIELDS.some((field) => lowerKey.includes(field.toLowerCase()));
+        || SENSITIVE_FIELDS.some((field) => lowerKey.includes(field));
       if (isSensitive) return REDACTION_PLACEHOLDER;
       if (value instanceof Error) return { name: value.name, message: value.message };
       // Checked before the falsy test: 0n is falsy, and JSON.stringify cannot encode a bigint.
@@ -255,7 +235,7 @@ class EnterpriseLogger {
    */
   private output(entry: LogEntry): void {
     if (this.config.enableConsole) {
-      const method = console[entry.level] || console.log;
+      const method = console[entry.level];
 
       if (this.config.enableStructured) {
         // One line per entry; the cause is reduced to its name and message (see reduceCause).
@@ -283,6 +263,26 @@ class EnterpriseLogger {
     }
   }
 
+  private logWithMetadataOrError(
+    level: 'warn' | 'error',
+    message: string,
+    metadataOrError: unknown,
+    error: unknown
+  ): void {
+    // No second argument - simple message only
+    if (metadataOrError === undefined) {
+      this.output(this.createLogEntry(level, message));
+      return;
+    }
+    // If second arg looks like an Error/unknown and third arg is undefined, it's the old signature
+    if (error === undefined &&
+        (metadataOrError instanceof Error || typeof metadataOrError !== 'object' || metadataOrError === null || Array.isArray(metadataOrError))) {
+      this.output(this.createLogEntry(level, message, undefined, metadataOrError));
+    } else {
+      this.output(this.createLogEntry(level, message, metadataOrError as Record<string, unknown>, error));
+    }
+  }
+
   // Public logging methods (the level check runs before any entry is built)
   debug(message: string, metadata?: Record<string, unknown>): void {
     if (!this.shouldLog('debug')) return;
@@ -300,18 +300,7 @@ class EnterpriseLogger {
   warn(message: string, metadata: Record<string, unknown>, error?: unknown): void;
   warn(message: string, metadataOrError?: Record<string, unknown> | unknown, error?: unknown): void {
     if (!this.shouldLog('warn')) return;
-    // No second argument - simple message only
-    if (metadataOrError === undefined) {
-      this.output(this.createLogEntry('warn', message));
-      return;
-    }
-    // If second arg looks like an Error/unknown and third arg is undefined, it's the old signature
-    if (error === undefined && metadataOrError !== undefined && 
-        (metadataOrError instanceof Error || typeof metadataOrError !== 'object' || metadataOrError === null || Array.isArray(metadataOrError))) {
-      this.output(this.createLogEntry('warn', message, undefined, metadataOrError));
-    } else {
-      this.output(this.createLogEntry('warn', message, metadataOrError as Record<string, unknown>, error));
-    }
+    this.logWithMetadataOrError('warn', message, metadataOrError, error);
   }
 
   // Supported forms: (message), (message, error) and (message, metadata, error?)
@@ -320,18 +309,7 @@ class EnterpriseLogger {
   error(message: string, metadata: Record<string, unknown>, error?: unknown): void;
   error(message: string, metadataOrError?: Record<string, unknown> | unknown, error?: unknown): void {
     if (!this.shouldLog('error')) return;
-    // No second argument - simple message only
-    if (metadataOrError === undefined) {
-      this.output(this.createLogEntry('error', message));
-      return;
-    }
-    // If second arg looks like an Error/unknown and third arg is undefined, it's the old signature
-    if (error === undefined && metadataOrError !== undefined && 
-        (metadataOrError instanceof Error || typeof metadataOrError !== 'object' || metadataOrError === null || Array.isArray(metadataOrError))) {
-      this.output(this.createLogEntry('error', message, undefined, metadataOrError));
-    } else {
-      this.output(this.createLogEntry('error', message, metadataOrError as Record<string, unknown>, error));
-    }
+    this.logWithMetadataOrError('error', message, metadataOrError, error);
   }
 
 }

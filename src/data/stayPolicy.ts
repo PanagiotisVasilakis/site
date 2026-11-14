@@ -6,9 +6,7 @@ export const CURRENCY = 'EUR';
 /**
  * The property's calendar: the blocked nights of the Booking.com export are local calendar dates, so
  * "today" for availability is the date in this zone. It is the only time-zone
- * source, also for the check-in/check-out times of day (the Wi-Fi window). The
- * PROPERTY_TIME_ZONE environment variable (runtime-env-schema.js) is validated
- * at startup but not read.
+ * source, also for the check-in/check-out times of day (the Wi-Fi window).
  */
 export const PROPERTY_TIME_ZONE = 'Europe/Athens';
 

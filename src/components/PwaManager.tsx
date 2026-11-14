@@ -77,15 +77,15 @@ export default function PwaManager() {
   }, []);
 
   useEffect(() => {
-      // In dev, aggressively unregister any existing SW (from prior prod build) to avoid intercepting RSC / flight data causing JSON parse errors.
-      if (!isServiceWorkerEnabled()) {
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
-          // Optional: clear our app's caches
-          caches.keys().then(keys => keys.forEach(k => { if (k.startsWith('guest-guide-')) caches.delete(k); }));
-        }
-        return;
+    // In dev, aggressively unregister any existing SW (from prior prod build) to avoid intercepting RSC / flight data causing JSON parse errors.
+    if (!isServiceWorkerEnabled()) {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
+        // Optional: clear our app's caches
+        caches.keys().then(keys => keys.forEach(k => { if (k.startsWith('guest-guide-')) caches.delete(k); }));
       }
+      return;
+    }
     const eventController = new AbortController();
     const { signal } = eventController;
     // SW registration & update banner
@@ -118,20 +118,20 @@ export default function PwaManager() {
             if (dismissedUpdate && updateKey && dismissedUpdate === updateKey) return;
             b.style.display = 'flex';
           };
-            if (reg.waiting) {
-              reg.waiting.postMessage({ type: 'REQUEST_VERSION' });
-              showBanner();
-            }
-            reg.addEventListener('updatefound', () => {
-              const nw = reg.installing; if (!nw) return;
-              nw.addEventListener('statechange', () => {
-                if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-                  nw.postMessage({ type: 'REQUEST_VERSION' });
-                  showBanner();
-                }
-              }, { signal });
+          if (reg.waiting) {
+            reg.waiting.postMessage({ type: 'REQUEST_VERSION' });
+            showBanner();
+          }
+          reg.addEventListener('updatefound', () => {
+            const nw = reg.installing; if (!nw) return;
+            nw.addEventListener('statechange', () => {
+              if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                nw.postMessage({ type: 'REQUEST_VERSION' });
+                showBanner();
+              }
             }, { signal });
-  } catch (err) { logger.error('Service worker registration failed', err instanceof Error ? err : { error: String(err) }); }
+          }, { signal });
+        } catch (err) { logger.error('Service worker registration failed', err instanceof Error ? err : { error: String(err) }); }
       };
       if (document.readyState === 'complete') {
         void registerServiceWorker();
@@ -140,10 +140,10 @@ export default function PwaManager() {
       }
     }
     // iOS A2HS tip
-  const hasTouch = 'maxTouchPoints' in navigator ? navigator.maxTouchPoints > 1 : false;
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && hasTouch);
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
-    ('standalone' in window.navigator ? (window.navigator as { standalone?: boolean }).standalone === true : false);
+    const hasTouch = 'maxTouchPoints' in navigator ? navigator.maxTouchPoints > 1 : false;
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && hasTouch);
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+      ('standalone' in window.navigator ? (window.navigator as { standalone?: boolean }).standalone === true : false);
     const dismissed = readStored(() => localStorage.getItem('ios-a2hs-dismissed')) === '1';
     if (isIOS && !isStandalone && !dismissed) {
       const tip = document.getElementById('ios-a2hs-tip'); if (tip) tip.style.display = 'flex';
@@ -178,7 +178,7 @@ export default function PwaManager() {
         if (newV) writeStored(() => localStorage.setItem('app-version', newV));
         if (newBuild) writeStored(() => localStorage.setItem('app-build', newBuild));
         window.location.reload();
-  } catch (err) { logger.error('Update reload handler failed', err instanceof Error ? err : { error: String(err) }); }
+      } catch (err) { logger.error('Update reload handler failed', err instanceof Error ? err : { error: String(err) }); }
     }, { signal });
     const dismiss = document.getElementById('update-dismiss-btn');
     dismiss?.addEventListener('click', () => {

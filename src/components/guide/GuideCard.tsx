@@ -3,7 +3,7 @@ import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import { Icon } from '@/components/icons/Icon';
 import { SharedElement } from '@/components/motion/SharedElement';
-import { normalizeLocale } from '@/i18n/config';
+import type { Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { GuideEntry } from './guideEntries';
 import { SaveButton } from './SaveButton';
@@ -19,10 +19,10 @@ export function ArtTile({ entry, iconSize = 56 }: { entry: Pick<GuideEntry, 'ico
 }
 
 /** The meta line: category (olive) · straight-line distance, with its full meaning for screen readers. */
-export function GuideMeta({ entry, locale, className }: { entry: GuideEntry; locale: string; className?: string }) {
-  const t = getDictionary(normalizeLocale(locale));
+export function GuideMeta({ entry, locale }: { entry: GuideEntry; locale: Locale }) {
+  const t = getDictionary(locale);
   return (
-    <p className={className ?? 'guide-meta'}>
+    <p className="guide-meta">
       <span className="guide-meta__cat">{entry.categoryLabel}</span>
       {entry.distanceText ? (
         <>
@@ -44,8 +44,8 @@ export function GuideMeta({ entry, locale, className }: { entry: GuideEntry; loc
  * `titleAs` keeps the heading order of the page: h2 right under the page h1 (guide list, R-360), h3 under a
  * section h2 (detail "More nearby").
  */
-export function GuideCard({ entry, locale, index = 0, priority = false, titleAs: Title = 'h3' }: { entry: GuideEntry; locale: string; index?: number; priority?: boolean; titleAs?: 'h2' | 'h3' }) {
-  const t = getDictionary(normalizeLocale(locale));
+export function GuideCard({ entry, locale, index = 0, priority = false, titleAs: Title = 'h3' }: { entry: GuideEntry; locale: Locale; index?: number; priority?: boolean; titleAs?: 'h2' | 'h3' }) {
+  const t = getDictionary(locale);
   return (
     <article className="guide-card" style={{ '--i': index } as CSSProperties} data-tilt>
       <div className="guide-card__media">

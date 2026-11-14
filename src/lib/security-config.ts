@@ -1,13 +1,8 @@
-/**
- * Enterprise Security Configuration Framework
- * Centralized security configuration with environment-specific settings
- */
-
 type SourceList = string[];
 
 // Static, per-environment security settings. Plain types: the values are
 // constants in this file, so they are checked at compile time, not per request.
-export interface SecurityConfig {
+interface SecurityConfig {
   csp: {
     reportOnly: boolean;
     directives: {
@@ -150,7 +145,7 @@ const productionConfig: SecurityConfig = {
       enabled: true,
       maxAge: 63072000, // 2 years
       includeSubDomains: true,
-      // Off by owner decision (R-227): the preload list is hard to leave and
+      // Off by owner decision: the preload list is hard to leave and
       // commits every subdomain of the registrable domain to HTTPS.
       preload: false,
     },

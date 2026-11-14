@@ -4,20 +4,9 @@
  * missing. It does not block `npm run dev` (the server's environment validation
  * does); it only prints guidance.
  */
-import fs from 'fs';
-import path from 'path';
+import { envPath, readEnv } from './lib/pepper-env.js';
 
-const envPath = path.resolve(process.cwd(), '.env.local');
-
-function readEnvFile(p) {
-  try {
-    return fs.readFileSync(p, 'utf8');
-  } catch {
-    return '';
-  }
-}
-
-const envFile = readEnvFile(envPath);
+const envFile = readEnv(envPath);
 const inEnvFile = {
   SECURITY_PEPPER: /^[^\S\n]*SECURITY_PEPPER[^\S\n]*=[^\S\n]*\S/m,
   CLAIM_TOKEN_PEPPER: /^[^\S\n]*CLAIM_TOKEN_PEPPER[^\S\n]*=[^\S\n]*\S/m,

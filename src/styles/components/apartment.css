@@ -260,7 +260,7 @@
   background: var(--color-surface-sunken);
   overflow: hidden;
   cursor: zoom-in;
-  /* Keyboard focus scrolls a tile below the sticky room chips, not under them (R-362). */
+  /* Keyboard focus scrolls a tile below the sticky room chips, not under them. */
   scroll-margin-top: calc(var(--apt-chips-top) + var(--apt-chips-h) + 8px);
 }
 .apt-masonry .apt-tile__img {
