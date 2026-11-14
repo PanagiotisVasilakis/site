@@ -10,14 +10,21 @@ import { attachPortalAuthCookies } from '@/lib/portalAuthHttp';
 import { checkSensitiveRateLimit, refundSensitiveIdentifierAttempt } from '@/lib/sensitiveRateLimit';
 import { logger } from '@/lib/logger-enterprise';
 import { GUEST_SESSION_COOKIE, parseGuestSession, verifyGuestSessionAccess } from '@/lib/guestSession';
+import { addSignInCredentialIssues, guestCredentialMessages, type GuestCredentialMessages } from '@/lib/validation/guestCredentials';
 
 export const dynamic = 'force-dynamic';
 
-const schema = z.object({
-  phone: z.string().trim().min(8).max(32),
-  password: z.string().min(8).max(128),
-  remember: z.boolean().optional().default(false),
-}).strict();
+// Sign-in compares against a stored hash, so it keeps the plain length bounds: a password that was
+// accepted when it was set (up to 128 characters, whatever its strength) must keep working. The
+// strength rules belong to the claim that sets a password (api/portal/claims). A phone number that
+// cannot be read as one answers 422 before the rate limiter or the database is used.
+function signInSchema(messages: GuestCredentialMessages) {
+  return z.object({
+    phone: z.string().trim().min(8).max(32),
+    password: z.string().min(8).max(128),
+    remember: z.boolean().optional().default(false),
+  }).strict().superRefine((value, ctx) => addSignInCredentialIssues(ctx, value, messages));
+}
 
 export const GET = withErrorHandler(async (request: NextRequest) => {
   const flags = await getFeatureFlagsAsync();
@@ -37,7 +44,9 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   if (!flags.portalEnabled) {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }
-  const parsed = schema.safeParse(await readJsonBody(request, 16 * 1_024));
+  // The `lang` cookie follows the page language (src/proxy.ts); it also picks the redirect below.
+  const locale = normalizeLocale(request.cookies.get('lang')?.value);
+  const parsed = signInSchema(guestCredentialMessages(locale)).safeParse(await readJsonBody(request, 16 * 1_024));
   if (!parsed.success) throw new ValidationError(parsed.error.issues);
 
   const rateLimit = await checkSensitiveRateLimit(request, {
@@ -63,8 +72,6 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     logger.warn('portal_session.rate_limit_refund_failed', { error: error instanceof Error ? error.name : 'unknown' });
   });
 
-  const lang = request.cookies.get('lang')?.value;
-  const locale = normalizeLocale(lang);
   // While check-in is off its page answers 404, so the guest lands on the stay hub instead.
   const redirect = flags.checkinEnabled ? `/${locale}/check-in` : `/${locale}${STAY_HUB_PATH}`;
   const response = createSuccessResponse({ bookingId: result.bookingId, redirect });

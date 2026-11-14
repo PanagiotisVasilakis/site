@@ -18,7 +18,7 @@ interface GuideDetailProps {
   backHref: string;
   backLabel: string;
   /** schema.org Place fields (identity unchanged from the former detail layout). */
-  structuredData: Record<string, string | undefined>;
+  structuredData: Record<string, unknown>;
   nonce?: string;
 }
 
@@ -73,6 +73,25 @@ export function GuideDetail({ entry, nearby, locale, backHref, backLabel, struct
           </div>
         </SharedElement>
       </div>
+      {entry.photo && entry.photoCredit ? (
+        <p className="guide-detail__credit">
+          {t.guide.photoCredit}: {entry.photoCredit.author}
+          {' · '}
+          <a
+            href={entry.photoCredit.licenseUrl ?? entry.photoCredit.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {entry.photoCredit.license}
+            <span className="sr-only"> {t.guide.opensWebsite}</span>
+          </a>
+          {' · '}
+          <a href={entry.photoCredit.sourceUrl} target="_blank" rel="noopener noreferrer">
+            {hostOf(entry.photoCredit.sourceUrl)}
+            <span className="sr-only"> {t.guide.opensWebsite}</span>
+          </a>
+        </p>
+      ) : null}
 
       <div className="guide-detail__main">
         <header className="guide-detail__head">

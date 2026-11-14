@@ -11,6 +11,7 @@ const navigation = vi.hoisted(() => ({ pathname: '/en/stay' }));
 vi.mock('next/navigation', () => ({ usePathname: () => navigation.pathname }));
 
 import PwaManager from '@/components/PwaManager';
+import { getDictionary } from '@/i18n/dictionaries';
 
 type FakeWorker = { postMessage: ReturnType<typeof vi.fn> };
 
@@ -93,13 +94,16 @@ describe('PwaManager service worker registration (R-253)', () => {
 
 const IPHONE_USER_AGENT = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
 
-// The update banner and the iOS tip as src/app/[locale]/layout.tsx renders them: hidden until PwaManager sets an inline display.
-function ShellWithPwaManager() {
+const updates = getDictionary('en').updates;
+
+// The update banner and the iOS tip as src/app/[locale]/layout.tsx renders them (its localized messages included):
+// hidden until PwaManager sets an inline display.
+function ShellWithPwaManager({ messages = updates }: { messages?: typeof updates } = {}) {
   return (
     <>
       <PwaManager />
-      <div id="update-banner" className="hidden">
-        <span>Update available</span>
+      <div id="update-banner" className="hidden" data-t-update-fromto={messages.fromTo} data-t-assets-fromto={messages.assetsFromTo}>
+        <span>{messages.updateAvailable}</span>
         <button id="update-reload-btn" type="button">Refresh</button>
         <button id="update-dismiss-btn" type="button">Dismiss</button>
       </div>
@@ -115,6 +119,11 @@ function element(id: string): HTMLElement {
   const found = document.getElementById(id);
   if (!found) throw new Error(`#${id} is not rendered`);
   return found;
+}
+
+/** What the banner says: its message span, without the buttons. */
+function bannerMessage(): string {
+  return element('update-banner').querySelector('span')?.textContent ?? '';
 }
 
 describe('PwaManager site storage (R-375)', () => {
@@ -209,7 +218,7 @@ describe('PwaManager site storage (R-375)', () => {
       workerMessageListener()(runtimeVersionMessage('2.0.0', 'newbuild0123', waitingWorker));
       const banner = element('update-banner');
       expect(banner.style.display).toBe('flex');
-      expect(banner).toHaveTextContent('Update available: 1.0.0 → 2.0.0');
+      expect(bannerMessage()).toBe(updates.fromTo);
     });
 
     it('also survives a browser that denies access to navigator.serviceWorker', async () => {
@@ -251,7 +260,7 @@ describe('PwaManager site storage (R-375)', () => {
 
       onMessage(runtimeVersionMessage('2.0.0', 'newbuild0123', waitingWorker));
       expect(banner.style.display).toBe('flex');
-      expect(banner).toHaveTextContent('Update available: 1.0.0 → 2.0.0');
+      expect(bannerMessage()).toBe(updates.fromTo);
 
       fireEvent.click(element('update-dismiss-btn'));
       expect(banner.style.display).toBe('none');
@@ -259,6 +268,63 @@ describe('PwaManager site storage (R-375)', () => {
 
       onMessage(runtimeVersionMessage('2.0.0', 'newbuild0123', waitingWorker));
       expect(banner.style.display).toBe('none');
+    });
+
+    // PP-05: the banner used to print "{old} → {new}" with the raw build hashes ("259ec4b9 → 8d1f0e22") after every deploy.
+    describe('the update message (PP-05)', () => {
+      const messages = {
+        en: updates,
+        el: getDictionary('el').updates,
+      };
+
+      it.each(['en', 'el'] as const)('has no placeholder in the %s dictionary', (locale) => {
+        for (const message of [messages[locale].fromTo, messages[locale].assetsFromTo]) {
+          expect(message).not.toMatch(/\{\w+\}/u);
+          expect(message).not.toContain('→');
+        }
+      });
+
+      it.each(['en', 'el'] as const)('says a new version is ready in %s without a version number or a build hash', (locale) => {
+        container.controller = controllerWorker;
+        render(<ShellWithPwaManager messages={messages[locale]} />);
+        const onMessage = workerMessageListener();
+
+        onMessage(runtimeVersionMessage('1.0.0', 'abcdef0123456789', controllerWorker));
+        onMessage(runtimeVersionMessage('2.0.0', '0123456789abcdef', waitingWorker));
+
+        expect(element('update-banner').style.display).toBe('flex');
+        expect(bannerMessage()).toBe(messages[locale].fromTo);
+        expect(bannerMessage()).not.toMatch(/\d|abcdef01|01234567/u);
+      });
+
+      it.each(['en', 'el'] as const)('says the local guide is updated in %s, without a build hash, when only the build changed', (locale) => {
+        container.controller = controllerWorker;
+        render(<ShellWithPwaManager messages={messages[locale]} />);
+        const onMessage = workerMessageListener();
+
+        onMessage(runtimeVersionMessage('1.0.0', 'abcdef0123456789', controllerWorker));
+        onMessage(runtimeVersionMessage('1.0.0', '0123456789abcdef', waitingWorker));
+
+        expect(element('update-banner').style.display).toBe('flex');
+        expect(bannerMessage()).toBe(messages[locale].assetsFromTo);
+        expect(bannerMessage()).not.toMatch(/\d|abcdef01|01234567/u);
+      });
+
+      it('falls back to a plain English message when the banner carries none', () => {
+        container.controller = controllerWorker;
+        render(
+          <>
+            <PwaManager />
+            <div id="update-banner" className="hidden"><span>x</span></div>
+          </>,
+        );
+        const onMessage = workerMessageListener();
+
+        onMessage(runtimeVersionMessage('1.0.0', 'abcdef0123456789', controllerWorker));
+        onMessage(runtimeVersionMessage('2.0.0', '0123456789abcdef', waitingWorker));
+
+        expect(bannerMessage()).toBe('A new version is ready');
+      });
     });
 
     // R-688: a waiting worker that activated by itself (every tab closed) answers REQUEST_VERSION as the controller on
@@ -273,15 +339,17 @@ describe('PwaManager site storage (R-375)', () => {
 
       onMessage(runtimeVersionMessage('0.1.2', 'probe-b', controllerWorker));
       expect(banner.style.display).toBe('');
-      expect(banner).toHaveTextContent('Update available');
+      expect(bannerMessage()).toBe(updates.updateAvailable);
       expect(banner).not.toHaveAttribute('data-update-key');
       expect(localStorage.getItem('app-version')).toBe('0.1.2');
       expect(localStorage.getItem('app-build')).toBe('probe-b');
 
-      // The baseline moved on: a later update names the version that actually runs.
+      // The baseline moved on: a later update is measured from the version that actually runs.
       onMessage(runtimeVersionMessage('0.1.3', 'probe-c', waitingWorker));
       expect(banner.style.display).toBe('flex');
-      expect(banner).toHaveTextContent('Update available: 0.1.2 → 0.1.3');
+      expect(bannerMessage()).toBe(updates.fromTo);
+      expect(banner).toHaveAttribute('data-old-version', '0.1.2');
+      expect(banner).toHaveAttribute('data-new-version', '0.1.3');
       expect(localStorage.getItem('app-version')).toBe('0.1.2');
     });
 
@@ -475,5 +543,119 @@ describe('PwaManager hands visited pages to the service worker (R-628)', () => {
     const { rerender } = render(<PwaManager />);
 
     expect(() => softNavigate('/en/moments', () => rerender(<PwaManager />))).not.toThrow();
+  });
+});
+
+// PS-07: the fixed pills must leave the end of the page reachable. PwaManager publishes the space they take at the
+// bottom of the viewport as --pwa-banners-clear; shell.css reads it for the footer padding and the scroll padding.
+describe('PwaManager keeps the end of the page clear of the pills (PS-07)', () => {
+  const TIP_HEIGHT = 62;
+  let resizeCallbacks: Array<() => void>;
+  let disconnected: number;
+
+  const clearance = () => document.documentElement.style.getPropertyValue('--pwa-banners-clear');
+  const notifyResize = () => resizeCallbacks.forEach((callback) => callback());
+
+  // The pills' container as layout.tsx renders it, 56 px above the bottom edge (the viewport below sm).
+  function ShellWithPills({ bottom = '56px' }: { bottom?: string }) {
+    return (
+      <>
+        <PwaManager />
+        <div className="pwa-banners" style={{ bottom }}>
+          <div id="update-banner" className="hidden"><span>Update available</span></div>
+          <div id="ios-a2hs-tip" className="hidden">
+            <span>Add to Home Screen</span>
+            <button id="ios-tip-close" type="button">Close</button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_FORCE_SW_DEV', '1');
+    Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: fakeServiceWorkerContainer() });
+    Object.defineProperty(navigator, 'userAgent', { configurable: true, value: IPHONE_USER_AGENT });
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })));
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ version: '1.2.3', build: 'abc' })));
+    // jsdom has no layout: the container is TIP_HEIGHT tall exactly while the tip is displayed.
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function measure(this: HTMLElement) {
+      const tipShown = document.getElementById('ios-a2hs-tip')?.style.display === 'flex';
+      return { height: this.classList.contains('pwa-banners') && tipShown ? TIP_HEIGHT : 0 } as DOMRect;
+    });
+    resizeCallbacks = [];
+    disconnected = 0;
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) { resizeCallbacks.push(callback); }
+      observe() {}
+      disconnect() { disconnected += 1; }
+    });
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(navigator, 'serviceWorker');
+    Reflect.deleteProperty(navigator, 'userAgent');
+    document.documentElement.style.removeProperty('--pwa-banners-clear');
+  });
+
+  it('publishes the space of a shown tip: its distance from the bottom, its height and 8 px of air', () => {
+    render(<ShellWithPills />);
+
+    expect(clearance()).toBe(`${56 + TIP_HEIGHT + 8}px`);
+  });
+
+  it('publishes nothing while no pill is shown', () => {
+    Object.defineProperty(navigator, 'userAgent', { configurable: true, value: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/141.0 Mobile Safari/537.36' });
+    render(<ShellWithPills />);
+
+    expect(element('ios-a2hs-tip').style.display).toBe('');
+    expect(clearance()).toBe('');
+  });
+
+  it('gives the space back when the tip is closed, and keeps remembering the dismissal', () => {
+    render(<ShellWithPills />);
+    expect(clearance()).not.toBe('');
+
+    fireEvent.click(element('ios-tip-close'));
+    notifyResize();
+
+    expect(element('ios-a2hs-tip').style.display).toBe('none');
+    expect(clearance()).toBe('');
+    expect(localStorage.getItem('ios-a2hs-dismissed')).toBe('1');
+  });
+
+  it('follows the offset of the container when the breakpoint changes', () => {
+    const { rerender } = render(<ShellWithPills />);
+    expect(clearance()).toBe('126px');
+
+    // Above sm the network dot is gone and the pills drop to 8 px from the bottom.
+    rerender(<ShellWithPills bottom="8px" />);
+    window.dispatchEvent(new Event('resize'));
+
+    expect(clearance()).toBe(`${8 + TIP_HEIGHT + 8}px`);
+  });
+
+  it('still publishes once in a browser without ResizeObserver', () => {
+    vi.stubGlobal('ResizeObserver', undefined);
+    render(<ShellWithPills />);
+
+    expect(clearance()).toBe('126px');
+  });
+
+  it('removes the property and stops observing when it unmounts', () => {
+    const { unmount } = render(<ShellWithPills />);
+    expect(clearance()).not.toBe('');
+
+    unmount();
+
+    expect(clearance()).toBe('');
+    expect(disconnected).toBeGreaterThan(0);
+  });
+
+  it('does nothing without the pills container', () => {
+    render(<ShellWithPwaManager />);
+
+    expect(clearance()).toBe('');
+    expect(resizeCallbacks).toEqual([]);
   });
 });

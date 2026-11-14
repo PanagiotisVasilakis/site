@@ -7,8 +7,9 @@ import '@/styles/components/map.css';
 import { buildBasePopupHtml, escapeMapHtml as escapeHtml } from '@/components/maps/leafletPopup';
 import { selectMapTileSource } from '@/components/maps/tileSource';
 import type { MapLocation, MapMarkerType } from '@/data/mapLocations';
+import { isMotionFull } from '@/lib/motion/motionPreference';
 
-/** What a pin and its popup show (identity §8 MapCard); the data layer's MapLocation without copies. */
+/** What a pin and its popup show (identity §8 MapCard); the data layer's MapLocation without copies (R-339). */
 export type LeafletMarkerData = Pick<
   MapLocation,
   'id' | 'name' | 'description' | 'address' | 'phone' | 'phones' | 'website' | 'directionsUrl' | 'href'
@@ -27,7 +28,10 @@ export interface LeafletMapLabels {
   fitToMarkers: string;
   zoomIn: string;
   zoomOut: string;
+  /** Closes a popup, and the location message below the map. */
   closePopup: string;
+  /** The accessible name of the focusable map (a region). Required, so a new caller cannot ship a nameless map. */
+  mapRegion: string;
 }
 
 export interface LeafletMapProps {
@@ -73,9 +77,25 @@ function buildIcon(marker: Pick<LeafletMarkerData, 'markerType' | 'number'>, hom
   } else if (marker.number !== undefined) {
     html = `<span class="map-pin map-pin--numbered"><span class="map-pin__disc">${marker.number}</span></span>`;
   } else {
-    html = `<span class="map-pin map-pin--place"><span class="map-pin__disc">${svgIcon(CATEGORY_ICON[marker.markerType])}</span></span>`;
+    html = `<span class="map-pin map-pin--place" data-type="${escapeHtml(marker.markerType)}"><span class="map-pin__disc">${svgIcon(CATEGORY_ICON[marker.markerType])}</span></span>`;
   }
   return L.divIcon({ className: 'map-pin-icon', html, iconSize: [0, 0], iconAnchor: [0, 0], popupAnchor: [0, -40] });
+}
+
+/**
+ * The guest's own position (§8 MapCard): a dot with a paper ring and a soft halo, not a place pin. It is decorative
+ * (aria-hidden) and, with `interactive: false, keyboard: false` on its marker, neither a tab stop nor a button.
+ */
+function buildPositionIcon() {
+  return L.divIcon({ className: 'map-pin-icon', html: '<span class="map-you" aria-hidden="true"></span>', iconSize: [0, 0], iconAnchor: [0, 0] });
+}
+
+/**
+ * Options of a programmatic move (Locate me, Fit): Leaflet pans and zooms with an animation by default, so
+ * without armed motion (identity §5.2) the map jumps.
+ */
+function moveOptions(): { animate?: false } {
+  return isMotionFull() ? {} : { animate: false };
 }
 
 function computeIsDark() {
@@ -88,18 +108,6 @@ function computeIsDark() {
 
 interface ControlExtender {
   extend: (o: { options?: Record<string, unknown>; onAdd: () => HTMLElement }) => new () => L.Control;
-}
-
-function createControlButton(label: string, svg: string, onClick: () => void) {
-  const button = L.DomUtil.create('button', 'leaflet-bar leaflet-control map-control-button') as HTMLButtonElement;
-  button.type = 'button';
-  button.title = label;
-  button.setAttribute('aria-label', label);
-  button.innerHTML = svg;
-  button.onclick = onClick;
-  // Like Leaflet's own buttons: a (double-)click on the control must not reach the map's zoom or popup handlers (R-394).
-  L.DomEvent.disableClickPropagation(button);
-  return button;
 }
 
 export default function LeafletMap({
@@ -115,12 +123,19 @@ export default function LeafletMap({
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const locationMarkerRef = useRef<L.Marker | null>(null);
+  const locateButtonRef = useRef<HTMLButtonElement | null>(null);
   const markersRef = useRef(markers);
   const [locationError, setLocationError] = useState('');
 
   useEffect(() => {
     markersRef.current = markers;
   }, [markers]);
+
+  // The message has a button of its own that unmounts with it, so focus goes back to the control that raised it.
+  const dismissLocationError = useCallback(() => {
+    setLocationError('');
+    locateButtonRef.current?.focus();
+  }, []);
 
   const applyTiles = useCallback((isDark: boolean) => {
     if (!mapRef.current) return;
@@ -138,17 +153,24 @@ export default function LeafletMap({
       : markersRef.current;
     const pts: L.LatLngExpression[] = focus.map(marker => [marker.coordinates[1], marker.coordinates[0]]);
     // The padding keeps the pills (up to the home label's width) inside the frame.
-    if (pts.length) mapRef.current.fitBounds(L.latLngBounds(pts).pad(0.15), { padding: [64, 56] });
+    if (pts.length) mapRef.current.fitBounds(L.latLngBounds(pts).pad(0.15), { padding: [64, 56], ...moveOptions() });
   }, []);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
+    // Leaflet animates zooms, popups, pins and the glide after a drag unless it is told not to. Like every other
+    // animation on the site (identity §5.2) they run only while motion is armed; map.css gates its transitions.
+    const motion = isMotionFull();
     const map = L.map(containerRef.current, {
       center: [center[1], center[0]],
       zoom,
       attributionControl: true,
       zoomControl: false,
+      zoomAnimation: motion,
+      fadeAnimation: motion,
+      markerZoomAnimation: motion,
+      inertia: motion,
     });
     mapRef.current = map;
     applyTiles(computeIsDark());
@@ -166,33 +188,53 @@ export default function LeafletMap({
 
     const LocateControl = (L.Control as unknown as ControlExtender).extend({
       options: { position: 'topleft' },
-      onAdd: () => createControlButton(mapLabels.locateMe, LOCATE_SVG, () => {
-        setLocationError('');
-        if (!navigator.geolocation) {
-          setLocationError(mapLabels.locationUnavailable);
-          return;
-        }
-        navigator.geolocation.getCurrentPosition(pos => {
-          const { latitude, longitude } = pos.coords;
-          const current = mapRef.current;
-          // The answer can arrive after the map was removed, e.g. the guest switched to the list meanwhile (R-398).
-          if (!current) return;
-          current.setView([latitude, longitude], 15);
-          // One pin that follows the guest; it has no popup, so it is neither a tab stop nor a button (R-398).
-          if (locationMarkerRef.current) locationMarkerRef.current.setLatLng([latitude, longitude]);
-          else locationMarkerRef.current = L.marker([latitude, longitude], { icon: buildIcon({ markerType: 'service' }, mapLabels.home), interactive: false, keyboard: false }).addTo(current);
-        }, () => setLocationError(mapLabels.locationUnavailable), {
-          enableHighAccuracy: false,
-          timeout: 10_000,
-          maximumAge: 60_000,
-        });
-      }),
+      onAdd: () => {
+        const div = L.DomUtil.create('button', 'leaflet-bar leaflet-control map-control-button') as HTMLButtonElement;
+        div.type = 'button';
+        div.title = mapLabels.locateMe;
+        div.setAttribute('aria-label', mapLabels.locateMe);
+        div.innerHTML = LOCATE_SVG;
+        locateButtonRef.current = div;
+        div.onclick = () => {
+          setLocationError('');
+          if (!navigator.geolocation) {
+            setLocationError(mapLabels.locationUnavailable);
+            return;
+          }
+          navigator.geolocation.getCurrentPosition(pos => {
+            const { latitude, longitude } = pos.coords;
+            const current = mapRef.current;
+            // The answer can arrive after the map was removed, e.g. the guest switched to the list meanwhile (R-398).
+            if (!current) return;
+            current.setView([latitude, longitude], 15, moveOptions());
+            // One marker that follows the guest; it has no popup, so it is neither a tab stop nor a button (R-398).
+            if (locationMarkerRef.current) locationMarkerRef.current.setLatLng([latitude, longitude]);
+            else locationMarkerRef.current = L.marker([latitude, longitude], { icon: buildPositionIcon(), interactive: false, keyboard: false }).addTo(current);
+          }, () => setLocationError(mapLabels.locationUnavailable), {
+            enableHighAccuracy: false,
+            timeout: 10_000,
+            maximumAge: 60_000,
+          });
+        };
+        // Like Leaflet's own buttons: a (double-)click on the control must not reach the map's zoom or popup handlers (R-394).
+        L.DomEvent.disableClickPropagation(div);
+        return div;
+      },
     });
     map.addControl(new LocateControl());
 
     const FitControl = (L.Control as unknown as ControlExtender).extend({
       options: { position: 'topleft' },
-      onAdd: () => createControlButton(mapLabels.fitToMarkers, FIT_SVG, fitOriginAndMarkers),
+      onAdd: () => {
+        const div = L.DomUtil.create('button', 'leaflet-bar leaflet-control map-control-button') as HTMLButtonElement;
+        div.type = 'button';
+        div.title = mapLabels.fitToMarkers;
+        div.setAttribute('aria-label', mapLabels.fitToMarkers);
+        div.innerHTML = FIT_SVG;
+        div.onclick = fitOriginAndMarkers;
+        L.DomEvent.disableClickPropagation(div);
+        return div;
+      },
     });
     map.addControl(new FitControl());
 
@@ -204,6 +246,7 @@ export default function LeafletMap({
       tileLayerRef.current = null;
       markersLayerRef.current = null;
       locationMarkerRef.current = null;
+      locateButtonRef.current = null;
     };
   }, [applyTiles, center, fitOriginAndMarkers, mapLabels, zoom]);
 
@@ -251,10 +294,19 @@ export default function LeafletMap({
 
   return (
     <div className="map-card" style={{ height }}>
-      <div ref={containerRef} className="map-card__canvas" />
+      {/* Leaflet makes the canvas focusable (arrow keys pan, + and - zoom); a focusable element needs a role and a name. */}
+      <div
+        ref={containerRef}
+        className="map-card__canvas"
+        role="region"
+        aria-label={mapLabels.mapRegion}
+      />
       {locationError && (
-        <div className="map-card__error" role="alert">
-          {locationError}
+        <div className="map-card__error">
+          <p className="map-card__error-text" role="alert">{locationError}</p>
+          <button type="button" className="map-card__error-close" aria-label={mapLabels.closePopup} onClick={dismissLocationError}>
+            <span aria-hidden="true">&times;</span>
+          </button>
         </div>
       )}
     </div>

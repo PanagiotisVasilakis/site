@@ -2,9 +2,10 @@ import type { Metadata } from 'next';
 import { StayHub } from '@/components/stay/StayHub';
 import { normalizeLocale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
-import { getFeatureFlagsAsync } from '@/lib/featureFlags';
+import { getFeatureFlagsOrOff } from '@/lib/featureFlags';
 
 // The portal tile follows the feature flag (a database setting), so the hub renders per request.
+// The hub itself needs no database: while the flags cannot be read it renders with the portal tile off.
 export const dynamic = 'force-dynamic';
 
 type StayPageProps = { params: Promise<{ locale: string }> };
@@ -20,6 +21,6 @@ export async function generateMetadata({ params }: StayPageProps): Promise<Metad
 
 export default async function StayPage({ params }: StayPageProps) {
   const { locale } = await params;
-  const flags = await getFeatureFlagsAsync();
+  const flags = await getFeatureFlagsOrOff();
   return <StayHub locale={normalizeLocale(locale)} portalEnabled={flags.portalEnabled} checkinEnabled={flags.checkinEnabled} />;
 }

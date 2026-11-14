@@ -127,7 +127,17 @@ describe.sequential('REM-04 admin source-budget isolation with live PostgreSQL',
         { params: Promise.resolve({}) },
       );
       expect(sourceASixth.status).toBe(429);
-      expect(await responseBody(sourceASixth)).toBe('{"error":"Too many authentication attempts"}');
+      // The shared error envelope of the API, with Retry-After for the rest of the 15-minute window.
+      const refusal = JSON.parse(await responseBody(sourceASixth)) as {
+        error: { code: string; message: string };
+      };
+      expect(refusal.error.code).toBe('RATE_LIMITED');
+      expect(refusal.error.message).toBe('Too many authentication attempts');
+      expect(sourceASixth.headers.get('x-error-code')).toBe('RATE_LIMITED');
+      const retryAfter = Number(sourceASixth.headers.get('retry-after'));
+      expect(Number.isInteger(retryAfter)).toBe(true);
+      expect(retryAfter).toBeGreaterThan(0);
+      expect(retryAfter).toBeLessThanOrEqual(900);
 
       const sourceAKey = `sensitive:${privacyHmac(
         `admin-login|ip:${SOURCE_A}`,
@@ -140,9 +150,10 @@ describe.sequential('REM-04 admin source-budget isolation with live PostgreSQL',
       const rows = await withTestPrismaClient(target, (prisma) => prisma.rateLimit.findMany({
         orderBy: { key: 'asc' },
       }));
+      // Source A spent its budget on wrong tokens; source B's one attempt was a correct token, which gave it back.
       expect(new Map(rows.map((row) => [row.key, row.count]))).toEqual(new Map([
         [sourceAKey, 6],
-        [sourceBKey, 1],
+        [sourceBKey, 0],
       ]));
       expect(await withTestPrismaClient(target, (prisma) => prisma.adminSession.count())).toBe(1);
 
@@ -206,11 +217,59 @@ describe.sequential('REM-04 admin source-budget isolation with live PostgreSQL',
         'sensitive-rate-limit:v1',
       )}`;
       const rows = await withTestPrismaClient(target, (prisma) => prisma.rateLimit.findMany());
+      // A correct token gives its attempt back, so source B's row is back at 0.
       expect(new Map(rows.map((row) => [row.key, row.count]))).toEqual(new Map([
         [sourceAKey, 6],
-        [sourceBKey, 1],
+        [sourceBKey, 0],
       ]));
       expect(await withTestPrismaClient(target, (prisma) => prisma.adminSession.count())).toBe(1);
+    } finally {
+      await resetApplicationPrismaSingleton();
+      await dropIsolatedDatabase(target);
+    }
+  });
+
+  it('refunds a correct token against the live limiter row and still limits the wrong ones', async () => {
+    const target = await createIsolatedDatabase(runtime, 'rem04_admin_refund');
+    try {
+      await applyMigrationsFromEmpty(target);
+      setApplicationEnvironment(target.databaseUrl);
+      await resetApplicationPrismaSingleton();
+      const [{ NextRequest }, adminRoute, { privacyHmac }] = await loadRouteModules();
+      const sourceAKey = `sensitive:${privacyHmac(
+        `admin-login|ip:${SOURCE_A}`,
+        'sensitive-rate-limit:v1',
+      )}`;
+      const countOfSourceA = () => withTestPrismaClient(target, async (prisma) => (
+        (await prisma.rateLimit.findUniqueOrThrow({ where: { key: sourceAKey } })).count
+      ));
+
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const wrong = await adminRoute.POST(
+          adminRequest(NextRequest, SOURCE_A, `invalid-admin-credential-${attempt}`),
+          { params: Promise.resolve({}) },
+        );
+        expect(wrong.status).toBe(401);
+      }
+      expect(await countOfSourceA()).toBe(4);
+
+      const correct = await adminRoute.POST(
+        adminRequest(NextRequest, SOURCE_A, ADMIN_CREDENTIAL),
+        { params: Promise.resolve({}) },
+      );
+      expect(correct.status).toBe(200);
+      expect(await countOfSourceA()).toBe(4);
+
+      const fifthWrong = await adminRoute.POST(
+        adminRequest(NextRequest, SOURCE_A, 'invalid-admin-credential-4'),
+        { params: Promise.resolve({}) },
+      );
+      expect(fifthWrong.status).toBe(401);
+      const sixthWrong = await adminRoute.POST(
+        adminRequest(NextRequest, SOURCE_A, 'invalid-admin-credential-5'),
+        { params: Promise.resolve({}) },
+      );
+      expect(sixthWrong.status).toBe(429);
     } finally {
       await resetApplicationPrismaSingleton();
       await dropIsolatedDatabase(target);

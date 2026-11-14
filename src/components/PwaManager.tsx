@@ -22,6 +22,33 @@ const cacheCurrentPage = (): void => {
   } catch { /* service workers unavailable or denied */ }
 };
 
+// The fixed pills (update banner, iOS tip) must not hide the end of the page (PS-07). While one shows, this keeps
+// --pwa-banners-clear (shell.css) at the space the pills take from the bottom of the viewport; the page footer and
+// the keyboard scroll padding leave that much clear. Without a pill the property is removed and the sheet says 0.
+const trackBannerClearance = (signal: AbortSignal): void => {
+  const banners = document.querySelector<HTMLElement>('.pwa-banners');
+  if (!banners) return;
+  const root = document.documentElement;
+  const publish = (): void => {
+    const { height } = banners.getBoundingClientRect();
+    if (height <= 0) {
+      root.style.removeProperty('--pwa-banners-clear');
+      return;
+    }
+    const offset = Number.parseFloat(getComputedStyle(banners).bottom) || 0;
+    root.style.setProperty('--pwa-banners-clear', `${Math.ceil(offset + height + 8)}px`);
+  };
+  publish();
+  // A pill changes height when it appears, is closed, or its text wraps differently; the offset follows the breakpoint.
+  window.addEventListener('resize', publish, { signal });
+  if (typeof ResizeObserver !== 'undefined') {
+    const observer = new ResizeObserver(publish);
+    observer.observe(banners);
+    signal.addEventListener('abort', () => observer.disconnect());
+  }
+  signal.addEventListener('abort', () => root.style.removeProperty('--pwa-banners-clear'));
+};
+
 export default function PwaManager() {
   const pathname = usePathname();
   const mountedPathname = useRef(pathname);
@@ -123,6 +150,7 @@ export default function PwaManager() {
     }
     const close = document.getElementById('ios-tip-close');
     close?.addEventListener('click', () => { writeStored(() => localStorage.setItem('ios-a2hs-dismissed','1')); const t = document.getElementById('ios-a2hs-tip'); if (t) t.style.display='none'; }, { signal });
+    trackBannerClearance(signal);
     const reload = document.getElementById('update-reload-btn');
     reload?.addEventListener('click', async () => {
       try {
@@ -182,7 +210,6 @@ export default function PwaManager() {
         }
         const storedVersion = readStored(() => localStorage.getItem('app-version'));
         const storedBuild = readStored(() => localStorage.getItem('app-build'));
-        const shortNewBuild = newBuild ? newBuild.slice(0,8) : '';
         if (!storedVersion) {
           writeStored(() => localStorage.setItem('app-version', newVersion));
           if (newBuild) writeStored(() => localStorage.setItem('app-build', newBuild));
@@ -194,13 +221,13 @@ export default function PwaManager() {
         if (banner && (versionChanged || buildChanged)) {
           const span = banner.querySelector('span');
           if (span) {
-            const updateTpl = banner.getAttribute('data-t-update-fromto') || 'Update available: {old} → {new}';
-            const assetsTpl = banner.getAttribute('data-t-assets-fromto') || 'Assets updated: {old} → {new}';
+            // Plain messages (the layout puts the localized ones on the banner): version numbers and build hashes mean nothing to a guest.
+            const updateMessage = banner.getAttribute('data-t-update-fromto') || 'A new version is ready';
+            const assetsMessage = banner.getAttribute('data-t-assets-fromto') || 'An updated local guide is ready';
             if (versionChanged) {
-              span.textContent = updateTpl.replace('{old}', storedVersion || '').replace('{new}', newVersion || '');
+              span.textContent = updateMessage;
             } else if (buildChanged) {
-              const oldShort = storedBuild ? storedBuild.slice(0,8) : '';
-              span.textContent = assetsTpl.replace('{old}', oldShort || 'old').replace('{new}', shortNewBuild || '');
+              span.textContent = assetsMessage;
             }
           }
           banner.setAttribute('data-old-version', storedVersion);

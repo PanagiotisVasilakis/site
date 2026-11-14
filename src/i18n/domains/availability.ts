@@ -24,6 +24,8 @@ export interface AvailabilityDictionary {
     legend: {
         free: string;
         booked: string;
+        /** Shown only while a free night is too short to start a stay (see `day.tooShort`). */
+        tooShort: string;
         selected: string;
     };
     /** Parts of a day's accessible name, after the full date. */
@@ -35,6 +37,8 @@ export interface AvailabilityDictionary {
         checkOutOnly: string;
         /** Its short visible label inside the day cell. */
         out: string;
+        /** A free night that cannot start a stay because the minimum stay does not fit. `{nights}`: that minimum. */
+        tooShort: string;
     };
     prompts: {
         checkIn: string;
@@ -110,6 +114,7 @@ export const availabilityTranslations: Record<Locale, AvailabilityDictionary> = 
         legend: {
             free: "Free night",
             booked: "Booked: the date is crossed out",
+            tooShort: "Free, but the minimum stay does not fit: dashed outline",
             selected: "Your stay: highlighted from check-in to check-out",
         },
         day: {
@@ -118,6 +123,7 @@ export const availabilityTranslations: Record<Locale, AvailabilityDictionary> = 
             selected: "selected",
             checkOutOnly: "check-out only",
             out: "out",
+            tooShort: "free, but a stay must be at least {nights}",
         },
         prompts: {
             checkIn: "Choose your check-in night.",
@@ -189,6 +195,7 @@ export const availabilityTranslations: Record<Locale, AvailabilityDictionary> = 
         legend: {
             free: "Ελεύθερη νύχτα",
             booked: "Κρατημένη: η ημερομηνία είναι διαγραμμένη",
+            tooShort: "Ελεύθερη, αλλά δεν χωράει η ελάχιστη διαμονή: διακεκομμένο περίγραμμα",
             selected: "Η διαμονή σας: επισημαίνεται από την άφιξη ως την αναχώρηση",
         },
         day: {
@@ -197,6 +204,7 @@ export const availabilityTranslations: Record<Locale, AvailabilityDictionary> = 
             selected: "επιλεγμένη",
             checkOutOnly: "μόνο αναχώρηση",
             out: "αναχ.",
+            tooShort: "ελεύθερη, αλλά η διαμονή πρέπει να είναι τουλάχιστον {nights}",
         },
         prompts: {
             checkIn: "Επιλέξτε τη νύχτα άφιξης.",

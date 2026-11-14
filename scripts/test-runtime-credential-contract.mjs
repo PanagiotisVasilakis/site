@@ -38,11 +38,29 @@ try {
     GUEST_JWT_SECRET: valid.ADMIN_JWT_SECRET,
   };
 
+  // `npm start` does not set NODE_ENV. The standalone server runs as production
+  // whatever the caller sets, so the start-up gate must validate it as production too.
+  const placeholderPepper = 'replace-me-with-a-long-random-pepper-value';
+  const withoutNodeEnv = { ...valid };
+  delete withoutNodeEnv.NODE_ENV;
+  const unsetPlaceholderPepper = { ...withoutNodeEnv, SECURITY_PEPPER: placeholderPepper };
+  const developmentPlaceholderPepper = {
+    ...valid,
+    NODE_ENV: 'development',
+    SECURITY_PEPPER: placeholderPepper,
+  };
+  const unsetWithoutProxySecret = { ...withoutNodeEnv };
+  delete unsetWithoutProxySecret.ORIGIN_PROXY_SHARED_SECRET;
+
   const results = [
     ['missing', runCase(missing), 78],
     ['invalid', runCase(invalid), 78],
     ['identical', runCase(identical), 78],
     ['valid', runCase(valid), 0],
+    ['unset-placeholder-pepper', runCase(unsetPlaceholderPepper), 78],
+    ['development-placeholder-pepper', runCase(developmentPlaceholderPepper), 78],
+    ['unset-without-proxy-secret', runCase(unsetWithoutProxySecret), 78],
+    ['unset-valid', runCase(withoutNodeEnv), 0],
   ];
 
   for (const [label, result, expectedStatus] of results) {
@@ -55,12 +73,13 @@ try {
       valid.GUEST_JWT_SECRET,
       valid.ADMIN_DASH_SECRET,
       invalid.ADMIN_DASH_SECRET,
+      placeholderPepper,
     ]) {
       assert.equal(output.includes(value), false, `${label} output must not expose credentials`);
     }
   }
 
-  console.log('Standalone runtime credential contract passed: 4/4 isolated cases.');
+  console.log(`Standalone runtime credential contract passed: ${results.length}/${results.length} isolated cases.`);
 } finally {
   rmSync(root, { recursive: true, force: true });
 }

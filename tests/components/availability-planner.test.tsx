@@ -14,6 +14,7 @@ vi.mock('@/data/contact', async (importOriginal) => ({
 }));
 
 import AvailabilityPlanner from '@/components/availability/AvailabilityPlanner';
+import { nextFreeNight } from '@/components/home/homeNights';
 import { getDictionary } from '@/i18n/dictionaries';
 import { addDays, nightsBetween, type IsoDate } from '@/lib/availability/calendarDate';
 import type { PublicAvailability } from '@/lib/prisma-repositories/availabilityRepository';
@@ -222,10 +223,10 @@ describe('AvailabilityPlanner', () => {
     // 15 and 16 October need 3 nights, but 17 October is booked.
     expect(day(container, '2026-10-15')).toBeDisabled();
     expect(day(container, '2026-10-15'))
-      .toHaveAccessibleName('Thursday, 15 October 2026, Minimum stay from this check-in: 3 nights.');
+      .toHaveAccessibleName('Thursday, 15 October 2026, free, but a stay must be at least 3 nights');
     expect(day(container, '2026-10-16')).toBeDisabled();
     expect(day(container, '2026-10-16'))
-      .toHaveAccessibleName('Friday, 16 October 2026, Minimum stay from this check-in: 3 nights.');
+      .toHaveAccessibleName('Friday, 16 October 2026, free, but a stay must be at least 3 nights');
     // A night that can start a stay, the booked night and a past day carry no such sentence.
     expect(day(container, '2026-10-14')).toBeEnabled();
     expect(day(container, '2026-10-14')).toHaveAccessibleName('Wednesday, 14 October 2026');
@@ -233,6 +234,120 @@ describe('AvailabilityPlanner', () => {
     expect(day(container, '2026-10-06')).toBeDisabled();
     expect(day(container, '2026-10-06')).toHaveAccessibleName('Tuesday, 6 October 2026');
     expect(within(summary()).getByText(t.summary.empty)).toBeInTheDocument();
+  });
+
+  // PS-12: a free night that is too short to start a stay is neither a booked night nor a past day.
+  describe('a free night that cannot start a stay', () => {
+    /** 15 and 16 October need 3 nights (the period's minimum) but 17 October is booked. */
+    const SHORT_GAP = { today: MID_MONTH, horizonEnd: addDays(MID_MONTH, 365), nights: nightsWith({ '2026-10-10': 'b', '2026-10-17': 'b' }).slice(6).padEnd(365, 'o') };
+    const cell = (container: HTMLElement, date: string) => {
+      const element = container.querySelector<HTMLElement>(`[data-day="${date}"]`);
+      if (!element) throw new Error(`No day cell for ${date}`);
+      return element;
+    };
+
+    it('is styled apart from a past day and from a booked day', () => {
+      const { container } = renderPlanner(SHORT_GAP);
+
+      for (const date of ['2026-10-15', '2026-10-16']) {
+        expect(cell(container, date)).toHaveClass('cal__day--short', 'cal__day--disabled');
+        expect(cell(container, date)).not.toHaveClass('cal__day--booked');
+      }
+      expect(cell(container, '2026-10-06')).toHaveClass('cal__day--disabled');
+      expect(cell(container, '2026-10-06')).not.toHaveClass('cal__day--short');
+      expect(cell(container, '2026-10-17')).toHaveClass('cal__day--booked');
+      expect(cell(container, '2026-10-17')).not.toHaveClass('cal__day--short');
+      expect(cell(container, '2026-10-14')).not.toHaveClass('cal__day--short');
+    });
+
+    it('is not selectable, and choosing it does nothing', () => {
+      const { container } = renderPlanner(SHORT_GAP);
+
+      fireEvent.click(day(container, '2026-10-15'));
+
+      expect(window.location.hash).toBe('');
+      expect(within(summary()).getByText(t.summary.empty)).toBeInTheDocument();
+      expect(screen.getByText(t.prompts.checkIn)).toBeInTheDocument();
+    });
+
+    it('shows no such style while a check-out is being chosen', () => {
+      const { container } = renderPlanner(SHORT_GAP);
+
+      fireEvent.click(day(container, '2026-10-12'));
+
+      expect(container.querySelector('.cal__day--short')).toBeNull();
+      expect(day(container, '2026-10-15')).not.toHaveAccessibleName(/free, but/);
+    });
+
+    it('keeps the style off the nights of a chosen stay that ends right before the booked night', () => {
+      const { container } = renderPlanner(SHORT_GAP);
+
+      // 11 to 16 October: 15 and 16 are inside the stay but cannot start one (3 nights needed, 17 October is booked).
+      fireEvent.click(day(container, '2026-10-11'));
+      fireEvent.click(day(container, '2026-10-16'));
+
+      for (const date of ['2026-10-15', '2026-10-16']) {
+        expect(cell(container, date)).toHaveClass('cal__day--selected');
+        expect(cell(container, date)).not.toHaveClass('cal__day--short');
+        expect(day(container, date).getAttribute('aria-label')).not.toMatch(/free, but/);
+      }
+    });
+
+    it('keeps the style on a too-short night outside the chosen stay', () => {
+      const { container } = renderPlanner(SHORT_GAP);
+
+      fireEvent.click(day(container, '2026-10-11'));
+      fireEvent.click(day(container, '2026-10-14'));
+
+      for (const date of ['2026-10-15', '2026-10-16']) {
+        expect(cell(container, date)).toHaveClass('cal__day--short');
+        expect(day(container, date)).toHaveAccessibleName(/free, but a stay must be at least 3 nights$/);
+      }
+      expect(cell(container, '2026-10-14')).not.toHaveClass('cal__day--short');
+    });
+
+    it('is explained in the legend only while such a night exists', () => {
+      const withGap = renderPlanner(SHORT_GAP);
+      expect(within(withGap.container.querySelector<HTMLElement>('.cal-legend')!).getByText(t.legend.tooShort)).toBeInTheDocument();
+      withGap.unmount();
+
+      renderPlanner();
+      expect(screen.queryByText(t.legend.tooShort)).not.toBeInTheDocument();
+    });
+
+    it('names the minimum without a price, fee, total or cancellation text', () => {
+      const { container } = renderPlanner(SHORT_GAP);
+
+      const name = day(container, '2026-10-15').getAttribute('aria-label') ?? '';
+      expect(name).toContain('3 nights');
+      expect(`${name} ${t.legend.tooShort} ${t.day.tooShort}`).not.toMatch(/€|\bprice|\bfee|\btotal|cancel/i);
+    });
+
+    it('speaks Greek', () => {
+      const el = getDictionary('el').availability;
+      const { container } = render(<AvailabilityPlanner locale="el" availability={availability(SHORT_GAP)} />);
+
+      expect(day(container, '2026-10-15')).toHaveAccessibleName(
+        'Πέμπτη, 15 Οκτωβρίου 2026, ελεύθερη, αλλά η διαμονή πρέπει να είναι τουλάχιστον 3 νύχτες',
+      );
+      expect(within(container.querySelector<HTMLElement>('.cal-legend')!).getByText(el.legend.tooShort)).toBeInTheDocument();
+    });
+
+    // AC-03: the BookBar names a night only if this calendar lets the visitor choose it as a check-in.
+    it('is never the night the BookBar names', () => {
+      const scenario = {
+        nights: nightsWith({ '2026-10-03': 'b', '2026-10-06': 'b' }),
+        rates: [{ start: TODAY, end: '2026-10-08' as IsoDate, minimumNights: 3 }],
+      };
+      const { container } = renderPlanner(scenario);
+
+      // 1, 2, 4 and 5 October are free but cannot start a 3-night stay before the booked 3rd and 6th.
+      for (const date of ['2026-10-01', '2026-10-02', '2026-10-04', '2026-10-05']) {
+        expect(day(container, date)).toBeDisabled();
+      }
+      expect(day(container, '2026-10-07')).toBeEnabled();
+      expect(nextFreeNight(availability(scenario))).toEqual({ tonight: false, date: '2026-10-07' });
+    });
   });
 
   it('explains the minimum stay and only enables check-out days that meet it', () => {
@@ -300,6 +415,42 @@ describe('AvailabilityPlanner', () => {
     expect(within(summary()).getByText(t.summary.empty)).toBeInTheDocument();
     expect(window.location.hash).toBe('');
     expect(window.location.search).toBe('?x=1');
+  });
+
+  // FGM-05 (WCAG 2.4.3): the button exists only while a check-in is chosen, so clearing removes the focused element
+  // and the browser would send focus back to the top of the page. It goes to the calendar instead.
+  it.each([
+    ['with a complete stay', '#checkin=2026-10-07&checkout=2026-10-10'],
+    ['with a check-in only', '#checkin=2026-10-07'],
+  ])('moves focus to the calendar when "Clear dates" is activated from the keyboard %s', async (_name, fragment) => {
+    window.history.replaceState(null, '', `${PAGE_PATH}${fragment}`);
+    const user = userEvent.setup();
+    renderPlanner();
+    const clear = screen.getByRole('button', { name: t.clearDates });
+    const calendar = screen.getByRole('group', { name: t.calendarLabel });
+
+    await user.tab();
+    while (document.activeElement !== clear) await user.tab();
+    await user.keyboard('{Enter}');
+
+    expect(screen.queryByRole('button', { name: t.clearDates })).not.toBeInTheDocument();
+    expect(within(summary()).getByText(t.summary.empty)).toBeInTheDocument();
+    expect(calendar).toHaveFocus();
+    expect(document.body).not.toHaveFocus();
+    // The calendar is a programmatic focus target only: it is no extra tab stop.
+    expect(calendar).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('keeps the calendar as the next step after clearing: Tab enters its first day', async () => {
+    window.history.replaceState(null, '', `${PAGE_PATH}#checkin=2026-10-07`);
+    const user = userEvent.setup();
+    renderPlanner();
+
+    fireEvent.click(screen.getByRole('button', { name: t.clearDates }));
+    await user.tab();
+
+    expect(document.activeElement?.tagName).toBe('BUTTON');
+    expect(screen.getByRole('group', { name: t.calendarLabel })).toContainElement(document.activeElement as HTMLElement);
   });
 
   it('clears the selection when the check-in is chosen again', () => {

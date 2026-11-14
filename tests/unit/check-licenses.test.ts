@@ -3,27 +3,32 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-// Fixed, git-ignored scratch directory: the checker reads ./package-lock.json and
-// ./node_modules/<pkg>/package.json from its cwd.
-const WORK_DIR = '.runtime/check-licenses-test';
-const ELKJS_DIR = `${WORK_DIR}/node_modules/elkjs`;
-const OTHER_DIR = `${WORK_DIR}/node_modules/not-elkjs`;
+import { enterScratchDir, leaveScratchDir } from './support/scratch-dir';
+
+const TSX = path.resolve('node_modules/.bin/tsx');
+const CHECKER = path.resolve('scripts/check-licenses.ts');
+
+// A scratch directory of its own per test, entered as the cwd: the checker reads ./package-lock.json
+// and ./node_modules/<pkg>/package.json from it.
+const ELKJS_DIR = 'node_modules/elkjs';
+const OTHER_DIR = 'node_modules/not-elkjs';
+let workDir = '';
 
 beforeEach(() => {
-  fs.rmSync(WORK_DIR, { recursive: true, force: true });
+  workDir = enterScratchDir('check-licenses-test');
   fs.mkdirSync(ELKJS_DIR, { recursive: true });
   fs.mkdirSync(OTHER_DIR, { recursive: true });
 });
 
 afterEach(() => {
-  fs.rmSync(WORK_DIR, { recursive: true, force: true });
+  leaveScratchDir(workDir);
 });
 
 function runChecker(elkjsLicense: string, otherLicense: string) {
   fs.writeFileSync(`${ELKJS_DIR}/package.json`, JSON.stringify({ name: 'elkjs', version: '1.0.0', license: elkjsLicense }));
   fs.writeFileSync(`${OTHER_DIR}/package.json`, JSON.stringify({ name: 'not-elkjs', version: '1.0.0', license: otherLicense }));
   fs.writeFileSync(
-    `${WORK_DIR}/package-lock.json`,
+    'package-lock.json',
     JSON.stringify({
       packages: {
         '': { version: '0.0.0' },
@@ -33,8 +38,8 @@ function runChecker(elkjsLicense: string, otherLicense: string) {
     }),
   );
 
-  return spawnSync(path.resolve('node_modules/.bin/tsx'), [path.resolve('scripts/check-licenses.ts')], {
-    cwd: WORK_DIR,
+  return spawnSync(TSX, [CHECKER], {
+    cwd: workDir,
     encoding: 'utf8',
     timeout: 30_000,
   });

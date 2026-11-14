@@ -8,6 +8,12 @@ if (!serverPath) {
   throw new Error('Standalone server path is required');
 }
 
+// This script only starts the production build, and the standalone server.js forces
+// NODE_ENV=production itself. Validate the environment that will actually run: with
+// NODE_ENV unset (`npm start`) the schema would default to development, accept placeholder
+// peppers and not require ORIGIN_PROXY_SHARED_SECRET.
+process.env.NODE_ENV = 'production';
+
 try {
   runtimeEnvSchema.parse(process.env);
   console.log('Environment validation passed');

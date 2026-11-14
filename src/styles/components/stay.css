@@ -207,7 +207,7 @@
 @media (hover: hover) and (pointer: fine) {
   .stay-phones .stay-phones__row:hover .stay-phones__name { text-decoration: underline; text-underline-offset: .2em; }
 }
-.stay-tile .stay-tile__more { margin-top: auto; min-height: 44px; }
+.stay-tile .stay-tile__more { margin-block: auto 0; min-height: 44px; }
 
 /* Guide tile search: submits to the guide list (?q=) */
 .stay-tile .stay-search { display: grid; gap: 6px; width: 100%; margin-top: 4px; }
@@ -544,7 +544,7 @@
 }
 .checkin-portal .checkin-map { min-height: 240px; }
 .checkin-portal .checkin-highlights { display: grid; gap: 10px; align-content: start; }
-.checkin-portal .checkin-guide-link { align-self: flex-start; min-height: 44px; }
+.checkin-portal .checkin-guide-link { align-self: flex-start; min-height: 44px; margin-block: 0; }
 
 /* §9.8 portal refresh, §9.10 404 and errors, §9.11 offline: the calm centred status layout */
 .status-main { display: grid; min-height: 100svh; place-items: center; padding-bottom: env(safe-area-inset-bottom); }
@@ -588,7 +588,7 @@
   padding: 0;
   list-style: none;
 }
-.status-page .status-page__link { min-height: 44px; font-size: 1.0625rem; }
+.status-page .status-page__link { min-height: 44px; margin-block: 0; font-size: 1.0625rem; }
 .status-page .status-page__note {
   margin: 0;
   font-size: .8125rem;
@@ -632,6 +632,9 @@
 /* StatusCluster (network status pill, mobile only), on tokens; the dot colour follows data-state */
 .net-status {
   position: relative;
+  /* The dot keeps clear of the home indicator like the BookBar and the PWA pills, and while the BookBar is shown
+     (right of the dot) it rides at its height instead of under it (PS-07, shell.css --dot-lift). */
+  translate: 0 calc(-1 * (var(--dot-lift, 0px) + env(safe-area-inset-bottom)));
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -666,6 +669,7 @@
     white-space: nowrap;
   }
   /* Keyboard focus scrolls a control above the fixed pill (layout.tsx: 8 px from the bottom, 40 px tall), not
-     under it (R-361: it covered up to 45 % of a focused footer link). The shown BookBar's larger padding wins. */
-  :root:has(.net-status) { scroll-padding-bottom: 56px; }
+     under it (R-361: it covered up to 45 % of a focused footer link), and above a shown PWA pill, which sits
+     over the dot (shell.css). The shown BookBar's larger padding wins. */
+  :root:has(.net-status) { scroll-padding-bottom: max(calc(56px + env(safe-area-inset-bottom)), var(--pwa-banners-clear)); }
 }

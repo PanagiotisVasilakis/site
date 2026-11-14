@@ -35,7 +35,9 @@ state. They rely on the edge/proxy layers, safe caching, and bounded queries.
   limiter groups addresses this way. All dimensions are updated in one
   transaction. A successful guest sign-in gives back its phone-number attempt
   (`refundSensitiveIdentifierAttempt`), so only failed attempts count against
-  an account; the client-address dimension keeps counting every attempt.
+  an account; the client-address dimension keeps counting every attempt. A
+  correct administrator token gives back its attempt on the address row
+  (`refundAdminLoginAttempt`, see "Administrator login source isolation").
 
 Confirmed PostgreSQL saturation returns a generic `429`. A PostgreSQL limiter
 failure rolls back all limiter dimensions, returns a generic `503`, and must
@@ -63,21 +65,62 @@ public reads.
 Administrator login has no anonymous, globally enforcing bucket. Until named
 administrator identities exist, the authoritative budget is the privacy-HMAC
 key of the verified source (the full IPv4 address, or the IPv6 /64, see above):
-five attempts in a fixed fifteen-minute window. Saturating source A does not
+five attempts in a fixed fifteen-minute window. Only wrong tokens count: a
+correct token gives its attempt back (`refundAdminLoginAttempt` in
+`src/lib/auth/adminLoginBudget.ts`, a PostgreSQL update of the same row that
+never reopens a spent window), so an operator who signs in repeatedly is not
+locked out while every wrong guess keeps counting. Saturating source A does not
 consume source B's budget unless both are IPv6 addresses in one /64, while A's
-sixth attempt is still denied.
+sixth attempt is still denied with `429` in the shared API error envelope and a
+`Retry-After` header for the rest of the window.
 
 Public forwarding headers cannot select that source; the limiter requires the
 private canonical IP and a valid proxy attestation. Credentials and
-attacker-supplied administrator hints are never key material. Administrator
-logins answered with `401` or `429` appear only as the info log line
-`API request completed` with that status in the application log; the Nginx
-access log (`origin_safe` format, `$status` field) also records that status; no
-counter or alert rule records them.
+attacker-supplied administrator hints are never key material.
+
+Every administrator login attempt that the limiter admits (a correct one included),
+and the first refusal of each window, is stored as a security audit event (`security_audit_events`, path `/api/admin/login`, written by
+`src/app/api/admin/login/route.ts`):
+
+| Event type | Severity | When | `details` |
+| --- | --- | --- | --- |
+| `admin.login_succeeded` | `low` | the secret matched and the admin session exists | `adminSessionId` |
+| `admin.login_failed` | `medium` | an attempt the limiter admitted, with the wrong secret (`401`) | `remainingAttempts` |
+| `admin.login_rate_limited` | `medium` | an attempt the limiter refused (`429`) | `limit` (5), `windowMinutes` (15), `windowEndsAt` |
+
+A row holds the correlation id and the keyed hash of the verified client address
+that all security events share (the privacy HMAC of the canonical address, never
+the address and never a forwarding header). The submitted secret, its length and
+any part of it are neither stored nor logged. A refusal is stored once per limiter
+window and bucket, however many requests are refused: the event id derives from
+the end of the window, so the primary key drops the repeats and the limiter table
+gets no extra row (two buckets whose windows end in the same millisecond share one
+refusal event). A source therefore writes at most five `admin.login_failed`
+events and one refusal event per window. `admin.login_succeeded` events are not
+bounded by the limiter, because a correct token is refunded; they need the
+administrator secret. A flood from many sources is left to Cloudflare and Nginx,
+as for the guest sign-in limiter. A request that ends before the
+limiter (login disabled, invalid or oversized body, no attested client address,
+limiter store failure) writes no event. The write is best effort: a failure is
+logged (`Admin login audit event could not be stored`) and never changes the
+answer.
+
+None of the three events is `high`, and the only security alert rule ("Recent
+high-severity security events", `src/lib/operationalMonitor.ts`) counts `high`
+and `critical` events, so a guessing run or an internet scan opens no alert and
+nothing counts these events as a metric. `runRetention` deletes security events
+90 days after they occurred, whatever their type. The answers `401` and `429`
+also appear as the info log line `API request completed` with that status in the
+application log, and the Nginx access log (`origin_safe` format, `$status` field)
+records that status too.
 Named-identity progressive budgets and durable off-host alerting are future
 work.
 
-Code and deterministic route/PostgreSQL regressions establish this contract.
+Code and deterministic route/PostgreSQL regressions (the events:
+`tests/security/admin-login-audit.test.ts`; the source isolation:
+`tests/security/admin-rate-limit-isolation.test.ts` and
+`tests/integration/security/admin-rate-limit-isolation.test.ts`) establish this
+contract.
 Manual evidence is still pending: run the A/B sequence through the staging
 proxy topology, confirm forwarding-header spoofing is rejected there, and
 observe the 401/429/success distributions.
@@ -94,7 +137,8 @@ chains, or high-cardinality route values:
 - PostgreSQL limiter latency and errors;
 - limiter-table row count, key cardinality, oldest expired row, and cleanup
   age;
-- authentication failures versus limiter denials; and
+- authentication failures versus limiter denials (for the administrator login the
+  `admin.login_failed` and `admin.login_rate_limited` events); and
 - reported false positives during qualification.
 
 The repository does not select a monitoring vendor. Dedicated Redis/Valkey is

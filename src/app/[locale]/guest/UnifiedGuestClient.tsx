@@ -6,10 +6,12 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 
 import ErrorSummary from '@/components/ErrorSummary';
 import { isGuestFormValid, type GuestMode, type GuestOrigin } from '@/components/guest/guestValidation';
+import { Callout } from '@/components/ui/Callout';
 import { normalizeLocale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 import { GUEST_TERMS_TEXT } from '@/lib/guestTermsText';
 import internalFetch from '@/lib/internalFetchClient';
+import { normalizePhone, phoneLookupCandidates } from '@/lib/phone';
 import { emitGuestSessionChanged } from '@/lib/sessionSignals';
 import { mapApiErrorToUI } from '@/lib/userFacingErrors';
 
@@ -23,7 +25,9 @@ export default function UnifiedGuestClient() {
   const search = useSearchParams();
   const searchKey = search.toString();
   const initialMode: GuestMode = search.get('mode') === 'signup' ? 'signup' : 'signin';
-  // `?flash=` carries a message code, never text: only known codes are shown.
+  // `?flash=` carries a message code, never text: only known codes are shown. `session_required` is the ordinary
+  // logged-out arrival (the QR code and arrival e-mail link to /check-in, and a refresh that cannot renew the
+  // session lands here too): it is information, so it renders as a neutral note and never as an error summary.
   const flashCode = search.get('flash');
   const flashMessage = flashCode === 'session_required' ? dictionary.errors.sessionRequired : undefined;
   const syncingFromUrlRef = useRef(false);
@@ -37,9 +41,8 @@ export default function UnifiedGuestClient() {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [submitError, setSubmitError] = useState<{ summary: string; details?: string[] } | null>(
-    flashMessage ? { summary: flashMessage } : null,
-  );
+  const [notice, setNotice] = useState<string | null>(flashMessage ?? null);
+  const [submitError, setSubmitError] = useState<{ summary: string; details?: string[] } | null>(null);
 
   const valid = useMemo(() => isGuestFormValid(mode, {
     origin,
@@ -74,7 +77,7 @@ export default function UnifiedGuestClient() {
   // reload does not bring it back.
   useEffect(() => {
     if (!flashCode) return;
-    setSubmitError(flashMessage ? { summary: flashMessage } : null);
+    setNotice(flashMessage ?? null);
     const nextSearch = new URLSearchParams(searchKey);
     nextSearch.delete('flash');
     const query = nextSearch.toString();
@@ -96,12 +99,24 @@ export default function UnifiedGuestClient() {
 
   function changeMode(nextMode: GuestMode) {
     setMode(nextMode);
+    setNotice(null);
     setSubmitError(null);
   }
 
   async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!valid || loading) return;
+    setNotice(null);
+    // The readings the server applies (normalizePhone with the origin at claim time, the lookup candidates at
+    // sign-in). A number that neither can read, such as a national 0151 1234567, is answered here with the hint
+    // shown under the field, without a request that would spend the claim or sign-in budget.
+    const phoneReadable = mode === 'signup'
+      ? normalizePhone(phone.trim(), origin || undefined) !== null
+      : phoneLookupCandidates(phone.trim()).length > 0;
+    if (!phoneReadable) {
+      setSubmitError({ summary: dictionary.phoneHint });
+      return;
+    }
     setLoading(true);
     setSubmitError(null);
 
@@ -190,6 +205,11 @@ export default function UnifiedGuestClient() {
         </div>
 
         <div id={`panel-${mode}`} role="tabpanel" aria-labelledby={`tab-${mode}`} tabIndex={-1}>
+          {notice && (
+            <Callout variant="info" role="status" className="mb-4">
+              <p className="ui-callout__text">{notice}</p>
+            </Callout>
+          )}
           {submitError && (
             <div className="guest-auth__error">
               <ErrorSummary
@@ -250,6 +270,7 @@ export default function UnifiedGuestClient() {
                 inputMode="tel"
                 autoComplete="tel"
                 placeholder="+30 690 000 0000"
+                aria-describedby="guest-phone-hint"
                 className={inputClass}
                 value={phone}
                 onChange={(event) => setPhone(event.target.value)}
@@ -257,6 +278,9 @@ export default function UnifiedGuestClient() {
                 maxLength={32}
                 required
               />
+              <p id="guest-phone-hint" className="ui-field__hint">
+                {dictionary.phoneHint}
+              </p>
             </div>
 
             <div className="ui-field">
@@ -270,6 +294,7 @@ export default function UnifiedGuestClient() {
                   type={showPassword ? 'text' : 'password'}
                   autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
                   placeholder={dictionary.passwordPlaceholder}
+                  aria-describedby={mode === 'signup' ? 'guest-password-hint' : undefined}
                   className={inputClass}
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
@@ -287,6 +312,11 @@ export default function UnifiedGuestClient() {
                   {showPassword ? '−' : 'Aa'}
                 </button>
               </div>
+              {mode === 'signup' && (
+                <p id="guest-password-hint" className="ui-field__hint">
+                  {dictionary.passwordHintSignup}
+                </p>
+              )}
             </div>
 
             {mode === 'signup' && (

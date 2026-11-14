@@ -1,7 +1,7 @@
 import type { IconName } from '@/components/icons/Icon';
 import { categories } from '@/data/categories';
 import { APARTMENT_LOCATION } from '@/data/mapLocations';
-import type { Category, Item } from '@/data/schemas';
+import { PROJECT_ARTWORK_HERO_IMAGES, type Category, type HeroImageCredit, type Item } from '@/data/schemas';
 import type { Locale } from '@/i18n/config';
 import type { Dictionary } from '@/i18n/dictionaries';
 import { mapsHref } from '@/lib/contactLinks';
@@ -32,6 +32,8 @@ export interface GuideEntry {
   /** A licensed 16:10 photo; absent means the art tile. */
   photo?: string;
   photoPosition?: string;
+  /** Author, licence and source of `photo`; the detail page prints it. */
+  photoCredit?: HeroImageCredit;
   address?: string;
   phones: string[];
   website?: string;
@@ -43,10 +45,10 @@ export interface GuideEntry {
 }
 
 /**
- * §7.3: photos that must not be shown as a card or hero image. viktoria-karelia-hero.jpg is almost black
- * (L = .018) and the SOS illustration is not used, so both get the art tile.
+ * §7.3: photos that must not be shown as a card or hero image. The SOS illustration is not used, so it
+ * gets the art tile, like every entry without a licensed photo.
  */
-const ART_TILE_PHOTOS = new Set(['/moments/viktoria-karelia-hero.jpg', '/phones/sos-hero.webp']);
+const ART_TILE_PHOTOS = PROJECT_ARTWORK_HERO_IMAGES;
 
 const EARTH_RADIUS_KM = 6371.0088;
 
@@ -115,6 +117,7 @@ export function toGuideEntry(item: Item, category: Category, locale: Locale, t: 
     icon: iconFor(tags, category.slug),
     photo,
     photoPosition: photo ? item.heroImagePosition : undefined,
+    photoCredit: photo ? item.heroImageCredit : undefined,
     address,
     phones: [...new Set([item.phone, ...(item.phones ?? [])].filter((value): value is string => Boolean(value)))],
     website: item.website,

@@ -19,10 +19,14 @@ export interface PortalDictionary {
     originGR: string;
     originAbroad: string;
     phoneLabel: string;
+    /** Under the phone field of both forms and the 422 text for a number that cannot be read as one. */
+    phoneHint: string;
     continueBtn: string;
     rememberMe: string;
     passwordLabel: string;
     passwordPlaceholder: string;
+    /** Under the password field of the claim form only: the rules for choosing a password. */
+    passwordHintSignup: string;
     modeHintSignin: string;
     modeHintSignup: string;
     working: string;
@@ -37,6 +41,8 @@ export interface PortalDictionary {
         sessionRequired: string;
         signInFailed: string;
         claimTokenInvalid: string;
+        passwordTooLong: string;
+        passwordTooWeak: string;
     };
 }
 
@@ -55,10 +61,12 @@ export const portalTranslations: Record<Locale, PortalDictionary> = {
         originGR: "Greece",
         originAbroad: "Abroad",
         phoneLabel: "Phone Number",
+        phoneHint: "Start with + and the country code, e.g. +30 69… (without a leading 0).",
         continueBtn: "Continue",
         rememberMe: "Remember me on this device",
         passwordLabel: "Password",
         passwordPlaceholder: "At least 8 characters",
+        passwordHintSignup: "At least 8 characters and at most 72 bytes (accented and Greek letters count as 2). Not one repeated character, a run such as 12345678 or abcdefgh, or your phone number.",
         modeHintSignin: "Access your booking and check-in details.",
         modeHintSignup: "Use the claim token from your host to create your guest account. If you already have one, enter its password, or ask the host to reset your access.",
         working: "Working…",
@@ -73,6 +81,8 @@ export const portalTranslations: Record<Locale, PortalDictionary> = {
             sessionRequired: "Please sign in to see your stay information.",
             signInFailed: "We couldn't sign you in. Check your phone number and password. Access opens about 7 days before check-in and closes shortly after the check-out date.",
             claimTokenInvalid: "This claim token is invalid, expired or already used. Ask your host for a new one.",
+            passwordTooLong: "This password is too long. Use at most 72 bytes (accented and Greek letters count as 2 bytes each).",
+            passwordTooWeak: "Choose a password that is harder to guess: not one repeated character, a run such as 12345678 or abcdefgh, or your phone number.",
         },
     },
     el: {
@@ -85,10 +95,12 @@ export const portalTranslations: Record<Locale, PortalDictionary> = {
         originGR: "Ελλάδα",
         originAbroad: "Εξωτερικό",
         phoneLabel: "Αριθμός Τηλεφώνου",
+        phoneHint: "Ξεκινήστε με + και τον κωδικό χώρας, π.χ. +30 69… (χωρίς αρχικό 0).",
         continueBtn: "Συνέχεια",
         rememberMe: "Να με θυμάσαι σε αυτή τη συσκευή",
         passwordLabel: "Κωδικός Πρόσβασης",
         passwordPlaceholder: "Τουλάχιστον 8 χαρακτήρες",
+        passwordHintSignup: "Τουλάχιστον 8 χαρακτήρες και το πολύ 72 byte (οι τονισμένοι και οι ελληνικοί χαρακτήρες μετρούν ως 2). Όχι έναν χαρακτήρα που επαναλαμβάνεται, ακολουθία όπως 12345678 ή abcdefgh, ούτε τον αριθμό τηλεφώνου σας.",
         modeHintSignin: "Αποκτήστε πρόσβαση στα στοιχεία της κράτησης και της άφιξής σας.",
         modeHintSignup: "Χρησιμοποιήστε τον κωδικό ενεργοποίησης κράτησης από την οικοδέσποινα για να δημιουργήσετε λογαριασμό. Αν έχετε ήδη λογαριασμό, βάλτε τον κωδικό πρόσβασής σας ή ζητήστε από την οικοδέσποινα επαναφορά πρόσβασης.",
         working: "Γίνεται επεξεργασία…",
@@ -103,6 +115,8 @@ export const portalTranslations: Record<Locale, PortalDictionary> = {
             sessionRequired: "Συνδεθείτε για να δείτε τις πληροφορίες της διαμονής σας.",
             signInFailed: "Δεν ήταν δυνατή η σύνδεση. Ελέγξτε τον αριθμό τηλεφώνου και τον κωδικό σας. Η πρόσβαση ανοίγει περίπου 7 ημέρες πριν την άφιξη και κλείνει λίγο μετά την ημερομηνία αναχώρησης.",
             claimTokenInvalid: "Ο κωδικός ενεργοποίησης δεν είναι έγκυρος, έχει λήξει ή έχει ήδη χρησιμοποιηθεί. Ζητήστε νέο από την οικοδέσποινα.",
+            passwordTooLong: "Ο κωδικός πρόσβασης είναι πολύ μεγάλος. Χρησιμοποιήστε το πολύ 72 byte (οι τονισμένοι και οι ελληνικοί χαρακτήρες μετρούν ως 2 byte ο καθένας).",
+            passwordTooWeak: "Επιλέξτε κωδικό που δεν μαντεύεται εύκολα: όχι έναν χαρακτήρα που επαναλαμβάνεται, ακολουθία όπως 12345678 ή abcdefgh, ούτε τον αριθμό τηλεφώνου σας.",
         },
     },
 };

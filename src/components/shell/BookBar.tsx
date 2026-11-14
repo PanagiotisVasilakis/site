@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import clsx from 'clsx';
 
@@ -19,9 +19,12 @@ type BookBarProps = {
  * booking call to action (`[data-cta-watch]`) is visible, both from IntersectionObserver. Hidden, it is
  * `inert` and `visibility: hidden` (shell.css), so it is out of the tab order and the accessibility tree.
  * Without a note (no fresh calendar, no free night), IntersectionObserver or JavaScript it never shows. The bar shows no price. M22 slides it in under motion.
+ * It publishes its height as `--bookbar-h` (ResizeObserver; the text wraps at larger text sizes), which shell.css uses to
+ * keep the network dot and the PWA pills beside and above it instead of under it (PS-07).
  */
 export default function BookBar({ note, href, ctaLabel }: BookBarProps) {
   const [shown, setShown] = useState(false);
+  const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (note === null || typeof IntersectionObserver === 'undefined') return undefined;
@@ -43,10 +46,24 @@ export default function BookBar({ note, href, ctaLabel }: BookBarProps) {
     return () => observer.disconnect();
   }, [note]);
 
+  useEffect(() => {
+    const bar = barRef.current;
+    if (!bar || typeof ResizeObserver === 'undefined') return undefined;
+    const root = document.documentElement;
+    const publish = () => root.style.setProperty('--bookbar-h', `${Math.ceil(bar.getBoundingClientRect().height)}px`);
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(bar);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty('--bookbar-h');
+    };
+  }, [note]);
+
   if (note === null) return null;
 
   return (
-    <div className={clsx('bookbar', shown && 'is-shown')} inert={!shown}>
+    <div ref={barRef} className={clsx('bookbar', shown && 'is-shown')} inert={!shown}>
       <p className="bookbar__text">{note}</p>
       <Button asChild variant="primary" size="sm">
         <Link href={href}>{ctaLabel}</Link>

@@ -6,7 +6,10 @@ const mocks = vi.hoisted(() => ({
   createAdminSession: vi.fn(),
   signAdmin: vi.fn(),
   queryRaw: vi.fn(),
+  executeRaw: vi.fn(),
   transaction: vi.fn(),
+  auditCreate: vi.fn(),
+  auditCreateMany: vi.fn(),
   logger: {
     setContext: vi.fn(),
     getContext: vi.fn(),
@@ -23,8 +26,13 @@ vi.mock('@/lib/auth/admin', () => ({
   signAdmin: mocks.signAdmin,
 }));
 
+// The sign-in audit events (tests/security/admin-login-audit.test.ts) go through securityAuditEvent.
 vi.mock('@/lib/prisma', () => ({
-  prisma: { $transaction: mocks.transaction },
+  prisma: {
+    $transaction: mocks.transaction,
+    $executeRaw: mocks.executeRaw,
+    securityAuditEvent: { create: mocks.auditCreate, createMany: mocks.auditCreateMany },
+  },
 }));
 
 vi.mock('@/lib/logger-enterprise', () => ({ logger: mocks.logger }));
@@ -87,6 +95,11 @@ describe('admin login source-budget isolation', () => {
       counts.set(key, count);
       return [{ count, reset_time: resetAt }];
     });
+    // The refund of a correct token (src/lib/auth/adminLoginBudget.ts) lowers the same row.
+    mocks.executeRaw.mockImplementation(async (_query: TemplateStringsArray, key: string) => {
+      counts.set(key, Math.max(0, (counts.get(key) ?? 0) - 1));
+      return 1;
+    });
     mocks.transaction.mockImplementation(async (callback) => callback({ $queryRaw: mocks.queryRaw }));
   });
 
@@ -110,7 +123,10 @@ describe('admin login source-budget isolation', () => {
 
     const sourceASixth = await login(adminRequest(SOURCE_A, 'invalid-admin-credential-6', SOURCE_B));
     expect(sourceASixth.response.status).toBe(429);
-    expect(sourceASixth.body).toBe('{"error":"Too many authentication attempts"}');
+    // The shared error envelope of the API (tests/security/admin-login-budget.test.ts covers its fields and Retry-After).
+    expect(JSON.parse(sourceASixth.body)).toEqual({
+      error: expect.objectContaining({ code: 'RATE_LIMITED', message: 'Too many authentication attempts' }),
+    });
 
     const sourceAKey = `sensitive:${privacyHmac(
       `admin-login|ip:${SOURCE_A}`,
@@ -120,9 +136,10 @@ describe('admin login source-budget isolation', () => {
       `admin-login|ip:${SOURCE_B}`,
       'sensitive-rate-limit:v1',
     )}`;
+    // Source A spent its budget on wrong tokens; source B's one attempt was a correct token, which gave it back.
     expect(counts).toEqual(new Map([
       [sourceAKey, 6],
-      [sourceBKey, 1],
+      [sourceBKey, 0],
     ]));
     expect(mocks.createAdminSession).toHaveBeenCalledOnce();
     expect(mocks.signAdmin).toHaveBeenCalledOnce();
@@ -135,6 +152,10 @@ describe('admin login source-budget isolation', () => {
       expect.stringMatching(/^sensitive:[a-f0-9]{64}$/u),
       expect.stringMatching(/^sensitive:[a-f0-9]{64}$/u),
     ]);
+    // The audit events add no limiter row (see the budgets above) and no error.
+    expect(mocks.auditCreate).toHaveBeenCalledTimes(6);
+    expect(mocks.auditCreateMany).toHaveBeenCalledTimes(1);
+    expect(mocks.logger.error).not.toHaveBeenCalled();
   });
 
   it('rejects attacker-supplied administrator hints identically, without a session or a hint-keyed budget', async () => {

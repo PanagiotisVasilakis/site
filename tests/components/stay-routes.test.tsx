@@ -2,12 +2,14 @@
 
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const navigation = vi.hoisted(() => ({ locale: 'en', search: '' }));
 const flags = vi.hoisted(() => ({ portalEnabled: true, checkinEnabled: true }));
+// When set, the real flag reader runs against a database whose read fails (the stay hub must still render).
+const flagRead = vi.hoisted(() => ({ fails: false, find: vi.fn() }));
 const session = vi.hoisted(() => ({ isSignedIn: false }));
 const fetchMock = vi.hoisted(() => vi.fn());
 const preferences = vi.hoisted(() => ({ checkOutTime: '11:00' }));
@@ -24,7 +26,15 @@ vi.mock('next/navigation', () => ({
 }));
 vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock('next/dynamic', () => ({ default: () => function MapStub() { return null; } }));
-vi.mock('@/lib/featureFlags', () => ({ getFeatureFlagsAsync: async () => ({ ...flags }) }));
+vi.mock('@/lib/prisma', () => ({ prisma: { operationalSetting: { findUnique: flagRead.find } } }));
+vi.mock('@/lib/featureFlags', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/featureFlags')>();
+  return {
+    ...actual,
+    getFeatureFlagsAsync: async () => (flagRead.fails ? actual.getFeatureFlagsAsync() : { ...flags }),
+    getFeatureFlagsOrOff: async () => (flagRead.fails ? actual.getFeatureFlagsOrOff() : { ...flags }),
+  };
+});
 vi.mock('@/hooks/useGuestSession', () => ({ useGuestSession: () => ({ isSignedIn: session.isSignedIn, signOut: vi.fn() }) }));
 vi.mock('@/lib/guestSession', () => ({
   GUEST_REFRESH_COOKIE: 'guest_refresh',
@@ -58,6 +68,11 @@ import { getItemsByCategory, pickLocale } from '@/lib/data';
 
 const wrap = (node: ReactNode) => render(<ToastProvider>{node}</ToastProvider>);
 const params = (locale: string) => ({ params: Promise.resolve({ locale }) });
+
+// src/lib/favorites.ts reads localStorage once per module instance and then follows `storage` events,
+// as a write from another tab does. Dispatching one makes the store re-read localStorage whether or
+// not an earlier test has already initialised it, so no test depends on the order.
+const syncFavorites = () => act(() => { window.dispatchEvent(new StorageEvent('storage', { key: 'favorites:v1' })); });
 
 // Every stylesheet under src/styles (literal paths; the listing test below keeps the list complete).
 const STYLESHEETS: Array<[file: string, css: string]> = [
@@ -117,10 +132,12 @@ beforeEach(() => {
   navigation.search = '';
   flags.portalEnabled = true;
   flags.checkinEnabled = true;
+  flagRead.fails = false;
   session.isSignedIn = false;
   preferences.checkOutTime = '11:00';
   phonesOrder.nonEmergencyFirst = false;
   window.localStorage.clear();
+  syncFavorites();
   fetchMock.mockImplementation(async (url: string) => new Response(JSON.stringify({
     success: true,
     data: url === '/api/check-in/preferences'
@@ -157,6 +174,7 @@ describe('/{l}/stay hub (identity §9.4)', () => {
     expect(known).toHaveLength(2);
     window.localStorage.setItem('favorites:v1', JSON.stringify([...known, 'moments:removed-place']));
     const { container } = wrap(await StayPage(params('en')));
+    syncFavorites();
 
     expect(screen.getByRole('heading', { level: 1, name: 'Welcome home.' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Sign in to your stay/u })).toHaveAttribute('href', '/en/guest');
@@ -227,6 +245,20 @@ describe('/{l}/stay hub (identity §9.4)', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: 'Καλώς ήρθατε.' })).toBeInTheDocument();
     expect(container.querySelector('a[href^="/el/guest"], a[href^="/el/check-in"]')).toBeNull();
+    expect(container.querySelector('.stay-tile--portal, .stay-tile--locked')).toBeNull();
+    expect(screen.getByRole('link', { name: /112/u })).toHaveAttribute('href', 'tel:112');
+    expectCalmStayPage(container);
+  });
+
+  it('still renders the hub, with the portal tile off, while the flags cannot be read', async () => {
+    flagRead.fails = true;
+    flagRead.find.mockRejectedValue(new Error('Connection terminated due to connection timeout'));
+    session.isSignedIn = true;
+    const { container } = wrap(await StayPage(params('en')));
+
+    expect(flagRead.find).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('heading', { level: 1, name: 'Welcome home.' })).toBeInTheDocument();
+    expect(container.querySelector('a[href^="/en/guest"], a[href^="/en/check-in"]')).toBeNull();
     expect(container.querySelector('.stay-tile--portal, .stay-tile--locked')).toBeNull();
     expect(screen.getByRole('link', { name: /112/u })).toHaveAttribute('href', 'tel:112');
     expectCalmStayPage(container);

@@ -41,6 +41,7 @@ export default async function ItemPage({ params }: { params: Promise<{ locale: s
 
   const entry = toGuideEntry(item, cat, eff, t);
   const others = getItemsByCategory(cat.id).map((other) => toGuideEntry(other, cat, eff, t));
+  const structuredImage = cat.slug === 'moments' ? item.image : (item.heroImage ?? item.image);
 
   // One layout for every category (identity §9.5); phones add their contact fields to the structured data.
   return (
@@ -56,11 +57,14 @@ export default async function ItemPage({ params }: { params: Promise<{ locale: s
         name: entry.name,
         description: entry.summary,
         url: absUrl(`/${eff}/${cat.slug}/${slug}`),
-        image: item.image,
+        // schema.org wants absolute URLs; the content paths are root-relative.
+        image: structuredImage ? absUrl(structuredImage) : undefined,
         ...(cat.slug === 'moments' ? {} : {
-          address: entry.address,
+          // The content holds one free-text address per place, so it is the street line; no locality or postcode is guessed.
+          address: entry.address
+            ? { '@type': 'PostalAddress', streetAddress: entry.address, addressCountry: 'GR' }
+            : undefined,
           telephone: item.phone,
-          image: item.heroImage ?? item.image,
         }),
       }}
       nonce={nonce}

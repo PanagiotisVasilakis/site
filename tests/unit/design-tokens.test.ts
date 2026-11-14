@@ -153,7 +153,7 @@ const LIGHT: Row[] = [
   ['band-accent on band-bg', 'band-accent', 'band-bg', 4.5, 7.23],
   ['band-accent-fg on band-accent', 'band-accent-fg', 'band-accent', 4.5, 9.63],
   // O43: transparent header bar. Over the page it sits on bg; over photos legibility comes from the text halo
-  // (.site-header--overlay in shell.css), measured on the rendered page, not from the tint.
+  // (every header variant, shell.css; tests/unit/shell-header-css.test.ts), measured on the rendered page, not from the tint.
   ['fg on header glass over bg', 'fg', 'glass@bg', 4.5, 13.99],
   ['cal: date on free cell', 'fg', 'cal-free-bg', 4.5, 15.15],
   ['cal: selected text', 'cal-selected-fg', 'cal-selected-bg', 4.5, 6.21],

@@ -10,9 +10,19 @@ const optionalEnv = (schema) => z.preprocess(
   schema.optional(),
 );
 
-// Zod 4 still runs the DATABASE_URL refine and the object-level refine below after `z.url()`
-// has rejected a value. An empty or unparsable value must give null here: a thrown TypeError
-// would hide the other issues and echo the value.
+// Zod 4 still runs this refine after the `z.url()` check fails, so an empty or unparsable
+// value must return false here instead of throwing a bare TypeError.
+function isPostgresUrl(value) {
+  try {
+    const protocol = new URL(value).protocol;
+    return protocol === 'postgresql:' || protocol === 'postgres:';
+  } catch {
+    return false;
+  }
+}
+
+// The object-level refine below also runs for a value that z.url() rejected. An unparsable
+// value must not throw there: the TypeError would hide the other issues and echo the value.
 function urlProtocol(value) {
   try {
     return new URL(value).protocol;
@@ -21,17 +31,12 @@ function urlProtocol(value) {
   }
 }
 
-function isPostgresUrl(value) {
-  const protocol = urlProtocol(value);
-  return protocol === 'postgresql:' || protocol === 'postgres:';
-}
-
-function requireHttpsInProduction(env, context, name) {
-  if (env.NODE_ENV === 'production' && env[name]) {
-    const protocol = urlProtocol(env[name]);
-    if (protocol !== null && protocol !== 'https:') {
-      context.addIssue({ code: 'custom', path: [name], message: `${name} must use HTTPS in production` });
-    }
+function isTimeZone(value) {
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: value }).format();
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -41,8 +46,27 @@ function isOriginProxySecret(value) {
     && !/^(?:deadbeef|changeme|placeholder)/iu.test(value);
 }
 
-// The two peppers key HMACs, so the placeholder words of .env.example must not pass in production.
-const PEPPER_PLACEHOLDER = /replace|changeme|placeholder|example/iu;
+// The placeholder words of .env.example must not pass in production: the two peppers key HMACs, and
+// the two Wi-Fi values are shown to guests as the real network.
+const PLACEHOLDER_WORDS = /replace|changeme|placeholder|example/iu;
+
+// site.ts strips one trailing slash and prefixes every canonical, hreflang, OG, sitemap and JSON-LD
+// URL with the rest, so the value must be a bare origin: scheme://host[:port] in the canonical form
+// that URL.origin prints (lowercase, punycode host, no default port), and no path, query, fragment,
+// userinfo or whitespace. The comparison runs on the raw string, not on its parsed parts, because
+// URL drops an empty `?`, `#` or userinfo.
+function isBareOrigin(value) {
+  const candidate = value.endsWith('/') ? value.slice(0, -1) : value;
+  return URL.canParse(candidate) && new URL(candidate).origin === candidate;
+}
+
+// z.url() trims the value it checks and hands the trimmed copy on, which would hide the whitespace
+// that site.ts reads verbatim from the environment. A plain string keeps the raw value for the
+// production shape check in the object refine below.
+const siteUrlEnv = (name) => optionalEnv(z.string().refine(
+  (value) => urlProtocol(value) !== null,
+  `${name} must be a valid URL`,
+));
 
 // The Booking.com calendar export URL carries a secret token in its query string (`t`),
 // so validation messages must never echo the value. Each host serves the export at one path
@@ -88,10 +112,12 @@ export const runtimeEnvSchema = z.object({
   CLAIM_TOKEN_PEPPER: z.string().min(32, 'CLAIM_TOKEN_PEPPER must be at least 32 characters'),
   GUEST_WIFI_NETWORK: z.string().min(1, 'GUEST_WIFI_NETWORK is required'),
   GUEST_WIFI_PASSWORD: z.string().min(8, 'GUEST_WIFI_PASSWORD must be at least 8 characters'),
+  PROPERTY_TIME_ZONE: z.string().refine(isTimeZone, 'PROPERTY_TIME_ZONE must be a valid IANA time zone').default('Europe/Athens'),
+
 
   ALLOWED_ORIGINS: z.string().optional(),
-  NEXT_PUBLIC_SITE_URL: optionalEnv(z.url()),
-  BUILD_SITE_URL: optionalEnv(z.url()),
+  NEXT_PUBLIC_SITE_URL: siteUrlEnv('NEXT_PUBLIC_SITE_URL'),
+  BUILD_SITE_URL: siteUrlEnv('BUILD_SITE_URL'),
   ORIGIN_PROXY_SHARED_SECRET: optionalEnv(z.string().refine(
     isOriginProxySecret,
     'ORIGIN_PROXY_SHARED_SECRET must be a non-placeholder 64-character hexadecimal secret',
@@ -112,6 +138,7 @@ export const runtimeEnvSchema = z.object({
     'CARTO_BASEMAPS_KEY must be 8-128 characters of letters, digits, "_" or "-"',
   )),
 
+  PRISMA_LOG_LIFECYCLE: optionalEnv(z.enum(['0', '1'])),
   LOG_LEVEL: optionalEnv(z.enum(['trace', 'debug', 'info', 'warn', 'error'])),
   LOG_CONSOLE: optionalEnv(z.enum(['true', 'false'])),
   LOG_STRUCTURED: optionalEnv(z.enum(['true', 'false'])),
@@ -143,7 +170,7 @@ export const runtimeEnvSchema = z.object({
     for (const name of ['SECURITY_PEPPER', 'CLAIM_TOKEN_PEPPER']) {
       const value = env[name];
       if (!value) continue;
-      if (hasRepeatedPattern(value) || PEPPER_PLACEHOLDER.test(value)) {
+      if (hasRepeatedPattern(value) || PLACEHOLDER_WORDS.test(value)) {
         context.addIssue({ code: 'custom', path: [name], message: `${name} must not be placeholder-like or patterned` });
       }
       const reused = ACTIVE_RUNTIME_CREDENTIAL_NAMES.find((other) => env[other] === value);
@@ -151,11 +178,34 @@ export const runtimeEnvSchema = z.object({
         context.addIssue({ code: 'custom', path: [name], message: `${name} must differ from ${reused}` });
       }
     }
+    // Only the placeholder words: a real network name or password may be short or patterned.
+    for (const name of ['GUEST_WIFI_NETWORK', 'GUEST_WIFI_PASSWORD']) {
+      const value = env[name];
+      if (value && PLACEHOLDER_WORDS.test(value)) {
+        context.addIssue({ code: 'custom', path: [name], message: `${name} must not be a placeholder value` });
+      }
+    }
   }
   if (env.NODE_ENV === 'production' && !env.NEXT_PUBLIC_SITE_URL) {
     context.addIssue({ code: 'custom', path: ['NEXT_PUBLIC_SITE_URL'], message: 'NEXT_PUBLIC_SITE_URL is required in production' });
   }
-  requireHttpsInProduction(env, context, 'NEXT_PUBLIC_SITE_URL');
+  if (env.NODE_ENV === 'production') {
+    for (const name of ['NEXT_PUBLIC_SITE_URL', 'BUILD_SITE_URL']) {
+      const value = env[name];
+      // An unparsable value is already reported by the field itself.
+      if (!value || urlProtocol(value) === null) continue;
+      if (urlProtocol(value) !== 'https:') {
+        context.addIssue({ code: 'custom', path: [name], message: `${name} must use HTTPS in production` });
+      }
+      if (!isBareOrigin(value)) {
+        context.addIssue({
+          code: 'custom',
+          path: [name],
+          message: `${name} must be a bare origin (scheme://host[:port] with a lowercase host, punycode xn-- for non-ASCII names and no :443, without path, query, fragment, credentials or whitespace)`,
+        });
+      }
+    }
+  }
   if (env.BUILD_SITE_URL && env.NEXT_PUBLIC_SITE_URL !== env.BUILD_SITE_URL) {
     context.addIssue({ code: 'custom', path: ['NEXT_PUBLIC_SITE_URL'], message: 'Runtime site URL does not match the URL compiled into this image' });
   }
@@ -182,9 +232,19 @@ export const runtimeEnvSchema = z.object({
   if (checkInWebhookUrl && !env.CHECKIN_REQUEST_WEBHOOK_TOKEN) {
     context.addIssue({ code: 'custom', path: ['CHECKIN_REQUEST_WEBHOOK_TOKEN'], message: 'CHECKIN_REQUEST_WEBHOOK_TOKEN is required when CHECKIN_REQUEST_WEBHOOK_URL is configured' });
   }
-  requireHttpsInProduction(env, context, 'CHECKIN_REQUEST_WEBHOOK_URL');
+  if (env.NODE_ENV === 'production' && checkInWebhookUrl) {
+    const protocol = urlProtocol(checkInWebhookUrl);
+    if (protocol !== null && protocol !== 'https:') {
+      context.addIssue({ code: 'custom', path: ['CHECKIN_REQUEST_WEBHOOK_URL'], message: 'CHECKIN_REQUEST_WEBHOOK_URL must use HTTPS in production' });
+    }
+  }
   if (env.ALERT_WEBHOOK_REQUIRED === '1' && !env.ALERT_WEBHOOK_URL) {
     context.addIssue({ code: 'custom', path: ['ALERT_WEBHOOK_URL'], message: 'ALERT_WEBHOOK_URL is required when ALERT_WEBHOOK_REQUIRED=1' });
   }
-  requireHttpsInProduction(env, context, 'ALERT_WEBHOOK_URL');
+  if (env.NODE_ENV === 'production' && env.ALERT_WEBHOOK_URL) {
+    const protocol = urlProtocol(env.ALERT_WEBHOOK_URL);
+    if (protocol !== null && protocol !== 'https:') {
+      context.addIssue({ code: 'custom', path: ['ALERT_WEBHOOK_URL'], message: 'ALERT_WEBHOOK_URL must use HTTPS in production' });
+    }
+  }
 });

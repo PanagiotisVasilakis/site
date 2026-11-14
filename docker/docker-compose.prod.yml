@@ -7,6 +7,11 @@
 #                     migration images are derived from it (-workers, -migrate)
 #   APP_ENV_FILE      root-owned env file with the application runtime configuration
 #   MIGRATE_ENV_FILE  root-owned env file for `migrate deploy` (its own database role)
+#   POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB   the bundled PostgreSQL
+#
+# All six belong in docker/.env next to this file, the single source for the operator and the
+# cron-run workers (Compose needs every one of them even for `run --no-deps outbox`); a variable
+# exported in a shell would override it for that shell only. See scripts/README.md, "Host layout".
 #
 # Nothing is read from a repository checkout at run time. The application port is
 # published on loopback only; the Nginx container (host network) is the only ingress.
@@ -40,6 +45,9 @@ services:
     volumes:
       - postgres-prod-data:/var/lib/postgresql/data
     restart: unless-stopped
+    # The image stops PostgreSQL with SIGINT (fast shutdown), which ends with a shutdown
+    # checkpoint; Docker's default 10 s could SIGKILL it and force crash recovery on the next start.
+    stop_grace_period: 60s
     logging: *logging
     security_opt:
       - no-new-privileges:true
@@ -59,12 +67,21 @@ services:
     # Overrides a NODE_ENV in the env file: the start-up gate must validate production mode.
     environment:
       NODE_ENV: production
+      # Node closes an idle keep-alive connection after 5 s by default, while the Nginx upstream
+      # (deploy/nginx/nginx.conf.template: `keepalive 32`, no keepalive_timeout) keeps one for its
+      # default 60 s and may reuse it just after Node closed it (502). Next.js standalone reads this
+      # in milliseconds; it must stay above 60000 so that Nginx is always the side that closes.
+      KEEP_ALIVE_TIMEOUT: "65000"
     ports:
       - "127.0.0.1:${WEB_PORT:-3000}:3000"
     tmpfs:
       - /tmp
-      # Next.js image-optimizer cache; the image creates this directory for uid 1001.
-      - /app/.next/cache/images:uid=1001,gid=1001,mode=0750
+      # Next.js image-optimizer cache; the image creates this directory for uid 1001. The size
+      # cap keeps the variants out of the host's memory (an uncapped tmpfs may use half of it);
+      # Next evicts least-recently-used entries at half of the free space, so it stops near 128m.
+      - /app/.next/cache/images:uid=1001,gid=1001,mode=0750,size=256m
+    # On SIGTERM Next.js stops accepting connections and finishes the requests in flight.
+    stop_grace_period: 30s
     depends_on:
       db:
         condition: service_healthy

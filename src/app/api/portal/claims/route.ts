@@ -14,23 +14,31 @@ import {
 import { attachPortalAuthCookies, requestAuthContext } from '@/lib/portalAuthHttp';
 import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
 import { logger } from '@/lib/logger-enterprise';
+import { addClaimCredentialIssues, guestCredentialMessages, type GuestCredentialMessages } from '@/lib/validation/guestCredentials';
 
 export const dynamic = 'force-dynamic';
 
-const schema = z.object({
-  origin: z.enum(['GR', 'ABROAD']),
-  phone: z.string().trim().min(8).max(32),
-  password: z.string().min(8).max(128),
-  remember: z.boolean().optional().default(false),
-  acceptTerms: z.literal(true),
-}).strict();
+// A claim sets the password of a new account, so it applies the password strength rules; sign-in
+// (api/portal/sessions) only compares against the stored hash and keeps the plain length bounds.
+// The phone format and the password rules answer 422 before the rate limiter or the database is used.
+function claimSchema(messages: GuestCredentialMessages) {
+  return z.object({
+    origin: z.enum(['GR', 'ABROAD']),
+    phone: z.string().trim().min(8).max(32),
+    password: z.string().min(8).max(128),
+    remember: z.boolean().optional().default(false),
+    acceptTerms: z.literal(true),
+  }).strict().superRefine((value, ctx) => addClaimCredentialIssues(ctx, value, messages));
+}
 
 const claim = withErrorHandler(async (request: NextRequest) => {
   const flags = await getFeatureFlagsAsync();
   if (!flags.portalEnabled) {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }
-  const parsed = schema.safeParse(await readJsonBody(request, 16 * 1_024));
+  // The `lang` cookie follows the page language (src/proxy.ts); it also picks the redirect below.
+  const locale = normalizeLocale(request.cookies.get('lang')?.value);
+  const parsed = claimSchema(guestCredentialMessages(locale)).safeParse(await readJsonBody(request, 16 * 1_024));
   if (!parsed.success) throw new ValidationError(parsed.error.issues);
   // The bucket follows the grant the caller proved it holds (read from the cookie, no database
   // access), not the phone: a caller without the exchange cookie only spends its own address budget.
@@ -67,8 +75,6 @@ const claim = withErrorHandler(async (request: NextRequest) => {
     throw error;
   }
 
-  const lang = request.cookies.get('lang')?.value;
-  const locale = normalizeLocale(lang);
   // While check-in is off its page answers 404, so the guest lands on the stay hub instead.
   const redirect = flags.checkinEnabled ? `/${locale}/check-in` : `/${locale}${STAY_HUB_PATH}`;
   const response = createSuccessResponse({

@@ -1,82 +1,135 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { guestDataExport } from '@/lib/guestDataExport';
-import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
+import { withErrorHandler } from '@/lib/apiErrorHandler';
+import { createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
+import { isSameOriginRequest } from '@/lib/net/sameOrigin';
 import { isAdminRequest } from '@/lib/rbac';
+
+interface QueryParams {
+  action?: string;
+  reference?: string;
+  phone?: string;
+  bookingId?: string;
+  startDate?: string;
+  endDate?: string;
+}
 
 const isoDate = z.iso.date();
 
-export const GET = withErrorHandler(async (request: NextRequest) => {
+const handler = async (request: NextRequest) => {
   if (!(await isAdminRequest(request))) {
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
   }
 
   const { searchParams } = new URL(request.url);
-  const param = (name: string) => searchParams.get(name) || undefined;
+  const params: QueryParams = {
+    action: searchParams.get('action') || undefined,
+    reference: searchParams.get('reference') || undefined,
+    phone: searchParams.get('phone') || undefined,
+    bookingId: searchParams.get('bookingId') || undefined,
+    startDate: searchParams.get('startDate') || undefined,
+    endDate: searchParams.get('endDate') || undefined,
+  };
 
-  switch (param('action')) {
-    case 'list': {
-      const bookings = await guestDataExport.getAllBookings();
-      return createSuccessResponse({ bookings, total: bookings.length });
-    }
+  switch (params.action) {
+    case 'list':
+      const allBookings = await guestDataExport.getAllBookings();
+      return createSuccessResponse({
+        bookings: allBookings,
+        total: allBookings.length,
+      });
 
-    case 'find': {
-      const reference = param('reference');
-      if (!reference) {
-        throw new ApiError(ApiErrorCode.VALIDATION_ERROR, 'Missing required parameter: reference');
+    case 'find':
+      if (!params.reference) {
+        throw new ApiError(
+          ApiErrorCode.VALIDATION_ERROR,
+          'Missing required parameter: reference'
+        );
       }
-      const booking = await guestDataExport.getBookingByReference(reference);
+      const booking = await guestDataExport.getBookingByReference(params.reference);
       if (!booking) {
-        throw new ApiError(ApiErrorCode.NOT_FOUND, 'Booking not found');
+        throw new ApiError(
+          ApiErrorCode.NOT_FOUND,
+          'Booking not found'
+        );
       }
       return createSuccessResponse({ booking });
-    }
 
-    case 'phone': {
-      const phone = param('phone');
-      if (!phone) {
-        throw new ApiError(ApiErrorCode.VALIDATION_ERROR, 'Missing required parameter: phone');
+    case 'phone':
+      if (!params.phone) {
+        throw new ApiError(
+          ApiErrorCode.VALIDATION_ERROR,
+          'Missing required parameter: phone'
+        );
       }
-      const bookings = await guestDataExport.getBookingsByPhone(phone);
-      return createSuccessResponse({ bookings, total: bookings.length });
-    }
+      const phoneBookings = await guestDataExport.getBookingsByPhone(params.phone);
+      return createSuccessResponse({
+        bookings: phoneBookings,
+        total: phoneBookings.length,
+      });
 
-    case 'search': {
-      const startDate = param('startDate');
-      if (!startDate) {
-        throw new ApiError(ApiErrorCode.VALIDATION_ERROR, 'Missing required parameter: startDate');
+    case 'search':
+      if (!params.startDate) {
+        throw new ApiError(
+          ApiErrorCode.VALIDATION_ERROR,
+          'Missing required parameter: startDate'
+        );
       }
-      if (!isoDate.safeParse(startDate).success) {
-        throw new ApiError(ApiErrorCode.VALIDATION_ERROR, 'startDate must be YYYY-MM-DD');
+      if (!isoDate.safeParse(params.startDate).success || !isoDate.optional().safeParse(params.endDate).success) {
+        throw new ApiError(
+          ApiErrorCode.VALIDATION_ERROR,
+          'startDate and endDate must be YYYY-MM-DD'
+        );
       }
-      const bookings = await guestDataExport.searchBookingsByDateRange(startDate);
-      return createSuccessResponse({ bookings, total: bookings.length });
-    }
+      const searchResults = await guestDataExport.searchBookingsByDateRange(
+        params.startDate,
+        params.endDate
+      );
+      return createSuccessResponse({
+        bookings: searchResults,
+        total: searchResults.length,
+        dateRange: {
+          startDate: params.startDate,
+          endDate: params.endDate,
+        },
+      });
 
-    case 'stats': {
+    case 'stats':
       const statistics = await guestDataExport.getStatistics();
       return createSuccessResponse({ statistics });
-    }
 
-    case 'export': {
-      const bookingId = param('bookingId');
-      if (!bookingId) {
-        throw new ApiError(ApiErrorCode.VALIDATION_ERROR, 'Missing required parameter: bookingId');
+    case 'export':
+      // A full personal-data file: refuse a page of another origin even though the cookie is SameSite=Strict.
+      const exportOrigin = request.headers.get('origin');
+      if (exportOrigin && !isSameOriginRequest(exportOrigin, request)) {
+        throw new ApiError(ApiErrorCode.FORBIDDEN, 'Cross-origin admin export rejected');
       }
-      if (!z.uuid().safeParse(bookingId).success) {
+      if (!params.bookingId) {
+        throw new ApiError(
+          ApiErrorCode.VALIDATION_ERROR,
+          'Missing required parameter: bookingId'
+        );
+      }
+      if (!z.uuid().safeParse(params.bookingId).success) {
         throw new ApiError(ApiErrorCode.NOT_FOUND, 'Booking not found');
       }
-      const exportData = await guestDataExport.getBookingDetails(bookingId);
+      // Everything stored about the guest of this booking (access and portability), not only the booking.
+      const exportData = await guestDataExport.getCompleteGuestExport(params.bookingId);
       if (!exportData) {
-        throw new ApiError(ApiErrorCode.NOT_FOUND, 'Booking not found');
+        throw new ApiError(
+          ApiErrorCode.NOT_FOUND,
+          'Booking not found'
+        );
       }
+      
+      // Return as downloadable JSON using NextResponse
       return NextResponse.json(exportData, {
         headers: {
-          'Content-Disposition': `attachment; filename="booking_${bookingId}_${Date.now()}.json"`,
+          'Content-Disposition': `attachment; filename="guest_data_${params.bookingId}_${Date.now()}.json"`,
           'Cache-Control': 'no-store',
         },
       });
-    }
 
     default:
       throw new ApiError(
@@ -84,4 +137,6 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
         'Invalid action. Supported actions: list, find, phone, search, stats, export'
       );
   }
-});
+};
+
+export const GET = withErrorHandler(handler);

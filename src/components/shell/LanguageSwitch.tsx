@@ -9,8 +9,11 @@ import { localeSwitchHref } from './shellLinks';
 
 /**
  * identity §8 LanguageSwitch: a Segmented of links to the same page in each locale (query and hash kept).
- * The proxy sets the `lang` cookie from the locale in the path, as before (src/proxy.ts). The Greek label
- * is written "ΕΛ" by hand (§2.6).
+ * The proxy sets the `lang` cookie from the locale in the path, as before (src/proxy.ts). Next removes its
+ * prefetch headers before the proxy runs, so the proxy cannot tell a next/link prefetch from a visit: the links
+ * must not prefetch (`prefetch={false}`), or the prefetches of the two links would overwrite the visitor's
+ * choice as soon as the switch scrolls into view.
+ * The Greek label is written "ΕΛ" by hand (§2.6).
  */
 const LOCALE_LINKS = [
   { code: 'en', short: 'EN', name: 'English' },
@@ -32,6 +35,7 @@ function LocaleLinks({ locale, search }: { locale: string; search: string }) {
   return LOCALE_LINKS.map(({ code, short, name }) => (
     <Link
       key={code}
+      prefetch={false}
       href={localeSwitchHref(pathname, code, search, hash)}
       hrefLang={code}
       lang={code}

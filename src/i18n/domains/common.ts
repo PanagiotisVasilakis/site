@@ -90,6 +90,7 @@ export interface CommonDictionary {
         zoomIn: string;
         zoomOut: string;
         closePopup: string;
+        mapRegion: string;
     };
 }
 
@@ -116,8 +117,8 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             updateAvailable: "An update is available",
             refresh: "Refresh",
             dismiss: "Dismiss",
-            fromTo: "A new version is ready: {old} → {new}",
-            assetsFromTo: "Local guide updated: {old} → {new}"
+            fromTo: "A new version is ready",
+            assetsFromTo: "An updated local guide is ready"
         },
         cta: {
             call: "Call",
@@ -208,6 +209,7 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             zoomIn: "Zoom in",
             zoomOut: "Zoom out",
             closePopup: "Close",
+            mapRegion: "Interactive map",
         },
     },
     el: {
@@ -228,8 +230,8 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             updateAvailable: "Μια ενημέρωση είναι διαθέσιμη",
             refresh: "Ανανέωση",
             dismiss: "Κλείσιμο",
-            fromTo: "Μια νέα έκδοση είναι έτοιμη: {old} → {new}",
-            assetsFromTo: "Ο τοπικός οδηγός ενημερώθηκε: {old} → {new}"
+            fromTo: "Μια νέα έκδοση είναι έτοιμη",
+            assetsFromTo: "Ένας ενημερωμένος τοπικός οδηγός είναι έτοιμος"
         },
         cta: {
             call: "Κλήση",
@@ -320,6 +322,7 @@ export const commonTranslations: Record<Locale, CommonDictionary> = {
             zoomIn: "Μεγέθυνση",
             zoomOut: "Σμίκρυνση",
             closePopup: "Κλείσιμο",
+            mapRegion: "Διαδραστικός χάρτης",
         },
     },
 };

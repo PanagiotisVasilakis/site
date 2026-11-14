@@ -11,7 +11,7 @@
   --color-surface-sunken: #EDE4D5;
   --color-surface-raised: #FFFFFF;
   /* Header bar: transparent like the original site (owner decision O43, 2026-09-30). Do not make it opaque;
-     legibility over photos comes from the text halo in shell.css (.site-header--overlay). */
+     legibility over photos comes from the text halo in shell.css (every header variant). */
   --color-glass: rgb(255 255 255 / .12);
   --color-fg: #1C2528;
   --color-fg-muted: #57524C;

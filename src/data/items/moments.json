@@ -7,7 +7,6 @@
     "summary_en": "A collection of Greek regional costumes in central Kalamata.",
     "summary_el": "Συλλογή ελληνικών τοπικών ενδυμασιών στο κέντρο της Καλαμάτας.",
     "image": "/moments/viktoria-karelia.jpg",
-    "heroImage": "/moments/viktoria-karelia-hero.jpg",
     "location": {
       "lat": 37.04217,
       "lng": 22.1076
@@ -41,7 +40,6 @@
     "summary_en": "Local heritage, traditional life, and Kalamata history in a compact museum.",
     "summary_el": "Τοπική κληρονομιά, παραδοσιακή ζωή και ιστορία της Καλαμάτας σε ένα μικρό μουσείο.",
     "image": "/moments/folklore-museum.jpg",
-    "heroImage": "/moments/folklore-museum-hero.jpg",
     "location": {
       "lat": 37.0391,
       "lng": 22.1121
@@ -72,8 +70,6 @@
     "summary_en": "Archaeological finds from Messinia, from prehistory through Byzantine times.",
     "summary_el": "Αρχαιολογικά ευρήματα της Μεσσηνίας, από την προϊστορία έως τα βυζαντινά χρόνια.",
     "image": "/moments/archaeological-museum.jpg",
-    "heroImage": "/moments/archaeological-museum-hero.jpg",
-    "heroImagePosition": "center 77%",
     "location": {
       "lat": 37.0438,
       "lng": 22.1135
@@ -104,7 +100,6 @@
     "summary_en": "A branch of the War Museum covering modern Greek military history.",
     "summary_el": "Παράρτημα του Πολεμικού Μουσείου για τη νεότερη ελληνική στρατιωτική ιστορία.",
     "image": "/moments/war-museum.jpg",
-    "heroImage": "/moments/war-museum-hero.jpg",
     "location": {
       "lat": 37.0432,
       "lng": 22.1156
@@ -136,7 +131,6 @@
     "summary_en": "An open-air railway park with historic locomotives and carriages.",
     "summary_el": "Υπαίθριο σιδηροδρομικό πάρκο με ιστορικές ατμομηχανές και βαγόνια.",
     "image": "/moments/railway-museum.jpg",
-    "heroImage": "/moments/railway-museum-hero.jpg",
     "location": {
       "lat": 37.0355,
       "lng": 22.1095

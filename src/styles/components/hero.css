@@ -2,19 +2,25 @@
    two-class colour and type rules (0,2,0) date from the legacy cascade that R3-V12b deleted. Motion (M1-M4) is in motion.css.
    The scrim geometry is measured (§3.3 hero contrast): keep it exactly. */
 
-/* Below 100svh so the photo stays the LCP element (§7.2). */
+/* Below 100svh so the photo stays the LCP element (§7.2). The height is a minimum, max(600px, min(760px, 88svh)),
+   and the text block below is in the flow of the stage, so a larger text size (WCAG 1.4.4, FHS-05) grows the hero
+   instead of pushing the H1 out of it: at the usual text size the hero is exactly as tall as before. */
 .hero {
   position: relative;
-  height: min(760px, 88svh);
-  min-height: 600px;
+  display: flex;
+  flex-direction: column;
+  min-height: max(600px, min(760px, 88svh));
   /* Vertical scroll and pinch-zoom stay native; only a sideways drag moves the view. The first line is
      the fallback for an engine that rejects the `pinch-zoom` keyword. */
   touch-action: pan-y;
   touch-action: pan-y pinch-zoom;
 }
 .hero__stage {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  justify-content: flex-end;
   overflow: hidden;
   isolation: isolate;
   background: #5D6A70;
@@ -61,8 +67,8 @@
 
 /* The text scrim follows the text block (§7.1): 0 → .58 at 150 px → .80 at 150 px + 30 % → .90. */
 .hero__content {
-  position: absolute;
-  inset: auto 0 0 0;
+  position: relative;
+  width: 100%;
   max-width: calc(var(--container) + 2 * var(--gutter));
   margin: 0 auto;
   padding: 0 var(--gutter) calc(52px + env(safe-area-inset-bottom));
@@ -81,7 +87,11 @@
 .hero .hero__title {
   margin: 0 0 24px -.04em;
   font-family: var(--font-display);
-  font-size: var(--text-hero);
+  /* The 4 rem floor of --text-hero doubles with the text size: capped at 24 vw (never reached at the usual size,
+     where --text-hero is the smaller value from 267 px up), a long word is not wider than the screen; a word that
+     still is breaks instead of being clipped. */
+  font-size: min(var(--text-hero), 24vw);
+  overflow-wrap: break-word;
   font-style: italic;
   font-weight: 400;
   line-height: var(--text-hero--line-height);
@@ -97,14 +107,11 @@
   align-items: center;
   gap: 10px;
 }
-.hero__actions .ui-btn { padding: 0 18px; }
+.hero__actions .ui-btn { padding-inline: 18px; }
 .hero__hint { display: none; }
 
 @media (min-width: 768px) {
-  .hero {
-    height: min(900px, 88svh);
-    min-height: 640px;
-  }
+  .hero { min-height: max(640px, min(900px, 88svh)); }
   .hero .hero__img { object-position: 60% 40%; }
   .hero__content {
     display: grid;

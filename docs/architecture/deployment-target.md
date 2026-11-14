@@ -163,12 +163,20 @@ blockers were re-checked against the repository on 2026-09-29 and remain open:
   locks and journald visibility on the VPS still require recorded evidence;
 - no alert path covers a failed or missing operations run: alerts are evaluated
   and sent only by the operations worker itself, and no health endpoint reads
-  worker activity; watch it from outside;
+  worker activity; watch it from outside
+  ([monitoring and alerting](../deployment/monitoring-and-alerting.md) specifies
+  the external uptime check and the dead-man's-switch heartbeats written by
+  `deploy/host/run-worker.sh` and `deploy/host/backup.sh`; none of them is
+  installed or recorded yet);
 - the versioned reverse-proxy and trusted-ingress contract exist, but live
   Netcup firewall, Cloudflare Full (strict), AOP, and certificate evidence is
   still required;
-- no automated encrypted off-site backup or restore-verification artifact
-  exists;
+- the repository ships a backup script (`deploy/host/backup.sh`: encrypted
+  nightly and pre-migration dumps, retention, optional off-site copy) and a
+  restore procedure ([backup and restore](../deployment/backup-and-restore.md)),
+  but no installed backup job, off-site copy, recorded restore drill or
+  RPO/RTO exists yet; that document also records where the script deviates
+  from the least-privilege backup role above;
 - two-role migration/app setup untested: `scripts/README.md` ("Host layout")
   documents distinct migration and application roles, but the production-image
   smoke uses one role for both, so no run has exercised the application role
@@ -195,7 +203,7 @@ blockers were re-checked against the repository on 2026-09-29 and remain open:
   the site shows no prices and no cancellation policy and that only Booking.com
   is used for now supplied 2026-10-15; Booking.com as the only calendar source
   and the sufficiency of 12 months of guest-data retention supplied 2026-10-20)
-  are still open only for: which Booking.com link to publish, the owner's
+  are still open only for: the owner's
   wording for Booking.com bookings, the Booking.com export URL in the
   production environment and the legal questions on the privacy notice (which
   names Booking.com everywhere since 2026-10-21); see "Open owner inputs" in

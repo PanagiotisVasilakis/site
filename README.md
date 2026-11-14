@@ -32,7 +32,7 @@ npm run system:up
 npm run verify:release
 ```
 
-This repository-owned command is the mandatory local gate for a commit that may later become a production release. It includes static policy, integrity, test, lint, real disposable-PostgreSQL, and production-format build checks. It requires local Docker, performs no deployment or persistent migration, and is not centrally enforced. See [Release verification](docs/release-verification.md) and [Testing strategy](docs/testing.md).
+This repository-owned command is the mandatory local gate for a commit that may later become a production release. It includes static policy, integrity, test, lint, real disposable-PostgreSQL, and production-format build checks. It requires local Docker, performs no deployment or persistent migration, and is not centrally enforced. See [Release verification](docs/release-verification.md) and [Testing strategy](docs/testing.md). Optional browser audits remain available through `audit:a11y`, `audit:responsive:ux` and `audit:vitals`; they are advisory, run against a local server only, and refuse non-loopback URLs.
 
 ## Operations
 
@@ -53,21 +53,31 @@ The visual identity and its implementation spec are in [docs/design/identity.md]
 
 ## Open owner inputs
 
-Status on 2026-10-21:
+Owner inputs (status on 2026-10-21):
 
-- still open: which Booking.com link to publish (the Share link in the code or the canonical property URL; only a `https://www.booking.com/Share-<token>` link, or the same on `booking.com`, passes `isBookingComListingUrl` in `src/lib/contactLinks.ts`, so a canonical property URL also needs a change of that function and of `tests/unit/contact-links.test.ts`, otherwise the Booking.com button disappears from the home, apartment and availability pages and the site shows no error), the owner's wording for Booking.com bookings (the "how to book" step makes no payment or confirmation claim until then), the Booking.com export URL (`BOOKING_ICAL_URL`: a secret that the owner creates in the Booking.com extranet with booked and closed dates and sets in the production environment; until it is set no calendar is shown) and the legal questions on the privacy notice. The privacy notice (`src/i18n/domains/legal.ts`) names Booking.com everywhere since 2026-10-21 (changed with the owner's permission; `git grep -n -i 'air[b]nb' -- src/i18n/domains/legal.ts` prints nothing). Whether the notice must list Booking.com as a recipient at all and as a source of the booking data, and what tax law needs for the unlinked booking rows, stay with the owner or a lawyer.
-- awaiting the owner's confirmation: the accented Greek spelling of the host's name (`HOST_CONTACT.legalName` in `src/data/contact.ts`; the owner typed it without accents);
-- settled and recorded where they apply: the host's name, address and ΑΜΑ, and that ΑΦΜ and ΓΕΜΗ are not shown (`HOST_CONTACT` in `src/data/contact.ts`); the Booking.com listing link (`BOOKING_COM_LISTING_URL`); no published price, total, fee line or cancellation policy; Booking.com as the only channel and the only calendar source (`BOOKING_ICAL_URL`); the hostess's name is not published (`HOST_PROFILE.name` stays empty); 12 months of guest-data retention (`GUEST_DATA_RETENTION_MONTHS`).
+- supplied by the owner on 2026-10-14: the address and ΑΜΑ (`HOST_CONTACT` in `src/data/contact.ts`) and the Booking.com listing link (`BOOKING_COM_LISTING_URL`);
+- supplied by the owner on 2026-10-15: the host's name, «Παναγιώτης Βασιλάκης / Panagiotis Vasilakis» (`HOST_CONTACT.legalName`: one string in both scripts, shown in the footer, in the apartment and availability page heads and in the controller list of the privacy notice; the owner typed it without accents, so the standard accented Greek spelling is used and awaits the owner's confirmation); that the nightly prices are final but are not published (the public site shows no price, total, fee line or cancellation policy, and the cancellation rule of 2026-10-14 is withdrawn); and that, for now, the owner uses only Booking.com. The host is a private individual and «Dolce Far Niente» is only the brand, so the ΑΦΜ and a ΓΕΜΗ number are deliberately not shown;
+- supplied by the owner on 2026-10-20: that Booking.com is the only channel on the site and the only calendar source (the Booking.com iCal export with booked and closed dates, `BOOKING_ICAL_URL`); that the hosts are the owner's mother, who writes the home letter, and the owner, so the feminine host texts stay and her name is not published (`HOST_PROFILE.name` stays empty); and that 12 months of guest-data retention are enough (`GUEST_DATA_RETENTION_MONTHS` = 12, unchanged);
+- supplied by the owner on 2026-10-22: the Booking.com Share link to publish (`https://www.booking.com/Share-VOK8VS9`, `BOOKING_COM_LISTING_URL`), the acceptance of the superuser backup role and of revoking every open claim grant after a restore, and that Neon is no longer used; the owner also created the Booking.com calendar export (its URL is a secret and is set only in the production environment, never in the repository);
+- still open:
+  - the owner's wording for Booking.com bookings (the "how to book" step makes no payment or confirmation claim until then);
+  - the Booking.com export URL (`BOOKING_ICAL_URL`: a secret that the owner creates in the Booking.com extranet with booked and closed dates and sets in the production environment; until it is set no calendar is shown);
+  - the legal questions on the privacy notice. The notice (`src/i18n/domains/legal.ts`) names Booking.com everywhere since 2026-10-21 (changed with the owner's permission; `git grep -n -i 'air[b]nb' -- src/i18n/domains/legal.ts` prints nothing). Five questions stay with the owner or a lawyer: (1) whether the notice must list Booking.com as a recipient at all; (2) its role as a controller and as a source of the booking data; (3) international transfers; (4) what tax law needs for the unlinked booking rows; (5) the controller entry. Drafted but unapplied wording for the other privacy findings (arrival notifications and the copy in the notification service, what remains after an erasure, server logs and backups, cookies and browser storage) is in [docs/privacy/proposed-notice-changes.md](docs/privacy/proposed-notice-changes.md);
+  - the GDPR operating inputs that only the owner can supply, marked `<OWNER: ...>` in [docs/privacy/](docs/privacy/README.md): the name and country of the arrival-notification service and the rule for its copy of the guests' data, the data processing agreements (hosting provider, Cloudflare, notification service, backup provider), the backup provider and its retention, the retention that has no end today (erasure records, arrival-request rows without contact data, the Nginx access log, container logs), and the contacts for an incident;
 
 ## Documentation
 
 - [Selected deployment target](docs/architecture/deployment-target.md)
 - [Release verification](docs/release-verification.md)
 - [Production-image smoke](docs/deployment/production-image-smoke.md)
+- Launch and operation of the VPS: [day-0 runbook](docs/deployment/day-0-runbook.md), [backup and restore](docs/deployment/backup-and-restore.md), [monitoring and alerting](docs/deployment/monitoring-and-alerting.md), [Cloudflare checklist](docs/deployment/cloudflare-checklist.md); the host scripts and env templates are in [deploy/host/](deploy/host/README.md)
 - [Trusted ingress contract](docs/security/trusted-ingress.md) and [origin runbook](docs/deployment/origin-ingress-runbook.md)
 - [Layered rate-limiting contract](docs/security/layered-rate-limiting.md)
 - [Booking claim-token transport](docs/security/claim-token-transport.md)
 - [Runtime credential contract](docs/security/runtime-credential-contract.md)
+- [Privacy operating documents](docs/privacy/README.md): [data subject requests](docs/privacy/dsar-runbook.md), [breach runbook](docs/privacy/breach-runbook.md), [record of processing](docs/privacy/record-of-processing.md), [processors](docs/privacy/processors.md), [proposed notice changes](docs/privacy/proposed-notice-changes.md)
+- [Host handbook](docs/operations/host-handbook.md)
+- [Adding a licensed guide photo](docs/operations/guide-photos.md)
 - [Setup and runtime](scripts/README.md)
 - [Visual identity and design system](docs/design/identity.md)
 - [Testing strategy](docs/testing.md)

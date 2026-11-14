@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/en/moments',
@@ -9,10 +9,16 @@ vi.mock('next/navigation', () => ({
 }));
 vi.mock('@/components/ApartmentLocationMap', () => ({ default: () => <div data-testid="guide-map" /> }));
 
-import CategoryPage from '@/app/[locale]/[category]/page';
-import { ToastProvider } from '@/components/Toast';
+// src/lib/favorites.ts keeps its snapshot, init flag and storage listener at module level and
+// tests/setup.ts can only clear localStorage. A fresh module registry per test (with the page
+// imported after the reset) gives every test its own store, so no test depends on the order.
+beforeEach(() => {
+  vi.resetModules();
+});
 
 async function renderGuide(locale = 'en') {
+  const { default: CategoryPage } = await import('@/app/[locale]/[category]/page');
+  const { ToastProvider } = await import('@/components/Toast');
   return render(
     <ToastProvider>{await CategoryPage({ params: Promise.resolve({ locale, category: 'moments' }) })}</ToastProvider>,
   );
