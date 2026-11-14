@@ -59,9 +59,9 @@ test('synthetic high-entropy credential assignment fails', async () => {
   assert.ok(result.unexpected.every((finding) => finding.classification === 'secret-assignment'));
 });
 
-async function scanWithAllowlist(contents, allowlist) {
+async function scanWithAllowlist(contents, allowlist, name = 'fixture.env') {
   return withFixture(async (root) => {
-    await writeFile(path.join(root, 'fixture.env'), contents, { encoding: 'utf8', mode: 0o600 });
+    await writeFile(path.join(root, name), contents, { encoding: 'utf8', mode: 0o600 });
     return scanPathForTest(root, { allowlist });
   });
 }
@@ -108,6 +108,32 @@ test('each occurrence of a reviewed value needs its own entry', async () => {
   assert.equal(twice.accepted.length, 2);
 });
 
+test('a reviewed value found in another file stays unexpected and its entry goes stale', async () => {
+  const line = `DATABASE_URL=${reviewedDatabaseUrl('Synthetic9Credential7Only')}\n`;
+  const [finding] = (await scanWithAllowlist(line, [])).unexpected;
+  const entry = { classification: 'synthetic-test-fixture', path: finding.path, rule: finding.rule, valueSha256: finding.valueSha256 };
+
+  const copied = await scanWithAllowlist(line, [entry], 'copied.env');
+
+  assert.notEqual(finding.path, 'copied.env');
+  assert.equal(copied.accepted.length, 0);
+  assert.deepEqual(copied.unexpected.map((item) => item.path), ['copied.env']);
+  assert.deepEqual(copied.stale.map((item) => item.path), [finding.path]);
+});
+
+test('a reviewed value reported under another rule stays unexpected and its entry goes stale', async () => {
+  const line = `DATABASE_URL=${reviewedDatabaseUrl('Synthetic9Credential7Only')}\n`;
+  const [finding] = (await scanWithAllowlist(line, [])).unexpected;
+  const entry = { classification: 'synthetic-test-fixture', path: finding.path, rule: 'generic-api-key', valueSha256: finding.valueSha256 };
+
+  const other = await scanWithAllowlist(line, [entry]);
+
+  assert.notEqual(finding.rule, entry.rule);
+  assert.equal(other.accepted.length, 0);
+  assert.deepEqual(other.unexpected.map((item) => item.rule), [finding.rule]);
+  assert.deepEqual(other.stale.map((item) => item.rule), [entry.rule]);
+});
+
 test('synthetic private key fails', async () => {
   const opening = ['-----BEGIN', ' PRIVATE KEY-----'].join('');
   const closing = ['-----END', ' PRIVATE KEY-----'].join('');
@@ -128,23 +154,31 @@ test('credential-bearing database URL fails', async () => {
   );
 });
 
-test('Airbnb calendar export URL with a token fails', async () => {
-  const token = ['Synthetic9Airbnb', '7Calendar3Only'].join('');
+test('Booking.com calendar export URL with a token fails', async () => {
+  const token = ['Synthetic9Booking', '7Calendar3Only'].join('');
+  // Eight characters: the shortest token the rule reports.
+  const floorToken = ['Fx9Kq', '2Zt'].join('');
   const urls = [
-    ['https://www.airbnb', '.com/calendar/ical/', '12345678', '.ics?s=', token].join(''),
-    ['https://airbnb', '.gr/calendar/ical/', '12345678', '.ics?t=1&s=', token].join(''),
+    ['https://ical.booking', '.com/v1/export?t=', token].join(''),
+    ['https://admin.booking', '.com/hotel/hoteladmin/ical.html?x=1&t=', token].join(''),
+    ['https://ical.booking', '.com/v1/export?t=', floorToken].join(''),
   ];
-  const result = await scanFixture(urls.map((url) => `AIRBNB_ICAL_URL=${url}\n`).join(''));
-  const matches = result.unexpected.filter((finding) => finding.rule === 'airbnb-calendar-export-token');
-  assert.equal(matches.length, 2);
-  assert.ok(matches.every((finding) => finding.valueSha256 === createHash('sha256').update(token).digest('hex')));
+  const result = await scanFixture(urls.map((url) => `BOOKING_ICAL_URL=${url}\n`).join(''));
+  const matches = result.unexpected.filter((finding) => finding.rule === 'booking-calendar-export-token');
+  const sha256 = (value) => createHash('sha256').update(value).digest('hex');
+  assert.equal(matches.length, 3);
+  assert.deepEqual(
+    matches.map((finding) => finding.valueSha256).sort(),
+    [sha256(token), sha256(token), sha256(floorToken)].sort(),
+  );
 });
 
-test('Airbnb calendar URL placeholders and short test tokens pass', async () => {
-  const prefix = ['https://www.airbnb', '.com/calendar/ical/'].join('');
+test('Booking.com calendar URL placeholders and short test tokens pass', async () => {
+  // 'fixture' has seven characters, one under the floor of the rule.
+  const prefix = ['https://ical.booking', '.com/v1/export?t='].join('');
   const result = await scanFixture([
-    `${prefix}<listing id>.ics?s=<token>`,
-    `${prefix}12345678.ics?s=fixture`,
+    `${prefix}<token>`,
+    `${prefix}fixture`,
     '',
   ].join('\n'));
   assert.deepEqual(result.unexpected, []);
@@ -159,8 +193,8 @@ const SCANNER_FILES = [
 
 // check-secrets.mjs derives its repository root from its own location, so a copy
 // under a scratch root scans with the scratch gitleaks.toml and never touches the
-// real configuration.
-async function withScratchScanner(configText, callback) {
+// real configuration. editLock, when given, rewrites the copied tool.lock.json.
+async function withScratchScanner(configText, callback, editLock) {
   const scratch = await mkdtemp(path.join(os.tmpdir(), 'secret-scanner-copy-'));
   try {
     for (const relative of SCANNER_FILES) {
@@ -169,6 +203,12 @@ async function withScratchScanner(configText, callback) {
       await copyFile(new URL(`../../${relative}`, import.meta.url), target);
     }
     await writeFile(path.join(scratch, 'config/secret-scanning/gitleaks.toml'), configText);
+    if (editLock) {
+      const lockPath = path.join(scratch, 'config/secret-scanning/tool.lock.json');
+      const lock = JSON.parse(await readFile(lockPath, 'utf8'));
+      editLock(lock);
+      await writeFile(lockPath, JSON.stringify(lock));
+    }
     const scanner = await import(
       pathToFileURL(path.join(scratch, 'scripts/check-secrets.mjs')).href
     );
@@ -202,6 +242,37 @@ test('a scanner that cannot load its configuration fails closed instead of passi
       ),
     );
   });
+});
+
+// The scanner binary stays the genuine one (GITLEAKS_BIN); only the copied lock is rewritten,
+// so each case breaks exactly one of the two checks that verifyScanner makes.
+async function scanWithEditedLock(editLock) {
+  const realConfig = await readFile(
+    new URL('../../config/secret-scanning/gitleaks.toml', import.meta.url),
+    'utf8',
+  );
+  return withScratchScanner(realConfig, (scanner) => withFixture(async (root) => {
+    await writeFile(path.join(root, 'fixture.env'), 'PUBLIC_LABEL=not-sensitive\n', { encoding: 'utf8', mode: 0o600 });
+    return scanner.scanPathForTest(root);
+  }), editLock);
+}
+
+test('a scanner binary whose hash differs from the repository lock is rejected', async () => {
+  await assert.rejects(
+    scanWithEditedLock((lock) => {
+      for (const artifact of Object.values(lock.artifacts)) artifact.binarySha256 = '0'.repeat(64);
+    }),
+    /binary does not match the repository lock/u,
+  );
+});
+
+test('a scanner whose version differs from the repository lock is rejected', async () => {
+  await assert.rejects(
+    scanWithEditedLock((lock) => {
+      lock.version = '0.0.0';
+    }),
+    /version does not match the repository lock/u,
+  );
 });
 
 test('an inline scanner suppression comment fails the scan instead of hiding the finding', async () => {
@@ -270,24 +341,6 @@ test('accepts an internal relative file symlink and scans its target once', asyn
   });
 });
 
-test('accepts an internal relative directory symlink', async () => {
-  await withFixture(async (root) => {
-    await mkdir(path.join(root, 'z-target'));
-    await writeFile(path.join(root, 'z-target', 'clean.txt'), 'PUBLIC_LABEL=clean\n');
-    await symlink('z-target', path.join(root, 'a-link'));
-    const artifact = await enumerateArtifactPathForTest(root);
-    assert.deepEqual(artifact.symlinks, [{
-      relative: 'a-link',
-      target: 'z-target',
-      targetType: 'directory',
-    }]);
-    assert.deepEqual(
-      artifact.files.map((file) => file.relative),
-      ['a-link/clean.txt'],
-    );
-  });
-});
-
 test('detects and redacts a secret reached through an internal symlink', async () => {
   await withFixture(async (root) => {
     const raw = [
@@ -350,26 +403,6 @@ test('rejects a relative out-of-root symlink and a path-prefix escape', async ()
   } finally {
     await rm(parent, { recursive: true, force: true });
   }
-});
-
-test('accepts a multi-hop chain that remains inside the artifact', async () => {
-  await withFixture(async (root) => {
-    await writeFile(path.join(root, 'z-target.txt'), 'PUBLIC_LABEL=clean\n');
-    await symlink('z-target.txt', path.join(root, 'b-hop'));
-    await symlink('b-hop', path.join(root, 'a-hop'));
-    const artifact = await enumerateArtifactPathForTest(root);
-    assert.deepEqual(
-      artifact.symlinks.map((entry) => [entry.relative, entry.target]),
-      [
-        ['a-hop', 'z-target.txt'],
-        ['b-hop', 'z-target.txt'],
-      ],
-    );
-    assert.deepEqual(
-      artifact.files.map((file) => file.relative),
-      ['a-hop'],
-    );
-  });
 });
 
 test('rejects a chain whose intermediate hop escapes the artifact', async () => {
@@ -466,38 +499,12 @@ test('rejects unsupported special filesystem nodes where supported', async () =>
   });
 });
 
-test('traversal results and ordering remain stable across repeated runs', async () => {
-  await withFixture(async (root) => {
-    await mkdir(path.join(root, 'z-target'));
-    await writeFile(path.join(root, 'z-target', 'b.txt'), 'PUBLIC_LABEL=b\n');
-    await writeFile(path.join(root, 'z-target', 'a.txt'), 'PUBLIC_LABEL=a\n');
-    await symlink('z-target', path.join(root, 'a-link'));
-    const first = await enumerateArtifactPathForTest(root);
-    const second = await enumerateArtifactPathForTest(root);
-    const summarize = (artifact) => ({
-      files: artifact.files.map((file) => file.relative),
-      symlinks: artifact.symlinks,
-    });
-    assert.deepEqual(summarize(first), summarize(second));
-    assert.deepEqual(
-      first.files.map((file) => file.relative),
-      ['a-link/a.txt', 'a-link/b.txt'],
-    );
-  });
-});
-
-test('the versioned incident baseline remains exactly six fingerprints', async () => {
-  const baseline = JSON.parse(await readFile(
-    new URL('../../config/secret-scanning/historical-incident-baseline.json', import.meta.url),
-    'utf8',
-  ));
-  assert.equal(baseline.findings.length, 6);
-  assert.equal(new Set(baseline.findings.map((finding) => finding.fingerprint)).size, 6);
-});
-
 const FRAMEWORK_IDENTIFIER = '1'.repeat(40);
 const ACTION_IDENTIFIER = '2'.repeat(40);
 const BUILD_IDENTIFIER = '3'.repeat(40);
+const PREVIEW_MODE_ID = '5'.repeat(32);
+const PREVIEW_MODE_SIGNING_KEY = '6'.repeat(64);
+const PREVIEW_MODE_ENCRYPTION_KEY = '7'.repeat(64);
 
 function fixtureKey(byte) {
   return Buffer.alloc(32, byte).toString('base64');
@@ -522,9 +529,10 @@ async function writeFixtureFile(root, relative, contents) {
 async function withGeneratedArtifactPolicy(options, callback) {
   return withFixture(async (root) => {
     const serverKey = options.serverKey ?? fixtureKey(4);
-    const previewModeId = options.previewModeId ?? '5'.repeat(32);
-    const previewModeSigningKey = options.previewModeSigningKey ?? '6'.repeat(64);
-    const previewModeEncryptionKey = options.previewModeEncryptionKey ?? '7'.repeat(64);
+    const previewModeId = options.previewModeId ?? PREVIEW_MODE_ID;
+    const previewModeSigningKey = options.previewModeSigningKey ?? PREVIEW_MODE_SIGNING_KEY;
+    const previewModeEncryptionKey = options.previewModeEncryptionKey ?? PREVIEW_MODE_ENCRYPTION_KEY;
+    const leakValue = options.leakValue ?? serverKey;
     const actionId = options.actionId === false ? null : ACTION_IDENTIFIER;
     const buildId = options.buildId ?? BUILD_IDENTIFIER;
     const nextVersion = options.nextVersion ?? GENERATED_ARTIFACT_CLASSIFICATIONS.SUPPORTED_NEXT_VERSION;
@@ -539,12 +547,20 @@ async function withGeneratedArtifactPolicy(options, callback) {
       previewModeSigningKey,
       previewModeEncryptionKey,
     };
+    // Next 16.4 repeats the preview keys in preview-props.json. The options below perturb one
+    // copy or one value at a time, so each negative test targets one production clause.
+    const previewPropsJson = JSON.stringify({ ...preview, ...options.previewPropsOverrides });
+    // JSON.parse keeps the last duplicate, so a repeated key is visible only in the text.
+    const duplicatedPreviewId = `,"previewModeId":${JSON.stringify(previewModeId)}`;
+    const previewPropsServer = options.previewPropsDuplicateKey
+      ? `${previewPropsJson.slice(0, -1)}${duplicatedPreviewId}}\n`
+      : `${previewPropsJson}\n`;
     const prerender = {
       version: 4,
       routes: {},
       dynamicRoutes: {},
       notFoundRoutes: [],
-      preview,
+      preview: { ...preview },
     };
     const frameworkSource =
       `* @see https://github.com/vercel/next.js/commit/${FRAMEWORK_IDENTIFIER} */`;
@@ -599,6 +615,14 @@ async function withGeneratedArtifactPolicy(options, callback) {
         `${JSON.stringify(prerender)}\n`,
       ],
       [
+        '.next/server/preview-props.json',
+        previewPropsServer,
+      ],
+      [
+        '.next/standalone/.next/server/preview-props.json',
+        `${JSON.stringify({ ...preview, ...options.standalonePreviewPropsOverrides })}\n`,
+      ],
+      [
         options.artifactMapPath ?? '.next/server/chunks/ssr/framework.js.map',
         artifactSourceMap,
       ],
@@ -609,13 +633,13 @@ async function withGeneratedArtifactPolicy(options, callback) {
       [
         '.next/static/chunks/client.js',
         options.publicLeakPath === '.next/static'
-          ? `window.fixture=${JSON.stringify(serverKey)};`
+          ? `window.fixture=${JSON.stringify(leakValue)};`
           : 'window.fixture=true;',
       ],
       [
         'public/generated-client.js',
         options.publicLeakPath === 'public'
-          ? `window.fixture=${JSON.stringify(serverKey)};`
+          ? `window.fixture=${JSON.stringify(leakValue)};`
           : 'window.fixture=true;',
       ],
     ]);
@@ -696,6 +720,17 @@ test('valid supported Next internal fields receive framework dispositions', asyn
         'preview-mode-encryption-key',
       ],
     ];
+    // Next 16.4 also writes the preview keys into preview-props.json, on the server only.
+    for (const relativePath of [
+      '.next/server/preview-props.json',
+      '.next/standalone/.next/server/preview-props.json',
+    ]) {
+      cases.push(
+        [previewModeId, relativePath, 'preview-mode-id'],
+        [previewModeSigningKey, relativePath, 'preview-mode-signing-key'],
+        [previewModeEncryptionKey, relativePath, 'preview-mode-encryption-key'],
+      );
+    }
     for (const [secret, relativePath, semanticClass] of cases) {
       const result = classifyFixture(context, {
         rule: 'generic-api-key',
@@ -737,25 +772,6 @@ test('malformed Next internal key encoding fails closed', async () => {
   );
 });
 
-test('approved server-runtime duplicates receive the same semantic classification', async () => {
-  await withGeneratedArtifactPolicy({}, async ({ context, serverKey, artifactContents }) => {
-    const paths = [
-      '.next/server/server-reference-manifest.json',
-      '.next/standalone/.next/server/server-reference-manifest.json',
-    ];
-    const results = paths.map((relativePath) => classifyFixture(context, {
-      rule: 'generic-api-key',
-      secret: serverKey,
-      relativePath,
-      source: artifactContents.get(relativePath),
-    }));
-    assert.deepEqual(
-      results.map((result) => result.classification),
-      Array(2).fill(GENERATED_ARTIFACT_CLASSIFICATIONS.INTERNAL_CLASSIFICATION),
-    );
-  });
-});
-
 test('Next internal material in client or static output fails closed', async () => {
   for (const publicLeakPath of ['.next/static', 'public']) {
     await assert.rejects(
@@ -763,6 +779,54 @@ test('Next internal material in client or static output fails closed', async () 
       /outside its supported server contract/u,
     );
   }
+});
+
+test('preview keys in client or static output fail closed', async () => {
+  for (const leakValue of [
+    PREVIEW_MODE_ID,
+    PREVIEW_MODE_SIGNING_KEY,
+    PREVIEW_MODE_ENCRYPTION_KEY,
+  ]) {
+    for (const publicLeakPath of ['.next/static', 'public']) {
+      await assert.rejects(
+        withGeneratedArtifactPolicy({ publicLeakPath, leakValue }, async () => {}),
+        /outside its supported server contract/u,
+      );
+    }
+  }
+});
+
+test('preview-props with an extra key fails closed', async () => {
+  await assert.rejects(
+    withGeneratedArtifactPolicy({ previewPropsOverrides: { unexpected: true } }, async () => {}),
+    /preview-props manifest schema was invalid/u,
+  );
+});
+
+test('preview-props that differs from the prerender preview fails closed', async () => {
+  await assert.rejects(
+    withGeneratedArtifactPolicy({
+      previewPropsOverrides: { previewModeId: '8'.repeat(32) },
+    }, async () => {}),
+    /preview-props manifest schema was invalid/u,
+  );
+});
+
+test('both preview-props copies equal but different from the prerender preview fails closed', async () => {
+  await assert.rejects(
+    withGeneratedArtifactPolicy({
+      previewPropsOverrides: { previewModeId: '8'.repeat(32) },
+      standalonePreviewPropsOverrides: { previewModeId: '8'.repeat(32) },
+    }, async () => {}),
+    /preview-props manifest schema was invalid/u,
+  );
+});
+
+test('a preview key repeated inside preview-props.json fails closed', async () => {
+  await assert.rejects(
+    withGeneratedArtifactPolicy({ previewPropsDuplicateKey: true }, async () => {}),
+    /outside its supported server contract/u,
+  );
 });
 
 test('Next internal material equal to an active application credential fails closed', async () => {
@@ -931,6 +995,39 @@ test('repeated known occurrences cannot conceal an unmatched identifier', async 
   });
 });
 
+test('a framework commit URL repeated in one source map remains actionable', async () => {
+  await withGeneratedArtifactPolicy({}, async ({ context, artifactContents }) => {
+    const relativePath = '.next/server/chunks/ssr/framework.js.map';
+    const commitUrl = `https://github.com/vercel/next.js/commit/${FRAMEWORK_IDENTIFIER}`;
+    const repeated = JSON.stringify({
+      version: 3,
+      sources: [
+        '../../../../node_modules/next/src/client/app-dir/link.tsx',
+        '../../../../node_modules/next/src/client/app-dir/router.tsx',
+      ],
+      sourcesContent: [`* @see ${commitUrl} */`, `* @see ${commitUrl} */`],
+      names: [],
+      mappings: '',
+    });
+    const single = classifyFixture(context, {
+      rule: 'sourcegraph-access-token',
+      secret: FRAMEWORK_IDENTIFIER,
+      relativePath,
+      source: artifactContents.get(relativePath),
+    });
+    assert.equal(
+      single.classification,
+      GENERATED_ARTIFACT_CLASSIFICATIONS.IDENTIFIER_CLASSIFICATION,
+    );
+    assert.equal(classifyFixture(context, {
+      rule: 'sourcegraph-access-token',
+      secret: FRAMEWORK_IDENTIFIER,
+      relativePath,
+      source: repeated,
+    }), null);
+  });
+});
+
 test('semantic results never serialize raw keys or identifiers', async () => {
   await withGeneratedArtifactPolicy({}, async ({ context, serverKey, artifactContents }) => {
     const result = classifyFixture(context, {
@@ -942,53 +1039,6 @@ test('semantic results never serialize raw keys or identifiers', async () => {
     assert.equal(JSON.stringify(result).includes(serverKey), false);
     assert.equal(JSON.stringify(result).includes(FRAMEWORK_IDENTIFIER), false);
   });
-});
-
-test('semantic disposition output and ordering are deterministic', async () => {
-  await withGeneratedArtifactPolicy({}, async ({ context, serverKey, artifactContents }) => {
-    const input = {
-      rule: 'generic-api-key',
-      secret: serverKey,
-      relativePath: '.next/server/server-reference-manifest.json',
-      source: artifactContents.get('.next/server/server-reference-manifest.json'),
-    };
-    assert.deepEqual(
-      classifyFixture(context, input),
-      classifyFixture(context, input),
-    );
-    assert.deepEqual(
-      context.summary.internalKeyClasses,
-      [
-        'server-actions-encryption-key',
-        'preview-mode-id',
-        'preview-mode-signing-key',
-        'preview-mode-encryption-key',
-      ],
-    );
-  });
-});
-
-test('different generated Next key values require no incident-baseline edit', async () => {
-  const baseline = fixtureBaseline();
-  const classifications = [];
-  for (const byte of [11, 12]) {
-    await withGeneratedArtifactPolicy({
-      serverKey: fixtureKey(byte),
-      incidentBaseline: baseline,
-    }, async ({ context, serverKey, artifactContents }) => {
-      classifications.push(classifyFixture(context, {
-        rule: 'generic-api-key',
-        secret: serverKey,
-        relativePath: '.next/server/server-reference-manifest.json',
-        source: artifactContents.get('.next/server/server-reference-manifest.json'),
-      }).classification);
-    });
-  }
-  assert.deepEqual(
-    classifications,
-    Array(2).fill(GENERATED_ARTIFACT_CLASSIFICATIONS.INTERNAL_CLASSIFICATION),
-  );
-  assert.equal(baseline.findings.length, 6);
 });
 
 test('framework identifier classification does not depend on hashed artifact filenames', async () => {

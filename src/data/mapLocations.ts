@@ -1,9 +1,9 @@
 import type { Locale } from '@/i18n/config';
-import { normalizeLocale } from '@/i18n/config';
 import { dedupeById } from '@/lib/collections';
 import { pickLocale } from '@/lib/localize';
 import { getApartmentContent } from '@/data/apartmentData';
 import { HOST_CONTACT } from '@/data/contact';
+import type { Item } from '@/data/schemas';
 
 export const APARTMENT_LOCATION: [number, number] = [22.094364, 37.040635];
 
@@ -42,28 +42,29 @@ export interface MapLocation {
   meta?: string;
 }
 
-export interface CategoryMapItem {
-  id: string;
-  name: string;
-  name_en?: string;
-  name_el?: string;
-  summary?: string;
-  summary_en?: string;
-  summary_el?: string;
-  description?: string;
-  description_en?: string;
-  description_el?: string;
-  address?: string;
-  address_en?: string;
-  address_el?: string;
-  phone?: string;
-  phones?: string[];
-  website?: string;
-  directionsUrl?: string;
-  tags?: string[];
-  location?: { lat: number; lng: number };
-  slug?: string;
-}
+export type CategoryMapItem = Pick<
+  Item,
+  | 'id'
+  | 'name'
+  | 'name_en'
+  | 'name_el'
+  | 'summary'
+  | 'summary_en'
+  | 'summary_el'
+  | 'description'
+  | 'description_en'
+  | 'description_el'
+  | 'address'
+  | 'address_en'
+  | 'address_el'
+  | 'phone'
+  | 'phones'
+  | 'website'
+  | 'directionsUrl'
+  | 'tags'
+  | 'location'
+  | 'slug'
+>;
 
 export interface MapContentItem {
   item: CategoryMapItem;
@@ -218,7 +219,6 @@ function markerTypeForItem(item: CategoryMapItem, categorySlug: string): MapMark
   if (tags.has('park') || tags.has('outdoor') || tags.has('railway')) return 'park';
   if (tags.has('site') || tags.has('sightseeing') || tags.has('archaeology')) return 'sightseeing';
   if (tags.has('church') || tags.has('religion')) return 'church';
-  if (tags.has('museum') || tags.has('culture') || tags.has('history')) return 'attraction';
 
   return 'attraction';
 }
@@ -245,16 +245,15 @@ export function getApartmentMapLocation(
 
 function createMapLocationFromItem(
   { item, categorySlug, meta }: MapContentItem,
-  locale: Locale | string
+  locale: Locale
 ): MapLocation | null {
   if (!item.location || typeof item.location.lat !== 'number' || typeof item.location.lng !== 'number') {
     return null;
   }
 
-  const eff: Locale = normalizeLocale(locale);
-  const name = pickLocale(item, 'name', eff) ?? item.name;
-  const description = pickLocale(item, 'summary', eff) ?? pickLocale(item, 'description', eff);
-  const address = pickLocale(item, 'address', eff);
+  const name = pickLocale(item, 'name', locale) ?? item.name;
+  const description = pickLocale(item, 'summary', locale) ?? pickLocale(item, 'description', locale);
+  const address = pickLocale(item, 'address', locale);
   const phones = item.phones?.length ? item.phones : item.phone ? [item.phone] : undefined;
 
   return {
@@ -268,7 +267,7 @@ function createMapLocationFromItem(
     directionsUrl: item.directionsUrl ?? getDirectionsUrl([item.location.lng, item.location.lat]),
     coordinates: [item.location.lng, item.location.lat],
     markerType: markerTypeForItem(item, categorySlug),
-    href: `/${eff}/${categorySlug}/${item.slug || item.id}`,
+    href: `/${locale}/${categorySlug}/${item.slug || item.id}`,
     meta,
   };
 }

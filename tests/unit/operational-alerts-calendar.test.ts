@@ -23,7 +23,7 @@ import { evaluateOperationalAlerts } from '@/lib/operationalMonitor';
 const RULE = 'Stale availability calendar';
 const RULE_ID = `rule:${RULE}`;
 const NOW = new Date('2026-10-24T22:30:00.000Z');
-const FEED_URL = 'https://www.airbnb.com/calendar/ical/12345678.ics';
+const FEED_URL = 'https://ical.booking.com/v1/export?t=token';
 const minutesAgo = (minutes: number) => new Date(NOW.getTime() - minutes * 60_000);
 
 /** The value of the stale-calendar alert opened by this evaluation, or null when none was opened. */
@@ -38,7 +38,7 @@ describe('stale availability calendar alert', () => {
     vi.setSystemTime(NOW);
     vi.stubEnv('ALERT_WEBHOOK_URL', '');
     vi.stubEnv('ALERT_WEBHOOK_REQUIRED', '0');
-    vi.stubEnv('AIRBNB_ICAL_URL', FEED_URL);
+    vi.stubEnv('BOOKING_ICAL_URL', FEED_URL);
     prismaMock.alertRule.upsert.mockImplementation(async ({ create }) => ({ ...create, id: `rule:${create.name}`, enabled: true }));
     // Every other rule reads a healthy value.
     prismaMock.$transaction.mockResolvedValue([0, 0]);
@@ -53,31 +53,10 @@ describe('stale availability calendar alert', () => {
     vi.useRealTimers();
   });
 
-  it('is registered like the other rules and counted as evaluated', async () => {
-    await expect(evaluateOperationalAlerts()).resolves.toEqual({ opened: 0, resolved: 0, evaluated: 4 });
-
-    const registration = prismaMock.alertRule.upsert.mock.calls.find(([args]) => args.where.name === RULE);
-    expect(registration?.[0].create).toEqual({
-      id: expect.any(String),
-      name: RULE,
-      description: expect.any(String),
-      metricName: 'availability.calendar.stale_minutes',
-      comparison: 'gt',
-      threshold: 180,
-      windowMinutes: 5,
-      severity: 'high',
-    });
-    expect(prismaMock.calendarSyncState.findUnique).toHaveBeenCalledWith({
-      where: { id: 'airbnb' },
-      select: { lastSuccessAt: true, createdAt: true },
-    });
-  });
-
   it.each([
-    ['unset', undefined],
     ['empty', ''],
   ])('reads 0 without a database read when the calendar URL is %s', async (_label, value) => {
-    vi.stubEnv('AIRBNB_ICAL_URL', value);
+    vi.stubEnv('BOOKING_ICAL_URL', value);
     prismaMock.calendarSyncState.findUnique.mockResolvedValue({ lastSuccessAt: null, createdAt: minutesAgo(525_600 * 3) });
     // An alert that is still open resolves once the metric reads 0.
     prismaMock.alert.findFirst.mockImplementation(async ({ where }: { where: { ruleId: string } }) => (
@@ -107,6 +86,10 @@ describe('stale availability calendar alert', () => {
 
     await expect(evaluateOperationalAlerts()).resolves.toEqual({ opened: 1, resolved: 0, evaluated: 4 });
 
+    expect(prismaMock.calendarSyncState.findUnique).toHaveBeenCalledWith({
+      where: { id: 'booking' },
+      select: { lastSuccessAt: true, createdAt: true },
+    });
     expect(openedValue()).toBe(181);
   });
 

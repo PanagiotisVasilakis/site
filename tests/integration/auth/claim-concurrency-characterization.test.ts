@@ -13,7 +13,7 @@ import {
   createIsolatedDatabase,
   dropIsolatedDatabase,
 } from '../support/database-lifecycle';
-import { withTestPrismaClient } from '../support/fixtures';
+import { utcDateOffset, withTestPrismaClient } from '../support/fixtures';
 import { applyMigrationsFromEmpty } from '../support/migrations';
 import {
   readDisposablePostgresRuntime,
@@ -34,12 +34,6 @@ import {
   type ClaimRaceScenario,
   type SafeClaimRaceWorkerEvidence,
 } from './support/claim-route-worker';
-
-interface Deferred<T> {
-  promise: Promise<T>;
-  resolve: (value: T | PromiseLike<T>) => void;
-  reject: (reason?: unknown) => void;
-}
 
 interface BlockedActivity {
   applicationName: string;
@@ -114,26 +108,6 @@ const DATABASE_BARRIER_TIMEOUT_MS = 8_000;
 const MAX_WORKER_OUTPUT_BYTES = 128 * 1_024;
 const A2_REPETITIONS = 15;
 const A3_REPETITIONS = 15;
-
-function createDeferred<T>(): Deferred<T> {
-  let resolve!: Deferred<T>['resolve'];
-  let reject!: Deferred<T>['reject'];
-  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
-    resolve = resolvePromise;
-    reject = rejectPromise;
-  });
-  return { promise, resolve, reject };
-}
-
-function utcDateOffset(now: Date, days: number): Date {
-  const date = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-  ));
-  date.setUTCDate(date.getUTCDate() + days);
-  return date;
-}
 
 function tokenDigest(token: string): string {
   return createHmac('sha256', CLAIM_RACE_TOKEN_PEPPER)
@@ -512,8 +486,8 @@ async function executeClaimRace(
 ): Promise<ClaimRaceResult> {
   return withTestPrismaClient(target, async (blocker) => (
     withTestPrismaClient(target, async (monitor) => {
-      const blockerReady = createDeferred<number>();
-      const releaseBlocker = createDeferred<void>();
+      const blockerReady = Promise.withResolvers<number>();
+      const releaseBlocker = Promise.withResolvers<void>();
       const applicationNames = [
         `pr02b_${scenario}_${repetition}_a`,
         `pr02b_${scenario}_${repetition}_b`,

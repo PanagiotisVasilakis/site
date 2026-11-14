@@ -10,7 +10,7 @@ import FactCounters from './FactCounters';
 
 /**
  * identity §8 FactStrip: six facts from the house data, overlapping the hero, and a link to the free
- * dates. It never shows a price (the hero has the only one, §0.3). Motion M6 (motion.css): the tiles
+ * dates. It never shows a price. Motion M6 (motion.css): the tiles
  * open like louvres once HomeRevealObserver marks the strip `is-in`, and the numbers count up (M34,
  * FactCounters; the markup holds the final numbers).
  * `inline` (§9.2 apartment page head): the same six facts as a plain list, without the overlap card,

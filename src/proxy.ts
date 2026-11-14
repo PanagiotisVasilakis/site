@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { locales, defaultLocale } from "@/i18n/config";
+import { locales, defaultLocale, isLocale, pathLocale } from "@/i18n/config";
 import { createSecurityMiddleware } from '@/lib/security-middleware-edge';
 
 function isLocalizedPage(pathname: string, page: string) {
   return locales.some((l) => pathname === `/${l}${page}` || pathname === `/${l}${page}/`);
-}
-
-function hasLocale(pathname: string) {
-  return locales.some((l) => pathname === `/${l}` || pathname.startsWith(`/${l}/`));
 }
 
 const NON_LOCALIZED_ROUTE_PREFIXES = [
@@ -43,7 +39,7 @@ function preferredLocale(header: string | null): string | null {
   for (const entry of (header ?? '').split(',')) {
     const [range, ...parameters] = entry.trim().split(';');
     const locale = range.split('-')[0].trim().toLowerCase();
-    if (!(locales as readonly string[]).includes(locale)) continue;
+    if (!isLocale(locale)) continue;
     const qParameter = parameters.map((parameter) => parameter.trim()).find((parameter) => /^q=/iu.test(parameter));
     const qValue = qParameter === undefined ? '1' : qParameter.slice(2).trim();
     const q = qValue === '' ? Number.NaN : Number(qValue);
@@ -61,6 +57,13 @@ function redirectWithSecurityHeaders(url: URL, status: 302 | 308, securityRespon
   });
   return redirectResponse;
 }
+
+const LANG_COOKIE_OPTIONS = {
+  path: "/",
+  maxAge: 60 * 60 * 24 * 365,
+  sameSite: "lax",
+  secure: process.env.NODE_ENV === 'production'
+} as const;
 
 const nonceSecurityMiddleware = createSecurityMiddleware();
 
@@ -86,20 +89,19 @@ export async function proxy(req: NextRequest) {
   // A retired booking page moves permanently to the availability page; its
   // query (the old form's dates) is dropped. A new URL, not a clone of nextUrl,
   // so a trailing slash on the old path is not carried over.
-  const pathLocale = locales.find((l) => pathname.startsWith(`/${l}/`));
-  if (pathLocale && isRetiredBookingPage(pathname.slice(pathLocale.length + 1))) {
-    return redirectWithSecurityHeaders(new URL(`/${pathLocale}/availability`, req.nextUrl.origin), 308, response);
+  const urlLocale = pathLocale(pathname);
+  if (urlLocale && isRetiredBookingPage(pathname.slice(urlLocale.length + 1))) {
+    return redirectWithSecurityHeaders(new URL(`/${urlLocale}/availability`, req.nextUrl.origin), 308, response);
   }
-  if (pathLocale && isRetiredAboutPage(pathname.slice(pathLocale.length + 1))) {
-    return redirectWithSecurityHeaders(new URL(`/${pathLocale}#host`, req.nextUrl.origin), 308, response);
+  if (urlLocale && isRetiredAboutPage(pathname.slice(urlLocale.length + 1))) {
+    return redirectWithSecurityHeaders(new URL(`/${urlLocale}#host`, req.nextUrl.origin), 308, response);
   }
 
-  const cookieLocale = req.cookies.get("lang")?.value as string | undefined;
-  const isValidCookie = cookieLocale ? (locales as readonly string[]).includes(cookieLocale) : false;
+  const cookieLocale = req.cookies.get("lang")?.value;
 
-  if (!hasLocale(pathname)) {
+  if (!urlLocale) {
     // An explicit choice (the cookie) wins; a first visit follows the browser's language preference.
-    const target = (isValidCookie ? cookieLocale : preferredLocale(req.headers.get('accept-language')) ?? defaultLocale) as string;
+    const target = isLocale(cookieLocale) ? cookieLocale : preferredLocale(req.headers.get('accept-language')) ?? defaultLocale;
     let url: URL;
     if (isRetiredBookingPage(pathname)) {
       url = new URL(`/${target}/availability`, req.nextUrl.origin);
@@ -117,25 +119,14 @@ export async function proxy(req: NextRequest) {
     // Temporary locale selection redirect.
     const redirectResponse = redirectWithSecurityHeaders(url, 302, response);
 
-    redirectResponse.cookies.set("lang", target, {
-      path: "/",
-      maxAge: 60 * 60 * 24 * 365,
-      sameSite: "lax", // Allow cross-origin for language detection
-      secure: process.env.NODE_ENV === 'production'
-    });
+    redirectResponse.cookies.set("lang", target, LANG_COOKIE_OPTIONS);
 
     return redirectResponse;
   }
 
   // When a locale is present in URL, ensure cookie matches it
-  const current = pathname.split("/")[1] as string;
-  if ((locales as readonly string[]).includes(current) && cookieLocale !== current) {
-    response.cookies.set("lang", current, {
-      path: "/",
-      maxAge: 60 * 60 * 24 * 365,
-      sameSite: "lax", // Allow cross-origin for language detection
-      secure: process.env.NODE_ENV === 'production'
-    });
+  if (cookieLocale !== urlLocale) {
+    response.cookies.set("lang", urlLocale, LANG_COOKIE_OPTIONS);
   }
 
   return response;

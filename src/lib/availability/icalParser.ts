@@ -1,12 +1,20 @@
-// Blocked nights from the Airbnb calendar export (iCalendar, RFC 5545,
+// Blocked nights from the Booking.com calendar export (iCalendar, RFC 5545,
 // https://www.rfc-editor.org/rfc/rfc5545). A strict subset: only VEVENT
 // components directly inside the VCALENDAR are read, and of those only
-// DTSTART, DTEND and DURATION with DATE values, STATUS and the recurrence
-// properties. The export can carry personal data (DESCRIPTION holds a
-// reservation URL and the last digits of the guest's phone), so every other
-// property is dropped: results hold dates only, and errors hold a code and at
-// most a line number, never input text. Anything outside the subset throws,
-// because a silently missed blocked night is worse than a failed sync.
+// DTSTART and DTEND with DATE values, DURATION in whole days or weeks, and
+// STATUS. SUMMARY is never read, so a reservation and a closed period are
+// alike: every event that is not cancelled blocks its nights. An export can
+// carry personal data in other properties (for example SUMMARY or
+// DESCRIPTION), so nothing but dates is kept: results hold dates only, and
+// errors hold a code and at most a line number, never input text. Components
+// other than VEVENT are skipped unread, though their lines must still be
+// well formed and balanced. These throw: a text over the size caps, text
+// that is not exactly one well formed, balanced VCALENDAR, a nested
+// VCALENDAR, a misplaced VEVENT, and an event with a recurrence property, a
+// missing DTSTART, a repeated or conflicting DTSTART, DTEND, DURATION or
+// STATUS, a value that is not a valid DATE or DURATION, or an end on or
+// before its start or after the year 9999. A silently missed blocked night
+// is worse than a failed sync.
 
 import { addDays, parseIsoDate, type IsoDate } from '@/lib/availability/calendarDate';
 
@@ -28,7 +36,10 @@ export type IcalParseErrorCode =
   | 'too_large'
   | 'too_many_lines'
   | 'too_many_events'
-  /** No valid property name, no ':' outside double quotes, or a parameter without name=value. */
+  /**
+   * No valid property name, no ':' outside double quotes, a parameter without name=value, or a
+   * BEGIN/END value that is not a component name.
+   */
   | 'malformed_line'
   /** The text is not exactly one VCALENDAR object. */
   | 'not_vcalendar'
@@ -49,8 +60,11 @@ export type IcalParseErrorCode =
   | 'invalid_duration';
 
 /**
- * `line` is the 1-based physical line where the offending content line starts
- * (for event-level errors, the BEGIN:VEVENT line); size caps have none.
+ * `line` is the 1-based physical line where the offending content line starts.
+ * For a missing DTSTART, for an end on or before the start or after the year
+ * 9999, and for too_many_events it is the BEGIN:VEVENT line of the event. It
+ * is undefined for too_large, for too_many_lines and for a text that ends
+ * without a closed VCALENDAR.
  */
 export class IcalParseError extends Error {
   readonly code: IcalParseErrorCode;
@@ -201,8 +215,8 @@ function mergeRanges(ranges: BlockedRange[]): BlockedRange[] {
  * The blocked nights of an iCalendar text as ranges start..end (end
  * exclusive, like DTEND). Every VEVENT that is not STATUS:CANCELLED blocks its
  * nights. The result is sorted by start, and overlapping or adjacent ranges
- * are merged, so no two ranges touch. Throws IcalParseError for anything
- * outside the supported subset.
+ * are merged, so no two ranges touch. Components other than VEVENT are skipped
+ * unread. Throws IcalParseError for the cases listed at the top of this file.
  */
 export function parseBlockedRanges(text: string): BlockedRange[] {
   if (text.length > MAX_TEXT_BYTES || new TextEncoder().encode(text).byteLength > MAX_TEXT_BYTES) {

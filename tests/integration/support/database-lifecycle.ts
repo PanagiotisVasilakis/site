@@ -231,7 +231,7 @@ export async function startDisposablePostgres(): Promise<DisposablePostgresRunti
     '--tmpfs', '/tmp:rw,noexec,nosuid,size=67108864',
     '--tmpfs', '/run/postgresql:rw,noexec,nosuid,size=16777216',
     '--security-opt', 'no-new-privileges',
-    '--health-cmd', 'pg_isready --username="$POSTGRES_USER" --dbname="$POSTGRES_DB"',
+    '--health-cmd', 'pg_isready --host=127.0.0.1 --username="$POSTGRES_USER" --dbname="$POSTGRES_DB"',
     '--health-interval', '1s',
     '--health-timeout', '3s',
     '--health-retries', '60',

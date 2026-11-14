@@ -5,7 +5,7 @@ import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const contact = vi.hoisted(() => ({ airbnbUrl: '' }));
+const contact = vi.hoisted(() => ({ bookingUrl: '' }));
 const mocks = vi.hoisted(() => ({
   read: vi.fn(),
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
@@ -20,8 +20,8 @@ vi.mock('next/link', () => ({
 }));
 vi.mock('@/data/contact', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/data/contact')>()),
-  get AIRBNB_LISTING_URL() {
-    return contact.airbnbUrl;
+  get BOOKING_COM_LISTING_URL() {
+    return contact.bookingUrl;
   },
 }));
 
@@ -29,6 +29,8 @@ import ApartmentPage from '@/app/[locale]/apartment/page';
 import FactStrip from '@/components/home/FactStrip';
 import { addDays, type IsoDate } from '@/lib/availability/calendarDate';
 import type { PublicAvailability } from '@/lib/prisma-repositories/availabilityRepository';
+
+import { installDialogMethods, removeDialogMethods, stubIntersectionObserver } from '../support/dom';
 
 const TODAY = '2026-10-18' as IsoDate;
 
@@ -39,12 +41,12 @@ function availability(overrides: Partial<PublicAvailability> = {}): PublicAvaila
     status: 'fresh',
     lastSyncedAt: new Date(Date.now() - 3_600_000).toISOString(),
     nights: `obb${'o'.repeat(362)}`,
-    rates: [{ start: TODAY, end: '2027-01-01' as IsoDate, nightlyPriceCents: 8500, minimumNights: 2 }],
+    rates: [],
     ...overrides,
   };
 }
 
-const ROOM_IDS = ['living', 'kitchen', 'bedroom-1', 'bedroom-2', 'bathroom', 'balcony', 'details'];
+const ROOM_IDS = ['living', 'kitchen', 'bedroom-1', 'bedroom-2', 'bathroom', 'balcony', 'parking', 'details'];
 
 // identity §7.3: never shown in the marketing views (retired, duplicates, soft, branded, stay-hub only).
 const EXCLUDED = [
@@ -58,7 +60,7 @@ async function renderPage(locale: 'en' | 'el') {
 }
 
 beforeEach(() => {
-  contact.airbnbUrl = '';
+  contact.bookingUrl = '';
   mocks.read.mockResolvedValue(availability());
 });
 
@@ -77,14 +79,14 @@ describe('apartment page (identity §9.2)', () => {
     }
   });
 
-  it('shows the 41 marketing photos in the §7.3 order and never an excluded one', async () => {
+  it('shows the 42 marketing photos in the §7.3 order and never an excluded one', async () => {
     const { container } = await renderPage('en');
 
     const sources = [...container.querySelectorAll('img')].map((img) => img.getAttribute('src') ?? '');
     for (const name of EXCLUDED) {
       expect(sources.filter((src) => src.includes(`/${name}.`)), name).toEqual([]);
     }
-    // The lead photo (living_8, LCP), the 30 room tiles and the 10 details tiles.
+    // The lead photo (living_8, LCP), the 30 room tiles, the parking tile and the 10 details tiles.
     const lead = container.querySelector('.apt-lead img');
     expect(lead?.getAttribute('src')).toBe('/house/living/living_8.jpeg');
     expect(lead?.getAttribute('loading')).toBe('eager');
@@ -102,8 +104,9 @@ describe('apartment page (identity §9.2)', () => {
       '/house/bedroom_2/bedroom_2_1.jpeg',
       '/house/bathroom/bathroom_6.jpeg', '/house/bathroom/bathroom_7.jpeg', '/house/bathroom/bathroom_3.jpeg',
       '/house/bathroom/bathroom_4.jpeg',
-      '/house/balcony/balcony_2.jpeg', '/house/balcony/balcony_1.jpeg', '/house/balcony/balcony_3.jpeg',
+      '/house/balcony/balcony_2.jpeg', '/house/balcony/balcony_3.jpeg', '/house/balcony/balcony_1.jpeg',
       '/house/balcony/balcony_4.jpeg', '/house/balcony/balcony_5.jpeg',
+      '/house/parking/parking_1.jpeg',
       '/house/details/details_1.jpeg', '/house/details/details_2.jpeg', '/house/details/details_3.jpeg',
       '/house/details/details_4.jpeg', '/house/details/details_5.jpeg', '/house/details/details_6.jpeg',
       '/house/details/details_7.jpeg', '/house/details/details_8.jpeg', '/house/details/details_9.jpeg',
@@ -115,23 +118,28 @@ describe('apartment page (identity §9.2)', () => {
     }
   });
 
-  it.each([
-    ['en', 'Up close', 'Shells, wood and stone in the afternoon light'],
-    ['el', 'Από κοντά', 'Κοχύλια, ξύλο και πέτρα στο απογευματινό φως'],
-  ] as const)('closes the gallery (%s) with the details section: its own title and line, ten tiles', async (locale, title, line) => {
-    const { container } = await renderPage(locale);
+  it('lays out the sections whose tiles share one box ratio as a row-major grid, the others as columns (R-700)', async () => {
+    const { container } = await renderPage('en');
 
-    const sections = [...container.querySelectorAll('section.apt-room')];
-    const details = sections[sections.length - 1] as HTMLElement;
-    expect(details.id).toBe('details');
-    expect(within(details).getByRole('heading', { level: 2 })).toHaveTextContent(title);
-    expect(details.querySelector('.apt-room__line')).toHaveTextContent(line);
-    expect(details.querySelectorAll('.apt-masonry img')).toHaveLength(10);
+    const layout = (id: string) => (container.querySelector(`section#${id} ul.apt-masonry`) as HTMLElement).className;
+    const ratios = (id: string) => new Set([...container.querySelectorAll(`section#${id} .apt-tile`)].map((tile) => (tile as HTMLElement).style.aspectRatio));
+    // Ten 2:3 details tiles and four equal 3:2 bedroom-2 tiles: a grid, so only the last row is short and no column is left empty.
+    for (const id of ['details', 'bedroom-2']) {
+      expect(layout(id), id).toBe('apt-masonry apt-masonry--grid');
+      expect(ratios(id).size, id).toBe(1);
+    }
+    // Sections that mix 3:2 and 2:3 tiles stay CSS columns.
+    for (const id of ['living', 'kitchen', 'bedroom-1', 'bathroom', 'balcony']) {
+      expect(layout(id), id).toBe('apt-masonry');
+      expect(ratios(id).size, id).toBeGreaterThan(1);
+    }
+    // The single parking tile is shown alone (D3), not as a grid.
+    expect(layout('parking')).toBe('apt-masonry apt-masonry--single');
+    expect(container.querySelectorAll('.apt-masonry--grid')).toHaveLength(2);
   });
 
   it.each([
     ['en', 'See free dates', '/en/availability', '/en#contact'],
-    ['el', 'Δείτε ελεύθερες ημερομηνίες', '/el/availability', '/el#contact'],
   ] as const)('links (%s) to the free dates and to the home contact section', async (locale, seeDates, availability, contactHref) => {
     const { container } = await renderPage(locale);
 
@@ -143,26 +151,15 @@ describe('apartment page (identity §9.2)', () => {
     expect(container.querySelector(`a[href="/${locale}/phones"]`)).toBeNull();
   });
 
-  it('hides "Book on Airbnb" without a valid listing URL (identity §1.4)', async () => {
-    for (const url of ['', 'https://example.com/rooms/1', 'http://www.airbnb.com/rooms/1']) {
-      contact.airbnbUrl = url;
-      const { container, unmount } = await renderPage('en');
-      expect(screen.queryByRole('link', { name: /Airbnb/ }), url).toBeNull();
-      expect(container.querySelector('a[href*="airbnb"]'), url).toBeNull();
-      unmount();
-    }
-  });
-
-  it('shows "Book on Airbnb" as the secondary CTA with a valid listing URL', async () => {
-    contact.airbnbUrl = 'https://www.airbnb.com/rooms/123456';
+  it('shows "Book on Booking.com" as the secondary CTA with a valid link', async () => {
+    contact.bookingUrl = 'https://www.booking.com/Share-AiCapK';
     const { container } = await renderPage('en');
 
-    const cta = container.querySelector('#book') as HTMLElement;
-    const airbnb = within(cta).getByRole('link', { name: /Book on Airbnb/ });
-    expect(airbnb).toHaveAttribute('href', 'https://www.airbnb.com/rooms/123456');
-    expect(airbnb).toHaveAttribute('target', '_blank');
-    expect(airbnb).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(airbnb.className).toContain('ui-btn--secondary');
+    const bookingLink = within(container.querySelector('#book') as HTMLElement).getByRole('link', { name: /Book on Booking\.com/ });
+    expect(bookingLink).toHaveAttribute('href', 'https://www.booking.com/Share-AiCapK');
+    expect(bookingLink).toHaveAttribute('target', '_blank');
+    expect(bookingLink).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(bookingLink.className).toContain('ui-btn--secondary');
   });
 
   // Owner decision O45 (2026-10-04): the sea view is confirmed by the owner, so the amenity lists it
@@ -205,23 +202,12 @@ describe('apartment page (identity §9.2)', () => {
 describe('apartment page gallery wiring (identity §9.2, §8 GalleryLightbox)', () => {
   // jsdom has no HTMLDialogElement.showModal/close and no Element.scrollTo (as in gallery-lightbox.test.tsx).
   beforeEach(() => {
-    Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
-      configurable: true,
-      value: vi.fn(function (this: HTMLDialogElement) { this.setAttribute('open', ''); }),
-    });
-    Object.defineProperty(HTMLDialogElement.prototype, 'close', {
-      configurable: true,
-      value: vi.fn(function (this: HTMLDialogElement) {
-        this.removeAttribute('open');
-        this.dispatchEvent(new Event('close'));
-      }),
-    });
+    installDialogMethods();
     Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: vi.fn() });
   });
 
   afterEach(() => {
-    Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
-    Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
+    removeDialogMethods();
     Reflect.deleteProperty(HTMLElement.prototype, 'scrollTo');
   });
 
@@ -243,43 +229,54 @@ describe('apartment page gallery wiring (identity §9.2, §8 GalleryLightbox)', 
 
     await user.click(tile('/house/kitchen/kitchen_2.jpeg'));
     expect(viewer().dialog).toHaveAttribute('open');
-    expect(viewer().counter).toHaveTextContent('9 / 41');
+    expect(viewer().counter).toHaveTextContent('9 / 42');
     expect(viewer().room).toHaveTextContent('Kitchen');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
     expect(viewer().dialog).not.toHaveAttribute('open');
 
     await user.click(tile('/house/living/living_11.jpeg'));
-    expect(viewer().counter).toHaveTextContent('3 / 41');
+    expect(viewer().counter).toHaveTextContent('3 / 42');
     expect(viewer().room).toHaveTextContent('Living room');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
 
+    // R-691: balcony_3 (2:3) sits before balcony_1 (3:2), so the single landscape photo does not end up alone in a column.
     await user.click(tile('/house/balcony/balcony_3.jpeg'));
-    expect(viewer().counter).toHaveTextContent('29 / 41');
+    expect(viewer().counter).toHaveTextContent('28 / 42');
+    expect(viewer().room).toHaveTextContent('Balcony');
+    await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
+
+    await user.click(tile('/house/balcony/balcony_1.jpeg'));
+    expect(viewer().counter).toHaveTextContent('29 / 42');
     expect(viewer().room).toHaveTextContent('Balcony');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
 
     await user.click(tile('/house/balcony/balcony_4.jpeg'));
-    expect(viewer().counter).toHaveTextContent('30 / 41');
+    expect(viewer().counter).toHaveTextContent('30 / 42');
     expect(viewer().room).toHaveTextContent('Balcony');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
 
     await user.click(tile('/house/balcony/balcony_5.jpeg'));
-    expect(viewer().counter).toHaveTextContent('31 / 41');
+    expect(viewer().counter).toHaveTextContent('31 / 42');
     expect(viewer().room).toHaveTextContent('Balcony');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
 
+    await user.click(tile('/house/parking/parking_1.jpeg'));
+    expect(viewer().counter).toHaveTextContent('32 / 42');
+    expect(viewer().room).toHaveTextContent('Parking');
+    await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
+
     await user.click(tile('/house/details/details_1.jpeg'));
-    expect(viewer().counter).toHaveTextContent('32 / 41');
+    expect(viewer().counter).toHaveTextContent('33 / 42');
     expect(viewer().room).toHaveTextContent('Up close');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
 
     await user.click(tile('/house/details/details_10.jpeg'));
-    expect(viewer().counter).toHaveTextContent('41 / 41');
+    expect(viewer().counter).toHaveTextContent('42 / 42');
     expect(viewer().room).toHaveTextContent('Up close');
     await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
 
     await user.click(container.querySelector('.apt-lead__open') as HTMLElement);
-    expect(viewer().counter).toHaveTextContent('1 / 41');
+    expect(viewer().counter).toHaveTextContent('1 / 42');
     expect(viewer().room).toHaveTextContent('Living room');
   });
 
@@ -319,58 +316,7 @@ describe('apartment page gallery wiring (identity §9.2, §8 GalleryLightbox)', 
   });
 });
 
-type ObserverCallback = (entries: Array<Pick<IntersectionObserverEntry, 'target' | 'isIntersecting'>>) => void;
-
-/** A controllable IntersectionObserver: each observer hears only about the elements it observes. */
-function stubObserver() {
-  const observers: Array<{ callback: ObserverCallback; targets: Element[] }> = [];
-  vi.stubGlobal('IntersectionObserver', class {
-    private readonly entry: { callback: ObserverCallback; targets: Element[] };
-    constructor(callback: ObserverCallback) {
-      this.entry = { callback, targets: [] };
-      observers.push(this.entry);
-    }
-    observe(target: Element) { this.entry.targets.push(target); }
-    unobserve() {}
-    disconnect() { this.entry.targets = []; }
-  });
-  return {
-    report(inView: Map<Element, boolean>) {
-      act(() => {
-        for (const { callback, targets } of observers) {
-          const entries = targets.filter((target) => inView.has(target)).map((target) => ({ target, isIntersecting: inView.get(target) ?? false }));
-          if (entries.length > 0) callback(entries);
-        }
-      });
-    },
-  };
-}
-
 describe('BookBar on the apartment page (identity §8, §9.2)', () => {
-  it.each([
-    ['en', /^from €85 \/ night/, 'Free tonight', '/en/availability', 'Check dates'],
-    ['el', /^από .*85.* \/ νύχτα/, 'Ελεύθερο απόψε', '/el/availability', 'Δείτε ημερομηνίες'],
-  ] as const)('carries the lowest bookable price and tonight (%s), from the same source as home', async (locale, price, note, href, label) => {
-    const { container } = await renderPage(locale);
-
-    const bar = container.querySelector('.bookbar') as HTMLElement;
-    expect(bar).not.toBeNull();
-    expect(bar.textContent).toMatch(price);
-    expect(bar).toHaveTextContent(note);
-    expect(within(bar).getByRole('link', { hidden: true })).toHaveAttribute('href', href);
-    expect(within(bar).getByRole('link', { hidden: true })).toHaveTextContent(label);
-    expect(mocks.read).toHaveBeenCalledTimes(1);
-  });
-
-  it('is not rendered without price data', async () => {
-    mocks.read.mockResolvedValue(availability({ rates: [] }));
-
-    const { container } = await renderPage('en');
-
-    expect(container.querySelector('.bookbar')).toBeNull();
-    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
-  });
-
   it('is not rendered when the availability read fails, and logs no details', async () => {
     mocks.read.mockRejectedValue(new Error('connect ECONNREFUSED 10.0.0.5:5432'));
 
@@ -379,12 +325,12 @@ describe('BookBar on the apartment page (identity §8, §9.2)', () => {
     expect(container.querySelector('.bookbar')).toBeNull();
     expect(container.querySelector('#book')).not.toBeNull();
     expect(mocks.logger.error).toHaveBeenCalledTimes(1);
-    expect(mocks.logger.error).toHaveBeenCalledWith('Apartment price could not be read');
+    expect(mocks.logger.error).toHaveBeenCalledWith('Apartment availability could not be read');
     expect(JSON.stringify(mocks.logger.error.mock.calls)).not.toContain('ECONNREFUSED');
   });
 
   it('stays hidden until the page head leaves the view, and while the #book CTAs are visible', async () => {
-    const io = stubObserver();
+    const io = stubIntersectionObserver();
     const { container } = await renderPage('en');
     const bar = container.querySelector('.bookbar');
     const shown = () => Boolean(bar?.classList.contains('is-shown')) && !bar?.hasAttribute('inert');

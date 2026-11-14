@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type React from 'react';
-import { act, render } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/link', () => ({
@@ -10,39 +10,15 @@ vi.mock('next/link', () => ({
 
 import BookBar from '@/components/shell/BookBar';
 
-type Callback = (entries: Array<Pick<IntersectionObserverEntry, 'target' | 'isIntersecting'>>) => void;
+import { stubIntersectionObserver } from '../support/dom';
 
-/** A controllable IntersectionObserver: the test reports which observed elements are in view. */
-function stubObserver() {
-  const observers: Array<{ callback: Callback; targets: Element[] }> = [];
-  vi.stubGlobal('IntersectionObserver', class {
-    private entry: { callback: Callback; targets: Element[] };
-    constructor(callback: Callback) {
-      this.entry = { callback, targets: [] };
-      observers.push(this.entry);
-    }
-    observe(target: Element) { this.entry.targets.push(target); }
-    unobserve() {}
-    disconnect() { this.entry.targets = []; }
-  });
-  return {
-    report(inView: Map<Element, boolean>) {
-      act(() => {
-        for (const { callback, targets } of observers) {
-          callback(targets.filter((target) => inView.has(target)).map((target) => ({ target, isIntersecting: inView.get(target) ?? false })));
-        }
-      });
-    },
-  };
-}
-
-function renderPage(price: string | null = '€85') {
+function renderPage(note: string | null = 'Free tonight') {
   return render(
     <>
       <section data-hero>Hero</section>
       <p data-cta-watch>See free dates</p>
       <div data-cta-watch>Contact actions</div>
-      <BookBar fromText="from {price} / night" price={price} note="Free tonight" href="/en/availability" ctaLabel="Check dates" />
+      <BookBar note={note} href="/en/availability" ctaLabel="Check dates" />
     </>,
   );
 }
@@ -51,7 +27,7 @@ const shown = (bar: Element | null) => Boolean(bar?.classList.contains('is-shown
 
 describe('BookBar visibility (identity §8)', () => {
   it('stays hidden while the hero is in view, shows once it has left, and hides again while a booking CTA is visible', () => {
-    const io = stubObserver();
+    const io = stubIntersectionObserver();
     const { container } = renderPage();
     const bar = container.querySelector('.bookbar');
     const [hero, cta1, cta2] = Array.from(container.querySelectorAll('[data-hero], [data-cta-watch]'));
@@ -64,7 +40,7 @@ describe('BookBar visibility (identity §8)', () => {
 
     io.report(new Map([[hero, false]]));
     expect(shown(bar)).toBe(true);
-    expect(bar).toHaveTextContent('from €85 / nightFree tonight');
+    expect(bar).toHaveTextContent('Free tonight');
 
     io.report(new Map([[cta2, true]]));
     expect(shown(bar)).toBe(false);
@@ -79,8 +55,8 @@ describe('BookBar visibility (identity §8)', () => {
     expect(shown(bar)).toBe(false);
   });
 
-  it('renders nothing without price data', () => {
-    stubObserver();
+  it('renders nothing without a note', () => {
+    stubIntersectionObserver();
     const { container } = renderPage(null);
 
     expect(container.querySelector('.bookbar')).toBeNull();

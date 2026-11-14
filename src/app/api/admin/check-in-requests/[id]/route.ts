@@ -46,7 +46,7 @@ export const PATCH = withErrorHandler(async (
     return createSuccessResponse({
       request: { id: existing.id, status: existing.status.toLowerCase() },
       notification: { status: 'queued' as const },
-    }, undefined, request.headers.get('x-correlation-id') ?? undefined);
+    });
   }
 
   const nextStatus = statusMap[body.status];
@@ -54,7 +54,7 @@ export const PATCH = withErrorHandler(async (
     return createSuccessResponse({
       request: { id: existing.id, status: existing.status.toLowerCase() },
       notification: { status: 'skipped' as const, reason: 'status_unchanged' },
-    }, undefined, request.headers.get('x-correlation-id') ?? undefined);
+    });
   }
 
   let update;
@@ -85,12 +85,11 @@ export const PATCH = withErrorHandler(async (
       ? { status: 'skipped' as const, reason: 'webhook_not_configured' }
       : { status: delivered ? 'sent' as const : 'queued' as const };
 
-  const correlationId = request.headers.get('x-correlation-id') ?? undefined;
   return createSuccessResponse({
     request: {
       id: update.request.id,
       status: update.request.status.toLowerCase(),
     },
     notification,
-  }, undefined, correlationId);
+  });
 });

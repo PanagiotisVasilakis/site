@@ -19,7 +19,7 @@ export default function HeroGlIsland() {
       const hero = document.querySelector<HTMLElement>('[data-hero]');
       const img = hero?.querySelector<HTMLImageElement>('.hero__img');
       if (!hero || !img) return;
-      const failure = heroGateFailure(navigator as Navigator & { deviceMemory?: number }, document, hero);
+      const failure = heroGateFailure(navigator, document, hero);
       const depthSrc = heroDepthSrc(img.currentSrc);
       if (failure || !depthSrc) {
         hero.dataset.gl = `off:${failure ?? 'assets'}`;

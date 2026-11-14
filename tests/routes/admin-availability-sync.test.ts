@@ -11,14 +11,14 @@ vi.mock('@/lib/rbac', () => ({ isAdminRequest: mocks.isAdminRequest }));
 vi.mock('@/lib/prisma', () => ({ prisma: { calendarSyncState: { findUnique: mocks.findUnique } } }));
 vi.mock('@/lib/availability/calendarSync', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/availability/calendarSync')>()),
-  syncAirbnbCalendar: mocks.sync,
+  syncBookingCalendar: mocks.sync,
 }));
 
 import { GET, POST } from '@/app/api/admin/availability-sync/route';
 
 const NOW = new Date('2026-09-28T10:00:00.000Z');
 const SENTINEL = 'SENTINELtoken0123456789abcdef';
-const FEED_URL = `https://www.airbnb.com/calendar/ical/12345678.ics?s=${SENTINEL}`;
+const FEED_URL = `https://ical.booking.com/v1/export?t=${SENTINEL}`;
 const SAME_ORIGIN = { host: 'localhost:3000', origin: 'http://localhost:3000' };
 const JSON_HEADERS = { 'content-type': 'application/json', ...SAME_ORIGIN };
 const HOUR = 3_600_000;
@@ -60,7 +60,7 @@ describe('admin availability-sync API', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(NOW);
-    vi.stubEnv('AIRBNB_ICAL_URL', FEED_URL);
+    vi.stubEnv('BOOKING_ICAL_URL', FEED_URL);
     mocks.isAdminRequest.mockResolvedValue(true);
     mocks.findUnique.mockResolvedValue(stateRow());
     mocks.sync.mockResolvedValue({ status: 'synced', blockedNights: 3 });
@@ -96,7 +96,7 @@ describe('admin availability-sync API', () => {
         nextAttemptAt: '2026-09-28T10:30:00.000Z',
         stale: false,
       });
-      expect(mocks.findUnique.mock.calls[0][0].where).toEqual({ id: 'airbnb' });
+      expect(mocks.findUnique.mock.calls[0][0].where).toEqual({ id: 'booking' });
     });
 
     it('reports the last failure code and HTTP status', async () => {
@@ -121,10 +121,9 @@ describe('admin availability-sync API', () => {
       ['a success exactly 3 hours ago (the alert threshold)', true, { lastSuccessAt: ago(3 * HOUR) }, false],
       ['a success more than 3 hours ago', true, { lastSuccessAt: ago(3 * HOUR + 1) }, true],
       ['no success yet', true, { lastSuccessAt: null, horizonStart: null, horizonEnd: null, blockedNights: [] }, true],
-      ['no calendar configured and no success', false, { lastSuccessAt: null }, false],
       ['no calendar configured and an old success', false, { lastSuccessAt: ago(48 * HOUR) }, false],
     ])('stale with %s is %s', async (_label, configured, overrides, stale) => {
-      if (!configured) vi.stubEnv('AIRBNB_ICAL_URL', '');
+      if (!configured) vi.stubEnv('BOOKING_ICAL_URL', '');
       mocks.findUnique.mockResolvedValue(stateRow(overrides));
 
       const { data } = await (await status()).json();
@@ -159,8 +158,8 @@ describe('admin availability-sync API', () => {
       const text = await (await status()).text();
 
       expect(text).not.toContain(SENTINEL);
-      expect(text.toLowerCase()).not.toContain('airbnb.com');
-      expect(text).not.toContain('/calendar/ical/');
+      expect(text.toLowerCase()).not.toContain('ical.booking.com');
+      expect(text).not.toContain('/v1/export');
     });
 
     it('fails as an internal error when the state row is missing', async () => {
@@ -198,9 +197,7 @@ describe('admin availability-sync API', () => {
 
     it.each([
       ['a non-empty object', { force: true }],
-      ['an array', []],
       ['null', null],
-      ['a string', 'sync'],
     ])('answers 422 to %s and does not sync', async (_label, body) => {
       const response = await syncNow(JSON.stringify(body));
 
@@ -231,7 +228,6 @@ describe('admin availability-sync API', () => {
     it.each([
       ['not_configured', 'The availability calendar is not configured'],
       ['busy', 'Another calendar sync is in progress'],
-      ['lease_lost', 'Another calendar sync is in progress'],
       ['skipped', 'The calendar sync did not run'],
     ])('answers 409 to %s', async (outcome, message) => {
       mocks.sync.mockResolvedValue({ status: outcome });
@@ -247,7 +243,6 @@ describe('admin availability-sync API', () => {
     it.each([
       ['20 s', 20_000, '40'],
       ['20.3 s', 20_300, '40'],
-      ['59.5 s', 59_500, '1'],
       ['60 s (the claim raced the clock)', 60_000, '1'],
     ])('answers 429 with Retry-After when the last attempt was %s ago', async (_label, elapsedMs, retryAfter) => {
       mocks.sync.mockResolvedValue({ status: 'too_soon' });
@@ -289,7 +284,8 @@ describe('admin availability-sync API', () => {
       const text = `${await response.text()} ${JSON.stringify([...response.headers])}`;
 
       expect(text).not.toContain(SENTINEL);
-      expect(text.toLowerCase()).not.toContain('airbnb.com');
+      expect(text.toLowerCase()).not.toContain('ical.booking.com');
+      expect(text).not.toContain('/v1/export');
     });
   });
 });

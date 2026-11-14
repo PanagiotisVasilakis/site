@@ -1,8 +1,3 @@
-/**
- * CSP Violation Report Endpoint
- * Handles Content Security Policy violation reports
- */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { handleCSPViolation } from '@/lib/security-monitoring';
@@ -62,13 +57,7 @@ export async function POST(request: NextRequest) {
     const parsed = cspReportSchema.safeParse(candidate);
     if (!parsed.success) return NextResponse.json({ error: 'Invalid CSP report' }, { status: 400 });
 
-    const clientInfo = {
-      ip: getClientIp(request),
-    };
-
-    await handleCSPViolation(parsed.data, clientInfo);
-
-    // Return success response
+    await handleCSPViolation(parsed.data, { ip: getClientIp(request) });
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     if (isClientIdentityUnavailableError(error)) {

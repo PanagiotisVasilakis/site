@@ -4,104 +4,104 @@ import { emitGuestSessionChanged, onGuestSessionChange } from '@/lib/sessionSign
 import { logger } from '@/lib/logger-client';
 
 export function useGuestSession() {
-    const [isSignedIn, setIsSignedIn] = useState(false);
-    // Off until the status request answers 200, so the shell offers no link that may lead to a 404.
-    const [portalEnabled, setPortalEnabled] = useState(false);
-    const [checkinEnabled, setCheckinEnabled] = useState(false);
-    const checkerRef = useRef<number | null>(null);
-    const inFlight = useRef<AbortController | null>(null);
-    const requestVersion = useRef(0);
+  const [isSignedIn, setIsSignedIn] = useState(false);
+  // Off until the status request answers 200, so the shell offers no link that may lead to a 404.
+  const [portalEnabled, setPortalEnabled] = useState(false);
+  const [checkinEnabled, setCheckinEnabled] = useState(false);
+  const inFlight = useRef<AbortController | null>(null);
+  const requestVersion = useRef(0);
 
-    const checkSession = useCallback(async () => {
-        const version = requestVersion.current + 1;
-        requestVersion.current = version;
-        try {
-            // Avoid overlapping calls
-            inFlight.current?.abort();
-            const ac = new AbortController();
-            inFlight.current = ac;
+  const checkSession = useCallback(async () => {
+    const version = requestVersion.current + 1;
+    requestVersion.current = version;
+    try {
+      // Avoid overlapping calls
+      inFlight.current?.abort();
+      const ac = new AbortController();
+      inFlight.current = ac;
 
-            const res = await internalFetch('/api/portal/sessions', {
-                method: 'GET',
-                signal: ac.signal,
-                headers: { 'cache-control': 'no-cache' }
-            });
+      const res = await internalFetch('/api/portal/sessions', {
+        method: 'GET',
+        signal: ac.signal,
+        headers: { 'cache-control': 'no-cache' }
+      });
 
-            const body = res.ok ? await res.json().catch(() => null) : null;
-            const signedIn = body?.data?.authenticated === true;
-            if (version === requestVersion.current) {
-                setIsSignedIn(signedIn);
-                // 200: the portal is on. 404: it is off. Other statuses say nothing about the flags.
-                if (res.ok) {
-                    setPortalEnabled(true);
-                    setCheckinEnabled(body?.data?.checkinEnabled === true);
-                } else if (res.status === 404) {
-                    setPortalEnabled(false);
-                    setCheckinEnabled(false);
-                }
-            }
-        } catch {
-            // Preserve the last verified state during transient network failures.
-        } finally {
-            if (version === requestVersion.current) inFlight.current = null;
+      const body = res.ok ? await res.json().catch(() => null) : null;
+      if (version === requestVersion.current) {
+        // 200: the portal is on and the body says whether the guest is signed in. 404: the portal is off and
+        // nobody is signed in. Other statuses say nothing about the session or the flags.
+        if (res.ok) {
+          setIsSignedIn(body?.data?.authenticated === true);
+          setPortalEnabled(true);
+          setCheckinEnabled(body?.data?.checkinEnabled === true);
+        } else if (res.status === 404) {
+          setIsSignedIn(false);
+          setPortalEnabled(false);
+          setCheckinEnabled(false);
         }
-    }, []);
+      }
+    } catch {
+      // Preserve the last verified state during transient network failures.
+    } finally {
+      if (version === requestVersion.current) inFlight.current = null;
+    }
+  }, []);
 
-    const signOut = useCallback(async (): Promise<boolean> => {
+  const signOut = useCallback(async (): Promise<boolean> => {
+    requestVersion.current += 1;
+    inFlight.current?.abort();
+    inFlight.current = null;
+    try {
+      const response = await internalFetch('/api/portal/logout', { method: 'POST' });
+      if (!response.ok) {
+        throw new Error(`Logout failed with status ${response.status}`);
+      }
+      setIsSignedIn(false);
+      emitGuestSessionChanged('signout');
+      return true;
+    } catch (error) {
+      logger.error('Guest logout failed', error instanceof Error ? error : { error: String(error) });
+      return false;
+    }
+  }, []);
+
+  useEffect(() => {
+    // Initial check
+    checkSession();
+
+    function onVisibility() {
+      if (document.visibilityState === 'visible') checkSession();
+    }
+    function onFocus() {
+      checkSession();
+    }
+
+    // Instant cross-tab reaction
+    const unsubscribe = onGuestSessionChange((event) => {
+      if (event.reason === 'signout') {
         requestVersion.current += 1;
         inFlight.current?.abort();
-        inFlight.current = null;
-        try {
-            const response = await internalFetch('/api/portal/logout', { method: 'POST' });
-            if (!response.ok) {
-                throw new Error(`Logout failed with status ${response.status}`);
-            }
-            setIsSignedIn(false);
-            emitGuestSessionChanged('signout');
-            return true;
-        } catch (error) {
-            logger.error('Guest logout failed', error instanceof Error ? error : { error: String(error) });
-            return false;
-        }
-    }, []);
+        setIsSignedIn(false);
+        return;
+      }
+      void checkSession();
+    });
 
-    useEffect(() => {
-        // Initial check
-        checkSession();
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onFocus);
 
-        function onVisibility() {
-            if (document.visibilityState === 'visible') checkSession();
-        }
-        function onFocus() {
-            checkSession();
-        }
+    // Periodic poll
+    const checker = window.setInterval(checkSession, 5 * 60_000);
 
-        // Instant cross-tab reaction
-        const unsubscribe = onGuestSessionChange((event) => {
-            if (event.reason === 'signout') {
-                requestVersion.current += 1;
-                inFlight.current?.abort();
-                setIsSignedIn(false);
-                return;
-            }
-            void checkSession();
-        });
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onFocus);
+      unsubscribe();
+      window.clearInterval(checker);
+      inFlight.current?.abort();
+      requestVersion.current += 1;
+    };
+  }, [checkSession]);
 
-        document.addEventListener('visibilitychange', onVisibility);
-        window.addEventListener('focus', onFocus);
-
-        // Periodic poll
-        checkerRef.current = window.setInterval(checkSession, 5 * 60_000);
-
-        return () => {
-            document.removeEventListener('visibilitychange', onVisibility);
-            window.removeEventListener('focus', onFocus);
-            unsubscribe?.();
-            if (checkerRef.current !== null) window.clearInterval(checkerRef.current);
-            inFlight.current?.abort();
-            requestVersion.current += 1;
-        };
-    }, [checkSession]);
-
-    return { isSignedIn, portalEnabled, checkinEnabled, signOut };
+  return { isSignedIn, portalEnabled, checkinEnabled, signOut };
 }

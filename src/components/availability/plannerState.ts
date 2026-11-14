@@ -8,8 +8,6 @@ import {
   isCheckInAllowed,
   maxCheckOut,
   minimumNightsFor,
-  rateForNight,
-  type RatePeriod,
   type StayContext,
 } from '@/lib/availability/stayQuote';
 
@@ -30,21 +28,6 @@ export function bookedNights(today: IsoDate, nights: string): Set<IsoDate> {
     booked.add(addDays(today, index));
   }
   return booked;
-}
-
-/**
- * The lowest nightly price (cents) of the nights that are not booked, for the
- * "best price" pill; null when those nights have fewer than two different
- * prices, because then no night is cheaper than another.
- */
-export function lowestNightlyPrice(today: IsoDate, nights: string, periods: readonly RatePeriod[]): number | null {
-  const prices = new Set<number>();
-  for (let index = 0; index < nights.length; index += 1) {
-    if (nights.charAt(index) === 'b') continue;
-    const rate = rateForNight(addDays(today, index), periods);
-    if (rate !== null) prices.add(rate.nightlyPriceCents);
-  }
-  return prices.size < 2 ? null : Math.min(...prices);
 }
 
 /**

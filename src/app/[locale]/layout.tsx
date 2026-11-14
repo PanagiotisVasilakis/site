@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { locales, normalizeLocale } from '@/i18n/config';
+import { isLocale, normalizeLocale } from '@/i18n/config';
 import { getDictionary } from "@/i18n/dictionaries";
 import { ToastProvider } from "@/components/Toast";
 import SiteHeader from "@/components/shell/SiteHeader";
@@ -11,8 +11,6 @@ import StatusCluster from "@/components/StatusCluster";
 import { Icon } from "@/components/icons/Icon";
 import { siteUrl } from '@/lib/site';
 import { localizedOpenGraph } from '@/lib/seo';
-
-// Removed font variable placeholders.
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
@@ -30,47 +28,49 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 export default async function LocaleLayout({ children, params }: { children: React.ReactNode; params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   // The proxy does not run for dotted or _next… paths, so only a supported locale may serve localized pages.
-  if (!(locales as readonly string[]).includes(locale)) notFound();
-  const eff = normalizeLocale(locale);
-  const t = getDictionary(eff);
-  // Avoid reading cookies server-side so the route can stay fully static; client components fetch session state.
+  if (!isLocale(locale)) notFound();
+  const t = getDictionary(locale);
+  // No cookies are read here (the root layout reads request headers, so the route is rendered per request); client components fetch session state.
   return (
-  <div data-locale={eff} lang={eff}>
-  <DocumentLocale locale={eff} />
-  <a href="#main-content" className="skip-link">{t.skipLink}</a>
+    <div data-locale={locale} lang={locale}>
+      <DocumentLocale locale={locale} />
+      <a href="#main-content" className="skip-link">{t.skipLink}</a>
       <ToastProvider>
-      <DeferredRuntimeManagers />
-  <SiteHeader locale={eff} />
-      {/* Update banner and iOS Add to Home Screen tip (shell.css .pwa-banner): hidden until PwaManager sets
-          display: flex; the first <span> holds the message PwaManager rewrites. */}
-      <div
-        id="update-banner"
-        className="pwa-banner hidden"
-        aria-live="polite"
-        data-t-update-fromto={t.updates.fromTo}
-        data-t-assets-fromto={t.updates.assetsFromTo}
-      >
-          <span>{t.updates.updateAvailable}</span>
-          <div className="pwa-banner__actions">
-            <button id="update-reload-btn" type="button" className="ui-btn ui-btn--primary ui-btn--sm">{t.updates.refresh}</button>
-            <button id="update-dismiss-btn" type="button" aria-label={t.updates.dismiss} className="ui-icon-btn"><Icon name="close" size={20} /></button>
+        <DeferredRuntimeManagers />
+        <SiteHeader locale={locale} />
+        {/* Update banner and iOS Add to Home Screen tip (shell.css .pwa-banners / .pwa-banner): one fixed column
+          container at the bottom so the pills never overlap; each is hidden until PwaManager sets display: flex;
+          the first <span> holds the message PwaManager rewrites. */}
+        <div className="pwa-banners">
+          <div
+            id="update-banner"
+            className="pwa-banner hidden"
+            aria-live="polite"
+            data-t-update-fromto={t.updates.fromTo}
+            data-t-assets-fromto={t.updates.assetsFromTo}
+          >
+            <span>{t.updates.updateAvailable}</span>
+            <div className="pwa-banner__actions">
+              <button id="update-reload-btn" type="button" className="ui-btn ui-btn--primary ui-btn--sm">{t.updates.refresh}</button>
+              <button id="update-dismiss-btn" type="button" aria-label={t.updates.dismiss} className="ui-icon-btn"><Icon name="close" size={20} /></button>
+            </div>
           </div>
-      </div>
-  <div id="ios-a2hs-tip" role="region" aria-label={t.a2hs.region} className="pwa-banner hidden">
-        <span>{t.a2hs.message}</span>
-        <button id="ios-tip-close" type="button" aria-label={t.a2hs.close} className="ui-icon-btn"><Icon name="close" size={20} /></button>
-      </div>
-  <main id="main-content" className="site-main" role="main">{children}</main>
-  <SiteFooter locale={eff} />
-      <div className="fixed bottom-2 left-2 z-50 sm:hidden">
-        <StatusCluster labels={{
-          online: t.labels.networkOnline,
-          offline: t.labels.networkOffline,
-          reconnecting: t.labels.networkReconnected,
-          slow: t.labels.networkSlow,
-        }} />
-      </div>
-  </ToastProvider>
+          <div id="ios-a2hs-tip" role="region" aria-label={t.a2hs.region} className="pwa-banner hidden">
+            <span>{t.a2hs.message}</span>
+            <button id="ios-tip-close" type="button" aria-label={t.a2hs.close} className="ui-icon-btn"><Icon name="close" size={20} /></button>
+          </div>
+        </div>
+        <main id="main-content" className="site-main">{children}</main>
+        <SiteFooter locale={locale} />
+        <div className="fixed bottom-2 left-2 z-50 sm:hidden">
+          <StatusCluster labels={{
+            online: t.labels.networkOnline,
+            offline: t.labels.networkOffline,
+            reconnecting: t.labels.networkReconnected,
+            slow: t.labels.networkSlow,
+          }} />
+        </div>
+      </ToastProvider>
     </div>
   );
 }

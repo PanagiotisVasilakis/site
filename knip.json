@@ -4,9 +4,6 @@
     "prisma.integration.config.ts",
     "vitest.integration.config.ts"
   ],
-  "ignore": [
-    "public/sw.js"
-  ],
   "ignoreDependencies": [
     "@prisma/client"
   ]

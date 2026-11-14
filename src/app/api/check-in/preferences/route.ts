@@ -14,21 +14,24 @@ const preferencesSchema = z.object({
 
 const PREFERENCES_KEY = 'checkin_preferences';
 
-interface CheckInPreferences {
+type CheckInPreferences = {
   checkInTime: string;
   checkOutTime: string;
   updatedAt: number;
-}
+};
 
-function defaultPreferences(): CheckInPreferences {
-  return { checkInTime: '15:00', checkOutTime: '11:00', updatedAt: 0 };
+function guestWifi(): { network: string; password: string } {
+  return {
+    network: process.env.GUEST_WIFI_NETWORK || '',
+    password: process.env.GUEST_WIFI_PASSWORD || '',
+  };
 }
 
 async function readPreferences(): Promise<CheckInPreferences> {
   const { prisma } = await import('@/lib/prisma');
   const row = await prisma.operationalSetting.findUnique({ where: { key: PREFERENCES_KEY } });
   const parsed = preferencesSchema.safeParse(row?.value);
-  if (!parsed.success) return defaultPreferences();
+  if (!parsed.success) return { checkInTime: '15:00', checkOutTime: '11:00', updatedAt: 0 };
   const value = row?.value as Record<string, unknown>;
   return {
     ...parsed.data,
@@ -38,21 +41,15 @@ async function readPreferences(): Promise<CheckInPreferences> {
 
 async function writePreferences(prefs: CheckInPreferences): Promise<void> {
   const { prisma } = await import('@/lib/prisma');
-  const value = {
-    checkInTime: prefs.checkInTime,
-    checkOutTime: prefs.checkOutTime,
-    updatedAt: prefs.updatedAt,
-  };
   await prisma.operationalSetting.upsert({
     where: { key: PREFERENCES_KEY },
-    create: { key: PREFERENCES_KEY, value },
-    update: { value },
+    create: { key: PREFERENCES_KEY, value: prefs },
+    update: { value: prefs },
   });
 }
 
 export const dynamic = 'force-dynamic';
 
-// GET: Retrieve current preferences
 export const GET = withErrorHandler(async (request: NextRequest) => {
   const flags = await getFeatureFlagsAsync();
   if (!flags.checkinEnabled) {
@@ -70,10 +67,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   let wifi: { network: string; password: string } | null = null;
   let wifiAvailableAt: string | null = null;
   if (adminAccess) {
-    wifi = {
-      network: process.env.GUEST_WIFI_NETWORK || '',
-      password: process.env.GUEST_WIFI_PASSWORD || '',
-    };
+    wifi = guestWifi();
   } else if (guestAccess?.booking?.id) {
     const { prisma } = await import('@/lib/prisma');
     const booking = await prisma.booking.findUnique({
@@ -91,23 +85,17 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
       wifiAvailableAt = revealAt.toISOString();
       const now = new Date();
       if (now >= revealAt && now <= expiresAt) {
-        wifi = {
-          network: process.env.GUEST_WIFI_NETWORK || '',
-          password: process.env.GUEST_WIFI_PASSWORD || '',
-        };
+        wifi = guestWifi();
       }
     }
   }
-  const correlationId = request.headers.get('x-correlation-id') ?? undefined;
   return createSuccessResponse({
     ...prefs,
-    canEdit: adminAccess,
     wifi,
     wifiAvailableAt,
-  }, undefined, correlationId);
+  });
 });
 
-// POST: Update preferences (admin-only)
 export const POST = withErrorHandler(async (request: NextRequest) => {
   const flags = await getFeatureFlagsAsync();
   if (!flags.checkinEnabled) {
@@ -130,10 +118,8 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   await writePreferences(prefs);
 
-  const correlationId = request.headers.get('x-correlation-id') ?? undefined;
-
   return createSuccessResponse({
     message: 'Check-in preferences updated successfully',
     preferences: prefs,
-  }, undefined, correlationId);
+  });
 });

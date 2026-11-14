@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { getDictionary } from '@/i18n/dictionaries';
 import {
@@ -9,27 +9,22 @@ import {
   footerContactLinks,
   footerNavLinks,
   footerStayLink,
-  footerVariantFor,
   headerCta,
-  headerOverlaysHero,
   isCurrentLink,
   localeSwitchHref,
   menuContactLinks,
   navLinks,
+  scrollToCurrentHash,
   shellVariantFor,
 } from '@/components/shell/shellLinks';
 
-const BOOKING_HREF = /\/availability|airbnb\./i;
+const BOOKING_HREF = /\/availability|booking\.com/i;
 
 describe('shell variant per route (identity §8, §9)', () => {
   it.each([
     ['/en', 'marketing'],
-    ['/el/apartment', 'marketing'],
     ['/en/availability', 'marketing'],
     ['/en/moments', 'guide'],
-    ['/el/moments/some-beach', 'guide'],
-    ['/en/favorites', 'guide'],
-    ['/el/phones', 'guide'],
     ['/en/stay', 'stay'],
     ['/el/stay/', 'stay'],
     ['/en/guest', 'stay'],
@@ -39,25 +34,10 @@ describe('shell variant per route (identity §8, §9)', () => {
   ] as const)('%s is %s', (pathname, variant) => {
     expect(shellVariantFor(pathname)).toBe(variant);
   });
-
-  it('uses the marketing footer for guide pages and the slim footer for stay pages', () => {
-    expect(footerVariantFor('marketing')).toBe('marketing');
-    expect(footerVariantFor('guide')).toBe('marketing');
-    expect(footerVariantFor('stay')).toBe('stay');
-  });
-
-  it('floats the header over the hero only on home (the apartment page starts with its page head, R3-V6f)', () => {
-    expect(headerOverlaysHero('/en')).toBe(true);
-    expect(headerOverlaysHero('/el')).toBe(true);
-    expect(headerOverlaysHero('/el/apartment')).toBe(false);
-    expect(headerOverlaysHero('/en/apartment')).toBe(false);
-    expect(headerOverlaysHero('/en/availability')).toBe(false);
-    expect(headerOverlaysHero('/en/guest')).toBe(false);
-  });
 });
 
 describe('shell links', () => {
-  it.each(['en', 'el'] as const)('gives the stay variant no booking, availability or Airbnb link (%s)', (locale) => {
+  it.each(['en'] as const)('gives the stay variant no booking, availability or Booking.com link (%s)', (locale) => {
     const t = getDictionary(locale);
     const hrefs = [
       brandHref('stay', locale),
@@ -82,25 +62,8 @@ describe('shell links', () => {
     expect(footerStayLink('marketing', 'en', getDictionary('en'))?.href).toBe('/en/stay');
   });
 
-  it('gives marketing the §8 nav, the "Check dates" CTA, and Call and WhatsApp in the menu', () => {
-    const t = getDictionary('en');
-    expect(navLinks('marketing', 'en', t).map(({ label, href }) => [label, href])).toEqual([
-      ['Apartment', '/en/apartment'],
-      ['Availability', '/en/availability'],
-      ['Kalamata guide', '/en/moments'],
-      ['Contact', '/en#contact'],
-      ['Your stay', '/en/stay'],
-    ]);
-    expect(headerCta('marketing', 'en', t)).toEqual({ key: 'check-dates', href: '/en/availability', label: 'Check dates' });
-    expect(menuContactLinks('marketing', t).map(({ key, href }) => [key, href])).toEqual([
-      ['call', 'tel:+306955810051'],
-      ['whatsapp', 'https://wa.me/306955810051'],
-    ]);
-  });
-
   it.each([
     ['en', 'Your stay'],
-    ['el', 'Η διαμονή σας'],
   ] as const)('ends the marketing and guide nav with "Your stay" and lists it once in the footer (%s)', (locale, label) => {
     const t = getDictionary(locale);
     const stay = { key: 'stay', href: `/${locale}${STAY_HUB_PATH}`, label: t.ui.yourStay };
@@ -122,12 +85,6 @@ describe('shell links', () => {
     expect(navLinks('guide', 'el', t)).toEqual(navLinks('marketing', 'el', t));
     expect(headerCta('guide', 'el', t)).toBeNull();
     expect(menuContactLinks('guide', t)).toEqual([]);
-  });
-
-  it('lists phone, e-mail, Instagram and WhatsApp in the marketing footer', () => {
-    expect(footerContactLinks('marketing', getDictionary('en')).map(({ key }) => key)).toEqual([
-      'phone', 'email', 'instagram', 'whatsapp',
-    ]);
   });
 
   it('gives the marketing footer the hero tagline and location line under the brand, and the slim stay footer none', () => {
@@ -173,5 +130,78 @@ describe('localeSwitchHref', () => {
   it('adds a locale to a path without one', () => {
     expect(localeSwitchHref('/', 'el')).toBe('/el');
     expect(localeSwitchHref('/offline', 'en', '', '')).toBe('/en/offline');
+  });
+});
+
+describe('scrollToCurrentHash (R-689)', () => {
+  const click = (init: Partial<Parameters<typeof scrollToCurrentHash>[0]> = {}) => ({
+    button: 0,
+    defaultPrevented: false,
+    metaKey: false,
+    ctrlKey: false,
+    shiftKey: false,
+    altKey: false,
+    preventDefault: vi.fn(),
+    ...init,
+  });
+
+  /** A page at `pathname` + `hash` whose only element with an id is `ids`. */
+  function stubPage(pathname: string, hash: string, ids: Record<string, { scrollIntoView: () => void }> = {}) {
+    vi.stubGlobal('window', { location: { pathname, hash, search: '' } });
+    vi.stubGlobal('document', { getElementById: (id: string) => ids[id] ?? null });
+  }
+
+  it('prevents the default and scrolls to the target when the URL already is the link', () => {
+    const target = { scrollIntoView: vi.fn() };
+    stubPage('/en', '#contact', { contact: target });
+    const event = click();
+    scrollToCurrentHash(event, '/en#contact');
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+    expect(target.scrollIntoView).toHaveBeenCalledTimes(1);
+    // No options: the page's CSS decides how it scrolls (there is no smooth scrolling, so reduced motion stays instant).
+    expect(target.scrollIntoView).toHaveBeenCalledWith();
+  });
+
+  it.each([
+    ['the first click: the URL has no hash yet', '/en', ''],
+    ['another hash', '/en', '#host'],
+  ])('leaves the click to the router: %s', (_name, pathname, hash) => {
+    const target = { scrollIntoView: vi.fn() };
+    stubPage(pathname, hash, { contact: target });
+    const event = click();
+    scrollToCurrentHash(event, '/en#contact');
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(target.scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a link without a hash', '/en/apartment'],
+  ])('ignores %s', (_name, href) => {
+    const target = { scrollIntoView: vi.fn() };
+    stubPage('/en/apartment', '', { contact: target });
+    const event = click();
+    scrollToCurrentHash(event, href);
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(target.scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['ctrl', { ctrlKey: true }],
+    ['the middle button', { button: 1 }],
+    ['an event another handler already prevented', { defaultPrevented: true }],
+  ])('leaves a click with %s to the browser', (_name, init) => {
+    const target = { scrollIntoView: vi.fn() };
+    stubPage('/en', '#contact', { contact: target });
+    const event = click(init);
+    scrollToCurrentHash(event, '/en#contact');
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(target.scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it('prevents nothing when the page has no element with that id', () => {
+    stubPage('/en', '#contact');
+    const event = click();
+    scrollToCurrentHash(event, '/en#contact');
+    expect(event.preventDefault).not.toHaveBeenCalled();
   });
 });

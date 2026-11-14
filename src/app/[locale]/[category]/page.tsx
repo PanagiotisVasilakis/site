@@ -1,7 +1,7 @@
 import Link from "next/link";
 import GuideList, { SavedLink } from '@/components/guide/GuideList';
 import { PhonesDirectory } from '@/components/guide/PhonesDirectory';
-import { favoriteIdOf, sortByDistance, toGuideEntry } from '@/components/guide/guideEntries';
+import { knownFavoriteIds, sortByDistance, toGuideEntry } from '@/components/guide/guideEntries';
 import { EmptyPanel } from '@/components/ui/EmptyPanel';
 import { categories } from "@/data/categories";
 import { getItemsByCategory, pickCategoryLocale } from "@/lib/data";
@@ -47,8 +47,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
   const items = getItemsByCategory(cat.id);
   const entries = sortByDistance(items.map((item) => toGuideEntry(item, cat, eff, t)));
   const { title, lead } = pageCopy(cat, eff, t);
-  // The Saved count covers only ids that still resolve to a place, like the favourites page (all categories).
-  const knownFavoriteIds = categories.flatMap((c) => getItemsByCategory(c.id).map((item) => favoriteIdOf(c, item)));
+  const favoriteIds = knownFavoriteIds();
 
   if (cat.slug === 'phones' && entries.length > 0) {
     return <PhonesDirectory entries={entries} locale={eff} title={title} lead={lead} />;
@@ -61,7 +60,7 @@ export default async function CategoryPage({ params }: { params: Promise<{ local
           <h1 className="guide-head__title">{title}</h1>
           {lead ? <p className="guide-head__lead">{lead}</p> : null}
         </div>
-        <SavedLink locale={eff} favoriteIds={knownFavoriteIds} />
+        <SavedLink locale={eff} favoriteIds={favoriteIds} />
       </header>
 
       {entries.length === 0 ? (

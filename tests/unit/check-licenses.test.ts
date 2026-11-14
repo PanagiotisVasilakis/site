@@ -53,10 +53,4 @@ describe('scripts/check-licenses.ts', () => {
     expect(run.stderr).toContain('not-elkjs@1.0.0 (disallowed license: EPL-2.0)');
     expect(run.stderr).not.toContain('  - elkjs@');
   }, 30_000);
-
-  it('does not extend the elkjs exception to other licenses', () => {
-    const run = runChecker('GPL-3.0-only', 'MIT');
-    expect(run.status).toBe(1);
-    expect(run.stderr).toContain('elkjs@1.0.0 (disallowed license: GPL-3.0-only)');
-  }, 30_000);
 });

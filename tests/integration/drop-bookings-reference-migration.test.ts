@@ -1,16 +1,13 @@
-import { readFile } from 'node:fs/promises';
 import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import type { DisposableDatabaseTarget } from './support/database-safety';
 import { withVerifiedDisposableDatabase } from './support/database-safety';
 import { createIsolatedDatabase, dropIsolatedDatabase } from './support/database-lifecycle';
-import { applyMigrationsFromEmpty } from './support/migrations';
+import { applyMigrationsFromEmpty, runMigrationFile, withScenario } from './support/migrations';
 import { readDisposablePostgresRuntime } from './support/runtime';
 
 const MIGRATION = '20260929120000_drop_bookings_reference';
-// The integration runner starts Vitest with the repository root as cwd.
-const MIGRATION_FILE = `prisma/migrations/${MIGRATION}/migration.sql`;
 const REFUSAL = 'Refusing to remove bookings.reference while bookings still hold a reference';
 
 const BOOKING_ID = '76000000-0000-4000-8000-000000000001';
@@ -21,26 +18,6 @@ let target: DisposableDatabaseTarget | undefined;
 function requireTarget(): DisposableDatabaseTarget {
   if (!target) throw new Error('Booking reference removal database was not initialized.');
   return target;
-}
-
-// Sent as one simple-protocol query, so PostgreSQL runs the whole file as one
-// implicit transaction (the behaviour the migration's header relies on).
-async function runMigrationFile(client: PgClient): Promise<void> {
-  const sql = await readFile(MIGRATION_FILE, 'utf8');
-  await client.query(sql);
-}
-
-// A scenario changes the migrated database only in `arrange` and always undoes
-// it in `restore`, so every test starts from the state the full chain leaves.
-function withScenario<T>(arrange: string, restore: string, action: (client: PgClient) => Promise<T>): Promise<T> {
-  return withVerifiedDisposableDatabase(requireTarget(), 'migration', async (client) => {
-    try {
-      await client.query(arrange);
-      return await action(client);
-    } finally {
-      await client.query(restore);
-    }
-  });
 }
 
 async function referenceColumn(client: PgClient) {
@@ -97,8 +74,8 @@ describe('drop_bookings_reference migration', () => {
   });
 
   it('refuses to drop a reference column that still holds a value and leaves the booking intact', async () => {
-    await withScenario(`${ADD_COLUMN} ${insertBooking(`'LEGACY-1'`)};`, RESTORE, async (client) => {
-      await expect(runMigrationFile(client)).rejects.toMatchObject({ code: 'P0001', message: REFUSAL });
+    await withScenario(requireTarget(), `${ADD_COLUMN} ${insertBooking(`'LEGACY-1'`)};`, RESTORE, async (client) => {
+      await expect(runMigrationFile(client, MIGRATION)).rejects.toMatchObject({ code: 'P0001', message: REFUSAL });
 
       const { rows } = await client.query<{ reference: string | null }>(
         'SELECT reference FROM bookings WHERE id = $1',
@@ -110,8 +87,8 @@ describe('drop_bookings_reference migration', () => {
   });
 
   it('drops a leftover reference column that holds only NULLs and keeps the booking', async () => {
-    await withScenario(`${ADD_COLUMN} ${insertBooking('NULL')};`, RESTORE, async (client) => {
-      await expect(runMigrationFile(client)).resolves.toBeUndefined();
+    await withScenario(requireTarget(), `${ADD_COLUMN} ${insertBooking('NULL')};`, RESTORE, async (client) => {
+      await expect(runMigrationFile(client, MIGRATION)).resolves.toBeUndefined();
 
       expect(await referenceColumn(client)).toEqual([]);
       expect(await referenceIndex(client)).toBeNull();
@@ -125,8 +102,8 @@ describe('drop_bookings_reference migration', () => {
 
   it('re-runs cleanly on the migrated database and changes nothing', async () => {
     await withVerifiedDisposableDatabase(requireTarget(), 'migration', async (client) => {
-      await expect(runMigrationFile(client)).resolves.toBeUndefined();
-      await expect(runMigrationFile(client)).resolves.toBeUndefined();
+      await expect(runMigrationFile(client, MIGRATION)).resolves.toBeUndefined();
+      await expect(runMigrationFile(client, MIGRATION)).resolves.toBeUndefined();
 
       expect(await referenceColumn(client)).toEqual([]);
       expect(await referenceIndex(client)).toBeNull();

@@ -1,5 +1,5 @@
 /* Availability page (docs/design/identity.md §9.3): Calendar (react-day-picker 9 skinned through `classNames`,
-   no react-day-picker stylesheet), legend, SummaryCard, QuoteBar and the no-JS night list (§8).
+   no react-day-picker stylesheet), legend, SummaryCard and the no-JS night list (§8).
    Unlayered (O38); the two-class colour rules (0,2,0) date from the legacy cascade that R3-V12b deleted, and
    are kept as they are. Motion is gated (§5.2). */
 
@@ -111,7 +111,7 @@
 .cal .cal__weekday:lang(el) { letter-spacing: .04em; text-transform: none; }
 .cal .cal__abbr { text-decoration: none; cursor: default; }
 
-/* Day cells (≥ 44 px; 58 px tall on mobile): date 16 px 600 + price 12 px */
+/* Day cells (≥ 44 px; 58 px tall on mobile): date 16 px 600; a check-out-only day adds a 12 px note */
 .cal__day { padding: 2px 0; text-align: center; }
 .cal .cal__btn {
   position: relative;
@@ -139,18 +139,10 @@
 @media (min-width: 768px) {
   .cal .cal__btn { min-height: 52px; }
 }
-.cal .cal__price,
 .cal .cal__note {
-  color: var(--color-cal-price);
   font-size: .75rem;
   font-weight: 600;
   line-height: 1.2;
-}
-.cal .cal__price--best {
-  padding: 1px 6px;
-  border-radius: var(--radius-control);
-  background: var(--color-cal-best-bg);
-  color: var(--color-cal-best-fg);
 }
 .cal .cal__btn:focus-visible {
   outline: 3px solid var(--color-focus);
@@ -187,7 +179,6 @@
   background: var(--color-cal-selected-bg);
   color: var(--color-cal-selected-fg);
 }
-.cal .cal__day--selected:not(.cal__day--middle) .cal__price:not(.cal__price--best) { color: var(--color-cal-selected-fg); }
 .cal .cal__day--start .cal__btn { border-radius: 12px 4px 4px 12px; }
 .cal .cal__day--end .cal__btn { border-radius: 4px 12px 12px 4px; }
 /* Hidden days (the other month's dates) carry the range modifiers too, but no button: no band there. */
@@ -213,25 +204,13 @@
 }
 .cal-legend .cal-legend__item { display: inline-flex; align-items: center; gap: 8px; color: var(--color-fg-muted); }
 .cal-legend .cal-legend__swatch {
-  display: inline-grid;
+  display: inline-block;
   flex: none;
-  place-items: center;
   width: 24px;
   height: 24px;
   border: 1px solid var(--color-border-strong);
   border-radius: 7px;
   background: var(--color-cal-free-bg);
-  color: var(--color-cal-price);
-  font-size: .75rem;
-  font-weight: 600;
-}
-.cal-legend .cal-legend__swatch--best {
-  width: auto;
-  padding: 0 6px;
-  border-color: transparent;
-  border-radius: var(--radius-control);
-  background: var(--color-cal-best-bg);
-  color: var(--color-cal-best-fg);
 }
 .cal-legend .cal-legend__swatch--booked {
   background:
@@ -242,7 +221,6 @@
 
 /* SummaryCard: surface, radius-dialog, shadow-raised; sticky at ≥ lg (see .planner__summary) */
 .summary-card {
-  scroll-margin-top: calc(var(--header-offset) + var(--header-h) + 16px);
   display: grid;
   gap: 14px;
   padding: 22px 20px;
@@ -256,8 +234,6 @@
   .summary-card { padding: 28px; }
 }
 .summary-card.summary-card { color: var(--color-fg); }
-.summary-card:focus { outline: none; }
-.summary-card:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 3px; }
 .summary-card .summary-card__eyebrow {
   display: flex;
   align-items: center;
@@ -296,77 +272,10 @@
   gap: 2px 16px;
 }
 .summary-card .summary-card__value { margin: 0; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums lining-nums; }
-.summary-card .summary-card__detail {
-  display: flex;
-  flex-wrap: wrap;
-  grid-column: 1 / -1;
-  gap: 2px 14px;
-  margin: 0;
-  color: var(--color-fg-muted);
-  font-size: .8125rem;
-  font-variant-numeric: tabular-nums lining-nums;
-}
-.summary-card__total {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-  padding-top: 14px;
-  border-top: 1.5px dashed var(--color-border-strong);
-  font-weight: 600;
-}
-.summary-card .summary-card__total-value {
-  display: inline-block;
-  color: var(--color-primary-text);
-  font-family: var(--font-display);
-  font-size: 2.75rem;
-  font-weight: 400;
-  line-height: 1;
-  font-variant-numeric: tabular-nums lining-nums;
-}
-.summary-card .summary-card__request { margin: 0; font-weight: 600; }
-.summary-card .summary-card__fine,
 .summary-card .summary-card__trust { margin: 0; color: var(--color-fg-muted); font-size: .8125rem; }
 
 .booking-options { display: grid; gap: 10px; }
 .booking-options__row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-
-/* QuoteBar (below lg): glass pill, fixed 12 px from the edges */
-.quote-bar {
-  position: fixed;
-  right: 12px;
-  bottom: calc(12px + env(safe-area-inset-bottom));
-  left: 12px;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 7px 7px 7px 20px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-glass-bar);
-  box-shadow: var(--shadow-overlay);
-  -webkit-backdrop-filter: blur(16px) saturate(1.2);
-  backdrop-filter: blur(16px) saturate(1.2);
-  font-family: var(--font-text);
-}
-.quote-bar.quote-bar { color: var(--color-fg); }
-.quote-bar .quote-bar__text { min-width: 0; margin: 0; font-size: .9375rem; font-weight: 600; font-variant-numeric: tabular-nums lining-nums; }
-@media (min-width: 1024px) {
-  .quote-bar { display: none; }
-}
-/* Below 640 px the fixed network-status pill (layout.tsx, 8-48 px from the left edge) sits over the bar's left end */
-@media (max-width: 639px) {
-  .quote-bar { padding-left: 56px; }
-}
-/* The footer and keyboard focus clear the shown QuoteBar, as the BookBar does (shell.css; WCAG 2.4.11). The doubled
-   class gives the scroll-padding selector specificity (0,3,0), like shell.css's :root:has(.bookbar.is-shown), so below
-   640 px it wins over the later :root:has(.net-status) { scroll-padding-bottom: 56px; } in stay.css (0,2,0) */
-@media (max-width: 1023.98px) {
-  :root:has(.quote-bar) .site-footer.site-footer { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
-  :root:has(.quote-bar.quote-bar) { scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
-}
 
 /* No-JS list of the next nights (rendered inside <noscript>) */
 .nights-list {
@@ -401,7 +310,7 @@
 }
 .nights-list .nights-list__status { font-weight: 600; }
 
-/* Motion (§5.5 M19, M20, M22), gated by §5.2 */
+/* Motion (§5.5 M19, M20), gated by §5.2 */
 @media (prefers-reduced-motion: no-preference) {
   :root[data-motion="full"] .cal .cal__btn { transition: background-color var(--dur-micro) var(--ease-glide); }
 
@@ -414,7 +323,7 @@
   :root[data-motion="full"] .cal[data-turn="prev"][data-turn-parity="0"] .cal__month { animation: cal-turn-prev-a 560ms var(--ease-sweep); }
   :root[data-motion="full"] .cal[data-turn="prev"][data-turn-parity="1"] .cal__month { animation: cal-turn-prev-b 560ms var(--ease-sweep); }
 
-  /* M20 range light: one pass across the chosen nights (55 ms per cell), then the total bumps */
+  /* M20 range light: one pass across the chosen nights (55 ms per cell) */
   :root[data-motion="full"] .cal .cal__day--middle .cal__btn::after,
   :root[data-motion="full"] .cal .cal__day--end .cal__btn::after {
     content: "";
@@ -427,13 +336,6 @@
     pointer-events: none;
     animation: cal-range-light 480ms var(--ease-glide) calc(var(--i, 0) * 55ms);
   }
-  :root[data-motion="full"] .summary-card .summary-card__total-value { animation: summary-total-bump 500ms var(--ease-glide); }
-
-  /* M22 QuoteBar slides up */
-  :root[data-motion="full"] .quote-bar { transition: transform var(--dur-ui) var(--ease-glide); }
-  @starting-style {
-    :root[data-motion="full"] .quote-bar { transform: translateY(160%); }
-  }
 }
 
 @keyframes cal-turn-next-a { from { transform: rotateY(-58deg) translateZ(-40px); } }
@@ -444,8 +346,4 @@
   0% { opacity: 0; }
   35% { opacity: .45; }
   100% { opacity: 0; }
-}
-@keyframes summary-total-bump {
-  0%, 100% { transform: translateY(0); }
-  40% { transform: translateY(-4px); }
 }

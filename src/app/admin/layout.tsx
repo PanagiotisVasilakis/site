@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import AdminSessionManager from '@/components/AdminSessionManager';
 import { BrandMark } from '@/components/icons/BrandMark';
+import { WORDMARK } from '@/data/brand';
 import { readActiveAdminSession } from '@/lib/auth/admin';
 
 // One session manager for every admin page. The layout persists across client
@@ -25,7 +26,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           <BrandMark className="site-brand__mark" />
           <span className="site-brand__text">
             {/* The wordmark (identity §1.2), as in SiteHeader. */}
-            <span className="site-brand__name">Dolce Far Niente</span>
+            <span className="site-brand__name">{WORDMARK}</span>
             <span className="site-brand__place">Admin</span>
           </span>
         </Link>

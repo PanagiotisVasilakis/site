@@ -6,6 +6,7 @@ import { fromDbDate, nightsBetween, parseIsoDate, toDbDate } from '@/lib/availab
 import { MAX_STAY_NIGHTS } from '@/data/stayPolicy';
 import { logger } from '@/lib/logger-enterprise';
 import { prisma } from '@/lib/prisma';
+import { retrySerializable } from '@/lib/serializableRetry';
 
 // Seasonal nightly prices. A period covers the nights [startDate, endDate):
 // endDate is exclusive (the check-out day), so [a, b) and [b, c) are adjacent,
@@ -14,9 +15,8 @@ import { prisma } from '@/lib/prisma';
 // the backstop for the overlap check done here.
 
 const MAX_PERIOD_NIGHTS = 366;
-const MAX_TRANSACTION_ATTEMPTS = 3;
 
-const isoDateSchema = z.iso.date().transform((value, context) => {
+export const isoDateSchema = z.iso.date().transform((value, context) => {
   // z.iso.date() accepts years 0000-0099, which the UTC-midnight conversion
   // would map to 1900-1999.
   const date = parseIsoDate(value);
@@ -103,15 +103,13 @@ function isExclusionViolation(error: unknown): boolean {
 }
 
 async function inSerializableTransaction<T>(work: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      return await prisma.$transaction(work, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-    } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034'
-        && attempt < MAX_TRANSACTION_ATTEMPTS) continue;
-      if (isExclusionViolation(error)) throw new RatePeriodOverlapError();
-      throw error;
-    }
+  try {
+    return await retrySerializable(
+      () => prisma.$transaction(work, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }),
+    );
+  } catch (error) {
+    if (isExclusionViolation(error)) throw new RatePeriodOverlapError();
+    throw error;
   }
 }
 

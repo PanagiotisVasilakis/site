@@ -8,7 +8,7 @@ import { Chip } from '@/components/ui/Chip';
 import { EmptyPanel } from '@/components/ui/EmptyPanel';
 import { Segmented, segmentedItemClass } from '@/components/ui/Segmented';
 import type { MapContentItem } from '@/data/mapLocations';
-import { normalizeLocale } from '@/i18n/config';
+import type { Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 import { useFavorites } from '@/lib/favorites';
 import { filterBySearchText } from '@/lib/searchText';
@@ -54,9 +54,8 @@ function toMapItem(entry: GuideEntry): MapContentItem {
  * "Clear filters". The map view keeps `?map=1` in the URL and lists the numbered places below the map,
  * then the matching places without coordinates (no pin), so every counted place stays reachable.
  */
-export default function GuideList({ entries, locale, cartoBasemapsKey }: { entries: GuideEntry[]; locale: string; cartoBasemapsKey?: string }) {
-  const eff = normalizeLocale(locale);
-  const t = getDictionary(eff);
+export default function GuideList({ entries, locale, cartoBasemapsKey }: { entries: GuideEntry[]; locale: Locale; cartoBasemapsKey?: string }) {
+  const t = getDictionary(locale);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<GuideFilterKey>('all');
   const [view, setView] = useState<View>('list');
@@ -155,13 +154,13 @@ export default function GuideList({ entries, locale, cartoBasemapsKey }: { entri
       ) : view === 'list' ? (
         <div className="guide-grid">
           {results.map((entry, index) => (
-            <GuideCard key={entry.id} entry={entry} locale={eff} index={index} priority={index === 0} titleAs="h2" />
+            <GuideCard key={entry.id} entry={entry} locale={locale} index={index} priority={index === 0} titleAs="h2" />
           ))}
         </div>
       ) : (
         <div className="guide-map">
           <div className="guide-map__frame">
-            <GuideMap locale={eff} height="100%" zoom={14} contentItems={mapItems} cartoBasemapsKey={cartoBasemapsKey} numbered />
+            <GuideMap locale={locale} height="100%" zoom={14} contentItems={mapItems} cartoBasemapsKey={cartoBasemapsKey} numbered />
           </div>
           {mapped.length > 0 ? (
             <>
@@ -205,8 +204,8 @@ export default function GuideList({ entries, locale, cartoBasemapsKey }: { entri
  * are the ids of every current place, so ids left in the store by removed content are not counted (the
  * favourites page shows only saved ids that resolve to a place).
  */
-export function SavedLink({ locale, favoriteIds }: { locale: string; favoriteIds: readonly string[] }) {
-  const t = getDictionary(normalizeLocale(locale));
+export function SavedLink({ locale, favoriteIds }: { locale: Locale; favoriteIds: readonly string[] }) {
+  const t = getDictionary(locale);
   const { favorites } = useFavorites();
   const count = useMemo(() => favoriteIds.filter((id) => favorites.has(id)).length, [favoriteIds, favorites]);
   return (

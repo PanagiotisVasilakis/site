@@ -8,7 +8,7 @@ import { buildBasePopupHtml, escapeMapHtml as escapeHtml } from '@/components/ma
 import { selectMapTileSource } from '@/components/maps/tileSource';
 import type { MapLocation, MapMarkerType } from '@/data/mapLocations';
 
-/** What a pin and its popup show (identity §8 MapCard); the data layer's MapLocation without copies (R-339). */
+/** What a pin and its popup show (identity §8 MapCard); the data layer's MapLocation without copies. */
 export type LeafletMarkerData = Pick<
   MapLocation,
   'id' | 'name' | 'description' | 'address' | 'phone' | 'phones' | 'website' | 'directionsUrl' | 'href'
@@ -27,6 +27,7 @@ export interface LeafletMapLabels {
   fitToMarkers: string;
   zoomIn: string;
   zoomOut: string;
+  closePopup: string;
 }
 
 export interface LeafletMapProps {
@@ -72,7 +73,7 @@ function buildIcon(marker: Pick<LeafletMarkerData, 'markerType' | 'number'>, hom
   } else if (marker.number !== undefined) {
     html = `<span class="map-pin map-pin--numbered"><span class="map-pin__disc">${marker.number}</span></span>`;
   } else {
-    html = `<span class="map-pin map-pin--place" data-type="${escapeHtml(marker.markerType)}"><span class="map-pin__disc">${svgIcon(CATEGORY_ICON[marker.markerType])}</span></span>`;
+    html = `<span class="map-pin map-pin--place"><span class="map-pin__disc">${svgIcon(CATEGORY_ICON[marker.markerType])}</span></span>`;
   }
   return L.divIcon({ className: 'map-pin-icon', html, iconSize: [0, 0], iconAnchor: [0, 0], popupAnchor: [0, -40] });
 }
@@ -87,6 +88,18 @@ function computeIsDark() {
 
 interface ControlExtender {
   extend: (o: { options?: Record<string, unknown>; onAdd: () => HTMLElement }) => new () => L.Control;
+}
+
+function createControlButton(label: string, svg: string, onClick: () => void) {
+  const button = L.DomUtil.create('button', 'leaflet-bar leaflet-control map-control-button') as HTMLButtonElement;
+  button.type = 'button';
+  button.title = label;
+  button.setAttribute('aria-label', label);
+  button.innerHTML = svg;
+  button.onclick = onClick;
+  // Like Leaflet's own buttons: a (double-)click on the control must not reach the map's zoom or popup handlers (R-394).
+  L.DomEvent.disableClickPropagation(button);
+  return button;
 }
 
 export default function LeafletMap({
@@ -153,54 +166,35 @@ export default function LeafletMap({
 
     const LocateControl = (L.Control as unknown as ControlExtender).extend({
       options: { position: 'topleft' },
-      onAdd: () => {
-        const div = L.DomUtil.create('button', 'leaflet-bar leaflet-control map-control-button') as HTMLButtonElement;
-        div.type = 'button';
-        div.title = mapLabels.locateMe;
-        div.setAttribute('aria-label', mapLabels.locateMe);
-        div.innerHTML = LOCATE_SVG;
-        div.onclick = () => {
-          setLocationError('');
-          if (!navigator.geolocation) {
-            setLocationError(mapLabels.locationUnavailable);
-            return;
-          }
-          navigator.geolocation.getCurrentPosition(pos => {
-            const { latitude, longitude } = pos.coords;
-            const current = mapRef.current;
-            // The answer can arrive after the map was removed, e.g. the guest switched to the list meanwhile (R-398).
-            if (!current) return;
-            current.setView([latitude, longitude], 15);
-            // One pin that follows the guest; it has no popup, so it is neither a tab stop nor a button (R-398).
-            if (locationMarkerRef.current) locationMarkerRef.current.setLatLng([latitude, longitude]);
-            else locationMarkerRef.current = L.marker([latitude, longitude], { icon: buildIcon({ markerType: 'service' }, mapLabels.home), interactive: false, keyboard: false }).addTo(current);
-          }, () => setLocationError(mapLabels.locationUnavailable), {
-            enableHighAccuracy: false,
-            timeout: 10_000,
-            maximumAge: 60_000,
-          });
-        };
-        // Like Leaflet's own buttons: a (double-)click on the control must not reach the map's zoom or popup handlers (R-394).
-        L.DomEvent.disableClickPropagation(div);
-        return div;
-      },
+      onAdd: () => createControlButton(mapLabels.locateMe, LOCATE_SVG, () => {
+        setLocationError('');
+        if (!navigator.geolocation) {
+          setLocationError(mapLabels.locationUnavailable);
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(pos => {
+          const { latitude, longitude } = pos.coords;
+          const current = mapRef.current;
+          // The answer can arrive after the map was removed, e.g. the guest switched to the list meanwhile (R-398).
+          if (!current) return;
+          current.setView([latitude, longitude], 15);
+          // One pin that follows the guest; it has no popup, so it is neither a tab stop nor a button (R-398).
+          if (locationMarkerRef.current) locationMarkerRef.current.setLatLng([latitude, longitude]);
+          else locationMarkerRef.current = L.marker([latitude, longitude], { icon: buildIcon({ markerType: 'service' }, mapLabels.home), interactive: false, keyboard: false }).addTo(current);
+        }, () => setLocationError(mapLabels.locationUnavailable), {
+          enableHighAccuracy: false,
+          timeout: 10_000,
+          maximumAge: 60_000,
+        });
+      }),
     });
-    map.addControl(new (LocateControl as unknown as { new(): L.Control })());
+    map.addControl(new LocateControl());
 
     const FitControl = (L.Control as unknown as ControlExtender).extend({
       options: { position: 'topleft' },
-      onAdd: () => {
-        const div = L.DomUtil.create('button', 'leaflet-bar leaflet-control map-control-button') as HTMLButtonElement;
-        div.type = 'button';
-        div.title = mapLabels.fitToMarkers;
-        div.setAttribute('aria-label', mapLabels.fitToMarkers);
-        div.innerHTML = FIT_SVG;
-        div.onclick = fitOriginAndMarkers;
-        L.DomEvent.disableClickPropagation(div);
-        return div;
-      },
+      onAdd: () => createControlButton(mapLabels.fitToMarkers, FIT_SVG, fitOriginAndMarkers),
     });
-    map.addControl(new (FitControl as unknown as { new(): L.Control })());
+    map.addControl(new FitControl());
 
     return () => {
       observer.disconnect();
@@ -234,6 +228,10 @@ export default function LeafletMap({
       });
       const baseHtml = buildBasePopupHtml(markerData, mapLabels);
       marker.bindPopup(baseHtml);
+      // Leaflet hard-codes aria-label="Close popup" on the close button; name it in the page's language (R-687).
+      marker.on('popupopen', (event) => {
+        event.popup.getElement()?.querySelector('.leaflet-popup-close-button')?.setAttribute('aria-label', mapLabels.closePopup);
+      });
       marker.on('add', () => {
         const element = marker.getElement();
         element?.setAttribute('aria-label', markerData.name);

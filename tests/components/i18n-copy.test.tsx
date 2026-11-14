@@ -16,7 +16,6 @@ vi.mock('@/lib/internalFetchClient', () => ({ default: vi.fn(async () => new Res
 import ItemPage from '@/app/[locale]/[category]/[slug]/page';
 import CheckInInfo from '@/components/CheckInInfo';
 import { ToastProvider } from '@/components/Toast';
-import { categories } from '@/data/categories';
 import { getDictionary } from '@/i18n/dictionaries';
 import { getItemsByCategory } from '@/lib/data';
 
@@ -37,21 +36,6 @@ describe('Greek copy', () => {
     expect(screen.queryByText('emergency')).not.toBeInTheDocument();
   });
 
-  it('shows translated tags on a moments detail page', async () => {
-    render(<ToastProvider>{await ItemPage({ params: Promise.resolve({ locale: 'el', category: 'moments', slug: 'viktoria-karelia-greek-costumes-collection' }) })}</ToastProvider>);
-
-    const el = getDictionary('el').momentTags!;
-    // The place's own meta, not only its "More nearby" cards, shows the translated tag (identity §9.5).
-    expect(within(placeHeader()).getByText(el.museum)).toBeInTheDocument();
-    expect(screen.queryByText('museum')).not.toBeInTheDocument();
-  });
-
-  it('describes the parking instead of repeating its heading', () => {
-    render(<ToastProvider><CheckInInfo locale="el" /></ToastProvider>);
-
-    expect(screen.getByText('Δωρεάν εξωτερικό ιδιωτικό πάρκινγκ στο κατάλυμα.')).toBeInTheDocument();
-  });
-
   it.each([
     ['el', 'Γρήγορες ενέργειες', ['Αντιγραφή Wi-Fi', 'Άνοιγμα χάρτη', 'Βασικά για τη διαμονή', 'Βασικά', 'Ασφάλεια', 'Τζάκι']],
     ['en', 'Quick actions', ['Copy Wi-Fi', 'Open Maps', 'Guest Essentials', 'Essentials', 'Safety', 'Fireplace']],
@@ -70,11 +54,5 @@ describe('Greek copy', () => {
     render(<ToastProvider><CheckInInfo locale={locale} nearbyServices={nearbyServices} /></ToastProvider>);
 
     expect(screen.getByText(tip)).toBeInTheDocument();
-  });
-
-  it('spells the moments title with its accent and the brunch filter in the singular', () => {
-    expect(categories.find((category) => category.slug === 'moments')?.title_el).toBe('Οδηγός Καλαμάτας');
-    expect(getDictionary('el').categories.moments).toBe('Οδηγός Καλαμάτας');
-    expect(getDictionary('en').momentsFilters?.brunchs).toBe('Brunch');
   });
 });

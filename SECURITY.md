@@ -7,7 +7,7 @@ recovered or reused.
 The maintained production credential map and rotation boundaries are documented
 in [`docs/security/runtime-credential-contract.md`](docs/security/runtime-credential-contract.md).
 
-This project uses a server-side secret named `SECURITY_PEPPER` for additional cryptographic salting/peppering in development and production. Treat it like any other secret.
+This project uses server-side secrets named `SECURITY_PEPPER` and `CLAIM_TOKEN_PEPPER` for additional cryptographic salting/peppering in development and production. Treat them like any other secret.
 
 ## Local development
 
@@ -33,7 +33,7 @@ This project uses a server-side secret named `SECURITY_PEPPER` for additional cr
 
 ## Rotation and leakage
 
-- If `SECURITY_PEPPER` is ever leaked, rotate it in your secret store and reissue/rehash any dependent tokens as necessary.
+- If `SECURITY_PEPPER` or `CLAIM_TOKEN_PEPPER` is ever leaked, rotate it in your secret store and use the rotation effects listed in [`docs/security/runtime-credential-contract.md`](docs/security/runtime-credential-contract.md) to plan the response.
 
 ## Database credential incident response
 

@@ -1,6 +1,5 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 
 const DEFAULT_MAX_IMAGE_BYTES = 512 * 1024;
@@ -25,7 +24,6 @@ interface ImageAssetValidationResult {
 }
 
 interface ImageAssetValidationOptions {
-  rootDir?: string;
   maxBytes?: number;
 }
 
@@ -49,13 +47,13 @@ async function collectRasterImages(directory: string): Promise<string[]> {
 }
 
 async function validateImageAssets({
-  rootDir = path.join(process.cwd(), 'public'),
   maxBytes = DEFAULT_MAX_IMAGE_BYTES,
 }: ImageAssetValidationOptions = {}): Promise<ImageAssetValidationResult> {
   if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) {
     throw new Error('maxBytes must be a positive safe integer');
   }
 
+  const rootDir = path.join(process.cwd(), 'public');
   const files = await collectRasterImages(rootDir);
   const issues: ImageAssetIssue[] = [];
 
@@ -112,10 +110,7 @@ async function main(): Promise<void> {
   console.log(`Validated ${result.checked} raster image assets (maximum ${maxBytes} bytes each).`);
 }
 
-const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : '';
-if (invokedPath === fileURLToPath(import.meta.url)) {
-  void main().catch((error: unknown) => {
-    console.error('Image asset validation failed:', error);
-    process.exitCode = 1;
-  });
-}
+void main().catch((error: unknown) => {
+  console.error('Image asset validation failed:', error);
+  process.exitCode = 1;
+});

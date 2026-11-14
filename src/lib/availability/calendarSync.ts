@@ -1,6 +1,7 @@
-// Syncs the Airbnb calendar export (AIRBNB_ICAL_URL) into the singleton
-// calendar_sync_state row: the blocked nights of the availability horizon, as
-// a snapshot that only a successful sync replaces. Runs are serialised by a
+// Syncs the Booking.com calendar export (BOOKING_ICAL_URL) into the singleton
+// calendar_sync_state row: the blocked nights (booked or closed) of the
+// availability horizon, as a snapshot that only a successful sync replaces.
+// Runs are serialised by a
 // short lease on the row, claimed and released with conditional updateMany
 // calls; the download and parsing run outside any transaction. A failed run
 // keeps the last good snapshot and records a code (never the URL or upstream
@@ -10,13 +11,13 @@ import { randomUUID } from 'node:crypto';
 
 import { AVAILABILITY_HORIZON_DAYS, PROPERTY_TIME_ZONE } from '@/data/stayPolicy';
 import { addDays, eachNight, propertyToday, toDbDate, type IsoDate } from '@/lib/availability/calendarDate';
-import { CalendarFetchError, fetchAirbnbCalendarText } from '@/lib/availability/icalFetch';
+import { CalendarFetchError, fetchBookingCalendarText } from '@/lib/availability/icalFetch';
 import { IcalParseError, parseBlockedRanges } from '@/lib/availability/icalParser';
 import { logger } from '@/lib/logger-enterprise';
 import { prisma } from '@/lib/prisma';
 
 /** The only calendar_sync_state row (seeded by the migration, enforced by a CHECK). */
-export const CALENDAR_SYNC_STATE_ID = 'airbnb';
+export const CALENDAR_SYNC_STATE_ID = 'booking';
 
 const LEASE_MS = 60_000;
 /** A manual run starts at most this long after the last attempt (the admin route's Retry-After). */
@@ -26,7 +27,7 @@ const MAX_BACKOFF_MINUTES = 45;
 const MAX_STORED_NIGHTS = 400; // calendar_sync_state_blocked_nights_check
 
 type CalendarSyncResult =
-  /** AIRBNB_ICAL_URL is unset; nothing was read or written. */
+  /** BOOKING_ICAL_URL is unset; nothing was read or written. */
   | { status: 'not_configured' }
   /** A scheduled run before nextAttemptAt. */
   | { status: 'skipped' }
@@ -65,9 +66,11 @@ function failureOf(error: unknown): Failure {
   }
   if (error instanceof IcalParseError) {
     // A line number is not feed content; it is the only pointer to what the parser rejected.
-    logger.warn('Airbnb calendar feed did not parse', { code: error.code, line: error.line ?? null });
+    logger.warn('Booking.com calendar feed did not parse', { code: error.code, line: error.line ?? null });
     return { code: error.code };
   }
+  // The error's name only: its message or stack can carry the feed URL token.
+  logger.warn('Booking.com calendar sync failed unexpectedly', { errorName: error instanceof Error ? error.name : typeof error });
   return { code: 'unexpected' };
 }
 
@@ -100,7 +103,7 @@ async function recordFailure(
     },
   });
   if (written.count === 0) return leaseLost();
-  logger.warn('Airbnb calendar sync failed', {
+  logger.warn('Booking.com calendar sync failed', {
     status: 'failed',
     code: failure.code,
     httpStatus: failure.httpStatus ?? null,
@@ -110,7 +113,7 @@ async function recordFailure(
 }
 
 function leaseLost(): CalendarSyncResult {
-  logger.warn('Airbnb calendar sync lost its lease', { status: 'lease_lost' });
+  logger.warn('Booking.com calendar sync lost its lease', { status: 'lease_lost' });
   return { status: 'lease_lost' };
 }
 
@@ -123,8 +126,8 @@ function leaseLost(): CalendarSyncResult {
  * manual run records the error but leaves consecutiveFailures and
  * nextAttemptAt unchanged; only scheduled runs back off.
  */
-export async function syncAirbnbCalendar({ trigger }: { trigger: 'scheduled' | 'manual' }): Promise<CalendarSyncResult> {
-  const url = process.env.AIRBNB_ICAL_URL;
+export async function syncBookingCalendar({ trigger }: { trigger: 'scheduled' | 'manual' }): Promise<CalendarSyncResult> {
+  const url = process.env.BOOKING_ICAL_URL;
   if (!url) return { status: 'not_configured' };
 
   const now = new Date();
@@ -157,7 +160,7 @@ export async function syncAirbnbCalendar({ trigger }: { trigger: 'scheduled' | '
 
   let outcome: { nights: Date[] } | Failure;
   try {
-    const nights = blockedNightsWithin(parseBlockedRanges(await fetchAirbnbCalendarText(url)), today, horizonEnd);
+    const nights = blockedNightsWithin(parseBlockedRanges(await fetchBookingCalendarText(url)), today, horizonEnd);
     outcome = nights.length > MAX_STORED_NIGHTS ? { code: 'too_many_nights' } : { nights: nights.map(toDbDate) };
   } catch (error) {
     outcome = failureOf(error);
@@ -192,6 +195,6 @@ export async function syncAirbnbCalendar({ trigger }: { trigger: 'scheduled' | '
     },
   });
   if (written.count === 0) return leaseLost();
-  logger.info('Airbnb calendar sync finished', { status: 'synced', blockedNights: outcome.nights.length });
+  logger.info('Booking.com calendar sync finished', { status: 'synced', blockedNights: outcome.nights.length });
   return { status: 'synced', blockedNights: outcome.nights.length };
 }

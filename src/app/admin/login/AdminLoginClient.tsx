@@ -7,10 +7,10 @@ import internalFetch from '@/lib/internalFetchClient';
 export default function AdminLoginClient() {
   const router = useRouter();
   const [token, setToken] = useState('');
-  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'error'>('idle');
   const [message, setMessage] = useState('Authentication failed');
 
-  async function submit(event: React.FormEvent) {
+  async function submit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     setStatus('idle');
     try {
@@ -28,7 +28,6 @@ export default function AdminLoginClient() {
         setStatus('error');
         return;
       }
-      setStatus('success');
       router.replace('/admin');
       router.refresh();
     } catch {

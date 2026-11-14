@@ -10,19 +10,9 @@ const optionalEnv = (schema) => z.preprocess(
   schema.optional(),
 );
 
-// Zod 4 still runs this refine after the `z.url()` check fails, so an empty or unparsable
-// value must return false here instead of throwing a bare TypeError.
-function isPostgresUrl(value) {
-  try {
-    const protocol = new URL(value).protocol;
-    return protocol === 'postgresql:' || protocol === 'postgres:';
-  } catch {
-    return false;
-  }
-}
-
-// The object-level refine below also runs for a value that z.url() rejected. An unparsable
-// value must not throw there: the TypeError would hide the other issues and echo the value.
+// Zod 4 still runs the DATABASE_URL refine and the object-level refine below after `z.url()`
+// has rejected a value. An empty or unparsable value must give null here: a thrown TypeError
+// would hide the other issues and echo the value.
 function urlProtocol(value) {
   try {
     return new URL(value).protocol;
@@ -31,12 +21,17 @@ function urlProtocol(value) {
   }
 }
 
-function isTimeZone(value) {
-  try {
-    new Intl.DateTimeFormat('en', { timeZone: value }).format();
-    return true;
-  } catch {
-    return false;
+function isPostgresUrl(value) {
+  const protocol = urlProtocol(value);
+  return protocol === 'postgresql:' || protocol === 'postgres:';
+}
+
+function requireHttpsInProduction(env, context, name) {
+  if (env.NODE_ENV === 'production' && env[name]) {
+    const protocol = urlProtocol(env[name]);
+    if (protocol !== null && protocol !== 'https:') {
+      context.addIssue({ code: 'custom', path: [name], message: `${name} must use HTTPS in production` });
+    }
   }
 }
 
@@ -49,17 +44,24 @@ function isOriginProxySecret(value) {
 // The two peppers key HMACs, so the placeholder words of .env.example must not pass in production.
 const PEPPER_PLACEHOLDER = /replace|changeme|placeholder|example/iu;
 
-// The Airbnb calendar export URL carries a secret token in its query string,
-// so validation messages must never echo the value.
-const AIRBNB_CALENDAR_HOSTS = new Set(['www.airbnb.com', 'airbnb.com', 'www.airbnb.gr', 'airbnb.gr']);
-const AIRBNB_CALENDAR_PATH = /^\/calendar\/ical\/\d+\.ics$/;
+// The Booking.com calendar export URL carries a secret token in its query string (`t`),
+// so validation messages must never echo the value. Each host serves the export at one path
+// only: ical.booking.com is the current extranet link, admin.booking.com the older one that
+// the extranet may still hand out (public guides; the owner's own link was not probed). A
+// link without a query cannot carry the token, so the query must not be empty; parameter
+// names and lengths are not checked.
+const BOOKING_CALENDAR_PATHS = new Map([
+  ['ical.booking.com', '/v1/export'],
+  ['admin.booking.com', '/hotel/hoteladmin/ical.html'],
+]);
 
 /**
- * An https Airbnb calendar export URL: no userinfo, default port, `/calendar/ical/<listing>.ics`.
+ * An https Booking.com calendar export URL: no userinfo, default port, the export path of its host
+ * and a non-empty query (the token).
  * @param {string} value
  * @returns {boolean}
  */
-export function isAirbnbCalendarUrl(value) {
+export function isBookingCalendarUrl(value) {
   let url;
   try {
     url = new URL(value);
@@ -70,8 +72,8 @@ export function isAirbnbCalendarUrl(value) {
     && url.username === ''
     && url.password === ''
     && url.port === ''
-    && AIRBNB_CALENDAR_HOSTS.has(url.hostname)
-    && AIRBNB_CALENDAR_PATH.test(url.pathname);
+    && BOOKING_CALENDAR_PATHS.get(url.hostname) === url.pathname
+    && url.search.length > 1;
 }
 
 export const runtimeEnvSchema = z.object({
@@ -86,8 +88,6 @@ export const runtimeEnvSchema = z.object({
   CLAIM_TOKEN_PEPPER: z.string().min(32, 'CLAIM_TOKEN_PEPPER must be at least 32 characters'),
   GUEST_WIFI_NETWORK: z.string().min(1, 'GUEST_WIFI_NETWORK is required'),
   GUEST_WIFI_PASSWORD: z.string().min(8, 'GUEST_WIFI_PASSWORD must be at least 8 characters'),
-  PROPERTY_TIME_ZONE: z.string().refine(isTimeZone, 'PROPERTY_TIME_ZONE must be a valid IANA time zone').default('Europe/Athens'),
-
 
   ALLOWED_ORIGINS: z.string().optional(),
   NEXT_PUBLIC_SITE_URL: optionalEnv(z.url()),
@@ -102,9 +102,9 @@ export const runtimeEnvSchema = z.object({
   ALERT_WEBHOOK_URL: optionalEnv(z.url()),
   ALERT_WEBHOOK_TOKEN: optionalEnv(z.string().min(20)),
   ALERT_WEBHOOK_REQUIRED: z.enum(['0', '1']).optional().default('0'),
-  AIRBNB_ICAL_URL: optionalEnv(z.string().refine(
-    isAirbnbCalendarUrl,
-    'AIRBNB_ICAL_URL must be an https Airbnb calendar export URL (/calendar/ical/<listing id>.ics)',
+  BOOKING_ICAL_URL: optionalEnv(z.string().refine(
+    isBookingCalendarUrl,
+    'BOOKING_ICAL_URL must be an https Booking.com calendar export URL (ical.booking.com/v1/export or admin.booking.com/hotel/hoteladmin/ical.html, with its token in the query)',
   )),
   // Public CARTO basemaps key: sent to browsers in tile URLs, but never logged.
   CARTO_BASEMAPS_KEY: optionalEnv(z.string().regex(
@@ -112,7 +112,6 @@ export const runtimeEnvSchema = z.object({
     'CARTO_BASEMAPS_KEY must be 8-128 characters of letters, digits, "_" or "-"',
   )),
 
-  PRISMA_LOG_LIFECYCLE: optionalEnv(z.enum(['0', '1'])),
   LOG_LEVEL: optionalEnv(z.enum(['trace', 'debug', 'info', 'warn', 'error'])),
   LOG_CONSOLE: optionalEnv(z.enum(['true', 'false'])),
   LOG_STRUCTURED: optionalEnv(z.enum(['true', 'false'])),
@@ -156,12 +155,7 @@ export const runtimeEnvSchema = z.object({
   if (env.NODE_ENV === 'production' && !env.NEXT_PUBLIC_SITE_URL) {
     context.addIssue({ code: 'custom', path: ['NEXT_PUBLIC_SITE_URL'], message: 'NEXT_PUBLIC_SITE_URL is required in production' });
   }
-  if (env.NODE_ENV === 'production' && env.NEXT_PUBLIC_SITE_URL) {
-    const protocol = urlProtocol(env.NEXT_PUBLIC_SITE_URL);
-    if (protocol !== null && protocol !== 'https:') {
-      context.addIssue({ code: 'custom', path: ['NEXT_PUBLIC_SITE_URL'], message: 'NEXT_PUBLIC_SITE_URL must use HTTPS in production' });
-    }
-  }
+  requireHttpsInProduction(env, context, 'NEXT_PUBLIC_SITE_URL');
   if (env.BUILD_SITE_URL && env.NEXT_PUBLIC_SITE_URL !== env.BUILD_SITE_URL) {
     context.addIssue({ code: 'custom', path: ['NEXT_PUBLIC_SITE_URL'], message: 'Runtime site URL does not match the URL compiled into this image' });
   }
@@ -188,19 +182,9 @@ export const runtimeEnvSchema = z.object({
   if (checkInWebhookUrl && !env.CHECKIN_REQUEST_WEBHOOK_TOKEN) {
     context.addIssue({ code: 'custom', path: ['CHECKIN_REQUEST_WEBHOOK_TOKEN'], message: 'CHECKIN_REQUEST_WEBHOOK_TOKEN is required when CHECKIN_REQUEST_WEBHOOK_URL is configured' });
   }
-  if (env.NODE_ENV === 'production' && checkInWebhookUrl) {
-    const protocol = urlProtocol(checkInWebhookUrl);
-    if (protocol !== null && protocol !== 'https:') {
-      context.addIssue({ code: 'custom', path: ['CHECKIN_REQUEST_WEBHOOK_URL'], message: 'CHECKIN_REQUEST_WEBHOOK_URL must use HTTPS in production' });
-    }
-  }
+  requireHttpsInProduction(env, context, 'CHECKIN_REQUEST_WEBHOOK_URL');
   if (env.ALERT_WEBHOOK_REQUIRED === '1' && !env.ALERT_WEBHOOK_URL) {
     context.addIssue({ code: 'custom', path: ['ALERT_WEBHOOK_URL'], message: 'ALERT_WEBHOOK_URL is required when ALERT_WEBHOOK_REQUIRED=1' });
   }
-  if (env.NODE_ENV === 'production' && env.ALERT_WEBHOOK_URL) {
-    const protocol = urlProtocol(env.ALERT_WEBHOOK_URL);
-    if (protocol !== null && protocol !== 'https:') {
-      context.addIssue({ code: 'custom', path: ['ALERT_WEBHOOK_URL'], message: 'ALERT_WEBHOOK_URL must use HTTPS in production' });
-    }
-  }
+  requireHttpsInProduction(env, context, 'ALERT_WEBHOOK_URL');
 });

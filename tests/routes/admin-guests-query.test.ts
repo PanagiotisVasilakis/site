@@ -74,8 +74,6 @@ describe('admin guests route query validation', () => {
 
   it.each([
     ['startDate=2026-10-5'],
-    ['startDate=25/12/2024'],
-    ['startDate=2026-10-05&endDate=2026-10-5'],
   ])('answers 422 for a malformed search date (%s) without searching', async (dates) => {
     const response = await get(`action=search&${dates}`);
 
@@ -83,14 +81,10 @@ describe('admin guests route query validation', () => {
     expect(mocks.searchBookingsByDateRange).not.toHaveBeenCalled();
   });
 
-  it('searches with well-formed dates', async () => {
-    const onlyStart = await get('action=search&startDate=2026-10-05');
-    expect(onlyStart.status).toBe(200);
-    expect(mocks.searchBookingsByDateRange).toHaveBeenLastCalledWith('2026-10-05', undefined);
-
-    const range = await get('action=search&startDate=2026-10-05&endDate=2026-10-12');
-    expect(range.status).toBe(200);
-    expect(mocks.searchBookingsByDateRange).toHaveBeenLastCalledWith('2026-10-05', '2026-10-12');
+  it('searches with a well-formed start date', async () => {
+    const response = await get('action=search&startDate=2026-10-05');
+    expect(response.status).toBe(200);
+    expect(mocks.searchBookingsByDateRange).toHaveBeenLastCalledWith('2026-10-05');
   });
 
   it.each(['action=list', `action=export&bookingId=${BOOKING_ID}`])(

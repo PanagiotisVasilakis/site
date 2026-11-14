@@ -5,14 +5,16 @@ import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
 import { BrandMark } from '@/components/icons/BrandMark';
 import { Icon, type IconName } from '@/components/icons/Icon';
+import { WORDMARK } from '@/data/brand';
 import { normalizeLocale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
+import { HostIdentity } from './HostIdentity';
 import LanguageSwitch from './LanguageSwitch';
 import { MotionSwitch } from './MotionSwitch';
 import { ThemeSetting } from './ThemeSwitch';
 import {
   footerBrandLines, footerContactId, footerContactLinks, footerLegalLinks, footerNavLinks, footerStayLink,
-  footerVariantFor, shellVariantFor,
+  footerVariantFor, scrollToCurrentHash, shellVariantFor,
 } from './shellLinks';
 
 const CONTACT_ICONS: Record<string, IconName> = { phone: 'phone', email: 'mail', instagram: 'camera', whatsapp: 'message' };
@@ -22,7 +24,8 @@ const CONTACT_ICONS: Record<string, IconName> = { phone: 'phone', email: 'mail',
  * nav, contact (on the home page this block is the `#contact` target of every "Contact" link), "Your stay",
  * MotionSwitch, LanguageSwitch. Stay: the brand, MotionSwitch and LanguageSwitch only (no booking or
  * availability link, no tagline). Both also carry the theme Segmented (see the note at the prefs) and the
- * Privacy link (R3-L2). The address/legal identity waits for its data (R3-L1): no placeholder is rendered (§1.4).
+ * Privacy link (R3-L2). The host identity (ΑΜΑ, the host's name, address) comes from HOST_CONTACT in both variants:
+ * a blank field is skipped, no placeholder is rendered (§1.4).
  */
 export default function SiteFooter({ locale }: { locale: string }) {
   const pathname = usePathname() || `/${locale}`;
@@ -43,7 +46,7 @@ export default function SiteFooter({ locale }: { locale: string }) {
         <div className="site-footer__about">
           <p className="site-footer__brand">
             <BrandMark className="site-brand__mark" />
-            <span className="site-brand__name">Dolce Far Niente</span>
+            <span className="site-brand__name">{WORDMARK}</span>
           </p>
           {brandLines && (
             <>
@@ -56,7 +59,14 @@ export default function SiteFooter({ locale }: { locale: string }) {
         {nav.length > 0 && (
           <nav className="site-footer__nav" aria-label={t.shell.footerNavigation}>
             {nav.map((link) => (
-              <Link key={link.key} href={link.href} className="site-footer__link shell-link">{link.label}</Link>
+              <Link
+                key={link.key}
+                href={link.href}
+                className="site-footer__link shell-link"
+                onClick={(event) => scrollToCurrentHash(event, link.href)}
+              >
+                {link.label}
+              </Link>
             ))}
           </nav>
         )}
@@ -89,13 +99,14 @@ export default function SiteFooter({ locale }: { locale: string }) {
         )}
 
         <div className="site-footer__prefs">
-          {/* Deviation from §8 (owner to confirm): the header icon only toggles Day/Night and the menu
+          {/* Deviation from §8 (owner-approved, O41 in PROGRESS.md): the header icon only toggles Day/Night and the menu
               button is hidden at ≥ 1320 px, so the footer also carries Auto · Day · Night at every width. */}
           <ThemeSetting t={t.shell} />
           <MotionSwitch t={t.shell} />
           <LanguageSwitch locale={locale} label={t.shell.language} />
         </div>
 
+        <HostIdentity labels={t.shell.identity} className="host-identity--footer" />
         <p className="site-footer__legal">
           {legal.map((link) => (
             <Link key={link.key} href={link.href} className="site-footer__link shell-link">{link.label}</Link>

@@ -6,8 +6,10 @@ import { useEffect, useId, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { BrandMark } from '@/components/icons/BrandMark';
 import { Icon } from '@/components/icons/Icon';
+import { useToast } from '@/components/Toast';
 import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
+import { WORDMARK } from '@/data/brand';
 import { useGuestSession } from '@/hooks/useGuestSession';
 import { useScroll } from '@/hooks/useScroll';
 import { normalizeLocale } from '@/i18n/config';
@@ -17,10 +19,9 @@ import { usePointerEffects } from '@/lib/motion/pointerEffects';
 import LanguageSwitch from './LanguageSwitch';
 import MobileMenu from './MobileMenu';
 import { ThemeSwitch } from './ThemeSwitch';
-import { brandHref, headerCta, headerOverlaysHero, isCurrentLink, navLinks, shellVariantFor } from './shellLinks';
-
-/** The wordmark (identity §1.2): the brand in every locale; the place label below it is localized. */
-const WORDMARK = 'Dolce Far Niente';
+import {
+  brandHref, headerCta, headerOverlaysHero, isCurrentLink, navLinks, scrollToCurrentHash, shellVariantFor,
+} from './shellLinks';
 
 /**
  * identity §8 SiteHeader: a sticky glass pill with the brand, the nav (≥ 1320 px), the language and theme
@@ -33,6 +34,7 @@ const WORDMARK = 'Dolce Far Niente';
 export default function SiteHeader({ locale }: { locale: string }) {
   const pathname = usePathname() || `/${locale}`;
   const router = useRouter();
+  const toast = useToast();
   const t = getDictionary(normalizeLocale(locale));
   const variant = shellVariantFor(pathname);
   const cta = headerCta(variant, locale, t);
@@ -66,6 +68,8 @@ export default function SiteHeader({ locale }: { locale: string }) {
     if (await signOut()) {
       router.replace(`/${locale}`);
       router.refresh();
+    } else {
+      toast.push(t.ui.signOutFailed);
     }
   };
 
@@ -94,6 +98,7 @@ export default function SiteHeader({ locale }: { locale: string }) {
               href={link.href}
               className="site-nav__link shell-link"
               aria-current={isCurrentLink(pathname, link.href) ? 'page' : undefined}
+              onClick={(event) => scrollToCurrentHash(event, link.href)}
             >
               {link.label}
             </Link>

@@ -42,16 +42,13 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
 
   const adminSession = await createAdminSession();
-  // Generate JWT with unique identifier and clean payload
   const jwt = signAdmin({ 
-    jti: crypto.randomUUID(),
     session_id: adminSession.id,
     login_at: adminSession.loginAt,
   });
   
   const res = NextResponse.json({ success: true }, { status: 200 });
   
-  // Enhanced cookie security with consistent settings
   res.cookies.set('admin_jwt', jwt, {
     path: '/',
     httpOnly: true,

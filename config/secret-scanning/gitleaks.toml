@@ -25,8 +25,8 @@ secretGroup = 0
 keywords = ["PRIVATE KEY"]
 
 [[rules]]
-id = "airbnb-calendar-export-token"
-description = "Airbnb calendar export URL with its s= access token"
-regex = '''(?i)\bairbnb\.(?:com|gr)/calendar/ical/[0-9]+\.ics\?(?:[^\s"'`#&]*&)*s=([A-Za-z0-9_-]{16,})'''
+id = "booking-calendar-export-token"
+description = "Booking.com calendar export URL with its t= access token"
+regex = '''(?i)\b(?:ical\.booking\.com/v1/export|admin\.booking\.com/hotel/hoteladmin/ical\.html)\?(?:[^\s"'`#&]*&)*t=([A-Za-z0-9_-]{8,})'''
 secretGroup = 1
-keywords = ["calendar/ical"]
+keywords = ["ical.booking.com", "hoteladmin/ical"]

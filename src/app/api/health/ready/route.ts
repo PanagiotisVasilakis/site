@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 // has to be exactly this one. A database that is behind (migrate has not run yet) and
 // one that is ahead (an older image started after a later release migrated) are both
 // not ready.
-const EXPECTED_MIGRATION = '20260930120000_minimise_user_data';
+const EXPECTED_MIGRATION = '20261020120000_booking_calendar_source';
 const READINESS_CACHE_MS = 2_000;
 let cachedReadiness: { ready: boolean; expiresAt: number } | null = null;
 let readinessInFlight: Promise<boolean> | null = null;

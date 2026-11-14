@@ -4,7 +4,7 @@ import LocaleNotFound from './[locale]/not-found';
 // outside the locale layout, so this wraps the same siesta page in the landmark that layout would give it.
 export default function RootNotFound() {
   return (
-    <main id="main-content" className="status-main" role="main">
+    <main id="main-content" className="status-main">
       <LocaleNotFound />
     </main>
   );

@@ -1,18 +1,18 @@
-// Server-side download of the Airbnb calendar export (AIRBNB_ICAL_URL). The URL
+// Server-side download of the Booking.com calendar export (BOOKING_ICAL_URL). The URL
 // carries a secret token in its query string, so neither it, a redirect
 // Location nor any upstream error text may reach an error message or a log:
 // failures carry a code and at most an HTTP status. Every request target,
 // including each redirect, must pass the same allowlist as the environment
 // schema, which keeps the fetch away from internal addresses.
 
-import { isAirbnbCalendarUrl } from '@/lib/runtime-env-schema.js';
+import { isBookingCalendarUrl } from '@/lib/runtime-env-schema.js';
 
 const MAX_REDIRECTS = 2;
 const FETCH_TIMEOUT_MS = 10_000;
 const MAX_BODY_BYTES = 1_048_576; // 1 MiB, the parser's input cap
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
-export type CalendarFetchErrorCode =
+type CalendarFetchErrorCode =
   | 'invalid_url'
   | 'timeout'
   | 'network'
@@ -89,7 +89,7 @@ function allowedRedirectTarget(location: string | null, base: URL): URL | null {
   if (location === null) return null;
   try {
     const target = new URL(location, base);
-    return isAirbnbCalendarUrl(target.href) ? target : null;
+    return isBookingCalendarUrl(target.href) ? target : null;
   } catch {
     return null;
   }
@@ -124,24 +124,16 @@ function isTimeoutError(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'name' in error && error.name === 'TimeoutError';
 }
 
-/**
- * Downloads the calendar export as text. Throws CalendarFetchError, or the
- * caller's own abort reason when `options.signal` aborts first.
- */
-export async function fetchAirbnbCalendarText(
-  url: string,
-  options: { signal?: AbortSignal } = {},
-): Promise<string> {
-  if (!isAirbnbCalendarUrl(url)) throw new CalendarFetchError('invalid_url');
+/** Downloads the calendar export as text. Throws CalendarFetchError. */
+export async function fetchBookingCalendarText(url: string): Promise<string> {
+  if (!isBookingCalendarUrl(url)) throw new CalendarFetchError('invalid_url');
 
-  const timeout = AbortSignal.timeout(FETCH_TIMEOUT_MS);
-  const signal = options.signal ? AbortSignal.any([timeout, options.signal]) : timeout;
+  const signal = AbortSignal.timeout(FETCH_TIMEOUT_MS);
   try {
     return await fetchFollowingAllowedRedirects(new URL(url), signal);
   } catch (error) {
     if (error instanceof CalendarFetchError) throw error;
-    if (timeout.aborted) throw new CalendarFetchError('timeout');
-    if (options.signal?.aborted) throw options.signal.reason;
+    if (signal.aborted) throw new CalendarFetchError('timeout');
     // Upstream errors are replaced, never wrapped: their text can hold the URL.
     throw new CalendarFetchError(isTimeoutError(error) ? 'timeout' : 'network');
   }

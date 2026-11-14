@@ -34,7 +34,17 @@ describe('admin logout route', () => {
     mocks.adminSessionUpdateMany.mockResolvedValue({ count: 1 });
   });
 
-  it('revokes the session named by the admin cookie and expires the cookie', async () => {
+  it('expires the cookie without a revocation when no cookie is sent', async () => {
+    const response = await logout();
+
+    expect(response.status).toBe(200);
+    expect(mocks.adminSessionUpdateMany).not.toHaveBeenCalled();
+    expect(response.headers.get('set-cookie') ?? '').toContain('Max-Age=0');
+  });
+
+  it('revokes the session named by the admin cookie and expires it as HttpOnly, SameSite=Strict, Path=/ and Secure in production', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('ADMIN_JWT_SECRET', PRODUCTION_JWT_SECRET);
     const token = signAdmin({ session_id: SESSION_ID });
 
     const response = await logout(`admin_jwt=${token}`);
@@ -45,25 +55,6 @@ describe('admin logout route', () => {
     const setCookie = response.headers.get('set-cookie') ?? '';
     expect(setCookie).toContain('admin_jwt=;');
     expect(setCookie).toContain('Max-Age=0');
-  });
-
-  it('expires the cookie without a revocation when no cookie is sent', async () => {
-    const response = await logout();
-
-    expect(response.status).toBe(200);
-    expect(mocks.adminSessionUpdateMany).not.toHaveBeenCalled();
-    expect(response.headers.get('set-cookie') ?? '').toContain('Max-Age=0');
-  });
-
-  it('expires the cookie as HttpOnly, SameSite=Strict, Path=/ and Secure in production', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('ADMIN_JWT_SECRET', PRODUCTION_JWT_SECRET);
-    const token = signAdmin({ session_id: SESSION_ID });
-
-    const response = await logout(`admin_jwt=${token}`);
-
-    expect(response.status).toBe(200);
-    expect(mocks.adminSessionUpdateMany).toHaveBeenCalledTimes(1);
     expect(cookieAttributes(response)).toEqual(expect.arrayContaining(['httponly', 'samesite=strict', 'path=/', 'secure']));
   });
 });

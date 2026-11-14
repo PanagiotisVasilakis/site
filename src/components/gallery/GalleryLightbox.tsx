@@ -5,6 +5,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Keyboar
 
 import { Icon } from '@/components/icons/Icon';
 import { IconButton } from '@/components/ui/IconButton';
+import { isMotionFull } from '@/lib/motion/motionPreference';
 
 export type LightboxPhoto = Readonly<{ src: string; alt: string; caption: string }>;
 
@@ -32,7 +33,7 @@ export function lightboxSlide(index: number): HTMLElement | null {
 }
 
 function scrollBehavior(): ScrollBehavior {
-  return document.documentElement.getAttribute('data-motion') === 'full' ? 'smooth' : 'instant';
+  return isMotionFull() ? 'smooth' : 'instant';
 }
 
 /**

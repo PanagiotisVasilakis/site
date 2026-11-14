@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { CALENDAR_STALE_ALERT_MINUTES, MAX_STAY_NIGHTS, PROPERTY_TIME_ZONE } from '@/data/stayPolicy';
+import { useCallback, useEffect, useState, type SubmitEvent } from 'react';
+import { CALENDAR_STALE_ALERT_MINUTES, DEFAULT_MINIMUM_NIGHTS, MAX_STAY_NIGHTS, PROPERTY_TIME_ZONE } from '@/data/stayPolicy';
 import { addDays, parseIsoDate } from '@/lib/availability/calendarDate';
 import { formatCents, parseEuroInputToCents } from '@/lib/availability/money';
 import internalFetch from '@/lib/internalFetchClient';
-import { Badge, Surface } from '@/components/ui';
+import { Badge } from '@/components/ui/Badge';
+import { Surface } from '@/components/ui/Surface';
 
 // Rate periods are edited as first night + LAST night (inclusive); the API
 // stores an exclusive end date (the check-out day), so the last night is sent
@@ -27,11 +28,9 @@ type SyncState = {
   lastFailureAt: string | null;
   lastErrorCode: string | null;
   lastHttpStatus: number | null;
-  consecutiveFailures: number;
   nights: number;
   horizonStart: string | null;
   horizonEnd: string | null;
-  nextAttemptAt: string;
   stale: boolean;
 };
 
@@ -103,6 +102,7 @@ function validate(form: FormState): Validated {
   if (!/^[0-9]+$/.test(form.minimum.trim()) || minimum < 1 || minimum > MAX_STAY_NIGHTS) {
     return { ok: false, message: `Minimum nights must be a whole number from 1 to ${MAX_STAY_NIGHTS}.` };
   }
+  if (last === '9999-12-31') return { ok: false, message: 'The last night must be before 9999-12-31.' };
   return {
     ok: true,
     body: { startDate: first, endDate: addDays(last, 1), nightlyPriceCents: cents, minimumNights: minimum },
@@ -123,7 +123,7 @@ function syncOutcome(response: Response, body: ApiBody | null): Feedback {
     const reason = [details?.code ?? 'unknown', details?.httpStatus ? `HTTP ${details.httpStatus}` : null]
       .filter(Boolean)
       .join(', ');
-    return { type: 'error', text: `The Airbnb calendar could not be read (${reason}). The last good calendar is kept.` };
+    return { type: 'error', text: `The Booking.com calendar could not be read (${reason}). The last good calendar is kept.` };
   }
   return { type: 'error', text: errorMessage(body, 'Unable to sync the calendar') };
 }
@@ -189,7 +189,7 @@ export default function AdminAvailabilityClient() {
     setForm(emptyForm);
   }
 
-  async function save(event: FormEvent) {
+  async function save(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     const validated = validate(form);
     if (!validated.ok) {
@@ -273,7 +273,7 @@ export default function AdminAvailabilityClient() {
         <p className="text-xs font-semibold uppercase tracking-[0.16em] admin-eyebrow">Admin</p>
         <h1 className="mt-2 font-display text-4xl font-semibold italic admin-title">Availability &amp; prices</h1>
         <p className="mt-3 text-sm admin-muted">
-          Seasonal nightly prices and the Airbnb calendar that marks the booked nights. Dates are nights at the property.
+          Seasonal nightly prices and the Booking.com calendar that marks the booked and closed nights. Dates are nights at the property.
         </p>
         <Link href="/admin" className="admin-action-outline shell-link mt-5 inline-flex">Back to operations</Link>
       </Surface>
@@ -284,7 +284,7 @@ export default function AdminAvailabilityClient() {
       <section className="admin-card mt-6 rounded-tile border p-5" aria-labelledby="calendar-sync-title">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <h2 id="calendar-sync-title" className="font-display text-2xl font-semibold italic admin-title">
-            Airbnb calendar sync
+            Booking.com calendar sync
           </h2>
           {sync && (
             <Badge variant={sync.configured ? 'approved' : 'pending'}>
@@ -295,7 +295,7 @@ export default function AdminAvailabilityClient() {
         {!sync ? <p className="mt-3 text-sm admin-muted">Loading sync state…</p> : (
           <>
             {!sync.configured && (
-              <p className="mt-3 text-sm admin-muted">Set AIRBNB_ICAL_URL in the production environment</p>
+              <p className="mt-3 text-sm admin-muted">Set BOOKING_ICAL_URL in the production environment</p>
             )}
             {sync.stale && (
               <p className="feedback-error mt-3 rounded-tile p-3 text-sm">
@@ -340,7 +340,7 @@ export default function AdminAvailabilityClient() {
 
       <section className="admin-card mt-6 rounded-tile border p-5" aria-labelledby="rate-periods-title">
         <h2 id="rate-periods-title" className="font-display text-2xl font-semibold italic admin-title">Rate periods</h2>
-        <p className="mt-1 text-sm admin-muted">Nights outside every period show as price on request.</p>
+        <p className="mt-1 text-sm admin-muted">The public site shows no prices: it uses only the minimum nights of the period that holds the check-in night (outside every period the minimum is {DEFAULT_MINIMUM_NIGHTS}). Enter the final price per night, all taxes and fees included; guests never see it.</p>
         {!periods ? <p className="mt-3 text-sm admin-muted">Loading rate periods…</p> : periods.length === 0 ? (
           <p className="mt-3 text-sm admin-muted">No rate periods yet.</p>
         ) : (

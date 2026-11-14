@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 
 interface Labels {
   online: string; offline: string; reconnecting: string; slow: string;
@@ -19,43 +19,30 @@ export default function StatusCluster({ labels }: Props) {
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [reconnecting, setReconnecting] = useState(false);
   const [effectiveType, setEffectiveType] = useState<string | undefined>();
-  // Use useCallback to prevent unnecessary re-renders and ensure stable references
-  const handleOnline = useCallback(() => {
-    // Use React's automatic batching for state updates
-    setIsOnline(true);
-    setReconnecting(true);
-    
-    // Set a timeout to clear reconnecting state with proper cleanup
-    const timeoutId = setTimeout(() => {
-      setReconnecting(false);
-    }, 2500);
-    
-    // Return cleanup function to prevent memory leaks
-    return () => clearTimeout(timeoutId);
-  }, []);
-  
-  const handleOffline = useCallback(() => {
-    setIsOnline(false);
-    setReconnecting(false); // Clear reconnecting when going offline
-  }, []);
 
   useEffect(() => {
-    let cleanupReconnecting: (() => void) | undefined;
-    
-    const handleOnlineWrapper = () => {
-      cleanupReconnecting?.(); // Clean up any previous timeout
-      cleanupReconnecting = handleOnline();
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const handleOnline = () => {
+      clearTimeout(reconnectTimer);
+      setIsOnline(true);
+      setReconnecting(true);
+      reconnectTimer = setTimeout(() => setReconnecting(false), 2500);
     };
-    
-    window.addEventListener('online', handleOnlineWrapper);
+    const handleOffline = () => {
+      setIsOnline(false);
+      setReconnecting(false);
+    };
+
+    window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-    
+
     return () => {
-      window.removeEventListener('online', handleOnlineWrapper);
+      window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
-      cleanupReconnecting?.(); // Clean up timeout on unmount
+      clearTimeout(reconnectTimer);
     };
-  }, [handleOnline, handleOffline]);
+  }, []);
 
   useEffect(() => {
     interface NavWithConn extends Navigator { 
@@ -107,11 +94,9 @@ export default function StatusCluster({ labels }: Props) {
         
         clearTimeout(timeoutId);
         
-        // Only update if we're currently offline to avoid unnecessary re-renders
-        setIsOnline(current => current ? current : true);
+        setIsOnline(true);
       } catch {
-        // Only update if we're currently online to avoid unnecessary re-renders
-        setIsOnline(current => current ? false : current);
+        setIsOnline(false);
       } finally {
         if (!aborted) {
           timer = setTimeout(probe, POLL_MS);
@@ -129,11 +114,10 @@ export default function StatusCluster({ labels }: Props) {
 
   const slowRaw = isOnline && effectiveType && /^(2g|slow-2g)$/i.test(effectiveType);
   const netStateRaw = !isOnline ? 'offline' : reconnecting ? 'reconnecting' : slowRaw ? 'slow' : 'online';
-  const netLabelRaw = !isOnline ? labels.offline : reconnecting ? labels.reconnecting : slowRaw ? labels.slow : labels.online;
 
   // During SSR/first client render, lock to stable placeholders so HTML matches
   const netState = hydrated ? netStateRaw : 'online';
-  const netLabel = hydrated ? netLabelRaw : labels.online;
+  const netLabel = labels[netState];
 
   const aria = `${netLabel}.`;
 

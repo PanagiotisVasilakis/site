@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-const DATABASE_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export const DATABASE_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const LOCK_KEY_DOMAIN = 'portal-refresh-generation-advisory-lock:v1\0';
 
 /**

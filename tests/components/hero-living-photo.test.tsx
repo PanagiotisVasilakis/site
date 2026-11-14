@@ -5,22 +5,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import HeroLivingPhoto from '@/components/home/hero/HeroLivingPhoto';
 
-const listing = vi.hoisted(() => ({ url: '' }));
+const listing = vi.hoisted(() => ({ bookingUrl: '' }));
 
 vi.mock('@/data/contact', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/data/contact')>()),
-  get AIRBNB_LISTING_URL() {
-    return listing.url;
+  get BOOKING_COM_LISTING_URL() {
+    return listing.bookingUrl;
   },
 }));
 
 beforeEach(() => {
-  listing.url = '';
+  listing.bookingUrl = '';
 });
 
 describe('HeroLivingPhoto (identity §9.1, §7.2, §1.4)', () => {
   it('renders the art-directed picture: AVIF then WebP per crop, the 3:2 WebP as the eager, high-priority LCP image', () => {
-    const { container } = render(<HeroLivingPhoto locale="en" fromPriceCents={8500} />);
+    const { container } = render(<HeroLivingPhoto locale="en" />);
 
     const sources = Array.from(container.querySelectorAll('picture > source'));
     expect(sources.map((source) => [source.getAttribute('media'), source.getAttribute('type')])).toEqual([
@@ -42,7 +42,7 @@ describe('HeroLivingPhoto (identity §9.1, §7.2, §1.4)', () => {
   });
 
   it('has the Italian H1 in two lines and labels the section with it', () => {
-    render(<HeroLivingPhoto locale="el" fromPriceCents={null} />);
+    render(<HeroLivingPhoto locale="el" />);
 
     const h1 = screen.getByRole('heading', { level: 1, name: 'Dolce far niente' });
     expect(h1).toHaveAttribute('lang', 'it');
@@ -50,54 +50,31 @@ describe('HeroLivingPhoto (identity §9.1, §7.2, §1.4)', () => {
     expect(screen.getByRole('region', { name: 'Dolce far niente' })).toHaveAttribute('data-hero');
   });
 
-  it('shows "from €X / night" from the availability price', () => {
-    const { container } = render(<HeroLivingPhoto locale="en" fromPriceCents={8500} />);
-
-    expect(container.querySelector('.hero__price')).toHaveTextContent('from €85 / night');
-    expect(container.querySelector('.hero__price-value')).toHaveTextContent('€85');
-  });
-
-  it('formats the Greek price line', () => {
-    const { container } = render(<HeroLivingPhoto locale="el" fromPriceCents={8500} />);
-
-    expect(container.querySelector('.hero__price')?.textContent?.replace(/\s/g, ' ')).toBe('από 85 € / νύχτα');
-  });
-
-  it('shows no number without a price', () => {
-    const { container } = render(<HeroLivingPhoto locale="en" fromPriceCents={null} />);
-
-    expect(container.querySelector('.hero__price')).toHaveTextContent('See prices & free dates');
-    expect(container.querySelector('.hero__price')?.textContent).not.toMatch(/\d|€/);
-  });
-
-  it('links "Check dates" to the availability page and hides Airbnb without a listing URL', () => {
-    render(<HeroLivingPhoto locale="el" fromPriceCents={null} />);
+  it('links "Check dates" to the availability page and hides Booking.com without a listing link', () => {
+    render(<HeroLivingPhoto locale="el" />);
+    expect(document.querySelector('.hero__price')).toBeNull();
+    expect(document.body).not.toHaveTextContent('€');
 
     const links = within(screen.getByRole('region')).getAllByRole('link');
     expect(links).toHaveLength(1);
     expect(links[0]).toHaveAttribute('href', '/el/availability');
     expect(links[0]).toHaveTextContent('Δείτε ημερομηνίες');
+    expect(screen.queryByText(/Booking\.com/)).toBeNull();
   });
 
-  it('adds the glass "Book on Airbnb" link for a valid listing URL only', () => {
-    listing.url = 'https://www.airbnb.com/rooms/123';
-    const { unmount } = render(<HeroLivingPhoto locale="en" fromPriceCents={null} />);
+  it('adds the glass Booking.com link for a valid link only', () => {
+    listing.bookingUrl = 'https://example.com/Share-AiCapK';
+    const invalid = render(<HeroLivingPhoto locale="en" />);
+    expect(screen.queryByRole('link', { name: /Booking\.com/ })).toBeNull();
+    expect(screen.queryByText(/Booking\.com/)).toBeNull();
+    invalid.unmount();
 
-    const airbnb = screen.getByRole('link', { name: 'Book on Airbnb (opens in a new tab)' });
-    expect(airbnb).toHaveAttribute('href', 'https://www.airbnb.com/rooms/123');
-    expect(airbnb).toHaveAttribute('target', '_blank');
-    expect(airbnb).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(airbnb).toHaveClass('ui-btn--glass');
-    unmount();
-
-    listing.url = 'https://example.com/rooms/123';
-    render(<HeroLivingPhoto locale="en" fromPriceCents={null} />);
-    expect(screen.queryByRole('link', { name: /Airbnb/ })).toBeNull();
-  });
-
-  it('keeps the scroll hint out of the accessibility tree', () => {
-    const { container } = render(<HeroLivingPhoto locale="en" fromPriceCents={null} />);
-
-    expect(container.querySelector('.hero__hint')).toHaveAttribute('aria-hidden', 'true');
+    listing.bookingUrl = 'https://www.booking.com/Share-AiCapK';
+    render(<HeroLivingPhoto locale="en" />);
+    const bookingLink = screen.getByRole('link', { name: 'Book on Booking.com (opens in a new tab)' });
+    expect(bookingLink).toHaveAttribute('href', 'https://www.booking.com/Share-AiCapK');
+    expect(bookingLink).toHaveAttribute('target', '_blank');
+    expect(bookingLink).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(bookingLink).toHaveClass('ui-btn--glass');
   });
 });

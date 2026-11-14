@@ -5,10 +5,11 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { flushSync } from 'react-dom';
 
 import type { ApartmentRoomKey, PhotoCrop } from '@/data/apartmentPhotos';
+import { isMotionFull } from '@/lib/motion/motionPreference';
 import GalleryLightbox, { lightboxSlide, type LightboxLabels, type LightboxPhoto } from './GalleryLightbox';
 import { morphPhoto } from './photoMorph';
 
-export type GalleryRoom = Readonly<{ key: ApartmentRoomKey; name: string; line: string }>;
+type GalleryRoom = Readonly<{ key: ApartmentRoomKey; name: string; line: string }>;
 
 export type GalleryPhoto = Readonly<{
   id: string;
@@ -57,7 +58,8 @@ function inViewport(element: HTMLElement | null): HTMLElement | null {
 
 /**
  * identity §9.2: the lead photo, the sticky room chips (the active chip follows the scroll), one section per
- * room (`id` = room key) with a CSS-columns masonry in the §7.3 order, and the GalleryLightbox over all photos.
+ * room (`id` = room key) with a CSS-columns masonry in the §7.3 order (a row-major grid when all its tiles share one box
+ * ratio, so no column is left short), and the GalleryLightbox over all photos.
  * Opening and closing morph between the tile and the viewer where View Transitions run (photoMorph.ts).
  */
 export default function ApartmentGallery({ rooms, photos, leadId, labels }: ApartmentGalleryProps) {
@@ -92,7 +94,7 @@ export default function ApartmentGallery({ rooms, photos, leadId, labels }: Apar
       const row = chipsRef.current;
       const chip = row?.querySelector<HTMLElement>(`[data-room="${first.key}"]`);
       if (row && chip) {
-        const behavior = document.documentElement.getAttribute('data-motion') === 'full' ? 'smooth' : 'instant';
+        const behavior = isMotionFull() ? 'smooth' : 'instant';
         row.scrollTo({ left: chip.offsetLeft - (row.clientWidth - chip.offsetWidth) / 2, behavior });
       }
     }, { rootMargin: '-140px 0px -55% 0px' });
@@ -161,13 +163,16 @@ export default function ApartmentGallery({ rooms, photos, leadId, labels }: Apar
           .map((photo, index) => ({ photo, index }))
           .filter(({ photo, index }) => photo.room === room.key && index !== leadIndex);
         const single = tiles.length === 1;
+        // Equal boxes in CSS columns split unevenly (3 + 3 + 3 + 1 tiles leave a column mostly empty): lay them out row by row.
+        const equalBoxes = tiles.length > 1 && new Set(tiles.map(({ photo }) => cropStyle(photo).box.aspectRatio)).size === 1;
+        const layout = single ? 'single' : equalBoxes ? 'grid' : null;
         return (
           <section key={room.key} id={room.key} className="apt-room" aria-labelledby={`${room.key}-title`}>
             <div className="apt-room__head">
               <h2 id={`${room.key}-title`} className="apt-room__title">{room.name}</h2>
               <p className="apt-room__line">{room.line}</p>
             </div>
-            <ul className={single ? 'apt-masonry apt-masonry--single' : 'apt-masonry'}>
+            <ul className={layout ? `apt-masonry apt-masonry--${layout}` : 'apt-masonry'}>
               {tiles.map(({ photo, index }) => {
                 const style = cropStyle(photo);
                 return (

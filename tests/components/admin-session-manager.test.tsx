@@ -124,6 +124,65 @@ describe('admin session manager', () => {
     expect(refreshCalls()).toBe(callsAtExpiry);
   });
 
+  it.each([
+    ['a 200 answer without expiresAt', () => new Response(JSON.stringify({ success: true }), { status: 200 })],
+    ['a 503 answer', () => new Response('Service unavailable', { status: 503 })],
+  ])('shows the refresh failure for %s and does not redirect before expiry', async (_label, answer) => {
+    mocks.fetch.mockImplementation(async () => answer());
+    render(<AdminSessionManager expiresAt={at(30)} />);
+
+    await advance(25);
+    expect(screen.getByText(/Token refresh failed/u)).toBeInTheDocument();
+    expect(mocks.router.replace).not.toHaveBeenCalled();
+
+    await advance(4);
+    expect(refreshCalls()).toBe(5);
+    expect(mocks.router.replace).not.toHaveBeenCalled();
+  });
+
+  it('Retry now after a rejected refresh runs the refresh at once', async () => {
+    mocks.fetch.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockImplementation(async () => refreshed(145));
+    render(<AdminSessionManager expiresAt={at(30)} />);
+    await advance(25);
+    expect(screen.getByText(/Token refresh failed/u)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry now' }));
+    expect(refreshCalls()).toBe(2);
+    await advance(0);
+
+    expect(screen.queryByText(/Token refresh failed/u)).not.toBeInTheDocument();
+    expect(screen.getByText('Session: ok')).toBeInTheDocument();
+    expect(mocks.router.replace).not.toHaveBeenCalled();
+  });
+
+  it('logs out with POST /api/admin/logout and reloads the page', async () => {
+    const reload = vi.fn();
+    vi.stubGlobal('location', { ...window.location, reload });
+    mocks.fetch.mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
+    render(<AdminSessionManager expiresAt={at(30)} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
+    await advance(0);
+
+    expect(mocks.fetch).toHaveBeenCalledWith('/api/admin/logout', { method: 'POST' });
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(refreshCalls()).toBe(0);
+  });
+
+  it('shows its own message when logout fails, not the refresh banner', async () => {
+    mocks.fetch.mockResolvedValue(new Response(JSON.stringify({ error: 'Server error' }), { status: 500 }));
+    render(<AdminSessionManager expiresAt={at(30)} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
+    await advance(0);
+
+    expect(screen.queryByText(/Token refresh failed/u)).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Logout failed. Try again.');
+    expect(screen.queryByRole('button', { name: 'Retry now' })).not.toBeInTheDocument();
+    expect(screen.getByText('Session: ok')).toBeInTheDocument();
+    expect(refreshCalls()).toBe(0);
+  });
+
   it('asks the server instead of redirecting when the expiry it was given has passed', async () => {
     mocks.fetch.mockResolvedValue(refreshed(120));
     render(<AdminSessionManager expiresAt={at(-5)} />);
@@ -135,15 +194,18 @@ describe('admin session manager', () => {
   });
 
   it('keeps one schedule across admin page navigations', async () => {
-    mocks.fetch.mockResolvedValue(refreshed(145));
+    mocks.fetch.mockImplementation(async () => refreshed(145));
     const { rerender } = render(<AdminSessionManager expiresAt={at(30)} />);
-    await advance(20);
+    await advance(26);
+    expect(refreshCalls()).toBe(1);
 
+    // The layout still passes the original expiry after the refresh; a schedule restarted by navigation would refresh again.
     mocks.pathname.current = '/admin/guests';
     rerender(<AdminSessionManager expiresAt={at(30)} />);
-    await advance(5);
+    await advance(10);
 
     expect(refreshCalls()).toBe(1);
+    expect(mocks.router.replace).not.toHaveBeenCalled();
   });
 
   it.each([

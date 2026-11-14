@@ -6,12 +6,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 // Fixed, git-ignored scratch directory: the script writes `.env.local` in its cwd.
 const WORK_DIR = '.runtime/ensure-pepper-test';
 
-function run(env: Record<string, string> = {}): string {
+function run(): string {
   const childEnv: NodeJS.ProcessEnv = { ...process.env };
   for (const key of Object.keys(childEnv)) if (key.startsWith('POSTGRES_')) delete childEnv[key];
   return execFileSync(process.execPath, ['../../scripts/ensure-pepper.js'], {
     cwd: WORK_DIR,
-    env: { ...childEnv, ...env },
+    env: childEnv,
     encoding: 'utf8',
   });
 }
@@ -39,13 +39,6 @@ describe('ensure-pepper local environment bootstrap', () => {
     expect(fs.statSync('.runtime/ensure-pepper-test/.env.local').mode & 0o777).toBe(0o600);
   });
 
-  it('follows the POSTGRES_* overrides that docker-compose uses', () => {
-    run({ POSTGRES_USER: 'me', POSTGRES_PASSWORD: 'p@ss', POSTGRES_DB: 'guide', POSTGRES_PORT: '6543' });
-
-    expect(fs.readFileSync('.runtime/ensure-pepper-test/.env.local', 'utf8'))
-      .toMatch(/^DATABASE_URL=postgresql:\/\/me:p%40ss@localhost:6543\/guide$/m);
-  });
-
   it('keeps an existing DATABASE_URL and is idempotent', () => {
     fs.writeFileSync('.runtime/ensure-pepper-test/.env.local', 'DATABASE_URL=postgresql://custom@db:5432/app\n');
 
@@ -59,33 +52,17 @@ describe('ensure-pepper local environment bootstrap', () => {
     expect(output).toContain('no action taken');
   });
 
-  it('generates SECURITY_PEPPER when the existing line is empty', () => {
-    fs.writeFileSync('.runtime/ensure-pepper-test/.env.local', 'SECURITY_PEPPER=\n');
-
-    const output = run();
-
-    expect(fs.readFileSync('.runtime/ensure-pepper-test/.env.local', 'utf8')).toMatch(/^SECURITY_PEPPER=[0-9a-f]{64}$/m);
-    expect(output).toContain('Generated SECURITY_PEPPER');
-  });
-
-  it('generates SECURITY_PEPPER when the empty line is followed by other lines', () => {
-    fs.writeFileSync('.runtime/ensure-pepper-test/.env.local', 'SECURITY_PEPPER=\nFOO=bar\n');
-
-    const output = run();
-
-    expect(fs.readFileSync('.runtime/ensure-pepper-test/.env.local', 'utf8')).toMatch(/^SECURITY_PEPPER=[0-9a-f]{64}$/m);
-    expect(output).toContain('Generated SECURITY_PEPPER');
-  });
-
-  it('generates DATABASE_URL, CLAIM_TOKEN_PEPPER and ORIGIN_PROXY_SHARED_SECRET when empty lines are followed by other lines', () => {
+  it('generates each empty secret line when other lines follow', () => {
     fs.writeFileSync(
       '.runtime/ensure-pepper-test/.env.local',
-      'DATABASE_URL=\nCLAIM_TOKEN_PEPPER=\nORIGIN_PROXY_SHARED_SECRET=\nFOO=bar\n',
+      'SECURITY_PEPPER=\nDATABASE_URL=\nCLAIM_TOKEN_PEPPER=\nORIGIN_PROXY_SHARED_SECRET=\nFOO=bar\n',
     );
 
-    run();
+    const output = run();
 
     const env = fs.readFileSync('.runtime/ensure-pepper-test/.env.local', 'utf8');
+    expect(env).toMatch(/^SECURITY_PEPPER=[0-9a-f]{64}$/m);
+    expect(output).toContain('Generated SECURITY_PEPPER');
     expect(env).toMatch(/^DATABASE_URL=postgresql:\/\/devuser:devpass@localhost:5433\/site_dev$/m);
     expect(env).toMatch(/^CLAIM_TOKEN_PEPPER=[0-9a-f]{64}$/m);
     expect(env).toMatch(/^ORIGIN_PROXY_SHARED_SECRET=[0-9a-f]{64}$/m);

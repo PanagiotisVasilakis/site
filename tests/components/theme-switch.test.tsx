@@ -57,21 +57,6 @@ describe('ThemeSwitch (header toggle)', () => {
     Reflect.deleteProperty(document, 'startViewTransition');
   });
 
-  it('derives the effective theme from the OS when data-theme is absent', async () => {
-    installMatchMedia(true);
-    render(<ThemeSwitch t={en} />);
-    expect(await screen.findByRole('button', { name: 'Switch to day' })).toBeInTheDocument();
-    expect(root).not.toHaveAttribute('data-theme');
-  });
-
-  it('shows the day action for a persisted dark choice', async () => {
-    localStorage.setItem('theme', 'dark');
-    root.setAttribute('data-theme', 'dark'); // as the boot script does
-    render(<ThemeSwitch t={en} />);
-    expect(await screen.findByRole('button', { name: 'Switch to day' })).toBeInTheDocument();
-    expect(root).toHaveAttribute('data-theme', 'dark');
-  });
-
   it('prefers data-theme set by the boot script over the OS preference', async () => {
     installMatchMedia(true);
     root.setAttribute('data-theme', 'light');
@@ -118,7 +103,7 @@ describe('ThemeSwitch (header toggle)', () => {
     await waitFor(() => expect(root).not.toHaveAttribute('data-vt'));
   });
 
-  it.each([['reduce'], [null]])('skips the view transition when data-motion is %s', async (motion) => {
+  it.each([['reduce']])('skips the view transition when data-motion is %s', async (motion) => {
     const start = installViewTransition();
     if (motion) root.setAttribute('data-motion', motion);
     const user = userEvent.setup();

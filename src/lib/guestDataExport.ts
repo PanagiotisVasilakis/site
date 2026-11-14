@@ -52,16 +52,10 @@ function toBookingExport(booking: Booking, user?: User): BookingExport {
 }
 
 class GuestDataExport {
-  /**
-   * Get all bookings with full details
-   */
   async getAllBookings(): Promise<BookingExport[]> {
-    return this.withDetails(await this.getAllBookingsRaw());
+    return this.withDetails(await guestStore.getAllBookings());
   }
 
-  /**
-   * Get booking by reference number
-   */
   async getBookingByReference(reference: string): Promise<BookingExport | null> {
     const booking = await guestStore.findBookingByReference(reference);
     if (!booking) {
@@ -71,28 +65,15 @@ class GuestDataExport {
     return this.getBookingDetails(booking.id);
   }
 
-  /**
-   * Get all bookings for a specific user
-   */
-  async getBookingsByUser(userId: string): Promise<BookingExport[]> {
-    return this.withDetails((await this.getAllBookingsRaw()).filter((b) => b.userId === userId));
-  }
-
-  /**
-   * Get booking by user phone number
-   */
   async getBookingsByPhone(phone: string): Promise<BookingExport[]> {
     const user = await guestStore.findUserByPhone(phone);
     if (!user) {
       logger.info('User not found by phone', { phone: phone.substring(0, 3) + '***' });
       return [];
     }
-    return this.getBookingsByUser(user.id);
+    return this.withDetails((await guestStore.getAllBookings()).filter((b) => b.userId === user.id));
   }
 
-  /**
-   * Get detailed booking information
-   */
   async getBookingDetails(bookingId: string): Promise<BookingExport | null> {
     const booking = await guestStore.findBookingById(bookingId);
     if (!booking) return null;
@@ -101,87 +82,42 @@ class GuestDataExport {
     return toBookingExport(booking, user);
   }
 
-  /**
-   * Search bookings by date range
-   */
-  async searchBookingsByDateRange(startDate: string, endDate?: string): Promise<BookingExport[]> {
-    const bookings = (await this.getAllBookingsRaw()).filter((booking) => {
+  async searchBookingsByDateRange(startDate: string): Promise<BookingExport[]> {
+    const bookings = (await guestStore.getAllBookings()).filter((booking) => {
         const bookingStart = calendarDate(booking.startDate);
         const bookingEnd = calendarDate(booking.endDate);
 
-        if (endDate) {
-          return bookingStart >= startDate && bookingStart <= endDate;
-        } else {
-          return bookingStart <= startDate && bookingEnd >= startDate;
-        }
+        return bookingStart <= startDate && bookingEnd >= startDate;
     });
 
     return this.withDetails(bookings);
   }
 
-  /**
-   * Get summary statistics
-   */
   async getStatistics(): Promise<{
     totalBookings: number;
     totalUsers: number;
     totalClaimedBookings: number;
-    bookingsBySource: Record<string, number>;
-    bookingsByStatus: Record<string, number>;
   }> {
     const [bookings, users] = await Promise.all([
-        this.getAllBookingsRaw(),
-        this.getAllUsersRaw(),
+        guestStore.getAllBookings(),
+        guestStore.getAllUsers(),
       ]);
-
-      const bookingsBySource: Record<string, number> = {};
-      const bookingsByStatus: Record<string, number> = {};
-
-      const now = new Date().toISOString().slice(0, 10);
-
-      bookings.forEach((booking) => {
-        bookingsBySource[booking.source] = (bookingsBySource[booking.source] || 0) + 1;
-
-        // Determine status based on dates
-        const bookingStart = calendarDate(booking.startDate);
-        const bookingEnd = calendarDate(booking.endDate);
-        let status = 'upcoming';
-        if (bookingEnd < now) {
-          status = 'completed';
-        } else if (bookingStart <= now && bookingEnd >= now) {
-          status = 'active';
-        }
-
-        bookingsByStatus[status] = (bookingsByStatus[status] || 0) + 1;
-      });
 
     return {
         totalBookings: bookings.length,
         totalUsers: users.length,
         totalClaimedBookings: bookings.filter((booking) => booking.accessStatus === 'VERIFIED').length,
-        bookingsBySource,
-        bookingsByStatus,
     };
   }
-
-  // Private helper methods
 
   // Joins users from one full-list query instead of querying per booking.
   private async withDetails(bookings: Booking[]): Promise<BookingExport[]> {
     if (bookings.length === 0) return [];
-    const usersById = new Map((await this.getAllUsersRaw()).map((user) => [user.id, user]));
+    const usersById = new Map((await guestStore.getAllUsers()).map((user) => [user.id, user]));
     return bookings.map((booking) => toBookingExport(
       booking,
       booking.userId ? usersById.get(booking.userId) : undefined,
     ));
-  }
-
-  private async getAllBookingsRaw(): Promise<Booking[]> {
-    return guestStore.getAllBookings();
-  }
-
-  private async getAllUsersRaw(): Promise<User[]> {
-    return guestStore.getAllUsers();
   }
 
 }

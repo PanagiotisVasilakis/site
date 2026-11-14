@@ -1,3 +1,4 @@
+import jwt from 'jsonwebtoken';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import type { PrismaClient } from '@/generated/prisma/client';
@@ -7,7 +8,7 @@ import {
   createIsolatedDatabase,
   dropIsolatedDatabase,
 } from '../support/database-lifecycle';
-import { withTestPrismaClient } from '../support/fixtures';
+import { utcDateOffset, withTestPrismaClient } from '../support/fixtures';
 import { applyMigrationsFromEmpty } from '../support/migrations';
 import { readDisposablePostgresRuntime } from '../support/runtime';
 import {
@@ -23,6 +24,7 @@ const LOGOUT_URL = 'http://integration.invalid/api/portal/logout';
 const REFRESH_URL = 'http://integration.invalid/api/portal/refresh';
 const SYNTHETIC_SECURITY_PEPPER = 'pr02b-logout-security-pepper-only';
 const SYNTHETIC_JWT_SECRET = 'pr02b-logout-jwt-secret-only';
+const SYNTHETIC_FOREIGN_JWT_SECRET = 'pr02b-logout-foreign-jwt-secret-only';
 const REQUEST_HEADERS = {
   'user-agent': 'pr02b-synthetic-logout-client',
   'x-origin-verified-client-ip': '198.51.100.73',
@@ -167,16 +169,6 @@ function restoreApplicationEnvironment(): void {
     if (value === undefined) delete process.env[name];
     else process.env[name] = value;
   }
-}
-
-function utcDateOffset(now: Date, days: number): Date {
-  const date = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-  ));
-  date.setUTCDate(date.getUTCDate() + days);
-  return date;
 }
 
 async function loadAuthModules(): Promise<AuthModules> {
@@ -447,6 +439,47 @@ async function safeGraphState(
   });
 }
 
+async function verifySessionToken(
+  loadedModules: AuthModules,
+  sessionToken: string,
+): ReturnType<SessionModule['verifyGuestSessionAccess']> {
+  return loadedModules.sessionModule.verifyGuestSessionAccess(
+    loadedModules.sessionModule.parseGuestSession(sessionToken),
+  );
+}
+
+function withWrongRefreshSecret(refreshToken: string): string {
+  return `${refreshToken.split('.', 1)[0]}.synthetic-wrong-secret`;
+}
+
+function foreignSignedSession(sessionId: string, fixture: AuthPrincipalFixture): string {
+  return jwt.sign({
+    type: 'guest',
+    sid: sessionId,
+    user: { id: fixture.userId },
+    booking: { id: fixture.bookingId },
+  }, SYNTHETIC_FOREIGN_JWT_SECRET, { algorithm: 'HS256', expiresIn: '1h' });
+}
+
+async function familyRevocationReason(
+  targetDatabase: DisposableDatabaseTarget,
+  familyId: string,
+): Promise<string | null> {
+  return withTestPrismaClient(targetDatabase, async (prisma) => {
+    const family = await prisma.refreshTokenFamily.findUnique({
+      where: { id: familyId },
+      select: { revocationReason: true },
+    });
+    return family?.revocationReason ?? null;
+  });
+}
+
+async function refreshReplayAuditCount(targetDatabase: DisposableDatabaseTarget): Promise<number> {
+  return withTestPrismaClient(targetDatabase, (prisma) => prisma.securityAuditEvent.count({
+    where: { eventType: 'portal.refresh_token_replay' },
+  }));
+}
+
 describe.sequential('portal logout authorization characterization', () => {
   beforeAll(async () => {
     target = await createIsolatedDatabase(runtime, 'logout_characterization');
@@ -478,6 +511,7 @@ describe.sequential('portal logout authorization characterization', () => {
     await seedAuthEligibilityFixtures(authTarget, new Date());
     const session = await issueSessionOnly(loadedModules, REVOKED_SESSION_FIXTURE);
     const before = await safeGraphState(authTarget, REVOKED_SESSION_FIXTURE);
+    const acceptedBeforeLogout = await verifySessionToken(loadedModules, session.sessionToken);
 
     const firstLogout = await safeLogoutEvidence(await performLogout(loadedModules, {
       sessionToken: session.sessionToken,
@@ -489,6 +523,7 @@ describe.sequential('portal logout authorization characterization', () => {
     const refreshDenial = await safeRefreshDenial(await performRefresh(loadedModules, {
       sessionToken: session.sessionToken,
     }));
+    const rejectedAfterLogout = await verifySessionToken(loadedModules, session.sessionToken);
     const finalState = await safeGraphState(authTarget, REVOKED_SESSION_FIXTURE);
 
     expect(before).toEqual({
@@ -498,6 +533,7 @@ describe.sequential('portal logout authorization characterization', () => {
       pairedGenerations: 0,
       generationPairingValid: true,
     });
+    expect(acceptedBeforeLogout).toMatchObject({ sid: session.sessionId });
     expect(firstLogout).toEqual(EXPECTED_LOGOUT);
     expect(afterFirst).toEqual({
       sessions: { total: 1, active: 0, revoked: 1 },
@@ -508,6 +544,7 @@ describe.sequential('portal logout authorization characterization', () => {
     });
     expect(repeatedLogout).toEqual(EXPECTED_LOGOUT);
     expect(refreshDenial).toEqual(EXPECTED_REFRESH_DENIAL);
+    expect(rejectedAfterLogout).toBeNull();
     expect(finalState).toEqual(afterFirst);
   });
 
@@ -581,17 +618,29 @@ describe.sequential('portal logout authorization characterization', () => {
       sessionToken: primary.sessionToken,
       refreshToken: primary.refreshToken,
     }));
+    const reasonBeforeRefresh = await familyRevocationReason(
+      authTarget,
+      REVOKED_SESSION_FIXTURE.familyId,
+    );
     const refreshDenial = await safeRefreshDenial(await performRefresh(loadedModules, {
       sessionToken: primary.sessionToken,
       refreshToken: primary.refreshToken,
     }));
+    const reasonAfterRefresh = await familyRevocationReason(
+      authTarget,
+      REVOKED_SESSION_FIXTURE.familyId,
+    );
+    const replayAuditCount = await refreshReplayAuditCount(authTarget);
     const primaryAfter = await safeGraphState(authTarget, REVOKED_SESSION_FIXTURE);
     const isolatedAfter = await safeGraphState(authTarget, ISOLATED_AUTH_FIXTURE);
 
     expect(stablePrimary).toEqual(REVOKED_BOUND_GRAPH);
     expect(stableIsolated).toEqual(ACTIVE_BOUND_GRAPH);
     expect(logout).toEqual(EXPECTED_LOGOUT);
+    expect(reasonBeforeRefresh).toBe('logout');
     expect(refreshDenial).toEqual(EXPECTED_REFRESH_DENIAL);
+    expect(reasonAfterRefresh).toBe('logout');
+    expect(replayAuditCount).toBe(0);
     expect(primaryAfter).toEqual(stablePrimary);
     expect(isolatedAfter).toEqual(stableIsolated);
   });
@@ -691,5 +740,111 @@ describe.sequential('portal logout authorization characterization', () => {
     expect(isolatedAfterRepeat).toEqual(stableIsolated);
     expect(refreshDenial).toEqual(EXPECTED_REFRESH_DENIAL);
     expect(primaryFinal).toEqual(stablePrimary);
+  });
+
+  it('revokes only the logged-out session among several session-only sessions of one principal', async () => {
+    const authTarget = requireTarget();
+    const loadedModules = requireModules();
+    await seedAuthEligibilityFixtures(authTarget, new Date(), { includeIsolatedPrincipal: true });
+    const first = await issueSessionOnly(loadedModules, REVOKED_SESSION_FIXTURE);
+    const second = await issueSessionOnly(loadedModules, REVOKED_SESSION_FIXTURE);
+    const isolated = await issueSessionOnly(loadedModules, ISOLATED_AUTH_FIXTURE);
+    const primaryBefore = await safeGraphState(authTarget, REVOKED_SESSION_FIXTURE);
+    const isolatedBefore = await safeGraphState(authTarget, ISOLATED_AUTH_FIXTURE);
+
+    const logout = await safeLogoutEvidence(await performLogout(loadedModules, {
+      sessionToken: first.sessionToken,
+    }));
+    const primaryAfter = await safeGraphState(authTarget, REVOKED_SESSION_FIXTURE);
+    const isolatedAfter = await safeGraphState(authTarget, ISOLATED_AUTH_FIXTURE);
+    const firstAccess = await verifySessionToken(loadedModules, first.sessionToken);
+    const secondAccess = await verifySessionToken(loadedModules, second.sessionToken);
+    const isolatedAccess = await verifySessionToken(loadedModules, isolated.sessionToken);
+
+    expect(primaryBefore).toEqual({
+      sessions: { total: 2, active: 2, revoked: 0 },
+      families: { total: 0, active: 0, revoked: 0 },
+      tokens: { total: 0, active: 0, revoked: 0, descendants: 0 },
+      pairedGenerations: 0,
+      generationPairingValid: true,
+    });
+    expect(isolatedBefore).toEqual({
+      sessions: { total: 1, active: 1, revoked: 0 },
+      families: { total: 0, active: 0, revoked: 0 },
+      tokens: { total: 0, active: 0, revoked: 0, descendants: 0 },
+      pairedGenerations: 0,
+      generationPairingValid: true,
+    });
+    expect(logout).toEqual(EXPECTED_LOGOUT);
+    expect(primaryAfter).toEqual({
+      sessions: { total: 2, active: 1, revoked: 1 },
+      families: { total: 0, active: 0, revoked: 0 },
+      tokens: { total: 0, active: 0, revoked: 0, descendants: 0 },
+      pairedGenerations: 0,
+      generationPairingValid: true,
+    });
+    expect(isolatedAfter).toEqual(isolatedBefore);
+    expect(firstAccess).toBeNull();
+    expect(secondAccess).toMatchObject({ sid: second.sessionId });
+    expect(isolatedAccess).toMatchObject({ sid: isolated.sessionId });
+  });
+
+  it('rejects a refresh token with a wrong secret on logout and refresh without revoking the chain', async () => {
+    const authTarget = requireTarget();
+    const loadedModules = requireModules();
+    await seedAuthEligibilityFixtures(authTarget, new Date(), { includeIsolatedPrincipal: true });
+    const primary = await issueBoundAuthorizationChain(loadedModules, REVOKED_SESSION_FIXTURE);
+    await issueBoundAuthorizationChain(loadedModules, ISOLATED_AUTH_FIXTURE);
+    const primaryBefore = await safeGraphState(authTarget, REVOKED_SESSION_FIXTURE);
+    const isolatedBefore = await safeGraphState(authTarget, ISOLATED_AUTH_FIXTURE);
+    const wrongSecretRefresh = withWrongRefreshSecret(primary.refreshToken);
+
+    const logout = await safeLogoutEvidence(await performLogout(loadedModules, {
+      refreshToken: wrongSecretRefresh,
+    }));
+    const refreshWithoutSession = await safeRefreshDenial(await performRefresh(loadedModules, {
+      refreshToken: wrongSecretRefresh,
+    }));
+    const refreshWithSession = await safeRefreshDenial(await performRefresh(loadedModules, {
+      sessionToken: primary.sessionToken,
+      refreshToken: wrongSecretRefresh,
+    }));
+    const primaryAfter = await safeGraphState(authTarget, REVOKED_SESSION_FIXTURE);
+    const isolatedAfter = await safeGraphState(authTarget, ISOLATED_AUTH_FIXTURE);
+    const primaryAccess = await verifySessionToken(loadedModules, primary.sessionToken);
+
+    expect(primaryBefore).toEqual(ACTIVE_BOUND_GRAPH);
+    expect(isolatedBefore).toEqual(ACTIVE_BOUND_GRAPH);
+    expect(logout).toEqual(EXPECTED_LOGOUT);
+    expect(refreshWithoutSession).toEqual(EXPECTED_REFRESH_DENIAL);
+    expect(refreshWithSession).toEqual(EXPECTED_REFRESH_DENIAL);
+    expect(primaryAfter).toEqual(primaryBefore);
+    expect(isolatedAfter).toEqual(isolatedBefore);
+    expect(primaryAccess).toMatchObject({ sid: primary.sessionId });
+  });
+
+  it('ignores a session JWT signed with another secret even when it carries a live session ID', async () => {
+    const authTarget = requireTarget();
+    const loadedModules = requireModules();
+    await seedAuthEligibilityFixtures(authTarget, new Date(), { includeIsolatedPrincipal: true });
+    const primary = await issueBoundAuthorizationChain(loadedModules, REVOKED_SESSION_FIXTURE);
+    await issueBoundAuthorizationChain(loadedModules, ISOLATED_AUTH_FIXTURE);
+    const primaryBefore = await safeGraphState(authTarget, REVOKED_SESSION_FIXTURE);
+    const isolatedBefore = await safeGraphState(authTarget, ISOLATED_AUTH_FIXTURE);
+    const forgedSession = foreignSignedSession(primary.sessionId, REVOKED_SESSION_FIXTURE);
+
+    const logout = await safeLogoutEvidence(await performLogout(loadedModules, {
+      sessionToken: forgedSession,
+    }));
+    const primaryAfter = await safeGraphState(authTarget, REVOKED_SESSION_FIXTURE);
+    const isolatedAfter = await safeGraphState(authTarget, ISOLATED_AUTH_FIXTURE);
+    const primaryAccess = await verifySessionToken(loadedModules, primary.sessionToken);
+
+    expect(primaryBefore).toEqual(ACTIVE_BOUND_GRAPH);
+    expect(isolatedBefore).toEqual(ACTIVE_BOUND_GRAPH);
+    expect(logout).toEqual(EXPECTED_LOGOUT);
+    expect(primaryAfter).toEqual(primaryBefore);
+    expect(isolatedAfter).toEqual(isolatedBefore);
+    expect(primaryAccess).toMatchObject({ sid: primary.sessionId });
   });
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type SubmitEvent } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 
@@ -25,7 +25,7 @@ export default function UnifiedGuestClient() {
   const initialMode: GuestMode = search.get('mode') === 'signup' ? 'signup' : 'signin';
   // `?flash=` carries a message code, never text: only known codes are shown.
   const flashCode = search.get('flash');
-  const flashMessage = flashCode === 'session_required' ? dictionary?.errors?.sessionRequired : undefined;
+  const flashMessage = flashCode === 'session_required' ? dictionary.errors.sessionRequired : undefined;
   const syncingFromUrlRef = useRef(false);
 
   const [mode, setMode] = useState<GuestMode>(initialMode);
@@ -99,7 +99,7 @@ export default function UnifiedGuestClient() {
     setSubmitError(null);
   }
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!valid || loading) return;
     setLoading(true);
@@ -122,7 +122,7 @@ export default function UnifiedGuestClient() {
           const mapped = mapApiErrorToUI(exchangeJson, locale);
           // The exchange checks only the token, so a 401 means the token itself
           // was refused (unknown, expired or already used).
-          const tokenRefused = exchangeResponse.status === 401 ? dictionary?.errors?.claimTokenInvalid : undefined;
+          const tokenRefused = exchangeResponse.status === 401 ? dictionary.errors.claimTokenInvalid : undefined;
           setSubmitError({ summary: tokenRefused ?? mapped.summary, details: tokenRefused ? undefined : mapped.details });
           return;
         }
@@ -137,7 +137,7 @@ export default function UnifiedGuestClient() {
         const mapped = mapApiErrorToUI(json, locale);
         // The server does not reveal whether the password or the booking dates
         // failed (no password oracle), so the message names both causes.
-        const signInFailed = mode === 'signin' && response.status === 401 ? dictionary?.errors?.signInFailed : undefined;
+        const signInFailed = mode === 'signin' && response.status === 401 ? dictionary.errors.signInFailed : undefined;
         setSubmitError({ summary: signInFailed ?? mapped.summary, details: signInFailed ? undefined : mapped.details });
         return;
       }

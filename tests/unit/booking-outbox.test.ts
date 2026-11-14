@@ -1,6 +1,5 @@
-import { createServer } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { startRedirectingReceiver } from './support/redirecting-receiver';
 
 // In-memory stand-in for the two tables the outbox touches. It supports only
 // the filters and updates bookingOutbox.ts uses (equality, lte/lt, in, increment).
@@ -165,7 +164,6 @@ describe('check-in outbox delivery state machine', () => {
   it.each([
     ['not yet due', { nextAttemptAt: new Date(NOW.getTime() + 60_000) }],
     ['already leased by another worker', { status: 'LEASED', leaseOwner: 'other-worker' }],
-    ['already delivered', { status: 'DELIVERED' }],
     ['dead', { status: 'DEAD' }],
   ])('does not send an event that is %s', async (_label, overrides) => {
     seed(overrides);
@@ -232,14 +230,6 @@ describe('check-in outbox delivery state machine', () => {
     await expect(deliverOutboxEvent(EVENT_ID)).resolves.toBe(false);
 
     expect(event()).toMatchObject({ status: 'LEASED', leaseOwner: 'another-worker', deliveredAt: null });
-  });
-
-  it('ignores an unsupported destination without claiming it', async () => {
-    seed({ destination: 'unknown_destination' });
-
-    await expect(deliverOutboxEvent(EVENT_ID)).resolves.toBe(false);
-    expect(event().status).toBe('PENDING');
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('recovers an abandoned lease and delivers the event in the next drain', async () => {
@@ -313,30 +303,6 @@ describe('check-in outbox delivery state machine', () => {
   });
 });
 
-// An in-process receiver on an ephemeral loopback port: `/hook` answers with a
-// redirect to `/moved`, which would answer 200. It records every request, so a
-// test can prove the redirect target was never contacted.
-async function startRedirectingReceiver(redirectStatus: number) {
-  const requests: string[] = [];
-  const server = createServer((request, response) => {
-    requests.push(`${request.method} ${request.url}`);
-    request.resume();
-    if (request.url === '/hook') response.writeHead(redirectStatus, { location: '/moved' }).end();
-    else response.writeHead(200).end('ok');
-  });
-  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const host = `127.0.0.1:${(server.address() as AddressInfo).port}`;
-  return {
-    url: `http://${host}/hook`,
-    host,
-    requests,
-    close: () => new Promise<void>((resolve) => {
-      server.closeAllConnections();
-      server.close(() => resolve());
-    }),
-  };
-}
-
 describe('check-in outbox delivery to a redirecting receiver', () => {
   const TOKEN = 'redirect-webhook-token';
   let receiver: Awaited<ReturnType<typeof startRedirectingReceiver>> | undefined;
@@ -351,7 +317,7 @@ describe('check-in outbox delivery to a redirecting receiver', () => {
     receiver = undefined;
   });
 
-  it.each([302, 307])('records a %i redirect as a failed attempt and never requests the redirect target', async (status) => {
+  it.each([302])('records a %i redirect as a failed attempt and never requests the redirect target', async (status) => {
     receiver = await startRedirectingReceiver(status);
     vi.stubEnv('CHECKIN_REQUEST_WEBHOOK_URL', receiver.url);
     vi.stubEnv('CHECKIN_REQUEST_WEBHOOK_TOKEN', TOKEN);

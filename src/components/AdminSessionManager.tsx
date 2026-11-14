@@ -21,6 +21,7 @@ export default function AdminSessionManager({ expiresAt }: { expiresAt: string |
   const pathname = usePathname();
   const router = useRouter();
   const [status, setStatus] = useState<'ok' | 'refreshing' | 'error'>('ok');
+  const [logoutFailed, setLogoutFailed] = useState(false);
   const retryRef = useRef<() => void>(() => {});
   const active = expiresAt !== null && pathname !== LOGIN_PATH;
 
@@ -100,12 +101,13 @@ export default function AdminSessionManager({ expiresAt }: { expiresAt: string |
   }, [active, expiresAt, router]);
 
   async function logout() {
+    setLogoutFailed(false);
     try {
       const response = await internalFetch('/api/admin/logout', { method: 'POST' });
       if (!response.ok) throw new Error('logout failed');
       window.location.reload();
     } catch {
-      setStatus('error');
+      setLogoutFailed(true);
     }
   }
 
@@ -120,6 +122,11 @@ export default function AdminSessionManager({ expiresAt }: { expiresAt: string |
         <div className="admin-session-error fixed top-12 right-2 z-50 max-w-xs text-xs px-3 py-2 rounded shadow animate-pulse">
           Token refresh failed. You may need to re-login.<br />
           <button type="button" onClick={() => retryRef.current()} className="admin-session__retry underline mt-1 inline-block">Retry now</button>
+        </div>
+      )}
+      {logoutFailed && (
+        <div className="admin-session-error fixed top-12 right-2 z-50 max-w-xs text-xs px-3 py-2 rounded shadow" role="alert">
+          Logout failed. Try again.
         </div>
       )}
     </>

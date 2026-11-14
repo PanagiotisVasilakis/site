@@ -29,12 +29,6 @@ describe('migrate image manifest (docker/migrate)', () => {
     expect(rootLock.packages['node_modules/prisma'].version).toBe(rootLock.packages['node_modules/@prisma/client'].version);
   });
 
-  it('has a lockfile that resolves exactly those versions with no dev dependencies', () => {
-    expect(lock.packages['node_modules/prisma'].version).toBe(manifest.dependencies?.prisma);
-    expect(lock.packages['node_modules/dotenv'].version).toBe(manifest.dependencies?.dotenv);
-    expect(Object.values(lock.packages).some((entry) => entry.dev)).toBe(false);
-  });
-
   it('copies the root overrides of the Prisma CLI dependency chain', () => {
     for (const name of PRISMA_CHAIN_OVERRIDES) {
       expect(rootManifest.overrides?.[name], name).toEqual(expect.any(String));
@@ -43,6 +37,9 @@ describe('migrate image manifest (docker/migrate)', () => {
   });
 
   it('resolves every package it shares with the root lockfile to the root version', () => {
+    expect(lock.packages['node_modules/prisma'].version).toBe(manifest.dependencies?.prisma);
+    expect(lock.packages['node_modules/dotenv'].version).toBe(manifest.dependencies?.dotenv);
+    expect(Object.values(lock.packages).some((entry) => entry.dev)).toBe(false);
     // Compared by node_modules path: every migrate package must exist in the root lock at the same
     // version, so the image ships a subset of the tree the root install tests.
     // Regenerate from a copy of the root lock; npm then keeps the root resolutions and

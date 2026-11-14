@@ -7,7 +7,6 @@ const KEY = 'favorites:v1';
 const EMPTY = new Set<string>();
 let snapshot = EMPTY;
 let initialized = false;
-let storageListenerInstalled = false;
 const listeners = new Set<() => void>();
 
 function readSet(): Set<string> {
@@ -30,14 +29,11 @@ function initialize(): void {
   if (initialized || typeof window === 'undefined') return;
   snapshot = readSet();
   initialized = true;
-  if (!storageListenerInstalled) {
-    window.addEventListener('storage', (event) => {
-      if (event.key !== KEY && event.key !== null) return;
-      snapshot = readSet();
-      emit();
-    });
-    storageListenerInstalled = true;
-  }
+  window.addEventListener('storage', (event) => {
+    if (event.key !== KEY && event.key !== null) return;
+    snapshot = readSet();
+    emit();
+  });
 }
 
 function subscribe(listener: () => void): () => void {

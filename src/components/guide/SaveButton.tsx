@@ -4,7 +4,7 @@ import { useState, type CSSProperties } from 'react';
 import clsx from 'clsx';
 import { Icon } from '@/components/icons/Icon';
 import { useToast } from '@/components/Toast';
-import { normalizeLocale } from '@/i18n/config';
+import type { Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 import { useFavorites } from '@/lib/favorites';
 
@@ -16,8 +16,8 @@ const BURST_DOTS = 6;
  * M21 burst (6 dots and a heart pop, motion-gated in motion.css): the keyed burst element remounts per
  * toggle, so the CSS animation runs once without timers. `labelled` adds the visible "Save" text (detail).
  */
-export function SaveButton({ id, name, locale, labelled = false }: { id: string; name: string; locale: string; labelled?: boolean }) {
-  const t = getDictionary(normalizeLocale(locale));
+export function SaveButton({ id, name, locale, labelled = false }: { id: string; name: string; locale: Locale; labelled?: boolean }) {
+  const t = getDictionary(locale);
   const { isFavorite, toggle } = useFavorites();
   const { push } = useToast();
   const [bursts, setBursts] = useState(0);

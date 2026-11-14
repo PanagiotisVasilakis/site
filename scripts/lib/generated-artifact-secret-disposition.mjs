@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-const SUPPORTED_NEXT_VERSION = '16.3.8';
+const SUPPORTED_NEXT_VERSION = '16.4.5';
 const SERVER_REFERENCE_KEYS = Object.freeze(['edge', 'encryptionKey', 'node']);
 const PREVIEW_KEYS = Object.freeze([
   'previewModeEncryptionKey',
@@ -206,6 +206,13 @@ export function buildGeneratedArtifactDispositionContext({
   const standaloneServerReference = readJson(standaloneServerReferencePath);
   const prerender = readJson(prerenderPath);
   const standalonePrerender = readJson(standalonePrerenderPath);
+  const previewPropsPath = path.join(repositoryRoot, '.next/server/preview-props.json');
+  const standalonePreviewPropsPath = path.join(
+    repositoryRoot,
+    '.next/standalone/.next/server/preview-props.json',
+  );
+  const previewProps = readJson(previewPropsPath);
+  const standalonePreviewProps = readJson(standalonePreviewPropsPath);
 
   if (
     !exactKeys(serverReference, SERVER_REFERENCE_KEYS)
@@ -233,6 +240,17 @@ export function buildGeneratedArtifactDispositionContext({
   ) {
     throw new Error('The supported Next prerender manifest schema was invalid.');
   }
+  // Next 16.4 writes the preview keys a second time into preview-props.json (server only).
+  // Same rules as the other manifests.
+  const previewValues = (value) => JSON.stringify(PREVIEW_KEYS.map((key) => value[key]));
+  if (
+    !exactKeys(previewProps, PREVIEW_KEYS)
+    || !exactKeys(standalonePreviewProps, PREVIEW_KEYS)
+    || previewValues(previewProps) !== previewValues(standalonePreviewProps)
+    || previewValues(previewProps) !== previewValues(prerender.preview)
+  ) {
+    throw new Error('The supported Next preview-props manifest schema was invalid.');
+  }
 
   const internalEntries = [
     {
@@ -253,6 +271,8 @@ export function buildGeneratedArtifactDispositionContext({
       paths: [
         '.next/prerender-manifest.json',
         '.next/standalone/.next/prerender-manifest.json',
+        '.next/server/preview-props.json',
+        '.next/standalone/.next/server/preview-props.json',
       ],
     },
     {
@@ -262,6 +282,8 @@ export function buildGeneratedArtifactDispositionContext({
       paths: [
         '.next/prerender-manifest.json',
         '.next/standalone/.next/prerender-manifest.json',
+        '.next/server/preview-props.json',
+        '.next/standalone/.next/server/preview-props.json',
       ],
     },
     {
@@ -271,6 +293,8 @@ export function buildGeneratedArtifactDispositionContext({
       paths: [
         '.next/prerender-manifest.json',
         '.next/standalone/.next/prerender-manifest.json',
+        '.next/server/preview-props.json',
+        '.next/standalone/.next/server/preview-props.json',
       ],
     },
   ];
@@ -282,12 +306,10 @@ export function buildGeneratedArtifactDispositionContext({
   }
 
   const validationFiles = [...artifactFiles];
-  for (const source of [prerenderPath]) {
-    validationFiles.push({
-      relative: normalizedRelative(repositoryRoot, source),
-      source,
-    });
-  }
+  validationFiles.push({
+    relative: normalizedRelative(repositoryRoot, prerenderPath),
+    source: prerenderPath,
+  });
   for (const entry of internalEntries) {
     assertExpectedOccurrences(validationFiles, entry.value, entry.paths);
   }
@@ -318,7 +340,7 @@ export function buildGeneratedArtifactDispositionContext({
   collectActionIds(serverReference.edge, actionIds);
   for (const identifier of actionIds) identifiers.set(identifier, 'next-action-id');
 
-  const gitCommit = spawnSync('git', ['rev-parse', 'HEAD'], {
+  const gitResult = spawnSync('git', ['rev-parse', 'HEAD'], {
     cwd: repositoryRoot,
     env: {
       PATH: environment.PATH ?? process.env.PATH,
@@ -326,7 +348,9 @@ export function buildGeneratedArtifactDispositionContext({
     },
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],
-  }).stdout.trim();
+  });
+  if (gitResult.error) throw new Error('git is required to identify the build commit.');
+  const gitCommit = String(gitResult.stdout ?? '').trim();
   if (UNPREFIXED_40_HEX.test(gitCommit)) identifiers.set(gitCommit, 'git-commit');
   const buildId = readFileSync(path.join(repositoryRoot, '.next/BUILD_ID'), 'utf8').trim();
   if (UNPREFIXED_40_HEX.test(buildId)) identifiers.set(buildId, 'next-build-id');

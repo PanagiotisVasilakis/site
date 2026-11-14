@@ -23,7 +23,7 @@ function serve(options: {
 }) {
   fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
     if (url === '/api/check-in/preferences') {
-      return json({ checkInTime: '15:00', checkOutTime: '11:00', canEdit: false, wifi: null });
+      return json({ checkInTime: '15:00', checkOutTime: '11:00', wifi: null });
     }
     if (url === '/api/check-in/arrival-request' && init?.method === 'POST' && options.postError) {
       const { status, message } = options.postError;

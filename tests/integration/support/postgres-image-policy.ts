@@ -90,20 +90,20 @@ function requiredStringRecord(
   return record as Record<string, string>;
 }
 
-export interface ApprovedPostgresImageReference {
+interface ApprovedPostgresImageReference {
   repository: typeof APPROVED_POSTGRES_REPOSITORY;
   tag: typeof APPROVED_POSTGRES_TAG;
   digest: typeof APPROVED_POSTGRES_INDEX_DIGEST;
   reference: typeof APPROVED_POSTGRES_IMAGE;
 }
 
-export interface ApprovedPostgresOciIndex {
+interface ApprovedPostgresOciIndex {
   digest: string;
   mediaType: typeof OCI_INDEX_MEDIA_TYPE;
   platforms: readonly ['linux/amd64', 'linux/arm64/v8'];
 }
 
-export interface ApprovedPulledPostgresImage {
+interface ApprovedPulledPostgresImage {
   imageId: string;
   repositoryDigest: typeof APPROVED_POSTGRES_REPO_DIGEST;
   platform: 'linux/amd64' | 'linux/arm64';

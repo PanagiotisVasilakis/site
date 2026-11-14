@@ -12,19 +12,14 @@ import {
   createIsolatedDatabase,
   dropIsolatedDatabase,
 } from '../support/database-lifecycle';
-import { withTestPrismaClient } from '../support/fixtures';
+import { utcDateOffset, withTestPrismaClient } from '../support/fixtures';
 import { applyMigrationsFromEmpty } from '../support/migrations';
 import { readDisposablePostgresRuntime } from '../support/runtime';
 
 type RefreshTokenRepository = ReturnType<typeof CreateRefreshTokenRepository>;
 type RotationResult = Awaited<ReturnType<RefreshTokenRepository['rotate']>>;
 type RaceOrdering = 'revoke-first' | 'refresh-first';
-
-interface Deferred<T> {
-  promise: Promise<T>;
-  resolve: (value: T | PromiseLike<T>) => void;
-  reject: (reason?: unknown) => void;
-}
+type RevocationCall = (repository: RefreshTokenRepository) => Promise<boolean>;
 
 interface LockActivity {
   pid: number;
@@ -70,32 +65,19 @@ const FAMILY_ID = 'pr02a-revocation-race-family';
 const DEVICE_HASH = '3'.repeat(64);
 const IP_HASH = '4'.repeat(64);
 
-let originalSecurityPepper: string | undefined;
+const revokeSessionAuthorization: RevocationCall = (repository) => (
+  repository.revokeAuthorizationForSession(ROOT_CREDENTIAL_ID, 'race_test_revocation')
+);
+const revokeRootTokenFamily: RevocationCall = (repository) => (
+  repository.revokeFamilyForToken(`${ROOT_CREDENTIAL_ID}.${ROOT_SECRET}`, 'race_test_revocation')
+);
 
-function createDeferred<T>(): Deferred<T> {
-  let resolve!: Deferred<T>['resolve'];
-  let reject!: Deferred<T>['reject'];
-  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
-    resolve = resolvePromise;
-    reject = rejectPromise;
-  });
-  return { promise, resolve, reject };
-}
+let originalSecurityPepper: string | undefined;
 
 function hashSecret(secret: string, salt: string): string {
   return createHash('sha256')
     .update(`${TEST_SECURITY_PEPPER}:${salt}:${secret}`)
     .digest('hex');
-}
-
-function utcDateOffset(now: Date, days: number): Date {
-  const date = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-  ));
-  date.setUTCDate(date.getUTCDate() + days);
-  return date;
 }
 
 async function seedBoundAuthorizationChain(
@@ -222,6 +204,7 @@ async function readRaceState(
 async function executeRace(
   target: DisposableDatabaseTarget,
   ordering: RaceOrdering,
+  revoke: RevocationCall,
   now: Date,
 ): Promise<RaceResult> {
   const { createRefreshTokenRepository } = await import(
@@ -233,8 +216,8 @@ async function executeRace(
       withTestPrismaClient(target, async (blockerAndMonitorClient) => {
         const refreshRepository = createRefreshTokenRepository(refreshClient);
         const revokeRepository = createRefreshTokenRepository(revokeClient);
-        const blockerReady = createDeferred<number>();
-        const releaseBlocker = createDeferred<void>();
+        const blockerReady = Promise.withResolvers<number>();
+        const releaseBlocker = Promise.withResolvers<void>();
         let rotationPromise: Promise<RotationResult> | undefined;
         let revocationPromise: Promise<boolean> | undefined;
 
@@ -271,10 +254,7 @@ async function executeRace(
           };
 
           if (ordering === 'revoke-first') {
-            revocationPromise = revokeRepository.revokeAuthorizationForSession(
-              ROOT_CREDENTIAL_ID,
-              'race_test_revocation',
-            );
+            revocationPromise = revoke(revokeRepository);
           } else {
             rotationPromise = refreshRepository.rotate(
               `${ROOT_CREDENTIAL_ID}.${ROOT_SECRET}`,
@@ -300,10 +280,7 @@ async function executeRace(
               replacement,
             );
           } else {
-            revocationPromise = revokeRepository.revokeAuthorizationForSession(
-              ROOT_CREDENTIAL_ID,
-              'race_test_revocation',
-            );
+            revocationPromise = revoke(revokeRepository);
           }
           const secondPromise = ordering === 'revoke-first'
             ? rotationPromise
@@ -351,13 +328,17 @@ async function executeRace(
   ));
 }
 
-async function runFreshRace(ordering: RaceOrdering, repetition: number): Promise<RaceResult> {
+async function runFreshRace(
+  ordering: RaceOrdering,
+  repetition: number,
+  revoke: RevocationCall,
+): Promise<RaceResult> {
   const target = await createIsolatedDatabase(runtime, `${ordering}_${repetition}`);
   try {
     await applyMigrationsFromEmpty(target);
     const now = new Date();
     await seedBoundAuthorizationChain(target, now);
-    return await executeRace(target, ordering, now);
+    return await executeRace(target, ordering, revoke, now);
   } finally {
     await dropIsolatedDatabase(target);
   }
@@ -399,6 +380,8 @@ async function runSigningFailureRollback(): Promise<RaceState> {
         expect(errorLog).toHaveBeenCalled();
         expect(diagnostics).not.toContain(ROOT_SECRET);
         expect(diagnostics).not.toContain(REPLACEMENT_SECRET);
+        expect(diagnostics).not.toContain(hashSecret(REPLACEMENT_SECRET, REPLACEMENT_SALT));
+        expect(diagnostics).not.toContain(REPLACEMENT_SALT);
         expect(diagnostics).not.toMatch(/eyJ[A-Za-z0-9_-]*\./);
         expect(diagnostics).not.toMatch(/postgres(?:ql)?:\/\//i);
         expect(diagnostics).not.toMatch(/\+1\d{10}/);
@@ -441,7 +424,7 @@ describe.sequential('refresh revocation linearization', () => {
 
   it('lets a family revocation that reaches the family lock first deny rotation', async () => {
     for (let repetition = 1; repetition <= REPETITIONS; repetition += 1) {
-      const result = await runFreshRace('revoke-first', repetition);
+      const result = await runFreshRace('revoke-first', repetition, revokeSessionAuthorization);
       expect(result, `revoke-first repetition ${repetition}`).toEqual({
         revocationResult: true,
         rotationResult: { status: 'invalid' },
@@ -464,7 +447,7 @@ describe.sequential('refresh revocation linearization', () => {
 
   it('lets a later family revocation invalidate a rotation that commits first', async () => {
     for (let repetition = 1; repetition <= REPETITIONS; repetition += 1) {
-      const result = await runFreshRace('refresh-first', repetition);
+      const result = await runFreshRace('refresh-first', repetition, revokeSessionAuthorization);
       expect(result.revocationResult, `refresh-first revoke repetition ${repetition}`).toBe(true);
       expect(result.rotationResult, `refresh-first rotate repetition ${repetition}`).toEqual({
         status: 'rotated',
@@ -481,6 +464,72 @@ describe.sequential('refresh revocation linearization', () => {
         sessionToken: 'synthetic-race-session-token',
       });
       expect(result.state, `refresh-first final state repetition ${repetition}`).toEqual({
+        familyRevoked: true,
+        familyReason: 'race_test_revocation',
+        tokenCount: 2,
+        activeTokenCount: 0,
+        revokedTokenCount: 2,
+        descendantCount: 1,
+        sessionCount: 2,
+        activeSessionCount: 0,
+        revokedSessionCount: 2,
+        rootUsable: false,
+        replacementUsable: false,
+      });
+    }
+  });
+
+  it('lets a token-family revocation reaching the family lock first deny rotation', async () => {
+    for (let repetition = 1; repetition <= REPETITIONS; repetition += 1) {
+      const result = await runFreshRace('revoke-first', repetition, revokeRootTokenFamily);
+      expect(result, `revoke-first root-token repetition ${repetition}`).toEqual({
+        revocationResult: true,
+        rotationResult: { status: 'invalid' },
+        state: {
+          familyRevoked: true,
+          familyReason: 'race_test_revocation',
+          tokenCount: 1,
+          activeTokenCount: 0,
+          revokedTokenCount: 1,
+          descendantCount: 0,
+          sessionCount: 1,
+          activeSessionCount: 0,
+          revokedSessionCount: 1,
+          rootUsable: false,
+          replacementUsable: false,
+        },
+      });
+    }
+  });
+
+  it('lets a later token-family revocation invalidate a rotation that commits first', async () => {
+    for (let repetition = 1; repetition <= REPETITIONS; repetition += 1) {
+      const result = await runFreshRace('refresh-first', repetition, revokeRootTokenFamily);
+      expect(
+        result.revocationResult,
+        `refresh-first root-token revoke repetition ${repetition}`,
+      ).toBe(true);
+      expect(
+        result.rotationResult,
+        `refresh-first root-token rotate repetition ${repetition}`,
+      ).toEqual({
+        status: 'rotated',
+        old: expect.objectContaining({ id: ROOT_CREDENTIAL_ID }),
+        rec: expect.objectContaining({
+          id: REPLACEMENT_CREDENTIAL_ID,
+          rotated_from_id: ROOT_CREDENTIAL_ID,
+        }),
+        session: expect.objectContaining({
+          id: REPLACEMENT_CREDENTIAL_ID,
+          userId: USER_ID,
+          bookingId: BOOKING_ID,
+        }),
+        sessionToken: 'synthetic-race-session-token',
+      });
+      expect(
+        result.state,
+        `refresh-first root-token final state repetition ${repetition}`,
+      ).toEqual({
         familyRevoked: true,
         familyReason: 'race_test_revocation',
         tokenCount: 2,

@@ -10,7 +10,7 @@ import {
   createIsolatedDatabase,
   dropIsolatedDatabase,
 } from '../support/database-lifecycle';
-import { withTestPrismaClient } from '../support/fixtures';
+import { utcDateOffset, withTestPrismaClient } from '../support/fixtures';
 import { applyMigrationsFromEmpty } from '../support/migrations';
 import { readDisposablePostgresRuntime } from '../support/runtime';
 
@@ -84,16 +84,6 @@ interface ClaimSeedOptions {
 let target: DisposableDatabaseTarget | undefined;
 let applicationPrisma: PrismaClient | undefined;
 const originalEnvironment = new Map<ManagedEnvironmentName, string | undefined>();
-
-function utcDateOffset(now: Date, days: number): Date {
-  const date = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-  ));
-  date.setUTCDate(date.getUTCDate() + days);
-  return date;
-}
 
 function setApplicationEnvironment(databaseUrl: string): void {
   for (const name of managedEnvironment) originalEnvironment.set(name, process.env[name]);
@@ -519,7 +509,7 @@ describe.sequential('booking claim eligibility-window defect gate', () => {
         after: {
           ...unchangedIdentity,
           grant: { consumed: false, revoked: change === 'grant-revoked' },
-          // Exchange: one client-address key; claims: client-address and phone keys.
+          // Exchange: one client-address key; claims: client-address and grant-digest keys.
           rateLimitRecords: 3,
         },
       });

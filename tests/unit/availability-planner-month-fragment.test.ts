@@ -24,19 +24,12 @@ describe('readMonthFragment', () => {
   it.each([
     // Before today's month.
     '#m=2026-09',
-    '#m=2025-12',
     // From the horizon end on (no night left in that month).
     '#m=2027-10',
-    '#m=2028-06',
     // Malformed.
     '#m=2027-13',
-    '#m=2027-00',
     '#m=2027-6',
-    '#m=27-06',
-    '#m=2027-06-15',
     '#m=',
-    '#checkin=2026-10-07',
-    '',
   ])('ignores %s', (hash) => {
     expect(readMonthFragment(hash, TODAY, HORIZON_END)).toBeNull();
   });

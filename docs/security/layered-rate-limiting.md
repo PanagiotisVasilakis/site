@@ -69,8 +69,11 @@ sixth attempt is still denied.
 
 Public forwarding headers cannot select that source; the limiter requires the
 private canonical IP and a valid proxy attestation. Credentials and
-attacker-supplied administrator hints are never key material. Bounded
-route/status counters keep a non-enforcing aggregate failure signal.
+attacker-supplied administrator hints are never key material. Administrator
+logins answered with `401` or `429` appear only as the info log line
+`API request completed` with that status in the application log; the Nginx
+access log (`origin_safe` format, `$status` field) also records that status; no
+counter or alert rule records them.
 Named-identity progressive budgets and durable off-host alerting are future
 work.
 

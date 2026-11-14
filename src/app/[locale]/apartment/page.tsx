@@ -7,16 +7,16 @@ import ApartmentCta from '@/components/apartment/ApartmentCta';
 import ApartmentGallery from '@/components/gallery/ApartmentGallery';
 import FactStrip from '@/components/home/FactStrip';
 import AvailabilityBookBar from '@/components/shell/AvailabilityBookBar';
+import { HostIdentity } from '@/components/shell/HostIdentity';
 import type { Metadata } from 'next';
-import { logger } from '@/lib/logger-enterprise';
-import { readPublicAvailability, type PublicAvailability } from '@/lib/prisma-repositories/availabilityRepository';
+import { readAvailabilityOrNull } from '@/lib/availability/readAvailabilityOrNull';
 import { localizedAlternates, localizedOpenGraph } from '@/lib/seo';
 
-// The BookBar price comes from the availability read: rendered per request, like home and availability.
+// The BookBar's free-night note comes from the availability read: rendered per request, like home and availability.
 export const dynamic = 'force-dynamic';
 
-/** The room names and lines are the home rooms showcase's (one source for both pages); the details section's are in house.ts. */
-const ROOM_COPY: Readonly<Record<Exclude<ApartmentRoomKey, 'details'>, HomeRoomKey>> = {
+/** The room names and lines are the home rooms showcase's (one source for both pages); the parking and details sections' are in house.ts. */
+const ROOM_COPY: Readonly<Record<Exclude<ApartmentRoomKey, 'parking' | 'details'>, HomeRoomKey>> = {
   living: 'living',
   kitchen: 'kitchen',
   'bedroom-1': 'bedroom1',
@@ -39,26 +39,16 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   };
 }
 
-/** The availability data for the BookBar price (identity §1.4, §8), or null. */
-async function apartmentAvailability(now: Date): Promise<PublicAvailability | null> {
-  try {
-    return await readPublicAvailability(now);
-  } catch {
-    // No details: the error may carry connection data. The page then shows no BookBar.
-    logger.error('Apartment price could not be read');
-    return null;
-  }
-}
-
 /** identity §9.2: page head, lead photo, room chips and galleries, amenities, CTA, BookBar (§8). */
 export default async function ApartmentPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const eff = normalizeLocale(locale);
   const t = getDictionary(eff);
   const ht = t.house;
-  const rooms = APARTMENT_ROOMS.map((key) => ({ key, ...(key === 'details' ? ht.details : t.home.rooms.items[ROOM_COPY[key]]) }));
+  const rooms = APARTMENT_ROOMS.map((key) => ({ key, ...(key === 'parking' || key === 'details' ? ht[key] : t.home.rooms.items[ROOM_COPY[key]]) }));
   const photos = APARTMENT_PHOTOS.map((photo) => ({ ...photo, alt: ht.photoAlts[photo.id] }));
-  const availability = await apartmentAvailability(new Date());
+  // The data for the BookBar's free-night note (identity §1.4, §8); null: the page shows no BookBar.
+  const availability = await readAvailabilityOrNull(new Date(), 'Apartment availability could not be read');
 
   return (
     <div className="apt">
@@ -68,6 +58,7 @@ export default async function ApartmentPage({ params }: { params: Promise<{ loca
         <h1 className="apt-head__title">{ht.title}</h1>
         <p className="apt-head__lead">{ht.intro}</p>
         <FactStrip locale={eff} inline />
+        <HostIdentity labels={t.shell.identity} className="host-identity--page" />
       </header>
       <ApartmentGallery
         rooms={rooms}

@@ -1,6 +1,6 @@
 import { BRAND_NAME } from '@/data/brand';
+import type { Locale } from '@/i18n/config';
 
-// Real apartment data for Kalamata stay
 const apartmentData = {
   shortName: {
     en: BRAND_NAME,
@@ -17,7 +17,7 @@ const apartmentData = {
     el: 'Διαμέρισμα 90 τ.μ. με δύο υπνοδωμάτια στον 2ο όροφο, με μεγάλες ηλιόλουστες βεράντες και θέα σε βουνό και θάλασσα, σε ήσυχο δρόμο 50 μ. από το νέο Δημαρχείο. Δωρεάν Wi-Fi και κλιματισμός. Για οικογένειες: παρκοκρέβατο, εξοπλισμός μπάνιου μωρού και καρεκλάκι φαγητού. Κοντά υπάρχουν σούπερ μάρκετ, φούρνος και στάση λεωφορείου, και στο κατάλυμα υπάρχει δωρεάν ιδιωτικό πάρκινγκ.'
   },
 
-  // Detailed amenities shown on the check-in page, grouped by area.
+  // Detailed amenities shown on the apartment page and the check-in page, grouped by area.
   amenityGroups: [
     {
       id: 'essentials',
@@ -147,8 +147,7 @@ const apartmentData = {
   ],
 };
 
-// Helper to get localized content
-export function getApartmentContent(locale: 'en' | 'el') {
+export function getApartmentContent(locale: Locale) {
   const data = apartmentData;
   return {
     shortName: data.shortName[locale],

@@ -12,6 +12,9 @@ STATE_FILE="$RUNTIME_DIR/state.env"
 APP_PID_FILE="$RUNTIME_DIR/app.pid"
 APP_LOG_FILE="$RUNTIME_DIR/app.log"
 MIGRATION_LOCK_FILE="$RUNTIME_DIR/migrate.lock"
+# The command start_app runs. app_process_matches looks for it in the `ps` command line to tell the
+# app from an unrelated process that reuses the PID in app.pid (`bash -lc "npm run dev"` execs npm).
+APP_START_COMMAND="npm run dev"
 
 STRICT_MODE=0
 DOCKER_FALLBACK=1
@@ -22,6 +25,9 @@ VERBOSE=0
 LOG_FOLLOW=0
 START_TIMEOUT=120
 DB_ONLY_MODE=0
+# Set only by --allow-remote-db: the assignment below discards an inherited value, and
+# load_environment skips env-file keys named in ORCHESTRATOR_RESERVED_NAMES (below).
+ORCHESTRATOR_ALLOW_REMOTE_DB=0
 
 SUBCOMMAND=""
 COMPOSE_IMPL=""
@@ -31,6 +37,14 @@ DB_COMPOSE_FILE="docker-compose.yml"
 DB_SERVICE="db"
 DB_CONTAINER="site-dev-db"
 DB_LOCAL_URL=""
+
+# The global variables of this script, above and assigned inside functions. load_environment
+# skips env-file keys with these names, so only the command line and the script itself set
+# them. Add every new global variable to this list.
+ORCHESTRATOR_RESERVED_NAMES="SCRIPT_DIR REPO_ROOT RUNTIME_DIR STATE_FILE APP_PID_FILE APP_LOG_FILE \
+MIGRATION_LOCK_FILE APP_START_COMMAND STRICT_MODE DOCKER_FALLBACK SKIP_MIGRATE SKIP_VERIFY FORCE_INSTALL VERBOSE \
+LOG_FOLLOW START_TIMEOUT DB_ONLY_MODE ORCHESTRATOR_ALLOW_REMOTE_DB ORCHESTRATOR_RESERVED_NAMES \
+SUBCOMMAND COMPOSE_IMPL DB_MODE DB_COMPOSE_FILE DB_SERVICE DB_CONTAINER DB_LOCAL_URL"
 
 usage() {
   cat <<'USAGE'
@@ -53,7 +67,9 @@ Commands:
 Options:
   --strict                                 Add lint + typecheck + coverage gate before start
   --db-only                                Validate only DB-related environment and skip app requirements
+                                           (bootstrap, migrate and check only)
   --no-docker-fallback                     Fail instead of starting local DB when DATABASE_URL is unreachable
+  --allow-remote-db                        Allow a DATABASE_URL host other than localhost, 127.0.0.1 or [::1]
   --skip-migrate                           Skip migration step where applicable
   --skip-verify                            Skip runtime endpoint verification
   --force-install                          Force npm ci even if node_modules exists
@@ -135,6 +151,10 @@ parse_args() {
         DOCKER_FALLBACK=0
         shift
         ;;
+      --allow-remote-db)
+        ORCHESTRATOR_ALLOW_REMOTE_DB=1
+        shift
+        ;;
       --skip-migrate)
         SKIP_MIGRATE=1
         shift
@@ -169,6 +189,10 @@ parse_args() {
         ;;
     esac
   done
+
+  if (( DB_ONLY_MODE )) && [[ "$SUBCOMMAND" != bootstrap && "$SUBCOMMAND" != migrate && "$SUBCOMMAND" != check ]]; then
+    die "--db-only is only valid with bootstrap, migrate and check" 1
+  fi
 }
 
 version_at_least() {
@@ -256,15 +280,25 @@ compose() {
   fi
 }
 
-# Load the development env files with the same parser and precedence as
-# `next dev` (dotenv; the first file that defines a key wins; values already
-# in the process environment are kept).
+# Load the development env files with dotenv.parse: it does not expand ${VAR} references, so
+# values are used literally (`next dev` does expand them; write literal values in the files).
+# The first file that defines a key wins, and a value already in the process environment is
+# kept (an inherited empty value is replaced). Keys named in ORCHESTRATOR_RESERVED_NAMES are
+# skipped, so an env file cannot change this script's own variables.
+#
+# --verbose turns on xtrace, which prints every command with its arguments expanded. A step
+# that expands a database URL or an env-file value therefore pauses it between these lines:
+#   { case $- in *x*) traced=1 ;; esac; set +x; } 2>/dev/null   (remember, switch off, stay silent)
+#   if (( traced )); then set -x; fi        (an `if`, so the function still returns 0 under set -e)
+# Pauses nest: an inner one finds tracing already off and leaves it off.
 load_environment() {
-  local exports
-  exports="$(cd "$REPO_ROOT" && node --input-type=module <<'NODE'
+  local exports traced=0
+  { case $- in *x*) traced=1 ;; esac; set +x; } 2>/dev/null
+  exports="$(cd "$REPO_ROOT" && node --input-type=module - "$ORCHESTRATOR_RESERVED_NAMES" <<'NODE'
 import fs from 'node:fs';
 import dotenv from 'dotenv';
 
+const reserved = new Set(process.argv[2].split(' '));
 const files = ['.env.development.local', '.env.local', '.env.development', '.env'];
 const merged = {};
 for (const file of files) {
@@ -277,16 +311,28 @@ for (const file of files) {
 const quote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`;
 for (const [key, value] of Object.entries(merged)) {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/u.test(key)) continue;
+  if (reserved.has(key)) {
+    process.stderr.write(`[system] Ignoring env-file key reserved by the orchestrator: ${key}\n`);
+    continue;
+  }
   if (process.env[key] !== undefined && process.env[key] !== '') continue;
   process.stdout.write(`export ${key}=${quote(value)}\n`);
 }
 NODE
 )"
   eval "$exports"
+  if (( traced )); then set -x; fi
 }
 
 maybe_ensure_pepper() {
+  local traced=0 pepper_ok=0
+  # Untraced (see load_environment): the test expands the pepper.
+  { case $- in *x*) traced=1 ;; esac; set +x; } 2>/dev/null
   if [[ -n "${SECURITY_PEPPER:-}" && ${#SECURITY_PEPPER} -ge 16 ]]; then
+    pepper_ok=1
+  fi
+  if (( traced )); then set -x; fi
+  if (( pepper_ok )); then
     return
   fi
 
@@ -301,6 +347,9 @@ maybe_ensure_pepper() {
 }
 
 validate_database_url() {
+  local traced=0
+  # Untraced (see load_environment) down to the last line: every check expands the database URL.
+  { case $- in *x*) traced=1 ;; esac; set +x; } 2>/dev/null
   if [[ -z "${DATABASE_URL:-}" ]]; then
     fallback_database_url
     export DATABASE_URL="$DB_LOCAL_URL"
@@ -308,13 +357,22 @@ validate_database_url() {
   fi
   (cd "$REPO_ROOT" && node --input-type=module -e "try { const protocol = new URL(process.argv[1]).protocol; process.exit(protocol === 'postgres:' || protocol === 'postgresql:' ? 0 : 1); } catch { process.exit(1); }" "$DATABASE_URL") \
     || die "DATABASE_URL must be a valid postgres or postgresql URL" 14
+  # Development helper: only a loopback database, unless --allow-remote-db is given.
+  if (( ORCHESTRATOR_ALLOW_REMOTE_DB == 0 )); then
+    (cd "$REPO_ROOT" && node --input-type=module -e "try { const host = new URL(process.argv[1]).hostname.toLowerCase(); process.exit(['localhost', '127.0.0.1', '[::1]'].includes(host) ? 0 : 1); } catch { process.exit(1); }" "$DATABASE_URL") \
+      || die "DATABASE_URL host must be localhost, 127.0.0.1 or [::1]; pass --allow-remote-db to use another database host" 14
+  fi
+  if (( traced )); then set -x; fi
 }
 
+# Takes no argument and reads DATABASE_URL itself: a call line with the URL as an argument would
+# print the password in the --verbose trace (see load_environment).
 database_reachable() {
-  local db_url="$1"
+  local traced=0 status=0
+  { case $- in *x*) traced=1 ;; esac; set +x; } 2>/dev/null
 
   # Resolve `pg` from the repository, whatever the caller's working directory.
-  (cd "$REPO_ROOT" && DATABASE_URL_TO_TEST="$db_url" node --input-type=module <<'NODE'
+  (cd "$REPO_ROOT" && DATABASE_URL_TO_TEST="$DATABASE_URL" node --input-type=module <<'NODE'
 import pg from 'pg';
 
 const connectionString = process.env.DATABASE_URL_TO_TEST;
@@ -331,15 +389,21 @@ try {
   process.exit(1);
 }
 NODE
-)
+) || status=$?
+  if (( traced )); then set -x; fi
+  return "$status"
 }
 
 fallback_database_url() {
+  local traced=0
+  # Untraced (see load_environment): the URL is built from the POSTGRES_* values.
+  { case $- in *x*) traced=1 ;; esac; set +x; } 2>/dev/null
   local user="${POSTGRES_USER:-devuser}"
   local password="${POSTGRES_PASSWORD:-devpass}"
   local database="${POSTGRES_DB:-site_dev}"
   local port="${POSTGRES_PORT:-5433}"
   DB_LOCAL_URL="postgresql://${user}:${password}@localhost:${port}/${database}"
+  if (( traced )); then set -x; fi
 }
 
 fallback_container_running() {
@@ -385,20 +449,34 @@ start_fallback_database() {
 
   log "Starting fallback database using $DB_COMPOSE_FILE"
   compose -f "$REPO_ROOT/$DB_COMPOSE_FILE" up -d "$DB_SERVICE"
+  # Record the container as soon as it exists: if the wait below fails or is interrupted, `down`
+  # still finds the state and stops it (prepare_database and start_app rewrite the state later).
+  DB_MODE="local"
+  write_state "none"
 
   wait_for_container_ready "$DB_CONTAINER" 90 || die "Fallback database failed to become ready" 16
 
+  # Untraced (see load_environment): the URL holds the POSTGRES_* values.
+  local traced=0
+  { case $- in *x*) traced=1 ;; esac; set +x; } 2>/dev/null
   export DATABASE_URL="$DB_LOCAL_URL"
-  DB_MODE="local"
+  if (( traced )); then set -x; fi
   log "Using local fallback DATABASE_URL (host localhost)"
 }
 
 prepare_database() {
   fallback_database_url
-  if database_reachable "$DATABASE_URL"; then
+  if database_reachable; then
     # A reachable URL that points at this script's fallback container is still
     # "local": `down` must stop it (e.g. after `npm run db:start`).
-    if [[ "$DATABASE_URL" == "$DB_LOCAL_URL" ]] && fallback_container_running; then
+    # The comparison is untraced (see load_environment): it expands both URLs.
+    local traced=0 is_fallback_url=0
+    { case $- in *x*) traced=1 ;; esac; set +x; } 2>/dev/null
+    if [[ "$DATABASE_URL" == "$DB_LOCAL_URL" ]]; then
+      is_fallback_url=1
+    fi
+    if (( traced )); then set -x; fi
+    if (( is_fallback_url )) && fallback_container_running; then
       DB_MODE="local"
     else
       DB_MODE="managed"
@@ -418,7 +496,7 @@ prepare_database() {
   log "DATABASE_URL is not reachable; using local Docker fallback"
   start_fallback_database
 
-  if ! database_reachable "$DATABASE_URL"; then
+  if ! database_reachable; then
     die "Fallback database started but DATABASE_URL is still unreachable" 17
   fi
   write_state "none"
@@ -504,6 +582,16 @@ run_migrations_with_retry() {
     return
   fi
 
+  # prisma.config.ts prefers DIRECT_URL over DATABASE_URL, so a different DIRECT_URL
+  # would send `migrate deploy` to a database this script neither checked nor started.
+  # The comparison is untraced (see load_environment): it expands both URLs.
+  local traced=0
+  { case $- in *x*) traced=1 ;; esac; set +x; } 2>/dev/null
+  if [[ -n "${DIRECT_URL:-}" && "$DIRECT_URL" != "$DATABASE_URL" ]]; then
+    die "DIRECT_URL is set and differs from DATABASE_URL; prisma migrate deploy would use DIRECT_URL. Remove DIRECT_URL from the shell and the env files for orchestrator runs." 14
+  fi
+  if (( traced )); then set -x; fi
+
   local attempts=3
   local attempt=1
   local backoff=2
@@ -542,12 +630,26 @@ run_strict_quality_gate_if_requested() {
   )
 }
 
+# True when the command line of process $1 contains APP_START_COMMAND. The check is untraced (see
+# load_environment): the command line of an unrelated process can hold a password.
+app_process_matches() {
+  local pid="$1" traced=0 matches=0 command_line=""
+  { case $- in *x*) traced=1 ;; esac; set +x; } 2>/dev/null
+  command_line="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+  if [[ "$command_line" == *"$APP_START_COMMAND"* ]]; then
+    matches=1
+  fi
+  if (( traced )); then set -x; fi
+  (( matches ))
+}
+
 app_is_running() {
   [[ -f "$APP_PID_FILE" ]] || return 1
   local pid
   pid="$(cat "$APP_PID_FILE" 2>/dev/null || true)"
   [[ -n "$pid" ]] || return 1
-  kill -0 "$pid" >/dev/null 2>&1
+  kill -0 "$pid" >/dev/null 2>&1 || return 1
+  app_process_matches "$pid"
 }
 
 write_state_value() {
@@ -578,7 +680,7 @@ load_state() {
 }
 
 start_app() {
-  local app_cmd="npm run dev"
+  local app_cmd="$APP_START_COMMAND"
   export NODE_ENV="development"
   ensure_runtime_dir
 
@@ -621,27 +723,37 @@ public_page_url() {
   printf '%s' "http://127.0.0.1:${port}/en"
 }
 
+# wait_for_runtime [1]: polls until START_TIMEOUT wall-clock seconds have passed. Each probe is
+# bounded by --max-time 30 (a cold first compile of /en can take several seconds). With 1 (the `up`
+# path) it also gives up as soon as the app process that start_app recorded has exited; `verify`
+# omits it, because an app started by hand has no PID file.
 wait_for_runtime() {
   require_cmd curl
 
+  local watch_app="${1:-0}"
   local live ready page
   live="$(live_url)"
   ready="$(ready_url)"
   page="$(public_page_url)"
-  local elapsed=0
+  local start=$SECONDS
   local live_code="" ready_code="" page_code=""
 
-  while (( elapsed < START_TIMEOUT )); do
-    live_code="$(curl -s -o /dev/null -w '%{http_code}' "$live" || true)"
-    ready_code="$(curl -s -o /dev/null -w '%{http_code}' "$ready" || true)"
-    page_code="$(curl -s -o /dev/null -w '%{http_code}' "$page" || true)"
+  while (( SECONDS - start < START_TIMEOUT )); do
+    live_code="$(curl -s --max-time 30 -o /dev/null -w '%{http_code}' "$live" || true)"
+    ready_code="$(curl -s --max-time 30 -o /dev/null -w '%{http_code}' "$ready" || true)"
+    page_code="$(curl -s --max-time 30 -o /dev/null -w '%{http_code}' "$page" || true)"
     if [[ "$live_code" == "200" && "$ready_code" == "200" && "$page_code" == "200" ]]; then
       log "Runtime endpoints are ready (live, ready, public page)"
       return 0
     fi
 
+    if (( watch_app )) && ! app_is_running; then
+      error "Application process exited before the runtime became ready (live=${live_code:-none}, ready=${ready_code:-none}, page=${page_code:-none})"
+      tail -n 120 "$APP_LOG_FILE" || true
+      return 1
+    fi
+
     sleep 2
-    elapsed=$((elapsed + 2))
   done
 
   error "Runtime did not become ready in ${START_TIMEOUT}s (live=${live_code:-none}, ready=${ready_code:-none}, page=${page_code:-none})"
@@ -650,7 +762,7 @@ wait_for_runtime() {
 }
 
 verify_runtime() {
-  wait_for_runtime || die "Runtime verification failed: live/ready/page checks did not pass" 20
+  wait_for_runtime "${1:-0}" || die "Runtime verification failed: live/ready/page checks did not pass" 20
   log "Runtime verification passed"
 }
 
@@ -670,6 +782,12 @@ stop_app() {
 
   if ! kill -0 "$pid" >/dev/null 2>&1; then
     log "App PID $pid not running; removing stale PID file"
+    rm -f "$APP_PID_FILE"
+    return
+  fi
+
+  if ! app_process_matches "$pid"; then
+    log "PID $pid is not the app started by this script; removing stale PID file"
     rm -f "$APP_PID_FILE"
     return
   fi
@@ -712,8 +830,12 @@ stop_fallback_database_if_needed() {
 
   resolve_compose_impl
   log "Stopping local fallback DB (${DB_COMPOSE_FILE})"
-  compose -f "$REPO_ROOT/$DB_COMPOSE_FILE" down || warn "Failed to stop fallback DB cleanly"
-  rm -f "$STATE_FILE"
+  # The state is the only handle on the container: keep it when `down` fails so the next `down` retries.
+  if compose -f "$REPO_ROOT/$DB_COMPOSE_FILE" down; then
+    rm -f "$STATE_FILE"
+  else
+    warn "Failed to stop fallback DB cleanly; state file kept"
+  fi
 }
 
 run_preflight() {
@@ -755,6 +877,9 @@ cmd_bootstrap() {
 }
 
 cmd_up() {
+  # Before anything is started: verify_runtime needs curl, and a fatal exit after start_app would
+  # leave the app running.
+  (( SKIP_VERIFY )) || require_cmd curl
   run_bootstrap_sequence
   start_app
 
@@ -763,7 +888,7 @@ cmd_up() {
     return
   fi
 
-  verify_runtime
+  verify_runtime 1
 }
 
 cmd_down() {
@@ -840,7 +965,7 @@ cmd_check() {
     ensure_dependencies
     validate_runtime_environment_contract
   fi
-  if database_reachable "$DATABASE_URL"; then
+  if database_reachable; then
     log "Check passed: DATABASE_URL accepted a SQL query"
   else
     die "Check failed: DATABASE_URL did not accept a SQL query" 22
@@ -851,6 +976,7 @@ main() {
   ensure_runtime_dir
   parse_args "$@"
 
+  # Steps that expand a database URL or an env-file value pause this trace (see load_environment).
   if (( VERBOSE )); then
     set -x
   fi

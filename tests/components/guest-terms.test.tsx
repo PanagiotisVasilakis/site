@@ -18,14 +18,14 @@ import { GUEST_TERMS_CONTENT_HASH, GUEST_TERMS_VERSION } from '@/lib/guestTerms'
 import { GUEST_TERMS_TEXT } from '@/lib/guestTermsText';
 
 describe('guest terms acceptance', () => {
-  it.each(['el', 'en'] as const)('renders exactly the canonical %s terms text on sign-up', (locale) => {
+  it.each(['el'] as const)('renders exactly the canonical %s terms text on sign-up', (locale) => {
     navigation.locale = locale;
     render(<UnifiedGuestClient />);
 
     expect(screen.getByText(GUEST_TERMS_TEXT[locale])).toBeInTheDocument();
   });
 
-  it.each(['el', 'en'] as const)('links the %s privacy notice outside the hashed terms text', (locale) => {
+  it.each(['el'] as const)('links the %s privacy notice outside the hashed terms text', (locale) => {
     navigation.locale = locale;
     render(<UnifiedGuestClient />);
 

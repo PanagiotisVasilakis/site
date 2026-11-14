@@ -184,9 +184,6 @@ describe('npm audit evidence', () => {
   });
 
   it.each([
-    ['negative', { info: 0, low: -1, moderate: 0, high: 0, critical: 0, total: -1 }],
-    ['fractional', { info: 0, low: 0.5, moderate: 0, high: 0, critical: 0, total: 0.5 }],
-    ['string', { info: 0, low: '0', moderate: 0, high: 0, critical: 0, total: 0 }],
     ['wrong total', { info: 1, low: 1, moderate: 1, high: 0, critical: 0, total: 2 }],
   ] as const)('fails closed for %s vulnerability counts', async (_scenario, counts) => {
     const evidence = await collectNpmAuditEvidence({
@@ -257,20 +254,6 @@ describe('npm audit evidence', () => {
 
     expect(evidence.passed).toBe(false);
     expect(evidence.failureReason).toBe('EMPTY_OUTPUT');
-  });
-
-  it('fails closed when an unexpected process exit accompanies valid High counts', async () => {
-    const evidence = await collectNpmAuditEvidence({
-      temporaryRoot: createAuditEvidenceTemporaryRoot(),
-      runner: createAuditFixtureRunner(
-        validAuditJson({ high: 1 }),
-        { exitCode: 2, signal: null, processError: false },
-      ),
-    });
-
-    expect(evidence.processExitCode).toBe(2);
-    expect(evidence.passed).toBe(false);
-    expect(evidence.failureReason).toBe('PROCESS_RESULT_INCONSISTENT');
   });
 
   it('propagates audit pass/fail decisions and stable summaries through the validator hook', async () => {

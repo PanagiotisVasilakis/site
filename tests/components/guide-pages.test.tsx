@@ -48,7 +48,7 @@ describe('important phones (identity §9.6)', () => {
         expect(node.parentElement?.closest('a[href^="tel:"]'), node.textContent ?? '').not.toBeNull();
       }
     }
-    for (const name of ['Kalamata Police Station', 'Kalamata Fire Department', 'General Hospital of Kalamata', 'Kalamata Radio Taxi']) {
+    for (const name of ['Kalamata Police Station', 'Kalamata Fire Department', 'General Hospital of Kalamata', 'Radio Taxi Kalamata']) {
       expect(screen.getByRole('link', { name: `Call ${name}` }).getAttribute('href')).toMatch(/^tel:\+30\d+$/);
     }
   });
@@ -83,8 +83,8 @@ describe('guide detail (identity §9.5)', () => {
     }
 
     const hrefs = [...container.querySelectorAll('a')].map((link) => link.getAttribute('href') ?? '');
-    expect(hrefs.filter((href) => /availability|airbnb/i.test(href))).toEqual([]);
-    expect(container).not.toHaveTextContent(/airbnb|check dates|book/i);
+    expect(hrefs.filter((href) => /availability|booking\.com/i.test(href))).toEqual([]);
+    expect(container).not.toHaveTextContent(/check dates|book/i);
   });
 
   it('lists three more places nearby, without the current one', async () => {

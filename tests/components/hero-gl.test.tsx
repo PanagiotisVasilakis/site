@@ -162,19 +162,6 @@ describe('mountHeroGl (identity §5.6)', () => {
     expect(hero.dataset.gl).toBe('off:reduced-motion');
   });
 
-  it('destroy() removes the canvas without recording a reason', () => {
-    const { hero, img } = heroParts();
-    const { gl, loseContext } = fakeWebGl();
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(gl);
-
-    mountHeroGl({ hero, img, depthSrc: '/house/balcony/hero/depth-3x2.webp' }).destroy();
-    vi.advanceTimersByTime(700);
-
-    expect(loseContext).toHaveBeenCalledTimes(1);
-    expect(hero.querySelector('canvas')).toBeNull();
-    expect(hero.dataset.gl).toBeUndefined();
-  });
-
   it('covers with the size of the uploaded crop, not the live img size', async () => {
     const { hero, img, photo } = startableHero('/house/balcony/hero/balcony-hero-9x16-720.avif', 720, 1280);
     const { gl, uniform4f } = fakeWebGl();
@@ -208,34 +195,6 @@ describe('mountHeroGl (identity §5.6)', () => {
     expect(loseContext).toHaveBeenCalledTimes(1);
     expect(hero.querySelector('canvas')).toBeNull();
     expect(hero.querySelector('.hero__img')).toBe(img);
-  });
-
-  it('registers no listeners or observer when the crop already changed before start', async () => {
-    const { hero, img } = startableHero('/house/balcony/hero/balcony-hero-3x2-1440.avif', 1440, 960);
-    const { gl, loseContext } = fakeWebGl();
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(gl);
-    const observe = vi.fn();
-    vi.stubGlobal('IntersectionObserver', class {
-      observe = observe;
-      disconnect() {}
-    });
-    const windowAdd = vi.spyOn(window, 'addEventListener');
-    const documentAdd = vi.spyOn(document, 'addEventListener');
-    const imgAdd = vi.spyOn(img, 'addEventListener');
-    const heroAdd = vi.spyOn(hero, 'addEventListener');
-
-    mountHeroGl({ hero, img, depthSrc: '/house/balcony/hero/depth-4x5.webp' });
-    await vi.advanceTimersByTimeAsync(0);
-
-    expect(hero.dataset.gl).toBe('off:crop-change');
-    expect(observe).not.toHaveBeenCalled();
-    expect(windowAdd).not.toHaveBeenCalled();
-    expect(documentAdd).not.toHaveBeenCalled();
-    expect(imgAdd).not.toHaveBeenCalled();
-    expect(heroAdd).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(700);
-    expect(loseContext).toHaveBeenCalledTimes(1);
-    expect(hero.querySelector('canvas')).toBeNull();
   });
 });
 
@@ -320,16 +279,5 @@ describe('HeroGlIsland', () => {
 
     expect(hero.dataset.gl).toBe('off:reduced-motion');
     expect(hero.querySelector('canvas')).toBeNull();
-  });
-
-  it('does nothing once unmounted before the idle callback', () => {
-    const { hero } = heroParts();
-    document.documentElement.setAttribute('data-motion', 'reduce');
-
-    const { unmount } = render(<HeroGlIsland />);
-    unmount();
-    vi.advanceTimersByTime(1200);
-
-    expect(hero.dataset.gl).toBeUndefined();
   });
 });

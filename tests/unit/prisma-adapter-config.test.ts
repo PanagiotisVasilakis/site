@@ -47,6 +47,23 @@ describe('Prisma PostgreSQL adapter configuration', () => {
       }));
   });
 
+  it.each([
+    ['statement_timeout', '5s'],
+    ['statement_timeout', '1.5'],
+    ['connection_limit', '20x'],
+  ])('falls back to the defaults for %s=%s (digits only, no units or fractions)', (param, value) => {
+    const { config } = buildPrismaPgAdapterArgs(`postgresql://localhost/app?${param}=${value}`);
+    expect(config).toEqual({
+      connectionString: 'postgresql://localhost/app',
+      connectionTimeoutMillis: 5_000,
+      idleTimeoutMillis: 300_000,
+      statement_timeout: 20_000,
+      query_timeout: 25_000,
+      lock_timeout: 5_000,
+      options: '-c TimeZone=UTC',
+    });
+  });
+
   it('keeps safe defaults for an unparsable URL', () => {
     expect(buildPrismaPgAdapterArgs('not-a-url')).toEqual({
       config: {

@@ -3,7 +3,7 @@
  * its tag list, but a chip renders only when its category has content (`chipCounts`), so categories without
  * places stay hidden until content is added. Labels come from `momentsFilters` (common.ts).
  */
-export const GUIDE_FILTER_KEYS = [
+const GUIDE_FILTER_KEYS = [
   'all', 'beaches', 'museums', 'restaurants', 'bars', 'brunchs', 'taygetos', 'sites', 'nearby',
 ] as const;
 

@@ -3,16 +3,14 @@ import nextTypescript from "eslint-config-next/typescript";
 import internalFetchRule from "./scripts/eslint-rules/internal-fetch.js";
 
 const eslintConfig = [
-  { ignores: ["**/node_modules/**", "**/.next/**", "**/coverage/**", "out/**", "build/**", "dist/**", "next-env.d.ts", "**/reports/**", ".runtime/**"] },
+  { ignores: ["**/node_modules/**", "**/.next/**", "**/coverage/**", "out/**", "build/**", "dist/**", "next-env.d.ts", ".runtime/**"] },
   ...nextCoreWebVitals,
   ...nextTypescript,
   {
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',
-      'react-hooks/immutability': 'off',
       'react-hooks/purity': 'off',
-      'react-hooks/set-state-in-effect': 'off',
-      'react-hooks/static-components': 'off'
+      'react-hooks/set-state-in-effect': 'off'
     }
   },
   {

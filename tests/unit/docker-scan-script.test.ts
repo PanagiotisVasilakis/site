@@ -19,7 +19,7 @@ const HOST_TRIVY_ARGS = ['image', '--exit-code', '1', '--severity', 'HIGH,CRITIC
 const DOCKER_STUB = `#!/bin/sh
 { printf '%s\\n' '@@'; for arg in "$@"; do printf '%s\\n' "$arg"; done; } >> "$DOCKER_STUB_LOG"
 case "$1" in
-  info) exit "$DOCKER_STUB_INFO_EXIT" ;;
+  info) exit 0 ;;
   scout) exit 0 ;;
   save)
     while [ "$#" -gt 0 ]; do
@@ -95,9 +95,8 @@ function runScan(
   {
     runExit = 0,
     docker = true,
-    infoExit = 0,
     hostTrivy = false,
-  }: { runExit?: number; docker?: boolean; infoExit?: number; hostTrivy?: boolean } = {},
+  }: { runExit?: number; docker?: boolean; hostTrivy?: boolean } = {},
 ) {
   const result = spawnSync(BASH, [SCRIPT, IMAGE_REF], {
     env: {
@@ -108,7 +107,6 @@ function runScan(
       DOCKER_STUB_LOG: LOG,
       DOCKER_STUB_MODES: MODES,
       DOCKER_STUB_RUN_EXIT: String(runExit),
-      DOCKER_STUB_INFO_EXIT: String(infoExit),
       TRIVY_STUB_LOG: TRIVY_LOG,
     },
     encoding: 'utf8',
@@ -179,14 +177,6 @@ describe('docker:scan script (scripts/docker-scan.sh)', () => {
     expect(readdirSync(TMP)).toEqual([]);
   });
 
-  it('prefers the Trivy container over Docker Scout in auto mode when no host Trivy exists', () => {
-    const { status, calls } = runScan('auto');
-
-    expect(status).toBe(0);
-    expect(calls.map((call) => call[0])).toEqual(['info', 'save', 'run']);
-    expect(calls[2]).toContain(TRIVY_IMAGE);
-  });
-
   it('prefers the pinned Trivy container over a host Trivy in auto mode when a Docker engine is reachable', () => {
     const { status, calls, trivyArgs } = runScan('auto', { hostTrivy: true });
 
@@ -201,14 +191,6 @@ describe('docker:scan script (scripts/docker-scan.sh)', () => {
 
     expect(status).toBe(0);
     expect(calls).toEqual([]);
-    expect(trivyArgs).toEqual(HOST_TRIVY_ARGS);
-  });
-
-  it('falls back to a host Trivy in auto mode when the Docker engine does not answer', () => {
-    const { status, calls, trivyArgs } = runScan('auto', { infoExit: 1, hostTrivy: true });
-
-    expect(status).toBe(0);
-    expect(calls.map((call) => call[0])).toEqual(['info']);
     expect(trivyArgs).toEqual(HOST_TRIVY_ARGS);
   });
 

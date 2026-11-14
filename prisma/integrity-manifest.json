@@ -5,14 +5,14 @@
   "checkerVersion": "1.0.0",
   "schema": {
     "path": "prisma/schema.prisma",
-    "sha256": "ab87c1ad6d93815622839499429988f8730f06a0ac42c95518a35957b390002a",
-    "bytes": 18012
+    "sha256": "a48f11c1cb3896b7f61c552236804609d244f47a53fa3e8a1dedeb7ec6fd858f",
+    "bytes": 18127
   },
   "migrations": {
     "root": "prisma/migrations",
     "treeHashAlgorithm": "sha256-prisma-migrations-v1",
-    "sha256": "14843658c70802d41ad13bd0e1d719046594205e5919131dad136af0e2dbeb8c",
-    "fileCount": 24,
+    "sha256": "1a47621be141ba720ed5a0f268879006a23e0971c626a0cfa4590c3c978983a2",
+    "fileCount": 25,
     "files": [
       {
         "path": "000_init/migration.sql",
@@ -128,6 +128,11 @@
         "path": "20260930120000_minimise_user_data/migration.sql",
         "sha256": "409bed84f20f8608059e5691ca4b5c2e1e0b05e7c7b4ca2d1c916453d8c2f557",
         "bytes": 1951
+      },
+      {
+        "path": "20261020120000_booking_calendar_source/migration.sql",
+        "sha256": "04337dae8ad471f846ffd1d8ecbad4602e021d25c0a9e6bf759c20ed53769f60",
+        "bytes": 2412
       },
       {
         "path": "migration_lock.toml",

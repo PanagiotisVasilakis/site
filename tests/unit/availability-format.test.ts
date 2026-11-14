@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { describeMonths, fill, formatStayDate, formatStayRange, nightsLabel } from '@/components/availability/format';
+import { fill, formatStayDate, formatStayRange, nightsLabel } from '@/components/availability/format';
 import type { IsoDate } from '@/lib/availability/calendarDate';
 
 describe('availability text formatting', () => {
@@ -8,22 +8,6 @@ describe('availability text formatting', () => {
     expect(fill('{nights} × {price}', { nights: '3 nights', price: '€80' })).toBe('3 nights × €80');
     expect(fill('{a} and {missing}', { a: 1 })).toBe('1 and {missing}');
     expect(fill('{toString}', {})).toBe('{toString}');
-  });
-
-  it('describes month ranges, including ones that wrap the year', () => {
-    expect(describeMonths([4, 5, 6, 7, 8, 9, 10], 'en')).toBe('April–October');
-    expect(describeMonths([11, 12, 1, 2, 3], 'en')).toBe('November–March');
-    expect(describeMonths([11, 12, 1, 2, 3], 'el')).toBe('Νοέμβριος–Μάρτιος');
-    expect(describeMonths([7], 'en')).toBe('July');
-    expect(describeMonths([1, 2, 7, 12], 'en')).toBe('July, December–February');
-    expect(describeMonths([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], 'en')).toBe('January–December');
-    expect(describeMonths([], 'en')).toBe('');
-    expect(describeMonths([0, 13, 2.5], 'en')).toBe('');
-  });
-
-  it('describes month ranges with short names for the stay summary', () => {
-    expect(describeMonths([4, 5, 6, 7, 8, 9, 10], 'en', 'short')).toBe('Apr–Oct');
-    expect(describeMonths([11, 12, 1, 2, 3], 'el', 'short')).toBe('Νοέ–Μάρ');
   });
 
   it('formats a stay as a compact range with an en dash', () => {

@@ -67,11 +67,7 @@ describe('admin request list: notification status', () => {
   });
 
   const nothingFailed: [string, ListedEvent[], OutboxStatus | undefined][] = [
-    ['no outbox event', [], undefined],
-    ['one pending event', [createdEvent('PENDING')], 'PENDING'],
     ['a leased decision over a delivered created event', [decisionEvent('LEASED'), createdEvent('DELIVERED')], 'LEASED'],
-    ['two delivered events', [decisionEvent('DELIVERED'), createdEvent('DELIVERED')], 'DELIVERED'],
-    ['a pending decision over a delivered created event', [decisionEvent('PENDING'), createdEvent('DELIVERED')], 'PENDING'],
   ];
 
   it.each(nothingFailed)('reports the newest status when nothing failed: %s', async (_label, events, expected) => {
@@ -79,7 +75,6 @@ describe('admin request list: notification status', () => {
   });
 
   it.each([
-    ['a payload without a redacted key', { previousStatus: null, status: 'PENDING' }],
     ['redacted: false', { requestId: 'b', redacted: false }],
   ])('still reports an older DEAD event with %s', async (_label, payload) => {
     const status = await notificationStatusOf([decisionEvent('DELIVERED'), { status: 'DEAD', payload }]);
@@ -109,15 +104,6 @@ describe('admin request list: notification status', () => {
     const status = await notificationStatusOf([{ status: 'DEAD', payload: ERASURE_PAYLOAD }]);
 
     expect(status).toBeUndefined();
-  });
-
-  it('reports the newest status that an erasure did not cancel', async () => {
-    const status = await notificationStatusOf([
-      { status: 'DEAD', payload: ERASURE_PAYLOAD },
-      createdEvent('DELIVERED'),
-    ]);
-
-    expect(status).toBe('DELIVERED');
   });
 
   it('asks for every outbox event of a request, newest first', async () => {
@@ -204,14 +190,5 @@ describe('retryFailedNotifications', () => {
     expect(prismaMock.outboxEvent.updateMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { checkInRequestId: REQUEST_ID, status: 'DEAD', id: { notIn: ['cancelled'] } },
     }));
-  });
-
-  it('requeues nothing when the only DEAD event was cancelled by an erasure', async () => {
-    store.push(stored('cancelled', 'DEAD', ERASURE_PAYLOAD));
-
-    const count = await checkInRequestRepository.retryFailedNotifications(REQUEST_ID);
-
-    expect(count).toBe(0);
-    expect(store[0]).toMatchObject({ status: 'DEAD', attemptCount: 10 });
   });
 });

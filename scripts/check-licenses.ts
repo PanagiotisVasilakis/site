@@ -22,13 +22,6 @@ const ALLOWED_LICENSES = [
   'WTFPL',
 ];
 
-// Some packages ship LICENSE files but omit package.json license fields.
-const PACKAGE_LICENSE_FALLBACKS: Record<string, string[]> = {
-  atomically: ['MIT'],
-  'seq-queue': ['MIT'],
-  'stubborn-fs': ['MIT'],
-};
-
 // Narrow per-package exceptions for licenses outside ALLOWED_LICENSES. Each entry allows exactly
 // the listed license for that package name only; never add these licenses to the global allowlist.
 // - elkjs (EPL-2.0): weak, file-level copyleft comparable to the allowed MPL-2.0. It arrives only via
@@ -54,7 +47,7 @@ type ManifestLike = {
 };
 
 type PackageLockLike = {
-  packages?: Record<string, (ManifestLike & { version?: unknown }) | undefined>;
+  packages?: Record<string, ManifestLike | undefined>;
 };
 
 type SpdxLeafNode = {
@@ -113,7 +106,7 @@ type SpdxExpressionNode =
     }
     seen.add(key);
 
-    const licenses = extractLicenses(manifest, name);
+    const licenses = extractLicenses(manifest);
 
     if (licenses.length === 0) {
       issues.push({
@@ -185,7 +178,7 @@ function inferPackageName(packagePath: string): string | null {
   return inferred;
 }
 
-function extractLicenses(manifest: ManifestLike, packageName: string): string[] {
+function extractLicenses(manifest: ManifestLike): string[] {
   const results = new Set<string>();
 
   const pushValue = (input: unknown) => {
@@ -214,12 +207,6 @@ function extractLicenses(manifest: ManifestLike, packageName: string): string[] 
   if (Array.isArray(manifest.licenses)) {
     for (const entry of manifest.licenses) {
       pushValue(entry);
-    }
-  }
-
-  if (results.size === 0 && PACKAGE_LICENSE_FALLBACKS[packageName]) {
-    for (const fallbackLicense of PACKAGE_LICENSE_FALLBACKS[packageName]) {
-      results.add(fallbackLicense);
     }
   }
 

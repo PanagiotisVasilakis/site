@@ -12,8 +12,6 @@ type PrismaClientWithEvents = PrismaClient & {
 };
 
 const globalThisWithPrisma = globalThis as ExtendedGlobal;
-let prismaInitLogged = false;
-const logPrismaLifecycle = process.env.PRISMA_LOG_LIFECYCLE === '1';
 
 function assertDatabaseUrl(): string {
   const databaseUrl = process.env.DATABASE_URL;
@@ -38,32 +36,25 @@ function addPrismaInstrumentation(client: PrismaClient): void {
   // Track query performance
   clientWithEvents.$on('query', (e: Prisma.QueryEvent) => {
     const duration = e.duration;
-    
-    // Extract model and action from query (best effort)
+    // Log slow queries (>1000ms)
+    if (duration <= 1000) return;
+
     const query = e.query.toLowerCase();
-    let action = 'unknown';
+    const action = query.trimStart().split(/\s+/, 1)[0];
     let model = 'unknown';
-    
-    if (query.startsWith('select')) action = 'findMany';
-    else if (query.startsWith('insert')) action = 'create';
-    else if (query.startsWith('update')) action = 'update';
-    else if (query.startsWith('delete')) action = 'delete';
-    
+
     // Try to extract table/model name
     const tableMatch = query.match(/\b(?:from|into|update)\s+"?(\w+)"?/i);
     if (tableMatch) {
       model = tableMatch[1];
     }
     
-    // Log slow queries (>1000ms)
-    if (duration > 1000) {
-      logger.warn('Slow database query detected', {
-        model,
-        action,
-        duration,
-        query: e.query.slice(0, 200), // Truncate long queries
-      });
-    }
+    logger.warn('Slow database query detected', {
+      model,
+      action,
+      duration,
+      query: e.query.slice(0, 200), // Truncate long queries
+    });
   });
   
   // Track errors
@@ -77,14 +68,6 @@ function addPrismaInstrumentation(client: PrismaClient): void {
 
 function createPrismaClient(): PrismaClient {
   const databaseUrl = assertDatabaseUrl();
-  
-  if (!prismaInitLogged && logPrismaLifecycle) {
-      logger.info('Prisma client initialization', {
-        environment: process.env.NODE_ENV,
-        note: 'Configure via DATABASE_URL: ?connection_limit=N&pool_timeout=N',
-      });
-      prismaInitLogged = true;
-    }
   
   const client = new PrismaClient({
     adapter: createPrismaPgAdapter(databaseUrl),
@@ -105,9 +88,6 @@ function createPrismaClient(): PrismaClient {
 if (!globalThisWithPrisma.__prisma__) {
   if (process.env.DATABASE_URL) {
     globalThisWithPrisma.__prisma__ = createPrismaClient();
-  } else {
-    // Leave undefined during build/time when no DATABASE_URL is configured.
-    globalThisWithPrisma.__prisma__ = undefined as unknown as PrismaClient;
   }
 }
 
@@ -126,12 +106,12 @@ function getActivePrismaClient(): PrismaClient {
 export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
   get(_target, prop, receiver) {
     const client = getActivePrismaClient();
-    const value = Reflect.get(client as unknown as object, prop, receiver);
+    const value = Reflect.get(client, prop, receiver);
     return typeof value === 'function' ? value.bind(client) : value;
   },
   set(_target, prop, value) {
     const client = getActivePrismaClient();
-    Reflect.set(client as unknown as object, prop, value);
+    Reflect.set(client, prop, value);
     return true;
   },
 });

@@ -1,16 +1,13 @@
-import { readFile } from 'node:fs/promises';
 import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import type { DisposableDatabaseTarget } from './support/database-safety';
 import { withVerifiedDisposableDatabase } from './support/database-safety';
 import { createIsolatedDatabase, dropIsolatedDatabase } from './support/database-lifecycle';
-import { applyMigrationsFromEmpty } from './support/migrations';
+import { applyMigrationsFromEmpty, runMigrationFile, withScenario } from './support/migrations';
 import { readDisposablePostgresRuntime } from './support/runtime';
 
 const MIGRATION = '20260928215800_remove_stay_requests';
-// The integration runner starts Vitest with the repository root as cwd.
-const MIGRATION_FILE = `prisma/migrations/${MIGRATION}/migration.sql`;
 const TABLE_REFUSAL = 'Refusing to remove non-empty table stay_requests';
 const COLUMN_REFUSAL = 'Refusing to remove outbox_events.stay_request_id while events still reference stay requests';
 const EVENT_REFUSAL = 'Refusing to remove stay requests while booking-request outbox events remain';
@@ -24,26 +21,6 @@ let target: DisposableDatabaseTarget | undefined;
 function requireTarget(): DisposableDatabaseTarget {
   if (!target) throw new Error('Stay-request removal database was not initialized.');
   return target;
-}
-
-// Sent as one simple-protocol query, so PostgreSQL runs the whole file as one
-// implicit transaction (the behaviour the migration's header relies on).
-async function runMigrationFile(client: PgClient): Promise<void> {
-  const sql = await readFile(MIGRATION_FILE, 'utf8');
-  await client.query(sql);
-}
-
-// A scenario changes the migrated database only in `arrange` and always undoes
-// it in `restore`, so every test starts from the state the full chain leaves.
-function withScenario<T>(arrange: string, restore: string, action: (client: PgClient) => Promise<T>): Promise<T> {
-  return withVerifiedDisposableDatabase(requireTarget(), 'migration', async (client) => {
-    try {
-      await client.query(arrange);
-      return await action(client);
-    } finally {
-      await client.query(restore);
-    }
-  });
 }
 
 async function removedObjects(client: PgClient) {
@@ -117,11 +94,12 @@ describe('remove_stay_requests migration', () => {
 
   it('refuses to drop a stay_requests table that still has a row and leaves it intact', async () => {
     await withScenario(
+      requireTarget(),
       `CREATE TABLE stay_requests (id UUID PRIMARY KEY);
        INSERT INTO stay_requests (id) VALUES ('${STAY_ID}');`,
       'DROP TABLE IF EXISTS stay_requests;',
       async (client) => {
-        await expect(runMigrationFile(client)).rejects.toMatchObject({ code: 'P0001', message: TABLE_REFUSAL });
+        await expect(runMigrationFile(client, MIGRATION)).rejects.toMatchObject({ code: 'P0001', message: TABLE_REFUSAL });
 
         const { rows } = await client.query<{ id: string }>('SELECT id::text FROM stay_requests');
         expect(rows).toEqual([{ id: STAY_ID }]);
@@ -131,10 +109,11 @@ describe('remove_stay_requests migration', () => {
 
   it('drops an empty leftover stay_requests table', async () => {
     await withScenario(
+      requireTarget(),
       'CREATE TABLE stay_requests (id UUID PRIMARY KEY);',
       'DROP TABLE IF EXISTS stay_requests;',
       async (client) => {
-        await expect(runMigrationFile(client)).resolves.toBeUndefined();
+        await expect(runMigrationFile(client, MIGRATION)).resolves.toBeUndefined();
         expect((await removedObjects(client)).table_name).toBeNull();
       },
     );
@@ -142,12 +121,13 @@ describe('remove_stay_requests migration', () => {
 
   it('refuses to drop a stay_request_id column that still holds a value and leaves the event intact', async () => {
     await withScenario(
+      requireTarget(),
       `ALTER TABLE outbox_events ADD COLUMN stay_request_id UUID;
        ${insertEvent('checkin_request_webhook', 'check_in_request', 'PENDING', `'${STAY_ID}'::uuid`)};`,
       `DELETE FROM outbox_events WHERE id = '${EVENT_ID}';
        ALTER TABLE outbox_events DROP COLUMN IF EXISTS stay_request_id;`,
       async (client) => {
-        await expect(runMigrationFile(client)).rejects.toMatchObject({ code: 'P0001', message: COLUMN_REFUSAL });
+        await expect(runMigrationFile(client, MIGRATION)).rejects.toMatchObject({ code: 'P0001', message: COLUMN_REFUSAL });
 
         const { rows } = await client.query<{ stay_request_id: string | null }>(
           'SELECT stay_request_id::text FROM outbox_events WHERE id = $1',
@@ -160,12 +140,13 @@ describe('remove_stay_requests migration', () => {
 
   it('drops a leftover stay_request_id column that holds only NULLs and keeps the event', async () => {
     await withScenario(
+      requireTarget(),
       `ALTER TABLE outbox_events ADD COLUMN stay_request_id UUID;
        ${insertEvent('checkin_request_webhook', 'check_in_request', 'PENDING', 'NULL')};`,
       `DELETE FROM outbox_events WHERE id = '${EVENT_ID}';
        ALTER TABLE outbox_events DROP COLUMN IF EXISTS stay_request_id;`,
       async (client) => {
-        await expect(runMigrationFile(client)).resolves.toBeUndefined();
+        await expect(runMigrationFile(client, MIGRATION)).resolves.toBeUndefined();
 
         const { rows } = await client.query<{ column_name: string }>(`
           SELECT column_name::text FROM information_schema.columns
@@ -185,10 +166,11 @@ describe('remove_stay_requests migration', () => {
     ['a dead event for a stay-request aggregate', 'checkin_request_webhook', 'stay_request', 'DEAD'],
   ])('refuses while the outbox holds %s and leaves the event intact', async (_label, destination, aggregateType, status) => {
     await withScenario(
+      requireTarget(),
       `${insertEvent(destination, aggregateType, status)};`,
       `DELETE FROM outbox_events WHERE id = '${EVENT_ID}';`,
       async (client) => {
-        await expect(runMigrationFile(client)).rejects.toMatchObject({ code: 'P0001', message: EVENT_REFUSAL });
+        await expect(runMigrationFile(client, MIGRATION)).rejects.toMatchObject({ code: 'P0001', message: EVENT_REFUSAL });
         expect(await eventRow(client)).toEqual([{ destination, aggregate_type: aggregateType, status }]);
       },
     );
@@ -196,8 +178,8 @@ describe('remove_stay_requests migration', () => {
 
   it('re-runs cleanly on the migrated database and changes nothing', async () => {
     await withVerifiedDisposableDatabase(requireTarget(), 'migration', async (client) => {
-      await expect(runMigrationFile(client)).resolves.toBeUndefined();
-      await expect(runMigrationFile(client)).resolves.toBeUndefined();
+      await expect(runMigrationFile(client, MIGRATION)).resolves.toBeUndefined();
+      await expect(runMigrationFile(client, MIGRATION)).resolves.toBeUndefined();
 
       expect(await removedObjects(client)).toEqual({ table_name: null, trigger_function: null, status_type: null });
       expect(await outboxLinks(client)).toEqual(['outbox_events_check_in_request_id_fkey']);

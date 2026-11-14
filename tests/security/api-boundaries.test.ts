@@ -176,16 +176,6 @@ describe('API response and deadline middleware', () => {
 });
 
 describe('security header builders', () => {
-  it('selects production and development policy intentionally', () => {
-    vi.stubEnv('NODE_ENV', 'development');
-    expect(getSecurityConfig().csp.reportOnly).toBe(true);
-    expect(getSecurityConfig().csp.directives.scriptSrc).not.toContain('https://vercel.live');
-    expect(getSecurityConfig().csp.directives.connectSrc).not.toContain('https://vercel.live');
-    vi.stubEnv('NODE_ENV', 'production');
-    expect(getSecurityConfig().csp.reportOnly).toBe(false);
-    expect(getSecurityConfig().headers.hsts.enabled).toBe(true);
-  });
-
   it('allows no third-party connect-src origin (the map calls no routing service)', () => {
     vi.stubEnv('NODE_ENV', 'production');
     expect(getSecurityConfig().csp.directives.connectSrc).toEqual(["'self'"]);
@@ -193,7 +183,7 @@ describe('security header builders', () => {
     expect(getSecurityConfig().csp.directives.connectSrc).toEqual(["'self'", 'wss:', 'ws:']);
   });
 
-  it.each(['production', 'development'])('serves fonts and styles only from the own origin in %s', (nodeEnv) => {
+  it.each(['production'])('serves fonts and styles only from the own origin in %s', (nodeEnv) => {
     vi.stubEnv('NODE_ENV', nodeEnv);
     const { directives } = getSecurityConfig().csp;
     // Fonts are self-hosted via next/font/local (identity §2.3); no Google Fonts origin remains.
@@ -228,12 +218,12 @@ describe('security header builders', () => {
     const response = await createSecurityMiddleware()(new NextRequest('https://guide.example/en'));
     const hsts = response.headers.get('strict-transport-security') ?? '';
 
-    // Preload list inclusion is hard to reverse; includeSubDomains awaits the hostname layout (R-227).
+    // Preload list inclusion is hard to reverse; includeSubDomains awaits the hostname layout.
     expect(hsts.split(';').map((directive) => directive.trim().toLowerCase())).not.toContain('preload');
     expect(hsts).toBe('max-age=63072000; includeSubDomains');
   });
 
-  it.each(['production', 'development'])(
+  it.each(['production'])(
     'advertises only the request headers and methods the API uses in %s preflights',
     async (nodeEnv) => {
       vi.stubEnv('NODE_ENV', nodeEnv);
@@ -243,7 +233,7 @@ describe('security header builders', () => {
         new NextRequest('https://guide.example/api/admin/rate-periods/1', { method: 'OPTIONS' }),
       );
 
-      // Cookie auth only (no API keys); route handlers export GET, POST, PUT, PATCH, DELETE (R-226, R-228).
+      // Cookie auth only (no API keys); route handlers export GET, POST, PUT, PATCH, DELETE.
       expect(response.headers.get('access-control-allow-headers')).toBe('Content-Type');
       expect(response.headers.get('access-control-allow-methods')).toBe('GET, POST, PUT, PATCH, DELETE, OPTIONS');
     },

@@ -10,7 +10,6 @@ export const dynamic = 'force-dynamic';
 
 const schema = z.object({
   confirm: z.literal(true),
-  ttlMinutes: z.number().int().min(5).max(1440).optional(),
 }).strict();
 
 // Resets a claimed guest's password and sessions and returns a one-time claim
@@ -35,7 +34,6 @@ export const POST = withErrorHandler(async (
   try {
     const grant = await resetGuestAccess({
       bookingId: id,
-      ttlMinutes: parsed.data.ttlMinutes,
       adminSessionId: admin.session_id,
     });
     const response = createSuccessResponse({

@@ -66,7 +66,7 @@ function insertRatePeriod(
 }
 
 function updateSyncState(client: PgClient, assignments: string): Promise<StatementOutcome> {
-  return attempt(client, `UPDATE calendar_sync_state SET ${assignments} WHERE id = 'airbnb'`);
+  return attempt(client, `UPDATE calendar_sync_state SET ${assignments} WHERE id = 'booking'`);
 }
 
 const utcMidnight = (isoDate: string) => new Date(`${isoDate}T00:00:00.000Z`);
@@ -189,13 +189,13 @@ describe('availability calendar schema after the full migration chain', () => {
                next_attempt_at IS NOT NULL AS scheduled
         FROM calendar_sync_state
       `)).rows,
-      duplicate: await attempt(client, `INSERT INTO calendar_sync_state (id) VALUES ('airbnb')`),
-      otherSource: await attempt(client, `INSERT INTO calendar_sync_state (id) VALUES ('booking')`),
+      duplicate: await attempt(client, `INSERT INTO calendar_sync_state (id) VALUES ('booking')`),
+      otherSource: await attempt(client, `INSERT INTO calendar_sync_state (id) VALUES ('other')`),
     }));
 
     expect(outcomes).toEqual({
       rows: [{
-        id: 'airbnb',
+        id: 'booking',
         blocked_nights: 0,
         horizon_start: null,
         horizon_end: null,
@@ -322,23 +322,23 @@ describe('availability calendar schema after the full migration chain', () => {
 
   it('round-trips the blocked nights DATE[] through Prisma as UTC-midnight dates', async () => {
     await withTestPrismaClient(requireTarget(), async (prisma) => {
-      const seeded = await prisma.calendarSyncState.findUniqueOrThrow({ where: { id: 'airbnb' } });
+      const seeded = await prisma.calendarSyncState.findUniqueOrThrow({ where: { id: 'booking' } });
       expect(seeded.blockedNights).toEqual([]);
 
       try {
         const nights = ['2031-02-28', '2031-03-01', '2032-02-29'];
         await prisma.calendarSyncState.update({
-          where: { id: 'airbnb' },
+          where: { id: 'booking' },
           data: { blockedNights: nights.map(utcMidnight) },
         });
 
-        const stored = await prisma.calendarSyncState.findUniqueOrThrow({ where: { id: 'airbnb' } });
+        const stored = await prisma.calendarSyncState.findUniqueOrThrow({ where: { id: 'booking' } });
         expect(stored.blockedNights.map((night) => night.toISOString()))
           .toEqual(nights.map((night) => `${night}T00:00:00.000Z`));
         await expect(prisma.$queryRaw`SELECT blocked_nights::text AS nights FROM calendar_sync_state`)
           .resolves.toEqual([{ nights: '{2031-02-28,2031-03-01,2032-02-29}' }]);
       } finally {
-        await prisma.calendarSyncState.update({ where: { id: 'airbnb' }, data: { blockedNights: [] } });
+        await prisma.calendarSyncState.update({ where: { id: 'booking' }, data: { blockedNights: [] } });
       }
     });
   });

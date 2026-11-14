@@ -14,7 +14,7 @@ export default function OfflinePage() {
   const en = getDictionary('en');
   const el = getDictionary('el');
   return (
-    <main id="main-content" className="status-main" role="main">
+    <main id="main-content" className="status-main">
       <StatusPage title={en.stay.offline.title} lead={en.stay.offline.lead}>
         <p className="status-page__lead status-page__lead--second" lang="el">
           {el.stay.offline.title}. {el.stay.offline.lead}

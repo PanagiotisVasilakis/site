@@ -16,7 +16,7 @@ type CalloutProps = {
 
 /**
  * identity §8 Callout: an icon and a note on the `info-bg` / `warning-bg` tokens (styles in
- * src/styles/components/ui.css). The `success` and `danger` variants arrive with their first consumer.
+ * src/styles/components/ui.css).
  */
 export function Callout({ variant, role, hidden, className, children }: CalloutProps) {
   return (

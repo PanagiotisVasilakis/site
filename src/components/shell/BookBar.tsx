@@ -7,28 +7,24 @@ import clsx from 'clsx';
 import { Button } from '@/components/ui/Button';
 
 type BookBarProps = {
-  /** The "from {price} / night" template; `{price}` is replaced by the formatted price. */
-  fromText: string;
-  /** The formatted lowest nightly price, or null: then there is no bar at all (identity §8). */
-  price: string | null;
-  /** "Free tonight" or "Next free night: …", only from a fresh calendar. */
+  /** "Free tonight" or "Next free night: …", only from a fresh calendar; null: there is no bar at all (identity §8). */
   note: string | null;
   href: string;
   ctaLabel: string;
 };
 
 /**
- * identity §8 BookBar (mobile, below lg; Home and Apartment only): a fixed glass pill with the price and
- * "Check dates". It stays hidden until the hero or page head (`[data-hero]`) has left the view and while any in-page
+ * identity §8 BookBar (mobile, below lg; Home and Apartment only): a fixed glass pill with the free-night note
+ * ("Free tonight", "Next free night: …") and "Check dates". It stays hidden until the hero or page head (`[data-hero]`) has left the view and while any in-page
  * booking call to action (`[data-cta-watch]`) is visible, both from IntersectionObserver. Hidden, it is
  * `inert` and `visibility: hidden` (shell.css), so it is out of the tab order and the accessibility tree.
- * Without IntersectionObserver or JavaScript it never shows. M22 slides it in under motion.
+ * Without a note (no fresh calendar, no free night), IntersectionObserver or JavaScript it never shows. The bar shows no price. M22 slides it in under motion.
  */
-export default function BookBar({ fromText, price, note, href, ctaLabel }: BookBarProps) {
+export default function BookBar({ note, href, ctaLabel }: BookBarProps) {
   const [shown, setShown] = useState(false);
 
   useEffect(() => {
-    if (price === null || typeof IntersectionObserver === 'undefined') return undefined;
+    if (note === null || typeof IntersectionObserver === 'undefined') return undefined;
     const hero = document.querySelector('[data-hero]');
     const watched = Array.from(document.querySelectorAll('[data-cta-watch]'));
     let heroInView = hero !== null;
@@ -45,21 +41,13 @@ export default function BookBar({ fromText, price, note, href, ctaLabel }: BookB
     if (hero) observer.observe(hero);
     watched.forEach((element) => observer.observe(element));
     return () => observer.disconnect();
-  }, [price]);
+  }, [note]);
 
-  if (price === null) return null;
-  const [before, after = ''] = fromText.split('{price}');
+  if (note === null) return null;
 
   return (
     <div className={clsx('bookbar', shown && 'is-shown')} inert={!shown}>
-      <p className="bookbar__text">
-        <span className="bookbar__price">
-          {before}
-          <strong className="bookbar__value">{price}</strong>
-          {after}
-        </span>
-        {note ? <span className="bookbar__note">{note}</span> : null}
-      </p>
+      <p className="bookbar__text">{note}</p>
       <Button asChild variant="primary" size="sm">
         <Link href={href}>{ctaLabel}</Link>
       </Button>

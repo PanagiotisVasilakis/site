@@ -1,52 +1,35 @@
-'use client'
+'use client';
 
-import Link from 'next/link'
-import { useState, useEffect } from 'react'
-import { MotionConfig, motion } from 'framer-motion'
-import internalFetch from '@/lib/internalFetchClient'
-import { logger } from '@/lib/logger-client'
-import { Badge } from '@/components/ui'
-import { createPortalBookingEligibilityWindow, isPortalBookingTemporallyEligible } from '@/lib/portalBookingEligibility'
-import { addDays, parseIsoDate } from '@/lib/availability/calendarDate'
+import Link from 'next/link';
+import { useState, useEffect, type CSSProperties } from 'react';
+import internalFetch from '@/lib/internalFetchClient';
+import { logger } from '@/lib/logger-client';
+import { Badge } from '@/components/ui/Badge';
+import { createPortalBookingEligibilityWindow, isPortalBookingTemporallyEligible } from '@/lib/portalBookingEligibility';
+import { addDays, parseIsoDate } from '@/lib/availability/calendarDate';
+import type { CheckInRequest } from '@/app/admin/adminApi';
 
 interface BookingData {
   booking: {
-    id: string
-    source: string
-    provider: string
-    externalReference?: string
-    accessStatus: 'PENDING' | 'VERIFIED'
-    claimedAt?: string
-    startDate: string
-    endDate: string
-    createdAt: string
-  }
+    id: string;
+    source: string;
+    provider: string;
+    externalReference?: string;
+    accessStatus: 'PENDING' | 'VERIFIED';
+    startDate: string;
+    endDate: string;
+    createdAt: string;
+  };
   user?: {
-    id: string
-    phone: string
-  }
-}
-
-interface CheckInRequestData {
-  id: string
-  bookingId?: string
-  userId?: string
-  guestName?: string
-  guestEmail?: string
-  guestPhone?: string
-  requestedTime: string
-  message?: string
-  status: 'pending' | 'approved' | 'rejected'
-  createdAt: string
-  updatedAt: string
+    id: string;
+    phone: string;
+  };
 }
 
 interface Statistics {
-  totalBookings: number
-  totalUsers: number
-  totalClaimedBookings: number
-  bookingsBySource: Record<string, number>
-  bookingsByStatus: Record<string, number>
+  totalBookings: number;
+  totalUsers: number;
+  totalClaimedBookings: number;
 }
 
 // Same calendar-date window the claim exchange enforces (UTC DATE values).
@@ -54,171 +37,174 @@ function isWithinClaimWindow(booking: { startDate: string; endDate: string }): b
   return isPortalBookingTemporallyEligible(
     { startDate: new Date(booking.startDate), endDate: new Date(booking.endDate) },
     createPortalBookingEligibilityWindow(new Date()),
-  )
+  );
 }
 
 // The first valid check-out is the day after check-in. addDays throws past 9999-12-31.
 function earliestCheckOut(checkIn: string): string | undefined {
-  const start = parseIsoDate(checkIn)
-  if (start === null || checkIn === '9999-12-31') return undefined
-  return addDays(start, 1)
+  const start = parseIsoDate(checkIn);
+  if (start === null || checkIn === '9999-12-31') return undefined;
+  return addDays(start, 1);
 }
 
 export default function GuestDataViewer() {
-  const [bookings, setBookings] = useState<BookingData[]>([])
-  const [arrivalRequests, setArrivalRequests] = useState<CheckInRequestData[]>([])
-  const [pendingArrivalCount, setPendingArrivalCount] = useState(0)
-  const [stats, setStats] = useState<Statistics | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [actionBusy, setActionBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchType, setSearchType] = useState<'reference' | 'phone' | 'date'>('reference')
-  const [claimGrant, setClaimGrant] = useState<{ bookingId: string; token: string; expiresAt: string } | null>(null)
-  const [claimCopyStatus, setClaimCopyStatus] = useState<'copied' | 'failed' | null>(null)
-  const [newBooking, setNewBooking] = useState({ startDate: '', endDate: '', source: 'ONSITE', externalReference: '' })
-  const [createdBookingId, setCreatedBookingId] = useState('')
+  const [bookings, setBookings] = useState<BookingData[]>([]);
+  const [arrivalRequests, setArrivalRequests] = useState<CheckInRequest[]>([]);
+  const [pendingArrivalCount, setPendingArrivalCount] = useState(0);
+  const [stats, setStats] = useState<Statistics | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchType, setSearchType] = useState<'reference' | 'phone' | 'date'>('reference');
+  const [claimGrant, setClaimGrant] = useState<{ bookingId: string; token: string; expiresAt: string } | null>(null);
+  const [claimCopyStatus, setClaimCopyStatus] = useState<'copied' | 'failed' | null>(null);
+  const [newBooking, setNewBooking] = useState({ startDate: '', endDate: '', source: 'ONSITE', externalReference: '' });
+  const [createdBookingId, setCreatedBookingId] = useState('');
 
   const fetchAllBookings = async () => {
-    setLoading(true)
-    setError('')
+    setLoading(true);
+    setError('');
     try {
-      const response = await internalFetch('/api/admin/guests?action=list')
-      const data = await response.json()
+      const response = await internalFetch('/api/admin/guests?action=list');
+      const data = await response.json();
       if (response.ok && data.success) {
-        setBookings(data.data.bookings || [])
+        setBookings(data.data.bookings || []);
       } else {
-        setError(data.error?.message || 'Failed to fetch bookings')
+        setError(data.error?.message || 'Failed to fetch bookings');
       }
     } catch (error) {
-      console.error('Error fetching bookings', error)
-      setError('Error fetching data')
+      console.error('Error fetching bookings', error);
+      setError('Error fetching data');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const fetchStatistics = async () => {
     try {
-      const response = await internalFetch('/api/admin/guests?action=stats')
+      const response = await internalFetch('/api/admin/guests?action=stats');
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
+        throw new Error(`HTTP ${response.status}`);
       }
-      const data = await response.json()
+      const data = await response.json();
       if (data.success) {
-        setStats(data.data.statistics)
+        setStats(data.data.statistics);
       }
     } catch (error) {
-      console.error('Failed to fetch statistics:', error)
+      console.error('Failed to fetch statistics:', error);
     }
-  }
+  };
 
   const fetchArrivalRequests = async () => {
     try {
-      const response = await internalFetch('/api/admin/check-in-requests?status=all&limit=6')
+      const response = await internalFetch('/api/admin/check-in-requests?status=all&limit=6');
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
+        throw new Error(`HTTP ${response.status}`);
       }
-      const data = await response.json()
+      const data = await response.json();
       if (data.success) {
-        setArrivalRequests(data.data.requests || [])
-        setPendingArrivalCount(data.data.summary?.pending ?? 0)
+        setArrivalRequests(data.data.requests || []);
+        setPendingArrivalCount(data.data.summary?.pending ?? 0);
       }
     } catch (error) {
-      console.error('Failed to fetch arrival requests:', error)
+      console.error('Failed to fetch arrival requests:', error);
     }
-  }
+  };
 
   const handleSearch = async () => {
-    if (!searchQuery.trim()) return
+    if (!searchQuery.trim()) return;
 
-    setLoading(true)
-    setError('')
+    setLoading(true);
+    setError('');
     try {
-      let url = ''
+      let url = '';
       if (searchType === 'reference') {
-        url = `/api/admin/guests?action=find&reference=${encodeURIComponent(searchQuery.trim())}`
+        url = `/api/admin/guests?action=find&reference=${encodeURIComponent(searchQuery.trim())}`;
       } else if (searchType === 'phone') {
-        url = `/api/admin/guests?action=phone&phone=${encodeURIComponent(searchQuery)}`
+        url = `/api/admin/guests?action=phone&phone=${encodeURIComponent(searchQuery)}`;
       } else if (searchType === 'date') {
-        url = `/api/admin/guests?action=search&startDate=${encodeURIComponent(searchQuery.trim())}`
+        url = `/api/admin/guests?action=search&startDate=${encodeURIComponent(searchQuery.trim())}`;
       }
 
-      const response = await internalFetch(url)
-      const data = await response.json()
+      const response = await internalFetch(url);
+      const data = await response.json();
 
       if (response.ok && data.success) {
-        const resultBookings = searchType === 'reference' ? [data.data.booking] : data.data.bookings
-        setBookings(resultBookings || [])
+        const resultBookings = searchType === 'reference' ? [data.data.booking] : data.data.bookings;
+        setBookings(resultBookings || []);
       } else {
-        setError(data.error?.message || 'Search failed')
-        setBookings([])
+        setError(data.error?.message || 'Search failed');
+        setBookings([]);
       }
     } catch (error) {
-      console.error('Search error', error)
-      setError('Search error')
-      setBookings([])
+      console.error('Search error', error);
+      setError('Search error');
+      setBookings([]);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const exportBooking = async (bookingId: string) => {
     try {
-      const response = await internalFetch(`/api/admin/guests?action=export&bookingId=${bookingId}`)
+      const response = await internalFetch(`/api/admin/guests?action=export&bookingId=${bookingId}`);
       if (!response.ok) {
-        throw new Error('Export failed')
+        throw new Error('Export failed');
       }
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `booking_${bookingId}_${Date.now()}.json`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      window.URL.revokeObjectURL(url)
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `booking_${bookingId}_${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Export booking failed', error)
-      setError('Export failed')
+      console.error('Export booking failed', error);
+      setError('Export failed');
     }
-  }
+  };
 
-  const issueClaimGrant = async (bookingId: string, channel: 'REMOTE' | 'ONSITE' = 'REMOTE') => {
-    setActionBusy(true)
-    setError('')
+  const requestClaimToken = async (bookingId: string, url: string, body: object, failureMessage: string) => {
+    setActionBusy(true);
+    setError('');
     try {
-      const response = await internalFetch(`/api/admin/bookings/${bookingId}/claim-grants`, {
+      const response = await internalFetch(url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ channel, ttlMinutes: 30 }),
-      })
-      const data = await response.json()
-      if (!response.ok || !data.success) throw new Error(data.error?.message || 'Claim grant failed')
-      setClaimGrant({ bookingId, token: data.data.claimToken, expiresAt: data.data.expiresAt })
-      setClaimCopyStatus(null)
+        body: JSON.stringify(body),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error?.message || failureMessage);
+      setClaimGrant({ bookingId, token: data.data.claimToken, expiresAt: data.data.expiresAt });
+      setClaimCopyStatus(null);
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Claim grant failed')
+      setError(error instanceof Error ? error.message : failureMessage);
     } finally {
-      setActionBusy(false)
+      setActionBusy(false);
     }
-  }
+  };
+
+  const issueClaimGrant = (bookingId: string) =>
+    requestClaimToken(bookingId, `/api/admin/bookings/${bookingId}/claim-grants`, { channel: 'REMOTE' }, 'Claim grant failed');
 
   const copyClaimToken = async (token: string) => {
     try {
-      await navigator.clipboard.writeText(token)
-      setClaimCopyStatus('copied')
+      await navigator.clipboard.writeText(token);
+      setClaimCopyStatus('copied');
     } catch (err) {
-      logger.warn('Clipboard copy failed', err instanceof Error ? err : { error: String(err) })
-      setClaimCopyStatus('failed')
+      logger.warn('Clipboard copy failed', err instanceof Error ? err : { error: String(err) });
+      setClaimCopyStatus('failed');
     }
-  }
+  };
 
-  const createBooking = async (event: React.FormEvent) => {
-    event.preventDefault()
-    setActionBusy(true)
-    setError('')
-    setCreatedBookingId('')
+  const createBooking = async (event: React.SubmitEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setActionBusy(true);
+    setError('');
+    setCreatedBookingId('');
     try {
       const response = await internalFetch('/api/admin/bookings', {
         method: 'POST',
@@ -229,92 +215,69 @@ export default function GuestDataViewer() {
           source: newBooking.source,
           externalReference: newBooking.externalReference.trim() || undefined,
         }),
-      })
-      const data = await response.json()
-      if (!response.ok || !data.success) throw new Error(data.error?.details?.validationErrors?.[0]?.message || data.error?.message || 'Booking creation failed')
-      setCreatedBookingId(data.data.booking.id)
-      setNewBooking({ startDate: '', endDate: '', source: 'ONSITE', externalReference: '' })
-      await Promise.all([fetchAllBookings(), fetchStatistics()])
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error?.details?.validationErrors?.[0]?.message || data.error?.message || 'Booking creation failed');
+      setCreatedBookingId(data.data.booking.id);
+      setNewBooking({ startDate: '', endDate: '', source: 'ONSITE', externalReference: '' });
+      await Promise.all([fetchAllBookings(), fetchStatistics()]);
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Booking creation failed')
+      setError(error instanceof Error ? error.message : 'Booking creation failed');
     } finally {
-      setActionBusy(false)
+      setActionBusy(false);
     }
-  }
+  };
 
   const resetGuestAccess = async (bookingId: string, phone: string) => {
-    if (!window.confirm(`Reset the password and sign-in sessions of ${phone} and issue a new claim token?`)) return
-    setActionBusy(true)
-    setError('')
-    try {
-      const response = await internalFetch(`/api/admin/bookings/${bookingId}/access-reset`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ confirm: true, ttlMinutes: 30 }),
-      })
-      const data = await response.json()
-      if (!response.ok || !data.success) throw new Error(data.error?.message || 'Access reset failed')
-      setClaimGrant({ bookingId, token: data.data.claimToken, expiresAt: data.data.expiresAt })
-      setClaimCopyStatus(null)
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'Access reset failed')
-    } finally {
-      setActionBusy(false)
-    }
-  }
+    if (!window.confirm(`Reset the password and sign-in sessions of ${phone} and issue a new claim token?`)) return;
+    await requestClaimToken(bookingId, `/api/admin/bookings/${bookingId}/access-reset`, { confirm: true }, 'Access reset failed');
+  };
 
   const eraseGuest = async (userId: string, phone: string) => {
-    if (!window.confirm(`Erase all personal data of the guest ${phone}? This cannot be undone.`)) return
-    const auditNote = window.prompt('Reason and how the request was verified, without names, phone numbers or e-mail addresses (kept in the privacy audit record):')?.trim() ?? ''
-    if (auditNote.length < 3) return
-    setActionBusy(true)
-    setError('')
+    if (!window.confirm(`Erase all personal data of the guest ${phone}? This cannot be undone.`)) return;
+    const auditNote = window.prompt('Reason and how the request was verified, without names, phone numbers or e-mail addresses (kept in the privacy audit record):')?.trim() ?? '';
+    if (auditNote.length < 3) return;
+    setActionBusy(true);
+    setError('');
     try {
       const response = await internalFetch(`/api/admin/guests/${userId}/erase`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ confirm: true, auditNote }),
-      })
-      const data = await response.json()
-      if (!response.ok || !data.success) throw new Error(data.error?.message || 'Erasure failed')
-      await Promise.all([fetchAllBookings(), fetchStatistics()])
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error?.message || 'Erasure failed');
+      await Promise.all([fetchAllBookings(), fetchStatistics()]);
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Erasure failed')
+      setError(error instanceof Error ? error.message : 'Erasure failed');
     } finally {
-      setActionBusy(false)
+      setActionBusy(false);
     }
-  }
+  };
 
   useEffect(() => {
-    fetchAllBookings()
-    fetchStatistics()
-    fetchArrivalRequests()
-  }, [])
+    fetchAllBookings();
+    fetchStatistics();
+    fetchArrivalRequests();
+  }, []);
 
   return (
-    <MotionConfig reducedMotion="user">
     <main className="p-6">
       <div className="max-w-7xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="admin-card rounded-card shadow-lg p-6 mb-6"
-        >
+        <div className="admin-card rounded-card shadow-lg p-6 mb-6 admin-rise">
           <h1 className="text-3xl font-display italic font-bold admin-title mb-2">
             🏠 Guest Data Viewer
           </h1>
           <p className="admin-muted">
             View and manage guest bookings and check-in information
           </p>
-        </motion.div>
+        </div>
 
         {/* Statistics */}
         {stats && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center"
+          <div
+            className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center admin-rise"
+            style={{ '--rise-delay': '100ms' } as CSSProperties}
           >
             <div className="admin-card p-4 rounded-tile shadow">
               <div className="text-2xl font-bold admin-info-text">{stats.totalBookings}</div>
@@ -328,15 +291,13 @@ export default function GuestDataViewer() {
               <div className="text-2xl font-bold admin-olive-text">{stats.totalClaimedBookings}</div>
               <div className="text-sm admin-muted">Claimed Bookings</div>
             </div>
-          </motion.div>
+          </div>
         )}
 
         {arrivalRequests.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="admin-card rounded-tile shadow p-6 mb-6"
+          <div
+            className="admin-card rounded-tile shadow p-6 mb-6 admin-rise"
+            style={{ '--rise-delay': '150ms' } as CSSProperties}
           >
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
               <div>
@@ -388,15 +349,13 @@ export default function GuestDataViewer() {
                 </div>
               ))}
             </div>
-          </motion.div>
+          </div>
         )}
 
         {/* Create booking */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.18 }}
-          className="admin-card rounded-tile shadow p-6 mb-6"
+        <div
+          className="admin-card rounded-tile shadow p-6 mb-6 admin-rise"
+          style={{ '--rise-delay': '180ms' } as CSSProperties}
         >
           <h2 className="text-xl font-display italic font-bold admin-title mb-1">Create Booking</h2>
           <p className="admin-muted text-sm mb-4">Add a confirmed stay, then issue a claim token for the guest.</p>
@@ -455,20 +414,21 @@ export default function GuestDataViewer() {
           {createdBookingId && (
             <p className="text-sm admin-muted mt-3" role="status">Booking {createdBookingId} created.</p>
           )}
-        </motion.div>
+        </div>
 
         {/* Search */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="admin-card rounded-tile shadow p-6 mb-6"
+        <div
+          className="admin-card rounded-tile shadow p-6 mb-6 admin-rise"
+          style={{ '--rise-delay': '200ms' } as CSSProperties}
         >
           <h2 className="text-xl font-display italic font-bold admin-title mb-4">Search Bookings</h2>
           <div className="flex flex-col sm:flex-row gap-4">
             <select
               value={searchType}
-              onChange={(e) => setSearchType(e.target.value as 'reference' | 'phone' | 'date')}
+              onChange={(e) => {
+                setSearchType(e.target.value as 'reference' | 'phone' | 'date');
+                setSearchQuery('');
+              }}
               className="admin-input px-4 py-2 rounded-tile"
             >
               <option value="reference">Booking Reference</option>
@@ -501,17 +461,13 @@ export default function GuestDataViewer() {
               Show All
             </button>
           </div>
-        </motion.div>
+        </div>
 
         {/* Error Display */}
         {error && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="feedback-error px-4 py-3 rounded mb-6"
-          >
+          <div className="feedback-error px-4 py-3 rounded mb-6 admin-rise">
             {error}
-          </motion.div>
+          </div>
         )}
 
         {claimGrant && (
@@ -530,11 +486,9 @@ export default function GuestDataViewer() {
         )}
 
         {/* Bookings List */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="space-y-4"
+        <div
+          className="space-y-4 admin-rise"
+          style={{ '--rise-delay': '300ms' } as CSSProperties}
         >
           {loading ? (
             <div className="text-center py-8">
@@ -551,13 +505,11 @@ export default function GuestDataViewer() {
             </div>
           ) : (
             bookings.map((booking, index) => (
-              <motion.div
+              <div
                 key={booking.booking.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
                 // Only the first few cards are staggered; the rest appear at once.
-                transition={{ delay: Math.min(index, 5) * 0.1 }}
-                className="admin-card rounded-tile shadow p-6"
+                style={{ '--rise-delay': `${Math.min(index, 5) * 100}ms` } as CSSProperties}
+                className="admin-card rounded-tile shadow p-6 admin-rise"
               >
                 <div className="flex justify-between items-start mb-4">
                   <div>
@@ -632,12 +584,11 @@ export default function GuestDataViewer() {
                   </div>
                 </div>
 
-              </motion.div>
+              </div>
             ))
           )}
-        </motion.div>
+        </div>
       </div>
     </main>
-    </MotionConfig>
-  )
+  );
 }

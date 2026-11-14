@@ -1,8 +1,3 @@
-/**
- * Enterprise-grade structured logging system
- * Features: Correlation IDs, Error context, Sanitization
- */
-
 import { AsyncLocalStorage } from 'node:async_hooks';
 import crypto from 'node:crypto';
 
@@ -44,18 +39,10 @@ interface LoggerConfig {
 }
 
 const SENSITIVE_FIELDS = [
-  'password',
-  'token',
-  'secret',
   'key',
-  'authorization',
-  'cookie',
   'session',
   'attestation',
   'forwarded',
-  'connecting-ip',
-  'real-ip',
-  'verified-client-ip',
 ];
 
 const REDACTION_PLACEHOLDER = '[REDACTED]';
@@ -67,6 +54,27 @@ const LOG_LEVELS: Record<LogLevel, number> = {
   warn: 3,
   error: 4,
 } as const;
+
+// LOG_MAX_METADATA_SIZE is read as a strict integer of at least 200 characters. Any other value, including
+// an unset one, keeps the default budget: the workers do not run the environment schema.
+const DEFAULT_MAX_METADATA_SIZE = 1000;
+const MIN_MAX_METADATA_SIZE = 200;
+
+function parseMaxMetadataSize(value: string | undefined): number {
+  if (value === undefined || !/^\d+$/.test(value)) return DEFAULT_MAX_METADATA_SIZE;
+  const size = Number(value);
+  return Number.isSafeInteger(size) && size >= MIN_MAX_METADATA_SIZE ? size : DEFAULT_MAX_METADATA_SIZE;
+}
+
+// Structured lines carry a cause as its name and message only. A cause is not sanitised, and it may be
+// circular or have no prototype, so an object is never converted with String().
+function reduceCause(cause: unknown): { name: string; message: string } | undefined {
+  if (cause === undefined || cause === null) return undefined;
+  if (cause instanceof Error) return { name: cause.name, message: cause.message };
+  if (typeof cause === 'string') return { name: 'StringError', message: cause };
+  if (typeof cause === 'object') return { name: 'UnknownError', message: Object.prototype.toString.call(cause) };
+  return { name: 'UnknownError', message: String(cause) };
+}
 
 class EnterpriseLogger {
   private config: LoggerConfig;
@@ -81,7 +89,7 @@ class EnterpriseLogger {
         : (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
       enableConsole: process.env.LOG_CONSOLE !== 'false',
       enableStructured: process.env.LOG_STRUCTURED === 'true',
-      maxMetadataSize: parseInt(process.env.LOG_MAX_METADATA_SIZE || '1000', 10),
+      maxMetadataSize: parseMaxMetadataSize(process.env.LOG_MAX_METADATA_SIZE),
     };
   }
 
@@ -89,15 +97,8 @@ class EnterpriseLogger {
    * Set correlation context for the current async execution
    */
   setContext(context: Partial<LogContext>): void {
-    const existing = asyncLocalStorage.getStore() || { correlationId: this.generateCorrelationId() };
+    const existing = asyncLocalStorage.getStore() || { correlationId: crypto.randomUUID() };
     asyncLocalStorage.enterWith({ ...existing, ...context });
-  }
-
-  /**
-   * Generate unique correlation ID
-   */
-  private generateCorrelationId(): string {
-    return crypto.randomUUID();
   }
 
   /**
@@ -122,30 +123,53 @@ class EnterpriseLogger {
       return {};
     }
 
+    // Only the current ancestor path is tracked (removed in the finally block): a repeated object is rendered again.
     const seen = new WeakSet<object>();
     const redactRecursively = (value: unknown, key = ''): unknown => {
       const lowerKey = key.toLowerCase();
       // Union of the shared classifier and this list: a key that was redacted before stays redacted.
       const isSensitive = isSensitiveFieldName(key)
-        || SENSITIVE_FIELDS.some((field) => lowerKey.includes(field.toLowerCase()));
+        || SENSITIVE_FIELDS.some((field) => lowerKey.includes(field));
       if (isSensitive) return REDACTION_PLACEHOLDER;
       if (value instanceof Error) return { name: value.name, message: value.message };
+      // Checked before the falsy test: 0n is falsy, and JSON.stringify cannot encode a bigint.
+      if (typeof value === 'bigint') return value.toString();
+      if (value instanceof Date) return Number.isNaN(value.getTime()) ? 'Invalid Date' : value.toISOString();
+      if (value instanceof URL) return value.href;
       if (!value || typeof value !== 'object') return value;
       if (seen.has(value)) return '[CIRCULAR]';
       seen.add(value);
-      if (Array.isArray(value)) return value.map((item) => redactRecursively(item));
+      try {
+        if (value instanceof Map) {
+          // Entries keep their key names, so the redaction rules still hide the value of a sensitive key.
+          return Array.from(value, ([entryKey, entryValue]) => [
+            redactRecursively(entryKey),
+            redactRecursively(entryValue, typeof entryKey === 'string' ? entryKey : ''),
+          ]);
+        }
+        if (value instanceof Set) return Array.from(value, (item) => redactRecursively(item));
+        if (Array.isArray(value)) return value.map((item) => redactRecursively(item));
 
-      const result: Record<string, unknown> = {};
-      for (const [childKey, childValue] of Object.entries(value as Record<string, unknown>)) {
-        result[childKey] = redactRecursively(childValue, childKey);
+        const result: Record<string, unknown> = {};
+        for (const [childKey, childValue] of Object.entries(value as Record<string, unknown>)) {
+          result[childKey] = redactRecursively(childValue, childKey);
+        }
+        return result;
+      } finally {
+        seen.delete(value);
       }
-      return result;
     };
 
     const redacted = redactRecursively(metadata) as Record<string, unknown>;
     
     // Truncate if too large
-    const serialized = JSON.stringify(redacted);
+    let serialized: string;
+    try {
+      serialized = JSON.stringify(redacted);
+    } catch {
+      // A value JSON cannot encode (for example a toJSON that throws) must not make the log call throw.
+      return { _unserializable: true };
+    }
     if (serialized.length > this.config.maxMetadataSize) {
       const previewBudget = Math.max(0, this.config.maxMetadataSize - 120);
       return {
@@ -211,10 +235,14 @@ class EnterpriseLogger {
    */
   private output(entry: LogEntry): void {
     if (this.config.enableConsole) {
-      const method = console[entry.level] || console.log;
+      const method = console[entry.level];
 
       if (this.config.enableStructured) {
-        method(JSON.stringify(entry, null, 2));
+        // One line per entry; the cause is reduced to its name and message (see reduceCause).
+        const structured = entry.error
+          ? { ...entry, error: { ...entry.error, cause: reduceCause(entry.error.cause) } }
+          : entry;
+        method(JSON.stringify(structured));
       } else {
         const parts = [
           `[${entry.timestamp}]`,
@@ -235,6 +263,26 @@ class EnterpriseLogger {
     }
   }
 
+  private logWithMetadataOrError(
+    level: 'warn' | 'error',
+    message: string,
+    metadataOrError: unknown,
+    error: unknown
+  ): void {
+    // No second argument - simple message only
+    if (metadataOrError === undefined) {
+      this.output(this.createLogEntry(level, message));
+      return;
+    }
+    // If second arg looks like an Error/unknown and third arg is undefined, it's the old signature
+    if (error === undefined &&
+        (metadataOrError instanceof Error || typeof metadataOrError !== 'object' || metadataOrError === null || Array.isArray(metadataOrError))) {
+      this.output(this.createLogEntry(level, message, undefined, metadataOrError));
+    } else {
+      this.output(this.createLogEntry(level, message, metadataOrError as Record<string, unknown>, error));
+    }
+  }
+
   // Public logging methods (the level check runs before any entry is built)
   debug(message: string, metadata?: Record<string, unknown>): void {
     if (!this.shouldLog('debug')) return;
@@ -252,18 +300,7 @@ class EnterpriseLogger {
   warn(message: string, metadata: Record<string, unknown>, error?: unknown): void;
   warn(message: string, metadataOrError?: Record<string, unknown> | unknown, error?: unknown): void {
     if (!this.shouldLog('warn')) return;
-    // No second argument - simple message only
-    if (metadataOrError === undefined) {
-      this.output(this.createLogEntry('warn', message));
-      return;
-    }
-    // If second arg looks like an Error/unknown and third arg is undefined, it's the old signature
-    if (error === undefined && metadataOrError !== undefined && 
-        (metadataOrError instanceof Error || typeof metadataOrError !== 'object' || metadataOrError === null || Array.isArray(metadataOrError))) {
-      this.output(this.createLogEntry('warn', message, undefined, metadataOrError));
-    } else {
-      this.output(this.createLogEntry('warn', message, metadataOrError as Record<string, unknown>, error));
-    }
+    this.logWithMetadataOrError('warn', message, metadataOrError, error);
   }
 
   // Supported forms: (message), (message, error) and (message, metadata, error?)
@@ -272,18 +309,7 @@ class EnterpriseLogger {
   error(message: string, metadata: Record<string, unknown>, error?: unknown): void;
   error(message: string, metadataOrError?: Record<string, unknown> | unknown, error?: unknown): void {
     if (!this.shouldLog('error')) return;
-    // No second argument - simple message only
-    if (metadataOrError === undefined) {
-      this.output(this.createLogEntry('error', message));
-      return;
-    }
-    // If second arg looks like an Error/unknown and third arg is undefined, it's the old signature
-    if (error === undefined && metadataOrError !== undefined && 
-        (metadataOrError instanceof Error || typeof metadataOrError !== 'object' || metadataOrError === null || Array.isArray(metadataOrError))) {
-      this.output(this.createLogEntry('error', message, undefined, metadataOrError));
-    } else {
-      this.output(this.createLogEntry('error', message, metadataOrError as Record<string, unknown>, error));
-    }
+    this.logWithMetadataOrError('error', message, metadataOrError, error);
   }
 
 }

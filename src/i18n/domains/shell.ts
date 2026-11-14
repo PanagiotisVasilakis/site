@@ -28,6 +28,7 @@ export interface ShellDictionary {
     motionReducedByDevice: string;
     whatsapp: string;
     instagram: string;
+    identity: { registryLabel: string; legalNameLabel: string; addressLabel: string };
 }
 
 export const shellTranslations: Record<Locale, ShellDictionary> = {
@@ -54,6 +55,11 @@ export const shellTranslations: Record<Locale, ShellDictionary> = {
         motionReducedByDevice: "Reduced by your device settings",
         whatsapp: "WhatsApp",
         instagram: "Instagram",
+        identity: {
+            registryLabel: "Property registry number (ΑΜΑ)",
+            legalNameLabel: "Host name",
+            addressLabel: "Address",
+        },
     },
     el: {
         brandPlace: "Καλαμάτα",
@@ -78,5 +84,10 @@ export const shellTranslations: Record<Locale, ShellDictionary> = {
         motionReducedByDevice: "Μειωμένη από τις ρυθμίσεις της συσκευής σας",
         whatsapp: "WhatsApp",
         instagram: "Instagram",
+        identity: {
+            registryLabel: "Αριθμός Μητρώου Ακινήτου (ΑΜΑ)",
+            legalNameLabel: "Ονοματεπώνυμο",
+            addressLabel: "Διεύθυνση",
+        },
     },
 };

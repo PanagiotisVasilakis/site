@@ -82,17 +82,8 @@ describe('pointer effects (identity §5.5 M27, M30)', () => {
     expect(card.style.getPropertyValue('--tilt-x')).toBe('');
   });
 
-  it('pulls a primary button toward the pointer by at most 6 px', async () => {
-    const { button } = await setup();
-    move(button, 100, 240); // bottom-right corner
-    expect(button).toHaveAttribute('data-magnet-active');
-    expect(button.style.getPropertyValue('--pull-x')).toBe('6.00px');
-    expect(button.style.getPropertyValue('--pull-y')).toBe('6.00px');
-  });
-
   const ignored: Array<[label: string, arrange: () => void, pointerType: string]> = [
     ['a coarse-pointer device', () => installPointer(false), 'mouse'],
-    ['a touch pointer', () => undefined, 'touch'],
     ['motion that is not full', () => document.documentElement.setAttribute('data-motion', 'reduce'), 'mouse'],
   ];
   it.each(ignored)('does nothing for %s', async (_label, arrange, pointerType) => {

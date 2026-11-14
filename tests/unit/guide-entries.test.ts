@@ -21,18 +21,6 @@ describe('guide entries (identity §8 GuideCard, §7.3)', () => {
     expect(formatDistance(0.001, 'en')).toBe('10 m');
   });
 
-  it('uses the art tile for the dark Viktoria Karelia photo and the SOS illustration, photos elsewhere', () => {
-    const t = getDictionary('en');
-    const byId = (category: typeof phones, id: string) => toGuideEntry(
-      getItemsByCategory(category.id).find((item) => item.id === id)!, category, 'en', t,
-    );
-
-    expect(byId(moments, 'viktoria-karelia-museum')).toMatchObject({ photo: undefined, icon: 'museum', categoryLabel: 'Museum' });
-    expect(byId(moments, 'railway-park-kalamata').photo).toBe('/moments/railway-museum-hero.jpg');
-    expect(byId(phones, 'emergency-112')).toMatchObject({ photo: undefined, icon: 'phone', distanceText: undefined });
-    expect(byId(phones, 'police')).toMatchObject({ distanceText: '800 m', favoriteId: 'phones:police', href: '/en/phones/kalamata-police-station' });
-  });
-
   it('sorts places without coordinates last and finds the nearest others', () => {
     const t = getDictionary('en');
     const entries = getItemsByCategory(phones.id).map((item) => toGuideEntry(item, phones, 'en', t));
@@ -40,7 +28,7 @@ describe('guide entries (identity §8 GuideCard, §7.3)', () => {
 
     expect(sorted.map((entry) => entry.id)).toEqual([
       'police', 'fire-department', 'kalamata-hospital',
-      'emergency-112', 'ambulance-166', 'fire-service-199', 'police-100', 'coast-guard-108', 'child-sos-1056', 'poison-centre', 'taxi',
+      'emergency-112', 'ambulance-166', 'fire-service-199', 'police-100', 'coast-guard-108', 'child-sos-1056', 'poison-centre', 'tourist-police-1571', 'taxi',
     ]);
     // Without coordinates: the closest to the apartment.
     expect(nearestTo(sorted[3], entries, 2).map((entry) => entry.id)).toEqual(['police', 'fire-department']);

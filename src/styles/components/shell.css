@@ -43,16 +43,27 @@
   box-shadow: none;
 }
 
-/* PWA update banner and iOS add-to-home tip ([locale]/layout.tsx): a toast-like pill at the bottom centre.
-   No `display` here: the `hidden` utility hides it until PwaManager sets an inline `display: flex`. */
-.pwa-banner {
+/* PWA update banner and iOS add-to-home tip ([locale]/layout.tsx): toast-like pills at the bottom centre.
+   .pwa-banners is the one fixed container (16 px gutters, flex column), so a narrow viewport gives each pill the
+   full width and two shown pills stack instead of overlapping; it lets clicks through, the pills take them back.
+   No `display` on .pwa-banner: the `hidden` utility hides it until PwaManager sets an inline `display: flex`. */
+.pwa-banners {
   position: fixed;
+  right: 16px;
   bottom: calc(8px + env(safe-area-inset-bottom));
-  left: 50%;
+  left: 16px;
   z-index: 50;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 8px;
-  max-width: calc(100vw - 32px);
+  pointer-events: none;
+}
+.pwa-banner {
+  position: static;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
   padding: 6px 6px 6px 16px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
@@ -60,7 +71,7 @@
   box-shadow: var(--shadow-overlay);
   font-family: var(--font-text);
   font-size: var(--text-caption);
-  translate: -50% 0;
+  pointer-events: auto;
 }
 .pwa-banner.pwa-banner { color: var(--color-fg); }
 .pwa-banner .pwa-banner__actions { display: flex; align-items: center; gap: 4px; }
@@ -338,8 +349,8 @@
   gap: 10px;
   margin: 0;
 }
-/* Marketing footer (§8 SiteFooter): under the wordmark, the primary tagline (§1.2) and the location line of the hero
-   lede. Display upright, not italic: on the Greek pages other than home the Greek display italic would be one more
+/* Marketing footer (§8 SiteFooter): under the wordmark, the primary tagline (§1.2) and the location line (home.heroFacts).
+   Display upright, not italic: on the Greek pages other than home the Greek display italic would be one more
    font file (§2.2). Static, no motion. */
 .site-footer__about {
   display: grid;
@@ -441,6 +452,36 @@
   .site-footer--stay .site-footer__inner { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: center; }
 }
 
+/* Host identity (registry number, legal name, address): text only, the same in the footer and the page heads.
+   Labels in the muted colour, values in the body colour, the registry value semibold. No motion. */
+.host-identity {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.host-identity__row {
+  display: grid;
+  gap: 2px;
+}
+.host-identity__label,
+.host-identity__value {
+  margin: 0;
+}
+.host-identity__label { color: var(--color-fg-muted); }
+.host-identity__value { color: var(--color-fg); }
+.host-identity__value--registry { font-weight: 600; }
+.host-identity--footer {
+  grid-column: 1 / -1;
+  font-size: var(--text-caption);
+  line-height: var(--text-caption--line-height);
+}
+.host-identity--page {
+  font-size: var(--text-body);
+  line-height: var(--text-body--line-height);
+}
+.apt-head .host-identity--page { margin-top: 20px; }
+
 /* MotionSwitch (footer and menu) */
 .motion-switch {
   display: flex;
@@ -506,23 +547,13 @@
   .bookbar { display: none; }
 }
 .bookbar .bookbar__text {
-  display: grid;
-  gap: 2px;
   min-width: 0;
   margin: 0;
   font-size: var(--text-caption);
+  font-weight: 600;
   line-height: 1.2;
-  color: var(--color-fg-muted);
-}
-.bookbar .bookbar__value {
-  margin: 0 .1em;
-  font-family: var(--font-display);
-  font-size: 1.5rem;
-  font-weight: 400;
-  font-variant-numeric: tabular-nums;
   color: var(--color-fg);
 }
-.bookbar .bookbar__note { font-size: .8125rem; color: var(--color-fg-muted); }
 /* The footer clears the bar (§8 SiteFooter). */
 @media (max-width: 1023.98px) {
   :root:has(.bookbar) .site-footer.site-footer { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }

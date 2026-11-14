@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger-enterprise';
 import { adminListPageArgs, toAdminListPage } from '@/lib/adminListPage';
+import { retrySerializable } from '@/lib/serializableRetry';
 import { CheckInRequestStatus, Prisma } from '@/generated/prisma/client';
 import type { CheckInRequest, OutboxStatus } from '@/generated/prisma/client';
 import crypto from 'node:crypto';
@@ -139,39 +140,29 @@ async function create(
 }
 
 async function findById(id: string): Promise<CheckInRequestRecord | undefined> {
-  try {
-    const request = await prisma.checkInRequest.findUnique({
-      where: { id },
-    });
+  const request = await prisma.checkInRequest.findUnique({
+    where: { id },
+  });
 
-    return request ? mapRequest(request) : undefined;
-  } catch (error) {
-    logger.error('checkInRequestRepository(prisma): findById failed', error);
-    throw error;
-  }
+  return request ? mapRequest(request) : undefined;
 }
 
 async function findLatestForGuest(params: { bookingId?: string; userId?: string }): Promise<CheckInRequestRecord | undefined> {
-  try {
-    if (!params.bookingId && !params.userId) return undefined;
+  if (!params.bookingId && !params.userId) return undefined;
 
-    const request = await prisma.checkInRequest.findFirst({
-      where: params.bookingId
-        ? {
-            OR: [
-              { bookingId: params.bookingId },
-              ...(params.userId ? [{ bookingId: null, userId: params.userId }] : []),
-            ],
-          }
-        : { userId: params.userId },
-      orderBy: { createdAt: 'desc' },
-    });
+  const request = await prisma.checkInRequest.findFirst({
+    where: params.bookingId
+      ? {
+          OR: [
+            { bookingId: params.bookingId },
+            ...(params.userId ? [{ bookingId: null, userId: params.userId }] : []),
+          ],
+        }
+      : { userId: params.userId },
+    orderBy: { createdAt: 'desc' },
+  });
 
-    return request ? mapRequest(request) : undefined;
-  } catch (error) {
-    logger.error('checkInRequestRepository(prisma): findLatestForGuest failed', error);
-    throw error;
-  }
+  return request ? mapRequest(request) : undefined;
 }
 
 // A privacy erasure cancels undelivered events by marking them DEAD with the
@@ -193,80 +184,58 @@ function notificationStatus(events: { status: OutboxStatus; payload: Prisma.Json
 async function list(
   params: ListCheckInRequestParams = {},
 ): Promise<{ requests: CheckInRequestRecord[]; nextCursor: string | null }> {
-  try {
-    const limit = Math.min(Math.max(params.limit ?? 100, 1), 200);
-    const rows = await prisma.checkInRequest.findMany({
-      where: params.status ? { status: params.status } : undefined,
-      ...adminListPageArgs(limit, params.cursor),
-      include: { outboxEvents: { orderBy: { createdAt: 'desc' }, select: { status: true, payload: true } } },
-    });
-    const page = toAdminListPage(rows, limit, params.cursor);
-    return {
-      requests: page.items.map((row) => ({ ...mapRequest(row), notification_status: notificationStatus(row.outboxEvents) })),
-      nextCursor: page.nextCursor,
-    };
-  } catch (error) {
-    logger.error('checkInRequestRepository(prisma): list failed', error);
-    throw error;
-  }
+  const limit = Math.min(Math.max(params.limit ?? 100, 1), 200);
+  const rows = await prisma.checkInRequest.findMany({
+    where: params.status ? { status: params.status } : undefined,
+    ...adminListPageArgs(limit, params.cursor),
+    include: { outboxEvents: { orderBy: { createdAt: 'desc' }, select: { status: true, payload: true } } },
+  });
+  const page = toAdminListPage(rows, limit, params.cursor);
+  return {
+    requests: page.items.map((row) => ({ ...mapRequest(row), notification_status: notificationStatus(row.outboxEvents) })),
+    nextCursor: page.nextCursor,
+  };
 }
 
 async function updateStatus(
   id: string,
   status: CheckInRequestStatus,
 ): Promise<{ request: CheckInRequestRecord; notificationEventId?: string; changed: boolean }> {
-  try {
-    let result: { request: CheckInRequest; notificationEventId?: string; changed: boolean } | undefined;
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
-      try {
-        result = await prisma.$transaction(async (tx) => {
-          const current = await tx.checkInRequest.findUnique({ where: { id } });
-          if (!current) throw new CheckInRequestNotFoundError(id);
-          if (current.status === status) return { request: current, changed: false };
-          // A decision is final: checked inside the transaction so two admins
-          // deciding at once cannot flip each other's answer.
-          if (current.status !== CheckInRequestStatus.PENDING) throw new CheckInRequestAlreadyDecidedError(id);
+  const result = await retrySerializable(() => prisma.$transaction(async (tx) => {
+    const current = await tx.checkInRequest.findUnique({ where: { id } });
+    if (!current) throw new CheckInRequestNotFoundError(id);
+    if (current.status === status) return { request: current, changed: false };
+    // A decision is final: checked inside the transaction so two admins
+    // deciding at once cannot flip each other's answer.
+    if (current.status !== CheckInRequestStatus.PENDING) throw new CheckInRequestAlreadyDecidedError(id);
 
-          const updated = await tx.checkInRequest.update({ where: { id }, data: { status } });
-          const notificationEventId = process.env.CHECKIN_REQUEST_WEBHOOK_URL
-            ? crypto.randomUUID()
-            : undefined;
-          if (notificationEventId) {
-            await tx.outboxEvent.create({
-              data: {
-                id: notificationEventId,
-                eventType: 'check_in_time_request.updated',
-                destination: 'checkin_request_webhook',
-                aggregateType: 'check_in_request',
-                aggregateId: id,
-                idempotencyKey: `check_in_time_request.updated:${id}:${status}:${updated.updatedAt.toISOString()}`,
-                payload: { previousStatus: current.status, status },
-                checkInRequestId: id,
-              },
-            });
-          }
-          return { request: updated, notificationEventId, changed: true };
-        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-        break;
-      } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034' && attempt < 3) continue;
-        throw error;
-      }
+    const updated = await tx.checkInRequest.update({ where: { id }, data: { status } });
+    const notificationEventId = process.env.CHECKIN_REQUEST_WEBHOOK_URL
+      ? crypto.randomUUID()
+      : undefined;
+    if (notificationEventId) {
+      await tx.outboxEvent.create({
+        data: {
+          id: notificationEventId,
+          eventType: 'check_in_time_request.updated',
+          destination: 'checkin_request_webhook',
+          aggregateType: 'check_in_request',
+          aggregateId: id,
+          idempotencyKey: `check_in_time_request.updated:${id}:${status}:${updated.updatedAt.toISOString()}`,
+          payload: { previousStatus: current.status, status },
+          checkInRequestId: id,
+        },
+      });
     }
-    if (!result) throw new Error('Check-in request update exhausted transaction retries');
+    return { request: updated, notificationEventId, changed: true };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }));
 
-    logger.info('Check-in request status updated', {
-      requestId: id,
-      status,
-      changed: result.changed,
-    });
-    return { request: mapRequest(result.request), notificationEventId: result.notificationEventId, changed: result.changed };
-  } catch (error) {
-    if (!(error instanceof CheckInRequestNotFoundError || error instanceof CheckInRequestAlreadyDecidedError)) {
-      logger.error('checkInRequestRepository(prisma): updateStatus failed', error);
-    }
-    throw error;
-  }
+  logger.info('Check-in request status updated', {
+    requestId: id,
+    status,
+    changed: result.changed,
+  });
+  return { request: mapRequest(result.request), notificationEventId: result.notificationEventId, changed: result.changed };
 }
 
 export class CheckInRequestNotFoundError extends Error {
@@ -284,23 +253,18 @@ export class CheckInRequestAlreadyDecidedError extends Error {
 }
 
 async function getStatusCounts(): Promise<CheckInRequestStatusCounts> {
-  try {
-    const [pending, approved, rejected] = await prisma.$transaction([
-      prisma.checkInRequest.count({ where: { status: CheckInRequestStatus.PENDING } }),
-      prisma.checkInRequest.count({ where: { status: CheckInRequestStatus.APPROVED } }),
-      prisma.checkInRequest.count({ where: { status: CheckInRequestStatus.REJECTED } }),
-    ]);
+  const [pending, approved, rejected] = await prisma.$transaction([
+    prisma.checkInRequest.count({ where: { status: CheckInRequestStatus.PENDING } }),
+    prisma.checkInRequest.count({ where: { status: CheckInRequestStatus.APPROVED } }),
+    prisma.checkInRequest.count({ where: { status: CheckInRequestStatus.REJECTED } }),
+  ]);
 
-    return {
-      pending,
-      approved,
-      rejected,
-      total: pending + approved + rejected,
-    };
-  } catch (error) {
-    logger.error('checkInRequestRepository(prisma): getStatusCounts failed', error);
-    throw error;
-  }
+  return {
+    pending,
+    approved,
+    rejected,
+    total: pending + approved + rejected,
+  };
 }
 
 // Requeues the request's exhausted webhook notifications; the outbox worker

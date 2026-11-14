@@ -33,6 +33,12 @@ file and archive hashes, extract it into a user-protected directory, and set:
 GITLEAKS_BIN=/absolute/protected/path/gitleaks npm run verify:release
 ```
 
+The lock lists the `darwin-arm64` artifact (Apple-silicon macOS) only. Another
+platform needs a reviewed addition to `tool.lock.json` (archive and binary
+SHA-256) and to the pinned expectation in `scripts/lib/release-policy.mjs`,
+which the policy compares with the lock; until then the scanner check stops on
+that platform with `No locked scanner artifact exists for <platform>`.
+
 The gate independently verifies the extracted binary hash and exact version.
 It performs no network download. The only accepted current findings are
 versioned, value-exact synthetic test fixtures or documented placeholders:

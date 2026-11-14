@@ -8,7 +8,7 @@ import type { Dictionary } from '@/i18n/dictionaries';
 import LanguageSwitch from './LanguageSwitch';
 import { MotionSwitch } from './MotionSwitch';
 import { ThemeSetting } from './ThemeSwitch';
-import { isCurrentLink, menuContactLinks, navLinks, type ShellVariant } from './shellLinks';
+import { isCurrentLink, menuContactLinks, navLinks, scrollToCurrentHash, type ShellVariant } from './shellLinks';
 
 const CONTACT_ICONS: Record<string, IconName> = { call: 'phone', whatsapp: 'message' };
 
@@ -82,7 +82,11 @@ export default function MobileMenu({
                 href={link.href}
                 className="mobile-menu__link shell-link"
                 aria-current={current ? 'page' : undefined}
-                onClick={close}
+                onClick={(event) => {
+                  // Close first: the open menu locks the page scroll (`:root:has(.mobile-menu[open])`).
+                  close();
+                  scrollToCurrentHash(event, link.href);
+                }}
               >
                 {link.label}
               </Link>

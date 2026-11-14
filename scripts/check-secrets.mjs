@@ -56,11 +56,11 @@ async function readJson(filePath) {
   return JSON.parse(await readFile(filePath, 'utf8'));
 }
 
-function run(command, args, options = {}) {
+function run(command, args) {
   return spawnSync(command, args, {
-    cwd: options.cwd ?? REPOSITORY_ROOT,
+    cwd: REPOSITORY_ROOT,
     encoding: 'utf8',
-    env: options.env ?? process.env,
+    env: process.env,
     maxBuffer: 16 * 1_024 * 1_024,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -115,6 +115,14 @@ async function rejectInlineSuppression(candidate, relative) {
   }
 }
 
+// Both copiers go through this helper, so the inline-suppression check covers both.
+async function copyIntoScanRoot(source, target, relative) {
+  await mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
+  await copyFile(source, target);
+  await chmod(target, 0o600);
+  await rejectInlineSuppression(target, relative);
+}
+
 async function copyCandidateFiles(files, destination) {
   for (const relative of files) {
     if (path.isAbsolute(relative) || relative.split('/').includes('..')) {
@@ -132,10 +140,7 @@ async function copyCandidateFiles(files, destination) {
       throw new Error(`Unsupported tracked release input type: ${relative}`);
     }
     const target = path.join(destination, relative);
-    await mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
-    await copyFile(source, target);
-    await chmod(target, 0o600);
-    await rejectInlineSuppression(target, relative);
+    await copyIntoScanRoot(source, target, relative);
   }
 }
 
@@ -174,10 +179,7 @@ async function copyResolvedCandidateFiles(files, destination) {
       );
     }
     const target = path.join(destination, relative);
-    await mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
-    await copyFile(source, target);
-    await chmod(target, 0o600);
-    await rejectInlineSuppression(target, relative);
+    await copyIntoScanRoot(source, target, relative);
   }
 }
 

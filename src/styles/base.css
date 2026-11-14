@@ -12,7 +12,6 @@
 @layer base {
   /* §2.5/§2.6 Greek display line-heights and label tracking */
   :lang(el) {
-    --lh-display-extra: .06;
     --text-d1--line-height: 1.08;
     --text-d2--line-height: 1.08;
     --text-d3--line-height: 1.15;

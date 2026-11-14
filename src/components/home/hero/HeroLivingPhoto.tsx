@@ -3,11 +3,9 @@ import Link from 'next/link';
 
 import { Icon } from '@/components/icons/Icon';
 import { Button } from '@/components/ui/Button';
-import { AIRBNB_LISTING_URL } from '@/data/contact';
 import type { Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
-import { formatCentsShort } from '@/lib/availability/money';
-import { airbnbListingHref, isAirbnbListingUrl } from '@/lib/contactLinks';
+import { bookingComHref } from '@/lib/contactLinks';
 
 import HeroGlIsland from './HeroGlIsland';
 
@@ -24,20 +22,15 @@ function srcSet(crop: string, widths: readonly (readonly [label: number, width: 
   return widths.map(([label, width]) => `${DIR}-${crop}-${label}.${ext} ${width}w`).join(', ');
 }
 
-type HeroLivingPhotoProps = {
-  locale: Locale;
-  /** The lowest nightly price from the availability data (lowestNightlyPriceCents), or null. */
-  fromPriceCents: number | null;
-};
-
 /**
  * The home hero (identity §5.6, §7.2, §9.1): the balcony photo as a server-rendered <picture> (the LCP
  * element), the scrim, the H1 and the booking CTAs. HeroGlIsland may later fade a WebGL canvas in
  * over the same photo; without it (no JS, reduced motion, weak device) this is the whole hero.
  */
-export default function HeroLivingPhoto({ locale, fromPriceCents }: HeroLivingPhotoProps) {
+export default function HeroLivingPhoto({ locale }: { locale: Locale }) {
   const t = getDictionary(locale);
-  const [before, after] = t.home.heroPriceFrom.split('{price}');
+  // The hero keeps two CTAs in its grid: "Check dates" and, with a valid link, "Book on Booking.com".
+  const bookingHref = bookingComHref();
 
   return (
     <section className="hero" data-hero aria-labelledby="hero-title">
@@ -68,30 +61,17 @@ export default function HeroLivingPhoto({ locale, fromPriceCents }: HeroLivingPh
             <span className="hero__line">Dolce</span>{' '}
             <span className="hero__line hero__line--2">far niente</span>
           </h1>
-          <p className="hero__lede">
-            {t.home.heroTagline}{' '}
-            <span className="hero__facts">{t.home.heroFacts}</span>
-          </p>
           <div className="hero__actions">
-            <p className="hero__price">
-              {fromPriceCents === null ? t.home.heroPriceNone : (
-                <>
-                  {before}
-                  <strong className="hero__price-value">{formatCentsShort(fromPriceCents, locale)}</strong>
-                  {after}
-                </>
-              )}
-            </p>
             <Button asChild variant="primary">
               <Link href={`/${locale}/availability`}>
                 {t.shell.checkDates}
                 <Icon name="arrow-right" size={20} />
               </Link>
             </Button>
-            {isAirbnbListingUrl(AIRBNB_LISTING_URL) ? (
+            {bookingHref ? (
               <Button asChild variant="glass">
-                <a href={airbnbListingHref(AIRBNB_LISTING_URL)} target="_blank" rel="noopener noreferrer">
-                  {t.availability.booking.airbnb}
+                <a href={bookingHref} target="_blank" rel="noopener noreferrer">
+                  {t.availability.booking.bookingCom}
                   <Icon name="arrow-up-right" size={20} />{' '}
                   <span className="sr-only">{t.availability.booking.opensInNewTab}</span>
                 </a>

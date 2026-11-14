@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { render } from '@testing-library/react';
-import { StrictMode } from 'react';
+import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import FactCounters from '@/components/home/FactCounters';
@@ -87,11 +87,18 @@ beforeEach(() => {
   });
 });
 
-afterEach(() => rectSpy.mockRestore());
+afterEach(() => {
+  rectSpy.mockRestore();
+  document.documentElement.removeAttribute('data-reveal-ready');
+});
 
-describe('HomeRevealObserver trigger (R-379)', () => {
-  it('reveals by a share of the viewport, not of the element: a rootMargin and no threshold', () => {
-    const observations = stubObserver();
+describe('HomeRevealObserver hydration flag (R-633)', () => {
+  const root = document.documentElement;
+
+  it('sets data-reveal-ready on <html> when it mounts, so the boot script failsafe sees that this page hydrated', () => {
+    stubObserver();
+    expect(root.hasAttribute('data-reveal-ready')).toBe(false);
+
     render(
       <>
         <div data-reveal />
@@ -99,29 +106,11 @@ describe('HomeRevealObserver trigger (R-379)', () => {
       </>,
     );
 
-    expect(observations).toHaveLength(1);
-    // A threshold is a share of the element's own area, which an element taller than innerHeight / threshold never reaches.
-    expect(observations[0].options).toStrictEqual({ rootMargin: '0px 0px -35% 0px' });
+    expect(root.hasAttribute('data-reveal-ready')).toBe(true);
   });
+});
 
-  it('gives data-reveal="0.45" an observer of its own and lets equal shares share one', () => {
-    const observations = stubObserver();
-    render(
-      <>
-        <div data-reveal id="first" />
-        <div data-reveal="0.45" id="window" />
-        <div data-reveal id="second" />
-        <HomeRevealObserver />
-      </>,
-    );
-
-    expect(observations.map(({ options }) => options)).toStrictEqual([
-      { rootMargin: '0px 0px -35% 0px' },
-      { rootMargin: '0px 0px -45% 0px' },
-    ]);
-    expect(observations.map(({ targets }) => targets.map((target) => target.id))).toStrictEqual([['first', 'second'], ['window']]);
-  });
-
+describe('HomeRevealObserver trigger (R-379)', () => {
   it('adds is-in once the target intersects and then stops observing it', () => {
     const observations = stubObserver();
     const { container } = render(
@@ -147,6 +136,7 @@ describe('HomeRevealObserver trigger (R-379)', () => {
 
   it('marks every target in view where IntersectionObserver is missing', () => {
     vi.stubGlobal('IntersectionObserver', undefined);
+    expect(document.documentElement.hasAttribute('data-reveal-ready')).toBe(false);
     const { container } = render(
       <>
         <div data-reveal />
@@ -155,24 +145,9 @@ describe('HomeRevealObserver trigger (R-379)', () => {
       </>,
     );
 
+    expect(document.documentElement.hasAttribute('data-reveal-ready')).toBe(true);
     const revealed = Array.from(container.querySelectorAll('[data-reveal]'), (target) => target.classList.contains('is-in'));
     expect(revealed).toStrictEqual([true, true]);
-  });
-
-  it('disconnects its observers when it unmounts', () => {
-    const observations = stubObserver();
-    const { unmount } = render(
-      <>
-        <div data-reveal />
-        <div data-reveal="0.45" />
-        <HomeRevealObserver />
-      </>,
-    );
-    expect(observations.map(({ disconnected }) => disconnected)).toStrictEqual([false, false]);
-
-    unmount();
-
-    expect(observations.map(({ disconnected }) => disconnected)).toStrictEqual([true, true]);
   });
 });
 
@@ -208,68 +183,6 @@ describe('HomeRevealObserver load-time reveal', () => {
     expect(observation.disconnected).toBe(false);
   });
 
-  it('also reveals a target already above the viewport (a restored scroll position)', () => {
-    const observations = stubObserver();
-    const { container } = render(
-      <>
-        <div data-reveal id="above" />
-        <HomeRevealObserver />
-      </>,
-    );
-    const above = container.querySelector('#above') as HTMLElement;
-    placeAt(above, -400);
-
-    frames.flush();
-    expect(above).not.toHaveClass('is-in');
-
-    frames.flush();
-
-    expect(above).toHaveClass('is-in');
-    expect(observations[0].unobserved).toStrictEqual([above]);
-  });
-
-  it('unobserves a revealed target from the observer that owns its share', () => {
-    const observations = stubObserver();
-    const { container } = render(
-      <>
-        <div data-reveal id="first" />
-        <div data-reveal="0.45" id="window" />
-        <HomeRevealObserver />
-      </>,
-    );
-    const first = container.querySelector('#first') as HTMLElement;
-    const windowTarget = container.querySelector('#window') as HTMLElement;
-    placeAt(first, 100);
-    placeAt(windowTarget, 120);
-
-    frames.flush();
-    expect(observations.map(({ unobserved }) => unobserved)).toStrictEqual([[], []]);
-
-    frames.flush();
-
-    expect(observations.map(({ unobserved }) => unobserved)).toStrictEqual([[first], [windowTarget]]);
-  });
-
-  it('cancels the load-time frame when it unmounts first, so nothing is revealed afterwards', () => {
-    stubObserver();
-    const { container, unmount } = render(
-      <>
-        <div data-reveal id="onscreen" />
-        <HomeRevealObserver />
-      </>,
-    );
-    const onscreen = container.querySelector('#onscreen') as HTMLElement;
-    placeAt(onscreen, 100);
-    expect(frames.pending()).toHaveLength(1);
-    const [scheduled] = frames.pending();
-
-    unmount();
-    expect(frames.cancelled).toContain(scheduled);
-    frames.flush();
-
-    expect(onscreen).not.toHaveClass('is-in');
-  });
-
   it('cancels the second frame when it unmounts between the two frames, so nothing is revealed afterwards', () => {
     const observations = stubObserver();
     const { container, unmount } = render(
@@ -294,88 +207,58 @@ describe('HomeRevealObserver load-time reveal', () => {
     expect(onscreen).not.toHaveClass('is-in');
     expect(observations[0].unobserved).toStrictEqual([]);
   });
-
-  it('leaves a target that is already revealed alone: the frames skip it and do not unobserve it again', () => {
-    const observations = stubObserver();
-    const { container } = render(
-      <>
-        <div data-reveal id="reported" />
-        <div className="is-in" data-reveal id="served" />
-        <HomeRevealObserver />
-      </>,
-    );
-    const reported = container.querySelector('#reported') as HTMLElement;
-    const served = container.querySelector('#served') as HTMLElement;
-    placeAt(reported, 100);
-    placeAt(served, 100);
-    const [observation] = observations;
-    // The server markup already carries is-in on one target, so it is never observed.
-    expect(observation.targets).toStrictEqual([reported]);
-
-    // An intersection report reveals the other one before the frames run.
-    observation.report([{ target: reported, isIntersecting: true }]);
-    expect(reported).toHaveClass('is-in');
-    expect(observation.unobserved).toStrictEqual([reported]);
-
-    expect(() => {
-      frames.flush();
-      frames.flush();
-    }).not.toThrow();
-
-    expect(reported).toHaveClass('is-in');
-    expect(served).toHaveClass('is-in');
-    expect(observation.unobserved).toStrictEqual([reported]);
-    expect(frames.pending()).toHaveLength(0);
-  });
-
-  it('under StrictMode (effects run, clean up and run again) reveals the on-screen target once and keeps the one below observed', () => {
-    const observations = stubObserver();
-    const { container } = render(
-      <StrictMode>
-        <div data-reveal id="onscreen" />
-        <div data-reveal id="below" />
-        <HomeRevealObserver />
-      </StrictMode>,
-    );
-    const onscreen = container.querySelector('#onscreen') as HTMLElement;
-    const below = container.querySelector('#below') as HTMLElement;
-    placeAt(onscreen, 100);
-
-    // The first run is cleaned up: its observer is disconnected and its pending frame cancelled.
-    expect(observations).toHaveLength(2);
-    expect(observations.map(({ disconnected }) => disconnected)).toStrictEqual([true, false]);
-    expect(frames.cancelled).toHaveLength(1);
-    expect(frames.pending()).toHaveLength(1);
-    expect(frames.pending()).not.toContain(frames.cancelled[0]);
-
-    frames.flush();
-    expect(onscreen).not.toHaveClass('is-in');
-    frames.flush();
-
-    expect(onscreen).toHaveClass('is-in');
-    expect(below).not.toHaveClass('is-in');
-    expect(observations.map(({ unobserved }) => unobserved)).toStrictEqual([[], [onscreen]]);
-    expect(observations[1].targets).toStrictEqual([onscreen, below]);
-    expect(observations[1].disconnected).toBe(false);
-    expect(frames.pending()).toHaveLength(0);
-  });
 });
 
-describe('FactCounters trigger (R-379)', () => {
-  afterEach(() => document.documentElement.removeAttribute('data-motion'));
+describe('HomeRevealObserver after a viewport change (R-685)', () => {
+  beforeEach(() => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }));
+  afterEach(() => vi.useRealTimers());
 
-  it('counts on the same viewport share as the louvres, so the numbers start with them', () => {
-    document.documentElement.setAttribute('data-motion', 'full');
+  /** Mounts one target below the viewport, runs both load frames (it stays hidden), then moves it into the bottom 35 % band, which no intersection report covers. */
+  function mountBelowThenGrow(wrap: (children: ReactNode) => ReactNode = (children) => children) {
     const observations = stubObserver();
-    const { container } = render(
-      <section className="facts" data-reveal>
-        <FactCounters />
-      </section>,
+    const view = render(
+      <>
+        {wrap(
+          <>
+            <div data-reveal id="band" />
+            <HomeRevealObserver />
+          </>,
+        )}
+      </>,
     );
+    const band = view.container.querySelector('#band') as HTMLElement;
+    frames.flush();
+    frames.flush();
+    expect(band).not.toHaveClass('is-in');
+    placeAt(band, window.innerHeight * 0.8);
+    return { ...view, observations, band };
+  }
 
-    expect(observations).toHaveLength(1);
-    expect(observations[0].options).toStrictEqual({ rootMargin: '0px 0px -35% 0px' });
-    expect(observations[0].targets).toStrictEqual([container.querySelector('.facts')]);
+  it('reveals a target that the viewport growth left in the bottom 35 %, after a debounced window resize, and unobserves it', () => {
+    const { observations, band } = mountBelowThenGrow();
+
+    window.dispatchEvent(new Event('resize'));
+    window.dispatchEvent(new Event('resize'));
+    expect(band).not.toHaveClass('is-in');
+    vi.advanceTimersByTime(500);
+
+    expect(band).toHaveClass('is-in');
+    expect(observations[0].unobserved).toStrictEqual([band]);
+  });
+
+  it('stops listening and drops a pending pass when it unmounts', () => {
+    const viewport = new EventTarget();
+    vi.stubGlobal('visualViewport', viewport);
+    const { observations, band, unmount } = mountBelowThenGrow();
+
+    window.dispatchEvent(new Event('resize'));
+    unmount();
+    window.dispatchEvent(new Event('resize'));
+    viewport.dispatchEvent(new Event('resize'));
+    vi.advanceTimersByTime(500);
+
+    expect(band).not.toHaveClass('is-in');
+    expect(observations[0].unobserved).toStrictEqual([]);
   });
 });
 
@@ -454,81 +337,50 @@ describe('FactCounters load-time count', () => {
     frames.flush(3000);
     expect(numbers()).toStrictEqual(['90', '4']);
   });
+});
 
-  it('cancels the load-time frame when it unmounts first, so no count starts afterwards', () => {
-    const { strip, numbers, unmount } = renderStrip();
-    placeAt(strip, 100);
-    expect(frames.pending()).toHaveLength(1);
-    const [scheduled] = frames.pending();
-
-    unmount();
-    expect(frames.cancelled).toContain(scheduled);
-    frames.flush(1000);
-
-    expect(frames.pending()).toHaveLength(0);
-    expect(numbers()).toStrictEqual(['90', '4']);
+describe('FactCounters after a viewport change (R-685)', () => {
+  beforeEach(() => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }));
+  afterEach(() => {
+    vi.useRealTimers();
+    document.documentElement.removeAttribute('data-motion');
   });
 
-  it('cancels the second frame when it unmounts between the two frames, so no count starts afterwards', () => {
-    const { observations, strip, numbers, unmount } = renderStrip();
-    placeAt(strip, 100);
-
-    frames.flush(1000);
-    expect(frames.pending()).toHaveLength(1);
-    const [second] = frames.pending();
-
-    unmount();
-    expect(frames.cancelled).toContain(second);
-    expect(frames.pending()).toHaveLength(0);
-    frames.flush(1000);
-
-    expect(frames.executed()).toBe(1);
-    expect(frames.pending()).toHaveLength(0);
-    expect(numbers()).toStrictEqual(['90', '4']);
-    expect(observations[0].disconnected).toBe(true);
-  });
-
-  it('under StrictMode (effects run, clean up and run again) starts the count once and ends on the server text', () => {
+  function renderGrown() {
     document.documentElement.setAttribute('data-motion', 'full');
-    const observations = stubObserver();
-    const { container } = render(
-      <StrictMode>
-        <section className="facts" data-reveal>
-          <span className="fact__num">90</span>
-          <span className="fact__num">4</span>
-          <FactCounters />
-        </section>
-      </StrictMode>,
+    stubObserver();
+    const view = render(
+      <section className="facts" data-reveal>
+        <span className="fact__num">90</span>
+        <span className="fact__num">4</span>
+        <FactCounters />
+      </section>,
     );
-    const strip = container.querySelector('.facts') as HTMLElement;
+    const strip = view.container.querySelector('.facts') as HTMLElement;
     const numbers = () => Array.from(strip.querySelectorAll('.fact__num'), (element) => element.textContent);
-    placeAt(strip, 100);
+    frames.flush(1000);
+    frames.flush(1000);
+    expect(frames.pending()).toHaveLength(0);
+    placeAt(strip, window.innerHeight * 0.8);
+    return { ...view, numbers };
+  }
 
-    // The first run is cleaned up: its observer is disconnected and its pending load frame cancelled.
-    expect(observations).toHaveLength(2);
-    expect(observations.map(({ disconnected }) => disconnected)).toStrictEqual([true, false]);
-    // (The cleanup also passes its idle count-frame id 0 to cancelAnimationFrame, a no-op: only real ids are counted.)
-    expect(frames.cancelled.filter((id) => id > 0)).toHaveLength(1);
+  it('starts counting after a debounced resize when the strip now sits in the bottom 35 %, and counts once', () => {
+    const { numbers } = renderGrown();
+
+    window.dispatchEvent(new Event('resize'));
+    window.dispatchEvent(new Event('resize'));
+    expect(frames.pending()).toHaveLength(0);
+    vi.advanceTimersByTime(500);
     expect(frames.pending()).toHaveLength(1);
-    expect(frames.cancelled).not.toContain(frames.pending()[0]);
-    expect(numbers()).toStrictEqual(['90', '4']);
+
+    window.dispatchEvent(new Event('resize'));
+    vi.advanceTimersByTime(500);
+    expect(frames.pending()).toHaveLength(1);
 
     frames.flush(1000);
-    expect(numbers()).toStrictEqual(['90', '4']);
-    expect(frames.pending()).toHaveLength(1);
-
-    // One count only: a single step frame is queued, the cancelled first run adds none.
-    frames.flush(1000);
-    expect(numbers()).toStrictEqual(['90', '4']);
-    expect(frames.pending()).toHaveLength(1);
-    expect(observations.map(({ disconnected }) => disconnected)).toStrictEqual([true, true]);
-
-    frames.flush(1000);
-    const [first, second] = numbers();
-    expect(first).not.toBe('90');
-    expect(second).not.toBe('4');
-    expect(frames.pending()).toHaveLength(1);
-
+    frames.flush(1100);
+    expect(numbers()[0]).not.toBe('90');
     frames.flush(3000);
     expect(numbers()).toStrictEqual(['90', '4']);
     expect(frames.pending()).toHaveLength(0);

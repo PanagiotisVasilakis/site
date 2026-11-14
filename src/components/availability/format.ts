@@ -50,30 +50,3 @@ export function formatStayRange(checkIn: IsoDate, checkOut: IsoDate, locale: Loc
 export function nightsLabel(count: number, forms: Readonly<{ one: string; other: string }>, locale: Locale): string {
   return fill(new Intl.PluralRules(locale).select(count) === 'one' ? forms.one : forms.other, { count });
 }
-
-const nextMonth = (month: number) => (month % 12) + 1;
-const previousMonth = (month: number) => ((month + 10) % 12) + 1;
-
-/** The standalone month name: 'April' / 'Apr' (en), 'Απρίλιος' / 'Απρ' (el, nominative). */
-function monthName(month: number, locale: Locale, width: 'long' | 'short'): string {
-  return format(new Date(2000, month - 1, 1), width === 'long' ? 'LLLL' : 'LLL', { locale: DAY_PICKER_LOCALES[locale] });
-}
-
-/**
- * Months (1-12) as ranges that may wrap the year: [4..10] -> 'April–October'
- * ('Apr–Oct' short), [11, 12, 1, 2, 3] -> 'November–March'. Separate runs are
- * joined by commas.
- */
-export function describeMonths(months: readonly number[], locale: Locale, width: 'long' | 'short' = 'long'): string {
-  const name = (month: number) => monthName(month, locale, width);
-  const included = new Set(months.filter((month) => Number.isInteger(month) && month >= 1 && month <= 12));
-  if (included.size === 12) return `${name(1)}–${name(12)}`;
-  const runs: string[] = [];
-  for (let start = 1; start <= 12; start += 1) {
-    if (!included.has(start) || included.has(previousMonth(start))) continue;
-    let end = start;
-    while (included.has(nextMonth(end))) end = nextMonth(end);
-    runs.push(start === end ? name(start) : `${name(start)}–${name(end)}`);
-  }
-  return runs.join(', ');
-}

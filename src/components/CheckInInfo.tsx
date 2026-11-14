@@ -10,18 +10,14 @@ import {
 import { getApartmentContent } from '@/data/apartmentData';
 import { getDictionary } from '@/i18n/dictionaries';
 import type { Locale } from '@/i18n/config';
-import { normalizeLocale } from '@/i18n/config';
-import { telHref } from '@/lib/contactLinks';
+import { EMERGENCY_112_HREF, EMERGENCY_112_ID, telHref } from '@/lib/contactLinks';
 import internalFetch from '@/lib/internalFetchClient';
 import { logger } from '@/lib/logger-client';
 import { timePattern } from '@/lib/propertyTime';
 import MapLoadingSkeleton from '@/components/MapLoadingSkeleton';
-import { MAP_DEFAULTS } from '@/lib/mapConstants';
 import WifiAccessCard from '@/components/checkin/WifiAccessCard';
-import { Icon as LineIcon, type IconName as LineIconName } from '@/components/icons/Icon';
+import { Icon as LineIcon } from '@/components/icons/Icon';
 import { useToast } from '@/components/Toast';
-
-type LocationHighlight = { icon: LineIconName; title: string; description: string };
 
 type NearbyCategoryItem = CategoryMapItem;
 
@@ -34,7 +30,6 @@ type IconName =
   | 'clock'
   | 'copy'
   | 'external'
-  | 'flame'
   | 'home'
   | 'info'
   | 'key'
@@ -44,7 +39,6 @@ type IconName =
   | 'shield'
   | 'sun'
   | 'utensils'
-  | 'washer'
   | 'waves'
   | 'wifi';
 
@@ -53,31 +47,29 @@ type CopyTarget = 'wifi' | 'network' | 'password' | null;
 type ArrivalRequestStatus = 'pending' | 'approved' | 'rejected';
 
 type ArrivalRequest = {
-  id: string;
   requestedTime: string;
-  message?: string;
   status: ArrivalRequestStatus;
-  createdAt: string;
-  updatedAt: string;
 };
 
-/** The 112 content entry: the emergency list's first row is the fixed tel:112 entry instead. */
-const EMERGENCY_112_ID = 'emergency-112';
-
 const MAP_HEIGHT = 'clamp(240px, 35vw, 420px)';
+const MAP_LOADING_HEIGHT = '260px';
 const DynamicApartmentLocationMap = dynamic(() => import('@/components/ApartmentLocationMap'), {
   ssr: false,
-  loading: () => <MapLoadingSkeleton height={MAP_DEFAULTS.HEIGHT.COMPACT} />,
+  loading: () => <MapLoadingSkeleton height={MAP_LOADING_HEIGHT} />,
 });
 
+function sessionRefreshUrl(locale: Locale) {
+  return `/${locale}/portal/refresh?next=${encodeURIComponent(`/${locale}/check-in`)}`;
+}
+
 interface CheckInInfoProps {
-  locale: string;
+  locale: Locale;
   nearbyRestaurants?: NearbyCategoryItem[];
   nearbyServices?: NearbyCategoryItem[];
   cartoBasemapsKey?: string;
 }
 
-function Icon({ name, className = 'h-5 w-5' }: { name: IconName; className?: string }) {
+function Icon({ name, className }: { name: IconName; className: string }) {
   const common = {
     className,
     viewBox: '0 0 24 24',
@@ -151,12 +143,6 @@ function Icon({ name, className = 'h-5 w-5' }: { name: IconName; className?: str
           <path d="M14 5h5v5" />
           <path d="m10 14 9-9" />
           <path d="M19 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4" />
-        </svg>
-      );
-    case 'flame':
-      return (
-        <svg {...common}>
-          <path d="M12 21a7 7 0 0 0 7-7c0-3.3-2.1-5.4-4.4-7.5-.3 2-1.4 3.1-2.6 4.1C10.8 8.4 10.3 6.7 10 4c-2.5 2.1-5 5.1-5 9.8A7 7 0 0 0 12 21Z" />
         </svg>
       );
     case 'home':
@@ -236,15 +222,6 @@ function Icon({ name, className = 'h-5 w-5' }: { name: IconName; className?: str
           <path d="M14 7a3 5 0 0 1 3-4" />
         </svg>
       );
-    case 'washer':
-      return (
-        <svg {...common}>
-          <rect x="5" y="3" width="14" height="18" rx="2" />
-          <circle cx="12" cy="14" r="4" />
-          <path d="M8 7h.01" />
-          <path d="M11 7h5" />
-        </svg>
-      );
     case 'waves':
       return (
         <svg {...common}>
@@ -262,10 +239,6 @@ function Icon({ name, className = 'h-5 w-5' }: { name: IconName; className?: str
         </svg>
       );
   }
-}
-
-function stripLeadingEmoji(value: string) {
-  return value.replace(/^[^\p{Letter}\p{Number}]+/u, '').trim();
 }
 
 function SectionTitle({
@@ -304,10 +277,9 @@ export default function CheckInInfo({
   nearbyServices = [],
   cartoBasemapsKey,
 }: CheckInInfoProps) {
-  const effLocale: Locale = normalizeLocale(locale);
-  const t = getDictionary(effLocale);
+  const t = getDictionary(locale);
   const toast = useToast();
-  const apartmentLocation = getApartmentMapLocation(effLocale);
+  const apartmentLocation = getApartmentMapLocation(locale);
   const mapContentItems = useMemo<MapContentItem[]>(
     () => [
       ...nearbyRestaurants.map((item) => ({ item, categorySlug: 'moments' })),
@@ -315,62 +287,9 @@ export default function CheckInInfo({
     ],
     [nearbyRestaurants, nearbyServices]
   );
-  const isGreek = effLocale === 'el';
-
-  const locationHighlights: LocationHighlight[] = t.locationPanel.highlights.map(({ icon, title, description }) => ({
-    icon,
-    title,
-    description,
-  }));
+  const isGreek = locale === 'el';
 
   const panel = t.checkinInfo.panel;
-  const ui = {
-    guideLabel: t.house.guideTitle,
-    heroTitle: panel.heroTitle,
-    quickActions: panel.quickActions,
-    copyWifi: panel.copyWifi,
-    openMaps: panel.openMaps,
-    viewRules: panel.viewRules,
-    guestEssentials: panel.guestEssentials,
-    goodToKnow: t.checkinInfo.additionalTitle,
-    address: panel.address,
-    schedule: t.checkinInfo.checkInOutTitle,
-    network: t.checkinInfo.wifiNetwork,
-    password: t.checkinInfo.wifiPassword,
-    unavailable: panel.unavailable,
-    wifiAvailableFrom: panel.wifiAvailableFrom,
-    parking: t.checkinInfo.parking,
-    keys: stripLeadingEmoji(t.checkinInfo.keysInfo).replace(/:$/, ''),
-    emergency: t.checkinInfo.emergencyTitle,
-    host: t.checkinInfo.hostContact,
-    save: panel.save,
-    saving: t.checkin.saving,
-    cancel: panel.cancel,
-    edit: panel.edit,
-    saved: panel.saved,
-    copied: t.checkinInfo.copied,
-    copy: t.checkinInfo.copy,
-    neighborhood: t.locationPanel.locationTitle,
-    nearby: t.locationPanel.nearby,
-    standardCheckIn: panel.standardCheckIn,
-    requestDifferentArrival: panel.requestDifferentArrival,
-    preferredArrivalTime: panel.preferredArrivalTime,
-    arrivalNote: panel.arrivalNote,
-    arrivalNotePlaceholder: panel.arrivalNotePlaceholder,
-    sendRequest: panel.sendRequest,
-    requestSent: panel.requestSent,
-    requestError: panel.requestError,
-    requestClosed: panel.requestClosed,
-    requestRequired: panel.requestRequired,
-    requestAlreadyPending: panel.requestAlreadyPending,
-    latestRequest: panel.latestRequest,
-    statusPending: panel.statusPending,
-    statusApproved: panel.statusApproved,
-    statusRejected: panel.statusRejected,
-    statusPendingCopy: panel.statusPendingCopy,
-    statusApprovedCopy: panel.statusApprovedCopy,
-    statusRejectedCopy: panel.statusRejectedCopy,
-  };
 
   const ruleItems = [
     t.checkinInfo.rule1,
@@ -384,7 +303,7 @@ export default function CheckInInfo({
   const amenityIcons: Record<string, IconName> = {
     essentials: 'home', comfort: 'air', kitchen: 'utensils', bathroom: 'bath', outdoor: 'sun', safety: 'shield',
   };
-  const amenityGroups = getApartmentContent(effLocale).amenityGroups.map((group) => ({
+  const amenityGroups = getApartmentContent(locale).amenityGroups.map((group) => ({
     title: group.title,
     icon: amenityIcons[group.id] ?? 'home',
     items: group.items,
@@ -400,17 +319,17 @@ export default function CheckInInfo({
 
   const goodToKnowItems: Array<{ label: string; detail: string; icon: IconName }> = [
     {
-      label: stripLeadingEmoji(t.checkinInfo.trashInfo).replace(/:$/, ''),
+      label: t.checkinInfo.trashInfo,
       detail: t.checkinInfo.trashDetail,
       icon: 'basket',
     },
     {
-      label: stripLeadingEmoji(t.checkinInfo.waterInfo).replace(/:$/, ''),
+      label: t.checkinInfo.waterInfo,
       detail: t.checkinInfo.waterDetail,
       icon: 'waves',
     },
     {
-      label: stripLeadingEmoji(t.checkinInfo.tvInfo).replace(/:$/, ''),
+      label: t.checkinInfo.tvInfo,
       detail: t.checkinInfo.tvDetail,
       icon: 'info',
     },
@@ -421,10 +340,10 @@ export default function CheckInInfo({
     {
       label: t.stay.checkin.emergency112,
       value: '112',
-      href: 'tel:112',
+      href: EMERGENCY_112_HREF,
     },
     {
-      label: ui.host,
+      label: t.checkinInfo.hostContact,
       value: apartmentLocation.phone,
       href: telHref(apartmentLocation.phone),
     },
@@ -441,13 +360,6 @@ export default function CheckInInfo({
   const [wifiAvailableAt, setWifiAvailableAt] = useState<string | null>(null);
   const [checkInTime, setCheckInTime] = useState('15:00');
   const [checkOutTime, setCheckOutTime] = useState('11:00');
-  const [canEditTimes, setCanEditTimes] = useState(false);
-  const [isEditingTimes, setIsEditingTimes] = useState(false);
-  const [tempCheckInTime, setTempCheckInTime] = useState('15:00');
-  const [tempCheckOutTime, setTempCheckOutTime] = useState('11:00');
-  const [savingTimes, setSavingTimes] = useState(false);
-  const [timesSaved, setTimesSaved] = useState(false);
-  const [timesSaveError, setTimesSaveError] = useState('');
   const [arrivalRequest, setArrivalRequest] = useState<ArrivalRequest | null>(null);
   const [isRequestingArrival, setIsRequestingArrival] = useState(false);
   const [requestedArrivalTime, setRequestedArrivalTime] = useState('15:00');
@@ -456,7 +368,7 @@ export default function CheckInInfo({
   const [arrivalRequestSuccess, setArrivalRequestSuccess] = useState('');
   const [arrivalRequestError, setArrivalRequestError] = useState('');
   const sessionRefreshStarted = useRef(false);
-  const wifiReloadMissed = useRef(false);
+  const wifiRevealAwaited = useRef(false);
 
   useEffect(() => {
     const loadPreferences = async () => {
@@ -467,9 +379,6 @@ export default function CheckInInfo({
           if (data.data) {
             setCheckInTime(data.data.checkInTime || '15:00');
             setCheckOutTime(data.data.checkOutTime || '11:00');
-            setTempCheckInTime(data.data.checkInTime || '15:00');
-            setTempCheckOutTime(data.data.checkOutTime || '11:00');
-            setCanEditTimes(Boolean(data.data.canEdit));
             setWifiNetwork(data.data.wifi?.network || '');
             setWifiPassword(data.data.wifi?.password || '');
             setWifiAvailableAt(typeof data.data.wifiAvailableAt === 'string' ? data.data.wifiAvailableAt : null);
@@ -477,7 +386,6 @@ export default function CheckInInfo({
         }
       } catch (error) {
         console.error('Failed to load check-in preferences:', error);
-        setCanEditTimes(false);
       }
     };
     loadPreferences();
@@ -498,26 +406,84 @@ export default function CheckInInfo({
     loadArrivalRequest();
   }, []);
 
-  // R-391: the preferences are fetched once and the server adds the Wi-Fi details only after
-  // wifiAvailableAt, so a page left open before then reloads one second after it (the server
-  // guard also renews an expired session). Not while an arrival request is being typed, after
-  // that time (the reload would get the same answer, in a loop) or beyond the 32-bit timer
-  // limit (a browser fires such a timer at once). R-619: if the form was open while that time
-  // was still ahead and is closed after it, the reload is owed once; wifiReloadMissed records
-  // that, and a page loaded after the time starts with it false, so it never reloads.
+  // The server adds the Wi-Fi details only after wifiAvailableAt, so a page opened earlier asks again one second
+  // after it and when the tab returns (a sleeping phone may skip one long timer); only the Wi-Fi fields change, so open
+  // forms stay. A page loaded after that time sends nothing: after the stay the server still answers without the
+  // details. No timer is set beyond the 32-bit limit (a browser fires such a timer at once).
   useEffect(() => {
     if (wifiNetwork || !wifiAvailableAt) return;
-    const delay = new Date(wifiAvailableAt).getTime() - Date.now();
-    if (isRequestingArrival) {
-      if (delay > 0) wifiReloadMissed.current = true;
-      return;
-    }
-    if (!(delay > 0) && !wifiReloadMissed.current) return;
-    const reloadIn = Math.max(0, delay + 1_000);
-    if (reloadIn > 2_147_483_647) return;
-    const timer = window.setTimeout(() => window.location.reload(), reloadIn);
-    return () => window.clearTimeout(timer);
-  }, [wifiAvailableAt, wifiNetwork, isRequestingArrival]);
+    const revealAt = new Date(wifiAvailableAt).getTime();
+    const delay = revealAt - Date.now();
+    if (delay > 0) wifiRevealAwaited.current = true;
+    if (!wifiRevealAwaited.current) return;
+
+    let active = true;
+    let requestInFlight = false;
+    let onlineRetryLeft = 1;
+    let waitingForOnline = false;
+
+    const refetchWifi = async () => {
+      if (requestInFlight || sessionRefreshStarted.current) return;
+      requestInFlight = true;
+      let failed = false;
+      try {
+        const res = await internalFetch('/api/check-in/preferences');
+        if (!active) return;
+        if (res.status === 401) {
+          sessionRefreshStarted.current = true;
+          window.location.replace(sessionRefreshUrl(locale));
+          return;
+        }
+        if (!res.ok) {
+          failed = true;
+          return;
+        }
+        const data = await res.json();
+        if (!active) return;
+        if (data.data) {
+          setWifiNetwork(data.data.wifi?.network || '');
+          setWifiPassword(data.data.wifi?.password || '');
+          setWifiAvailableAt(typeof data.data.wifiAvailableAt === 'string' ? data.data.wifiAvailableAt : null);
+        }
+      } catch (error) {
+        if (!active) return;
+        console.error('Failed to refresh the Wi-Fi details:', error);
+        failed = true;
+      } finally {
+        requestInFlight = false;
+        if (failed && onlineRetryLeft > 0) {
+          onlineRetryLeft -= 1;
+          waitingForOnline = true;
+        }
+      }
+    };
+
+    const refetchAfterReturn = () => {
+      if (Date.now() >= revealAt) refetchWifi();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refetchAfterReturn();
+    };
+    const onOnline = () => {
+      if (!waitingForOnline) return;
+      waitingForOnline = false;
+      refetchWifi();
+    };
+
+    const timer = delay > 0 && delay + 1_000 <= 2_147_483_647
+      ? window.setTimeout(refetchWifi, delay + 1_000)
+      : undefined;
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('pageshow', refetchAfterReturn);
+    window.addEventListener('online', onOnline);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('pageshow', refetchAfterReturn);
+      window.removeEventListener('online', onOnline);
+    };
+  }, [wifiAvailableAt, wifiNetwork, locale]);
 
   const copyToClipboard = async (text: string, target: CopyTarget) => {
     try {
@@ -528,56 +494,8 @@ export default function CheckInInfo({
       setTimeout(() => setCopiedTarget(null), 2000);
     } catch (err) {
       logger.warn('Clipboard copy failed', err instanceof Error ? err : { error: String(err) });
-      // R-363 (the R-303 pattern): tell the guest the copy failed and to select the details instead.
+      // Tell the guest the copy failed and to select the details instead.
       toast.push(t.stay.checkin.wifiCopyFailed);
-    }
-  };
-
-  const handleEditTimes = () => {
-    if (!canEditTimes) return;
-    setTempCheckInTime(checkInTime);
-    setTempCheckOutTime(checkOutTime);
-    setIsEditingTimes(true);
-  };
-
-  const handleCancelEdit = () => {
-    setIsEditingTimes(false);
-    setTempCheckInTime(checkInTime);
-    setTempCheckOutTime(checkOutTime);
-  };
-
-  const handleSaveTimes = async () => {
-    setSavingTimes(true);
-    setTimesSaved(false);
-    setTimesSaveError('');
-    try {
-      const res = await internalFetch('/api/check-in/preferences', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          checkInTime: tempCheckInTime,
-          checkOutTime: tempCheckOutTime,
-        }),
-      });
-
-      if (res.ok) {
-        setCheckInTime(tempCheckInTime);
-        setCheckOutTime(tempCheckOutTime);
-        setIsEditingTimes(false);
-        setTimesSaved(true);
-        setTimeout(() => setTimesSaved(false), 3000);
-      } else {
-        const error = await res.json();
-        const unknownError = panel.unknownError;
-        setTimesSaveError(`${panel.saveFailed}: ${error.error?.message || unknownError}`);
-      }
-    } catch (error) {
-      console.error('Failed to save preferences:', error);
-      setTimesSaveError(panel.saveFailedRetry);
-    } finally {
-      setSavingTimes(false);
     }
   };
 
@@ -593,7 +511,7 @@ export default function CheckInInfo({
     setArrivalRequestError('');
     setArrivalRequestSuccess('');
     if (!timePattern.test(requestedArrivalTime)) {
-      setArrivalRequestError(ui.requestRequired);
+      setArrivalRequestError(panel.requestRequired);
       return;
     }
 
@@ -615,14 +533,14 @@ export default function CheckInInfo({
         // stale page out of the history, as the refresh page itself does.
         if (!sessionRefreshStarted.current) {
           sessionRefreshStarted.current = true;
-          window.location.replace(`/${effLocale}/portal/refresh?next=${encodeURIComponent(`/${effLocale}/check-in`)}`);
+          window.location.replace(sessionRefreshUrl(locale));
         }
         return;
       }
       if (!res.ok) {
         // Server messages are English-only; always show the localized text.
         // 409: the check-in date has passed, so the route no longer accepts requests.
-        setArrivalRequestError(res.status === 409 ? ui.requestClosed : ui.requestError);
+        setArrivalRequestError(res.status === 409 ? panel.requestClosed : panel.requestError);
         return;
       }
 
@@ -630,59 +548,45 @@ export default function CheckInInfo({
       setIsRequestingArrival(false);
       // The server keeps the earlier pending request and discards this one.
       if (data.data?.notification?.reason === 'request_already_pending') {
-        setArrivalRequestError(ui.requestAlreadyPending);
+        setArrivalRequestError(panel.requestAlreadyPending);
         return;
       }
-      setArrivalRequestSuccess(ui.requestSent);
+      setArrivalRequestSuccess(panel.requestSent);
       setArrivalRequestMessage('');
     } catch (error) {
       console.error('Failed to submit arrival request:', error);
-      setArrivalRequestError(ui.requestError);
+      setArrivalRequestError(panel.requestError);
     } finally {
       setArrivalRequestSubmitting(false);
     }
   };
 
-  const requestStatusLabel = (status: ArrivalRequestStatus) => {
-    if (status === 'approved') return ui.statusApproved;
-    if (status === 'rejected') return ui.statusRejected;
-    return ui.statusPending;
+  const requestStatusText = (status: ArrivalRequestStatus) => {
+    if (status === 'approved') return { label: panel.statusApproved, description: panel.statusApprovedCopy };
+    if (status === 'rejected') return { label: panel.statusRejected, description: panel.statusRejectedCopy };
+    return { label: panel.statusPending, description: panel.statusPendingCopy };
   };
 
-  const requestStatusDescription = (status: ArrivalRequestStatus) => {
-    if (status === 'approved') return ui.statusApprovedCopy;
-    if (status === 'rejected') return ui.statusRejectedCopy;
-    return ui.statusPendingCopy;
-  };
-
-  const wifiText = `${ui.network}: ${wifiNetwork}\n${ui.password}: ${wifiPassword}`;
+  const wifiText = `${t.checkinInfo.wifiNetwork}: ${wifiNetwork}\n${t.checkinInfo.wifiPassword}: ${wifiPassword}`;
   // Before the disclosure window the server returns when the details appear
   // (24 h before check-in); shown in the guest's own time zone.
   const wifiRevealAt = wifiAvailableAt ? new Date(wifiAvailableAt) : null;
   const wifiNotice = !wifiNetwork && wifiRevealAt && wifiRevealAt.getTime() > Date.now()
-    ? `${ui.wifiAvailableFrom} ${new Intl.DateTimeFormat(isGreek ? 'el-GR' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }).format(wifiRevealAt)}`
+    ? `${panel.wifiAvailableFrom} ${new Intl.DateTimeFormat(isGreek ? 'el-GR' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }).format(wifiRevealAt)}`
     : null;
   // identity §9.8 (calm, cards on tokens; styles in components/stay.css). The section ids are the stay hub's
   // anchors: #wifi, #check-out, #house-rules (plus #arrival and #emergency).
-  const rowClass = 'checkin-row';
-  const titleClass = 'checkin-title';
-  const valueClass = 'checkin-value';
-  const bodyTextClass = 'checkin-copy';
-  const mutedTextClass = 'checkin-muted-text';
-  const iconClass = 'checkin-icon-token';
-  const accentIconClass = 'checkin-accent-token';
-
   return (
     <div className="checkin-portal">
       <header className="checkin-head" aria-labelledby="checkin-welcome-title">
-        <p className="checkin-label">{ui.guideLabel}</p>
+        <p className="checkin-label">{t.house.guideTitle}</p>
         <h1 id="checkin-welcome-title" className="checkin-head__title">
           {t.ui.yourStay}
         </h1>
         <p className="checkin-head__lead">
           {t.checkinInfo.welcomeMessage}
         </p>
-        <div className="checkin-actions" aria-label={ui.quickActions}>
+        <div className="checkin-actions" aria-label={panel.quickActions}>
           <button
             type="button"
             onClick={() => copyToClipboard(wifiText, 'wifi')}
@@ -690,7 +594,7 @@ export default function CheckInInfo({
             className="ui-btn ui-btn--primary ui-btn--sm"
           >
             <Icon name={copiedTarget === 'wifi' ? 'check' : 'copy'} className="checkin-action-icon" />
-            {copiedTarget === 'wifi' ? ui.copied : ui.copyWifi}
+            {copiedTarget === 'wifi' ? t.checkinInfo.copied : panel.copyWifi}
           </button>
           {apartmentLocation.directionsUrl && (
             <a
@@ -700,23 +604,23 @@ export default function CheckInInfo({
               className="ui-btn ui-btn--secondary ui-btn--sm"
             >
               <Icon name="external" className="checkin-action-icon" />
-              {ui.openMaps}
+              {panel.openMaps}
             </a>
           )}
           <a href="#house-rules" className="ui-btn ui-btn--secondary ui-btn--sm">
             <Icon name="shield" className="checkin-action-icon" />
-            {ui.viewRules}
+            {panel.viewRules}
           </a>
         </div>
       </header>
 
       <div className="checkin-grid">
         <section id="arrival" className="checkin-panel" aria-labelledby="arrival-title">
-          <SectionTitle id="arrival-title" title={ui.guestEssentials} icon="home" />
+          <SectionTitle id="arrival-title" title={panel.guestEssentials} icon="home" />
           <dl className="checkin-summary">
             <div className="checkin-summary__item checkin-summary__item--wide">
-              <dt className="checkin-label">{ui.address}</dt>
-              <dd className={valueClass}>{apartmentLocation.address}</dd>
+              <dt className="checkin-label">{panel.address}</dt>
+              <dd className="checkin-value">{apartmentLocation.address}</dd>
             </div>
             <div className="checkin-summary__item">
               <dt className="checkin-label">{t.checkinInfo.checkInTime}</dt>
@@ -728,205 +632,143 @@ export default function CheckInInfo({
             </div>
             <div className="checkin-summary__item checkin-summary__item--wide">
               <dt className="checkin-label">{t.checkinInfo.wifiTitle}</dt>
-              <dd className="checkin-mono">{wifiNetwork || wifiNotice || ui.unavailable}</dd>
+              <dd className="checkin-mono">{wifiNetwork || wifiNotice || panel.unavailable}</dd>
             </div>
           </dl>
 
-          <div className={rowClass}>
-            <Icon name="clock" className={iconClass} />
+          <div className="checkin-row">
+            <Icon name="clock" className="checkin-icon-token" />
             <div className="checkin-row__body">
               <div className="checkin-row__head">
-                <h3 className={titleClass}>
-                  {ui.schedule}
+                <h3 className="checkin-title">
+                  {t.checkinInfo.checkInOutTitle}
                 </h3>
-                {!isEditingTimes && canEditTimes && (
-                  <button
-                    type="button"
-                    onClick={handleEditTimes}
-                    className="ui-btn ui-btn--secondary ui-btn--sm"
-                    title={panel.editTimesHostOnly}
-                  >
-                    {ui.edit}
-                  </button>
-                )}
               </div>
-
-              {timesSaved && (
-                <p className="ui-callout ui-callout--success checkin-note" role="status">
-                  {ui.saved}
-                </p>
-              )}
-              {timesSaveError && (
-                <p role="alert" className="ui-callout ui-callout--danger checkin-note">
-                  {timesSaveError}
-                </p>
-              )}
 
               <div className="checkin-times">
-                <label className="checkin-times__field">
-                  <span className={mutedTextClass}>
-                    {ui.standardCheckIn}
+                <div className="checkin-times__field">
+                  <span className="checkin-muted-text">
+                    {panel.standardCheckIn}
                   </span>
-                  {isEditingTimes ? (
-                    <input
-                      type="time"
-                      value={tempCheckInTime}
-                      onChange={(e) => setTempCheckInTime(e.target.value)}
-                      className="ui-field__input"
-                    />
-                  ) : (
-                    <span className="checkin-time">
-                      {checkInTime}
-                    </span>
-                  )}
-                </label>
-                <label className="checkin-times__field">
-                  <span className={mutedTextClass}>
+                  <span className="checkin-time">
+                    {checkInTime}
+                  </span>
+                </div>
+                <div className="checkin-times__field">
+                  <span className="checkin-muted-text">
                     {t.checkinInfo.checkOutTime}
                   </span>
-                  {isEditingTimes ? (
-                    <input
-                      type="time"
-                      value={tempCheckOutTime}
-                      onChange={(e) => setTempCheckOutTime(e.target.value)}
-                      className="ui-field__input"
-                    />
-                  ) : (
-                    <span className="checkin-time">
-                      {checkOutTime}
-                    </span>
-                  )}
-                </label>
+                  <span className="checkin-time">
+                    {checkOutTime}
+                  </span>
+                </div>
               </div>
 
-              {isEditingTimes && (
-                <div className="checkin-button-pair">
+              <div className="checkin-stack">
+                {arrivalRequest && (
+                  <div className="checkin-card">
+                    <div className="checkin-row__head">
+                      <p className="checkin-label">
+                        {panel.latestRequest}
+                      </p>
+                      <span className={`checkin-status-pill checkin-status-${arrivalRequest.status}`}>
+                        {requestStatusText(arrivalRequest.status).label}
+                      </span>
+                    </div>
+                    <p className="checkin-copy">
+                      {panel.preferredArrivalTime}: <strong className="checkin-value">{arrivalRequest.requestedTime}</strong>
+                    </p>
+                    <p className="checkin-copy">
+                      {requestStatusText(arrivalRequest.status).description}
+                    </p>
+                  </div>
+                )}
+
+                {!isRequestingArrival && arrivalRequest?.status !== 'pending' && (
                   <button
                     type="button"
-                    onClick={handleSaveTimes}
-                    disabled={savingTimes}
-                    className="ui-btn ui-btn--primary ui-btn--sm"
+                    onClick={handleOpenArrivalRequest}
+                    className="ui-btn ui-btn--secondary ui-btn--sm ui-btn--block"
                   >
-                    {savingTimes ? ui.saving : ui.save}
+                    {panel.requestDifferentArrival}
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleCancelEdit}
-                    disabled={savingTimes}
-                    className="ui-btn ui-btn--secondary ui-btn--sm"
-                  >
-                    {ui.cancel}
-                  </button>
-                </div>
-              )}
+                )}
 
-              {!isEditingTimes && (
-                <div className="checkin-stack">
-                  {arrivalRequest && (
-                    <div className="checkin-card">
-                      <div className="checkin-row__head">
-                        <p className="checkin-label">
-                          {ui.latestRequest}
-                        </p>
-                        <span className={`checkin-status-pill checkin-status-${arrivalRequest.status}`}>
-                          {requestStatusLabel(arrivalRequest.status)}
-                        </span>
-                      </div>
-                      <p className={bodyTextClass}>
-                        {ui.preferredArrivalTime}: <strong className={valueClass}>{arrivalRequest.requestedTime}</strong>
+                {isRequestingArrival && (
+                  <div className="checkin-card checkin-card--strong">
+                    <label className="ui-field">
+                      <span className="ui-field__label">
+                        {panel.preferredArrivalTime}
+                      </span>
+                      <input
+                        type="time"
+                        value={requestedArrivalTime}
+                        onChange={(event) => setRequestedArrivalTime(event.target.value)}
+                        className="ui-field__input"
+                        aria-invalid={Boolean(arrivalRequestError)}
+                      />
+                    </label>
+                    <label className="ui-field">
+                      <span className="ui-field__label">
+                        {panel.arrivalNote}
+                      </span>
+                      <textarea
+                        value={arrivalRequestMessage}
+                        onChange={(event) => setArrivalRequestMessage(event.target.value)}
+                        maxLength={500}
+                        rows={3}
+                        placeholder={panel.arrivalNotePlaceholder}
+                        className="ui-field__input checkin-textarea"
+                      />
+                    </label>
+                    {arrivalRequestError && (
+                      <p className="ui-callout ui-callout--danger checkin-note" role="alert">
+                        {arrivalRequestError}
                       </p>
-                      <p className={bodyTextClass}>
-                        {requestStatusDescription(arrivalRequest.status)}
-                      </p>
+                    )}
+                    <div className="checkin-button-pair">
+                      <button
+                        type="button"
+                        onClick={handleSubmitArrivalRequest}
+                        disabled={arrivalRequestSubmitting}
+                        className="ui-btn ui-btn--primary ui-btn--sm"
+                      >
+                        {arrivalRequestSubmitting ? t.checkin.saving : panel.sendRequest}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsRequestingArrival(false);
+                          setArrivalRequestError('');
+                        }}
+                        disabled={arrivalRequestSubmitting}
+                        className="ui-btn ui-btn--secondary ui-btn--sm"
+                      >
+                        {panel.cancel}
+                      </button>
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {!isRequestingArrival && arrivalRequest?.status !== 'pending' && (
-                    <button
-                      type="button"
-                      onClick={handleOpenArrivalRequest}
-                      className="ui-btn ui-btn--secondary ui-btn--sm ui-btn--block"
-                    >
-                      {ui.requestDifferentArrival}
-                    </button>
-                  )}
-
-                  {isRequestingArrival && (
-                    <div className="checkin-card checkin-card--strong">
-                      <label className="ui-field">
-                        <span className="ui-field__label">
-                          {ui.preferredArrivalTime}
-                        </span>
-                        <input
-                          type="time"
-                          value={requestedArrivalTime}
-                          onChange={(event) => setRequestedArrivalTime(event.target.value)}
-                          className="ui-field__input"
-                          aria-invalid={Boolean(arrivalRequestError)}
-                        />
-                      </label>
-                      <label className="ui-field">
-                        <span className="ui-field__label">
-                          {ui.arrivalNote}
-                        </span>
-                        <textarea
-                          value={arrivalRequestMessage}
-                          onChange={(event) => setArrivalRequestMessage(event.target.value)}
-                          maxLength={500}
-                          rows={3}
-                          placeholder={ui.arrivalNotePlaceholder}
-                          className="ui-field__input checkin-textarea"
-                        />
-                      </label>
-                      {arrivalRequestError && (
-                        <p className="ui-callout ui-callout--danger checkin-note" role="alert">
-                          {arrivalRequestError}
-                        </p>
-                      )}
-                      <div className="checkin-button-pair">
-                        <button
-                          type="button"
-                          onClick={handleSubmitArrivalRequest}
-                          disabled={arrivalRequestSubmitting}
-                          className="ui-btn ui-btn--primary ui-btn--sm"
-                        >
-                          {arrivalRequestSubmitting ? ui.saving : ui.sendRequest}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsRequestingArrival(false);
-                            setArrivalRequestError('');
-                          }}
-                          disabled={arrivalRequestSubmitting}
-                          className="ui-btn ui-btn--secondary ui-btn--sm"
-                        >
-                          {ui.cancel}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {arrivalRequestSuccess && (
-                    <p className="ui-callout ui-callout--success checkin-note" role="status">
-                      {arrivalRequestSuccess}
-                    </p>
-                  )}
-                  {arrivalRequestError && !isRequestingArrival && (
-                    <p className="ui-callout ui-callout--danger checkin-note" role="alert">
-                      {arrivalRequestError}
-                    </p>
-                  )}
-                </div>
-              )}
+                {arrivalRequestSuccess && (
+                  <p className="ui-callout ui-callout--success checkin-note" role="status">
+                    {arrivalRequestSuccess}
+                  </p>
+                )}
+                {arrivalRequestError && !isRequestingArrival && (
+                  <p className="ui-callout ui-callout--danger checkin-note" role="alert">
+                    {arrivalRequestError}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className={rowClass}>
-            <Icon name="car" className={iconClass} />
+          <div className="checkin-row">
+            <Icon name="car" className="checkin-icon-token" />
             <div className="checkin-row__body">
-              <h3 className={titleClass}>{ui.parking}</h3>
-              <p className={bodyTextClass}>
+              <h3 className="checkin-title">{t.checkinInfo.parking}</h3>
+              <p className="checkin-copy">
                 {t.checkinInfo.parkingDetail}
               </p>
             </div>
@@ -936,14 +778,14 @@ export default function CheckInInfo({
         <section id="wifi" className="checkin-panel" aria-labelledby="wifi-title">
           <SectionTitle id="wifi-title" title={t.checkinInfo.wifiTitle} icon="wifi" />
           <WifiAccessCard
-            networkLabel={ui.network}
-            passwordLabel={ui.password}
+            networkLabel={t.checkinInfo.wifiNetwork}
+            passwordLabel={t.checkinInfo.wifiPassword}
             network={wifiNetwork}
             password={wifiPassword}
-            unavailableLabel={ui.unavailable}
+            unavailableLabel={panel.unavailable}
             notice={wifiNotice}
-            copyLabel={ui.copy}
-            copiedLabel={ui.copied}
+            copyLabel={t.checkinInfo.copy}
+            copiedLabel={t.checkinInfo.copied}
             copiedTarget={copiedTarget === 'network' || copiedTarget === 'password' ? copiedTarget : null}
             onCopy={copyToClipboard}
             networkCopyLabel={panel.networkCopyLabel}
@@ -968,12 +810,12 @@ export default function CheckInInfo({
         <section id="check-out" className="checkin-panel" aria-labelledby="check-out-title">
           <SectionTitle id="check-out-title" title={t.stay.hub.checkoutTitle} icon="clock" />
           <p className="checkin-time checkin-time--large">{checkOutTime}</p>
-          <p className={bodyTextClass}>{t.stay.checkin.checkoutBy.replace('{time}', checkOutTime)}</p>
-          <div className={rowClass}>
-            <Icon name="key" className={iconClass} />
+          <p className="checkin-copy">{t.stay.checkin.checkoutBy.replace('{time}', checkOutTime)}</p>
+          <div className="checkin-row">
+            <Icon name="key" className="checkin-icon-token" />
             <div className="checkin-row__body">
-              <h3 className={titleClass}>{ui.keys}</h3>
-              <p className={bodyTextClass}>
+              <h3 className="checkin-title">{t.checkinInfo.keysInfo}</h3>
+              <p className="checkin-copy">
                 {t.checkinInfo.keysDetail}
               </p>
             </div>
@@ -981,19 +823,19 @@ export default function CheckInInfo({
         </section>
 
         <section id="emergency" className="checkin-panel" aria-labelledby="emergency-title">
-          <SectionTitle id="emergency-title" title={ui.emergency} icon="phone" />
+          <SectionTitle id="emergency-title" title={t.checkinInfo.emergencyTitle} icon="phone" />
           <div className="checkin-divided">
             {emergencyItems.map((item) => (
               <div key={`${item.label}-${item.value}`} className="checkin-contact">
                 <div className="checkin-contact__text">
-                  <h3 className={titleClass}>{item.label}</h3>
-                  <p className={bodyTextClass}>{item.value}</p>
+                  <h3 className="checkin-title">{item.label}</h3>
+                  <p className="checkin-copy">{item.value}</p>
                 </div>
                 {item.href && (
                   <a
                     href={item.href}
                     className="ui-icon-btn checkin-call shell-link"
-                    aria-label={`${ui.emergency}: ${item.label}`}
+                    aria-label={`${t.checkinInfo.emergencyTitle}: ${item.label}`}
                   >
                     <Icon name="phone" className="checkin-action-icon" />
                   </a>
@@ -1004,13 +846,13 @@ export default function CheckInInfo({
         </section>
 
         <section className="checkin-panel" aria-labelledby="good-to-know-title">
-          <SectionTitle id="good-to-know-title" title={ui.goodToKnow} icon="info" />
+          <SectionTitle id="good-to-know-title" title={t.checkinInfo.additionalTitle} icon="info" />
           <div className="checkin-stack">
             {goodToKnowItems.map((item) => (
               <div key={item.label} className="checkin-line">
-                <Icon name={item.icon} className={iconClass} />
-                <p className={bodyTextClass}>
-                  <strong className={titleClass}>{item.label}:</strong>{' '}
+                <Icon name={item.icon} className="checkin-icon-token" />
+                <p className="checkin-copy">
+                  <strong className="checkin-title">{item.label}:</strong>{' '}
                   {item.detail}
                 </p>
               </div>
@@ -1027,7 +869,7 @@ export default function CheckInInfo({
                   <span className="checkin-amenity-icon">
                     <Icon name={group.icon} className="checkin-amenity-icon__svg" />
                   </span>
-                  <h3 className={titleClass}>{group.title}</h3>
+                  <h3 className="checkin-title">{group.title}</h3>
                 </div>
                 <div className="checkin-chips">
                   {group.items.map((item) => (
@@ -1046,8 +888,8 @@ export default function CheckInInfo({
           <div className="checkin-divided">
             {tipItems.map((tip) => (
               <div key={tip.text} className="checkin-line">
-                <Icon name={tip.icon} className={accentIconClass} />
-                <p className={bodyTextClass}>{tip.text}</p>
+                <Icon name={tip.icon} className="checkin-accent-token" />
+                <p className="checkin-copy">{tip.text}</p>
               </div>
             ))}
           </div>
@@ -1055,15 +897,15 @@ export default function CheckInInfo({
 
         <section className="checkin-panel checkin-panel--guide" aria-labelledby="checkin-guide-title">
           <SectionTitle id="checkin-guide-title" title={t.shell.navGuide} icon="map" />
-          <p className={bodyTextClass}>{t.stay.checkin.guideText}</p>
-          <a href={`/${effLocale}/moments`} className="ui-btn ui-btn--link-arrow checkin-guide-link">
+          <p className="checkin-copy">{t.stay.checkin.guideText}</p>
+          <a href={`/${locale}/moments`} className="ui-btn ui-btn--link-arrow checkin-guide-link">
             {t.stay.checkin.guideCta}
           </a>
         </section>
 
         <section className="checkin-panel checkin-panel--wide" aria-labelledby="neighborhood-title">
-          <SectionTitle id="neighborhood-title" eyebrow={ui.nearby} title={ui.neighborhood} icon="map" />
-          <p className={bodyTextClass}>
+          <SectionTitle id="neighborhood-title" eyebrow={t.locationPanel.nearby} title={t.locationPanel.locationTitle} icon="map" />
+          <p className="checkin-copy">
             {t.locationPanel.locationDescription}
           </p>
           <div className="checkin-map-layout">
@@ -1077,17 +919,17 @@ export default function CheckInInfo({
                 cartoBasemapsKey={cartoBasemapsKey}
               />
             </div>
-            {locationHighlights.length > 0 && (
+            {t.locationPanel.highlights.length > 0 && (
               <div className="checkin-highlights">
-                {locationHighlights.map(({ icon, title, description }) => (
+                {t.locationPanel.highlights.map(({ icon, title, description }) => (
                   <div
                     key={`${title}-${description}`}
                     className="checkin-card checkin-line"
                   >
-                    <LineIcon name={icon} className={accentIconClass} />
+                    <LineIcon name={icon} className="checkin-accent-token" />
                     <div>
-                      <h3 className={titleClass}>{title}</h3>
-                      <p className={`${bodyTextClass} checkin-copy--small`}>{description}</p>
+                      <h3 className="checkin-title">{title}</h3>
+                      <p className="checkin-copy checkin-copy--small">{description}</p>
                     </div>
                   </div>
                 ))}
