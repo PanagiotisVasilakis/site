@@ -228,6 +228,7 @@ describe('admin availability-sync API', () => {
     it.each([
       ['not_configured', 'The availability calendar is not configured'],
       ['busy', 'Another calendar sync is in progress'],
+      ['lease_lost', 'Another calendar sync is in progress'],
       ['skipped', 'The calendar sync did not run'],
     ])('answers 409 to %s', async (outcome, message) => {
       mocks.sync.mockResolvedValue({ status: outcome });

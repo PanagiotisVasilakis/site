@@ -58,7 +58,7 @@ describe('getItemsByCategory strict mode (build gate, R-421/R-456)', () => {
     expect(strictFailure()).toBe('Invalid item in category fixture (index 0): id (invalid_type)');
   });
 
-  it.each([[null]])('throws on the non-object entry %j', (entry) => {
+  it.each([[null], ['text']])('throws on the non-object entry %j', (entry) => {
     serve([place, entry]);
 
     expect(strictFailure()).toBe('Category fixture: entry 1 is not an object');

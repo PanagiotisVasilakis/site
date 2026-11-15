@@ -176,6 +176,13 @@ describe('API response and deadline middleware', () => {
 });
 
 describe('security header builders', () => {
+  it('selects production and development policy intentionally', () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    expect(getSecurityConfig().csp.reportOnly).toBe(true);
+    expect(getSecurityConfig().csp.directives.scriptSrc).not.toContain('https://vercel.live');
+    expect(getSecurityConfig().csp.directives.connectSrc).not.toContain('https://vercel.live');
+  });
+
   it('allows no third-party connect-src origin (the map calls no routing service)', () => {
     vi.stubEnv('NODE_ENV', 'production');
     expect(getSecurityConfig().csp.directives.connectSrc).toEqual(["'self'"]);
@@ -183,7 +190,7 @@ describe('security header builders', () => {
     expect(getSecurityConfig().csp.directives.connectSrc).toEqual(["'self'", 'wss:', 'ws:']);
   });
 
-  it.each(['production'])('serves fonts and styles only from the own origin in %s', (nodeEnv) => {
+  it.each(['production', 'development'])('serves fonts and styles only from the own origin in %s', (nodeEnv) => {
     vi.stubEnv('NODE_ENV', nodeEnv);
     const { directives } = getSecurityConfig().csp;
     // Fonts are self-hosted via next/font/local (identity §2.3); no Google Fonts origin remains.
@@ -223,7 +230,7 @@ describe('security header builders', () => {
     expect(hsts).toBe('max-age=63072000; includeSubDomains');
   });
 
-  it.each(['production'])(
+  it.each(['production', 'development'])(
     'advertises only the request headers and methods the API uses in %s preflights',
     async (nodeEnv) => {
       vi.stubEnv('NODE_ENV', nodeEnv);

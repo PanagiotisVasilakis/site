@@ -155,6 +155,18 @@ describe('Highlights + SeasonSwitch (identity §8, graft 10)', () => {
 describe('RoomsShowcase (identity §8, M11/M12)', () => {
   const rooms = homeRoomsFrom('en', APARTMENT_PHOTOS);
 
+  it('builds six rooms from the apartment photos, lead photos per §7.3, linked to the apartment room sections', () => {
+    expect(rooms.map((room) => [room.href, room.photo])).toEqual([
+      ['/en/apartment#living', '/house/living/living_8.jpeg'],
+      ['/en/apartment#kitchen', '/house/kitchen/kitchen_2.jpeg'],
+      ['/en/apartment#bedroom-1', '/house/bedroom/bedroom_1.jpeg'],
+      ['/en/apartment#bedroom-2', '/house/bedroom_2/bedroom_2_5.jpeg'],
+      ['/en/apartment#bathroom', '/house/bathroom/bathroom_6.jpeg'],
+      ['/en/apartment#balcony', '/house/balcony/balcony_2.jpeg'],
+    ]);
+    expect(homeRoomsFrom('el', APARTMENT_PHOTOS)[2]).toMatchObject({ name: 'Υπνοδωμάτιο 1', href: '/el/apartment#bedroom-1' });
+  });
+
   it('renders no chip and no card for a room without its photo', () => {
     const withoutBedroom2 = homeRoomsFrom('en', APARTMENT_PHOTOS.filter((photo) => photo.room !== 'bedroom-2'));
     render(<RoomsShowcase rooms={withoutBedroom2} chipsLabel="Rooms" trackLabel="Room photos" />);

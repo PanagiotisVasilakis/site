@@ -199,6 +199,26 @@ describe('claim capability transport', () => {
     expect(response.cookies.get(PORTAL_CLAIM_EXCHANGE_COOKIE)).toBeUndefined();
   });
 
+  it('rejects replay and clears the exchange cookie again without exposing the capability', async () => {
+    const cookie = `${PORTAL_CLAIM_EXCHANGE_COOKIE}=${exchangeCookieValue()}`;
+    const first = await consumeClaim(
+      request('/api/portal/claims', claimBody(), cookie),
+      { params: Promise.resolve({}) },
+    );
+    expect(first.status).toBe(200);
+
+    mocks.consumeBookingClaimGrant.mockRejectedValueOnce(new PortalAuthError('INVALID_CLAIM'));
+    const replay = await consumeClaim(
+      request('/api/portal/claims', claimBody(), cookie),
+      { params: Promise.resolve({}) },
+    );
+    expect(replay.status).toBe(401);
+    expect(replay.cookies.get(PORTAL_CLAIM_EXCHANGE_COOKIE)?.maxAge).toBe(0);
+    const body = await replay.text();
+    expect(body).not.toContain(TOKEN);
+    expect(body).not.toContain(TOKEN_DIGEST);
+  });
+
   it.each([
     ['a bare digest', () => TOKEN_DIGEST],
     ['a digest with a wrong MAC', () => `${TOKEN_DIGEST}.${'0'.repeat(64)}`],

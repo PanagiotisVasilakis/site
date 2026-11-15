@@ -212,6 +212,7 @@ describe('parseBlockedRanges: event dates', () => {
     'DTSTART:20261001T140000Z',
     'DTSTART:20261001T140000',
     'DTSTART;VALUE=PERIOD:20261001',
+    'DTSTART;VALUE=DATE;VALUE=DATE-TIME:20261001',
   ])('rejects the non-DATE value %s', (dtstart) => {
     const text = calendar(vevent(dtstart, 'DTEND;VALUE=DATE:20261003'));
     expect(parseError(text)).toMatchObject({ code: 'unsupported_value', line: FIRST_BODY_LINE + 1 });
@@ -277,6 +278,8 @@ describe('parseBlockedRanges: event dates', () => {
 
   it.each([
     'RRULE:FREQ=WEEKLY;COUNT=4',
+    'RDATE;VALUE=DATE:20261010',
+    'EXDATE;VALUE=DATE:20261008',
     'RECURRENCE-ID;VALUE=DATE:20261001',
   ])('rejects the recurrence property %s', (recurrence) => {
     const text = calendar(vevent('DTSTART;VALUE=DATE:20261001', 'DTEND;VALUE=DATE:20261003', recurrence));

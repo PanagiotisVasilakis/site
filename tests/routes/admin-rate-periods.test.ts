@@ -190,6 +190,7 @@ describe('admin rate-period API', () => {
       ['a price below 100 cents', { ...VALID, nightlyPriceCents: 99 }],
       ['a price above 1,000,000 cents', { ...VALID, nightlyPriceCents: 1_000_001 }],
       ['end on the start day', { ...VALID, endDate: VALID.startDate }],
+      ['end before start', { ...VALID, startDate: '2026-11-05', endDate: '2026-11-01' }],
       ['367 nights', { ...VALID, startDate: '2032-01-01', endDate: '2033-01-02' }],
       ['minimumNights 0', { ...VALID, minimumNights: 0 }],
       ['minimumNights above the longest bookable stay (31)', { ...VALID, minimumNights: 31 }],

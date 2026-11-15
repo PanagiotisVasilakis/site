@@ -228,6 +228,17 @@ describe('admin availability & prices', () => {
       expect(await screen.findByRole('alert')).toHaveTextContent('Authentication required');
       expect(screen.getByText('Rate period saved.')).toBeInTheDocument();
     });
+
+    it('keeps the deleted message when the list reload fails', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      await renderLoaded();
+      routes['GET /api/admin/rate-periods'] = () => failure(401, 'UNAUTHORIZED', 'Authentication required');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Delete 2026-11-01 to 2026-11-04' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Authentication required');
+      expect(screen.getByText('Rate period deleted.')).toBeInTheDocument();
+    });
   });
 
   describe('calendar sync', () => {

@@ -405,6 +405,26 @@ test('rejects a relative out-of-root symlink and a path-prefix escape', async ()
   }
 });
 
+test('accepts a multi-hop chain that remains inside the artifact', async () => {
+  await withFixture(async (root) => {
+    await writeFile(path.join(root, 'z-target.txt'), 'PUBLIC_LABEL=clean\n');
+    await symlink('z-target.txt', path.join(root, 'b-hop'));
+    await symlink('b-hop', path.join(root, 'a-hop'));
+    const artifact = await enumerateArtifactPathForTest(root);
+    assert.deepEqual(
+      artifact.symlinks.map((entry) => [entry.relative, entry.target]),
+      [
+        ['a-hop', 'z-target.txt'],
+        ['b-hop', 'z-target.txt'],
+      ],
+    );
+    assert.deepEqual(
+      artifact.files.map((file) => file.relative),
+      ['a-hop'],
+    );
+  });
+});
+
 test('rejects a chain whose intermediate hop escapes the artifact', async () => {
   const parent = await mkdtemp(path.join(os.tmpdir(), 'secret-hop-test-'));
   const root = path.join(parent, 'artifact');
@@ -499,6 +519,35 @@ test('rejects unsupported special filesystem nodes where supported', async () =>
   });
 });
 
+test('traversal results and ordering remain stable across repeated runs', async () => {
+  await withFixture(async (root) => {
+    await mkdir(path.join(root, 'z-target'));
+    await writeFile(path.join(root, 'z-target', 'b.txt'), 'PUBLIC_LABEL=b\n');
+    await writeFile(path.join(root, 'z-target', 'a.txt'), 'PUBLIC_LABEL=a\n');
+    await symlink('z-target', path.join(root, 'a-link'));
+    const first = await enumerateArtifactPathForTest(root);
+    const second = await enumerateArtifactPathForTest(root);
+    const summarize = (artifact) => ({
+      files: artifact.files.map((file) => file.relative),
+      symlinks: artifact.symlinks,
+    });
+    assert.deepEqual(summarize(first), summarize(second));
+    assert.deepEqual(
+      first.files.map((file) => file.relative),
+      ['a-link/a.txt', 'a-link/b.txt'],
+    );
+  });
+});
+
+test('the versioned incident baseline remains exactly six fingerprints', async () => {
+  const baseline = JSON.parse(await readFile(
+    new URL('../../config/secret-scanning/historical-incident-baseline.json', import.meta.url),
+    'utf8',
+  ));
+  assert.equal(baseline.findings.length, 6);
+  assert.equal(new Set(baseline.findings.map((finding) => finding.fingerprint)).size, 6);
+});
+
 const FRAMEWORK_IDENTIFIER = '1'.repeat(40);
 const ACTION_IDENTIFIER = '2'.repeat(40);
 const BUILD_IDENTIFIER = '3'.repeat(40);
@@ -560,7 +609,7 @@ async function withGeneratedArtifactPolicy(options, callback) {
       routes: {},
       dynamicRoutes: {},
       notFoundRoutes: [],
-      preview: { ...preview },
+      preview: { ...preview, ...options.prerenderPreviewOverrides },
     };
     const frameworkSource =
       `* @see https://github.com/vercel/next.js/commit/${FRAMEWORK_IDENTIFIER} */`;
@@ -812,6 +861,25 @@ test('preview-props that differs from the prerender preview fails closed', async
   );
 });
 
+test('the standalone preview-props with an extra key fails closed', async () => {
+  await assert.rejects(
+    withGeneratedArtifactPolicy({
+      standalonePreviewPropsOverrides: { unexpected: true },
+    }, async () => {}),
+    /preview-props manifest schema was invalid/u,
+  );
+});
+
+test('only the standalone preview-props differing from the server copy fails closed', async () => {
+  await assert.rejects(
+    withGeneratedArtifactPolicy({
+      previewPropsOverrides: { previewModeId: '8'.repeat(32) },
+      prerenderPreviewOverrides: { previewModeId: '8'.repeat(32) },
+    }, async () => {}),
+    /preview-props manifest schema was invalid/u,
+  );
+});
+
 test('both preview-props copies equal but different from the prerender preview fails closed', async () => {
   await assert.rejects(
     withGeneratedArtifactPolicy({
@@ -857,6 +925,18 @@ test('unknown Next version fails closed', async () => {
     withGeneratedArtifactPolicy({ nextVersion: '16.3.7-unknown' }, async () => {}),
     /do not support the installed Next version/u,
   );
+});
+
+test('build identification without a git binary fails with a named error', async () => {
+  const emptyBinDirectory = await mkdtemp(path.join(os.tmpdir(), 'secret-scanning-no-git-'));
+  try {
+    await assert.rejects(
+      withGeneratedArtifactPolicy({ environment: { PATH: emptyBinDirectory } }, async () => {}),
+      /git is required to identify the build commit\./u,
+    );
+  } finally {
+    await rm(emptyBinDirectory, { recursive: true, force: true });
+  }
 });
 
 test('an extra same-value occurrence in an approved file fails closed', async () => {

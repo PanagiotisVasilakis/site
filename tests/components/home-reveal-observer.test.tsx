@@ -183,6 +183,26 @@ describe('HomeRevealObserver load-time reveal', () => {
     expect(observation.disconnected).toBe(false);
   });
 
+  it('also reveals a target already above the viewport (a restored scroll position)', () => {
+    const observations = stubObserver();
+    const { container } = render(
+      <>
+        <div data-reveal id="above" />
+        <HomeRevealObserver />
+      </>,
+    );
+    const above = container.querySelector('#above') as HTMLElement;
+    placeAt(above, -400);
+
+    frames.flush();
+    expect(above).not.toHaveClass('is-in');
+
+    frames.flush();
+
+    expect(above).toHaveClass('is-in');
+    expect(observations[0].unobserved).toStrictEqual([above]);
+  });
+
   it('cancels the second frame when it unmounts between the two frames, so nothing is revealed afterwards', () => {
     const observations = stubObserver();
     const { container, unmount } = render(
@@ -240,6 +260,18 @@ describe('HomeRevealObserver after a viewport change (R-685)', () => {
     window.dispatchEvent(new Event('resize'));
     window.dispatchEvent(new Event('resize'));
     expect(band).not.toHaveClass('is-in');
+    vi.advanceTimersByTime(500);
+
+    expect(band).toHaveClass('is-in');
+    expect(observations[0].unobserved).toStrictEqual([band]);
+  });
+
+  it('reveals the same way on a visualViewport resize', () => {
+    const viewport = new EventTarget();
+    vi.stubGlobal('visualViewport', viewport);
+    const { observations, band } = mountBelowThenGrow();
+
+    viewport.dispatchEvent(new Event('resize'));
     vi.advanceTimersByTime(500);
 
     expect(band).toHaveClass('is-in');
@@ -383,6 +415,28 @@ describe('FactCounters after a viewport change (R-685)', () => {
     expect(numbers()[0]).not.toBe('90');
     frames.flush(3000);
     expect(numbers()).toStrictEqual(['90', '4']);
+    expect(frames.pending()).toHaveLength(0);
+  });
+
+  it('starts on a visualViewport resize too', () => {
+    const viewport = new EventTarget();
+    vi.stubGlobal('visualViewport', viewport);
+    renderGrown();
+
+    viewport.dispatchEvent(new Event('resize'));
+    vi.advanceTimersByTime(500);
+
+    expect(frames.pending()).toHaveLength(1);
+  });
+
+  it('does not start on a resize after it unmounts', () => {
+    const { unmount } = renderGrown();
+
+    window.dispatchEvent(new Event('resize'));
+    unmount();
+    window.dispatchEvent(new Event('resize'));
+    vi.advanceTimersByTime(500);
+
     expect(frames.pending()).toHaveLength(0);
   });
 });

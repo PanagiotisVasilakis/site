@@ -341,6 +341,13 @@ describe('site shell', () => {
       .toHaveAttribute('href', `/${locale}/privacy`);
   });
 
+  it.each(['/en'])('offers Auto · Day · Night in the footer at every width (%s)', (pathname) => {
+    navigation.pathname = pathname;
+    render(<SiteFooter locale="en" />);
+    const theme = within(screen.getByRole('contentinfo')).getByRole('group', { name: 'Theme' });
+    expect(within(theme).getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
   // R-689 (decision D13): next/link scrolls only when the hash changes, so "Contact" at an URL that already ends in
   // #contact did nothing. The nav links then scroll to the target themselves. Next's own navigation is not under
   // test (no router here): the first click is "not prevented by our handler", the second is "prevented and scrolled".
@@ -382,6 +389,22 @@ describe('site shell', () => {
     expect(clickPrevented(within(menu).getByRole('link', { name: 'Apartment' }))).toBe(false);
     expect(menu).not.toHaveAttribute('open');
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
+  it('scrolls on a second footer "Contact" click at /en#contact and leaves the first and the other footer links alone (R-689)', () => {
+    const { container } = render(<SiteFooter locale="en" />);
+    const footer = screen.getByRole('contentinfo');
+    const contact = within(footer).getByRole('link', { name: 'Contact' });
+
+    expect(clickPrevented(contact)).toBe(false);
+    expect(scrollIntoView).not.toHaveBeenCalled();
+
+    window.history.pushState(null, '', '/en#contact');
+    expect(clickPrevented(within(footer).getByRole('link', { name: 'Apartment' }))).toBe(false);
+    expect(clickPrevented(within(footer).getByRole('link', { name: /Your stay/ }))).toBe(false);
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    expect(clickPrevented(contact)).toBe(true);
+    expect(scrollIntoView.mock.contexts).toEqual([container.querySelector('#contact')]);
   });
 
   it('makes the home footer contact block the #contact target, with phone, e-mail, Instagram and WhatsApp', () => {

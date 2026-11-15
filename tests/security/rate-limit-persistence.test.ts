@@ -217,6 +217,7 @@ describe('durable sensitive-operation rate limiting', () => {
   it.each([
     ['2001:db8:1:3::1', 'portal-signin|ip6:2001:db8:1:3::/64'],
     ['2001:db8::1:2:3:4', 'portal-signin|ip6:2001:db8:0:0::/64'],
+    ['2001::1:2:3:4:5', 'portal-signin|ip6:2001:0:0:1::/64'],
   ] as const)('keeps %j outside the 2001:db8:1:2::/64 bucket', async (ip, expected) => {
     const reference = await addressDimension('2001:db8:1:2::1');
     const other = await addressDimension(ip);

@@ -216,7 +216,7 @@ describe('fetchBookingCalendarText', () => {
     expect(source.cancel).toHaveBeenCalledTimes(1);
   });
 
-  it.each([302, 308])('follows a %i redirect from the older export URL to the current one', async (status) => {
+  it.each([301, 302, 303, 307, 308])('follows a %i redirect from the older export URL to the current one', async (status) => {
     const next = `https://ical.booking.com/v1/export?${SENTINEL}&v=2`;
     mocks.fetch
       .mockResolvedValueOnce(redirectTo(next, status))

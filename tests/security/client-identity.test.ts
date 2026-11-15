@@ -8,6 +8,7 @@ import {
   requireCanonicalClientIp,
 } from '@/lib/net/clientIdentity';
 import { canonicalizeClientIp } from '@/lib/net/getClientIp';
+import { mapApiErrorToUI } from '@/lib/userFacingErrors';
 const CLIENT_IDENTITY_UNAVAILABLE = 'CLIENT_IDENTITY_UNAVAILABLE'; // response contract value
 
 describe('canonical client identity', () => {
@@ -105,6 +106,16 @@ describe('canonical client identity', () => {
     });
     expect(JSON.stringify(await createClientIdentityUnavailableResponse().json()))
       .not.toContain(CLIENT_IDENTITY_UNAVAILABLE);
+  });
+
+  it.each([
+    ['en', 'temporarily unavailable'],
+  ] as const)('is shown to a %s guest as the unavailable message, not the generic one', async (locale, expected) => {
+    const body = await createClientIdentityUnavailableResponse().json();
+    const mapped = mapApiErrorToUI(body, locale);
+
+    expect(mapped.summary).toContain(expected);
+    expect(mapped.summary).not.toBe(mapApiErrorToUI(null, locale).summary);
   });
 
   it('logs only the bounded rejection reason at warn level', () => {

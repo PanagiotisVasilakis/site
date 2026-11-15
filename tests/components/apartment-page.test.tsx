@@ -27,6 +27,8 @@ vi.mock('@/data/contact', async (importOriginal) => ({
 
 import ApartmentPage from '@/app/[locale]/apartment/page';
 import FactStrip from '@/components/home/FactStrip';
+import { HOST_CONTACT } from '@/data/contact';
+import { getDictionary } from '@/i18n/dictionaries';
 import { addDays, type IsoDate } from '@/lib/availability/calendarDate';
 import type { PublicAvailability } from '@/lib/prisma-repositories/availabilityRepository';
 
@@ -151,6 +153,17 @@ describe('apartment page (identity §9.2)', () => {
     expect(container.querySelector(`a[href="/${locale}/phones"]`)).toBeNull();
   });
 
+  it('hides "Book on Booking.com" without a valid link (identity §1.4)', async () => {
+    for (const url of ['', 'https://example.com/Share-AiCapK', 'http://www.booking.com/Share-AiCapK']) {
+      contact.bookingUrl = url;
+      const { container, unmount } = await renderPage('en');
+      expect(screen.queryByRole('link', { name: /Booking\.com/ }), url).toBeNull();
+      expect(screen.queryByText(/Book on Booking\.com/), url).toBeNull();
+      expect(container.querySelector('a[href*="booking.com"]'), url).toBeNull();
+      unmount();
+    }
+  });
+
   it('shows "Book on Booking.com" as the secondary CTA with a valid link', async () => {
     contact.bookingUrl = 'https://www.booking.com/Share-AiCapK';
     const { container } = await renderPage('en');
@@ -185,6 +198,18 @@ describe('apartment page (identity §9.2)', () => {
 
     expect(apartmentFacts).toHaveLength(6);
     expect(apartmentFacts).toEqual(homeFacts);
+  });
+
+  it('shows the host identity in the apartment head (el), without a link', async () => {
+    const labels = getDictionary('el').shell.identity;
+    const { container } = await renderPage('el');
+    const head = container.querySelector('.apt-head') as HTMLElement;
+    const identity = head.querySelector('.host-identity') as HTMLElement;
+    expect(identity).not.toBeNull();
+    for (const text of [labels.registryLabel, labels.legalNameLabel, HOST_CONTACT.registrationNumber, HOST_CONTACT.legalName, HOST_CONTACT.address]) {
+      expect(within(identity).getByText(text)).toBeInTheDocument();
+    }
+    expect(within(head).queryByRole('link')).toBeNull();
   });
 
   it('has one h1 and amenity groups built from the apartment data', async () => {

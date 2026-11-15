@@ -12,6 +12,14 @@ const HOUSE_IMAGES = readdirSync('public/house', { recursive: true, encoding: 'u
   .filter((file) => /[.](avif|jpe?g|png|webp)$/i.test(file));
 
 describe('apartment photo files (identity §7.1, §7.3)', () => {
+  it('serves every catalogue photo from public/ as a JPEG of the declared size', async () => {
+    for (const photo of APARTMENT_PHOTOS) {
+      const meta = await sharp(path.join(PUBLIC_DIR, photo.src)).metadata();
+      expect(meta.format, photo.src).toBe('jpeg');
+      expect(`${meta.width}x${meta.height}`, photo.src).toBe(`${photo.width}x${photo.height}`);
+    }
+  });
+
   it('publishes no house image with EXIF (camera or location data), XMP, IPTC or an ICC profile', async () => {
     expect(HOUSE_IMAGES.length).toBeGreaterThan(APARTMENT_PHOTOS.length);
     for (const file of HOUSE_IMAGES) {

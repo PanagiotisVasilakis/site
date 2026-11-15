@@ -14,4 +14,13 @@ describe('application URL configuration', () => {
 
     expect(siteUrl).toBe('https://guest.example');
   });
+
+  it('does not treat VERCEL_URL as an application origin', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', '');
+    vi.stubEnv('VERCEL_URL', 'legacy.example');
+
+    const { siteUrl } = await import('@/lib/site');
+
+    expect(siteUrl).toBe('http://localhost:3000');
+  });
 });

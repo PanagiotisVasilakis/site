@@ -184,6 +184,8 @@ describe('npm audit evidence', () => {
   });
 
   it.each([
+    ['negative', { info: 0, low: -1, moderate: 0, high: 0, critical: 0, total: -1 }],
+    ['fractional', { info: 0, low: 0.5, moderate: 0, high: 0, critical: 0, total: 0.5 }],
     ['wrong total', { info: 1, low: 1, moderate: 1, high: 0, critical: 0, total: 2 }],
   ] as const)('fails closed for %s vulnerability counts', async (_scenario, counts) => {
     const evidence = await collectNpmAuditEvidence({

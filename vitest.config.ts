@@ -12,6 +12,8 @@ export default defineConfig({
   test: {
     root,
     environment: 'node',
+    // Node >= 25 defines a localStorage global that is undefined without --localstorage-file and hides the jsdom one.
+    execArgv: ['--no-experimental-webstorage'],
     include: ['tests/**/*.test.{ts,tsx}'],
     exclude: ['tests/integration/**'],
     setupFiles: ['./tests/setup.ts'],

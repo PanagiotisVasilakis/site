@@ -50,6 +50,12 @@ describe('runtime environment fail-closed policy', () => {
     expect(result).not.toHaveProperty('ADMIN_DASH_SECRET');
   });
 
+  it('treats an empty NEXT_PUBLIC_SITE_URL line in development as unset', () => {
+    const result = runtimeEnvSchema.safeParse({ ...requiredEnv, NEXT_PUBLIC_SITE_URL: '' });
+    expect(result.success).toBe(true);
+    expect(result.data?.NEXT_PUBLIC_SITE_URL).toBeUndefined();
+  });
+
   it('accepts a complete HTTPS production environment without external limiter variables', () => {
     expect(runtimeEnvSchema.safeParse(productionEnv()).success).toBe(true);
   });
@@ -131,6 +137,7 @@ describe('runtime environment fail-closed policy', () => {
 
   it.each([
     ['admin and guest', 'GUEST_JWT_SECRET', 'ADMIN_JWT_SECRET'],
+    ['admin and dashboard', 'ADMIN_DASH_SECRET', 'ADMIN_JWT_SECRET'],
   ] as const)('rejects identical %s credentials', (_label, target, source) => {
     const baseline = productionEnv();
     const result = runtimeEnvSchema.safeParse({
@@ -151,6 +158,20 @@ describe('runtime environment fail-closed policy', () => {
     if (!result.success) {
       expect(result.error.issues.some(({ path }) => path[0] === 'NEXT_PUBLIC_SITE_URL')).toBe(true);
     }
+  });
+
+  it('strips retired credential names instead of restoring them to the contract', () => {
+    const result = runtimeEnvSchema.parse({
+      ...requiredEnv,
+      JWT_SECRET: 'retired',
+      SESSION_SECRET: 'retired',
+      SECURITY_ENC_KEY_HEX: 'retired',
+      SECURITY_ENC_KEY_HEX_PREVIOUS: 'retired',
+    });
+    expect(result).not.toHaveProperty('JWT_SECRET');
+    expect(result).not.toHaveProperty('SESSION_SECRET');
+    expect(result).not.toHaveProperty('SECURITY_ENC_KEY_HEX');
+    expect(result).not.toHaveProperty('SECURITY_ENC_KEY_HEX_PREVIOUS');
   });
 
   it('validates production CORS origins', () => {
@@ -221,6 +242,14 @@ describe('runtime environment fail-closed policy', () => {
       expect(result.error.issues.map(({ path }) => path[0])).toEqual(['CARTO_BASEMAPS_KEY']);
       expect(JSON.stringify(result.error.issues)).not.toContain('secret');
     }
+  });
+
+  it.each([
+    ['empty', ''],
+  ])('treats an %s CARTO_BASEMAPS_KEY as not configured', (_label, value) => {
+    const result = runtimeEnvSchema.safeParse(productionEnv({ CARTO_BASEMAPS_KEY: value }));
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.CARTO_BASEMAPS_KEY).toBeUndefined();
   });
 
   it.each([
@@ -296,6 +325,7 @@ describe('runtime environment fail-closed policy', () => {
 
   it.each([
     ['SECURITY_PEPPER', 'ADMIN_JWT_SECRET'],
+    ['SECURITY_PEPPER', 'ADMIN_DASH_SECRET'],
     ['CLAIM_TOKEN_PEPPER', 'GUEST_JWT_SECRET'],
   ] as const)('rejects %s that reuses the value of %s', (pepper, credential) => {
     const baseline = productionEnv();
@@ -446,8 +476,21 @@ describe('trusted proxy IP extraction', () => {
     } as unknown as NextRequest;
   }
 
+  it('canonicalizes attested IPv6 and IPv4-mapped IPv6 identities', () => {
+    vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);
+    expect(getClientIp(request({
+      'x-origin-verified-client-ip': '2001:0DB8:0000:0000:0000:0000:0000:0001',
+      'x-origin-proxy-attestation': secret,
+    }))).toBe('2001:db8::1');
+    expect(getClientIp(request({
+      'x-origin-verified-client-ip': '::ffff:203.0.113.10',
+      'x-origin-proxy-attestation': secret,
+    }))).toBe('203.0.113.10');
+  });
+
   it.each([
     ['missing attestation', { 'x-origin-verified-client-ip': '203.0.113.10' }],
+    ['missing private IP', { 'x-origin-proxy-attestation': secret }],
     ['wrong attestation', {
       'x-origin-verified-client-ip': '203.0.113.10',
       'x-origin-proxy-attestation': 'fedcba9876543210'.repeat(4),
@@ -455,6 +498,10 @@ describe('trusted proxy IP extraction', () => {
     ['duplicated attestation', {
       'x-origin-verified-client-ip': '203.0.113.10',
       'x-origin-proxy-attestation': `${secret}, ${secret}`,
+    }],
+    ['IP with port', {
+      'x-origin-verified-client-ip': '203.0.113.10:443',
+      'x-origin-proxy-attestation': secret,
     }],
   ] as const)('rejects %s', (_label, headers) => {
     vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);

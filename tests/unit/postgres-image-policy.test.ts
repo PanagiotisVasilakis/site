@@ -22,7 +22,7 @@ function digest(raw: string): string {
 
 function platformDescriptor(
   architecture: 'amd64' | 'arm64',
-  options: { source?: string } = {},
+  options: { source?: string; variant?: string } = {},
 ) {
   const bashbrewArchitecture = architecture === 'amd64' ? 'amd64' : 'arm64v8';
   return {
@@ -39,7 +39,7 @@ function platformDescriptor(
     platform: {
       architecture,
       os: 'linux',
-      ...(architecture === 'arm64' ? { variant: 'v8' } : {}),
+      ...(architecture === 'arm64' ? { variant: options.variant ?? 'v8' } : {}),
     },
     size: 3_054,
   };
@@ -108,6 +108,7 @@ describe('local Docker daemon boundary', () => {
 
   it.each([
     ['remote TCP endpoint', JSON.stringify('tcp://docker.example.invalid:2376')],
+    ['non-string endpoint', JSON.stringify({ host: 'unix:///var/run/docker.sock' })],
     ['malformed response', 'not-json'],
   ])('rejects a %s without echoing it', (_scenario, rawEndpoint) => {
     let diagnostic = '';
@@ -146,6 +147,7 @@ describe('PostgreSQL OCI index metadata', () => {
     const cases = [
       [platformDescriptor('amd64')],
       [platformDescriptor('amd64'), platformDescriptor('amd64'), platformDescriptor('arm64')],
+      [platformDescriptor('amd64'), platformDescriptor('arm64', { variant: 'v7' })],
     ];
     for (const manifests of cases) {
       const raw = ociIndex(manifests);
@@ -199,6 +201,7 @@ describe('pulled PostgreSQL image inspection', () => {
     ],
     ['short image ID', { Id: 'sha256:1234' }],
     ['unsupported platform', { Architecture: 's390x' }],
+    ['non-Linux image', { Os: 'windows' }],
   ])('rejects a %s inspection', (_scenario, override) => {
     expect(() => validatePulledPostgresImageInspection({
       ...validImageInspection(),
@@ -211,5 +214,17 @@ describe('pulled PostgreSQL image inspection', () => {
     const diagnostic = postgresImagePolicyDiagnostic(new Error(secret));
     expect(diagnostic).not.toContain(secret);
     expect(diagnostic).toContain('Docker diagnostics were withheld');
+  });
+
+  it('does not echo rejected references through policy diagnostics', () => {
+    const rejected = 'registry.example.invalid/private/postgres:16-alpine@sha256:token-value';
+    let diagnostic = '';
+    try {
+      assertApprovedPostgresImageReference(rejected);
+    } catch (error) {
+      diagnostic = postgresImagePolicyDiagnostic(error);
+    }
+    expect(diagnostic).not.toContain(rejected);
+    expect(diagnostic).toContain('image policy rejected');
   });
 });

@@ -135,6 +135,7 @@ describe('validateStay', () => {
     ['2026-02-30', '2026-03-02'],
     ['2026-10-10', '2026-10-10'],
     ['2026-10-12', '2026-10-10'],
+    ['2026-10-10', ''],
   ])('rejects %j to %j as invalid', (checkIn, checkOut) => {
     expect(validateStay(checkIn, checkOut, context())).toEqual({ ok: false, reason: 'invalid' });
   });

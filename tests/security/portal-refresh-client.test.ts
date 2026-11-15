@@ -127,6 +127,23 @@ describe('portal refresh client state machine', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('cancels a pending retry when the caller aborts', async () => {
+    vi.mocked(fetch).mockResolvedValue(response({
+      status: 409,
+      headers: { 'retry-after': '5' },
+      json: { code: 'REFRESH_IN_PROGRESS' },
+    }));
+    const controller = new AbortController();
+    const pending = refreshPortalSession({
+      refreshHref: '/api/portal/refresh?next=%2Fen%2Fcheck-in',
+      baseHref,
+      signal: controller.signal,
+    });
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    controller.abort();
+    await expect(pending).resolves.toEqual({ status: 'aborted' });
+  });
+
   it('clears the retry timer when the caller aborts during the wait', async () => {
     vi.useFakeTimers();
     vi.mocked(fetch).mockResolvedValue(response({

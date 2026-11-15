@@ -5,6 +5,7 @@ import { filterBySearchText } from '@/lib/searchText';
 describe('search text normalisation', () => {
   it.each([
     ['ΜΟΥΣΕΙΟ', 'Μουσείο'],
+    ['ΟΔΟΣ', 'οδός'],
     ['οδοσ', 'Οδός'],
     ['προιοντα', 'Προϊόντα'],
   ])('finds %s in %s', (query, text) => {

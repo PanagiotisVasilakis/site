@@ -93,6 +93,24 @@ describe('check-in Wi-Fi copy', () => {
   });
 });
 
+describe('check-in Wi-Fi copy toast (identity §9.8)', () => {
+  afterEach(() => {
+    Reflect.deleteProperty(window.navigator, 'clipboard');
+  });
+
+  it('confirms a successful copy with a toast', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(window.navigator, 'clipboard', { value: { writeText }, configurable: true });
+    servePreferences({ wifi: { network: 'Guest-Net', password: 'p4ss-w0rd' }, wifiAvailableAt: '2000-01-01T12:00:00.000Z' });
+    const { container } = render(<ToastProvider><CheckInInfo locale="en" /></ToastProvider>);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy Wi-Fi password' }));
+
+    expect(writeText).toHaveBeenCalledWith('p4ss-w0rd');
+    await vi.waitFor(() => expect(container.querySelector('.ui-toasts')).toHaveTextContent('Wi-Fi details copied'));
+  });
+});
+
 // R-391 / R-684 / R-683 / R-682 (decision D13): the preferences are fetched once and the server adds the Wi-Fi
 // details only after wifiAvailableAt, so a page left open before that time asks the server again one second
 // after it. The page is never reloaded, so the form, its messages and the offline state stay as they are.

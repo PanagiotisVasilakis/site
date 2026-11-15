@@ -101,7 +101,7 @@ describe('LeafletMap tile source', () => {
     document.documentElement.removeAttribute('data-theme');
   });
 
-  it.each(['dark'])('uses the exact OpenStreetMap URL in the %s theme without a key', (theme) => {
+  it.each(['light', 'dark'])('uses the exact OpenStreetMap URL in the %s theme without a key', (theme) => {
     document.documentElement.setAttribute('data-theme', theme);
     renderMap();
     expect(tileCalls).toEqual([{ url: OSM_URL, attribution: OSM_COPYRIGHT }]);

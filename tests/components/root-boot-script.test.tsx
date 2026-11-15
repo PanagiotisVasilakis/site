@@ -83,7 +83,7 @@ describe('root layout boot script (identity §5.2)', () => {
     expect((await bootScript()).props.nonce).toBe('abc123');
   });
 
-  it.each(['light'] as const)('applies a stored %s theme', async (stored) => {
+  it.each(['light', 'dark'] as const)('applies a stored %s theme', async (stored) => {
     localStorage.setItem('theme', stored);
     installMatchMedia(['(prefers-color-scheme: dark)']);
     await runBoot();
