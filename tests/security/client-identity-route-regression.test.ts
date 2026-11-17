@@ -30,6 +30,8 @@ const SYNTHETIC_ADMIN_DASH_CREDENTIAL = createHash('sha256')
 vi.mock('@/lib/auth/admin', () => ({
   createAdminSession: mocks.createAdminSession,
   signAdmin: mocks.signAdmin,
+  verifyAdmin: vi.fn(),
+  revokeAdminSession: vi.fn(),
 }));
 
 vi.mock('@/lib/prisma', () => ({
@@ -67,6 +69,7 @@ vi.mock('@/lib/guestSession', () => ({
   issueGuestSession: vi.fn(),
   parseGuestSession: vi.fn(),
   parseGuestSessionBinding: vi.fn(),
+  revokeGuestSessionById: vi.fn(),
 }));
 
 vi.mock('@/lib/logger-enterprise', () => ({ logger: mocks.logger }));

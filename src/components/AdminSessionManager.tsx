@@ -36,7 +36,9 @@ export default function AdminSessionManager({ expiresAt }: { expiresAt: string |
     let expiryTimer: number | undefined;
 
     const toLogin = () => {
-      if (!disposed) router.replace(LOGIN_PATH);
+      if (disposed) return;
+      router.replace(LOGIN_PATH);
+      (router as { refresh?: () => void }).refresh?.();
     };
 
     const refresh = async () => {

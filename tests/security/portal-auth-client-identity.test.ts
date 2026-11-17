@@ -7,6 +7,8 @@ const authMocks = vi.hoisted(() => ({
   issueRefreshToken: vi.fn(),
   issueGuestSession: vi.fn(),
   parseGuestSession: vi.fn(),
+  parseGuestSessionBinding: vi.fn(),
+  revokeGuestSessionById: vi.fn(),
   clearRefreshCookie: vi.fn(),
   createRefreshCookie: vi.fn(),
   createSessionCookie: vi.fn(),
@@ -21,11 +23,14 @@ vi.mock('@/lib/guestDataStore', () => ({
 }));
 vi.mock('@/lib/guestSession', () => ({
   GUEST_REFRESH_COOKIE: 'guest_rt',
+  GUEST_SESSION_COOKIE: 'guest_session',
   clearRefreshCookie: authMocks.clearRefreshCookie,
   createRefreshCookie: authMocks.createRefreshCookie,
   createSessionCookie: authMocks.createSessionCookie,
   issueGuestSession: authMocks.issueGuestSession,
   parseGuestSession: authMocks.parseGuestSession,
+  parseGuestSessionBinding: authMocks.parseGuestSessionBinding,
+  revokeGuestSessionById: authMocks.revokeGuestSessionById,
 }));
 
 const CLIENT_IDENTITY_UNAVAILABLE = 'CLIENT_IDENTITY_UNAVAILABLE'; // response contract value
@@ -169,5 +174,31 @@ describe('portal auth client identity', () => {
         expect(authMocks.issueRefreshToken).not.toHaveBeenCalled();
       },
     );
+    it('revokes a presented guest session cookie even when the previous login used remember=false', async () => {
+      authMocks.parseGuestSessionBinding.mockReturnValue({
+        status: 'present',
+        sessionId: 'old-session-id',
+        userId: 'user-id',
+        bookingId: 'booking-id',
+      });
+      const reqWithSessionOnly = new NextRequest('https://guest.test/api/portal/sessions', {
+        method: 'POST',
+        headers: {
+          'user-agent': 'synthetic-test-client',
+          'x-origin-verified-client-ip': '203.0.113.10',
+          'x-origin-proxy-attestation': '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2',
+          cookie: 'guest_session=old.jwt.token',
+        },
+      });
+
+      await attachPortalAuthCookies(
+        reqWithSessionOnly,
+        NextResponse.json({}),
+        { userId: 'user-id', bookingId: 'booking-id', remember: false },
+      );
+
+      expect(authMocks.revokeGuestSessionById).toHaveBeenCalledExactlyOnceWith('old-session-id');
+      expect(authMocks.issueGuestSession).toHaveBeenCalledTimes(1);
+    });
   });
 });

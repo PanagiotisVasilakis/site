@@ -3,11 +3,15 @@
 
 const CHANNEL_NAME = 'guest-session';
 const STORAGE_KEY = 'guest_session_changed';
+export const SESSION_SIGNAL_SOURCE_ID =
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `tab-${Math.random().toString(36).slice(2)}`;
 
-type SessionChange = { t: number; reason?: string };
+type SessionChange = { t: number; reason?: string; sourceId?: string };
 
 export function emitGuestSessionChanged(reason?: string): void {
-  const payload: SessionChange = { t: Date.now(), reason };
+  const payload: SessionChange = { t: Date.now(), reason, sourceId: SESSION_SIGNAL_SOURCE_ID };
   try {
     if (typeof BroadcastChannel !== 'undefined') {
       const bc = new BroadcastChannel(CHANNEL_NAME);

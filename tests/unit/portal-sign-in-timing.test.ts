@@ -161,4 +161,63 @@ describe('portal sign-in does the same bcrypt work for every phone number', () =
     expect(m.bcryptCompare).not.toHaveBeenCalled();
     expect(m.bcryptHash).not.toHaveBeenCalled();
   });
+
+  it('prefers the continuing stay over a departing-today stay in back-to-back bookings', async () => {
+    m.userFindUnique.mockResolvedValue({ id: 'user-1', phoneE164: PHONE, passwordHash: STORED_HASH });
+    m.bcryptCompare.mockResolvedValue(true);
+    // Today in NOW is 2030-07-10. Booking A ends today (2030-07-08..2030-07-10);
+    // Booking B continues past today (2030-07-10..2030-07-14); Booking C is future (2030-07-16..2030-07-18).
+    m.bookingFindMany.mockResolvedValue([
+      {
+        id: 'booking-departing-today',
+        userId: 'user-1',
+        accessStatus: 'VERIFIED',
+        startDate: new Date(Date.UTC(2030, 6, 8)),
+        endDate: new Date(Date.UTC(2030, 6, 10)),
+      },
+      {
+        id: 'booking-continuing',
+        userId: 'user-1',
+        accessStatus: 'VERIFIED',
+        startDate: new Date(Date.UTC(2030, 6, 10)),
+        endDate: new Date(Date.UTC(2030, 6, 14)),
+      },
+      {
+        id: 'booking-future',
+        userId: 'user-1',
+        accessStatus: 'VERIFIED',
+        startDate: new Date(Date.UTC(2030, 6, 16)),
+        endDate: new Date(Date.UTC(2030, 6, 18)),
+      },
+    ]);
+    const { authenticatePortalUser } = await loadService();
+
+    await expect(authenticatePortalUser({ phone: PHONE, password: PASSWORD }))
+      .resolves.toEqual({ userId: 'user-1', bookingId: 'booking-continuing' });
+  });
+
+  it('prefers a departing-today stay over a future stay when there is no continuation today', async () => {
+    m.userFindUnique.mockResolvedValue({ id: 'user-1', phoneE164: PHONE, passwordHash: STORED_HASH });
+    m.bcryptCompare.mockResolvedValue(true);
+    m.bookingFindMany.mockResolvedValue([
+      {
+        id: 'booking-departing-today',
+        userId: 'user-1',
+        accessStatus: 'VERIFIED',
+        startDate: new Date(Date.UTC(2030, 6, 8)),
+        endDate: new Date(Date.UTC(2030, 6, 10)),
+      },
+      {
+        id: 'booking-future',
+        userId: 'user-1',
+        accessStatus: 'VERIFIED',
+        startDate: new Date(Date.UTC(2030, 6, 12)),
+        endDate: new Date(Date.UTC(2030, 6, 14)),
+      },
+    ]);
+    const { authenticatePortalUser } = await loadService();
+
+    await expect(authenticatePortalUser({ phone: PHONE, password: PASSWORD }))
+      .resolves.toEqual({ userId: 'user-1', bookingId: 'booking-departing-today' });
+  });
 });

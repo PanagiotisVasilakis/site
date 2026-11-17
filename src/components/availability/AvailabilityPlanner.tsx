@@ -256,13 +256,26 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
     }
   };
 
+  const first = toLocalDate(today);
+  const last = toLocalDate(horizonEnd);
+  const visibleMonths = wideScreen ? 2 : Math.min(shownMonths, totalMonths);
+  // The first month react-day-picker shows: the 1st of `month`, kept within the first and the last pair.
+  const firstStart = new Date(first.getFullYear(), first.getMonth(), 1);
+  const lastPairStart = new Date(last.getFullYear(), last.getMonth() - 1, 1);
+  const shownMonth = month < firstStart ? firstStart
+    : month > lastPairStart ? lastPairStart
+    : new Date(month.getFullYear(), month.getMonth(), 1);
+  const secondMonth = new Date(shownMonth.getFullYear(), shownMonth.getMonth() + 1, 1);
+  const canGoBack = shownMonth > firstStart;
+  const canGoForward = secondMonth < new Date(last.getFullYear(), last.getMonth(), 1);
+
   const handleMonthChange = (next: Date) => {
     if (!wideScreen) {
       // Stacked months never page: keyboard moves past the last month add months instead.
       setShownMonths((count) => stackedMonthsFor(today, fromLocalDate(next), count, totalMonths));
       return;
     }
-    setTurn((previous) => ({ direction: next > month ? 'next' : 'prev', count: (previous?.count ?? 0) + 1 }));
+    setTurn((previous) => ({ direction: next > shownMonth ? 'next' : 'prev', count: (previous?.count ?? 0) + 1 }));
     setMonth(next);
   };
 
@@ -287,19 +300,6 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
       noteIsWarning = true;
     }
   }
-
-  const first = toLocalDate(today);
-  const last = toLocalDate(horizonEnd);
-  const visibleMonths = wideScreen ? 2 : Math.min(shownMonths, totalMonths);
-  // The first month react-day-picker shows: the 1st of `month`, kept within the first and the last pair.
-  const firstStart = new Date(first.getFullYear(), first.getMonth(), 1);
-  const lastPairStart = new Date(last.getFullYear(), last.getMonth() - 1, 1);
-  const shownMonth = month < firstStart ? firstStart
-    : month > lastPairStart ? lastPairStart
-    : new Date(month.getFullYear(), month.getMonth(), 1);
-  const secondMonth = new Date(shownMonth.getFullYear(), shownMonth.getMonth() + 1, 1);
-  const canGoBack = shownMonth > firstStart;
-  const canGoForward = secondMonth < new Date(last.getFullYear(), last.getMonth(), 1);
 
   const turnTo = (direction: 'next' | 'prev') => {
     handleMonthChange(new Date(shownMonth.getFullYear(), shownMonth.getMonth() + (direction === 'next' ? 1 : -1), 1));
@@ -343,7 +343,7 @@ export default function AvailabilityPlanner({ locale, availability }: Availabili
               modifiersClassNames={MODIFIER_CLASSES}
               classNames={CALENDAR_CLASSES}
               today={first}
-              month={wideScreen ? month : first}
+              month={wideScreen ? shownMonth : first}
               onMonthChange={handleMonthChange}
               startMonth={first}
               endMonth={last}

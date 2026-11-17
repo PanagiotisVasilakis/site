@@ -28,7 +28,10 @@ function list(notificationStatus: string | null) {
 describe('admin arrival requests: failed notifications', () => {
   beforeEach(() => {
     let retried = false;
-    fetchMock.mockImplementation(async (_url: string, init?: RequestInit) => {
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === '/api/check-in/preferences') {
+        return new Response(JSON.stringify({ success: true, data: { checkInTime: '14:30', checkOutTime: '11:00' } }), { status: 200 });
+      }
       if (init?.method === 'PATCH') {
         retried = true;
         return new Response(JSON.stringify({ success: true, data: { notification: { status: 'queued' } } }), { status: 200 });
@@ -37,10 +40,11 @@ describe('admin arrival requests: failed notifications', () => {
     });
   });
 
-  it('marks a failed notification and requeues it on request', async () => {
+  it('marks a failed notification, shows configured standard check-in time, and requeues it on request', async () => {
     render(<AdminRequestsClient />);
 
     expect(await screen.findByText('Notification failed')).toBeInTheDocument();
+    expect(await screen.findByText('14:30')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Retry notification' }));
 
     expect(await screen.findByText('Notification queued for delivery.')).toBeInTheDocument();

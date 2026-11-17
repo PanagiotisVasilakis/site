@@ -34,14 +34,14 @@ Environment loading order:
 ## Sensitive routes in development
 
 Admin login, guest sign-in and claims, error and CSP reports
-resolve the client identity only from the two private headers that Nginx
-overwrites in production (see `docs/security/trusted-ingress.md`). A browser
+resolve the client identity only from the two private headers that the trusted
+edge proxy sets in production (see `docs/security/trusted-ingress.md`). A browser
 cannot send them, so `next dev` alone answers `503 Service temporarily
 unavailable` on those routes, and the server logs
 `Client identity unavailable; request rejected before persistence` with the
 bounded reason.
 
-Run the local stand-in for the Nginx hop next to the dev server:
+Run the local stand-in for the trusted proxy hop next to the dev server:
 
 ```bash
 npm run ensure-pepper   # adds a local 64-hex ORIGIN_PROXY_SHARED_SECRET if missing
@@ -68,9 +68,9 @@ The authoritative schema is `src/lib/runtime-env-schema.js`; `scripts/start-stan
 
 Production additionally requires:
 
-- `ORIGIN_PROXY_SHARED_SECRET`, generated with `openssl rand -hex 32` and injected into both Nginx and the application
+- `ORIGIN_PROXY_SHARED_SECRET`, generated with `openssl rand -hex 32` and injected into both the edge proxy (e.g. Cloudflare Transform Rule) and the application
 - no external limiter variables: authoritative sensitive-operation limits use
-  PostgreSQL and verified ingress identity. Cloudflare and Nginx provide coarse
+  PostgreSQL and verified ingress identity. Edge WAF/CDN provides coarse
   protection; see `docs/security/layered-rate-limiting.md`.
 
 If the check-in webhook URL is configured, its token is mandatory;
@@ -159,8 +159,8 @@ Guest data retention (`GUEST_DATA_RETENTION_MONTHS` in `src/data/stayPolicy.ts`,
 - Version error: switch the active shell to Node 22.19/npm 11.18 and reinstall with `npm ci`.
 - A style sheet newly `@import`ed into `src/app/globals.css` is missing from a local `npm run build`: a stale Turbopack cache can drop it. Delete `.next/cache/turbopack` before the build whenever a change adds such an import. Docker builds start without `.next` (`.dockerignore`), so they are not affected.
 - Readiness fails (503): the web log names the cause in one warn line: `Readiness: database check failed` (the check threw: no SQL connection, a statement timeout, no `_prisma_migrations` table because the database was never migrated (run `prisma migrate deploy`), or no privilege to read that table; the line carries only the error name, so run the readiness query of `src/app/api/health/ready/route.ts` by hand as the application's database role to see which), `Readiness: expected migration is not applied` (run `prisma migrate deploy`), or `Readiness: database schema is newer than this image` (a newer migration is applied; deploy the image that ships it). Liveness alone does not prove the app is ready.
-- Production proxy validation fails: verify the Cloudflare source allowlist,
-  Nginx header overwrite, and private attestation contract; do not trust a
+- Production proxy validation fails: verify the edge transform rule / proxy
+  header overwrite and private attestation contract; do not trust a
   public forwarding header directly.
 - Outbox backlog: inspect `outbox_events.last_error`, the destination URL/token, and the outbox worker logs.
 - `next dev` or `next build` run by a coding agent (Claude Code) may send the installed Next version to `https://registry.npmjs.org/-/npm/v1/security/advisories/bulk` and stop once with an upgrade recommendation when an advisory applies (`experimental.agentUpgrade` defaults to `'security'` since Next 16.4.0; `next.config.ts` leaves it at the default). Retry the same command, or run the build from a plain shell. Docker builds are not affected.

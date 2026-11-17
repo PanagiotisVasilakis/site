@@ -132,13 +132,40 @@ export const guestStore = {
     };
   },
   
-  // Admin helpers - get all data for export/analysis
+  // Admin helpers
   async getAllBookings(): Promise<Booking[]> {
     return bookingRepository.getAll();
   },
 
+  async findBookingsByUserId(userId: string): Promise<Booking[]> {
+    return bookingRepository.findByUserId(userId);
+  },
+
+  async findBookingsOnDate(date: Date): Promise<Booking[]> {
+    return bookingRepository.findOnDate(date);
+  },
+
   async getAllUsers(): Promise<User[]> {
     return userRepository.getAll();
+  },
+
+  async findUsersByIds(ids: readonly string[]): Promise<User[]> {
+    return userRepository.findManyByIds(ids);
+  },
+
+  async getStatistics(): Promise<{
+    totalBookings: number;
+    totalUsers: number;
+    totalClaimedBookings: number;
+  }> {
+    const [bookingCounts, totalUsers] = await Promise.all([
+      bookingRepository.countStatistics(),
+      userRepository.count(),
+    ]);
+    return {
+      ...bookingCounts,
+      totalUsers,
+    };
   },
 
 };

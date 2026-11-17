@@ -27,8 +27,22 @@ async function getAll(): Promise<UserRecord[]> {
   return await prisma.user.findMany({ orderBy: { createdAt: 'desc' }, select: userSelect });
 }
 
+async function findManyByIds(ids: readonly string[]): Promise<UserRecord[]> {
+  if (ids.length === 0) return [];
+  return await prisma.user.findMany({
+    where: { id: { in: [...ids] } },
+    select: userSelect,
+  });
+}
+
+async function count(): Promise<number> {
+  return await prisma.user.count();
+}
+
 export const userRepository = {
   findByPhone,
   findById,
   getAll,
+  findManyByIds,
+  count,
 };

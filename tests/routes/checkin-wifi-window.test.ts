@@ -59,15 +59,15 @@ describe('GET /api/check-in/preferences Wi-Fi window', () => {
   });
 
   it.each([
-    ['one second before the window opens', '2030-06-09T11:59:59.000Z', null],
-    ['when the window opens', REVEAL_AT, WIFI],
-    ['at the check-out time', '2030-06-14T08:00:00.000Z', WIFI],
-    ['one second after the check-out time', '2030-06-14T08:00:01.000Z', null],
-  ])('%s', async (_label, now, wifi) => {
+    ['one second before the window opens', '2030-06-09T11:59:59.000Z', null, true],
+    ['when the window opens', REVEAL_AT, WIFI, false],
+    ['at the check-out time', '2030-06-14T08:00:00.000Z', WIFI, false],
+    ['one second after the check-out time', '2030-06-14T08:00:01.000Z', null, false],
+  ])('%s', async (_label, now, wifi, wifiPending) => {
     const response = await getWifi(now);
 
     expect(response.status).toBe(200);
-    expect((await response.json()).data).toMatchObject({ wifi, wifiAvailableAt: REVEAL_AT });
+    expect((await response.json()).data).toMatchObject({ wifi, wifiAvailableAt: REVEAL_AT, wifiPending });
   });
 
   it('uses the stayPolicy property time zone, not the PROPERTY_TIME_ZONE environment variable', async () => {

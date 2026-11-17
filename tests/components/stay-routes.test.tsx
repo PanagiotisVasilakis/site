@@ -8,7 +8,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const navigation = vi.hoisted(() => ({ locale: 'en', search: '' }));
 const flags = vi.hoisted(() => ({ portalEnabled: true, checkinEnabled: true }));
-const session = vi.hoisted(() => ({ isSignedIn: false }));
+const session = vi.hoisted(() => ({
+  isSignedIn: false,
+  portalEnabled: true,
+  checkinEnabled: true,
+  flagsLoaded: false,
+}));
 const fetchMock = vi.hoisted(() => vi.fn());
 const preferences = vi.hoisted(() => ({ checkOutTime: '11:00' }));
 // When set, the phones list puts its non-emergency numbers right after 112 (R3-L10 stay hub filter).
@@ -25,7 +30,15 @@ vi.mock('next/navigation', () => ({
 vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock('next/dynamic', () => ({ default: () => function MapStub() { return null; } }));
 vi.mock('@/lib/featureFlags', () => ({ getFeatureFlagsAsync: async () => ({ ...flags }) }));
-vi.mock('@/hooks/useGuestSession', () => ({ useGuestSession: () => ({ isSignedIn: session.isSignedIn, signOut: vi.fn() }) }));
+vi.mock('@/hooks/useGuestSession', () => ({
+  useGuestSession: () => ({
+    isSignedIn: session.isSignedIn,
+    portalEnabled: session.portalEnabled,
+    checkinEnabled: session.checkinEnabled,
+    flagsLoaded: session.flagsLoaded,
+    signOut: vi.fn(),
+  }),
+}));
 vi.mock('@/lib/guestSession', () => ({
   GUEST_REFRESH_COOKIE: 'guest_refresh',
   getVerifiedGuestSessionFromCookies: async () => (session.isSignedIn ? { sessionId: 's1', bookingId: 'b1' } : null),
@@ -118,6 +131,9 @@ beforeEach(() => {
   flags.portalEnabled = true;
   flags.checkinEnabled = true;
   session.isSignedIn = false;
+  session.portalEnabled = true;
+  session.checkinEnabled = true;
+  session.flagsLoaded = false;
   preferences.checkOutTime = '11:00';
   phonesOrder.nonEmergencyFirst = false;
   window.localStorage.clear();
@@ -160,7 +176,7 @@ describe('/{l}/stay hub (identity §9.4)', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: 'Welcome home.' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Sign in to your stay/u })).toHaveAttribute('href', '/en/guest');
-    for (const name of ['Wi-Fi', 'Check-out']) {
+    for (const name of ['Wi-Fi', 'Check-out', 'House rules']) {
       const tile = screen.getByRole('heading', { name }).closest('.stay-tile') as HTMLElement;
       expect(tile).toHaveClass('stay-tile--locked');
       expect(tile).toHaveTextContent('Sign in to see');
@@ -230,6 +246,17 @@ describe('/{l}/stay hub (identity §9.4)', () => {
     expect(container.querySelector('.stay-tile--portal, .stay-tile--locked')).toBeNull();
     expect(screen.getByRole('link', { name: /112/u })).toHaveAttribute('href', 'tel:112');
     expectCalmStayPage(container);
+  });
+
+  it('applies live feature flags once resolved by useGuestSession', async () => {
+    session.isSignedIn = true;
+    session.portalEnabled = true;
+    session.checkinEnabled = false;
+    session.flagsLoaded = true;
+    const { container } = wrap(await StayPage(params('en')));
+
+    expect(container.querySelector('a[href^="/en/check-in"]')).toBeNull();
+    expect(container.querySelector('.stay-tile--portal, .stay-tile--locked')).toBeNull();
   });
 
   it('is not indexed', async () => {

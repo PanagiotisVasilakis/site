@@ -11,8 +11,16 @@ vi.mock('@/lib/logger-client', () => ({ logger: { error: logError } }));
 import { useGuestSession } from '@/hooks/useGuestSession';
 import { emitGuestSessionChanged, onGuestSessionChange } from '@/lib/sessionSignals';
 
-function status(authenticated: boolean, checkinEnabled = true) {
-  return new Response(JSON.stringify({ success: true, data: { authenticated, bookingId: null, checkinEnabled } }), {
+function status(authenticated: boolean, checkinEnabled = true, refreshable = false) {
+  return new Response(JSON.stringify({
+    success: true,
+    data: {
+      authenticated,
+      bookingId: null,
+      checkinEnabled,
+      ...(refreshable ? { refreshable: true } : {}),
+    },
+  }), {
     status: 200,
     headers: { 'content-type': 'application/json' },
   });
@@ -172,6 +180,61 @@ describe('useGuestSession', () => {
 
       await waitFor(() => expect(result.current.isSignedIn).toBe(false));
       expect(fetchMock).toHaveBeenCalledTimes(requests);
+    });
+  });
+
+  describe('silent remember-me renewal and deduplication', () => {
+    it('silently refreshes once when the short session expired while a refresh cookie is present', async () => {
+      fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+        if (url === '/api/portal/sessions' && init?.method === 'GET') {
+          return status(false, true, true);
+        }
+        if (url === '/api/portal/refresh' && init?.method === 'POST') {
+          return new Response(JSON.stringify({ success: true, data: { refreshed: true } }), { status: 200 });
+        }
+        throw new Error(`unexpected ${url}`);
+      });
+
+      const { result } = renderHook(() => useGuestSession());
+      await waitFor(() => expect(result.current.isSignedIn).toBe(true));
+      expect(result.current).toMatchObject({ isSignedIn: true, portalEnabled: true, checkinEnabled: true, flagsLoaded: true });
+      expect(fetchMock).toHaveBeenCalledWith('/api/portal/refresh', expect.objectContaining({ method: 'POST' }));
+    });
+
+    it('deduplicates simultaneous status and refresh requests across multiple mounted hooks', async () => {
+      fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+        if (url === '/api/portal/sessions' && init?.method === 'GET') {
+          return status(false, true, true);
+        }
+        if (url === '/api/portal/refresh' && init?.method === 'POST') {
+          return new Response(JSON.stringify({ success: true, data: { refreshed: true } }), { status: 200 });
+        }
+        throw new Error(`unexpected ${url}`);
+      });
+
+      const hookA = renderHook(() => useGuestSession());
+      const hookB = renderHook(() => useGuestSession());
+
+      await waitFor(() => {
+        expect(hookA.result.current.isSignedIn).toBe(true);
+        expect(hookB.result.current.isSignedIn).toBe(true);
+      });
+      const statusCalls = fetchMock.mock.calls.filter(([url]) => url === '/api/portal/sessions').length;
+      const refreshCalls = fetchMock.mock.calls.filter(([url]) => url === '/api/portal/refresh').length;
+      expect(statusCalls).toBe(1);
+      expect(refreshCalls).toBe(1);
+    });
+
+    it('stays signed out when the silent refresh returns 401', async () => {
+      fetchMock.mockImplementation(async (url: string) => (
+        url === '/api/portal/sessions'
+          ? status(false, true, true)
+          : new Response('Unauthorized', { status: 401 })
+      ));
+
+      const { result } = renderHook(() => useGuestSession());
+      await waitFor(() => expect(result.current.flagsLoaded).toBe(true));
+      expect(result.current).toMatchObject({ isSignedIn: false, portalEnabled: true, checkinEnabled: true });
     });
   });
 });

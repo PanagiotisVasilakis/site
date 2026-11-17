@@ -109,4 +109,20 @@ describe('check-in time format', () => {
     expect(response.status).toBe(422);
     expect(mocks.createRequest).not.toHaveBeenCalled();
   });
+
+  it('rejects a cross-origin POST to preferences', async () => {
+    mocks.isAdminRequest.mockResolvedValue(true);
+
+    const response = await postPreferences(new NextRequest('http://localhost:3000/api/check-in/preferences', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'https://evil.example',
+      },
+      body: JSON.stringify({ checkInTime: '09:00', checkOutTime: '11:00' }),
+    }), { params: Promise.resolve({}) });
+
+    expect(response.status).toBe(403);
+    expect(mocks.settingUpsert).not.toHaveBeenCalled();
+  });
 });

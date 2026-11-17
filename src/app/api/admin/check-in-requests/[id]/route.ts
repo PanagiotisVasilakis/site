@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { CheckInRequestStatus } from '@/generated/prisma/client';
 import { withErrorHandler, validateRequestBody, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 import { isAdminRequest } from '@/lib/rbac';
+import { isSameOriginRequest } from '@/lib/net/sameOrigin';
 import {
   CheckInRequestAlreadyDecidedError,
   CheckInRequestNotFoundError,
@@ -30,6 +31,11 @@ export const PATCH = withErrorHandler(async (
 ) => {
   if (!(await isAdminRequest(request))) {
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
+  }
+
+  const origin = request.headers.get('origin');
+  if (origin && !isSameOriginRequest(origin, request)) {
+    throw new ApiError(ApiErrorCode.FORBIDDEN, 'Cross-origin admin mutation rejected');
   }
 
   const params = await context.params;

@@ -59,7 +59,8 @@ const DynamicApartmentLocationMap = dynamic(() => import('@/components/Apartment
 });
 
 function sessionRefreshUrl(locale: Locale) {
-  return `/${locale}/portal/refresh?next=${encodeURIComponent(`/${locale}/check-in`)}`;
+  const hash = typeof window !== 'undefined' ? window.location.hash : '';
+  return `/${locale}/portal/refresh?next=${encodeURIComponent(`/${locale}/check-in${hash}`)}`;
 }
 
 interface CheckInInfoProps {
@@ -358,6 +359,7 @@ export default function CheckInInfo({
   const [wifiNetwork, setWifiNetwork] = useState('');
   const [wifiPassword, setWifiPassword] = useState('');
   const [wifiAvailableAt, setWifiAvailableAt] = useState<string | null>(null);
+  const [wifiPending, setWifiPending] = useState<boolean | null>(null);
   const [checkInTime, setCheckInTime] = useState('15:00');
   const [checkOutTime, setCheckOutTime] = useState('11:00');
   const [arrivalRequest, setArrivalRequest] = useState<ArrivalRequest | null>(null);
@@ -371,17 +373,28 @@ export default function CheckInInfo({
   const wifiRevealAwaited = useRef(false);
 
   useEffect(() => {
+    let active = true;
     const loadPreferences = async () => {
       try {
         const res = await internalFetch('/api/check-in/preferences');
+        if (!active) return;
+        if (res.status === 401) {
+          if (!sessionRefreshStarted.current) {
+            sessionRefreshStarted.current = true;
+            window.location.replace(sessionRefreshUrl(locale));
+          }
+          return;
+        }
         if (res.ok) {
           const data = await res.json();
+          if (!active) return;
           if (data.data) {
             setCheckInTime(data.data.checkInTime || '15:00');
             setCheckOutTime(data.data.checkOutTime || '11:00');
             setWifiNetwork(data.data.wifi?.network || '');
             setWifiPassword(data.data.wifi?.password || '');
             setWifiAvailableAt(typeof data.data.wifiAvailableAt === 'string' ? data.data.wifiAvailableAt : null);
+            setWifiPending(typeof data.data.wifiPending === 'boolean' ? data.data.wifiPending : null);
           }
         }
       } catch (error) {
@@ -389,14 +402,25 @@ export default function CheckInInfo({
       }
     };
     loadPreferences();
-  }, []);
+    return () => { active = false; };
+  }, [locale]);
 
   useEffect(() => {
+    let active = true;
     const loadArrivalRequest = async () => {
       try {
         const res = await internalFetch('/api/check-in/arrival-request');
+        if (!active) return;
+        if (res.status === 401) {
+          if (!sessionRefreshStarted.current) {
+            sessionRefreshStarted.current = true;
+            window.location.replace(sessionRefreshUrl(locale));
+          }
+          return;
+        }
         if (res.ok) {
           const data = await res.json();
+          if (!active) return;
           setArrivalRequest(data.data?.request ?? null);
         }
       } catch (error) {
@@ -404,7 +428,8 @@ export default function CheckInInfo({
       }
     };
     loadArrivalRequest();
-  }, []);
+    return () => { active = false; };
+  }, [locale]);
 
   // The server adds the Wi-Fi details only after wifiAvailableAt, so a page opened earlier asks again one second
   // after it and when the tab returns (a sleeping phone may skip one long timer); only the Wi-Fi fields change, so open
@@ -414,7 +439,9 @@ export default function CheckInInfo({
     if (wifiNetwork || !wifiAvailableAt) return;
     const revealAt = new Date(wifiAvailableAt).getTime();
     const delay = revealAt - Date.now();
-    if (delay > 0) wifiRevealAwaited.current = true;
+    if (wifiPending === true || (wifiPending === null && delay > 0)) {
+      wifiRevealAwaited.current = true;
+    }
     if (!wifiRevealAwaited.current) return;
 
     let active = true;
@@ -444,6 +471,7 @@ export default function CheckInInfo({
           setWifiNetwork(data.data.wifi?.network || '');
           setWifiPassword(data.data.wifi?.password || '');
           setWifiAvailableAt(typeof data.data.wifiAvailableAt === 'string' ? data.data.wifiAvailableAt : null);
+          setWifiPending(typeof data.data.wifiPending === 'boolean' ? data.data.wifiPending : null);
         }
       } catch (error) {
         if (!active) return;
@@ -483,7 +511,7 @@ export default function CheckInInfo({
       window.removeEventListener('pageshow', refetchAfterReturn);
       window.removeEventListener('online', onOnline);
     };
-  }, [wifiAvailableAt, wifiNetwork, locale]);
+  }, [wifiAvailableAt, wifiNetwork, wifiPending, locale]);
 
   const copyToClipboard = async (text: string, target: CopyTarget) => {
     try {

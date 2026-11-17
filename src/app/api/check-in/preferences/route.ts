@@ -5,6 +5,7 @@ import { GUEST_SESSION_COOKIE, parseGuestSession, verifyGuestSessionAccess } fro
 import { isAdminRequest } from '@/lib/rbac';
 import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 import { PROPERTY_TIME_ZONE } from '@/data/stayPolicy';
+import { isSameOriginRequest } from '@/lib/net/sameOrigin';
 import { timePattern, wifiDisclosureWindow } from '@/lib/propertyTime';
 
 const preferencesSchema = z.object({
@@ -66,6 +67,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   const prefs = await readPreferences();
   let wifi: { network: string; password: string } | null = null;
   let wifiAvailableAt: string | null = null;
+  let wifiPending = false;
   if (adminAccess) {
     wifi = guestWifi();
   } else if (guestAccess?.booking?.id) {
@@ -84,6 +86,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
       });
       wifiAvailableAt = revealAt.toISOString();
       const now = new Date();
+      wifiPending = now < revealAt;
       if (now >= revealAt && now <= expiresAt) {
         wifi = guestWifi();
       }
@@ -93,6 +96,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     ...prefs,
     wifi,
     wifiAvailableAt,
+    wifiPending,
   });
 });
 
@@ -104,6 +108,11 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   if (!(await isAdminRequest(request))) {
     throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required to update preferences');
+  }
+
+  const origin = request.headers.get('origin');
+  if (origin && !isSameOriginRequest(origin, request)) {
+    throw new ApiError(ApiErrorCode.FORBIDDEN, 'Cross-origin admin mutation rejected');
   }
 
   // Strict for the request body only: readPreferences parses the stored value, which also carries updatedAt.

@@ -26,9 +26,6 @@ interface BookingExport {
   };
 }
 
-// Booking dates are UTC-midnight instants (PostgreSQL DATE); compare them as YYYY-MM-DD calendar dates.
-const calendarDate = (date: Date): string => date.toISOString().slice(0, 10);
-
 function toBookingExport(booking: Booking, user?: User): BookingExport {
   return {
     booking: {
@@ -71,7 +68,8 @@ class GuestDataExport {
       logger.info('User not found by phone', { phone: phone.substring(0, 3) + '***' });
       return [];
     }
-    return this.withDetails((await guestStore.getAllBookings()).filter((b) => b.userId === user.id));
+    const bookings = await guestStore.findBookingsByUserId(user.id);
+    return bookings.map((booking) => toBookingExport(booking, user));
   }
 
   async getBookingDetails(bookingId: string): Promise<BookingExport | null> {
@@ -83,14 +81,10 @@ class GuestDataExport {
   }
 
   async searchBookingsByDateRange(startDate: string): Promise<BookingExport[]> {
-    const bookings = (await guestStore.getAllBookings()).filter((booking) => {
-        const bookingStart = calendarDate(booking.startDate);
-        const bookingEnd = calendarDate(booking.endDate);
-
-        return bookingStart <= startDate && bookingEnd >= startDate;
-    });
-
-    return this.withDetails(bookings);
+    if (!/^\d{4}-\d{2}-\d{2}$/u.test(startDate)) return [];
+    const targetDate = new Date(`${startDate}T00:00:00Z`);
+    if (Number.isNaN(targetDate.getTime())) return [];
+    return this.withDetails(await guestStore.findBookingsOnDate(targetDate));
   }
 
   async getStatistics(): Promise<{
@@ -98,28 +92,24 @@ class GuestDataExport {
     totalUsers: number;
     totalClaimedBookings: number;
   }> {
-    const [bookings, users] = await Promise.all([
-        guestStore.getAllBookings(),
-        guestStore.getAllUsers(),
-      ]);
-
-    return {
-        totalBookings: bookings.length,
-        totalUsers: users.length,
-        totalClaimedBookings: bookings.filter((booking) => booking.accessStatus === 'VERIFIED').length,
-    };
+    return guestStore.getStatistics();
   }
 
-  // Joins users from one full-list query instead of querying per booking.
+  // Joins only the referenced users in one filtered query instead of per booking.
   private async withDetails(bookings: Booking[]): Promise<BookingExport[]> {
     if (bookings.length === 0) return [];
-    const usersById = new Map((await guestStore.getAllUsers()).map((user) => [user.id, user]));
+    const userIds = [...new Set(
+      bookings
+        .map((booking) => booking.userId)
+        .filter((userId): userId is string => typeof userId === 'string' && userId.length > 0),
+    )];
+    const users = await guestStore.findUsersByIds(userIds);
+    const usersById = new Map(users.map((user) => [user.id, user]));
     return bookings.map((booking) => toBookingExport(
       booking,
       booking.userId ? usersById.get(booking.userId) : undefined,
     ));
   }
-
 }
 
 // Export singleton instance

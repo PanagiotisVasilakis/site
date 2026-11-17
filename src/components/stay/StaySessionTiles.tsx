@@ -8,32 +8,34 @@ import { useFavorites } from '@/lib/favorites';
 import { StayTile } from './StayTile';
 
 /**
- * identity §9.4 tiles 1–4: the portal tile (only with the portal flag on), then Wi-Fi and check-out, locked
- * until sign-in, and the house rules. Wi-Fi, check-out and the rules link into the check-in page, so they
- * render only while check-in is enabled (which needs the portal). For the same reason a signed-in guest gets
- * no portal tile while check-in is off: its only target is the check-in page.
+ * identity §9.4 tiles 1–4: the portal tile (only with the portal flag on), then Wi-Fi, check-out, and
+ * house rules, locked until sign-in. They link into the check-in page, so they render only while check-in
+ * is enabled (which needs the portal). For the same reason a signed-in guest gets no portal tile while
+ * check-in is off: its only target is the check-in page.
  */
 export function StaySessionTiles({ locale, portalEnabled, checkinEnabled }: { locale: Locale; portalEnabled: boolean; checkinEnabled: boolean }) {
-  const { isSignedIn } = useGuestSession();
+  const { isSignedIn, portalEnabled: livePortalEnabled, checkinEnabled: liveCheckinEnabled, flagsLoaded } = useGuestSession();
+  const effectivePortalEnabled = flagsLoaded ? livePortalEnabled : portalEnabled;
+  const effectiveCheckinEnabled = flagsLoaded ? liveCheckinEnabled : checkinEnabled;
   const t = getDictionary(locale).stay.hub;
   const checkIn = `/${locale}/check-in`;
   const unlocked = isSignedIn ? 'default' : 'locked';
   return (
     <>
-      {portalEnabled ? (
+      {effectivePortalEnabled ? (
         isSignedIn ? (
-          checkinEnabled ? (
+          effectiveCheckinEnabled ? (
             <StayTile variant="portal" icon="key" title={t.portalOpenTitle} text={t.portalOpenText} href={checkIn} cta={t.portalOpenCta} />
           ) : null
         ) : (
           <StayTile variant="portal" icon="user" title={t.portalSignInTitle} text={t.portalSignInText} href={`/${locale}/guest`} cta={t.portalSignInCta} />
         )
       ) : null}
-      {checkinEnabled ? (
+      {effectiveCheckinEnabled ? (
         <>
           <StayTile variant={unlocked} icon="wifi" title={t.wifiTitle} text={t.wifiText} href={`${checkIn}#wifi`} lockedLabel={t.locked} />
           <StayTile variant={unlocked} icon="clock" title={t.checkoutTitle} text={t.checkoutText} href={`${checkIn}#check-out`} lockedLabel={t.locked} />
-          <StayTile icon="rules" title={t.rulesTitle} text={t.rulesText} href={`${checkIn}#house-rules`} />
+          <StayTile variant={unlocked} icon="rules" title={t.rulesTitle} text={t.rulesText} href={`${checkIn}#house-rules`} lockedLabel={t.locked} />
         </>
       ) : null}
     </>

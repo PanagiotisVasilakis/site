@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode, readJsonBody, ValidationError } from '@/lib/apiErrorHandler';
 import { isAdminRequest } from '@/lib/rbac';
+import { isSameOriginRequest } from '@/lib/net/sameOrigin';
 import { getFeatureFlagsAsync, setFeatureFlags, type FeatureFlags } from '@/lib/featureFlags';
 import { logger } from '@/lib/logger-enterprise';
 
@@ -20,6 +21,10 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   if (!(await isAdminRequest(req))) throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
+  const origin = req.headers.get('origin');
+  if (origin && !isSameOriginRequest(origin, req)) {
+    throw new ApiError(ApiErrorCode.FORBIDDEN, 'Cross-origin admin mutation rejected');
+  }
   const body = await readJsonBody(req, 8 * 1_024);
   const parsed = schema.safeParse(body);
   if (!parsed.success) {

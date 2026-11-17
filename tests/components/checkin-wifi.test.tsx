@@ -429,4 +429,23 @@ describe('check-in Wi-Fi refetch at the disclosure time', () => {
       expect(reload).not.toHaveBeenCalled();
     },
   );
+
+  it('redirects to portal refresh (preserving #hash) when initial preferences load answers 401', async () => {
+    vi.stubGlobal('location', { ...window.location, hash: '#wifi', reload, replace });
+    serveSteps([sessionExpired]);
+    render(<ToastProvider><CheckInInfo locale="en" /></ToastProvider>);
+    await advance(0);
+
+    expect(replace).toHaveBeenCalledExactlyOnceWith('/en/portal/refresh?next=%2Fen%2Fcheck-in%23wifi');
+  });
+
+  it('schedules refetch when server sets wifiPending: true even with minor client clock skew', async () => {
+    await renderPage(
+      { prefs: { wifi: null, wifiAvailableAt: revealAfter(-500), wifiPending: true, checkInTime: '14:00' } as never },
+      revealed(-500),
+    );
+    await returnToTab();
+    expect(preferencesRequests()).toBe(2);
+    expect(screen.getAllByText('Guest-Net').length).toBeGreaterThan(0);
+  });
 });

@@ -9,7 +9,7 @@ import { PortalAuthError, authenticatePortalUser } from '@/lib/portalAuthService
 import { attachPortalAuthCookies } from '@/lib/portalAuthHttp';
 import { checkSensitiveRateLimit, refundSensitiveIdentifierAttempt } from '@/lib/sensitiveRateLimit';
 import { logger } from '@/lib/logger-enterprise';
-import { GUEST_SESSION_COOKIE, parseGuestSession, verifyGuestSessionAccess } from '@/lib/guestSession';
+import { GUEST_REFRESH_COOKIE, GUEST_SESSION_COOKIE, parseGuestSession, verifyGuestSessionAccess } from '@/lib/guestSession';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +28,16 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   const access = session ? await verifyGuestSessionAccess(session) : null;
   // A status query: "signed out" is a normal answer (every public page asks), not an error.
   // The 404 above tells the shell the portal is off; checkinEnabled tells it whether the check-in page exists.
-  if (!access) return createSuccessResponse({ authenticated: false, bookingId: null, checkinEnabled: flags.checkinEnabled });
+  // If the short session expired while a remember-me refresh cookie is still present, tell the shell so it can renew silently.
+  if (!access) {
+    const hasRefreshCookie = Boolean(request.cookies.get(GUEST_REFRESH_COOKIE)?.value);
+    return createSuccessResponse({
+      authenticated: false,
+      bookingId: null,
+      checkinEnabled: flags.checkinEnabled,
+      ...(hasRefreshCookie ? { refreshable: true } : {}),
+    });
+  }
   return createSuccessResponse({ authenticated: true, bookingId: access.booking?.id ?? null, checkinEnabled: flags.checkinEnabled });
 });
 

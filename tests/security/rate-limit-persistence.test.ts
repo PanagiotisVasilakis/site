@@ -266,4 +266,36 @@ describe('durable sensitive-operation rate limiting', () => {
     expect(queryRaw).not.toHaveBeenCalled();
     expect(privacyHmac).not.toHaveBeenCalled();
   });
+
+  it('shares buckets for 10-digit international and +prefixed numbers in portal-session and refunds both', async () => {
+    executeRaw.mockResolvedValue(1);
+    await checkSensitiveRateLimit(request('203.0.113.10'), {
+      scope: 'portal-session',
+      identifier: '4917123456',
+      limit: 5,
+      windowMs: 60_000,
+    });
+    const dimensions49 = privacyHmac.mock.calls.map(([dim]) => dim);
+    expect(dimensions49).toEqual([
+      'portal-session|ip:203.0.113.10',
+      'portal-session|identifier:+4917123456',
+      'portal-session|identifier:+304917123456',
+    ]);
+
+    privacyHmac.mockClear();
+    queryRaw.mockClear();
+    await checkSensitiveRateLimit(request('203.0.113.10'), {
+      scope: 'portal-session',
+      identifier: '+4917123456',
+      limit: 5,
+      windowMs: 60_000,
+    });
+    expect(privacyHmac.mock.calls.map(([dim]) => dim)).toEqual([
+      'portal-session|ip:203.0.113.10',
+      'portal-session|identifier:+4917123456',
+    ]);
+
+    await refundSensitiveIdentifierAttempt({ scope: 'portal-session', identifier: '4917123456' });
+    expect(executeRaw).toHaveBeenCalledTimes(2);
+  });
 });

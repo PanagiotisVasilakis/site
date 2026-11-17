@@ -133,4 +133,19 @@ describe('addressing a check-in request', () => {
     expect(mocks.findById).not.toHaveBeenCalled();
     expect(mocks.updateStatus).not.toHaveBeenCalled();
   });
+
+  it('rejects a cross-origin PATCH before updating a check-in request', async () => {
+    const response = await patchCheckInRequest(new NextRequest(`http://localhost:3000/api/admin/check-in-requests/${CHECK_IN_ID}`, {
+      method: 'PATCH',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'https://evil.example',
+      },
+      body: JSON.stringify({ status: 'approved' }),
+    }), { params: Promise.resolve({ id: CHECK_IN_ID }) });
+
+    expect(response.status).toBe(403);
+    expect(mocks.findById).not.toHaveBeenCalled();
+    expect(mocks.updateStatus).not.toHaveBeenCalled();
+  });
 });

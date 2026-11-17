@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Own next/headers and guestSession mocks: the ones of stay-routes.test.tsx never hold a refresh cookie.
-const refreshCookie = vi.hoisted(() => ({ name: 'guest_refresh', value: undefined as string | undefined }));
+const refreshCookie = vi.hoisted(() => ({ name: 'guest_rt', value: undefined as string | undefined }));
+const verifiedSession = vi.hoisted(() => ({ current: null as { sid: string } | null }));
 const flags = vi.hoisted(() => ({ portalEnabled: true, checkinEnabled: true }));
 
 vi.mock('next/navigation', () => ({
@@ -16,7 +17,7 @@ vi.mock('next/headers', () => ({
 vi.mock('@/lib/featureFlags', () => ({ getFeatureFlagsAsync: async () => ({ ...flags }) }));
 vi.mock('@/lib/guestSession', () => ({
   GUEST_REFRESH_COOKIE: refreshCookie.name,
-  getVerifiedGuestSessionFromCookies: async () => null,
+  getVerifiedGuestSessionFromCookies: async () => verifiedSession.current,
 }));
 
 import CheckInPage from '@/app/[locale]/check-in/page';
@@ -35,6 +36,7 @@ beforeEach(() => {
   flags.portalEnabled = true;
   flags.checkinEnabled = true;
   refreshCookie.value = undefined;
+  verifiedSession.current = null;
 });
 
 describe('check-in page without a session', () => {
@@ -95,6 +97,34 @@ describe('guest sign-in page', () => {
 
   it('serves the sign-in client while the portal is on', async () => {
     const element = await GuestUnifiedPage();
+
+    expect(element.type).toBe(UnifiedGuestClient);
+  });
+
+  it('redirects an already signed-in guest away from /guest to /check-in (or /stay when check-in is off)', async () => {
+    verifiedSession.current = { sid: 's1' };
+    await expect(GuestUnifiedPage({ params: Promise.resolve({ locale: 'el' }) }))
+      .rejects.toThrow(new Error('NEXT_REDIRECT /el/check-in'));
+
+    flags.checkinEnabled = false;
+    await expect(GuestUnifiedPage({ params: Promise.resolve({ locale: 'el' }) }))
+      .rejects.toThrow(new Error('NEXT_REDIRECT /el/stay'));
+  });
+
+  it('routes a guest with a refresh cookie through /portal/refresh instead of asking for their password again', async () => {
+    refreshCookie.value = 'refresh-token';
+    await expect(GuestUnifiedPage({ params: Promise.resolve({ locale: 'el' }) }))
+      .rejects.toThrow(new Error('NEXT_REDIRECT /el/portal/refresh?next=%2Fel%2Fcheck-in&failure=%2Fel%2Fguest%3Fflash%3Dsession_required'));
+  });
+
+  it('keeps the guest on the sign-up form when mode=signup even with an existing session', async () => {
+    verifiedSession.current = { sid: 's1' };
+    refreshCookie.value = 'refresh-token';
+
+    const element = await GuestUnifiedPage({
+      params: Promise.resolve({ locale: 'el' }),
+      searchParams: Promise.resolve({ mode: 'signup' }),
+    });
 
     expect(element.type).toBe(UnifiedGuestClient);
   });

@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   createAdminSession: vi.fn(),
   signAdmin: vi.fn(),
+  verifyAdmin: vi.fn(),
+  revokeAdminSession: vi.fn(),
   queryRaw: vi.fn(),
   transaction: vi.fn(),
   logger: {
@@ -21,6 +23,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/lib/auth/admin', () => ({
   createAdminSession: mocks.createAdminSession,
   signAdmin: mocks.signAdmin,
+  verifyAdmin: mocks.verifyAdmin,
+  revokeAdminSession: mocks.revokeAdminSession,
 }));
 
 vi.mock('@/lib/prisma', () => ({
@@ -246,5 +250,26 @@ describe('admin login source-budget isolation', () => {
       .slice(1)
       .map((attribute) => attribute.toLowerCase());
     expect(attributes).toEqual(expect.arrayContaining(['httponly', 'samesite=strict', 'path=/', 'secure']));
+  });
+
+  it('revokes an existing valid admin session cookie when issuing a new admin session', async () => {
+    mocks.verifyAdmin.mockReturnValue({ type: 'admin', role: 'admin', session_id: 'old-admin-session' });
+    const req = new NextRequest('https://admin.example.invalid/api/admin/login', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-origin-verified-client-ip': SOURCE_A,
+        'x-origin-proxy-attestation': ATTESTATION,
+        cookie: 'admin_jwt=existing.admin.jwt',
+      },
+      body: JSON.stringify({ token: ADMIN_CREDENTIAL }),
+    });
+
+    const result = await login(req);
+
+    expect(result.response.status).toBe(200);
+    expect(mocks.verifyAdmin).toHaveBeenCalledWith('existing.admin.jwt');
+    expect(mocks.revokeAdminSession).toHaveBeenCalledExactlyOnceWith('old-admin-session');
+    expect(mocks.createAdminSession).toHaveBeenCalledOnce();
   });
 });

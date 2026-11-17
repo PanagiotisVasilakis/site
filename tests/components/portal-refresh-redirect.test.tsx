@@ -5,7 +5,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const refreshPortalSession = vi.hoisted(() => vi.fn());
+const emitGuestSessionChanged = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/portalRefreshClient', () => ({ refreshPortalSession }));
+vi.mock('@/lib/sessionSignals', () => ({ emitGuestSessionChanged }));
 
 import PortalRefreshRedirect from '@/components/PortalRefreshRedirect';
 import type { PortalRefreshResult } from '@/lib/portalRefreshClient';
@@ -104,6 +106,20 @@ describe('portal refresh redirect shell', () => {
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/en/check-in'));
     expect(replace).toHaveBeenCalledTimes(1);
+    expect(emitGuestSessionChanged).toHaveBeenCalledExactlyOnceWith('refresh');
+  });
+
+  it('preserves the URL hash fragment across refresh navigation', async () => {
+    const replace = vi.fn<(destination: string) => void>();
+    vi.stubGlobal('location', { ...window.location, hash: '#house-rules', replace });
+    refreshPortalSession.mockResolvedValue({ status: 'refreshed', href: '/en/check-in' });
+    render(<PortalRefreshRedirect
+      locale="en"
+      refreshHref="/api/portal/refresh?next=%2Fen%2Fcheck-in"
+      failureHref="/en/guest?mode=signin"
+    />);
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/en/check-in#house-rules'));
   });
 
   it.each([

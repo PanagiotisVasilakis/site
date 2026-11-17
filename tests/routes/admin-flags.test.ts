@@ -75,4 +75,18 @@ describe('admin feature flags route', () => {
     expect(response.status).toBe(200);
     expect((await response.json()).data).toEqual(FLAGS);
   });
+
+  it('rejects a cross-origin POST before writing flags', async () => {
+    const response = await POST(new NextRequest('http://localhost:3000/api/admin/flags', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'https://evil.example',
+      },
+      body: JSON.stringify({ portalEnabled: false }),
+    }), { params: Promise.resolve({}) });
+
+    expect(response.status).toBe(403);
+    expect(mocks.setFeatureFlags).not.toHaveBeenCalled();
+  });
 });

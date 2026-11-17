@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createAdminSession, signAdmin } from '@/lib/auth/admin';
+import { createAdminSession, revokeAdminSession, signAdmin, verifyAdmin } from '@/lib/auth/admin';
 import { logger } from '@/lib/logger-enterprise';
 import { withErrorHandler, validateRequestBody } from '@/lib/apiErrorHandler';
 import crypto from 'node:crypto';
@@ -39,6 +39,14 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const expected = Buffer.from(secret);
   if (supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const previousToken = req.cookies.get('admin_jwt')?.value;
+  if (previousToken) {
+    const previousPayload = verifyAdmin(previousToken);
+    if (previousPayload?.session_id) {
+      await revokeAdminSession(previousPayload.session_id);
+    }
   }
 
   const adminSession = await createAdminSession();

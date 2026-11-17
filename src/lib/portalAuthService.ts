@@ -318,6 +318,17 @@ function getUnusedPasswordHash(): Promise<string> {
   return unusedPasswordHash;
 }
 
+function bookingSelectionPriority(
+  booking: { startDate: Date; endDate: Date },
+  businessTodayMs: number,
+): number {
+  const startsOnOrBeforeToday = booking.startDate.getTime() <= businessTodayMs;
+  const endsAfterToday = booking.endDate.getTime() > businessTodayMs;
+  if (startsOnOrBeforeToday && endsAfterToday) return 0; // active continuing stay
+  if (startsOnOrBeforeToday) return 1; // departing today (endDate === businessToday)
+  return 2; // upcoming within the access window
+}
+
 export async function authenticatePortalUser(input: {
   phone: string;
   password: string;
@@ -352,9 +363,14 @@ export async function authenticatePortalUser(input: {
     },
     orderBy: { startDate: 'asc' },
   });
-  const booking = bookingCandidates.find((candidate) => (
-    isPortalBookingTemporallyEligible(candidate, eligibilityWindow)
-  ));
+  const businessTodayMs = eligibilityWindow.businessToday.getTime();
+  const eligibleBookings = bookingCandidates
+    .filter((candidate) => isPortalBookingTemporallyEligible(candidate, eligibilityWindow))
+    .sort((a, b) => (
+      bookingSelectionPriority(a, businessTodayMs) - bookingSelectionPriority(b, businessTodayMs)
+      || a.startDate.getTime() - b.startDate.getTime()
+    ));
+  const booking = eligibleBookings[0];
   if (!booking) {
     throw new PortalAuthError('NO_ELIGIBLE_BOOKING');
   }

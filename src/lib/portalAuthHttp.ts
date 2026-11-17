@@ -6,8 +6,11 @@ import {
   createRefreshCookie,
   createSessionCookie,
   GUEST_REFRESH_COOKIE,
+  GUEST_SESSION_COOKIE,
   issueGuestSession,
   parseGuestSession,
+  parseGuestSessionBinding,
+  revokeGuestSessionById,
 } from '@/lib/guestSession';
 import { requireCanonicalClientIp } from '@/lib/net/clientIdentity';
 import { privacyHmac } from '@/lib/privacyHash';
@@ -35,12 +38,19 @@ export async function attachPortalAuthCookies(
   // observes the same fail-closed identity contract.
   const context = requestAuthContext(request);
 
-  // A new sign-in ends the refresh family this browser presented, with or
-  // without remember-me, so a copied refresh cookie stops working. This runs
-  // before the new session is issued.
+  // A new sign-in ends any previous session and refresh family this browser
+  // presented, with or without remember-me, so copied or non-remembered cookies
+  // stop working before the new session is issued.
   const presentedRefreshToken = request.cookies.get(GUEST_REFRESH_COOKIE)?.value;
   if (presentedRefreshToken) {
     await guestStore.revokeRefreshFamily(presentedRefreshToken);
+  }
+  const presentedSessionToken = request.cookies.get(GUEST_SESSION_COOKIE)?.value;
+  if (presentedSessionToken) {
+    const binding = parseGuestSessionBinding(presentedSessionToken);
+    if (binding.status === 'present') {
+      await revokeGuestSessionById(binding.sessionId);
+    }
   }
 
   if (!input.remember) {

@@ -66,6 +66,7 @@ export default function AdminRequestsClient() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback>(null);
+  const [standardCheckInTime, setStandardCheckInTime] = useState('15:00');
   const loadVersionRef = useRef(0);
   const loadAbortRef = useRef<AbortController | null>(null);
   const filterRef = useRef<RequestFilter>('pending');
@@ -114,8 +115,16 @@ export default function AdminRequestsClient() {
   }, []);
 
   useEffect(() => {
+    let active = true;
     void loadRequests('pending');
+    void adminRequest<{ checkInTime?: string }>('Unable to load check-in preferences', '/api/check-in/preferences')
+      .then((result) => {
+        if (active && result.ok && typeof result.data?.checkInTime === 'string' && result.data.checkInTime) {
+          setStandardCheckInTime(result.data.checkInTime);
+        }
+      });
     return () => {
+      active = false;
       loadVersionRef.current += 1;
       loadAbortRef.current?.abort();
     };
@@ -325,7 +334,7 @@ export default function AdminRequestsClient() {
                         </div>
                         <div>
                           <dt className="text-xs font-semibold uppercase tracking-[0.12em] admin-muted">Standard check-in</dt>
-                          <dd className="mt-1 admin-muted">15:00</dd>
+                          <dd className="mt-1 admin-muted">{standardCheckInTime}</dd>
                         </div>
                         <div>
                           <dt className="text-xs font-semibold uppercase tracking-[0.12em] admin-muted">Submitted</dt>

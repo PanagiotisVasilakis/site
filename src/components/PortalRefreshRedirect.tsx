@@ -7,6 +7,7 @@ import type { Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 import { refreshPortalSession } from '@/lib/portalRefreshClient';
 import { toSafeLocalPath } from '@/lib/safeLocalPath';
+import { emitGuestSessionChanged } from '@/lib/sessionSignals';
 
 type PortalRefreshRedirectProps = {
   locale: Locale;
@@ -45,7 +46,13 @@ export default function PortalRefreshRedirect({
       if (!active || result.status === 'aborted' || navigationStarted.current) return;
 
       const safeFailureHref = toSafeLocalPath(failureHref, baseHref) || '/';
-      const destination = result.status === 'refreshed' ? result.href : safeFailureHref;
+      let destination = result.status === 'refreshed' ? result.href : safeFailureHref;
+      if (result.status === 'refreshed') {
+        emitGuestSessionChanged('refresh');
+        if (window.location.hash && !destination.includes('#')) {
+          destination = toSafeLocalPath(`${destination}${window.location.hash}`, baseHref) ?? destination;
+        }
+      }
       navigationStarted.current = true;
       window.location.replace(destination);
     });

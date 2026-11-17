@@ -1,9 +1,7 @@
 # Security notes for local development and secrets
 
-The sanitized IR-01 disposition and the maintained local release scanner are
-documented in [`docs/security/secret-scanning.md`](docs/security/secret-scanning.md).
-The historical credential values remain permanently retired and must never be
-recovered or reused.
+Historical credential values from past incidents remain permanently retired and
+must never be recovered or reused.
 The maintained production credential map and rotation boundaries are documented
 in [`docs/security/runtime-credential-contract.md`](docs/security/runtime-credential-contract.md).
 
@@ -25,7 +23,7 @@ This project uses server-side secrets named `SECURITY_PEPPER` and `CLAIM_TOKEN_P
 
 ## Production
 
-- Inject every production secret at runtime from root-owned VPS configuration
+- Inject every production secret at runtime from the deployment environment
   (never baked into the image) for every secret listed in
   [`scripts/README.md`](scripts/README.md#required-runtime-configuration).
 

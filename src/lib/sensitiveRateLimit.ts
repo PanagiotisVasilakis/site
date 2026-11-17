@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 import { requireCanonicalClientIp } from '@/lib/net/clientIdentity';
-import { normalizePhone } from '@/lib/phone';
+import { normalizePhone, phoneLookupCandidates } from '@/lib/phone';
 import { privacyHmac } from '@/lib/privacyHash';
 
 interface RateLimitDecision {
@@ -18,14 +18,18 @@ interface RateLimitOptions {
   windowMs: number;
 }
 
-function normalizeIdentifier(value: string): string {
+function normalizeIdentifiers(scope: string, value: string): string[] {
   const normalized = value.trim().toLowerCase();
   // Same separators as normalizePhone (any \s character), so every spelling that sign-in resolves to one
   // number shares one bucket.
   const compact = normalized.replace(/[\s()-]/g, '');
-  if (!/^\+?[0-9]+$/.test(compact)) return normalized;
+  if (!/^\+?[0-9]+$/.test(compact)) return [normalized];
+  if (scope === 'portal-session') {
+    const candidates = phoneLookupCandidates(normalized);
+    return candidates.length > 0 ? candidates : [normalized];
+  }
   const phone = normalizePhone(normalized, !compact.startsWith('+') && compact.length === 10 ? 'GR' : undefined);
-  return phone?.e164 ?? normalized;
+  return [phone?.e164 ?? normalized];
 }
 
 function limiterKey(scope: string, dimension: string): string {
@@ -51,7 +55,11 @@ function limiterAddressDimension(ip: string): string {
 
 function buildKeys(ip: string, options: RateLimitOptions): string[] {
   const dimensions = [limiterAddressDimension(ip)];
-  if (options.identifier) dimensions.push(`identifier:${normalizeIdentifier(options.identifier)}`);
+  if (options.identifier) {
+    for (const id of normalizeIdentifiers(options.scope, options.identifier)) {
+      dimensions.push(`identifier:${id}`);
+    }
+  }
   return dimensions.map((dimension) => limiterKey(options.scope, dimension));
 }
 
@@ -107,10 +115,13 @@ export async function checkSensitiveRateLimit(
  * which a caller could otherwise offset with successful operations on an account of its own.
  */
 export async function refundSensitiveIdentifierAttempt(options: { scope: string; identifier: string }): Promise<void> {
-  const key = limiterKey(options.scope, `identifier:${normalizeIdentifier(options.identifier)}`);
+  const keys = normalizeIdentifiers(options.scope, options.identifier)
+    .map((id) => limiterKey(options.scope, `identifier:${id}`));
   const { prisma } = await import('@/lib/prisma');
-  await prisma.$executeRaw`
-    UPDATE "rate_limits" SET "count" = GREATEST("count" - 1, 0)
-    WHERE "key" = ${key} AND "reset_time" > CURRENT_TIMESTAMP
-  `;
+  for (const key of keys) {
+    await prisma.$executeRaw`
+      UPDATE "rate_limits" SET "count" = GREATEST("count" - 1, 0)
+      WHERE "key" = ${key} AND "reset_time" > CURRENT_TIMESTAMP
+    `;
+  }
 }

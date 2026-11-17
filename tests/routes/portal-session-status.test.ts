@@ -78,4 +78,21 @@ describe('portal session status', () => {
     expect(response.status).toBe(404);
     expect(mocks.verifyGuestSessionAccess).not.toHaveBeenCalled();
   });
+
+  it('marks the response refreshable when the short session expired but a guest_rt cookie is present', async () => {
+    mocks.parseGuestSession.mockReturnValue(null);
+    mocks.verifyGuestSessionAccess.mockResolvedValue(null);
+
+    const response = await GET(new NextRequest('http://localhost:3000/api/portal/sessions', {
+      headers: { cookie: 'guest_rt=token-id.secret' },
+    }), { params: Promise.resolve({}) });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).data).toEqual({
+      authenticated: false,
+      bookingId: null,
+      checkinEnabled: true,
+      refreshable: true,
+    });
+  });
 });
