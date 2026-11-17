@@ -13,8 +13,9 @@ Runtime: Node >= 22.19 (22.19.x tested) and npm 11.18.x. `.nvmrc` does not switc
 ```bash
 npm ci                     # also runs `prisma generate` (postinstall)
 npm run ensure-pepper      # repair local dev secrets in .env.local (never production)
-npm run system:up          # dev only: env check, dev DB (Docker fallback), migrate, start, verify
-npm run dev:proxy          # local stand-in for the Nginx identity headers; open http://localhost:3001
+npm run db:start           # dev only: start local PostgreSQL 16 via Docker Compose
+npm run db:migrate         # dev only: apply committed Prisma migrations
+npm run dev:proxy          # local stand-in for the trusted proxy identity headers; open http://localhost:3001
 npm run dev                # `next dev -H 0.0.0.0` (all interfaces); `predev` checks the pepper
 
 npm test                   # full default Vitest suite (no live DB/network)
@@ -29,18 +30,15 @@ npm run lint:security      # separate config: eslint.config.security.mjs
 npm run check:dead-code    # knip
 
 npm run test:integration   # disposable, digest-pinned PostgreSQL 16 container; needs local Docker
-npm run verify:release     # mandatory local release gate (30 ordered gates, needs Docker)
-npm run smoke:image        # production-image smoke of the built images with docker/docker-compose.prod.yml (isolated project, torn down)
+npm run validate:local     # typecheck + lint + coverage + validate:security
 
 npm run design:hero | design:og | design:icons   # regenerate committed hero crops/depth maps/grain, OG cards, app icons
-npm run audit:a11y | audit:responsive:ux | audit:vitals   # advisory browser audits; loopback base URL only
 ```
 
 - Run the integration suite only through `npm run test:integration`. It creates and tears down its own container and databases, and its guard rejects any caller-supplied or inherited database URL. Never `docker prune` or remove its containers by label alone (see `docs/testing.md`).
 - `npm run build` runs `scripts/validate-content.ts` and `generate-version.ts` before `next build` (`output: 'standalone'`). `npm start` serves `.next/standalone`. When a change adds a new CSS `@import` to `src/app/globals.css`, delete `.next/cache/turbopack` before `npm run build`: a stale Turbopack cache can drop the new sheet. Docker builds start clean (`.next` is in `.dockerignore`).
-- `docs/release-verification.md` lists the exact gate order. The repository intentionally has no GitHub Actions workflows, so `verify:release` is enforced only by operator discipline.
-- Operational workers: `npm run outbox:drain` and `npm run operations:check` in development; in production the `outbox` and `operations` one-off services of `docker/docker-compose.prod.yml` (bundled by `scripts/build-workers.mjs`), scheduled every 1 and 5 minutes by host timers.
-- Production is the Docker images only (`docker/Dockerfile.security`: `runner`, `workers`, `migrate` targets; `npm run docker:build`); the host orchestrator is development-only and there is no systemd path.
+- Operational workers: `npm run outbox:drain` and `npm run operations:check` in development; in production run `node dist/workers/drain-outbox.mjs` and `node dist/workers/run-operational-maintenance.mjs` inside the unified image on a schedule.
+- Production uses the unified immutable Docker image (`docker/Dockerfile.security`: `runner` target; `npm run docker:build`).
 
 ## Architecture
 
@@ -60,7 +58,7 @@ npm run audit:a11y | audit:responsive:ux | audit:vitals   # advisory browser aud
 
 **Outbox.** Check-in webhook notifications are `OutboxEvent` rows created in the same write or transaction as their aggregate. For example, `checkInRequestRepository` nests the event create inside the `CheckInRequest` create, then `api/check-in/arrival-request` attempts one immediate `deliverOutboxEvent`. `src/lib/bookingOutbox.ts` handles leased claiming, bounded retries with backoff, and a terminal `DEAD` state. Do not replace this with best-effort inline fetches. Keep leased-work ownership checks in the same transaction as aggregate status updates.
 
-**Rate limiting and client identity.** Sensitive limits are PostgreSQL-backed (`sensitiveRateLimit.ts`, `RateLimit` model) and limit both verified client identity and normalized identifiers. Client IP comes from `src/lib/net/`. Production trusts only the loopback Nginx upstream when both the private identity headers and the `ORIGIN_PROXY_SHARED_SECRET` attestation validate. Do not add a mandatory external limiter without a new architecture decision (`docs/security/layered-rate-limiting.md`).
+**Rate limiting and client identity.** Sensitive limits are PostgreSQL-backed (`sensitiveRateLimit.ts`, `RateLimit` model) and limit both verified client identity and normalized identifiers. Client IP comes from `src/lib/net/`. Production trusts only the attested edge/proxy headers when both the private identity headers and the `ORIGIN_PROXY_SHARED_SECRET` attestation validate. Do not add a mandatory external limiter without a new architecture decision (`docs/security/layered-rate-limiting.md`).
 
 **Environment.** `src/lib/runtime-env-schema.js` is the authoritative schema. `scripts/start-standalone.mjs` (the image CMD and `npm start`) validates it before loading `server.js` and exits 78 on failure. Production is the Docker image, which never contains `.env*` files (`.dockerignore`) and fails closed at start. Never put secrets in `NEXT_PUBLIC_*`.
 
@@ -80,7 +78,6 @@ npm run audit:a11y | audit:responsive:ux | audit:vitals   # advisory browser aud
 ## Database changes
 
 - Edit `prisma/schema.prisma` and add a forward migration under `prisma/migrations/`. Migrations must fail on ambiguous legacy data, not silently drop data or guess ownership.
-- Any schema or migration change breaks `npm run check:prisma-integrity`. Regenerate the committed baseline (`prisma/integrity-manifest.json`) only with `npm run update:prisma-integrity`; the integration suite reads the same manifest.
 
 ## Testing rules
 
@@ -89,11 +86,10 @@ npm run audit:a11y | audit:responsive:ux | audit:vitals   # advisory browser aud
 - `vitest.config.ts` sets `mockReset`, `restoreMocks`, `unstubEnvs` and `unstubGlobals`, so set mock implementations per test (e.g. in `beforeEach`). `tests/setup.ts` provides test secrets and mocks `next/image`.
 - Do not add sleeps, `NODE_ENV=test` behavior, auth bypasses, exported test-only helpers or in-memory production fallbacks. Fix production bugs in production code instead of weakening assertions.
 - A new critical module should be added to the explicit coverage `include` list with meaningful tests. Update tests before widening that scope or raising the thresholds, and do not exclude hard-to-test code to keep the percentage.
-- The optional `audit:*` browser audits (a11y including color contrast, responsive) are advisory. Do not weaken production behavior (CSP, headers, auth) to improve an audit score.
 
 ## Reference docs
 
-- `docs/` holds the deployment target (ADR), release verification, testing strategy, the visual identity and design system (`docs/design/identity.md`), and the security contracts (trusted ingress, rate limiting, claim-token transport, runtime credentials, secret scanning).
+- `docs/` holds the testing strategy, the visual identity and design system (`docs/design/identity.md`), and the security contracts (trusted ingress, rate limiting, claim-token transport, runtime credentials).
 - `scripts/README.md` is the setup and runtime runbook.
-- Open owner inputs are listed in `README.md` ("Open owner inputs"): which Booking.com link to publish, the owner's wording for Booking.com bookings, the Booking.com export URL (`BOOKING_ICAL_URL`, a secret that the owner sets in the production environment) and the last edit of the privacy notice (`src/i18n/domains/legal.ts`: its English recipients item 4 still names the former booking channel; whether Booking.com must be listed as a recipient and what tax law needs for the unlinked booking rows stay with the owner or a lawyer). The host's name, address and ΑΜΑ are supplied (`HOST_CONTACT` in `src/data/contact.ts`), the 12-month guest-data retention is confirmed by the owner (2026-10-20), and the hostess's name stays unpublished (`HOST_PROFILE.name` is `''` by the owner's decision of 2026-10-20). Do not invent values for the open inputs.
+- Open owner inputs are listed in `README.md` ("Open owner inputs"): which Booking.com link to publish, the owner's wording for Booking.com bookings, the Booking.com export URL (`BOOKING_ICAL_URL`, a secret that the owner sets in the production environment) and the legal questions on the privacy notice (`src/i18n/domains/legal.ts` names Booking.com everywhere since 2026-10-21; whether Booking.com must be listed as a recipient and as a source of the booking data, and what tax law needs for the unlinked booking rows, stay with the owner or a lawyer). The host's name, address and ΑΜΑ are supplied (`HOST_CONTACT` in `src/data/contact.ts`), the 12-month guest-data retention is confirmed by the owner (2026-10-20), and the hostess's name stays unpublished (`HOST_PROFILE.name` is `''` by the owner's decision of 2026-10-20). Do not invent values for the open inputs.
 - The 2026-07-15 audit and remediation records (`01_`–`04_*.md`) were removed from the tree; they are in git history (commit `7a955ea`) and describe code that has since changed.

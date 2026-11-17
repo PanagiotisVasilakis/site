@@ -54,6 +54,11 @@ next-env.d.ts
 public/version.json
 QWEN.md
 GEMINI.md
+CLAUDE.md
+*CLAUDE*.md
+*AGENTS*.md
+*GEMINI*.md
+*QWEN*.md
 
 .venv
 .runtime/
@@ -63,4 +68,5 @@ GEMINI.md
 /.codex/
 /AGENTS.md
 /graphify-out/
-jpegmini_optimized/
+/.claude/
+jpegmini_*/
