@@ -8,7 +8,6 @@ import { getClientIp } from '@/lib/net/getClientIp';
 import { privacyHmac } from '@/lib/privacyHash';
 import { isSensitiveFieldName, redactSensitiveText } from '@/lib/redaction';
 import { runtimeEnvSchema } from '@/lib/runtime-env-schema.js';
-import { SYNTHETIC_PRODUCTION_ENVIRONMENT } from '../../scripts/lib/release-gates.mjs';
 
 const requiredEnv = {
   DATABASE_URL: 'postgresql://user:pass@localhost:5432/guest_guide',
@@ -337,8 +336,12 @@ describe('runtime environment fail-closed policy', () => {
     }
   });
 
-  it('accepts the release synthetic production environment and hexadecimal peppers', () => {
-    expect(runtimeEnvSchema.safeParse(SYNTHETIC_PRODUCTION_ENVIRONMENT).success).toBe(true);
+  it('accepts a synthetic production environment and hexadecimal peppers', () => {
+    expect(runtimeEnvSchema.safeParse(productionEnv({
+      SECURITY_PEPPER: 'release-only-security-pepper',
+      CLAIM_TOKEN_PEPPER: 'release-only-claim-token-pepper-0000',
+      BUILD_SITE_URL: 'https://guest.example',
+    })).success).toBe(true);
     const hex = (purpose: string) => createHash('sha256').update(purpose, 'utf8').digest('hex');
     expect(runtimeEnvSchema.safeParse(productionEnv({
       SECURITY_PEPPER: hex('security-pepper'),

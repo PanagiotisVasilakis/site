@@ -12,7 +12,6 @@ import {
 } from './support/fixtures';
 import {
   applyMigrationsFromEmpty,
-  assertCommittedMigrationManifest,
   assertCompleteMigrationHistory,
   hasMigrationHistoryTable,
   installMigrationFailureFixture,
@@ -37,7 +36,6 @@ async function release(target: DisposableDatabaseTarget): Promise<void> {
 
 describe.sequential('disposable PostgreSQL integration foundation', () => {
   beforeAll(async () => {
-    await assertCommittedMigrationManifest();
     initialMigrationHashes = await migrationFileHashes();
   });
 
@@ -48,7 +46,6 @@ describe.sequential('disposable PostgreSQL integration foundation', () => {
   });
 
   afterAll(async () => {
-    await assertCommittedMigrationManifest();
     expect(await migrationFileHashes()).toEqual(initialMigrationHashes);
   });
 

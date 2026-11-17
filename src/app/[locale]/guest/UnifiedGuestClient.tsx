@@ -52,7 +52,6 @@ export default function UnifiedGuestClient() {
   useEffect(() => {
     const current = new URL(window.location.href);
     const before = current.toString();
-    // Spelled out on purpose: the release policy (scripts/lib/release-policy.mjs) checks these exact lines.
     current.searchParams.delete('claim');
     current.searchParams.delete('claimToken');
     if (/^#.*claim(?:Token)?=/iu.test(current.hash)) current.hash = '';

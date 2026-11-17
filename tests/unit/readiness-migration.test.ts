@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
+import { migrationFileHashes } from '../integration/support/migrations';
+
 // Vitest runs with the repository root as cwd.
 const migrations = readdirSync('prisma/migrations', { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
@@ -14,5 +16,18 @@ describe('readiness migration pin', () => {
 
     expect(migrations.length).toBeGreaterThan(0);
     expect(pinned).toBe(migrations.at(-1));
+  });
+
+  it('hashes every committed migration directory and migration_lock.toml for integration history checks', async () => {
+    const hashes = await migrationFileHashes();
+    const expectedFiles = [
+      ...migrations.map((name) => `prisma/migrations/${name}/migration.sql`),
+      'prisma/migrations/migration_lock.toml',
+    ].sort();
+
+    expect(Object.keys(hashes)).toEqual(expectedFiles);
+    for (const digest of Object.values(hashes)) {
+      expect(digest).toMatch(/^[0-9a-f]{64}$/u);
+    }
   });
 });

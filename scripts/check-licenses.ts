@@ -25,8 +25,7 @@ const ALLOWED_LICENSES = [
 // Narrow per-package exceptions for licenses outside ALLOWED_LICENSES. Each entry allows exactly
 // the listed license for that package name only; never add these licenses to the global allowlist.
 // - elkjs (EPL-2.0): weak, file-level copyleft comparable to the allowed MPL-2.0. It arrives only via
-//   prisma > @prisma/studio-core (Prisma Studio) and is used unmodified; the Prisma CLI in the
-//   migrate image (docker/migrate) carries it too, which this root-lockfile check does not scan.
+//   prisma > @prisma/studio-core (Prisma Studio) and is used unmodified.
 //   Re-check on every Prisma upgrade (`npm ls elkjs`) and remove when no longer needed. Decision O35.
 const PACKAGE_LICENSE_EXCEPTIONS: Record<string, string[]> = {
   elkjs: ['EPL-2.0'],

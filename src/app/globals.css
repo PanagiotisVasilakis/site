@@ -1,5 +1,5 @@
 @import "tailwindcss";
-/* Automatic source detection would also read the notes (REVIEW.md, PROGRESS.md, docs) and emit the class names
+/* Automatic source detection would also read documentation files and emit the class names
    quoted there (R-358); no markdown file is a source of classes. */
 @source not "../../**/*.md";
 /* Keep one ordered global CSS entrypoint so critical styles require one request.

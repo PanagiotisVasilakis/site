@@ -1,7 +1,6 @@
 // Bundles the two operational workers into self-contained Node modules for the
-// production image (docker/Dockerfile.security, `workers` target). The image then
-// needs neither the repository checkout nor `node_modules`, as the deployment ADR
-// requires. Usage: node scripts/build-workers.mjs [outdir]  (default dist/workers)
+// unified production image (docker/Dockerfile.security, `runner` target).
+// Usage: node scripts/build-workers.mjs [outdir]  (default dist/workers)
 import { createHash } from 'node:crypto';
 import { readFile, rm } from 'node:fs/promises';
 import path from 'node:path';

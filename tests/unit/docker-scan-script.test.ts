@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import path from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-// Approved in PROGRESS.md O33: the official Trivy 0.69.3 image by its multi-platform index digest
+// Official Trivy 0.69.3 image by its multi-platform index digest
 // (published before the 0.69.4-0.69.6 compromise, GHSA-69fq-xp46-6x23).
 const TRIVY_IMAGE = 'aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c';
 const SCRIPT = path.resolve('scripts/docker-scan.sh');

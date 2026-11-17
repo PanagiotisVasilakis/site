@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -36,4 +36,12 @@ describe('worker bundles for the production image', () => {
       expect(events).toEqual([{ worker, status: 'failed', error: expect.stringContaining('DATABASE_URL') }]);
     }
   }, 60_000);
+
+  it('copies the bundled workers into the unified runner stage of Dockerfile.security', () => {
+    const dockerfile = readFileSync('docker/Dockerfile.security', 'utf8');
+    const stages = [...dockerfile.matchAll(/^FROM\s+\S+\s+AS\s+(\S+)$/gmu)].map((match) => match[1]);
+    expect(stages).toEqual(['builder', 'runner']);
+    const runnerStage = dockerfile.split(/^FROM\s+\S+\s+AS\s+runner$/mu)[1];
+    expect(runnerStage).toContain('COPY --from=builder --chown=nextjs:nodejs /app/dist/workers ./dist/workers');
+  });
 });

@@ -21,31 +21,32 @@ Use Node 22.19 and npm 11.18, then:
 ```bash
 npm ci
 npm run ensure-pepper
-npm run system:up
+npm run db:start
+npm run db:migrate
+npm run dev
 ```
 
-`ensure-pepper` writes the local `.env.local` (docker-compose `DATABASE_URL` and development secrets), so no manual copy of `.env.example` is needed. The development orchestrator validates the environment, provisions a local PostgreSQL fallback when needed, applies migrations, starts the app, and verifies readiness plus a localized page. See [scripts/README.md](scripts/README.md) for the complete runbook.
+`ensure-pepper` writes the local `.env.local` (docker-compose `DATABASE_URL` and development secrets), so no manual copy of `.env.example` is needed. For routes requiring verified client identity in development, run `npm run dev:proxy` alongside `npm run dev` and open `http://localhost:3001`. See [scripts/README.md](scripts/README.md) for the complete runbook.
 
-## Release verification
+## Local verification
 
 ```bash
-npm run verify:release
+npm run validate:local
+npm run test:integration
 ```
 
-This repository-owned command is the mandatory local gate for a commit that may later become a production release. It includes static policy, integrity, test, lint, real disposable-PostgreSQL, and production-format build checks. It requires local Docker, performs no deployment or persistent migration, and is not centrally enforced. See [Release verification](docs/release-verification.md) and [Testing strategy](docs/testing.md).
+`validate:local` runs TypeScript typechecking, ESLint (`--max-warnings=0`), coverage-enforced Vitest tests, and security/build validation. `test:integration` runs the disposable PostgreSQL 16 integration suite (requires local Docker). See [Testing strategy](docs/testing.md).
 
 ## Operations
 
-Production runs three immutable Docker images of one commit (web, workers, migrate) on the VPS behind the pinned Nginx container (host network) (see the [deployment target](docs/architecture/deployment-target.md)); the host orchestrator is a local development helper only. The production workers are the `outbox` and `operations` one-off services of `docker/docker-compose.prod.yml`, run by host timers (see "Worker schedule" in [scripts/README.md](scripts/README.md)):
+Production runs a single unified non-root Docker image built from `docker/Dockerfile.security` (`NEXT_PUBLIC_SITE_URL=https://your-host.example npm run docker:build`, tagged by `scripts/image-tag.sh` as `villa-app:<first 12 hex of the commit>`). The image contains both the standalone Next.js web server (`scripts/start-standalone.mjs server.js`) and the bundled operational workers under `/app/dist/workers/` (`drain-outbox.mjs` and `run-operational-maintenance.mjs`, bundled by `scripts/build-workers.mjs`):
 
-- a one-minute leased outbox drain for check-in webhooks;
-- a five-minute operational alert, retention and Booking.com calendar sync run (the calendar itself is fetched at most every 30 minutes).
+- a one-minute leased outbox drain for check-in webhooks (`node dist/workers/drain-outbox.mjs`);
+- a five-minute operational alert, retention and Booking.com calendar sync run (`node dist/workers/run-operational-maintenance.mjs`; the calendar itself is fetched at most every 30 minutes).
 
 `npm run outbox:drain` and `npm run operations:check` run the same workers in development only.
 
-Production startup never loads `.env.local` and requires an explicit trusted-proxy topology. Secrets are injected at runtime from root-owned VPS configuration.
-
-Production runs as non-root containers built from `docker/Dockerfile.security`. `NEXT_PUBLIC_SITE_URL=https://your-host.example npm run docker:build` builds three images of one commit (`scripts/docker-build.sh`): the web runtime `villa-app:<first 12 hex of the commit>`, the workers `…-workers` (both operational workers bundled by `scripts/build-workers.mjs`, no checkout or `node_modules` inside) and `…-migrate` (the Prisma CLI from its own lockfile in `docker/migrate/`, plus this commit's migrations). The tag carries `-dirty` when the working tree has uncommitted changes; the HTTPS site URL is required because Next.js compiles canonical URLs and the sitemap into the output, and the commit is recorded in `public/version.json` and the `org.opencontainers.image.revision` label.
+Production startup never loads `.env.local` and requires an explicit trusted-proxy topology. Secrets are injected at runtime from the deployment environment. The tag carries `-dirty` when the working tree has uncommitted changes; the HTTPS site URL is required because Next.js compiles canonical URLs and the sitemap into the output, and the commit is recorded in `public/version.json` and the `org.opencontainers.image.revision` label.
 
 ## Design system
 
@@ -61,10 +62,7 @@ Status on 2026-10-21:
 
 ## Documentation
 
-- [Selected deployment target](docs/architecture/deployment-target.md)
-- [Release verification](docs/release-verification.md)
-- [Production-image smoke](docs/deployment/production-image-smoke.md)
-- [Trusted ingress contract](docs/security/trusted-ingress.md) and [origin runbook](docs/deployment/origin-ingress-runbook.md)
+- [Trusted ingress contract](docs/security/trusted-ingress.md)
 - [Layered rate-limiting contract](docs/security/layered-rate-limiting.md)
 - [Booking claim-token transport](docs/security/claim-token-transport.md)
 - [Runtime credential contract](docs/security/runtime-credential-contract.md)

@@ -40,7 +40,7 @@ The retired names `JWT_SECRET`, `SESSION_SECRET`, `SECURITY_ENC_KEY_HEX`, and
 `SECURITY_ENC_KEY_HEX_PREVIOUS` have no executable consumer and are not part of
 the deployment contract. Do not recreate a consumer or alias to retain them.
 Historical values of the credentials retired in incident IR-01
-([secret scanning](secret-scanning.md)) remain permanently forbidden.
+remain permanently forbidden.
 
 ## Environment isolation
 

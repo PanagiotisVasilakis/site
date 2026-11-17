@@ -82,8 +82,8 @@ const config = [
     rules: { 'security/detect-non-literal-fs-filename': 'off' }
   },
   {
-    // Integration-test filesystem inputs are either the fixed migration root,
-    // the committed manifest, or the explicit dotenv filename allowlist.
+    // Integration-test filesystem inputs are either the fixed migration root
+    // or the explicit dotenv filename allowlist.
     files: [
       'tests/integration/support/database-lifecycle.ts',
       'tests/integration/support/migrations.ts',

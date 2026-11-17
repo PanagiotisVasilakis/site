@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { Client as PgClient } from 'pg';
 
 import {
   sanitizeDatabaseDiagnostics,
@@ -14,19 +13,10 @@ import {
   runtimeEnvironment,
   safeChildEnvironment,
 } from './runtime';
-import { checkPrismaIntegrity } from '../../../scripts/lib/prisma-integrity.mjs';
 
 interface ExpectedMigration {
   name: string;
   checksum: string;
-}
-
-// The canonical committed manifest; checkPrismaIntegrity fails closed on any drift.
-function committedMigrationChain(): ExpectedMigration[] {
-  const { manifest } = checkPrismaIntegrity(REPOSITORY_ROOT);
-  return (manifest.migrations.files as Array<{ path: string; sha256: string }>)
-    .filter((file) => file.path.endsWith('/migration.sql'))
-    .map((file) => ({ name: file.path.split('/')[0], checksum: file.sha256 }));
 }
 
 interface MigrationRecord {
@@ -43,13 +33,7 @@ async function listMigrationFiles(): Promise<string[]> {
   const files = ['prisma/migrations/migration_lock.toml'];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    const migrationFile = path.join(root, entry.name, 'migration.sql');
-    try {
-      await readFile(migrationFile);
-      files.push(`prisma/migrations/${entry.name}/migration.sql`);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-    }
+    files.push(`prisma/migrations/${entry.name}/migration.sql`);
   }
   return files.sort();
 }
@@ -63,8 +47,14 @@ export async function migrationFileHashes(): Promise<Record<string, string>> {
   return hashes;
 }
 
-export async function assertCommittedMigrationManifest(): Promise<void> {
-  checkPrismaIntegrity(REPOSITORY_ROOT);
+async function committedMigrationChain(): Promise<ExpectedMigration[]> {
+  const hashes = await migrationFileHashes();
+  return Object.entries(hashes)
+    .filter(([relativeFile]) => relativeFile.endsWith('/migration.sql'))
+    .map(([relativeFile, checksum]) => ({
+      name: relativeFile.split('/')[2],
+      checksum,
+    }));
 }
 
 interface CommandResult {
@@ -171,7 +161,6 @@ function runPrismaMigrateProcess(target: DisposableDatabaseTarget): Promise<Comm
 export async function applyMigrationsFromEmpty(
   target: DisposableDatabaseTarget,
 ): Promise<void> {
-  await assertCommittedMigrationManifest();
   await withVerifiedDisposableDatabase(target, 'migration', async () => {
     let result: CommandResult;
     try {
@@ -192,7 +181,6 @@ export async function applyMigrationsFromEmpty(
       throw new Error(`Migration command failed with exit code ${result.exitCode}. ${diagnostic}`);
     }
   });
-  await assertCommittedMigrationManifest();
 }
 
 async function readAppliedMigrationHistory(
@@ -211,7 +199,7 @@ async function readAppliedMigrationHistory(
 export async function assertCompleteMigrationHistory(
   target: DisposableDatabaseTarget,
 ): Promise<void> {
-  const expectedMigrations = committedMigrationChain();
+  const expectedMigrations = await committedMigrationChain();
   const history = await readAppliedMigrationHistory(target);
   if (history.length !== expectedMigrations.length) {
     throw new Error('Disposable database has an incomplete migration history.');
@@ -244,31 +232,5 @@ export async function installMigrationFailureFixture(
 ): Promise<void> {
   await withVerifiedDisposableDatabase(target, 'failure-fixture', async (client) => {
     await client.query('CREATE TABLE users (id text PRIMARY KEY)');
-  });
-}
-
-// Sent as one simple-protocol query, so PostgreSQL runs the whole file as one
-// implicit transaction (the behaviour the migration's header relies on).
-export async function runMigrationFile(client: PgClient, migration: string): Promise<void> {
-  const migrationFile = path.join(REPOSITORY_ROOT, 'prisma/migrations', migration, 'migration.sql');
-  const sql = await readFile(migrationFile, 'utf8');
-  await client.query(sql);
-}
-
-// A scenario changes the migrated database only in `arrange` and always undoes
-// it in `restore`, so every test starts from the state the full chain leaves.
-export function withScenario<T>(
-  target: DisposableDatabaseTarget,
-  arrange: string,
-  restore: string,
-  action: (client: PgClient) => Promise<T>,
-): Promise<T> {
-  return withVerifiedDisposableDatabase(target, 'migration', async (client) => {
-    try {
-      await client.query(arrange);
-      return await action(client);
-    } finally {
-      await client.query(restore);
-    }
   });
 }

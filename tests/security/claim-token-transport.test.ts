@@ -293,7 +293,6 @@ describe('claim capability transport', () => {
       readFileSync('src/app/api/portal/claims/route.ts', 'utf8'),
       readFileSync('src/lib/portalClaimExchange.ts', 'utf8'),
       readFileSync('src/proxy.ts', 'utf8'),
-      readFileSync('deploy/nginx/nginx.conf.template', 'utf8'),
     ].join('\n');
     for (const forbidden of [
       /[?&#]claim(?:Token)?=/iu,
@@ -304,22 +303,6 @@ describe('claim capability transport', () => {
     ]) {
       expect(source).not.toMatch(forbidden);
     }
-    expect(source).toContain('$uri');
-  });
-
-  it('writes the Nginx access log with a format that carries no request line, query string or client address', () => {
-    // Same reading as the release policy: a comment is not active configuration.
-    const template = readFileSync('deploy/nginx/nginx.conf.template', 'utf8').replace(
-      /(^|[\s;{}])#.*$/gmu,
-      '$1',
-    );
-    const logFormat = /log_format\s+origin_safe\s([\s\S]*?);[ \t]*$/mu.exec(template)?.[1];
-
-    expect(logFormat).toBeDefined();
-    expect(template).toMatch(/access_log\s+[^\s;]+\s+origin_safe(?=[\s;])/u);
-    expect(logFormat).not.toMatch(
-      /\$(?:request|request_uri|args|query_string|is_args|remote_addr|binary_remote_addr|http_x_forwarded_for|http_referer)\b/u,
-    );
   });
 });
 

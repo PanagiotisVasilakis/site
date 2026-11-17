@@ -99,7 +99,7 @@ export default function SiteFooter({ locale }: { locale: string }) {
         )}
 
         <div className="site-footer__prefs">
-          {/* Deviation from §8 (owner-approved, O41 in PROGRESS.md): the header icon only toggles Day/Night and the menu
+          {/* Deviation from §8 (owner-approved, O41): the header icon only toggles Day/Night and the menu
               button is hidden at ≥ 1320 px, so the footer also carries Auto · Day · Night at every width. */}
           <ThemeSetting t={t.shell} />
           <MotionSwitch t={t.shell} />

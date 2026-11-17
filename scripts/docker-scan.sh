@@ -5,8 +5,7 @@ readonly IMAGE_REF="${1:-${DOCKER_IMAGE_REF:?pass the image reference (npm run d
 readonly REQUESTED_SCANNER="${DOCKER_SCAN_SCANNER:-auto}"
 
 # Official Trivy 0.69.3 image, pinned by its multi-platform index digest (identical on Docker Hub
-# and GHCR). 0.69.4-0.69.6 were compromised (GHSA-69fq-xp46-6x23). Change it only through the
-# controlled update in docs/release-verification.md.
+# and GHCR). 0.69.4-0.69.6 were compromised (GHSA-69fq-xp46-6x23).
 readonly TRIVY_CONTAINER_IMAGE='aquasec/trivy:0.69.3@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c'
 # Named Docker volume for the vulnerability database cache: written only by the scanner
 # container, never a host directory.

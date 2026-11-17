@@ -23,7 +23,7 @@ next-env.d.ts
 **/.DS_Store
 .env
 .env.*
-# Any depth (docker/.env, nested keys). release-policy.mjs requires these lines and the root-only lines above.
+# Any depth (docker/.env, nested keys).
 **/.env
 **/.env.*
 **/*.pem
@@ -35,7 +35,6 @@ tmp
 # Local agent and review files
 .claude/
 CLAUDE.md
-PROGRESS.md
 
 # Owner photo originals (local, git-ignored, with EXIF metadata)
 jpegmini_optimized

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The repository uses Vitest 4 with explicit TypeScript imports, jsdom only for browser-facing components, and Testing Library for user-observable UI behavior. Release verification is local and repository-owned; see [Release verification](release-verification.md).
+The repository uses Vitest 4 with explicit TypeScript imports, jsdom only for browser-facing components, and Testing Library for user-observable UI behavior.
 
 The design goal is high-signal regression protection, not assertions against implementation details. Tests cover boundary behavior, security invariants, failure modes, accessibility interactions, and public response contracts.
 
@@ -36,14 +36,7 @@ npm run test:integration # disposable PostgreSQL migration/integration foundatio
 npm run test:watch       # interactive local development
 npm run test:coverage    # suite plus enforced coverage gate
 npm run validate:local   # typecheck, lint, coverage, security/build validation
-npm run verify:release   # complete mandatory local release gate
-npm run hash:prisma-integrity # deterministic Prisma integrity hashes
-npm run check:prisma-integrity # verify the committed static history baseline
-npm run validate:release-policy # verify the restricted local release profile
-npm run check:postgres-image-policy # verify/pull the approved OCI index
 ```
-
-The system orchestrator's `--strict` option also runs lint, typecheck, and the coverage gate before startup.
 
 ## Disposable PostgreSQL integration lifecycle
 
@@ -105,14 +98,6 @@ Only a contender whose committed preflight shows an active generation, valid ses
 
 A request that owns the marker and authoritatively re-reads an already-revoked predecessor is completed replay: it atomically revokes the family, all family tokens, and paired sessions before returning `401` and clearing both auth cookies. Integration coverage uses PostgreSQL lock barriers rather than ordering sleeps and includes 20 same-context overlaps, one same-device-hash overlap from a different IP (`409`, family intact), 15 different-context overlaps, five fresh-database completed-replay commit witnesses, invalid bindings, family/generation isolation, and owner rollback/retry.
 
-## Prisma integrity hashing
-
-Run `npm run hash:prisma-integrity` from the repository root. The schema hash covers the raw `prisma/schema.prisma` bytes. The migration-tree hash recursively includes every regular file below `prisma/migrations`, including `migration_lock.toml`; it byte-sorts UTF-8 relative paths and hashes a versioned, length-prefixed path/content stream. Ambiguous or duplicate paths, symbolic links, and special files fail closed; filesystem traversal order, timestamps, and metadata are excluded. `npm run check:prisma-integrity` compares those bytes with the canonical committed `prisma/integrity-manifest.json`; only the explicit `npm run update:prisma-integrity` command rewrites that baseline.
-
-The current values are recorded only in `prisma/integrity-manifest.json`. The integration support (`tests/integration/support/migrations.ts`) reads the same manifest through `checkPrismaIntegrity` and compares its per-migration SHA-256 values with the applied `_prisma_migrations` checksums.
-
-This manifest is static repository evidence only. It does not read a live `_prisma_migrations` table or prove that staging/production is migrated, drift-free, or compatible.
-
 ## Coverage policy
 
 `vitest.config.ts` lists the critical authored-code coverage scope explicitly. Generated Prisma files, declarations, page composition, and infrastructure that requires live services are not counted in this percentage.
@@ -132,4 +117,4 @@ Coverage thresholds are regression gates, not a claim that every repository line
 
 ## Known boundaries
 
-The integration foundation proves the existing migration chain from an empty PostgreSQL 16 database, final Prisma access, deterministic fixture isolation, guarded cleanup, and sanitized migration failure. The committed auth integration suites separately cover claim eligibility, refresh revocation, rollback, isolation, and deterministic concurrency regressions. They do not inspect live schema drift, production migration state, historical data shapes, backup/restore behavior, or production topology. `verify:release` is necessary repository evidence, not production readiness; live migration rehearsal, runtime verification, backup/restore, and topology checks belong to a separately authorized release phase.
+The integration foundation proves the existing migration chain from an empty PostgreSQL 16 database, final Prisma access, deterministic fixture isolation, guarded cleanup, and sanitized migration failure. The committed auth integration suites separately cover claim eligibility, refresh revocation, rollback, isolation, and deterministic concurrency regressions. They do not inspect live schema drift, production migration state, historical data shapes, backup/restore behavior, or production topology.

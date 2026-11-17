@@ -1,5 +1,5 @@
 /**
- * GuideFilters categories (identity §8 GuideFilters, §9.5; REVIEW.md R-325/R-326 decision). Every key keeps
+ * GuideFilters categories (identity §8 GuideFilters, §9.5; R-325/R-326 decision). Every key keeps
  * its tag list, but a chip renders only when its category has content (`chipCounts`), so categories without
  * places stay hidden until content is added. Labels come from `momentsFilters` (common.ts).
  */

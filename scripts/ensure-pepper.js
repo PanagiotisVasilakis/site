@@ -17,7 +17,7 @@ const randomSecret = () => crypto.randomBytes(32).toString('hex');
 // as missing; GUEST_JWT_SECRET and the GUEST_WIFI_* keys treat it as present.
 const EXPECTED = [
   ['DATABASE_URL', /^[^\S\n]*DATABASE_URL[^\S\n]*=[^\S\n]*\S/m, () => {
-    // The docker-compose dev database; mirrors fallback_database_url in scripts/system-orchestrator.sh.
+    // The docker-compose dev database (docker-compose.yml).
     const url = new URL('postgresql://localhost');
     url.username = process.env.POSTGRES_USER || 'devuser';
     url.password = process.env.POSTGRES_PASSWORD || 'devpass';

@@ -16,11 +16,6 @@ const manifests: Array<[string, Manifest, Lockfile]> = [
     JSON.parse(readFileSync('package.json', 'utf8')) as Manifest,
     JSON.parse(readFileSync('package-lock.json', 'utf8')) as Lockfile,
   ],
-  [
-    'docker/migrate/package.json',
-    JSON.parse(readFileSync('docker/migrate/package.json', 'utf8')) as Manifest,
-    JSON.parse(readFileSync('docker/migrate/package-lock.json', 'utf8')) as Lockfile,
-  ],
 ];
 
 // The `name@version` keys npm matches in allowScripts, for every dependency the lockfile marks
@@ -42,12 +37,12 @@ describe('install-script allowlist (strict-allow-scripts)', () => {
     expect(Object.keys(manifest.allowScripts ?? {}).sort()).toEqual(scriptBearingPackages(lock));
   });
 
-  it('fails local installs and both image npm ci runs on an unlisted install script', () => {
+  it('fails local installs and the image npm ci run on an unlisted install script', () => {
     expect(readFileSync('.npmrc', 'utf8').split('\n')).toContain('strict-allow-scripts=true');
     const npmCiLines = readFileSync('docker/Dockerfile.security', 'utf8')
       .split('\n')
       .filter((line) => /\bnpm ci\b/.test(line));
-    expect(npmCiLines).toHaveLength(2);
+    expect(npmCiLines).toHaveLength(1);
     for (const line of npmCiLines) {
       expect(line).toContain('--strict-allow-scripts');
     }

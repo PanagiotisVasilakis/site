@@ -24,79 +24,6 @@ COPY . .
 RUN npm run build
 RUN npm run build:workers
 
-# Outbox and operations workers: two self-contained bundles, no checkout, no node_modules.
-# Run one per invocation from the production Compose file (services `outbox` and `operations`).
-FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS workers
-
-ARG GIT_COMMIT
-
-LABEL org.opencontainers.image.title="QR City Guest Guide workers" \
-      org.opencontainers.image.description="Outbox drain and operational maintenance workers" \
-      org.opencontainers.image.revision="${GIT_COMMIT}" \
-      org.opencontainers.image.licenses="UNLICENSED"
-
-RUN apk add --no-cache dumb-init=1.2.5-r4 \
-  && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn-* \
-  && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /usr/local/bin/yarn /usr/local/bin/yarnpkg \
-  && addgroup --system --gid 1001 nodejs \
-  && adduser --system --uid 1001 --ingroup nodejs --no-create-home nextjs
-
-WORKDIR /app
-ENV NODE_ENV=production \
-    NEXT_TELEMETRY_DISABLED=1
-
-COPY --from=builder --chown=nextjs:nodejs /app/dist/workers ./dist/workers
-
-RUN find /app -type d -exec chmod 0555 {} + \
-  && find /app -type f -exec chmod 0444 {} +
-
-USER 1001:1001
-STOPSIGNAL SIGTERM
-ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-CMD ["node", "dist/workers/drain-outbox.mjs"]
-
-# Prisma migrate deploy, run once per release. The CLI is installed from its own lockfile
-# (docker/migrate/, pinned to the application's Prisma version) together with the committed
-# schema and migrations of this build.
-FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS migrate
-
-ARG GIT_COMMIT
-
-LABEL org.opencontainers.image.title="QR City Guest Guide migrate" \
-      org.opencontainers.image.description="Prisma migrate deploy for the release's committed migrations" \
-      org.opencontainers.image.revision="${GIT_COMMIT}" \
-      org.opencontainers.image.licenses="UNLICENSED"
-
-WORKDIR /app
-ENV NODE_ENV=production \
-    CHECKPOINT_DISABLE=1 \
-    PRISMA_HIDE_UPDATE_MESSAGE=1
-
-RUN apk add --no-cache dumb-init=1.2.5-r4 \
-  && addgroup --system --gid 1001 nodejs \
-  && adduser --system --uid 1001 --ingroup nodejs --no-create-home nextjs
-
-COPY --chown=nextjs:nodejs docker/migrate/package.json docker/migrate/package-lock.json ./
-COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.ts ./prisma.config.ts
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-
-# Install, drop the package managers and fix ownership/modes in one layer (a later chown/chmod
-# would copy every file into another layer).
-RUN npm install --global npm@11.18.0 \
-  && npm ci --omit=dev --strict-allow-scripts --audit=false --fund=false \
-  && npm cache clean --force \
-  && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn-* \
-  && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /usr/local/bin/yarn /usr/local/bin/yarnpkg \
-  && chown -R nextjs:nodejs /app \
-  && find /app -type d -exec chmod 0555 {} + \
-  && find /app -type f -exec chmod 0444 {} + \
-  && find /app/node_modules/@prisma/engines -maxdepth 1 -type f -name 'schema-engine-*' -exec chmod 0555 {} +
-
-USER 1001:1001
-STOPSIGNAL SIGTERM
-ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-CMD ["node", "node_modules/prisma/build/index.js", "migrate", "deploy"]
-
 FROM node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402 AS runner
 
 ARG NEXT_PUBLIC_SITE_URL
@@ -104,7 +31,7 @@ ARG GIT_COMMIT
 
 LABEL org.opencontainers.image.title="QR City Guest Guide" \
       org.opencontainers.image.revision="${GIT_COMMIT}" \
-      org.opencontainers.image.description="Guest guide and check-in portal application" \
+      org.opencontainers.image.description="Guest guide, check-in portal, and operational workers" \
       org.opencontainers.image.version="0.1.1" \
       org.opencontainers.image.licenses="UNLICENSED"
 
@@ -125,6 +52,7 @@ ENV NODE_ENV=production \
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/dist/workers ./dist/workers
 COPY --from=builder --chown=nextjs:nodejs /app/scripts/start-standalone.mjs ./scripts/start-standalone.mjs
 COPY --from=builder --chown=nextjs:nodejs /app/src/lib/runtime-env-schema.js ./src/lib/runtime-env-schema.js
 COPY --from=builder --chown=nextjs:nodejs /app/src/lib/runtime-credentials.js ./src/lib/runtime-credentials.js
