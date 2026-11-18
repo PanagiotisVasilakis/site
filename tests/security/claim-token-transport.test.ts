@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -95,18 +93,22 @@ function exchangeCookieValue(digest = TOKEN_DIGEST): string {
   return `${digest}.${privacyHmac(digest, EXCHANGE_MAC_CONTEXT)}`;
 }
 
-function claimRequest(exchangeValue?: string): NextRequest {
+function claimRequest(exchangeValue?: string, extraCookie?: string): NextRequest {
+  const cookies = [
+    ...(exchangeValue === undefined ? [] : [`${PORTAL_CLAIM_EXCHANGE_COOKIE}=${exchangeValue}`]),
+    ...(extraCookie ? [extraCookie] : []),
+  ];
   return request(
     '/api/portal/claims',
     claimBody(),
-    exchangeValue === undefined ? undefined : `${PORTAL_CLAIM_EXCHANGE_COOKIE}=${exchangeValue}`,
+    cookies.length > 0 ? cookies.join('; ') : undefined,
   );
 }
 
 describe('claim capability transport', () => {
   beforeEach(() => {
     vi.stubEnv('NODE_ENV', 'production');
-    mocks.getFeatureFlagsAsync.mockResolvedValue({ portalEnabled: true });
+    mocks.getFeatureFlagsAsync.mockResolvedValue({ portalEnabled: true, checkinEnabled: true });
     mocks.checkSensitiveRateLimit.mockResolvedValue({
       allowed: true,
       limit: 20,
@@ -281,27 +283,27 @@ describe('claim capability transport', () => {
     expect(mocks.consumeBookingClaimGrant).not.toHaveBeenCalled();
   });
 
-  it('never creates or parses a claim capability in application URLs', () => {
-    const source = [
-      readFileSync('src/app/[locale]/guest/UnifiedGuestClient.tsx', 'utf8'),
-      readFileSync('src/app/[locale]/guest/page.tsx', 'utf8'),
-      readFileSync('src/app/admin/guests/page.tsx', 'utf8'),
-      readFileSync('src/app/api/admin/bookings/[id]/claim-grants/route.ts', 'utf8'),
-      readFileSync('src/app/api/admin/bookings/[id]/access-reset/route.ts', 'utf8'),
-      readFileSync('src/app/api/portal/claim-exchange/route.ts', 'utf8'),
-      readFileSync('src/app/api/portal/claims/route.ts', 'utf8'),
-      readFileSync('src/lib/portalClaimExchange.ts', 'utf8'),
-      readFileSync('src/proxy.ts', 'utf8'),
-    ].join('\n');
-    for (const forbidden of [
-      /[?&#]claim(?:Token)?=/iu,
-      /searchParams?\.get\(['"]claim(?:Token)?['"]\)/u,
-      /searchParams?\.set\(['"]claim(?:Token)?['"]/u,
-      /\$request_uri/u,
-      /claim-link/u,
-    ]) {
-      expect(source).not.toMatch(forbidden);
-    }
+  it('redirects a claiming guest to check-in when enabled and stay hub when off', async () => {
+    const checkInRes = await consumeClaim(
+      claimRequest(exchangeCookieValue(), 'lang=el'),
+      { params: Promise.resolve({}) },
+    );
+    expect(checkInRes.status).toBe(200);
+    expect((await checkInRes.json()).data).toEqual({
+      bookingId: 'transport-booking',
+      redirect: '/el/check-in',
+    });
+
+    mocks.getFeatureFlagsAsync.mockResolvedValue({ portalEnabled: true, checkinEnabled: false });
+    const stayRes = await consumeClaim(
+      claimRequest(exchangeCookieValue(), 'lang=el'),
+      { params: Promise.resolve({}) },
+    );
+    expect(stayRes.status).toBe(200);
+    expect((await stayRes.json()).data).toEqual({
+      bookingId: 'transport-booking',
+      redirect: '/el/stay',
+    });
   });
 });
 

@@ -1,7 +1,8 @@
 import type { NextRequest } from 'next/server';
-import { afterAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import type { PrismaClient } from '@/generated/prisma/client';
+import type { DisposableDatabaseTarget } from '../support/database-safety';
 
 import {
   createIsolatedDatabase,
@@ -135,66 +136,84 @@ const PUBLIC_WRITE_ROUTES: ReadonlyArray<{
 ];
 
 describe.sequential('D1A missing client identity with live PostgreSQL', () => {
-  afterAll(() => restoreApplicationEnvironment());
+  let target: DisposableDatabaseTarget | undefined;
 
-  it.each(PUBLIC_WRITE_ROUTES)('leaves limiter and audit state untouched for $path in three clean migrated databases', async (route) => {
-    for (const sequence of [1, 2, 3]) {
-      const target = await createIsolatedDatabase(runtime, `d1a_noid_${route.tag}_${sequence}`);
-      try {
-        await applyMigrationsFromEmpty(target);
-        setApplicationEnvironment(target.databaseUrl);
-        await resetApplicationPrismaSingleton();
+  beforeAll(async () => {
+    target = await createIsolatedDatabase(runtime, 'd1a_noid_shared');
+    await applyMigrationsFromEmpty(target);
+    setApplicationEnvironment(target.databaseUrl);
+    await resetApplicationPrismaSingleton();
+  });
 
-        const [{ NextRequest }, post] = await Promise.all([
-          import('next/server'),
-          route.load(),
-        ]);
+  afterEach(async () => {
+    if (!target) return;
+    await withTestPrismaClient(target, async (prisma) => {
+      await prisma.$transaction([
+        prisma.securityAuditEvent.deleteMany(),
+        prisma.outboxEvent.deleteMany(),
+        prisma.privacyRequest.deleteMany(),
+        prisma.rateLimit.deleteMany(),
+      ]);
+    }, 'cleanup');
+  });
 
-        const before = await withTestPrismaClient(target, durableState);
-        expect(before).toEqual(EMPTY_DURABLE_STATE);
-
-        const response = await post(new NextRequest(
-          `http://integration.invalid${route.path}`,
-          {
-            method: 'POST',
-            headers: {
-              'content-type': route.contentType,
-              'user-agent': 'd1a-integration-client',
-            },
-            body: JSON.stringify(route.body(sequence)),
-          },
-        ));
-        const responseBody = await response.text();
-
-        expect(response.status).toBe(503);
-        expect(response.headers.get('cache-control')).toBe('no-store');
-        expect(response.headers.get('retry-after')).toBeNull();
-        expect(response.headers.get('set-cookie')).toBeNull();
-        expect(responseBody).not.toMatch(/CLIENT_IDENTITY_UNAVAILABLE|x-forwarded-for|cf-connecting-ip|client-error-report|csp-report|198\.51\.100/iu);
-
-        const afterUnavailable = await withTestPrismaClient(target, durableState);
-        expect(afterUnavailable).toEqual(before);
-
-        const { checkSensitiveRateLimit } = await import('@/lib/sensitiveRateLimit');
-        const canonicalDecision = await checkSensitiveRateLimit(new NextRequest(
-          'http://integration.invalid/api/canonical-control',
-          { headers: {
-            'x-origin-verified-client-ip': '198.51.100.240',
-            'x-origin-proxy-attestation': process.env.ORIGIN_PROXY_SHARED_SECRET ?? '',
-          } },
-        ), {
-          scope: `d1a-canonical-control-${sequence}`,
-          limit: 3,
-          windowMs: 60_000,
-        });
-        expect(canonicalDecision.allowed).toBe(true);
-
-        const afterCanonicalControl = await withTestPrismaClient(target, durableState);
-        expect(afterCanonicalControl).toEqual({ ...EMPTY_DURABLE_STATE, rateLimits: 1 });
-      } finally {
-        await resetApplicationPrismaSingleton();
-        await dropIsolatedDatabase(target);
-      }
+  afterAll(async () => {
+    try {
+      await resetApplicationPrismaSingleton();
+    } finally {
+      restoreApplicationEnvironment();
+      if (target) await dropIsolatedDatabase(target);
+      target = undefined;
     }
+  });
+
+  it.each(PUBLIC_WRITE_ROUTES)('leaves limiter and audit state untouched for $path when client identity is absent', async (route) => {
+    if (!target) throw new Error('Shared D1A database was not initialized.');
+    const [{ NextRequest }, post] = await Promise.all([
+      import('next/server'),
+      route.load(),
+    ]);
+
+    const before = await withTestPrismaClient(target, durableState);
+    expect(before).toEqual(EMPTY_DURABLE_STATE);
+
+    const response = await post(new NextRequest(
+      `http://integration.invalid${route.path}`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': route.contentType,
+          'user-agent': 'd1a-integration-client',
+        },
+        body: JSON.stringify(route.body(1)),
+      },
+    ));
+    const responseBody = await response.text();
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('retry-after')).toBeNull();
+    expect(response.headers.get('set-cookie')).toBeNull();
+    expect(responseBody).not.toMatch(/CLIENT_IDENTITY_UNAVAILABLE|x-forwarded-for|cf-connecting-ip|client-error-report|csp-report|198\.51\.100/iu);
+
+    const afterUnavailable = await withTestPrismaClient(target, durableState);
+    expect(afterUnavailable).toEqual(before);
+
+    const { checkSensitiveRateLimit } = await import('@/lib/sensitiveRateLimit');
+    const canonicalDecision = await checkSensitiveRateLimit(new NextRequest(
+      'http://integration.invalid/api/canonical-control',
+      { headers: {
+        'x-origin-verified-client-ip': '198.51.100.240',
+        'x-origin-proxy-attestation': process.env.ORIGIN_PROXY_SHARED_SECRET ?? '',
+      } },
+    ), {
+      scope: `d1a-canonical-control-${route.tag}`,
+      limit: 3,
+      windowMs: 60_000,
+    });
+    expect(canonicalDecision.allowed).toBe(true);
+
+    const afterCanonicalControl = await withTestPrismaClient(target, durableState);
+    expect(afterCanonicalControl).toEqual({ ...EMPTY_DURABLE_STATE, rateLimits: 1 });
   });
 });

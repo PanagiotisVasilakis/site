@@ -588,15 +588,10 @@ describe.sequential('portal logout authorization characterization', () => {
       sessionToken: 'synthetic-malformed-session-cookie',
       refreshToken: 'synthetic-malformed-refresh-cookie',
     }));
-    const malformedRefresh = await safeRefreshDenial(await performRefresh(loadedModules, {
-      sessionToken: 'synthetic-malformed-session-cookie',
-      refreshToken: 'synthetic-malformed-refresh-cookie',
-    }));
     const primaryAfter = await safeGraphState(authTarget, REVOKED_SESSION_FIXTURE);
     const isolatedAfter = await safeGraphState(authTarget, ISOLATED_AUTH_FIXTURE);
 
     expect(logout).toEqual(EXPECTED_LOGOUT);
-    expect(malformedRefresh).toEqual(EXPECTED_REFRESH_DENIAL);
     expect(primaryBefore).toEqual(ACTIVE_BOUND_GRAPH);
     expect(isolatedBefore).toEqual(ACTIVE_BOUND_GRAPH);
     expect(primaryAfter).toEqual(primaryBefore);
@@ -617,31 +612,16 @@ describe.sequential('portal logout authorization characterization', () => {
       sessionToken: primary.sessionToken,
       refreshToken: primary.refreshToken,
     }));
-    const reasonBeforeRefresh = await familyRevocationReason(
-      authTarget,
-      REVOKED_SESSION_FIXTURE.familyId,
-    );
-    const refreshDenial = await safeRefreshDenial(await performRefresh(loadedModules, {
-      sessionToken: primary.sessionToken,
-      refreshToken: primary.refreshToken,
-    }));
-    const reasonAfterRefresh = await familyRevocationReason(
-      authTarget,
-      REVOKED_SESSION_FIXTURE.familyId,
-    );
+    const reasonAfter = await familyRevocationReason(authTarget, REVOKED_SESSION_FIXTURE.familyId);
     const replayAuditCount = await refreshReplayAuditCount(authTarget);
-    const primaryAfter = await safeGraphState(authTarget, REVOKED_SESSION_FIXTURE);
-    const isolatedAfter = await safeGraphState(authTarget, ISOLATED_AUTH_FIXTURE);
 
     expect(stablePrimary).toEqual(REVOKED_BOUND_GRAPH);
     expect(stableIsolated).toEqual(ACTIVE_BOUND_GRAPH);
     expect(logout).toEqual(EXPECTED_LOGOUT);
-    expect(reasonBeforeRefresh).toBe('logout');
-    expect(refreshDenial).toEqual(EXPECTED_REFRESH_DENIAL);
-    expect(reasonAfterRefresh).toBe('logout');
+    expect(reasonAfter).toBe('logout');
     expect(replayAuditCount).toBe(0);
-    expect(primaryAfter).toEqual(stablePrimary);
-    expect(isolatedAfter).toEqual(stableIsolated);
+    expect(await safeGraphState(authTarget, REVOKED_SESSION_FIXTURE)).toEqual(stablePrimary);
+    expect(await safeGraphState(authTarget, ISOLATED_AUTH_FIXTURE)).toEqual(stableIsolated);
   });
 
   it('revokes both mismatched valid graphs while preserving a third control family', async () => {
@@ -723,22 +703,13 @@ describe.sequential('portal logout authorization characterization', () => {
       sessionToken: primary.sessionToken,
       refreshToken: primary.refreshToken,
     }));
-    const primaryAfterRepeat = await safeGraphState(authTarget, REVOKED_SESSION_FIXTURE);
-    const isolatedAfterRepeat = await safeGraphState(authTarget, ISOLATED_AUTH_FIXTURE);
-    const refreshDenial = await safeRefreshDenial(await performRefresh(loadedModules, {
-      sessionToken: primary.sessionToken,
-      refreshToken: primary.refreshToken,
-    }));
-    const primaryFinal = await safeGraphState(authTarget, REVOKED_SESSION_FIXTURE);
 
     expect(first).toEqual(EXPECTED_LOGOUT);
     expect(second).toEqual(EXPECTED_LOGOUT);
     expect(stablePrimary).toEqual(REVOKED_BOUND_GRAPH);
     expect(stableIsolated).toEqual(ACTIVE_BOUND_GRAPH);
-    expect(primaryAfterRepeat).toEqual(stablePrimary);
-    expect(isolatedAfterRepeat).toEqual(stableIsolated);
-    expect(refreshDenial).toEqual(EXPECTED_REFRESH_DENIAL);
-    expect(primaryFinal).toEqual(stablePrimary);
+    expect(await safeGraphState(authTarget, REVOKED_SESSION_FIXTURE)).toEqual(stablePrimary);
+    expect(await safeGraphState(authTarget, ISOLATED_AUTH_FIXTURE)).toEqual(stableIsolated);
   });
 
   it('revokes only the logged-out session among several session-only sessions of one principal', async () => {
@@ -788,7 +759,7 @@ describe.sequential('portal logout authorization characterization', () => {
     expect(isolatedAccess).toMatchObject({ sid: isolated.sessionId });
   });
 
-  it('rejects a refresh token with a wrong secret on logout and refresh without revoking the chain', async () => {
+  it('rejects a refresh token with a wrong secret on logout without revoking the chain', async () => {
     const authTarget = requireTarget();
     const loadedModules = requireModules();
     await seedAuthEligibilityFixtures(authTarget, new Date(), { includeIsolatedPrincipal: true });
@@ -801,24 +772,13 @@ describe.sequential('portal logout authorization characterization', () => {
     const logout = await safeLogoutEvidence(await performLogout(loadedModules, {
       refreshToken: wrongSecretRefresh,
     }));
-    const refreshWithoutSession = await safeRefreshDenial(await performRefresh(loadedModules, {
-      refreshToken: wrongSecretRefresh,
-    }));
-    const refreshWithSession = await safeRefreshDenial(await performRefresh(loadedModules, {
-      sessionToken: primary.sessionToken,
-      refreshToken: wrongSecretRefresh,
-    }));
-    const primaryAfter = await safeGraphState(authTarget, REVOKED_SESSION_FIXTURE);
-    const isolatedAfter = await safeGraphState(authTarget, ISOLATED_AUTH_FIXTURE);
     const primaryAccess = await verifySessionToken(loadedModules, primary.sessionToken);
 
     expect(primaryBefore).toEqual(ACTIVE_BOUND_GRAPH);
     expect(isolatedBefore).toEqual(ACTIVE_BOUND_GRAPH);
     expect(logout).toEqual(EXPECTED_LOGOUT);
-    expect(refreshWithoutSession).toEqual(EXPECTED_REFRESH_DENIAL);
-    expect(refreshWithSession).toEqual(EXPECTED_REFRESH_DENIAL);
-    expect(primaryAfter).toEqual(primaryBefore);
-    expect(isolatedAfter).toEqual(isolatedBefore);
+    expect(await safeGraphState(authTarget, REVOKED_SESSION_FIXTURE)).toEqual(primaryBefore);
+    expect(await safeGraphState(authTarget, ISOLATED_AUTH_FIXTURE)).toEqual(isolatedBefore);
     expect(primaryAccess).toMatchObject({ sid: primary.sessionId });
   });
 

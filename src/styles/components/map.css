@@ -1,6 +1,6 @@
 /* MapCard: the restyled Leaflet map (docs/design/identity.md §8 MapCard; replaces the Leaflet part of
    08-vendor.css). Imported by src/components/LeafletMap.tsx only, so it loads with Leaflet's own CSS on the
-   map toggle and never with the list (§9.5, §12 R3-V8). Colours come from tokens only: the dark theme
+   map toggle and never with the list (§9.5). Colours come from tokens only: the dark theme
    switches them at token level, so there are no per-component dark selectors (the tile dimming is the
    --map-tile-filter token). Selectors carry two classes (0,2,0) so they beat leaflet.css (0,1,0 / 0,1,1).
    Motion is gated (§5.2). */

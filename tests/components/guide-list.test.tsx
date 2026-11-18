@@ -1,15 +1,16 @@
 // @vitest-environment jsdom
 
+import type React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-// Module factories run when a module is first imported, so these spies record the import itself.
 const loads = vi.hoisted(() => ({ map: [] as string[], leaflet: [] as string[] }));
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/en/moments',
   notFound: () => { throw new Error('NEXT_NOT_FOUND'); },
 }));
+vi.mock('next/headers', () => ({ headers: async () => new Headers() }));
 vi.mock('@/components/ApartmentLocationMap', () => {
   loads.map.push('ApartmentLocationMap');
   return { default: () => <div data-testid="guide-map" /> };
@@ -20,22 +21,25 @@ vi.mock('leaflet', () => {
 });
 
 import CategoryPage from '@/app/[locale]/[category]/page';
+import ItemPage from '@/app/[locale]/[category]/[slug]/page';
+import FavoritesPage from '@/app/[locale]/favorites/page';
 import { ToastProvider } from '@/components/Toast';
+import { telHref } from '@/lib/contactLinks';
+import { getItemsByCategory } from '@/lib/data';
+
+const wrap = (node: React.ReactNode) => render(<ToastProvider>{node}</ToastProvider>);
 
 async function renderGuide(locale = 'en') {
-  return render(
-    <ToastProvider>{await CategoryPage({ params: Promise.resolve({ locale, category: 'moments' }) })}</ToastProvider>,
-  );
+  return wrap(await CategoryPage({ params: Promise.resolve({ locale, category: 'moments' }) }));
 }
 
 const cardTitles = () => screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent);
 
 describe('guide list (identity §9.5, R3-V8)', () => {
-  it('imports the map module only after the List/Map toggle, and never Leaflet with the list', async () => {
+  it('defers loading Leaflet/map until Map is clicked and filters unmapped places by active chip', async () => {
     try {
       await renderGuide();
       expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(18);
-      // Let any dynamic import started on mount (a preload, an effect) settle before asserting it never ran.
       await vi.dynamicImportSettled();
       expect(loads.map).toEqual([]);
       expect(loads.leaflet).toEqual([]);
@@ -47,141 +51,116 @@ describe('guide list (identity §9.5, R3-V8)', () => {
       expect(await screen.findByTestId('guide-map')).toBeInTheDocument();
       expect(mapButton).toHaveAttribute('aria-pressed', 'true');
       expect(loads.map).toEqual(['ApartmentLocationMap']);
-      // The numbered list stays below the map (the list is the primary navigation).
-      expect(screen.getByRole('list', { name: 'Places on the map' })).toBeInTheDocument();
+
+      const links = (name: string) => within(screen.getByRole('list', { name })).getAllByRole('link').map((l) => l.textContent);
+      expect(screen.getByText('18 places')).toHaveAttribute('role', 'status');
+      expect(links('Places on the map').length + links('Not on the map').length).toBe(18);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Beaches 2' }));
+      expect(screen.getByText('2 places')).toHaveAttribute('role', 'status');
+      expect(screen.queryByRole('list', { name: 'Places on the map' })).toBeNull();
+      expect(links('Not on the map')).toEqual(['Kalamata City Beach (Navarinou Avenue)', 'Gialova Lagoon and Voidokilia Beach']);
     } finally {
       window.history.replaceState(null, '', '/');
     }
   });
 
-  it('renders category chips only for categories with content, each with its count', async () => {
-    await renderGuide();
-
-    const chips = within(screen.getByRole('group', { name: 'Filter by category' })).getAllByRole('button');
-    // R3-C2 content: bars, brunch and nearby have no content, so their chips stay hidden (R-325/R-326 decision).
-    expect(chips.map((chip) => chip.textContent)).toEqual([
-      'All 18', 'Beaches 2', 'Museums 6', 'Restaurants 3', 'Taygetos 1', 'Sites 9',
-    ]);
-    expect(chips[0]).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.queryByRole('button', { name: /Bars|Brunch|Nearby/ })).toBeNull();
-  });
-
-  it('sorts the cards by straight-line distance from the apartment and shows it', async () => {
-    await renderGuide();
-
-    expect(cardTitles()).toEqual([
-      'Viktoria Karelia Greek Costumes Collection',
-      'Kalamata Railway Park',
-      'Historical and Folklore Museum of Kalamata',
-      'Archaeological Museum of Messenia (Benakeion)',
-      'War Museum Kalamata Branch',
-      // Places without coordinates follow, in content order, without a distance.
-      'Kalamata City Beach (Navarinou Avenue)',
-      'Kalamata Central Market',
-      'Kalamata Olives and Messinian Olive Oil',
-      'Lalagia',
-      'Kalamata Castle and Old Town',
-      'Ancient Messene',
-      'Polylimnio, Messenia',
-      'Niokastro (Pylos Castle)',
-      'Methoni Castle',
-      'Koroni Castle',
-      'Gialova Lagoon and Voidokilia Beach',
-      'Palace of Nestor',
-      'Mount Taygetos',
-    ]);
-    const railway = screen.getByRole('heading', { level: 2, name: 'Kalamata Railway Park' }).closest('article')!;
-    expect(railway).toHaveTextContent('1.5 km');
-  });
-
-  it('keeps the heading order without a skipped level (R-360: h1, then the card titles)', async () => {
-    const { container } = await renderGuide();
-
-    const levels = [...container.querySelectorAll('h1, h2, h3, h4, h5, h6')].map((heading) => Number(heading.tagName[1]));
-    expect(levels[0]).toBe(1);
-    levels.slice(1).forEach((level, index) => expect(level, `heading ${index + 2}`).toBeLessThanOrEqual(levels[index] + 1));
-  });
-
-  it('applies the ?q= search submitted from the stay hub guide tile (identity §9.4)', async () => {
+  it('shows populated category chips, sorts by distance, and supports ?q=, search/Escape, and Clear filters', async () => {
     window.history.replaceState(null, '', '/en/moments?q=war');
     try {
-      await renderGuide();
-
+      const qRender = await renderGuide();
       expect(screen.getByRole('searchbox', { name: 'Search the guide' })).toHaveValue('war');
       expect(screen.getByText('1 place')).toBeInTheDocument();
+      qRender.unmount();
     } finally {
       window.history.replaceState(null, '', '/');
     }
-  });
 
-  it('filters by search and clears the search with Escape', async () => {
     await renderGuide();
-    const search = screen.getByRole('searchbox', { name: 'Search the guide' });
-    expect(search).toHaveAttribute('type', 'search');
+    const chips = within(screen.getByRole('group', { name: 'Filter by category' })).getAllByRole('button');
+    expect(chips[0]).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('button', { name: /Bars|Brunch|Nearby/ })).toBeNull();
 
+    expect(cardTitles().slice(0, 2)).toEqual(['Viktoria Karelia Greek Costumes Collection', 'Kalamata Railway Park']);
+    expect(screen.getByRole('heading', { level: 2, name: 'Kalamata Railway Park' }).closest('article')).toHaveTextContent('1.5 km');
+
+    const search = screen.getByRole('searchbox', { name: 'Search the guide' });
     fireEvent.change(search, { target: { value: 'locomotives' } });
     expect(cardTitles()).toEqual(['Kalamata Railway Park']);
 
     fireEvent.keyDown(search, { key: 'Escape' });
     expect(search).toHaveValue('');
     expect(cardTitles()).toHaveLength(18);
-  });
 
-  it('shows an EmptyPanel with "Clear filters" when nothing matches', async () => {
-    await renderGuide();
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search the guide' }), { target: { value: 'zzzz' } });
-
-    expect(screen.queryAllByRole('article')).toHaveLength(0);
+    fireEvent.change(search, { target: { value: 'zzzz' } });
     expect(screen.getByRole('heading', { name: 'No places match' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(cardTitles()).toHaveLength(18);
   });
 
-  it('Save toggles aria-pressed and persists through the favourites store', async () => {
+  it('persists saved favourites, updates the header link, and filters stale ids from storage', async () => {
     await renderGuide();
     const save = screen.getByRole('button', { name: 'Save Kalamata Railway Park' });
     expect(save).toHaveAttribute('aria-pressed', 'false');
 
     fireEvent.click(save);
-
     expect(save).toHaveAttribute('aria-pressed', 'true');
     expect(JSON.parse(window.localStorage.getItem('favorites:v1') ?? '[]')).toEqual(['moments:railway-park-kalamata']);
-    // The saved count reaches the list header link to /favorites (O41).
     expect(screen.getByRole('link', { name: /Saved/ })).toHaveAttribute('href', '/en/favorites');
     expect(screen.getByRole('link', { name: /Saved/ })).toHaveTextContent('1');
 
     fireEvent.click(save);
     expect(save).toHaveAttribute('aria-pressed', 'false');
     expect(JSON.parse(window.localStorage.getItem('favorites:v1') ?? '[]')).toEqual([]);
-  });
 
-  it('counts only saved ids that still resolve to a place, like the favourites page', async () => {
-    await renderGuide();
-    // A stale id (content removed since it was saved) next to a current one.
     window.localStorage.setItem('favorites:v1', JSON.stringify(['sightseeing:removed-place', 'moments:railway-park-kalamata']));
     act(() => { window.dispatchEvent(new StorageEvent('storage', { key: 'favorites:v1' })); });
-
     expect(screen.getByRole('link', { name: 'Saved places: 1' })).toHaveTextContent('1');
   });
+});
 
-  it('map view lists the filtered places without coordinates, so the count matches what is reachable', async () => {
-    try {
-      await renderGuide();
-      fireEvent.click(screen.getByRole('button', { name: 'Map' }));
-      await screen.findByTestId('guide-map');
-      const links = (name: string) => within(screen.getByRole('list', { name })).getAllByRole('link').map((link) => link.textContent);
+describe('phones, detail, and favourites pages', () => {
+  it('renders 112 first and wraps every phone number in a tel: link on /phones', async () => {
+    const { container } = wrap(await CategoryPage({ params: Promise.resolve({ locale: 'en', category: 'phones' }) }));
 
-      expect(screen.getByText('18 places')).toHaveAttribute('role', 'status');
-      expect(links('Places on the map').length + links('Not on the map').length).toBe(18);
-
-      // Neither beach has coordinates: no numbered list (and no note about its numbers), both beaches still listed.
-      fireEvent.click(screen.getByRole('button', { name: 'Beaches 2' }));
-      expect(screen.getByText('2 places')).toHaveAttribute('role', 'status');
-      expect(screen.queryByRole('list', { name: 'Places on the map' })).toBeNull();
-      expect(screen.queryByText(/The numbers on the map match this list/)).toBeNull();
-      expect(links('Not on the map')).toEqual(['Kalamata City Beach (Navarinou Avenue)', 'Gialova Lagoon and Voidokilia Beach']);
-    } finally {
-      window.history.replaceState(null, '', '/');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Important phones');
+    expect(within(container.querySelector('section')!).getByRole('link', { name: 'Call 112' })).toHaveAttribute('href', 'tel:112');
+    const numbers = getItemsByCategory('phones').flatMap((i) => [i.phone, ...(i.phones ?? [])]).filter((v): v is string => Boolean(v));
+    for (const number of new Set(numbers)) {
+      expect(container.querySelectorAll(`a[href="${telHref(number)}"]`).length, number).toBeGreaterThan(0);
     }
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (/(\+30[\d ]{6,}|^\s*112\s*$)/.test(node.textContent ?? '')) {
+        expect(node.parentElement?.closest('a[href^="tel:"]'), node.textContent ?? '').not.toBeNull();
+      }
+    }
+  });
+
+  it('renders guide detail without booking links and lists nearby places', async () => {
+    const { container } = wrap(await ItemPage({ params: Promise.resolve({ locale: 'en', category: 'moments', slug: 'kalamata-railway-park' }) }));
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Kalamata Railway Park');
+    expect(screen.getAllByRole('link', { name: /Directions/ })[0]).toHaveAttribute('target', '_blank');
+    expect([...container.querySelectorAll('a')].filter((l) => /availability|booking\.com/i.test(l.getAttribute('href') ?? ''))).toEqual([]);
+    const nearby = screen.getByRole('region', { name: 'More nearby' });
+    const titles = within(nearby).getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+    expect(titles).toHaveLength(3);
+    expect(titles).not.toContain('Kalamata Railway Park');
+  });
+
+  it('shows EmptyPanel until a place is saved, then renders the saved card on storage update', async () => {
+    window.localStorage.removeItem('favorites:v1');
+    act(() => { window.dispatchEvent(new StorageEvent('storage', { key: 'favorites:v1' })); });
+    wrap(await FavoritesPage({ params: Promise.resolve({ locale: 'en' }) }));
+
+    expect(screen.getByRole('heading', { name: 'No favourites yet.' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Browse the guide' })).toHaveAttribute('href', '/en/moments');
+
+    window.localStorage.setItem('favorites:v1', JSON.stringify(['moments:war-museum-kalamata']));
+    act(() => { window.dispatchEvent(new StorageEvent('storage', { key: 'favorites:v1' })); });
+
+    expect(screen.queryByRole('heading', { name: 'No favourites yet.' })).toBeNull();
+    expect(screen.getByRole('heading', { level: 3, name: 'War Museum Kalamata Branch' })).toBeInTheDocument();
   });
 });

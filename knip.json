@@ -2,7 +2,8 @@
   "$schema": "https://unpkg.com/knip@latest/schema.json",
   "entry": [
     "prisma.integration.config.ts",
-    "vitest.integration.config.ts"
+    "vitest.integration.config.ts",
+    "public/sw.js"
   ],
   "ignoreDependencies": [
     "@prisma/client"

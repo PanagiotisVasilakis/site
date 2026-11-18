@@ -129,6 +129,13 @@ describe('arrival-time request route', () => {
     expect(mocks.deliverOutboxEvent).not.toHaveBeenCalled();
   });
 
+  it('refuses an arrival request time that is not zero-padded', async () => {
+    const response = await post({ requestedTime: '9:30' });
+
+    expect(response.status).toBe(422);
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
   it('returns the latest request of the verified guest', async () => {
     mocks.findLatestForGuest.mockResolvedValue(record('18:15'));
 

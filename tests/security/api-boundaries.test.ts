@@ -270,3 +270,48 @@ describe('security header builders', () => {
     expect(generateNonce()).not.toBe(generateNonce());
   });
 });
+
+describe('pre-authentication security diagnostics', () => {
+  afterEach(() => {
+    vi.doUnmock('@/lib/prisma');
+    vi.doUnmock('@/lib/featureFlags');
+    vi.resetModules();
+  });
+
+  it('rejects forged Origin and invalid content-type with warning logs and zero database writes', async () => {
+    const transaction = vi.fn().mockResolvedValue(undefined);
+    vi.stubEnv('DATABASE_URL', 'postgresql://user:pass@127.0.0.1:1/db');
+    vi.resetModules();
+    vi.doMock('@/lib/prisma', () => ({ prisma: { $transaction: transaction } }));
+    vi.doMock('@/lib/featureFlags', () => ({ getFeatureFlagsAsync: async () => ({ portalEnabled: true }) }));
+
+    const [{ logger: reloadedLogger }, { createSecurityMiddleware }, { POST: claimPost }] = await Promise.all([
+      import('@/lib/logger-enterprise'),
+      import('@/lib/security-middleware-edge'),
+      import('@/app/api/portal/claims/route'),
+    ]);
+    const warn = vi.spyOn(reloadedLogger, 'warn').mockImplementation(() => {});
+
+    const corsResponse = await createSecurityMiddleware()(new NextRequest('https://guide.example/api/does-not-exist', {
+      headers: { origin: 'https://evil.example', host: 'guide.example' },
+    }));
+    expect(corsResponse.status).toBe(403);
+    expect(warn).toHaveBeenCalledWith('Security diagnostic', expect.objectContaining({
+      type: 'cors_violation',
+      path: '/api/does-not-exist',
+    }));
+
+    const typeResponse = await claimPost(new NextRequest('https://guide.example/api/portal/claims', {
+      method: 'POST',
+      headers: { 'content-type': 'text/plain' },
+      body: 'x',
+    }), { params: Promise.resolve({}) });
+    expect(typeResponse.status).toBe(415);
+    await expect(typeResponse.json()).resolves.toMatchObject({ error: { code: 'UNSUPPORTED_MEDIA_TYPE' } });
+    expect(warn).toHaveBeenCalledWith('Security diagnostic', expect.objectContaining({
+      type: 'api_security_violation',
+      details: expect.objectContaining({ violationType: 'invalid_content_type' }),
+    }));
+    expect(transaction).not.toHaveBeenCalled();
+  });
+});

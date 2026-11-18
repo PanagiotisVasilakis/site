@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, render } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import HeroGlIsland from '@/components/home/hero/HeroGlIsland';
 import { heroCover } from '@/components/home/hero/heroCover';
@@ -331,5 +331,64 @@ describe('HeroGlIsland', () => {
     vi.advanceTimersByTime(1200);
 
     expect(hero.dataset.gl).toBeUndefined();
+  });
+
+  describe('crop depth resolution and mount lifecycle', () => {
+    const mockMountHeroGl = vi.fn();
+    const mockDestroy = vi.fn();
+    let MockedIsland: typeof HeroGlIsland;
+
+    function setupCapableHero(currentSrc: string) {
+      const parts = heroParts();
+      Object.defineProperty(parts.img, 'currentSrc', { configurable: true, value: currentSrc });
+      vi.spyOn(navigator, 'hardwareConcurrency', 'get').mockReturnValue(8);
+      vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+      vi.spyOn(Element.prototype, 'clientWidth', 'get').mockReturnValue(390);
+      vi.spyOn(Element.prototype, 'clientHeight', 'get').mockReturnValue(844);
+      vi.spyOn(parts.hero, 'getBoundingClientRect').mockReturnValue({ top: 0, bottom: 700, left: 0, right: 390 } as DOMRect);
+      return parts;
+    }
+
+    beforeEach(async () => {
+      mockMountHeroGl.mockReset().mockReturnValue({ destroy: mockDestroy });
+      mockDestroy.mockReset();
+      vi.resetModules();
+      vi.doMock('@/components/home/hero/heroGl', () => ({ mountHeroGl: mockMountHeroGl }));
+      ({ default: MockedIsland } = await import('@/components/home/hero/HeroGlIsland'));
+    });
+
+    afterAll(() => {
+      vi.doUnmock('@/components/home/hero/heroGl');
+      vi.resetModules();
+    });
+
+    it('mounts with the depth map of img.currentSrc and destroys on unmount', async () => {
+      const { hero, img } = setupCapableHero('http://localhost/house/balcony/hero/balcony-hero-9x16-720.avif');
+      const { unmount } = render(<MockedIsland />);
+      act(() => { vi.advanceTimersByTime(1200); });
+      await vi.dynamicImportSettled();
+
+      expect(mockMountHeroGl).toHaveBeenCalledTimes(1);
+      expect(mockMountHeroGl).toHaveBeenCalledWith({ hero, img, depthSrc: '/house/balcony/hero/depth-9x16.webp' });
+      expect(mockDestroy).not.toHaveBeenCalled();
+      unmount();
+      expect(mockDestroy).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips mount if unmounted while loading and records off:assets for non-hero crops', async () => {
+      setupCapableHero('http://localhost/house/balcony/hero/balcony-hero-3x2-1440.avif');
+      const { unmount } = render(<MockedIsland />);
+      act(() => { vi.advanceTimersByTime(1200); });
+      unmount();
+      await vi.dynamicImportSettled();
+      expect(mockMountHeroGl).not.toHaveBeenCalled();
+
+      const { hero } = setupCapableHero('http://localhost/house/balcony/balcony_1.jpeg');
+      render(<MockedIsland />);
+      act(() => { vi.advanceTimersByTime(1200); });
+      await vi.dynamicImportSettled();
+      expect(hero.dataset.gl).toBe('off:assets');
+      expect(mockMountHeroGl).not.toHaveBeenCalled();
+    });
   });
 });

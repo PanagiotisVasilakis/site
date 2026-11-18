@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-// This must name the newest schema migration (tests/unit/readiness-migration.test.ts
+// This must name the newest schema migration (tests/routes/health-ready.test.ts
 // enforces it). Readiness is not merely a TCP/SELECT probe: the running binary
 // and database schema must agree, so the newest finished migration in the database
 // has to be exactly this one. A database that is behind (migrations have not run yet) and

@@ -1,11 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { BOOKING_COM_LISTING_URL } from '@/data/contact';
 import { ApiErrorCode } from '@/lib/apiErrorTypes';
-import { mapsHref, telHref } from '@/lib/contactLinks';
+import { isBookingComListingUrl, mapsHref, telHref } from '@/lib/contactLinks';
 import { serializeJsonLd } from '@/lib/jsonLd';
 import { toSafeLocalPath } from '@/lib/safeLocalPath';
 import { absUrl, siteUrl } from '@/lib/site';
 import { mapApiErrorToUI } from '@/lib/userFacingErrors';
+import { whatsappHref } from '@/lib/whatsapp';
 
 describe('core utility contracts', () => {
   it('builds safe phone and maps links', () => {
@@ -86,5 +88,68 @@ describe('core utility contracts', () => {
   it('uses localized safe fallbacks for unknown errors', () => {
     expect(mapApiErrorToUI(null).summary).toContain('Something went wrong');
     expect(mapApiErrorToUI({ error: { code: ApiErrorCode.GATEWAY_TIMEOUT } }, 'el').summary).toContain('προσωρινά');
+  });
+});
+
+describe('application URL configuration', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('uses only NEXT_PUBLIC_SITE_URL for an explicitly configured origin', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'guest.example');
+    vi.stubEnv('VERCEL_URL', 'legacy.example');
+
+    const { siteUrl: configuredSiteUrl } = await import('@/lib/site');
+
+    expect(configuredSiteUrl).toBe('https://guest.example');
+  });
+
+  it('does not treat VERCEL_URL as an application origin', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', '');
+    vi.stubEnv('VERCEL_URL', 'legacy.example');
+
+    const { siteUrl: fallbackSiteUrl } = await import('@/lib/site');
+
+    expect(fallbackSiteUrl).toBe('http://localhost:3000');
+  });
+});
+
+describe('whatsappHref', () => {
+  it('encodes the prefilled text and rejects blank phones', () => {
+    expect(whatsappHref('+30 695 581 0051', 'Check-in: 7 Oct & check-out: 10 Oct?'))
+      .toBe('https://wa.me/306955810051?text=Check-in%3A%207%20Oct%20%26%20check-out%3A%2010%20Oct%3F');
+    expect(whatsappHref('+30 695 581 0051', 'Άφιξη'))
+      .toBe(`https://wa.me/306955810051?text=${encodeURIComponent('Άφιξη')}`);
+    expect(whatsappHref('+30 695 581 0051', '')).toBe('https://wa.me/306955810051');
+    expect(() => whatsappHref('+ -')).toThrow(RangeError);
+  });
+});
+
+describe('isBookingComListingUrl', () => {
+  it.each([
+    BOOKING_COM_LISTING_URL,
+    'https://booking.com/Share-AiCapK',
+    'https://www.booking.com/Share-AiCapK?aid=123',
+  ])('accepts %s', (url) => {
+    expect(isBookingComListingUrl(url)).toBe(true);
+  });
+
+  it.each([
+    'not a url',
+    'http://www.booking.com/Share-AiCapK',
+    'https://www.booking.com.evil.test/Share-AiCapK',
+    'https://user:pass@www.booking.com/Share-AiCapK',
+    'https://www.booking.com:8443/Share-AiCapK',
+    'https://www.booking.com/',
+    'https://www.booking.com/Share-',
+    'https://www.booking.com/Share-AiCapK/extra',
+  ])('rejects %j', (url) => {
+    expect(isBookingComListingUrl(url)).toBe(false);
   });
 });

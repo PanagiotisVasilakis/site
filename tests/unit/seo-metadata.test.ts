@@ -2,7 +2,8 @@ import type { Metadata } from 'next';
 import { describe, expect, it } from 'vitest';
 
 import { generateMetadata as homeMetadata } from '@/app/[locale]/page';
-import { generateMetadata as localeLayoutMetadata } from '@/app/[locale]/layout';
+import LocaleLayout, { generateMetadata as localeLayoutMetadata } from '@/app/[locale]/layout';
+import { normalizeLocale } from '@/i18n/config';
 import { generateMetadata as apartmentMetadata } from '@/app/[locale]/apartment/page';
 import { generateMetadata as availabilityMetadata } from '@/app/[locale]/availability/page';
 import { generateMetadata as checkInMetadata } from '@/app/[locale]/check-in/page';
@@ -14,6 +15,8 @@ import { generateMetadata as portalRefreshMetadata } from '@/app/[locale]/portal
 import { generateMetadata as guestMetadata } from '@/app/[locale]/guest/page';
 import { generateMetadata as localeOfflineMetadata } from '@/app/[locale]/offline/page';
 import { metadata as offlineMetadata } from '@/app/offline/page';
+import robots from '@/app/robots';
+import sitemap from '@/app/sitemap';
 import { metadata as adminMetadata } from '@/app/admin/page';
 import { metadata as adminAvailabilityMetadata } from '@/app/admin/availability/page';
 import { metadata as adminGuestsMetadata } from '@/app/admin/guests/layout';
@@ -136,5 +139,50 @@ describe('locale layout metadata', () => {
     // resolution and would clear the root "%s | Dolce Far Niente · Kalamata"
     // template for every page under /[locale].
     expect(metadata.title).toBeUndefined();
+  });
+});
+
+describe('sitemap and robots.txt', () => {
+  const NON_INDEXABLE = ['/admin', '/api', '/offline'].concat(
+    ['stay', 'guest', 'check-in', 'portal', 'offline', 'favorites'].flatMap((section) => [`/en/${section}`, `/el/${section}`]),
+  );
+
+  it('lists public pages including privacy and omits non-indexable paths or lastModified', () => {
+    const entries = sitemap();
+    const urls = entries.map(({ url }) => url);
+    expect(urls).toContain(`${siteUrl}/en/privacy`);
+    expect(urls).toContain(`${siteUrl}/el/privacy`);
+
+    for (const entry of entries) {
+      const path = entry.url.slice(siteUrl.length);
+      expect(NON_INDEXABLE.filter((prefix) => path === prefix || path.startsWith(`${prefix}/`)), path).toEqual([]);
+      expect(entry).not.toHaveProperty('lastModified');
+    }
+  });
+
+  it('disallows every non-indexable route in robots.txt and points to sitemap', () => {
+    expect(robots()).toEqual({
+      sitemap: `${siteUrl}/sitemap.xml`,
+      rules: [{ userAgent: '*', allow: '/', disallow: NON_INDEXABLE }],
+    });
+  });
+});
+
+describe('locale layout guard and normalizeLocale', () => {
+  const NOT_FOUND_DIGEST = /^NEXT_HTTP_ERROR_FALLBACK;404$/;
+  const renderLayout = (locale: string) => LocaleLayout({ children: null, params: Promise.resolve({ locale }) });
+
+  it.each(['x.y', '_nextfoo', 'admin'])('answers 404 for unsupported locale segment %j', async (locale) => {
+    await expect(renderLayout(locale)).rejects.toMatchObject({ digest: expect.stringMatching(NOT_FOUND_DIGEST) });
+  });
+
+  it('renders the layout for supported locale en and normalizes locale inputs', async () => {
+    const tree = await renderLayout('en');
+    expect(tree.props).toMatchObject({ 'data-locale': 'en', lang: 'en' });
+
+    expect(normalizeLocale('el')).toBe('el');
+    expect(normalizeLocale('EL')).toBe('en');
+    expect(normalizeLocale(null)).toBe('en');
+    expect(normalizeLocale('../el')).toBe('en');
   });
 });

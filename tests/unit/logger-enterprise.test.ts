@@ -354,3 +354,18 @@ describe('admin guest lookups', () => {
     expect(info.mock.calls[0][1]).toEqual({ phone: '[REDACTED]' });
   });
 });
+
+describe('client logger metadata', () => {
+  it('keeps the message of an Error nested in metadata and survives circular references', async () => {
+    const { logger } = await import('@/lib/logger-client');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    logger.warn('request failed', { error: new Error('boom') });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('"message": "boom"'));
+
+    const circular: Record<string, unknown> = { name: 'node' };
+    circular.self = circular;
+    expect(() => logger.warn('circular', { circular })).not.toThrow();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('[unserializable metadata]'));
+  });
+});

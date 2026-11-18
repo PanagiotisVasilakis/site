@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 
 import { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -88,14 +87,6 @@ describe('client error report contract', () => {
     expect(response.status).toBeLessThan(300);
     const data = mocks.securityAuditEventCreate.mock.calls[0][0].data as { details: { buildVersion?: string } };
     expect(data.details.buildVersion).toBe('0123456789abcdef0123456789abcdef01234567');
-  });
-
-  it('inlines the release commit as the build version in the image build', () => {
-    const builderStage = readFileSync('docker/Dockerfile.security', 'utf8').split(/^FROM /mu)[1];
-    const lines = builderStage.split('\n');
-    const envIndex = lines.indexOf('ENV NEXT_PUBLIC_BUILD_VERSION=${GIT_COMMIT}');
-    expect(envIndex).toBeGreaterThan(lines.indexOf('ARG GIT_COMMIT'));
-    expect(envIndex).toBeLessThan(lines.indexOf('RUN npm run build'));
   });
 
   it('checks the per-address limit first and then a limit shared by all clients', async () => {

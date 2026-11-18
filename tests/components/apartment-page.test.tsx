@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type React from 'react';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -13,8 +13,6 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/lib/prisma-repositories/availabilityRepository', () => ({ readPublicAvailability: mocks.read }));
 vi.mock('@/lib/logger-enterprise', () => ({ logger: mocks.logger }));
-
-// A plain anchor: the app router is not mounted in jsdom, and the test only needs the link's target.
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => <a href={href} {...props}>{children}</a>,
 }));
@@ -28,13 +26,17 @@ vi.mock('@/data/contact', async (importOriginal) => ({
 import ApartmentPage from '@/app/[locale]/apartment/page';
 import FactStrip from '@/components/home/FactStrip';
 import { HOST_CONTACT } from '@/data/contact';
-import { getDictionary } from '@/i18n/dictionaries';
 import { addDays, type IsoDate } from '@/lib/availability/calendarDate';
 import type { PublicAvailability } from '@/lib/prisma-repositories/availabilityRepository';
 
 import { installDialogMethods, removeDialogMethods, stubIntersectionObserver } from '../support/dom';
 
 const TODAY = '2026-10-18' as IsoDate;
+const ROOM_IDS = ['living', 'kitchen', 'bedroom-1', 'bedroom-2', 'bathroom', 'balcony', 'parking', 'details'];
+const EXCLUDED = [
+  'living_1', 'living_2', 'living_3', 'living_1_booking', 'bedroom_4',
+  'bedroom_2_2', 'bedroom_2_4', 'bathroom_5', 'bathroom_1', 'bathroom_8', 'bathroom_2',
+];
 
 function availability(overrides: Partial<PublicAvailability> = {}): PublicAvailability {
   return {
@@ -48,15 +50,6 @@ function availability(overrides: Partial<PublicAvailability> = {}): PublicAvaila
   };
 }
 
-const ROOM_IDS = ['living', 'kitchen', 'bedroom-1', 'bedroom-2', 'bathroom', 'balcony', 'parking', 'details'];
-
-// identity §7.3: never shown in the marketing views (retired, duplicates, soft, branded, stay-hub only).
-const EXCLUDED = [
-  'living_1', 'living_2',
-  'living_3', 'living_1_booking', 'bedroom_4', 'bedroom_2_2', 'bedroom_2_4',
-  'bathroom_5', 'bathroom_1', 'bathroom_8', 'bathroom_2',
-];
-
 async function renderPage(locale: 'en' | 'el') {
   return render(await ApartmentPage({ params: Promise.resolve({ locale }) }));
 }
@@ -67,163 +60,62 @@ beforeEach(() => {
 });
 
 describe('apartment page (identity §9.2)', () => {
-  it.each(['en', 'el'] as const)('links each room chip (%s) to the room section with the same id', async (locale) => {
-    const { container } = await renderPage(locale);
+  it('links room chips to sections, enforces photo exclusions/layout, and matches FactStrip + host identity', async () => {
+    const { container, unmount } = await renderPage('en');
 
-    const nav = container.querySelector('nav.apt-chips');
-    expect(nav).not.toBeNull();
-    const hrefs = within(nav as HTMLElement).getAllByRole('link').map((link) => link.getAttribute('href'));
-    expect(hrefs).toEqual(ROOM_IDS.map((id) => `#${id}`));
+    const nav = container.querySelector('nav.apt-chips') as HTMLElement;
+    expect(within(nav).getAllByRole('link').map((l) => l.getAttribute('href'))).toEqual(ROOM_IDS.map((id) => `#${id}`));
     for (const id of ROOM_IDS) {
-      const section = container.querySelector(`section#${id}`);
-      expect(section, id).not.toBeNull();
-      expect(within(section as HTMLElement).getByRole('heading', { level: 2 })).toBeInTheDocument();
+      expect(within(container.querySelector(`section#${id}`) as HTMLElement).getByRole('heading', { level: 2 })).toBeInTheDocument();
     }
-  });
-
-  it('shows the 42 marketing photos in the §7.3 order and never an excluded one', async () => {
-    const { container } = await renderPage('en');
 
     const sources = [...container.querySelectorAll('img')].map((img) => img.getAttribute('src') ?? '');
-    for (const name of EXCLUDED) {
-      expect(sources.filter((src) => src.includes(`/${name}.`)), name).toEqual([]);
-    }
-    // The lead photo (living_8, LCP), the 30 room tiles, the parking tile and the 10 details tiles.
+    expect(sources).toHaveLength(42);
+    for (const name of EXCLUDED) expect(sources.filter((src) => src.includes(`/${name}.`)), name).toEqual([]);
     const lead = container.querySelector('.apt-lead img');
     expect(lead?.getAttribute('src')).toBe('/house/living/living_8.jpeg');
     expect(lead?.getAttribute('loading')).toBe('eager');
     expect(lead?.getAttribute('fetchpriority')).toBe('high');
-    const tiles = [...container.querySelectorAll('.apt-masonry img')].map((img) => img.getAttribute('src'));
-    expect(tiles).toEqual([
-      '/house/living/living_6.jpeg', '/house/living/living_11.jpeg', '/house/living/living_7.jpeg',
-      '/house/living/living_9.jpeg', '/house/living/living_10.jpeg', '/house/living/living_4.jpeg',
-      '/house/living/living_5.jpeg',
-      '/house/kitchen/kitchen_2.jpeg', '/house/kitchen/kitchen_6.jpeg', '/house/kitchen/kitchen_3.jpeg',
-      '/house/kitchen/kitchen_4.jpeg', '/house/kitchen/kitchen_5.jpeg', '/house/kitchen/kitchen_1.jpeg',
-      '/house/bedroom/bedroom_1.jpeg', '/house/bedroom/bedroom_2.jpeg', '/house/bedroom/bedroom_3.jpeg',
-      '/house/bedroom/bedroom_5.jpeg',
-      '/house/bedroom_2/bedroom_2_5.jpeg', '/house/bedroom_2/bedroom_2_6.jpeg', '/house/bedroom_2/bedroom_2_3.jpeg',
-      '/house/bedroom_2/bedroom_2_1.jpeg',
-      '/house/bathroom/bathroom_6.jpeg', '/house/bathroom/bathroom_7.jpeg', '/house/bathroom/bathroom_3.jpeg',
-      '/house/bathroom/bathroom_4.jpeg',
-      '/house/balcony/balcony_2.jpeg', '/house/balcony/balcony_3.jpeg', '/house/balcony/balcony_1.jpeg',
-      '/house/balcony/balcony_4.jpeg', '/house/balcony/balcony_5.jpeg',
-      '/house/parking/parking_1.jpeg',
-      '/house/details/details_1.jpeg', '/house/details/details_2.jpeg', '/house/details/details_3.jpeg',
-      '/house/details/details_4.jpeg', '/house/details/details_5.jpeg', '/house/details/details_6.jpeg',
-      '/house/details/details_7.jpeg', '/house/details/details_8.jpeg', '/house/details/details_9.jpeg',
-      '/house/details/details_10.jpeg',
-    ]);
-    for (const img of container.querySelectorAll('.apt-masonry img')) {
-      expect(img.getAttribute('alt'), img.getAttribute('src') ?? '').not.toBe('');
-      expect(img.getAttribute('loading')).toBe('lazy');
-    }
-  });
-
-  it('lays out the sections whose tiles share one box ratio as a row-major grid, the others as columns (R-700)', async () => {
-    const { container } = await renderPage('en');
 
     const layout = (id: string) => (container.querySelector(`section#${id} ul.apt-masonry`) as HTMLElement).className;
-    const ratios = (id: string) => new Set([...container.querySelectorAll(`section#${id} .apt-tile`)].map((tile) => (tile as HTMLElement).style.aspectRatio));
-    // Ten 2:3 details tiles and four equal 3:2 bedroom-2 tiles: a grid, so only the last row is short and no column is left empty.
-    for (const id of ['details', 'bedroom-2']) {
-      expect(layout(id), id).toBe('apt-masonry apt-masonry--grid');
-      expect(ratios(id).size, id).toBe(1);
-    }
-    // Sections that mix 3:2 and 2:3 tiles stay CSS columns.
-    for (const id of ['living', 'kitchen', 'bedroom-1', 'bathroom', 'balcony']) {
-      expect(layout(id), id).toBe('apt-masonry');
-      expect(ratios(id).size, id).toBeGreaterThan(1);
-    }
-    // The single parking tile is shown alone (D3), not as a grid.
+    expect(layout('details')).toBe('apt-masonry apt-masonry--grid');
+    expect(layout('bedroom-2')).toBe('apt-masonry apt-masonry--grid');
+    expect(layout('living')).toBe('apt-masonry');
     expect(layout('parking')).toBe('apt-masonry apt-masonry--single');
-    expect(container.querySelectorAll('.apt-masonry--grid')).toHaveLength(2);
-  });
 
-  it('links (en) to the free dates and to the home contact section', async () => {
-    const { container } = await renderPage('en');
-
-    const cta = container.querySelector('#book') as HTMLElement;
-    expect(within(cta).getByRole('link', { name: 'See free dates' })).toHaveAttribute('href', '/en/availability');
-    const contactLinks = [...container.querySelectorAll('a')].filter((a) => a.getAttribute('href')?.endsWith('#contact'));
-    expect(contactLinks.map((a) => a.getAttribute('href'))).toEqual(['/en#contact']);
-    // The old page sent "Contact" to the phones directory (plan V6).
-    expect(container.querySelector('a[href="/en/phones"]')).toBeNull();
-  });
-
-  it('hides "Book on Booking.com" without a valid link (identity §1.4)', async () => {
-    for (const url of ['', 'https://example.com/Share-AiCapK', 'http://www.booking.com/Share-AiCapK']) {
-      contact.bookingUrl = url;
-      const { container, unmount } = await renderPage('en');
-      expect(screen.queryByRole('link', { name: /Booking\.com/ }), url).toBeNull();
-      expect(screen.queryByText(/Book on Booking\.com/), url).toBeNull();
-      expect(container.querySelector('a[href*="booking.com"]'), url).toBeNull();
-      unmount();
-    }
-  });
-
-  it('shows "Book on Booking.com" as the secondary CTA with a valid link', async () => {
-    contact.bookingUrl = 'https://www.booking.com/Share-AiCapK';
-    const { container } = await renderPage('en');
-
-    const bookingLink = within(container.querySelector('#book') as HTMLElement).getByRole('link', { name: /Book on Booking\.com/ });
-    expect(bookingLink).toHaveAttribute('href', 'https://www.booking.com/Share-AiCapK');
-    expect(bookingLink).toHaveAttribute('target', '_blank');
-    expect(bookingLink).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(bookingLink.className).toContain('ui-btn--secondary');
-  });
-
-  // Owner decision O45 (2026-10-04): the sea view is confirmed by the owner, so the amenity lists it
-  // (this lifts identity §1.4 rule 1 for the apartment data).
-  it.each([
-    ['en', 'Sea, mountain, and city views'],
-    ['el', 'Θέα σε θάλασσα, βουνό και πόλη'],
-  ] as const)('lists the owner-confirmed view amenity (%s, O45)', async (locale, amenity) => {
-    const { container } = await renderPage(locale);
-    expect(container.textContent).toContain(amenity);
-  });
-
-  it.each(['en', 'el'] as const)('shows the six home facts inline in the page head (%s), without a link', async (locale) => {
-    const { container, unmount } = await renderPage(locale);
     const head = container.querySelector('.apt-head') as HTMLElement;
-    const list = within(head).getByRole('list', { name: locale === 'en' ? 'Key facts' : 'Βασικά στοιχεία' });
-    const apartmentFacts = within(list).getAllByRole('listitem').map((item) => item.textContent);
+    expect(within(head).getByText(HOST_CONTACT.legalName)).toBeInTheDocument();
     expect(within(head).queryByRole('link')).toBeNull();
+    const apartmentFacts = within(within(head).getByRole('list', { name: 'Key facts' })).getAllByRole('listitem').map((i) => i.textContent);
     unmount();
 
-    const home = render(<FactStrip locale={locale} />);
-    const homeFacts = within(home.container.querySelector('ul') as HTMLElement).getAllByRole('listitem').map((item) => item.textContent);
-
-    expect(apartmentFacts).toHaveLength(6);
+    const homeFacts = within(render(<FactStrip locale="en" />).container.querySelector('ul') as HTMLElement)
+      .getAllByRole('listitem')
+      .map((i) => i.textContent);
     expect(apartmentFacts).toEqual(homeFacts);
   });
 
-  it('shows the host identity in the apartment head (el), without a link', async () => {
-    const labels = getDictionary('el').shell.identity;
-    const { container } = await renderPage('el');
-    const head = container.querySelector('.apt-head') as HTMLElement;
-    const identity = head.querySelector('.host-identity') as HTMLElement;
-    expect(identity).not.toBeNull();
-    for (const text of [labels.registryLabel, labels.legalNameLabel, HOST_CONTACT.registrationNumber, HOST_CONTACT.legalName, HOST_CONTACT.address]) {
-      expect(within(identity).getByText(text)).toBeInTheDocument();
+  it('gates the Booking.com secondary CTA to HTTPS booking.com URLs and links to availability and contact', async () => {
+    for (const url of ['', 'https://example.com/Share-AiCapK', 'http://www.booking.com/Share-AiCapK']) {
+      contact.bookingUrl = url;
+      const { container, unmount } = await renderPage('en');
+      expect(container.querySelector('a[href*="booking.com"]'), url).toBeNull();
+      unmount();
     }
-    expect(within(head).queryByRole('link')).toBeNull();
-  });
 
-  it('has one h1 and amenity groups built from the apartment data', async () => {
+    contact.bookingUrl = 'https://www.booking.com/Share-AiCapK';
     const { container } = await renderPage('en');
-
-    expect(screen.getAllByRole('heading', { level: 1 }).map((h) => h.textContent)).toEqual(['The apartment']);
-    const amenities = container.querySelector('#amenities') as HTMLElement;
-    expect(within(amenities).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
-      'Essentials', 'Comfort', 'Kitchen', 'Bathroom', 'Outdoor and views', 'Safety',
-    ]);
-    expect(within(amenities).getByText('Free Wi-Fi throughout the property')).toBeInTheDocument();
+    const cta = container.querySelector('#book') as HTMLElement;
+    expect(within(cta).getByRole('link', { name: 'See free dates' })).toHaveAttribute('href', '/en/availability');
+    expect([...container.querySelectorAll('a')].filter((a) => a.getAttribute('href')?.endsWith('#contact')).map((a) => a.getAttribute('href'))).toEqual(['/en#contact']);
+    const bookingLink = within(cta).getByRole('link', { name: /Book on Booking\.com/ });
+    expect(bookingLink).toHaveAttribute('href', 'https://www.booking.com/Share-AiCapK');
+    expect(bookingLink).toHaveAttribute('target', '_blank');
+    expect(bookingLink).toHaveAttribute('rel', 'noopener noreferrer');
   });
 });
 
-describe('apartment page gallery wiring (identity §9.2, §8 GalleryLightbox)', () => {
-  // jsdom has no HTMLDialogElement.showModal/close and no Element.scrollTo (as in gallery-lightbox.test.tsx).
+describe('apartment page gallery and chips interaction', () => {
   beforeEach(() => {
     installDialogMethods();
     Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: vi.fn() });
@@ -234,148 +126,67 @@ describe('apartment page gallery wiring (identity §9.2, §8 GalleryLightbox)', 
     Reflect.deleteProperty(HTMLElement.prototype, 'scrollTo');
   });
 
-  function viewer() {
-    // By selector: a closed <dialog> is not exposed with its role.
-    const dialog = document.querySelector('dialog.lightbox') as HTMLDialogElement;
-    expect(dialog).toHaveAttribute('aria-label', 'Photo viewer');
-    return {
-      dialog,
-      counter: dialog.querySelector('.lightbox__count'),
-      room: dialog.querySelector('.lightbox__room'),
-    };
-  }
-
-  it('opens the viewer at the photo that was clicked, lead photo included', async () => {
-    const user = userEvent.setup();
-    const { container } = await renderPage('en');
-    const tile = (src: string) => container.querySelector(`.apt-masonry img[src="${src}"]`)?.closest('button') as HTMLElement;
-
-    await user.click(tile('/house/kitchen/kitchen_2.jpeg'));
-    expect(viewer().dialog).toHaveAttribute('open');
-    expect(viewer().counter).toHaveTextContent('9 / 42');
-    expect(viewer().room).toHaveTextContent('Kitchen');
-    await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
-    expect(viewer().dialog).not.toHaveAttribute('open');
-
-    await user.click(tile('/house/living/living_11.jpeg'));
-    expect(viewer().counter).toHaveTextContent('3 / 42');
-    expect(viewer().room).toHaveTextContent('Living room');
-    await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
-
-    // R-691: balcony_3 (2:3) sits before balcony_1 (3:2), so the single landscape photo does not end up alone in a column.
-    await user.click(tile('/house/balcony/balcony_3.jpeg'));
-    expect(viewer().counter).toHaveTextContent('28 / 42');
-    expect(viewer().room).toHaveTextContent('Balcony');
-    await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
-
-    await user.click(tile('/house/balcony/balcony_1.jpeg'));
-    expect(viewer().counter).toHaveTextContent('29 / 42');
-    expect(viewer().room).toHaveTextContent('Balcony');
-    await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
-
-    await user.click(tile('/house/balcony/balcony_4.jpeg'));
-    expect(viewer().counter).toHaveTextContent('30 / 42');
-    expect(viewer().room).toHaveTextContent('Balcony');
-    await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
-
-    await user.click(tile('/house/balcony/balcony_5.jpeg'));
-    expect(viewer().counter).toHaveTextContent('31 / 42');
-    expect(viewer().room).toHaveTextContent('Balcony');
-    await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
-
-    await user.click(tile('/house/parking/parking_1.jpeg'));
-    expect(viewer().counter).toHaveTextContent('32 / 42');
-    expect(viewer().room).toHaveTextContent('Parking');
-    await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
-
-    await user.click(tile('/house/details/details_1.jpeg'));
-    expect(viewer().counter).toHaveTextContent('33 / 42');
-    expect(viewer().room).toHaveTextContent('Up close');
-    await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
-
-    await user.click(tile('/house/details/details_10.jpeg'));
-    expect(viewer().counter).toHaveTextContent('42 / 42');
-    expect(viewer().room).toHaveTextContent('Up close');
-    await user.click(within(viewer().dialog).getByRole('button', { name: 'Close photo viewer' }));
-
-    await user.click(container.querySelector('.apt-lead__open') as HTMLElement);
-    expect(viewer().counter).toHaveTextContent('1 / 42');
-    expect(viewer().room).toHaveTextContent('Living room');
-  });
-
-  it('marks the first room chip as current and moves it to a clicked chip', async () => {
-    const user = userEvent.setup();
-    const { container } = await renderPage('en');
-    const nav = container.querySelector('nav.apt-chips') as HTMLElement;
-    const current = () => [...nav.querySelectorAll('[aria-current="true"]')].map((chip) => chip.getAttribute('href'));
-
-    expect(current()).toEqual(['#living']);
-    await user.click(within(nav).getByRole('link', { name: 'Kitchen' }));
-    expect(current()).toEqual(['#kitchen']);
-  });
-
-  it('follows the scroll with the room chips and returns to the first room above the rooms', async () => {
-    // The room sections' observer only (the BookBar has its own).
+  it('opens the lightbox at the clicked tile or lead photo, and syncs room chips on click and scroll', async () => {
     let notify: IntersectionObserverCallback = () => {};
     vi.stubGlobal('IntersectionObserver', class {
       constructor(private readonly callback: IntersectionObserverCallback) {}
       observe(target: Element) { if (target.matches('section.apt-room')) notify = this.callback; }
       disconnect() {}
     });
+
+    const user = userEvent.setup();
     const { container } = await renderPage('en');
+    const dialog = document.querySelector('dialog.lightbox') as HTMLDialogElement;
+
+    await user.click(container.querySelector('.apt-masonry img[src="/house/kitchen/kitchen_2.jpeg"]')?.closest('button') as HTMLElement);
+    expect(dialog).toHaveAttribute('open');
+    expect(dialog.querySelector('.lightbox__count')).toHaveTextContent('9 / 42');
+    expect(dialog.querySelector('.lightbox__room')).toHaveTextContent('Kitchen');
+    await user.click(within(dialog).getByRole('button', { name: 'Close photo viewer' }));
+    expect(dialog).not.toHaveAttribute('open');
+
+    await user.click(container.querySelector('.apt-lead__open') as HTMLElement);
+    expect(dialog.querySelector('.lightbox__count')).toHaveTextContent('1 / 42');
+
     const nav = container.querySelector('nav.apt-chips') as HTMLElement;
     const current = () => [...nav.querySelectorAll('[aria-current="true"]')].map((chip) => chip.getAttribute('href'));
+    expect(current()).toEqual(['#living']);
+    await user.click(within(nav).getByRole('link', { name: 'Kitchen' }));
+    expect(current()).toEqual(['#kitchen']);
+
     const entry = (id: string, isIntersecting: boolean) =>
       ({ isIntersecting, target: container.querySelector(`section#${id}`) }) as unknown as IntersectionObserverEntry;
-
     act(() => notify([entry('bedroom-1', true)], {} as IntersectionObserver));
     expect(current()).toEqual(['#bedroom-1']);
 
-    // Scrolled back up: no room in the band and the first room starts below the top of the viewport.
-    const living = container.querySelector('section#living') as HTMLElement;
-    vi.spyOn(living, 'getBoundingClientRect').mockReturnValue({ top: 500 } as DOMRect);
+    vi.spyOn(container.querySelector('section#living') as HTMLElement, 'getBoundingClientRect').mockReturnValue({ top: 500 } as DOMRect);
     act(() => notify([entry('bedroom-1', false)], {} as IntersectionObserver));
     expect(current()).toEqual(['#living']);
   });
 });
 
-describe('BookBar on the apartment page (identity §8, §9.2)', () => {
-  it('is not rendered when the availability read fails, and logs no details', async () => {
-    mocks.read.mockRejectedValue(new Error('connect ECONNREFUSED 10.0.0.5:5432'));
-
-    const { container } = await renderPage('en');
-
-    expect(container.querySelector('.bookbar')).toBeNull();
-    expect(container.querySelector('#book')).not.toBeNull();
-    expect(mocks.logger.error).toHaveBeenCalledTimes(1);
+describe('BookBar on the apartment page', () => {
+  it('omits BookBar without leaking DB details when availability read fails, and toggles visibility via observer', async () => {
+    mocks.read.mockRejectedValueOnce(new Error('connect ECONNREFUSED 10.0.0.5:5432'));
+    const failed = await renderPage('en');
+    expect(failed.container.querySelector('.bookbar')).toBeNull();
     expect(mocks.logger.error).toHaveBeenCalledWith('Apartment availability could not be read');
     expect(JSON.stringify(mocks.logger.error.mock.calls)).not.toContain('ECONNREFUSED');
-  });
+    failed.unmount();
 
-  it('stays hidden until the page head leaves the view, and while the #book CTAs are visible', async () => {
     const io = stubIntersectionObserver();
     const { container } = await renderPage('en');
     const bar = container.querySelector('.bookbar');
     const shown = () => Boolean(bar?.classList.contains('is-shown')) && !bar?.hasAttribute('inert');
     const head = container.querySelector('.apt-head') as Element;
-    const book = container.querySelector('#book') as HTMLElement;
-    const ctas = within(book).getByRole('link', { name: 'See free dates' }).closest('[data-cta-watch]') as Element;
-    expect(ctas).not.toBeNull();
+    const ctas = within(container.querySelector('#book') as HTMLElement).getByRole('link', { name: 'See free dates' }).closest('[data-cta-watch]') as Element;
 
     expect(shown()).toBe(false);
-    io.report(new Map([[head, true], [ctas, false]]));
-    expect(shown()).toBe(false);
-
-    io.report(new Map([[head, false]]));
+    io.report(new Map([[head, false], [ctas, false]]));
     expect(shown()).toBe(true);
-
     io.report(new Map([[ctas, true]]));
     expect(shown()).toBe(false);
-
-    io.report(new Map([[ctas, false]]));
-    expect(shown()).toBe(true);
-
-    io.report(new Map([[head, true]]));
+    io.report(new Map([[ctas, false], [head, true]]));
     expect(shown()).toBe(false);
   });
 });

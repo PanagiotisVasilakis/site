@@ -81,6 +81,18 @@ async function validateImageAssets({
       if (!metadata.width || !metadata.height) {
         issues.push({ file: relativeFile, message: 'has no decodable pixel dimensions' });
       }
+      if (metadata.exif || metadata.xmp || metadata.iptc) {
+        issues.push({
+          file: relativeFile,
+          message: 'contains embedded EXIF/XMP/IPTC metadata; strip metadata before publishing',
+        });
+      }
+      if (relativeFile.startsWith('house/') && metadata.hasProfile) {
+        issues.push({
+          file: relativeFile,
+          message: 'contains an embedded ICC profile under house/; strip profile before publishing',
+        });
+      }
     } catch (error) {
       issues.push({
         file: relativeFile,

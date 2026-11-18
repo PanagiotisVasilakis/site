@@ -18,17 +18,28 @@ type EventWhere = {
   id?: { notIn: string[] };
 };
 
-const prismaMock = vi.hoisted(() => ({
-  checkInRequest: { findMany: vi.fn<(args: ListArgs) => Promise<unknown[]>>() },
-  outboxEvent: {
-    findMany: vi.fn<(args: { where: EventWhere }) => Promise<{ id: string }[]>>(),
-    updateMany: vi.fn<(args: { where: EventWhere; data: Record<string, unknown> }) => Promise<{ count: number }>>(),
-  },
-}));
+const prismaMock = vi.hoisted(() => {
+  const tx = {
+    checkInRequest: { findUnique: vi.fn(), update: vi.fn() },
+    outboxEvent: { create: vi.fn() },
+  };
+  return {
+    tx,
+    $transaction: vi.fn(),
+    checkInRequest: { findMany: vi.fn<(args: ListArgs) => Promise<unknown[]>>() },
+    outboxEvent: {
+      findMany: vi.fn<(args: { where: EventWhere }) => Promise<{ id: string }[]>>(),
+      updateMany: vi.fn<(args: { where: EventWhere; data: Record<string, unknown> }) => Promise<{ count: number }>>(),
+    },
+  };
+});
 
 vi.mock('@/lib/prisma', () => ({ prisma: prismaMock }));
 
-import { checkInRequestRepository } from '@/lib/prisma-repositories/checkInRequestRepository';
+import {
+  CheckInRequestAlreadyDecidedError,
+  checkInRequestRepository,
+} from '@/lib/prisma-repositories/checkInRequestRepository';
 
 const REQUEST_ID = '79100000-0000-4000-8000-000000000001';
 const OTHER_REQUEST_ID = '79100000-0000-4000-8000-000000000002';
@@ -184,5 +195,47 @@ describe('retryFailedNotifications', () => {
     expect(prismaMock.outboxEvent.updateMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { checkInRequestId: REQUEST_ID, status: 'DEAD', id: { notIn: ['cancelled'] } },
     }));
+  });
+});
+
+describe('arrival request decisions', () => {
+  const decisionRow = (status: string) => ({
+    id: REQUEST_ID,
+    bookingId: null,
+    userId: null,
+    guestName: null,
+    guestEmail: null,
+    guestPhone: null,
+    requestedTime: '17:00',
+    message: null,
+    status,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  beforeEach(() => {
+    vi.stubEnv('CHECKIN_REQUEST_WEBHOOK_URL', 'http://127.0.0.1:3999/hook');
+    prismaMock.$transaction.mockImplementation(async (callback: (client: typeof prismaMock.tx) => unknown) => callback(prismaMock.tx));
+    prismaMock.tx.checkInRequest.update.mockImplementation(async ({ data }: { data: { status: string } }) => decisionRow(data.status));
+  });
+
+  it('approves a pending request and queues one notification', async () => {
+    prismaMock.tx.checkInRequest.findUnique.mockResolvedValue(decisionRow('PENDING'));
+
+    const result = await checkInRequestRepository.updateStatus(REQUEST_ID, 'APPROVED');
+
+    expect(result.changed).toBe(true);
+    expect(prismaMock.tx.outboxEvent.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses to reverse a decision and treats repeating the same decision as unchanged', async () => {
+    prismaMock.tx.checkInRequest.findUnique.mockResolvedValue(decisionRow('APPROVED'));
+    await expect(checkInRequestRepository.updateStatus(REQUEST_ID, 'REJECTED')).rejects.toBeInstanceOf(CheckInRequestAlreadyDecidedError);
+    expect(prismaMock.tx.checkInRequest.update).not.toHaveBeenCalled();
+
+    prismaMock.tx.checkInRequest.findUnique.mockResolvedValue(decisionRow('REJECTED'));
+    const result = await checkInRequestRepository.updateStatus(REQUEST_ID, 'REJECTED');
+    expect(result.changed).toBe(false);
+    expect(prismaMock.tx.outboxEvent.create).not.toHaveBeenCalled();
   });
 });

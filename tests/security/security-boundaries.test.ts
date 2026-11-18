@@ -3,11 +3,10 @@ import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { hashSensitive, verifySensitive } from '@/lib/crypto';
-import { getClientIp } from '@/lib/net/getClientIp';
+import { requirePepper } from '@/lib/pepper';
 import { privacyHmac } from '@/lib/privacyHash';
 import { isSensitiveFieldName, redactSensitiveText } from '@/lib/redaction';
 import { runtimeEnvSchema } from '@/lib/runtime-env-schema.js';
@@ -434,12 +433,6 @@ describe('credential hashing and privacy-safe logging', () => {
     expect(verifySensitive('guest-secret', first.salt, 'malformed')).toBe(false);
   });
 
-  it('produces context-separated deterministic privacy digests', () => {
-    expect(privacyHmac('203.0.113.10', 'ip:v1')).toBe(privacyHmac('203.0.113.10', 'ip:v1'));
-    expect(privacyHmac('203.0.113.10', 'ip:v1')).not.toBe(privacyHmac('203.0.113.10', 'device:v1'));
-    expect(privacyHmac('203.0.113.10', 'ip:v1')).toMatch(/^[a-f0-9]{64}$/);
-  });
-
   it('redacts email, phone and token shapes without corrupting ordinary dates', () => {
     const token = `${'a'.repeat(24)}.${'b'.repeat(24)}.signature`;
     expect(redactSensitiveText(`guest@example.com +30 690 000 0000 ${token}`)).toBe(
@@ -539,71 +532,55 @@ describe('credential hashing and privacy-safe logging', () => {
   });
 });
 
-describe('trusted proxy IP extraction', () => {
-  const secret = '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2';
-
-  afterEach(() => vi.unstubAllEnvs());
-
-  function request(headers: Record<string, string>): NextRequest {
-    return {
-      headers: { get: (name: string) => headers[name.toLowerCase()] ?? null },
-    } as unknown as NextRequest;
-  }
-
-  it('canonicalizes attested IPv6 and IPv4-mapped IPv6 identities', () => {
-    vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);
-    expect(getClientIp(request({
-      'x-origin-verified-client-ip': '2001:0DB8:0000:0000:0000:0000:0000:0001',
-      'x-origin-proxy-attestation': secret,
-    }))).toBe('2001:db8::1');
-    expect(getClientIp(request({
-      'x-origin-verified-client-ip': '::ffff:203.0.113.10',
-      'x-origin-proxy-attestation': secret,
-    }))).toBe('203.0.113.10');
+describe('HMAC keys and crypto secret bootstrap policy', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
   });
 
-  it.each([
-    ['missing attestation', { 'x-origin-verified-client-ip': '203.0.113.10' }],
-    ['missing private IP', { 'x-origin-proxy-attestation': secret }],
-    ['wrong attestation', {
-      'x-origin-verified-client-ip': '203.0.113.10',
-      'x-origin-proxy-attestation': 'fedcba9876543210'.repeat(4),
-    }],
-    ['duplicated attestation', {
-      'x-origin-verified-client-ip': '203.0.113.10',
-      'x-origin-proxy-attestation': `${secret}, ${secret}`,
-    }],
-    ['IP with port', {
-      'x-origin-verified-client-ip': '203.0.113.10:443',
-      'x-origin-proxy-attestation': secret,
-    }],
-  ] as const)('rejects %s', (_label, headers) => {
-    vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);
-    expect(getClientIp(request(headers))).toBe('unknown');
+  it('refuses missing claim-token or security peppers outside production without fallback', () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('SECURITY_PEPPER', 's'.repeat(32));
+    vi.stubEnv('CLAIM_TOKEN_PEPPER', '');
+    expect(() => requirePepper('CLAIM_TOKEN_PEPPER')).toThrow('CLAIM_TOKEN_PEPPER is required');
+
+    vi.stubEnv('SECURITY_PEPPER', '');
+    expect(() => privacyHmac('203.0.113.7', 'security-event-ip:v1')).toThrow('SECURITY_PEPPER is required');
   });
 
-  it('ignores spoofed public candidates when the private pair is valid', () => {
-    vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);
-    expect(getClientIp(request({
-      'cf-connecting-ip': '198.51.100.1',
-      'x-forwarded-for': '198.51.100.2',
-      'x-real-ip': '198.51.100.3',
-      forwarded: 'for=198.51.100.4',
-      'x-origin-verified-client-ip': '203.0.113.10',
-      'x-origin-proxy-attestation': secret,
-    }))).toBe('203.0.113.10');
+  it('keys context-separated privacy hashes with SECURITY_PEPPER', () => {
+    vi.stubEnv('SECURITY_PEPPER', 'a'.repeat(32));
+    const first = privacyHmac('203.0.113.7', 'ctx');
+    expect(first).toBe(privacyHmac('203.0.113.7', 'ctx'));
+    expect(first).not.toBe(privacyHmac('203.0.113.7', 'other-ctx'));
+    expect(first).toMatch(/^[a-f0-9]{64}$/);
+    vi.stubEnv('SECURITY_PEPPER', 'b'.repeat(32));
+    expect(privacyHmac('203.0.113.7', 'ctx')).not.toBe(first);
   });
 
-  it.each([
-    ['CF-Connecting-IP', 'header', 'cf-connecting-ip', 'cf-connecting-ip'],
-    ['X-Real-IP', 'header', 'x-real-ip', 'x-real-ip'],
-    ['X-Forwarded-For', 'hops', undefined, 'x-forwarded-for'],
-  ] as const)(
-    'does not trust an unverified direct request merely because it supplies %s',
-    (_label, _mode, _configuredHeader, suppliedHeader) => {
-      vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);
+  it('generates one process-local pepper in development when none is configured', async () => {
+    vi.resetModules();
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('SECURITY_PEPPER', '');
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const cryptoModule = await import('@/lib/crypto');
+    const signed = cryptoModule.hashSensitive('value');
+    expect(cryptoModule.verifySensitive('value', signed.salt, signed.hash)).toBe(true);
+    expect(warning).toHaveBeenCalledTimes(1);
+  });
 
-      expect(getClientIp(request({ [suppliedHeader]: '203.0.113.195' }))).toBe('unknown');
-    },
-  );
+  it('fails module initialization in production without SECURITY_PEPPER but allows build phase', async () => {
+    vi.resetModules();
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('NEXT_PHASE', '');
+    vi.stubEnv('SECURITY_PEPPER', '');
+    await expect(import('@/lib/crypto')).rejects.toThrow('SECURITY_PEPPER');
+
+    vi.resetModules();
+    vi.stubEnv('NEXT_PHASE', 'phase-production-build');
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const cryptoModule = await import('@/lib/crypto');
+    expect(cryptoModule.hashSensitive('build-value').hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(warning).not.toHaveBeenCalled();
+  });
 });

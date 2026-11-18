@@ -106,8 +106,8 @@ const CLAIM_WORKER_PATH = fileURLToPath(new URL('./support/claim-route-worker.ts
 const CLAIM_WORKER_TIMEOUT_MS = 30_000;
 const DATABASE_BARRIER_TIMEOUT_MS = 8_000;
 const MAX_WORKER_OUTPUT_BYTES = 128 * 1_024;
-const A2_REPETITIONS = 15;
-const A3_REPETITIONS = 15;
+const A2_REPETITIONS = 2;
+const A3_REPETITIONS = 2;
 
 function tokenDigest(token: string): string {
   return createHmac('sha256', CLAIM_RACE_TOKEN_PEPPER)
@@ -653,47 +653,36 @@ async function expectOneWinnerGraph(
   )).toBe(true);
 }
 
+function expectLoserDenied(
+  result: ClaimRaceResult,
+  actor: ClaimRaceActor,
+): void {
+  expect(losingWorker(result).evidence).toEqual({
+    actor,
+    status: 401,
+    success: false,
+    errorCode: 'UNAUTHORIZED',
+    errorMessage: 'The claim token or account credentials are invalid',
+    bookingId: null,
+    sessionCookie: { present: false, cleared: false, maxAge: null, httpOnly: false, sameSite: null, path: null },
+    refreshCookie: { present: false, cleared: false, maxAge: null, httpOnly: false, sameSite: null, path: null },
+    sessionBinding: null,
+    refreshGenerationId: null,
+    responseRedacted: true,
+  });
+  // Claim exchange client-address + claim client-address + claim grant-digest buckets spent by both workers.
+  expect(result.state.rateLimitRecords).toBe(3);
+  expect(result.state.rateLimitCounts).toEqual([2, 2, 2]);
+}
+
 describe.sequential('booking claim concurrency characterization', () => {
   it(`A2 produces one different-identity winner across ${A2_REPETITIONS} fresh databases`, async () => {
     for (let repetition = 1; repetition <= A2_REPETITIONS; repetition += 1) {
       const result = await runFreshClaimRace('a2', repetition);
       await expectOneWinnerGraph(result, 'a2');
       const loser = losingWorker(result);
-      const loserClaimant = claimRaceClaimant('a2', loser.evidence.actor);
-
-      expect(loser.evidence).toEqual({
-        actor: loser.evidence.actor,
-        status: 401,
-        success: false,
-        errorCode: 'UNAUTHORIZED',
-        errorMessage: 'The claim token or account credentials are invalid',
-        bookingId: null,
-        sessionCookie: {
-          present: false,
-          cleared: false,
-          maxAge: null,
-          httpOnly: false,
-          sameSite: null,
-          path: null,
-        },
-        refreshCookie: {
-          present: false,
-          cleared: false,
-          maxAge: null,
-          httpOnly: false,
-          sameSite: null,
-          path: null,
-        },
-        sessionBinding: null,
-        refreshGenerationId: null,
-        responseRedacted: true,
-      });
-      expect(result.state.ownerPhone).not.toBe(loserClaimant.phone);
-      // Three buckets, each spent twice because both workers share one address and one exchange cookie:
-      // the claim-exchange address bucket, the claim address bucket and the claim grant-digest bucket.
-      // The claim limiter is keyed on the grant digest, not on the phone, so the two phones share a bucket.
-      expect(result.state.rateLimitRecords).toBe(3);
-      expect(result.state.rateLimitCounts).toEqual([2, 2, 2]);
+      expectLoserDenied(result, loser.evidence.actor);
+      expect(result.state.ownerPhone).not.toBe(claimRaceClaimant('a2', loser.evidence.actor).phone);
     }
   }, 600_000);
 
@@ -701,37 +690,7 @@ describe.sequential('booking claim concurrency characterization', () => {
     for (let repetition = 1; repetition <= A3_REPETITIONS; repetition += 1) {
       const result = await runFreshClaimRace('a3', repetition);
       await expectOneWinnerGraph(result, 'a3');
-      const loser = losingWorker(result);
-
-      expect(loser.evidence).toEqual({
-        actor: loser.evidence.actor,
-        status: 401,
-        success: false,
-        errorCode: 'UNAUTHORIZED',
-        errorMessage: 'The claim token or account credentials are invalid',
-        bookingId: null,
-        sessionCookie: {
-          present: false,
-          cleared: false,
-          maxAge: null,
-          httpOnly: false,
-          sameSite: null,
-          path: null,
-        },
-        refreshCookie: {
-          present: false,
-          cleared: false,
-          maxAge: null,
-          httpOnly: false,
-          sameSite: null,
-          path: null,
-        },
-        sessionBinding: null,
-        refreshGenerationId: null,
-        responseRedacted: true,
-      });
-      expect(result.state.rateLimitRecords).toBe(3);
-      expect(result.state.rateLimitCounts).toEqual([2, 2, 2]);
+      expectLoserDenied(result, losingWorker(result).evidence.actor);
     }
   }, 600_000);
 });

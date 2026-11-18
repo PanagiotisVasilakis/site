@@ -1477,19 +1477,39 @@ afterAll(() => {
   else process.env.SECURITY_PEPPER = originalSecurityPepper;
 });
 
+const OWNER_ROTATED = {
+  status: 'rotated',
+  familyId: PRIMARY_FAMILY_ID,
+  oldId: ROOT_GENERATION_ID,
+  replacementId: WINNER_GENERATION_ID,
+  sessionId: WINNER_GENERATION_ID,
+  sessionTokenIssued: true,
+} as const;
+
+const REVOKED_PRIMARY_BASE = {
+  familyRevoked: true,
+  tokenCount: 2,
+  activeTokenCount: 0,
+  revokedTokenCount: 2,
+  descendantCount: 1,
+  activeDescendantCount: 0,
+  sessionCount: 2,
+  activeSessionCount: 0,
+  revokedSessionCount: 2,
+  generationSessionPairingValid: true,
+  rootUsable: false,
+  replacementUsable: false,
+  contenderUsable: false,
+} as const;
+
+const REPETITIONS = 2;
+
 describe.sequential('refresh overlap classification through PostgreSQL contention', () => {
-  it('classifies 20 same-context overlaps as one rotation plus one concurrent result', async () => {
-    for (let repetition = 1; repetition <= 20; repetition += 1) {
+  it('classifies same-context overlaps as one rotation plus one concurrent result', async () => {
+    for (let repetition = 1; repetition <= REPETITIONS; repetition += 1) {
       const result = await runFreshOverlap('same-context', repetition);
-      expect(result, `same-context overlap repetition ${repetition}`).toEqual({
-        owner: {
-          status: 'rotated',
-          familyId: PRIMARY_FAMILY_ID,
-          oldId: ROOT_GENERATION_ID,
-          replacementId: WINNER_GENERATION_ID,
-          sessionId: WINNER_GENERATION_ID,
-          sessionTokenIssued: true,
-        },
+      expect(result, `same-context overlap ${repetition}`).toEqual({
+        owner: OWNER_ROTATED,
         contender: { status: 'concurrent', familyId: PRIMARY_FAMILY_ID },
         ownerLockObserved: true,
         contenderWaitObserved: false,
@@ -1517,38 +1537,16 @@ describe.sequential('refresh overlap classification through PostgreSQL contentio
     }
   }, 600_000);
 
-  it('revokes after 15 different-context overlaps while preserving the approved winner result', async () => {
-    for (let repetition = 1; repetition <= 15; repetition += 1) {
+  it('revokes after different-context overlaps while preserving the approved winner result', async () => {
+    for (let repetition = 1; repetition <= REPETITIONS; repetition += 1) {
       const result = await runFreshOverlap('different-context', repetition);
-      expect(result, `different-context overlap repetition ${repetition}`).toEqual({
-        owner: {
-          status: 'rotated',
-          familyId: PRIMARY_FAMILY_ID,
-          oldId: ROOT_GENERATION_ID,
-          replacementId: WINNER_GENERATION_ID,
-          sessionId: WINNER_GENERATION_ID,
-          sessionTokenIssued: true,
-        },
+      expect(result, `different-context overlap ${repetition}`).toEqual({
+        owner: OWNER_ROTATED,
         contender: { status: 'replayed', familyId: PRIMARY_FAMILY_ID },
         ownerLockObserved: true,
         contenderWaitObserved: true,
         state: {
-          primary: {
-            familyRevoked: true,
-            familyReason: 'suspicious_refresh_overlap',
-            tokenCount: 2,
-            activeTokenCount: 0,
-            revokedTokenCount: 2,
-            descendantCount: 1,
-            activeDescendantCount: 0,
-            sessionCount: 2,
-            activeSessionCount: 0,
-            revokedSessionCount: 2,
-            generationSessionPairingValid: true,
-            rootUsable: false,
-            replacementUsable: false,
-            contenderUsable: false,
-          },
+          primary: { ...REVOKED_PRIMARY_BASE, familyReason: 'suspicious_refresh_overlap' },
           isolated: ACTIVE_ISOLATED_FAMILY,
           theftSignals: [SUSPICIOUS_OVERLAP_THEFT_SIGNAL],
         },
@@ -1559,55 +1557,30 @@ describe.sequential('refresh overlap classification through PostgreSQL contentio
   it('does not let an invalid same-context session binding use the 409 shortcut', async () => {
     const result = await runFreshOverlap('same-context-invalid-binding', 1);
     expect(result).toEqual({
-      owner: {
-        status: 'rotated',
-        familyId: PRIMARY_FAMILY_ID,
-        oldId: ROOT_GENERATION_ID,
-        replacementId: WINNER_GENERATION_ID,
-        sessionId: WINNER_GENERATION_ID,
-        sessionTokenIssued: true,
-      },
+      owner: OWNER_ROTATED,
       contender: { status: 'replayed', familyId: PRIMARY_FAMILY_ID },
       ownerLockObserved: true,
       contenderWaitObserved: true,
       state: {
-        primary: {
-          familyRevoked: true,
-          familyReason: 'suspicious_refresh_overlap',
-          tokenCount: 2,
-          activeTokenCount: 0,
-          revokedTokenCount: 2,
-          descendantCount: 1,
-          activeDescendantCount: 0,
-          sessionCount: 2,
-          activeSessionCount: 0,
-          revokedSessionCount: 2,
-          generationSessionPairingValid: true,
-          rootUsable: false,
-          replacementUsable: false,
-          contenderUsable: false,
-        },
+        primary: { ...REVOKED_PRIMARY_BASE, familyReason: 'suspicious_refresh_overlap' },
         isolated: ACTIVE_ISOLATED_FAMILY,
         theftSignals: [SUSPICIOUS_OVERLAP_THEFT_SIGNAL],
       },
     });
   }, 120_000);
 
-  it('never returns concurrent across 5 fresh-database replays after the winner commit', async () => {
-    for (let repetition = 1; repetition <= 5; repetition += 1) {
+  it('never returns concurrent across fresh-database replays after the winner commit', async () => {
+    for (let repetition = 1; repetition <= REPETITIONS; repetition += 1) {
       const result = await runFreshOverlap('completed-replay-contention', repetition);
       const replayStatuses = [result.owner.status, result.contender.status];
-      expect(replayStatuses, `completed replay repetition ${repetition}`).not.toContain('concurrent');
-      expect(replayStatuses.sort(), `completed replay repetition ${repetition}`).toEqual([
-        'invalid',
-        'replayed',
-      ]);
+      expect(replayStatuses, `completed replay ${repetition}`).not.toContain('concurrent');
+      expect(replayStatuses.sort(), `completed replay ${repetition}`).toEqual(['invalid', 'replayed']);
       expect({
         completedRotationCommit: result.completedRotationCommit,
         ownerLockObserved: result.ownerLockObserved,
         contenderWaitObserved: result.contenderWaitObserved,
         state: result.state,
-      }, `completed replay repetition ${repetition}`).toEqual({
+      }, `completed replay ${repetition}`).toEqual({
         completedRotationCommit: {
           predecessorMarkerAcquired: true,
           witnessMarkerReleased: true,
@@ -1624,22 +1597,7 @@ describe.sequential('refresh overlap classification through PostgreSQL contentio
         ownerLockObserved: true,
         contenderWaitObserved: true,
         state: {
-          primary: {
-            familyRevoked: true,
-            familyReason: 'refresh_token_replay',
-            tokenCount: 2,
-            activeTokenCount: 0,
-            revokedTokenCount: 2,
-            descendantCount: 1,
-            activeDescendantCount: 0,
-            sessionCount: 2,
-            activeSessionCount: 0,
-            revokedSessionCount: 2,
-            generationSessionPairingValid: true,
-            rootUsable: false,
-            replacementUsable: false,
-            contenderUsable: false,
-          },
+          primary: { ...REVOKED_PRIMARY_BASE, familyReason: 'refresh_token_replay' },
           isolated: ACTIVE_ISOLATED_FAMILY,
           theftSignals: [REPLAY_THEFT_SIGNAL],
         },

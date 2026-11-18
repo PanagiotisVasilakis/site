@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { fill, formatStayDate, formatStayRange, nightsLabel } from '@/components/availability/format';
-import type { IsoDate } from '@/lib/availability/calendarDate';
+import { readMonthFragment } from '@/components/availability/plannerState';
+import { parseIsoDate, type IsoDate } from '@/lib/availability/calendarDate';
+
+function iso(value: string): IsoDate {
+  const parsed = parseIsoDate(value);
+  if (parsed === null) throw new Error(`test fixture is not an ISO date: ${value}`);
+  return parsed;
+}
 
 describe('availability text formatting', () => {
   it('fills known placeholders and keeps unknown ones', () => {
@@ -24,5 +31,33 @@ describe('availability text formatting', () => {
     const forms = { one: '{count} night', other: '{count} nights' };
     expect(nightsLabel(1, forms, 'en')).toBe('1 night');
     expect(nightsLabel(2, forms, 'el')).toBe('2 nights');
+  });
+});
+
+describe('readMonthFragment', () => {
+  const TODAY = iso('2026-10-05');
+  const HORIZON_END = iso('2027-10-01');
+
+  it.each([
+    ['#m=2026-10', '2026-10-01'],
+    ['#m=2027-09', '2027-09-01'],
+    ['m=2027-06', '2027-06-01'],
+  ])('opens %s on %s', (hash, expected) => {
+    expect(readMonthFragment(hash, TODAY, HORIZON_END)).toBe(expected);
+  });
+
+  it.each([
+    '#m=2026-09',
+    '#m=2027-10',
+    '#m=2027-13',
+    '#m=2027-6',
+    '#m=',
+  ])('ignores out-of-range or malformed %s', (hash) => {
+    expect(readMonthFragment(hash, TODAY, HORIZON_END)).toBeNull();
+  });
+
+  it('opens the horizon-end month while it still has a night before a mid-month horizon end', () => {
+    expect(readMonthFragment('#m=2027-10', TODAY, iso('2027-10-15'))).toBe('2027-10-01');
+    expect(readMonthFragment('#m=2027-11', TODAY, iso('2027-10-15'))).toBeNull();
   });
 });

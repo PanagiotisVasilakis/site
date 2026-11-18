@@ -16,7 +16,7 @@ const database = vi.hoisted(() => ({ migrations: [] as MigrationRows }));
 vi.mock('@/lib/prisma', () => ({ prisma: { $transaction: mocks.transaction } }));
 vi.mock('@/lib/logger-enterprise', () => ({ logger: mocks.logger }));
 
-// The route pins the newest migration directory (tests/unit/readiness-migration.test.ts enforces it).
+// The route expects the newest committed migration directory.
 function newestMigrationName(): string {
   const names = readdirSync('prisma/migrations', { withFileTypes: true })
     .filter((entry) => entry.isDirectory())

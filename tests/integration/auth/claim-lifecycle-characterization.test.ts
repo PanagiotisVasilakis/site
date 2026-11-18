@@ -90,6 +90,8 @@ interface SeedOptions {
   existingClaimant?: boolean;
   ownerId?: string;
   includeClaimantBookingAndSession?: boolean;
+  startOffset?: number;
+  endOffset?: number;
 }
 
 let target: DisposableDatabaseTarget | undefined;
@@ -157,8 +159,8 @@ async function seedClaimLifecycle(options: SeedOptions = {}): Promise<{
       data: {
         id: PRIMARY_BOOKING_ID,
         source: 'EXTERNAL',
-        startDate: utcDateOffset(now, -1),
-        endDate: utcDateOffset(now, 7),
+        startDate: utcDateOffset(now, options.startOffset ?? -1),
+        endDate: utcDateOffset(now, options.endOffset ?? 7),
         userId: options.ownerId ?? null,
         provider: 'integration-claim-lifecycle',
         externalReference: 'claim-lifecycle-primary',
@@ -335,10 +337,13 @@ async function performClaim(input: {
   password?: string;
   remember: boolean;
   sessionCookie?: string;
+  beforeClaim?: () => Promise<void>;
 }): Promise<{
   http: ClaimHttpEvidence;
   body: string;
   credentials: { sessionToken: string; refreshToken: string } | null;
+  claimRouteReached: boolean;
+  exchangeCookieCleared: boolean;
 }> {
   const [{ NextRequest }, exchangeRoute, claimRoute] = await Promise.all([
     import('next/server'),
@@ -370,6 +375,8 @@ async function performClaim(input: {
     return {
       body,
       credentials: null,
+      claimRouteReached: false,
+      exchangeCookieCleared: false,
       http: {
         status: exchangeResponse.status,
         success: parsed.success === true,
@@ -382,6 +389,7 @@ async function performClaim(input: {
   }
   const exchangeCookie = exchangeResponse.cookies.get('booking_claim_exchange')?.value;
   if (!exchangeCookie) throw new Error('Claim exchange did not issue its short-lived cookie');
+  await input.beforeClaim?.();
   headers.cookie = [
     `booking_claim_exchange=${exchangeCookie}`,
     input.sessionCookie ? `guest_session=${input.sessionCookie}` : '',
@@ -404,6 +412,8 @@ async function performClaim(input: {
   const refreshCookie = response.cookies.get('guest_rt');
   return {
     body,
+    claimRouteReached: true,
+    exchangeCookieCleared: response.cookies.get('booking_claim_exchange')?.maxAge === 0,
     credentials: sessionCookie?.value && refreshCookie?.value
       ? { sessionToken: sessionCookie.value, refreshToken: refreshCookie.value }
       : null,
@@ -713,4 +723,82 @@ describe.sequential('booking claim lifecycle characterization', () => {
     });
     expect(await readClaimGraph()).toEqual(before);
   });
+
+  it('rejects a +30-day grant before /claims without domain side effects', async () => {
+    const claimTarget = requireTarget();
+    await seedClaimLifecycle({ startOffset: 30, endOffset: 37 });
+    const before = await readClaimGraph();
+    const result = await performClaim({ remember: false });
+
+    expectSafeBody(result.body, claimTarget);
+    expect(result.claimRouteReached).toBe(false);
+    expect(result.http).toEqual({
+      status: 401,
+      success: false,
+      errorCode: 'UNAUTHORIZED',
+      sessionCookie: false,
+      refreshCookie: false,
+      refreshCookieCleared: false,
+    });
+    expect(await readClaimGraph()).toEqual(before);
+  });
+
+  it.each([
+    ['far-future-booking', false, false],
+    ['far-future-booking', true, true],
+    ['grant-revoked', false, false],
+    ['grant-expired', false, false],
+  ] as const)(
+    'rejects TOCTOU post-exchange mutation (%s, existing: %s, remember: %s) and clears exchange cookie',
+    async (change, existingClaimant, remember) => {
+      const claimTarget = requireTarget();
+      await seedClaimLifecycle({ existingClaimant });
+      const before = await readClaimGraph();
+      const result = await performClaim({
+        remember,
+        beforeClaim: async () => {
+          const now = new Date();
+          await withTestPrismaClient(claimTarget, async (prisma) => {
+            if (change === 'far-future-booking') {
+              await prisma.booking.update({
+                where: { id: PRIMARY_BOOKING_ID },
+                data: { startDate: utcDateOffset(now, 30), endDate: utcDateOffset(now, 37) },
+              });
+            } else if (change === 'grant-revoked') {
+              await prisma.bookingClaimGrant.update({
+                where: { id: PRIMARY_GRANT_ID },
+                data: { revokedAt: now },
+              });
+            } else {
+              await prisma.bookingClaimGrant.update({
+                where: { id: PRIMARY_GRANT_ID },
+                data: { expiresAt: new Date(now.getTime() - 60_000) },
+              });
+            }
+          }, 'seed');
+        },
+      });
+      const after = await readClaimGraph();
+
+      expectSafeBody(result.body, claimTarget);
+      expect(result.claimRouteReached).toBe(true);
+      expect(result.exchangeCookieCleared).toBe(true);
+      expect(result.http).toEqual({
+        status: 401,
+        success: false,
+        errorCode: 'UNAUTHORIZED',
+        sessionCookie: false,
+        refreshCookie: false,
+        refreshCookieCleared: false,
+      });
+      expect(after).toEqual({
+        ...before,
+        grants: before.grants.map((g) => (
+          g.id === PRIMARY_GRANT_ID && change === 'grant-revoked'
+            ? { ...g, revoked: true }
+            : g
+        )),
+      });
+    },
+  );
 });

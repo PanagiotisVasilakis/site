@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildPrismaPgAdapterArgs } from '@/lib/prismaPgConfig';
 
@@ -82,5 +82,48 @@ describe('Prisma PostgreSQL adapter configuration', () => {
         options: '-c TimeZone=UTC',
       },
     });
+  });
+});
+
+describe('prisma client lifecycle', () => {
+  type PrismaGlobal = typeof globalThis & { __prisma__?: unknown };
+  const prismaGlobal = globalThis as PrismaGlobal;
+  const originalArgv = process.argv;
+  const shutdownSignals = ['SIGINT', 'SIGTERM', 'SIGQUIT'] as const;
+
+  const signalListenerCounts = () =>
+    Object.fromEntries(shutdownSignals.map((signal) => [signal, process.listenerCount(signal)]));
+
+  beforeEach(() => {
+    delete prismaGlobal.__prisma__;
+    vi.stubEnv('DATABASE_URL', 'postgresql://user:pass@127.0.0.1:5432/app');
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+    delete prismaGlobal.__prisma__;
+    vi.doUnmock('@/generated/prisma/client');
+    vi.doUnmock('@prisma/adapter-pg');
+    vi.doUnmock('@/lib/prismaPgConfig');
+    vi.doUnmock('@/lib/logger-enterprise');
+    vi.resetModules();
+  });
+
+  it('registers no SIGINT, SIGTERM or SIGQUIT listener', async () => {
+    process.argv = ['/usr/bin/node', '/srv/site-env/node_modules/.bin/tsx', 'scripts/drain-outbox.ts'];
+    vi.resetModules();
+    vi.doMock('@/generated/prisma/client', () => ({
+      PrismaClient: class { $on = vi.fn(); $disconnect = vi.fn().mockResolvedValue(undefined); },
+    }));
+    vi.doMock('@prisma/adapter-pg', () => ({ PrismaPg: class {} }));
+    vi.doMock('@/lib/prismaPgConfig', () => ({ buildPrismaPgAdapterArgs: () => ({ config: {} }) }));
+    vi.doMock('@/lib/logger-enterprise', () => ({
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+    }));
+
+    const before = signalListenerCounts();
+    await import('@/lib/prisma');
+
+    expect(signalListenerCounts()).toEqual(before);
   });
 });

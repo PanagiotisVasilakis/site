@@ -4,8 +4,13 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const navigation = vi.hoisted(() => {
-  const router = { push: vi.fn(), replace: vi.fn(), refresh: vi.fn() };
-  return { locale: 'en', router };
+  const replace = vi.fn();
+  return {
+    locale: 'en',
+    search: new URLSearchParams('mode=signin'),
+    replace,
+    router: { push: vi.fn(), replace, refresh: vi.fn() },
+  };
 });
 const fetchMock = vi.hoisted(() => vi.fn());
 const emitMock = vi.hoisted(() => vi.fn());
@@ -13,7 +18,7 @@ const emitMock = vi.hoisted(() => vi.fn());
 vi.mock('next/navigation', () => ({
   useParams: () => ({ locale: navigation.locale }),
   useRouter: () => navigation.router,
-  useSearchParams: () => new URLSearchParams('mode=signin'),
+  useSearchParams: () => navigation.search,
 }));
 vi.mock('@/lib/internalFetchClient', () => ({ default: fetchMock }));
 vi.mock('@/lib/sessionSignals', () => ({ emitGuestSessionChanged: emitMock }));
@@ -51,7 +56,10 @@ function signIn(status: number, code: string) {
 }
 
 describe('guest sign-in errors', () => {
-  beforeEach(() => { navigation.locale = 'en'; });
+  beforeEach(() => {
+    navigation.locale = 'en';
+    navigation.search = new URLSearchParams('mode=signin');
+  });
 
   it('names both causes of a refused sign-in: credentials or the access window', async () => {
     signIn(401, 'UNAUTHORIZED');
@@ -68,7 +76,10 @@ describe('guest sign-in errors', () => {
 });
 
 describe('guest sign-in flow', () => {
-  beforeEach(() => { navigation.locale = 'en'; });
+  beforeEach(() => {
+    navigation.locale = 'en';
+    navigation.search = new URLSearchParams('mode=signin');
+  });
 
   it('posts the credentials, announces the new session and opens the page the server names', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { success: true, data: { bookingId: 'booking-1', redirect: '/en/stay' } }));
@@ -135,6 +146,47 @@ describe('guest sign-in flow', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
 
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+describe('guest page flash messages', () => {
+  const GREEK_SESSION_REQUIRED = 'Συνδεθείτε για να δείτε τις πληροφορίες της διαμονής σας.';
+
+  beforeEach(() => {
+    navigation.locale = 'el';
+    navigation.replace.mockImplementation((href: string) => {
+      navigation.search = new URL(href, 'https://guide.test').searchParams;
+    });
+  });
+
+  it('shows the localized message for a known code and strips it from the URL', async () => {
+    navigation.search = new URLSearchParams('flash=session_required');
+    render(<UnifiedGuestClient />);
+
+    expect(screen.getByText(GREEK_SESSION_REQUIRED)).toBeInTheDocument();
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/el/guest', { scroll: false }));
+  });
+
+  it('never renders free text passed in the URL', () => {
+    navigation.search = new URLSearchParams('flash=Your+account+is+locked.+Call+%2B1-555-0100');
+    render(<UnifiedGuestClient />);
+
+    expect(screen.queryByText(/account is locked/u)).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('does not bring the flash message back after switching tabs', async () => {
+    navigation.search = new URLSearchParams('flash=session_required');
+    const { rerender } = render(<UnifiedGuestClient />);
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/el/guest', { scroll: false }));
+    rerender(<UnifiedGuestClient />);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Εγγραφή' }));
+    rerender(<UnifiedGuestClient />);
+
+    await waitFor(() => expect(navigation.search.get('mode')).toBe('signup'));
+    rerender(<UnifiedGuestClient />);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

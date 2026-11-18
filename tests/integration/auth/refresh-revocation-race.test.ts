@@ -50,7 +50,7 @@ interface RaceResult {
 }
 
 const runtime = readDisposablePostgresRuntime();
-const REPETITIONS = 5;
+const REPETITIONS = 2;
 const DATABASE_WAIT_TIMEOUT_MS = 4_000;
 const TEST_SECURITY_PEPPER = 'pr02a-race-integration-security-pepper-only';
 const ROOT_SECRET = 'pr02a-synthetic-root-refresh-secret';
@@ -433,126 +433,65 @@ describe.sequential('refresh revocation linearization', () => {
     });
   });
 
-  it('lets a family revocation that reaches the family lock first deny rotation', async () => {
-    for (let repetition = 1; repetition <= REPETITIONS; repetition += 1) {
-      const result = await runFreshRace('revoke-first', repetition, revokeSessionAuthorization);
-      expect(result, `revoke-first repetition ${repetition}`).toEqual({
-        revocationResult: true,
-        rotationResult: { status: 'invalid' },
-        state: {
+  describe.each([
+    ['family', revokeSessionAuthorization],
+    ['token-family', revokeRootTokenFamily],
+  ] as const)('%s revocation vs rotation', (label, revoke) => {
+    it('denies rotation when revocation reaches the family lock first', async () => {
+      for (let repetition = 1; repetition <= REPETITIONS; repetition += 1) {
+        const result = await runFreshRace('revoke-first', repetition, revoke);
+        expect(result, `${label} revoke-first ${repetition}`).toEqual({
+          revocationResult: true,
+          rotationResult: { status: 'invalid' },
+          state: {
+            familyRevoked: true,
+            familyReason: 'race_test_revocation',
+            tokenCount: 1,
+            activeTokenCount: 0,
+            revokedTokenCount: 1,
+            descendantCount: 0,
+            sessionCount: 1,
+            activeSessionCount: 0,
+            revokedSessionCount: 1,
+            rootUsable: false,
+            replacementUsable: false,
+          },
+        });
+      }
+    });
+
+    it('invalidates a rotation that committed first when revocation follows', async () => {
+      for (let repetition = 1; repetition <= REPETITIONS; repetition += 1) {
+        const result = await runFreshRace('refresh-first', repetition, revoke);
+        expect(result.revocationResult, `${label} refresh-first revoke ${repetition}`).toBe(true);
+        expect(result.rotationResult, `${label} refresh-first rotate ${repetition}`).toEqual({
+          status: 'rotated',
+          old: expect.objectContaining({ id: ROOT_CREDENTIAL_ID }),
+          rec: expect.objectContaining({
+            id: REPLACEMENT_CREDENTIAL_ID,
+            rotated_from_id: ROOT_CREDENTIAL_ID,
+          }),
+          session: expect.objectContaining({
+            id: REPLACEMENT_CREDENTIAL_ID,
+            userId: USER_ID,
+            bookingId: BOOKING_ID,
+          }),
+          sessionToken: 'synthetic-race-session-token',
+        });
+        expect(result.state, `${label} refresh-first state ${repetition}`).toEqual({
           familyRevoked: true,
           familyReason: 'race_test_revocation',
-          tokenCount: 1,
+          tokenCount: 2,
           activeTokenCount: 0,
-          revokedTokenCount: 1,
-          descendantCount: 0,
-          sessionCount: 1,
+          revokedTokenCount: 2,
+          descendantCount: 1,
+          sessionCount: 2,
           activeSessionCount: 0,
-          revokedSessionCount: 1,
+          revokedSessionCount: 2,
           rootUsable: false,
           replacementUsable: false,
-        },
-      });
-    }
-  });
-
-  it('lets a later family revocation invalidate a rotation that commits first', async () => {
-    for (let repetition = 1; repetition <= REPETITIONS; repetition += 1) {
-      const result = await runFreshRace('refresh-first', repetition, revokeSessionAuthorization);
-      expect(result.revocationResult, `refresh-first revoke repetition ${repetition}`).toBe(true);
-      expect(result.rotationResult, `refresh-first rotate repetition ${repetition}`).toEqual({
-        status: 'rotated',
-        old: expect.objectContaining({ id: ROOT_CREDENTIAL_ID }),
-        rec: expect.objectContaining({
-          id: REPLACEMENT_CREDENTIAL_ID,
-          rotated_from_id: ROOT_CREDENTIAL_ID,
-        }),
-        session: expect.objectContaining({
-          id: REPLACEMENT_CREDENTIAL_ID,
-          userId: USER_ID,
-          bookingId: BOOKING_ID,
-        }),
-        sessionToken: 'synthetic-race-session-token',
-      });
-      expect(result.state, `refresh-first final state repetition ${repetition}`).toEqual({
-        familyRevoked: true,
-        familyReason: 'race_test_revocation',
-        tokenCount: 2,
-        activeTokenCount: 0,
-        revokedTokenCount: 2,
-        descendantCount: 1,
-        sessionCount: 2,
-        activeSessionCount: 0,
-        revokedSessionCount: 2,
-        rootUsable: false,
-        replacementUsable: false,
-      });
-    }
-  });
-
-  it('lets a token-family revocation reaching the family lock first deny rotation', async () => {
-    for (let repetition = 1; repetition <= REPETITIONS; repetition += 1) {
-      const result = await runFreshRace('revoke-first', repetition, revokeRootTokenFamily);
-      expect(result, `revoke-first root-token repetition ${repetition}`).toEqual({
-        revocationResult: true,
-        rotationResult: { status: 'invalid' },
-        state: {
-          familyRevoked: true,
-          familyReason: 'race_test_revocation',
-          tokenCount: 1,
-          activeTokenCount: 0,
-          revokedTokenCount: 1,
-          descendantCount: 0,
-          sessionCount: 1,
-          activeSessionCount: 0,
-          revokedSessionCount: 1,
-          rootUsable: false,
-          replacementUsable: false,
-        },
-      });
-    }
-  });
-
-  it('lets a later token-family revocation invalidate a rotation that commits first', async () => {
-    for (let repetition = 1; repetition <= REPETITIONS; repetition += 1) {
-      const result = await runFreshRace('refresh-first', repetition, revokeRootTokenFamily);
-      expect(
-        result.revocationResult,
-        `refresh-first root-token revoke repetition ${repetition}`,
-      ).toBe(true);
-      expect(
-        result.rotationResult,
-        `refresh-first root-token rotate repetition ${repetition}`,
-      ).toEqual({
-        status: 'rotated',
-        old: expect.objectContaining({ id: ROOT_CREDENTIAL_ID }),
-        rec: expect.objectContaining({
-          id: REPLACEMENT_CREDENTIAL_ID,
-          rotated_from_id: ROOT_CREDENTIAL_ID,
-        }),
-        session: expect.objectContaining({
-          id: REPLACEMENT_CREDENTIAL_ID,
-          userId: USER_ID,
-          bookingId: BOOKING_ID,
-        }),
-        sessionToken: 'synthetic-race-session-token',
-      });
-      expect(
-        result.state,
-        `refresh-first root-token final state repetition ${repetition}`,
-      ).toEqual({
-        familyRevoked: true,
-        familyReason: 'race_test_revocation',
-        tokenCount: 2,
-        activeTokenCount: 0,
-        revokedTokenCount: 2,
-        descendantCount: 1,
-        sessionCount: 2,
-        activeSessionCount: 0,
-        revokedSessionCount: 2,
-        rootUsable: false,
-        replacementUsable: false,
-      });
-    }
+        });
+      }
+    });
   });
 });

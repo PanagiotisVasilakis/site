@@ -35,7 +35,7 @@ Environment loading order:
 
 Admin login, guest sign-in and claims, error and CSP reports
 resolve the client identity only from the two private headers that the trusted
-edge proxy sets in production (see `docs/security/trusted-ingress.md`). A browser
+edge proxy sets in production (see [Trusted ingress contract](../docs/security/trusted-ingress.md)). A browser
 cannot send them, so `next dev` alone answers `503 Service temporarily
 unavailable` on those routes, and the server logs
 `Client identity unavailable; request rejected before persistence` with the
@@ -71,19 +71,26 @@ Production additionally requires:
 - `ORIGIN_PROXY_SHARED_SECRET`, generated with `openssl rand -hex 32` and injected into both the edge proxy (e.g. Cloudflare Transform Rule) and the application
 - no external limiter variables: authoritative sensitive-operation limits use
   PostgreSQL and verified ingress identity. Edge WAF/CDN provides coarse
-  protection; see `docs/security/layered-rate-limiting.md`.
+  protection; see [Layered rate-limiting contract](../docs/security/layered-rate-limiting.md).
 
 If the check-in webhook URL is configured, its token is mandatory;
 production webhook URLs must use HTTPS.
 
-Optional `BOOKING_ICAL_URL` is the Booking.com calendar export URL (iCal), the only source of the availability calendar: the owner creates it in the Booking.com extranet with booked and closed dates and copies the link (public guides show `https://ical.booking.com/v1/export?t=<token>` and an older form `https://admin.booking.com/hotel/hoteladmin/ical.html?t=<token>`). It is read server-side only by the calendar sync (see "Operational workers"); without it the availability page shows no calendar, only a notice and the contact options. A reservation and a closed date are not told apart: both show as booked, and only dates are stored. It is a secret (the `t` query parameter is a token): set it only in the production environment, never in `.env.local`, and never commit or log it. The schema accepts only https on the default port, no userinfo, a non-empty query, and exactly these host and path pairs: `ical.booking.com` with `/v1/export`, `admin.booking.com` with `/hotel/hoteladmin/ical.html`; the fetch applies the same check to the start URL and to every redirect. A set value that the schema rejects stops the web container at start-up (exit 78; the message names the variable and never the value). So print the shape of the link before adding it, on any computer with Node.js 22 and without writing the link to a file: `printf 'Paste the link and press Enter: '; read -rs U; printf '\n'; U="$U" node -e 'let u; try { u = new URL(process.env.U) } catch { console.log("not an absolute URL"); process.exit(1) } const P = { "ical.booking.com": "/v1/export", "admin.booking.com": "/hotel/hoteladmin/ical.html" }; const known = Object.hasOwn(P, u.host); console.log([u.protocol === "https:" ? "https:" : "other-protocol", known ? u.host : "other-host", known && P[u.host] === u.pathname ? u.pathname : "other-path", u.searchParams.get("t") ? "t" : "no-t", ...(u.username || u.password ? ["USERINFO"] : [])].join(" "))'; unset U` must print `https: ical.booking.com /v1/export t` or `https: admin.booking.com /hotel/hoteladmin/ical.html t`; any other output means that the link is not the expected export link: `other-protocol`, `other-host`, `other-path`, `USERINFO` or `not an absolute URL` would stop the web container at start-up, and `no-t` shows that the link has no non-empty `t` parameter, the token (the start-up check only requires a non-empty query). The command prints only fixed words: the protocol, the host and the path only when they are the expected ones (otherwise `other-protocol`, `other-host` or `other-path`), `t` or `no-t`, `USERINFO`, or `not an absolute URL`; it never prints any other part of the link. Set `BOOKING_ICAL_URL` in production only after the privacy notice (`src/i18n/domains/legal.ts`) names Booking.com everywhere: `git grep -n -i 'air[b]nb' -- src/i18n/domains/legal.ts` must print nothing.
+Optional `BOOKING_ICAL_URL` is the Booking.com calendar export iCal URL (a secret tokenised link created in the Booking.com extranet covering both bookings and closures; usually `https://ical.booking.com/v1/export?t=<token>`, or legacy `https://admin.booking.com/hotel/hoteladmin/ical.html?t=<token>`). Without it, `/[locale]/availability` shows a notice and contact options instead of a calendar. It is a secret (the `t` query parameter is a token): set it only in the production environment, never in `.env.local`, and never commit or log it. Set it in production only after the privacy notice (`src/i18n/domains/legal.ts`) names Booking.com everywhere: `git grep -n -i 'air[b]nb' -- src/i18n/domains/legal.ts` must print nothing.
 
-Optional `CARTO_BASEMAPS_KEY` (https://carto.com/basemaps/apikey/) is read server-side at request time and sent to browsers in the map tile URLs (CARTO Voyager in light, Dark Matter in dark); without it the map uses the standard OpenStreetMap tiles in both themes. It is public by design but should not be logged; restrict it to the site domain in the CARTO dashboard.
+- **Validation rule:** Production start-up (`scripts/start-standalone.mjs`, exit 78 on failure) and runtime fetch redirects require `https:`, default port, no userinfo, a non-empty `t`/query, and either `ical.booking.com` (`/v1/export`) or `admin.booking.com` (`/hotel/hoteladmin/ical.html`).
+- **Safe local shape check (prints fixed labels only, never the secret):**
+
+  ```bash
+  printf 'Paste the link and press Enter: '; read -rs U; printf '\n'
+  U="$U" node -e 'let u; try { u = new URL(process.env.U) } catch { console.log("not an absolute URL"); process.exit(1) } const P = { "ical.booking.com": "/v1/export", "admin.booking.com": "/hotel/hoteladmin/ical.html" }; const known = Object.hasOwn(P, u.host); console.log([u.protocol === "https:" ? "https:" : "other-protocol", known ? u.host : "other-host", known && P[u.host] === u.pathname ? u.pathname : "other-path", u.searchParams.get("t") ? "t" : "no-t", ...(u.username || u.password ? ["USERINFO"] : [])].join(" "))'
+  unset U
+  ```
 
 Optional `LOG_LEVEL` accepts `trace`, `debug`, `info`, `warn` or `error`; the production start-up validation (`scripts/start-standalone.mjs`) rejects any other value, including `fatal`.
 
 Never place secrets in `NEXT_PUBLIC_*` variables.
-See `docs/security/runtime-credential-contract.md` for the production strength,
+See [Runtime credential contract](../docs/security/runtime-credential-contract.md) for production strength,
 isolation, startup, and rotation requirements.
 
 ## Local verification
@@ -109,7 +116,7 @@ The default suite does not contact a live PostgreSQL, webhook, or third-party
 API. `test:integration` is the isolated exception: it owns a digest-pinned
 disposable PostgreSQL container and synthetic databases. See [Testing strategy](../docs/testing.md).
 
-Committed design assets are regenerated with `npm run design:hero` (hero crops, depth maps, grain tiles), `npm run design:og` (the Open Graph cards in `public/og/`) and `npm run design:icons` (app icons and favicon); see `docs/design/identity.md`.
+Committed design assets are regenerated with `npm run design:hero` (hero crops, depth maps, grain tiles), `npm run design:og` (the Open Graph cards in `public/og/`) and `npm run design:icons` (app icons and favicon); see [Visual identity](../docs/design/identity.md).
 
 ## Production
 

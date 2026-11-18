@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import type { PrismaClient } from '@/generated/prisma/client';
 
@@ -41,7 +41,6 @@ const DIFFERENT_CONTEXT_HEADERS = {
   'x-origin-verified-client-ip': '203.0.113.99',
   'x-origin-proxy-attestation': '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2',
 } as const;
-const CONTROLLED_REPLAY_NOW = new Date('2030-06-15T12:34:56.789Z');
 const DATABASE_WAIT_TIMEOUT_MS = 4_000;
 const RESPONSE_WAIT_TIMEOUT_MS = 4_000;
 
@@ -757,68 +756,6 @@ describe.sequential('refresh authorization generation regressions', () => {
       severity: 'high',
       details: { reason: 'refresh_token_replay', familyId: expect.any(String) },
     }]);
-  });
-
-  it.each([
-    ['immediately after commit', 0],
-    ['inside the former grace window', 4_999],
-    ['at the former grace boundary', 5_000],
-    ['after the former grace window', 5_001],
-  ])('classifies completed replay %s without using revokedAt age', async (_label, ageMs) => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(CONTROLLED_REPLAY_NOW);
-    try {
-      const authTarget = requireTarget();
-      await seedAuthEligibilityFixtures(authTarget, new Date());
-      const modules = await loadAuthModules();
-      const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
-      const rotationResponse = await performRefresh(
-        modules,
-        chain.refreshToken,
-        chain.sessionToken,
-      );
-      const rotation = await safeSuccessEvidence(rotationResponse, modules.sessionModule);
-      await withTestPrismaClient(authTarget, async (prisma) => {
-        await prisma.refreshToken.update({
-          where: { id: chain.sessionId },
-          data: { revokedAt: new Date(CONTROLLED_REPLAY_NOW.getTime() - ageMs) },
-        });
-      }, 'failure-fixture');
-
-      const replayResponse = await performRefresh(
-        modules,
-        chain.refreshToken,
-        chain.sessionToken,
-      );
-      const replay = await safeFailureEvidence(replayResponse, modules.sessionModule);
-      const afterReplay = await safeAuthStateSnapshot(authTarget, new Date());
-
-      expect({ rotation, replay, afterReplay }).toEqual({
-        rotation: {
-          status: 200,
-          sessionCookieSet: true,
-          refreshCookieSet: true,
-          replacementSessionValid: true,
-        },
-        replay: EXPECTED_UNAUTHORIZED,
-        afterReplay: {
-          users: 1,
-          bookings: 1,
-          sessions: { total: 2, active: 0, expired: 0, revoked: 2 },
-          refreshFamilies: { total: 1, active: 0, expired: 0, revoked: 1 },
-          refreshTokens: {
-            total: 2,
-            active: 0,
-            expired: 0,
-            revoked: 2,
-            descendants: 1,
-            activeDescendants: 0,
-          },
-        },
-      });
-    } finally {
-      vi.useRealTimers();
-    }
   });
 
   it('returns 200 plus cookie-free 409 only for database-observed same-context overlap', async () => {

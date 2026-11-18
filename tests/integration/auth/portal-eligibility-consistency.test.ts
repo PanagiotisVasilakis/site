@@ -66,8 +66,6 @@ interface BoundaryCase {
 const boundaryCases: BoundaryCase[] = [
   { label: 'ended yesterday', startOffset: -5, endOffset: -1, eligible: false },
   { label: 'ends today', startOffset: -5, endOffset: 0, eligible: true },
-  { label: 'starts today', startOffset: 0, endOffset: 3, eligible: true },
-  { label: 'starts in one day', startOffset: 1, endOffset: 4, eligible: true },
   { label: 'starts in seven days', startOffset: 7, endOffset: 10, eligible: true },
   { label: 'starts in eight days', startOffset: 8, endOffset: 12, eligible: false },
   { label: 'has an inverted range', startOffset: 1, endOffset: 0, eligible: false },

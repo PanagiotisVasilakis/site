@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MotionSwitch } from '@/components/shell/MotionSwitch';
 import { getDictionary } from '@/i18n/dictionaries';
+import { useMotionPreference } from '@/lib/motion/motionPreference';
 
 type Listener = () => void;
 
@@ -90,5 +91,50 @@ describe('MotionSwitch', () => {
       window.dispatchEvent(new StorageEvent('storage', { key: 'motion', newValue: 'reduce' }));
     });
     expect(await screen.findByRole('button', { name: 'Allow motion' })).toHaveAttribute('aria-pressed', 'true');
+  });
+});
+
+describe('useMotionPreference (identity §5.2)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    root.removeAttribute('data-motion');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  it('follows live OS changes, keeps stored reduce choice, reacts cross-tab, handles blocked storage, and cleans up on unmount', () => {
+    const media = installReducedMotion(false);
+    const { unmount } = renderHook(() => useMotionPreference());
+    expect(root.getAttribute('data-motion')).toBe('full');
+
+    act(() => media.setReduce(true));
+    expect(root.hasAttribute('data-motion')).toBe(false);
+    act(() => media.setReduce(false));
+    expect(root.getAttribute('data-motion')).toBe('full');
+
+    localStorage.setItem('motion', 'reduce');
+    act(() => window.dispatchEvent(new StorageEvent('storage', { key: 'motion', newValue: 'reduce' })));
+    expect(root.getAttribute('data-motion')).toBe('reduce');
+    act(() => media.setReduce(true));
+    expect(root.getAttribute('data-motion')).toBe('reduce');
+
+    act(() => media.setReduce(false));
+    localStorage.removeItem('motion');
+    act(() => window.dispatchEvent(new StorageEvent('storage', { key: 'motion', newValue: null })));
+    expect(root.getAttribute('data-motion')).toBe('full');
+
+    unmount();
+    localStorage.setItem('motion', 'reduce');
+    act(() => window.dispatchEvent(new StorageEvent('storage', { key: 'motion', newValue: 'reduce' })));
+    expect(root.getAttribute('data-motion')).toBe('full');
+
+    localStorage.clear();
+    root.removeAttribute('data-motion');
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
+    renderHook(() => useMotionPreference());
+    expect(root.getAttribute('data-motion')).toBe('full');
   });
 });

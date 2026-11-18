@@ -21,7 +21,7 @@ const bcryptMock = vi.hoisted(() => ({ hash: vi.fn(), compare: vi.fn() }));
 vi.mock('@/lib/prisma', () => ({ prisma: prismaMock }));
 vi.mock('bcrypt', () => ({ default: { hash: bcryptMock.hash, compare: bcryptMock.compare } }));
 
-import { consumeBookingClaimGrant, PortalAuthError, resetGuestAccess } from '@/lib/portalAuthService';
+import { consumeBookingClaimGrant, issueBookingClaimGrant, PortalAuthError, resetGuestAccess } from '@/lib/portalAuthService';
 
 const NOW = new Date('2030-07-10T15:00:00.000Z');
 const day = (offset: number) => new Date(Date.UTC(2030, 6, 10 + offset));
@@ -238,5 +238,37 @@ describe("claiming a reset grant with another guest's phone", () => {
     expect(bcryptMock.compare).toHaveBeenCalledTimes(1);
     expect(bcryptMock.compare).toHaveBeenCalledWith('a-guessed-password-1', STORED_HASH);
     expect(prismaMock.tx.bookingClaimGrant.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('claim grant issuance access window', () => {
+  function issueFor(startOffset: number, endOffset: number) {
+    prismaMock.tx.booking.findUnique.mockResolvedValue({
+      id: BOOKING_ID,
+      userId: null,
+      accessStatus: 'PENDING',
+      startDate: day(startOffset),
+      endDate: day(endOffset),
+    });
+    return issueBookingClaimGrant({ bookingId: BOOKING_ID, channel: 'REMOTE', adminSessionId: ADMIN_SESSION_ID });
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(NOW);
+    vi.stubEnv('CLAIM_TOKEN_PEPPER', 'claim-grant-issuance-test-pepper-0123456789');
+    prismaMock.$transaction.mockImplementation(async (callback: (client: typeof prismaMock.tx) => unknown) => callback(prismaMock.tx));
+    prismaMock.tx.bookingClaimGrant.updateMany.mockResolvedValue({ count: 0 });
+    prismaMock.tx.bookingClaimGrant.create.mockResolvedValue({});
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('issues a token for a booking with check-in in 7 days and refuses 8 days', async () => {
+    await expect(issueFor(7, 10)).resolves.toMatchObject({ token: expect.stringMatching(/^claim_/) });
+    expect(prismaMock.tx.bookingClaimGrant.create).toHaveBeenCalledTimes(1);
+
+    prismaMock.tx.bookingClaimGrant.create.mockClear();
+    await expect(issueFor(8, 12)).rejects.toEqual(new PortalAuthError('BOOKING_NOT_IN_ACCESS_WINDOW'));
+    expect(prismaMock.tx.bookingClaimGrant.create).not.toHaveBeenCalled();
   });
 });

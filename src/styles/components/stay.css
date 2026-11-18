@@ -1,8 +1,5 @@
 /* In-stay pages (docs/design/identity.md §8 Tile, §9.4 stay hub, §9.7 guest sign-in, §9.8 check-in and portal
-   refresh, §9.10 404 and errors, §9.11 offline; R3-V9). Calm mode: no motion rules here and none of these
-   classes appears in motion.css (tests/components/stay-routes.test.tsx). Unlayered (O38); the two-class colour
-   rules (0,2,0) date from the legacy cascade that R3-V12b deleted, and are kept as they are. Replaced the
-   legacy check-in palette and network-status styles. */
+   refresh, §9.10 404 and errors, §9.11 offline). Calm mode: keep motion rules out of stay classes. */
 
 .stay-page {
   width: min(100% - 2 * var(--gutter), var(--container));

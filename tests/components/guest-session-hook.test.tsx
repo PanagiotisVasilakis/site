@@ -238,3 +238,44 @@ describe('useGuestSession', () => {
     });
   });
 });
+
+describe('onGuestSessionChange', () => {
+  const change = { t: 1, reason: 'signout' };
+
+  class FakeBroadcastChannel {
+    static instances: FakeBroadcastChannel[] = [];
+    onmessage: ((ev: MessageEvent) => void) | null = null;
+    constructor() {
+      FakeBroadcastChannel.instances.push(this);
+    }
+    close() {}
+  }
+
+  function dispatchStorageSignal() {
+    window.dispatchEvent(new StorageEvent('storage', { key: 'guest_session_changed', newValue: JSON.stringify(change) }));
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('delivers once across BroadcastChannel + storage events and falls back when BroadcastChannel is absent', () => {
+    FakeBroadcastChannel.instances = [];
+    vi.stubGlobal('BroadcastChannel', FakeBroadcastChannel);
+    const cb = vi.fn();
+    const unsub = onGuestSessionChange(cb);
+    dispatchStorageSignal();
+    FakeBroadcastChannel.instances[0]?.onmessage?.(new MessageEvent('message', { data: change }));
+    expect(cb).toHaveBeenCalledTimes(1);
+    expect(cb).toHaveBeenCalledWith(change);
+    unsub();
+
+    vi.stubGlobal('BroadcastChannel', undefined);
+    const fallbackCb = vi.fn();
+    const unsubFallback = onGuestSessionChange(fallbackCb);
+    dispatchStorageSignal();
+    expect(fallbackCb).toHaveBeenCalledTimes(1);
+    expect(fallbackCb).toHaveBeenCalledWith(change);
+    unsubFallback();
+  });
+});

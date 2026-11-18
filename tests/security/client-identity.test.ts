@@ -7,7 +7,7 @@ import {
   createClientIdentityUnavailableResponse,
   requireCanonicalClientIp,
 } from '@/lib/net/clientIdentity';
-import { canonicalizeClientIp } from '@/lib/net/getClientIp';
+import { canonicalizeClientIp, getClientIp } from '@/lib/net/getClientIp';
 import { mapApiErrorToUI } from '@/lib/userFacingErrors';
 const CLIENT_IDENTITY_UNAVAILABLE = 'CLIENT_IDENTITY_UNAVAILABLE'; // response contract value
 
@@ -126,5 +126,43 @@ describe('canonical client identity', () => {
     for (const value of ['x-origin', 'forwarded', CLIENT_IDENTITY_UNAVAILABLE]) {
       expect(logged).not.toContain(value);
     }
+  });
+
+  describe('trusted proxy IP extraction (getClientIp)', () => {
+    function rawRequest(headers: Record<string, string>): NextRequest {
+      return {
+        headers: { get: (name: string) => headers[name.toLowerCase()] ?? null },
+      } as unknown as NextRequest;
+    }
+
+    it('canonicalizes attested IPv6 and IPv4-mapped IPv6 and ignores public candidates', () => {
+      vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);
+      expect(getClientIp(rawRequest({
+        'x-origin-verified-client-ip': '2001:0DB8:0000:0000:0000:0000:0000:0001',
+        'x-origin-proxy-attestation': secret,
+      }))).toBe('2001:db8::1');
+      expect(getClientIp(rawRequest({
+        'cf-connecting-ip': '198.51.100.1',
+        'x-forwarded-for': '198.51.100.2',
+        'x-real-ip': '198.51.100.3',
+        forwarded: 'for=198.51.100.4',
+        'x-origin-verified-client-ip': '::ffff:203.0.113.10',
+        'x-origin-proxy-attestation': secret,
+      }))).toBe('203.0.113.10');
+    });
+
+    it.each([
+      ['missing attestation', { 'x-origin-verified-client-ip': '203.0.113.10' }],
+      ['missing private IP', { 'x-origin-proxy-attestation': secret }],
+      ['wrong attestation', { 'x-origin-verified-client-ip': '203.0.113.10', 'x-origin-proxy-attestation': 'fedcba9876543210'.repeat(4) }],
+      ['duplicated attestation', { 'x-origin-verified-client-ip': '203.0.113.10', 'x-origin-proxy-attestation': `${secret}, ${secret}` }],
+      ['IP with port', { 'x-origin-verified-client-ip': '203.0.113.10:443', 'x-origin-proxy-attestation': secret }],
+      ['CF-Connecting-IP alone', { 'cf-connecting-ip': '203.0.113.195' }],
+      ['X-Real-IP alone', { 'x-real-ip': '203.0.113.195' }],
+      ['X-Forwarded-For alone', { 'x-forwarded-for': '203.0.113.195' }],
+    ] as const)('returns unknown for %s', (_label, headers) => {
+      vi.stubEnv('ORIGIN_PROXY_SHARED_SECRET', secret);
+      expect(getClientIp(rawRequest(headers))).toBe('unknown');
+    });
   });
 });

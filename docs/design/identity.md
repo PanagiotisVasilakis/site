@@ -1,97 +1,6 @@
 # Dolce Far Niente · Kalamata: visual identity and design system
 
-Final design system and implementation spec (R3-V1 output). This is `docs/design/identity.md`; the local mockups and screenshots it cites live in the gitignored `.runtime/design/` of the lead's machine and are not part of the repository.
-
-- **Status:** decided by the design lead on 2026-09-28 under owner decision O32 ("take the design decisions yourself; 3D, motion, something strong; make it wow"). G-DESIGN is a lead self-review.
-- **Implementation (2026-10-06):** R3-V2 to R3-V14 are done. R3-V12b deleted the legacy style sheets (`src/styles/01…13`), so references to them below are history. §11 shows the current file layout; the migration plan (§12) is kept as the record of how the system was introduced. The owner-approved marketing copy of R3-C1 is applied (2026-10-06; the `// C1 review` draft markers are removed), and the remaining owner inputs in §13 are open. On 2026-10-11 the owner had the KineticBand (§0.2 graft 2, M7) and the ContactBand removed from the home page; the marketing footer's contact block became the `#contact` target (on the home page only), and the footer gained the tagline and the location line under the brand (§8 SiteFooter, §9.1). On 2026-10-15 the owner decided that the site shows no prices and no cancellation policy (guests book on Booking.com or by phone/WhatsApp): the price lines, the lowest-price pill, the totals, the QuoteBar, the cancellation texts and the stale-data warning were removed (§1.4, §8, §9.1–§9.3).
-- **Scope:** every public route (en/el), the guest portal, and the admin (tokens only).
-- **Authority:** where this document and a mockup disagree, this document wins. The mockups in `.runtime/design/` are visual references only. Their JS is not production code.
-- **Evidence labels:** CONFIRMED means read in the code or docs of the installed version, or computed/measured here. SUSPECTED means not yet verified; each SUSPECTED item names the check that settles it.
-
----
-
-## 0. Decision
-
-### 0.1 Winner
-
-The panel scored seven criteria (wow, usability, conversion, performance, accessibility, brand fit, Greek typography), each 0–10. Sums were computed from the three judges' JSON:
-
-| Direction | Judge 1 | Judge 2 | Judge 3 | **Total** | Usability + performance | Winner votes |
-|---|---|---|---|---|---|---|
-| **messinian-light** | 57.5 | 58.0 | 58.5 | **174.0** | 51.0 | 3 of 3 |
-| aegean-depth | 52.5 | 52.0 | 51.5 | 156.0 | 39.5 | 0 |
-| kalamata-playful | 50.0 | 49.5 | 51.0 | 150.5 | 46.5 | 0 |
-
-**Base: messinian-light.** No tie-break was needed.
-
-Its weakness is "wow" (7, 7 and 8 against aegean's 8.5, 9 and 9). The grafts in §0.2 exist to close that gap without giving up its performance, accessibility and honesty.
-
-### 0.2 Grafts: accepted and rejected
-
-**Accepted.** Each graft is listed with the judges who proposed it.
-
-1. **From aegean (all 3 judges):** the hero **recedes into depth** on the first scroll. The photo stage tilts back and darkens (`rotateX 16°`, `scale .86`). It is CSS scroll-driven and chained with messinian's one-time light sweep.
-2. **From aegean (all 3):** a **bilingual kinetic serif band** right after the fact strip. EN is an outline serif; EL is a terracotta (`primary-text`, both themes) italic reading "Ταΰγετος ✦ Μεσσηνιακός κόλπος ✦ Καλαμάτα". It is scroll-linked, never loops, and is `aria-hidden`. *Removed on 2026-10-11 at the owner's request (the moving rows were dizzying): the fact strip is now followed directly by the intro, and M7 is gone.*
-3. **From aegean (all 3):** a **3D deck-fan gallery** at ≥ 1024 px. Captions show on the active card only. Below 1024 px, messinian's native scroll-snap coverflow stays.
-4. **From aegean (all 3):** an **in-page "Reduce motion" switch** in the footer and the mobile menu, on top of `prefers-reduced-motion`.
-5. **From aegean and playful (judges 1 and 3):** a **circular View Transition reveal** from the Day/Night switch, when motion is allowed.
-6. **From aegean (judges 1 and 2):** Greek month names in the nominative in calendar headings. *The climate fee broken down by season in the summary was removed on 2026-10-14 at the owner's request: the ΤΑΚΚ is part of the nightly price, so the summary has no fee line.*
-7. **From aegean (judge 3):** a live-region message "Now pick your check-out, latest <date>".
-8. **From playful (all 3):** the rule for a range that crosses a booked night: the tapped day becomes the new check-in, and the live region explains why.
-9. **From playful (judges 2 and 3):** Mobile months are **stacked**. *The lowest-price pill and the sticky total bar were removed on 2026-10-15 at the owner's request: the site shows no prices.*
-10. **From playful (all 3):** **Summer/Winter highlights** (April–October / November–March, the `SUMMER_MONTHS` constant in `src/components/home/homeSeason.ts`).
-11. **From playful (all 3):** guide **search**, **category chips with counts**, **favourites with a heart burst**, and **Directions**.
-12. **From playful (judges 2 and 3):** in the stay hub, an **SOS row with `tel:112`**, direct `tel:` call rows, and a skip link. The skip link already exists in `src/app/[locale]/layout.tsx`.
-13. **From playful (judges 2 and 3):** **art-directed hero crops in several widths** (§7.2).
-14. **From playful (judge 1):** tactile button press: `scale(.98)` on active and a 2 px lift on hover (fine pointers only).
-15. **From playful (judge 2):** a "Free tonight / next free night" hint in the bottom bar. *The teaser copy that explained the "from" price was removed on 2026-10-15 at the owner's request: the site shows no prices.*
-
-**Rejected:**
-
-- **Continuously animating WebGL sea (aegean).** It drains the battery, needs a second WebGL context, and implies a sea view that no photo proves.
-- **Beach props: swim ring, lemon, stickers (playful).** They conflict with the brand.
-- **"Facing the Messinian Gulf" copy.** No photo shows the gulf.
-- **Dark-mode "descent" background (judge 1, optional).** It adds little over the sun/moon glow and costs paint.
-- **Indigo/gold night palette (aegean).** It reads as a hotel bar.
-
-### 0.3 Fixes applied to the base before implementation
-
-Every fix the judges raised against messinian-light is resolved in this spec:
-
-- **Double price in the first viewport at 1440 px.** The fact strip no longer shows a price (§9.1); since 2026-10-15 no page shows one.
-- **Headline cut off at 390 px** ("A slow walk through the rooms", SUSPECTED). The rooms section now uses its own reveal, and V5's G-VIS must show it uncut.
-- **Soft mobile hero.** New portrait crops (§7.2).
-- **Copy:** "You stay here" becomes "You're staying here".
-- **Greek uppercase.** `.night__dow` and the weekday `abbr` elements no longer use uppercase under `:lang(el)` (§2.6).
-- **Text size.** Nothing renders below 12 px; calendar notes are 12 px.
-- **Emergency number.** `tel:112` link in the hub.
-- **Grid overflow.** Grids always use `minmax(0, 1fr)`.
-- **Missing photo tiles.** Illustrated guide tiles become a deliberate "art tile" instead of beige or striped placeholders.
-- **Placeholders.** Never shipped; missing owner data hides the field (§1.4).
-
-### 0.4 Reference screenshots (winning mockup)
-
-Folder: `.runtime/design/messinian-light/shots/`. Every file was captured under the production CSP shape, with 0 violations according to the mockup's `tools/shoot.mjs` report.
-
-| Screen | Files |
-|---|---|
-| Home, full page | `home-390-light.png`, `home-390-dark.png`, `home-1440-light.png`, `home-1440-dark.png`, `home-390-reduced.png`, `home-390-light-el.png` |
-| Availability, full page | `availability-390-light.png`, `availability-390-dark.png`, `availability-1440-light.png`, `availability-1440-dark.png`, `availability-390-reduced.png` |
-| Stay hub + guide, full page | `stay-390-light.png`, `stay-390-dark.png`, `stay-1440-light.png`, `stay-1440-dark.png`, `stay-390-reduced.png`, `stay-390-light-el.png` |
-| Motion frames | `frame-hero-webgl-1440.png`, `frame-hero-webgl-390.png`, `frame-shutters-opening-1440.png`, `frame-relief-1440.png`, `frame-coverflow-390.png` |
-| Measured hero contrast | `hero-contrast.json` |
-
-Graft references, for look only:
-
-- **aegean-depth** (`.runtime/design/aegean-depth/shots/`): `frame-1440-dark-hero-receding.png` (recede and kinetic band) and `frame-1440-dark-deck.png` (deck fan). **Do not copy** its empty dark caption boxes.
-- **kalamata-playful** (`.runtime/design/kalamata-playful/shots/`): `availability-390-light-viewport.png` (sticky total bar) and `guide-1440-light.png` (search, chips with counts, favourites).
-
-Mockup sources to read for exact geometry, as reference only:
-
-- `messinian-light/styles.css`
-- `messinian-light/hero-gl.js`
-- `messinian-light/tools/gen-assets.mjs`
-- `aegean-depth/styles.css:283-287`, `:355-374` and `:736-856`
+Design system and visual implementation reference for all public routes (`en`/`el`), the guest portal, and admin token theming.
 
 ---
 
@@ -99,17 +8,17 @@ Mockup sources to read for exact geometry, as reference only:
 
 ### 1.1 Concept: "Messinian light"
 
-The site is built around the one thing the photos prove: a sunlit second-floor balcony that looks over the rooftops to Mount Taygetos.
+The site is built around the sunlit second-floor balcony looking over Kalamata rooftops to Mount Taygetos:
 
-- **Day mode** is warm sand paper with terracotta (the bedroom wall), olive (the balcony plants) and the deep blue of the gulf.
-- **Night mode ("gulf night")** is deep sea blue, not grey.
-- **Motion follows light and real objects of the place.** A living photograph gains depth; one warm pass of light crosses Taygetos. Greek louvred shutters swing open. A paper relief runs from Taygetos to the gulf. The scroll-driven sun glow (M16) is dropped, not implemented.
+- **Day mode** uses warm sand paper with terracotta (`primary`), olive (`olive`), and deep gulf blue (`accent`).
+- **Night mode ("gulf night")** uses deep sea blue rather than grey.
+- **Motion follows light and real physical elements:** living-photograph depth on the hero, a warm light pass across the display headline, opening shutters on scroll, and layered relief map lines.
 
 ### 1.2 Name and taglines
 
-- **Brand:** "Dolce Far Niente · Kalamata" (O27).
-- **Wordmark:** "Dolce Far Niente" in Noto Serif Display italic 400. Beneath it, "Kalamata" / "Καλαμάτα" in Commissioner 600. The Latin label is set in uppercase with tracking `.18em`; the Greek label is sentence case with tracking `.04em`.
-- **H1 on Home:** "Dolce far niente" in both locales. It is Italian and the brand, so it carries `lang="it"`.
+- **Brand:** "Dolce Far Niente · Kalamata"
+- **Wordmark:** "Dolce Far Niente" in Noto Serif Display italic 400. Beneath it, "Kalamata" / "Καλαμάτα" in Commissioner 600 (Latin uppercase with tracking `.18em`; Greek sentence case with tracking `.04em`).
+- **H1 on Home:** "Dolce far niente" in both locales (`lang="it"`).
 
 | Use | EN | EL |
 |---|---|---|
@@ -117,29 +26,18 @@ The site is built around the one thing the photos prove: a sunlit second-floor b
 | Secondary (location band, share cards) | Taygetos at breakfast, the gulf a short drive away. | Ο Ταΰγετος στο πρωινό σας, ο κόλπος λίγα λεπτά με το αυτοκίνητο. |
 | Stay hub greeting | Welcome home. | Καλώς ήρθατε. |
 
-The final marketing strings belong to R3-C1, which the owner approves. The taglines above are the voice reference and the defaults.
-
 ### 1.3 Voice rules (both languages)
 
-- **Warm, unhurried, precise.** Short sentences. Numbers beat adjectives: "90 m²", "50 m from the Town Hall", "2nd floor".
-- **Person.** The host letter uses "we"; everything else addresses the guest as "you". The EL formal plural ("σας") is the default.
-- **Banned words:** "luxury", "paradise", "hidden gem", "best price".
-- **No direct-booking wording.** Never say "cheaper if you book direct" or anything like it, and never offer a discount for booking off Booking.com (plan §3).
-- **Greek is written, not translated.** Use natural Greek word order; month headings in the nominative ("Οκτώβριος 2026") and dates in the genitive ("18 Οκτωβρίου"). This is what `Intl` `el-GR` produces: CONFIRMED on Node 22.19.0 and 26.8.1 (`{month:'long',year:'numeric'}` gives "Οκτώβριος 2026"; `{day:'numeric',month:'long'}` gives "18 Οκτωβρίου").
+- **Warm, unhurried, precise.** Short sentences; concrete measurements beat vague adjectives ("90 m²", "50 m from the Town Hall", "2nd floor").
+- **Person.** The host letter uses "we"; all other copy addresses the guest as "you" (formal Greek plural "σας").
+- **No hype or direct-booking discount claims.** Avoid "luxury", "paradise", "hidden gem", "best price", or "cheaper if you book direct".
+- **Natural Greek phrasing and calendar forms.** Month headings use the nominative ("Οκτώβριος 2026") and dates use the genitive ("18 Οκτωβρίου"), matching `Intl.DateTimeFormat('el-GR')`.
 
 ### 1.4 Honesty rules (binding)
 
-1. **Sea view.** *Superseded by owner decision O45 (2026-10-04): the owner confirms the sea view, so copy and the amenity list may state it. The text below is kept for history.*
-   - No photo shows the Messinian Gulf (assets research §1), so no copy claims a sea view. Copy says "the gulf a short drive away".
-   - The gulf appears only on the relief map, which is labelled "Illustrative map, not to scale".
-   - The claim unlocks only when the owner supplies a real balcony photo that shows the gulf (§7.4).
-2. **No synthetic night.** Night mode tints the hero photo cooler as a theme treatment. It never presents a fake dusk photo.
-3. **No placeholder ever ships.** If owner data is missing (the host letter's signature, portrait, languages, reply time, reviews), the component omits that field or section. It never shows `[placeholder]`, `#` links or invented values.
-4. **Availability comes only from the availability repository (R3-F05–F09), and the public site shows no price anywhere** (owner decision of 2026-10-15: the prices are final but are not published; guests book on Booking.com or by phone/WhatsApp).
-   - The public read never selects the nightly price of a rate period; it passes only each period's dates and minimum stay.
-   - Without a fresh calendar, the home page has no nights teaser and no BookBar, and the availability page shows the contact options instead of the calendar.
-   - The summary card carries one trust line, `summary.trust`, whose wording is the dictionary's (`src/i18n/domains/availability.ts`). It mentions no price, no fee and no cancellation rule.
-5. **Reviews and rating** appear only from the owner's real data. The optional `ReviewsStrip` slot stays empty otherwise.
+1. **No synthetic night.** Night mode tints the hero cooler as a theme treatment without presenting a fake dusk photograph.
+2. **No placeholder ever ships.** When optional owner data (`HOST_PROFILE` signature, portrait, languages, reply time, reviews) is empty, components omit the field or section rather than showing placeholder text or `#` links.
+3. **Truthful availability and no public pricing.** Availability comes only from `availabilityRepository` (`BOOKING_ICAL_URL`). The public site displays no nightly prices, fee lines, totals, or cancellation policy; public reads never select rate-period prices. Without a fresh calendar, Home omits `NightsTeaser` and `BookBar`, and Availability falls back to contact options (`summary.trust` makes no pricing/cancellation claims).
 
 ---
 
@@ -160,15 +58,7 @@ The final marketing strings belong to R3-C1, which the owner approves. The tagli
 
 ### 2.2 Files (woff2 subsets) and budget
 
-**Where the files come from.**
-
-- The files are the pre-subset woff2 builds in the npm packages `@fontsource-variable/noto-serif-display@5.3.0` and `@fontsource-variable/commissioner@5.3.0`. Those packages are built from the google/fonts sources.
-- Fetch them with `npm pack <pkg>@5.3.0`: download only, **not** a dependency, nothing added to `package.json`. Before fetching, re-check the npm registry certificate issuer as O29 requires, and stop if interception is back.
-- Extract only the six files below, plus each package's `LICENSE` saved as `OFL-<Family>.txt`.
-- Record the SHA-256 of each committed file in `src/app/fonts/SOURCES.txt`, together with the package name, version and tarball integrity.
-- **latin-ext is deliberately not shipped.** The Noto Serif Display latin-ext file is 174,044 B, and EN/EL copy has no latin-ext characters. Rare characters, such as foreign guest names, fall back to the metric-adjusted system face.
-
-Sizes are exact bytes from the jsDelivr data API for fontsource 5.3.0, fetched 2026-09-28:
+Committed woff2 font subsets live in `src/app/fonts/` alongside `OFL-NotoSerifDisplay.txt`, `OFL-Commissioner.txt`, and `SOURCES.txt` (SHA-256 checksums and `@fontsource-variable/*@5.3.0` origins; `latin-ext` is omitted intentionally).
 
 | File (committed to `src/app/fonts/`) | Bytes | Preload | Needed by |
 |---|---|---|---|
@@ -177,99 +67,22 @@ Sizes are exact bytes from the jsDelivr data API for fontsource 5.3.0, fetched 2
 | `noto-serif-display-latin-wght-normal.woff2` | 41,232 | no | Latin headings |
 | `noto-serif-display-latin-wght-italic.woff2` | 49,264 | no | H1 "Dolce far niente", wordmark, italic accents |
 | `noto-serif-display-greek-wght-normal.woff2` | 30,004 | no | EL headings |
-| `noto-serif-display-greek-wght-italic.woff2` | 33,808 | no | EL italic accents (today only on the EL home page) |
+| `noto-serif-display-greek-wght-italic.woff2` | 33,808 | no | EL italic accents |
 | **Total** | **206,388** | 36,700 critical | |
 
-**Budget:**
-
-- **Preloaded:** ≤ 40 KB (Commissioner latin only).
-- **All fonts on any single page:** ≤ 210 KB. Roughly 206 KB on EL Home. EN Home was roughly 176 KB (computed from the sizes in the table above, not measured) while the kinetic band's Greek italic row was on it; without the band (removed 2026-10-11) EN Home should not fetch the Greek display italic, about 143 KB (SUSPECTED until a network log of a production build confirms it).
-- **Unicode ranges stop unneeded downloads.** A subset file is fetched only when the page renders glyphs in its unicode-range. Files are content-hashed and immutable-cached under `/_next/static/media`.
-- **Why the display italic is not preloaded.** The Home LCP element is the hero `<img>`; the budget keeps the critical path for the image.
-  - The H1 first renders in the metric-adjusted Times New Roman fallback and swaps when the font arrives.
-  - V13 measures LCP with and without preloading `noto-serif-display-latin-wght-italic` and keeps the preload only if LCP stays ≤ 2.5 s (§5.10).
-  - **Result (R3-V13):** the preload is not added; it raised the measured LCP by 170–205 ms.
+- **Budget:** Preloaded critical path ≤ 40 KB (Commissioner Latin only); total font weight ≤ 210 KB. Display italic is intentionally not preloaded so the home hero `<img>` keeps priority for LCP.
+- **Unicode ranges:** Non-overlapping `unicode-range` declarations prevent fetching Greek subsets on EN routes without Greek glyphs; files are served as content-hashed immutable assets.
 
 ### 2.3 `next/font/local` usage
 
-**How this was verified.**
+Each font subset uses its own module-scope `localFont()` call in `src/app/fonts/fonts.ts` (because Next's loader applies `declarations` uniformly per call and calculates `adjustFontFallback` metrics from Latin glyphs):
 
-- CONFIRMED by reading the webpack loader:
-  - `node_modules/next/dist/compiled/@next/font/dist/local/loader.js:31-45` applies `declarations` to **every** `src` file of one call, so per-file `unicode-range` inside one call is impossible.
-  - `get-fallback-metrics-from-font-file.js` computes fallback metrics from Latin letters (`'aaabcdeeeefghiijklmnnoopqrrssttuvwxyz'`), so the adjusted fallback must come from a latin file.
-  - `postcss-next-font.js` sets the CSS variable to `'<family>', '<family> Fallback', ...fallback`.
-- **Design:** one call per **subset**. Each call holds the upright and italic files of that subset and declares its own `unicode-range`. The subsets are then stacked in one CSS font stack: Greek first, then Latin with its metric-adjusted fallback, then system fonts. The ranges do not overlap, so each glyph resolves to exactly one webfont.
-- **Rule: next/font arguments must be literals.** Inline the range strings; do not reference constants.
+- `textLatin` (`--font-text-latin`, `preload: true`, `adjustFontFallback: 'Arial'`)
+- `textGreek` (`--font-text-greek`, `preload: false`, `adjustFontFallback: false`)
+- `displayLatin` (`--font-display-latin`, `preload: false`, `adjustFontFallback: 'Times New Roman'`)
+- `displayGreek` (`--font-display-greek`, `preload: false`, `adjustFontFallback: false`)
 
-```ts
-// src/app/fonts/fonts.ts  (module scope, one const per call)
-import localFont from 'next/font/local';
-
-export const textLatin = localFont({
-  src: [{ path: './commissioner-latin-wght-normal.woff2', weight: '100 900', style: 'normal' }],
-  variable: '--font-text-latin',
-  display: 'swap',
-  preload: true,
-  adjustFontFallback: 'Arial',
-  declarations: [{ prop: 'unicode-range', value: 'U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD' }],
-});
-
-export const textGreek = localFont({
-  src: [{ path: './commissioner-greek-wght-normal.woff2', weight: '100 900', style: 'normal' }],
-  variable: '--font-text-greek',
-  display: 'swap',
-  preload: false,
-  adjustFontFallback: false,
-  declarations: [{ prop: 'unicode-range', value: 'U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF' }],
-});
-
-export const displayLatin = localFont({
-  src: [
-    { path: './noto-serif-display-latin-wght-normal.woff2', weight: '100 900', style: 'normal' },
-    { path: './noto-serif-display-latin-wght-italic.woff2', weight: '100 900', style: 'italic' },
-  ],
-  variable: '--font-display-latin',
-  display: 'swap',
-  preload: false,
-  adjustFontFallback: 'Times New Roman',
-  declarations: [{ prop: 'unicode-range', value: '<same latin range as textLatin>' }],
-});
-
-export const displayGreek = localFont({
-  src: [
-    { path: './noto-serif-display-greek-wght-normal.woff2', weight: '100 900', style: 'normal' },
-    { path: './noto-serif-display-greek-wght-italic.woff2', weight: '100 900', style: 'italic' },
-  ],
-  variable: '--font-display-greek',
-  display: 'swap',
-  preload: false,
-  adjustFontFallback: false,
-  declarations: [{ prop: 'unicode-range', value: '<same greek range as textGreek>' }],
-});
-```
-
-**Where the classes go.**
-
-- The root layout (`src/app/layout.tsx`) sets `className={[textLatin, textGreek, displayLatin, displayGreek].map(f => f.variable).join(' ')}` on **`<html>`**, not on `<body>`.
-- Reason: `--font-text` and `--font-display` are declared on `:root` and substitute these variables there.
-
-The unicode ranges are the fontsource 5.3.0 `unicode.json` values, CONFIRMED by fetch. The Latin range does not contain `→` (U+2192) or `✦` (U+2726), so those are never typed as text; use the SVG icons in §6.
-
-```css
-/* in @theme (src/styles/tokens.css) */
---font-text: var(--font-text-greek), var(--font-text-latin), "Segoe UI", Roboto, "Noto Sans", system-ui, sans-serif;
---font-display: var(--font-display-greek), var(--font-display-latin), Georgia, "Noto Serif", serif;
-```
-
-**Open verification (SUSPECTED).** The build uses Turbopack (`next.config.ts` has `turbopack.root`), whose next/font implementation is native code I could not read. The R3-V2 spike must check, in `.next/static/css` and in a network log of a production build (`npm run build && npm start`):
-
-1. Four font families are emitted, each with its `unicode-range`.
-2. Only the Commissioner latin file gets `<link rel="preload">`.
-3. An EN page without Greek glyphs does not request the Greek files.
-
-**Result (R3-V2a):** all three checks passed on a production build, so the fallback below was not needed.
-
-**Fallback if the check fails:** plain `@font-face` rules in `src/styles/fonts.css` using `url('../app/fonts/<file>.woff2')`, which the bundler emits as hashed immutable assets, with the same unicode-ranges. Fallback metrics are then hand-written from a one-off run of `get-fallback-metrics-from-font-file.js`, and there is no preload.
+`src/app/layout.tsx` sets `[textLatin, textGreek, displayLatin, displayGreek].map(f => f.variable).join(' ')` on `<html>`, matching `--font-text` and `--font-display` in `src/styles/tokens.css`. Avoid raw `→` (U+2192) or `✦` (U+2726) in UI prose because they fall outside the shipped Latin woff2 range; use `<Icon>` SVGs (§6).
 
 ### 2.4 Weights and features
 
@@ -282,7 +95,7 @@ The unicode ranges are the fontsource 5.3.0 `unicode.json` values, CONFIRMED by 
 - `font-variant-numeric: tabular-nums lining-nums` on dates, distances and the fact strip.
 - `text-wrap: balance` on headings; `text-wrap: pretty` on paragraphs.
 - `hyphens: manual`.
-- All Greek strings in `src/i18n` must be NFC-normalized (precomposed tonos), because the Greek subset has no combining U+0301. Add the assertion `s === s.normalize('NFC')` to the existing i18n parity test in R3-V2.
+- All Greek strings in `src/i18n` must remain NFC-normalized (precomposed tonos), because the Greek font subset excludes combining U+0301 (`scripts/validate-content.ts` validates content).
 
 ### 2.5 Type scale (fluid)
 
@@ -333,11 +146,9 @@ Measure: running text ≤ 65ch; lead ≤ 38em.
 
 **Rules:**
 
-- A unit test (`tests/unit/design-tokens.test.ts`, R3-V2) parses `tokens.css`. It asserts that the two dark blocks are identical and that every `--color-*` has a dark value.
-- The same test computes every text/background pair in §3.3 with the WCAG formula and fails below the stated minimum. This automates G-CONTRAST.
-- New code must not use Tailwind `dark:` colour utilities or per-component dark selectors. R3-V12b removed the legacy `@custom-variant dark` from `src/app/globals.css`, so a `dark:` utility would now fall back to Tailwind's default (OS preference only) and ignore a stored theme choice.
-- No `light-dark()`: iOS Safari before 17.5 lacks it, and an invalid custom-property substitution would drop every colour.
-- Token names were chosen so they did not collide with the legacy `:root` variables (`--fg-muted`, `--radius-*`, `--shadow-*`, `--font-sans`, and so on in `src/styles/01-tokens.css`, deleted in R3-V12b).
+- Both dark-mode blocks in `src/styles/tokens.css` (`@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }` and `:root[data-theme="dark"]`) must stay identical and override every semantic colour token.
+- Do not use Tailwind `dark:` utilities or per-component dark selectors (`src/app/globals.css` has no legacy dark variant; `dark:` would ignore explicit `data-theme` choices).
+- Avoid `light-dark()` (unsupported before iOS Safari 17.5).
 
 ### 3.2 Tokens
 
@@ -401,17 +212,12 @@ Measure: running text ≤ 65ch; lead ≤ 38em.
 
 **Theme colour.**
 
-- Next `viewport.themeColor`: `[{ media: '(prefers-color-scheme: light)', color: '#F6F0E6' }, { media: '(prefers-color-scheme: dark)', color: '#0A1A21' }]`. This replaces `#36b9ab` in `src/app/layout.tsx:26`.
-- Manifest (`public/app.webmanifest`): `theme_color` `#F6F0E6`, `background_color` `#F6F0E6`. Done in R3-V3.
+- Next `viewport.themeColor`: `[{ media: '(prefers-color-scheme: light)', color: '#F6F0E6' }, { media: '(prefers-color-scheme: dark)', color: '#0A1A21' }]`.
+- Manifest (`public/app.webmanifest`): `theme_color` `#F6F0E6`, `background_color` `#F6F0E6`.
 
 ### 3.3 Computed contrast (WCAG 2.x relative luminance)
 
-**Method.**
-
-- Computed via the WCAG relative-luminance formula with alpha tokens composited over the stated background (verified continuously by `tests/unit/design-tokens.test.ts`).
-- The R3-V2 unit test must reproduce these numbers.
-- Minimums: 4.5 for text, 3.0 for large text (≥ 24 px, or ≥ 18.66 px bold) and for UI boundaries and focus indicators.
-- **Result: 0 failures.** The table has 123 rows (59 light, 56 dark, 8 both; rows from R3-V5b, V5c, V6, V7, V8, V9, V10 and V12a included; the two kinetic band rows went with the band on 2026-10-11). `tests/unit/design-tokens.test.ts` holds 13 more pairs (136 labels in all; rows with the same pair, minimum and ratio share one test case) and is the source of truth; 135 of its labels have a minimum, and the decorative `sun` row has none (it is never text). R3-V9 note: over the stay hub's half sun, `fg-muted` would be 2.50:1 at night, so the sun is sized from `--text-d1` and ends above the lead; only the d1 H1 (large text) sits over it.
+**Method:** WCAG relative luminance with alpha tokens composited over the stated background. Minimums: `4.5` for normal text, `3.0` for large text (`≥ 24 px`, or `≥ 18.66 px` bold), UI boundaries, and focus indicators. (Over the stay hub's half-sun decoration, the `sun` disk is capped so the lead sits cleanly below it and only the large `d1` heading overlaps.)
 
 | Mode | Pair | FG | BG | Ratio | Min |
 |---|---|---|---|---|---|
@@ -541,35 +347,16 @@ Measure: running text ≤ 65ch; lead ≤ 38em.
 
 **Hero contrast measured on the real photo pixels.**
 
-- Source: `messinian-light/tools/hero-contrast.mjs` → `shots/hero-contrast.json`. The method keeps the scrim, hides the text, and computes `#FFF8EE` against every pixel behind each text block.
-- **H1** (large text, ≥ 3:1), minimum per viewport: 4.31 at 390 px light, 4.35 at 1440 px light, 4.27 at 768 px light, ≥ 8.01 in dark.
-- **Lede:** ≥ 10.3 everywhere (measured before the lede was removed on 2026-10-14; the figure is historical).
-- **Price:** ≥ 13.2 (measured before the price line was removed on 2026-10-15; the figure is historical).
+- **Measurement:** hero contrast keeps the scrim, hides text, and checks `#FFF8EE` against every pixel behind each text block.
+- **H1** (large text, ≥ 3:1): ≥ 4.27 in light mode across viewports, ≥ 8.01 in dark mode; the one-pass H1 shimmer highlight (`#FFD6A0`) stays ≥ 3.45.
 - **Glass CTA:** ≥ 13.4.
-- **Transient case.** The one-pass H1 light sweep highlight (`#FFD6A0`) drops to 3.45 for under 3.4 s; that is still ≥ 3:1 for large text.
-- **Condition:** the scrim geometry in §5.5 must be kept exactly, because these numbers depend on it. V5 re-runs the measurement on the real page (G-CONTRAST).
+- **Open Graph share cards (`scripts/design/gen-og-images.ts`):** `npm run design:og` checks every text line against the lightest pixel inside its box and fails below 4.5:1 (measured: wordmark `band-fg` 6.84, place label `band-accent` 6.85, tagline `band-fg` 11.52).
 
-**Open Graph share cards (R3-V11).** `npm run design:og` (`scripts/design/gen-og-images.ts`) measures each text line against the lightest pixel of the scrimmed photo inside its box and fails below 4.5:1. Measured (both locales): wordmark `band-fg` 6.84, place label `band-accent` 6.85, tagline `band-fg` 11.52. The brand mark above the wordmark is a logotype (no minimum): over its lightest pixel the waves give 2.85 and the sun 1.77, over the mean pixel 8.32 and 5.17.
+**Usage rules:**
 
-**R3-V12a (legacy CSS consumers).** Placeholders in the guest, check-in and admin fields move from the legacy slate colour to `fg-muted`, and the Leaflet attribution links in dark take `accent` instead of the legacy dark link colour (rows above). The kinetic band EL row was `primary-text` in both themes (8.88 in dark; the earlier `sun` row described a colour that was never rendered); the band and its rows were removed on 2026-10-11. Everything else reuses existing pairs: the skip link `accent-fg` on `accent`, the PWA banner `fg` on `surface-raised`, the focus ring rows, and the scrollbar thumb `border-control` (the "UI: border-control vs bg/surface" rows).
-
-**R3-V12b (legacy sweep) adds no colour pair.** It deletes the legacy sheets. The dark-mode contrast findings they carried are closed by the surfaces that replaced them, and each of those surfaces is covered by an existing row:
-
-- R-166: guide card name and directions (`fg` and `accent` on `surface`).
-- R-187: placeholders (`fg-muted` on `surface`, R3-V12a).
-- R-188: primary button (`primary-fg` on `primary` and on `primary-hover`).
-- R-189, R-190, R-277: the booking bar and its CTA are gone. Covered by the `cal:` rows and the primary button rows.
-- R-223 and R-274: the components are gone. Empty states use `fg` and `fg-muted` on `surface`, and their action is the secondary button.
-- R-275: secondary button (`accent` on `surface`, hover `accent-hover` on `bg`).
-- R-279 and R-282: the blanket inherit rule and the no-JS fallback are gone. Dark values exist only in the two `tokens.css` dark blocks, which the parity test checks.
-
-**R3-V14 adds no colour pair.** The scroll hairline is decorative and uses `primary` (the "UI: primary fill vs bg" rows). The pointer glare is a transient white `soft-light` layer kept off text (over photos, or under the letter's text); the heading rise (M28) is a transient opacity, like the H1 sweep.
-
-**Usage rules.**
-
-- `sun`, `olive-soft`, the raw terracotta `#B26646` and the shutter greens are decorative and never used for text.
-- Text on photos is allowed only over the scrim.
-- Grain is a background image on `body` (§4.5), capped at 8 % alpha; the rows above prove the worst-case speck still passes.
+- `sun`, `olive-soft`, raw terracotta `#B26646`, and shutter greens are decorative and never used for text.
+- Text over photography appears only behind a scrim (`--scrim`).
+- Paper grain (`§4.5`) is capped at 8 % alpha so worst-case contrast remains above minimum thresholds.
 
 ---
 
@@ -624,11 +411,9 @@ Primary button glow: `0 14px 26px -14px rgb(160 69 42 / .55)` (light) / `0 14px 
 | Deck fan instead of coverflow | `lg` |
 | Bottom bars hidden | `lg` |
 
-**Grid (not implemented; layouts use ad-hoc `repeat(n, minmax(0, 1fr))` grids):** 4 columns (< 768, gap 16), 8 columns (768–1023, gap 24), 12 columns (≥ 1024, gap 32), inside the container.
+**Grid rule:** Layouts use `repeat(n, minmax(0, 1fr))`, never `1fr 1fr`, to avoid grid item overflow. `overflow-x: clip` may apply only to `html`/`body`.
 
-**Grid rule:** always `repeat(n, minmax(0, 1fr))`, never `1fr 1fr`. This avoids the aegean hub overflow bug. No page may clip overflowing content to hide it: `overflow-x: clip` is allowed only on `html`/`body` as a safety net. The V13 audit checks every element's right edge ≤ viewport width, not only `scrollWidth`.
-
-**z-index:** content 1, sticky header 50, bottom bars: BookBar 60, PWA banner 50; toasts 60 (same level as the BookBar; the toast host comes after the page in DOM order, `Toast.tsx`). Dialogs use the top layer.
+**z-index:** content 1 (`z-index: 2` on `.facts`), sticky header 50, PWA banner 50, BookBar 60, toasts 60 (rendered after the page in DOM order inside `Toast.tsx`), skip link 100. Dialogs use the browser top layer.
 
 **Touch targets:** buttons 48 px (sm 40), icon buttons 44 px, chips 40 px with ≥ 8 px gaps, calendar cells ≥ 44 × 44 px. All meet WCAG 2.5.8.
 
@@ -668,14 +453,12 @@ setTimeout(function(){if(d.getAttribute('data-motion')==='full'&&!d.hasAttribute
 try{if(!sessionStorage.getItem('brand-intro')){sessionStorage.setItem('brand-intro','1');d.setAttribute('data-intro','')}}catch(e){}}})()
 ```
 
-The 4 s failsafe removes `data-motion` again when a `[data-reveal]` block exists and `HomeRevealObserver` has not set `data-reveal-ready` on `<html>` (the bundle is late or failed), so no home block stays hidden.
+The 4 s failsafe removes `data-motion` when a `[data-reveal]` block exists and `HomeRevealObserver` has not set `data-reveal-ready` on `<html>`, preventing hidden sections if the client bundle fails or stalls. `data-intro` marks the first full-motion load of the session (`sessionStorage` key `brand-intro`).
 
-R3-V14 added the last line: `data-intro` marks the first full-motion load of the browser session (tab), for the brand mark intro (M26). The key `brand-intro` is listed in the privacy notice (sessionStorage).
+**How the flags work.**
 
-**How the flag works.**
-
-- `data-motion="full"` is the only flag that arms motion. It is a data attribute rendered by no React component, so hydration never touches it (unlike `className` on `<html>`, which next/font uses).
-- `data-theme` is now set **only** when the visitor chose a theme. Otherwise the CSS media query follows the OS live. This is a change from today's always-set behaviour; `ThemeSwitch` derives the effective theme as `data-theme ?? (matchMedia dark ? 'dark' : 'light')`.
+- `data-motion="full"` is the only flag that arms motion and is set only on `<html>` (never by React components, so hydration never touches it).
+- `data-theme` is set only when the visitor explicitly selects Light or Dark; otherwise OS `prefers-color-scheme` controls the palette (`ThemeSwitch` computes effective theme as `data-theme ?? (matchMedia dark ? 'dark' : 'light')`).
 
 **Tailwind variant:**
 
@@ -687,10 +470,7 @@ R3-V14 added the last line: `data-intro` marks the first full-motion load of the
 }
 ```
 
-**Plain-CSS gate.** Motion CSS outside utilities sits inside `@media (prefers-reduced-motion: no-preference) { :root[data-motion="full"] … }`. Scroll-driven rules are additionally inside `@supports (animation-timeline: view())`.
-
-- This gate is required. Measured in Chrome 148 (tech research §1.3): the repo's global duration reset (then `src/styles/05-primitives.css:290-298`, in `src/styles/motion.css` since R3-V12b) does **not** stop scroll-driven animations.
-- Keep a reset as a safety net in the new `motion.css`, extended to `:root:not([data-motion="full"])` for View Transition pseudo-elements.
+**Plain-CSS gate.** Motion CSS outside utilities sits inside `@media (prefers-reduced-motion: no-preference) { :root[data-motion="full"] … }`. Scroll-driven rules are additionally inside `@supports (animation-timeline: view())`, and `src/styles/motion.css` keeps the reduced-motion duration/View-Transition reset safeguard.
 
 **Live changes.** `src/lib/motion/motionPreference.ts`, a small client module mounted by the header, keeps `data-motion` in sync:
 
@@ -733,57 +513,45 @@ The WebGL hero watches `data-motion` with a `MutationObserver` and tears down wh
 | M3 | Hero stage **recede** (graft 1) | `.hero__stage` goes to `perspective(1400px) translateY(6%) rotateX(16deg) scale(.86)`, `border-radius` 0 → `var(--radius-card)`. A dark overlay (`rgb(var(--scrim) / 0 → .55)`) and hero content opacity 1 → 0 plus `translateY(-80px)` over the first 70 % of the exit | Scroll: `view()` on `section.hero`, `animation-range: exit 0% exit 100%` | CSS scroll-driven | Static |
 | M4 | Hero dolly (T1) | `.hero__img` scale 1 → 1.14, `translateY(3%)`. Disabled when `[data-gl="on"]`, because the shader does the dolly | Scroll, same timeline | CSS scroll-driven | Static |
 | M5 | Living photograph (T2) | §5.6 | Pointer, sideways touch-drag, scroll; ambient drift ≤ 4.8 s | WebGL | Never mounted |
-| M6 | Fact strip | Six tiles open like louvres from `rotateX(-86deg)` (transform-origin top), 75 ms stagger, `--ease-shutter` | Top passes 65 % of the viewport height, once (IntersectionObserver with `rootMargin` -35 % from the bottom, HomeRevealObserver); a strip already on screen at load (it overlaps the hero, so it starts in the bottom 35 % of the first screen) or above the viewport after a restored scroll position opens two animation frames after mount | CSS + IO | Visible |
-| M7 | Kinetic band (graft 2) | **Removed on 2026-10-11 with the KineticBand (owner request).** Was: Row A (EN outline, `-webkit-text-stroke: 1px` in `fg` at 45 % opacity) translateX 4 % → −38 %. Row B (EL italic, `primary-text`) −40 % → 0 %. Separators are the SVG star. Font `clamp(3.2rem, 11vw, 9.5rem)` | Scroll: `view()`, `animation-range: cover` | CSS scroll-driven | Static offsets: row A −10 %, row B −20 % |
+| M6 | Fact strip | Six tiles open like louvres from `rotateX(-86deg)` (transform-origin top), 75 ms stagger, `--ease-shutter` | Top passes 65 % of viewport height (IO `rootMargin` −35 %), or 2 rAF if already on/above viewport | CSS + IO | Visible |
 | M8 | Highlights | Rise 40 px and untilt from `rotateX(18deg)`, 90 ms stagger. Afterwards they tilt toward the pointer (max 6°) on fine pointers | In view / pointer | CSS + IO; JS writes `--tx`/`--ty` (rAF-throttled) | Flat |
-| M9 | Season switch (graft 10) | Cards flip `rotateY` 0 → 90° → 0 (640 ms, `--ease-sweep`, 70 ms stagger); content swaps at 50 % | Click | CSS class + JS | Instant swap |
-| M10 | Balcony window **shutters** | Two louvred shutters swing to ±104° (`--dur-shutter`, spring); a warm flare fades; the photo settles 1.14 → 1 | Top passes 55 % of the viewport height, once (`data-reveal="0.45"`, `rootMargin` -45 % from the bottom) | CSS 3D + IO | Shutters not rendered; the photo stays |
+| M9 | Season switch | Cards flip `rotateY` 0 → 90° → 0 (640 ms, `--ease-sweep`, 70 ms stagger); content swaps at 50 % | Click | CSS class + JS | Instant swap |
+| M10 | Balcony window **shutters** | Two louvred shutters swing to ±104° (`--dur-shutter`, spring); a warm flare fades; the photo settles 1.14 → 1 | Top passes 55 % of viewport height (`rootMargin` −45 %) | CSS 3D + IO | Shutters not rendered; the photo stays |
 | M11 | Rooms coverflow (< 1024) | Each card `perspective(900px)`: `translateZ(-40px) rotateY(34deg) scale(.9)` → flat at the centre → mirrored; opacity .7 → 1 → .7 | The row's own horizontal scroll: `view(inline)` | CSS scroll-driven (0 JS) | Flat snap row |
-| M12 | Rooms deck fan (≥ 1024, graft 3) | Six cards pile, then fan out (`translate3d(pos*clamp(100px, 12vw, 175px), |pos|*18px, -|pos|*70px) rotateZ(pos*5deg) rotateY(pos*-7deg)`, 800 ms spring). Chip or click lifts the active card (`translateZ(140px)`, `translateY(-34px)`, `shadow-object`); the others desaturate (`saturate(.75) brightness(.8)`). The stage tilts toward the pointer (max 6°) | In view, once (IO adds `.is-in`) / chip / pointer | CSS transitions + JS classes and custom properties | Fanned static, no tilt |
+| M12 | Rooms deck fan (≥ 1024) | Six cards pile, then fan out; chip or click lifts the active card (`translateZ(140px)`, `translateY(-34px)`, `shadow-object`) while others desaturate (`saturate(.75) brightness(.8)`). Stage tilts toward pointer (max 6°) | In view, once / chip / pointer | CSS transitions + JS classes/vars | Fanned static, no tilt |
 | M13 | 14-night strip | Cells flip in `rotateY(-90deg)`, 45 ms stagger | In view, once | CSS + IO | Visible |
-| M14 | Relief map | Contour layers rise (`translateZ` 0 → 18/36/54 px), pins stand up, stage tilt `rotateX(40deg) rotateZ(-6deg)` (≥ 1024: 50°/−14°). The home pin pulses **2×** (1.6 s, 1.2 s delay; ends at 4.4 s) | In view / pointer (fine) | CSS 3D + IO + JS custom properties | Flat 2D plan |
+| M14 | Relief map | Contour layers rise (`translateZ` 0 → 18/36/54 px), pins stand up, stage tilt `rotateX(40deg) rotateZ(-6deg)` (≥ 1024: 50°/−14°). Home pin pulses 2× (ends by 4.4 s) | In view / pointer (fine) | CSS 3D + IO + JS custom properties | Flat 2D plan |
 | M15 | Relief waves | Wave pattern `translateX(-60px → 0)` | Scroll: `view()` | CSS scroll-driven | Static |
-| M16 | Sun path | **Dropped, not implemented (as of 2026-10-09).** Was: a fixed 110vmax element with a static radial gradient (`glow` token) translates from top-right to bottom-left. It is moonlight in Night mode. **Transform only**, not a `@property` gradient animation (compositor-only; changed from the mockup) | Scroll: `scroll(root)` | CSS scroll-driven | Glow parked top-right |
-| M17 | Generic section reveal | **Dropped, not implemented (as of 2026-10-13).** Was: `translateY(32px)` + opacity over `--dur-reveal`; each section has its own reveal (M6, M8, M10, M13, M14) | In view, once | CSS + IO | Visible |
 | M18 | Buttons | Hover (fine pointers): lift −2 px plus a warm glint sweep on primary (700 ms). Active: `scale(.98)` for 160 ms | Pointer | CSS | Colour change only |
 | M19 | Calendar month turn | Desktop previous/next: `rotateY(±58deg) translateZ(-40px)` → flat, 560 ms, origin at the spine | Click / PageUp / PageDown | CSS class | Instant |
 | M20 | Calendar range light | One pass of light across the chosen nights (55 ms per cell) | Selection complete | CSS | None |
 | M21 | Favourite heart burst | 6 dots scale out and fade (400 ms); the heart scales 1 → 1.25 → 1 | Toggle on | CSS | Icon fill change only |
 | M22 | Bottom bars | Slide up from `translateY(160%)` (`--dur-ui`) | IO state | CSS | Appear instantly |
-| M23 | Menu sheet | Slides from the right via `@starting-style` (Chrome 117, Safari 17.5, Firefox 129) | Open | CSS | Appears instantly |
-| M24 | FAQ | Height animates via `interpolate-size: allow-keywords` and `::details-content` where supported (Chrome 131+) | Toggle | CSS | Instant (default `<details>`) |
-| M25 | Calm mode (hub, portal, phones, guide lists) | Tiles and cards fade up 10 px, 60 ms stagger (`--i` inline style, allowed by `style-src 'unsafe-inline'`) | Load, once | CSS | Visible |
-
-**R3-V14 additions (owner request 2026-09-30, "more modern, extra motion, 3D").** Same rules: static by construction, the §5.2 gate, transform and opacity only, no new dependency, CSP unchanged. `tests/unit/motion-css-gate.test.ts` checks that every animation, transition, scroll timeline and view-transition name in `motion.css` and `components/*.css` is gated (the WebGL canvas fade is gated by its own capability check).
-
-| # | Element | Motion | Trigger | Engine | Reduced / unsupported |
-|---|---|---|---|---|---|
-| M26 | Header brand mark | The sun rises 6 px with a fade (1 s, .45 s delay) while the two waves draw (stroke dash over `pathLength="1"`, 1.2 s). Ends by 1.45 s. Not in the stay header | First full-motion load of the session (`data-intro`, §5.2; removed when the sun has risen) | CSS | Static mark |
-| M27 | Room deck cards (≥ 1024), guide cards, host letter | Tilt toward the pointer, max 6° (`perspective` + `rotateX/Y`), and a soft light glare (white radial, `soft-light`) at the pointer, kept off text: over the photo on room and guide cards, under the letter's text. Springs back with `--ease-shutter` (700 ms). The coverflow (< 1024) keeps M11 | Fine pointer (`pointerType` mouse); `src/lib/motion/pointerEffectsRuntime.ts`, a lazy chunk loaded only on fine-pointer devices (one delegated listener, box read on enter, custom properties written once per frame) | CSS + JS custom properties | Flat |
-| M28 | Section headings (`.ui-section__title`: home, apartment, availability) | Rise out of a 3D plane: `perspective(600px) translateY(.5em) rotateX(-58deg)` and opacity → flat, origin at the baseline | Scroll: `view()`, `entry 0%` → `entry 100%` | CSS scroll-driven | Static |
-| M29 | Header across navigations | Own view-transition group (`site-header`), no animation, above the morph (Next view-transitions guide, "Anchoring the header"); not during the theme reveal or the photo morph (`data-vt`) | Navigation View Transitions | CSS | Instant |
-| M30 | Primary buttons | Magnetic pull toward the pointer, max 6 px (individual `translate`, so the M18 lift, press and glint stay) | Fine pointer | CSS + JS custom properties | Colour change only |
-| M31 | Marketing header | 2 px `primary` hairline along the pill's bottom edge, `scaleX(0 → 1)` with the page scroll. Decorative (`aria-hidden`) | Scroll: `scroll(root)` | CSS scroll-driven | Not shown |
-| M32 | Marketing footer waves | Drift `translateX(-160px → 0)` (user units; the path runs one period past the viewBox) | Scroll: footer `view()`, entry | CSS scroll-driven | Static |
-| M33 | Apartment lead photo | CSS layered parallax: the photo drifts `translateY(-5% → 5%)` at `scale(1.12)` inside its frame; the frame recedes (`perspective(1400px) rotateX(7deg) scale(.95)`) as it leaves. Not WebGL: §5.10 gives the apartment no deferred GL budget (only the 1.5 KB fine-pointer effects chunk) | Scroll: `view()` | CSS scroll-driven | Static |
-| M34 | Fact strip numbers | Plain numbers count up from 0 (850 ms, ease-out cubic) as the louvres open; ordinals ("2nd", "2ος") stay as rendered, since their suffix belongs to the final digit. The server markup holds the final numbers and the count ends on that exact text | Top passes 65 % of the viewport height, once (IO with `rootMargin` -35 % from the bottom), or two animation frames after mount when the strip is already on screen | JS (rAF) | Final numbers |
-| M35 | Guide map pins | Drop 40 px with a squash-and-settle spring (760 ms), 45 ms stagger (`--i` set by LeafletMap through the CSSOM) | Map opens | CSS | Pins appear |
+| M23 | Menu sheet | Slides from the right via `@starting-style` | Open | CSS | Appears instantly |
+| M24 | FAQ | Height animates via `interpolate-size: allow-keywords` and `::details-content` where supported | Toggle | CSS | Instant (`<details>`) |
+| M25 | Calm mode (stay hub, portal, phones, guide) | Tiles and cards fade up 10 px, 60 ms stagger (`--i` inline style, allowed by `style-src 'unsafe-inline'`) | Load, once | CSS | Visible |
+| M26 | Header brand mark | Sun rises 6 px with fade while waves draw (`pathLength="1"`, ends by 1.45 s; not in stay header) | First full-motion load of session (`data-intro`) | CSS | Static mark |
+| M27 | Room deck cards (≥ 1024), guide cards, host letter | Fine-pointer 3D tilt (max 6°) and soft glare (`src/lib/motion/pointerEffectsRuntime.ts`) | Fine pointer | CSS + JS custom properties | Flat |
+| M28 | Section headings (`.ui-section__title`: home, apartment, availability) | Rise out of a 3D plane (`perspective(600px) translateY(.5em) rotateX(-58deg)`) | Scroll: `view()`, `entry 0%..100%` | CSS scroll-driven | Static |
+| M29 | Header across navigations | Anchored `site-header` view-transition group above morphing elements | Navigation View Transitions | CSS | Instant |
+| M30 | Primary buttons | Magnetic pull toward fine pointer (max 6 px via `translate`) | Fine pointer | CSS + JS custom properties | Colour change only |
+| M31 | Marketing header | 2 px `primary` scroll progress hairline along pill bottom edge (`aria-hidden`) | Scroll: `scroll(root)` | CSS scroll-driven | Hidden |
+| M32 | Marketing footer waves | Drift `translateX(-160px → 0)` | Scroll: footer `view()`, entry | CSS scroll-driven | Static |
+| M33 | Apartment lead photo | Parallax drift inside frame and gentle frame recede on exit | Scroll: `view()` | CSS scroll-driven | Static |
+| M34 | Fact strip numbers | Plain numbers count up from 0 (850 ms) matching rendered text; ordinals stay static (`FactCounters.tsx`) | On louvre reveal | JS (`rAF`) | Final numbers |
+| M35 | Guide map pins | Drop 40 px with spring stagger (760 ms, `--i` set by `LeafletMap`) | Map opens | CSS | Pins appear |
 
 ### 5.6 The 3D hero: "living photograph"
 
 **Decision: a hand-written WebGL fragment shader.** No library.
 
-It is ported from `.runtime/design/messinian-light/hero-gl.js`, which the tech research prototype and the messinian mockup both ran without CSP violations under the production policy in headless Chrome 148.
-
 | Option | Added JS (gz) | CSP fit | Verdict |
 |---|---|---|---|
-| **Hand-written WebGL: one triangle, one fragment shader** | **4.1 KB measured** (mockup, with comments; 3.4 KB stripped). **Budget ≤ 6 KB** | No `eval`, no WASM, no workers (CONFIRMED under the production CSP, tech research §1.2) | **Adopted** |
-| three.js core | ≈ 175.7 KB (the `WebGLRenderer` import, bundlephobia) | Core fine; Draco, KTX2 and meshopt need `'wasm-unsafe-eval'` (absent) | Rejected: about 40× the bytes for one textured plane |
-| @react-three/fiber + drei | ≥ 233 KB before any drei component | drei defaults fetch from CDNs (Draco from gstatic, environment presets, detect-gpu from unpkg), blocked by `connect-src 'self'` | Rejected |
-| OGL | 10–15 KB for a minimal plane (SUSPECTED) | No WASM in core | Rejected: no gain at a single shader; unmaintained for about 20 months |
-| GSAP / Lenis | 5.5 KB+ | Fine if bundled | Rejected: CSS does it, and Lenis moves scroll off the compositor |
+| **Hand-written WebGL: one triangle, one fragment shader** | **~3.4–4.1 KB** (Budget ≤ 6 KB) | No `eval`, no WASM, no workers | **Adopted** |
+| three.js / @react-three/fiber | ≥ 175–233 KB | Draco/default presets require WASM or CDN hosts | Rejected |
+| OGL / GSAP / Lenis | Extra bundle cost | CSS scroll-driven + single shader suffice | Rejected |
 
-**Rendering (from the mockup, unchanged).**
+**Rendering:**
 
 - GLSL ES 1.00 (runs on WebGL2 and WebGL1). One full-screen triangle. Two textures:
   - `uImg`: the LCP `<img>` itself, taken from `img.currentSrc` after `img.decode()`. It is the same origin, so there is no second download.
@@ -799,7 +567,7 @@ It is ported from `.runtime/design/messinian-light/hero-gl.js`, which the tech r
 **Loading sequence.**
 
 1. SSR renders only the `<picture>` (§7.2), the scrim and the content. `section.hero` has `touch-action: pan-y pinch-zoom` (`src/styles/components/hero.css:12-13`; the `pan-y` line above it is the fallback for engines without `pinch-zoom`), so vertical scroll and pinch-zoom stay native and a sideways drag moves the view. While the page is zoomed in, a one-finger sideways drag that starts on the hero does not pan the page, because `pan-y` allows only vertical one-finger panning (with the WebGL view running, the drag moves the view instead): pan with two fingers, which `pinch-zoom` allows, or start the drag below the hero. This limit is accepted.
-2. `HeroGlIsland` (client, ≤ 1.5 KB) runs `scheduleIdle`: after `load`, `requestIdleCallback({ timeout: 2500 })`, falling back to `setTimeout(1200)` because Safari has no `requestIdleCallback`. The idle helper is extracted from `src/components/DeferredRuntimeManagers.tsx:6-40` into `src/lib/motion/scheduleIdle.ts` and reused.
+2. `HeroGlIsland` uses `scheduleIdle` (`src/lib/motion/scheduleIdle.ts`): after `load`, `requestIdleCallback({ timeout: 2500 })`, falling back to `setTimeout(1200)` when unsupported.
 3. **Capability gate** (`src/lib/motion/heroCapability.ts`, a pure function taking `navigator`, `document` and the hero element). It aborts if any of these holds:
    - `data-motion` ≠ `full`;
    - `navigator.connection?.saveData === true`;
@@ -822,7 +590,7 @@ It is ported from `.runtime/design/messinian-light/hero-gl.js`, which the tech r
    - On teardown the canvas fades out, then `WEBGL_lose_context` is called and the canvas removed. The reason is recorded as `data-gl="off:<reason>"`.
 9. Device orientation is not used. Permissions-Policy blocks the accelerometer and gyroscope (`productionConfig.headers.permissionsPolicy` in `src/lib/security-config.ts`); do not relax it.
 
-**Assets:** depth maps ≤ 2 KB each (§7.2). They are drawn from the SVG polygon layers in `messinian-light/tools/gen-assets.mjs:17-38`: sky, Taygetos, pine and rooftops, far parapet, table and chairs, right plant, left plant and parapet nearest. Rasterised with `sharp` `blur(9)`.
+**Assets:** depth maps (`public/house/balcony/hero/depth-*.webp`, ≤ 2 KB each; blurred sky/mountains/rooftops/balcony/plants planes).
 
 **Files:**
 
@@ -841,117 +609,42 @@ It is ported from `.runtime/design/messinian-light/hero-gl.js`, which the tech r
 
 ### 5.7 Page transitions (View Transitions)
 
-**React `<ViewTransition>`.**
+`src/components/motion/SharedElement.tsx` wraps Next's React `<ViewTransition>` for guide cards → detail (`name="guide-<slug>"`), `ApartmentGallery` triggers `document.startViewTransition` (`name="gallery-photo"`, `photoMorph.ts`) with a 200 ms fade fallback (`lightbox.css`), `.site-header` stays anchored (`M29`), and `ThemeSwitch` reveals root theme switches circularly (`html[data-vt="theme"]`, `--vt-x`/`--vt-y`) when `data-motion="full"`.
 
-- It works in the Next 16.4.5 App Router with no configuration. Next vendors a React canary that exports it (CONFIRMED: `node_modules/next/dist/docs/01-app/02-guides/view-transitions.md:50` for 'no configuration'; `node_modules/next/dist/compiled/react/cjs/react.production.js:395` and `:565` for the vendored React canary `19.3.0-canary-278794d7-20261002` and its `ViewTransition` export).
-- Wrappers live in `page.tsx`, not in layouts (same guide).
-- It is a canary API, so it is isolated in `src/components/motion/SharedElement.tsx`.
-
-| Navigation | Transition |
-|---|---|
-| Forward links (Home → Apartment/Availability/Guide; list → detail) | **Not implemented (as of 2026-10-13).** `transitionTypes={['nav-forward']}`: the old page sinks (`opacity 0`, `translateZ(-120px) rotateX(6deg)`, 260 ms); the new page rises (`translateY(48px) rotateX(-6deg)` → 0, 420 ms, `--ease-glide`) |
-| Back links | **Not implemented (as of 2026-10-13).** `nav-back`: the mirror of forward |
-| Untyped (browser back/forward, refresh, Suspense) | **Not implemented (as of 2026-10-13).** `default: 'none'` |
-| Guide card → guide detail | Shared element `name="guide-<slug>"` with `share="morph" default="none"` on the card image and the detail hero |
-| Gallery thumbnail → lightbox | Shared element `gallery-photo` (one fixed name, `photoMorph.ts`): `document.startViewTransition`, with the open and the close committed by `flushSync` (`ApartmentGallery.tsx`), so the morph runs. Morphing into a top-layer `<dialog>` is SUSPECTED; V6 verifies it in Chrome and Safari 26, and falls back to a 200 ms crossfade (`lightbox.css`) |
-| Stay hub, portal, phones | **Not implemented (as of 2026-10-13).** Crossfade only (`vt-fade`, 200 ms) |
-| Header (R3-V14, M29) | Anchored: its own group without animation, above the morphing elements |
-| Theme switch (graft 5) | `document.startViewTransition` with `html[data-vt="theme"]`; the new root reveals with `clip-path: circle(0 → 150vmax)` from the switch's centre (`--vt-x`/`--vt-y`), 760 ms. Only when `data-motion="full"` and the API exists; otherwise the switch is instant |
-
-Always add `::view-transition { pointer-events: none; }` (Next guide). With reduced motion or the switch off: `:root:not([data-motion="full"])::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }`, plus the same inside `@media (prefers-reduced-motion: reduce)`.
+Always keep `::view-transition { pointer-events: none; }` and `:root:not([data-motion="full"])::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }` (mirrored inside `@media (prefers-reduced-motion: reduce)`).
 
 ### 5.8 Reduced motion (summary)
 
-Reduced motion comes from the OS setting or from the in-page switch (`data-motion="reduce"`). It gives:
+Reduced motion (`prefers-reduced-motion: reduce` or `data-motion="reduce"`) disables the WebGL hero, balcony shutters, deck tilt, 3D relief depth, scroll-driven reveals, and View Transitions (`@media print` in `motion.css` forces reveals visible and hides shutters).
 
-- No canvas, and live teardown if the preference changes.
-- No shutters (the window shows the photo).
-- A flat room row or a fanned static deck.
-- A flat map.
-- Reveals already visible.
-- No sun movement.
-- View Transitions and scroll behaviour: instant.
-- Only colour and opacity changes on hover.
-- Print: the hidden starting states of the home blocks are forced to their final state, and the closed balcony shutters are not printed (`@media print` in `motion.css`); the rooms deck keeps its fan.
+### 5.9 CSP rules
 
-Screenshot proof in the mockup: `home-390-reduced.png`, `availability-390-reduced.png`, `stay-390-reduced.png`.
-
-### 5.9 CSP interaction (unchanged in spirit)
-
-- **Scripts.**
-  - The production `script-src` is `'self' 'nonce-…'` (`productionConfig.csp.directives.scriptSrc` in `src/lib/security-config.ts`, with the nonce added by `buildCSPDirective`).
-  - Lazy chunks load via `'self'`.
-  - Inline code is only the existing nonce'd boot script.
-  - No WASM, no `eval`, no blob workers.
-- **Styles.**
-  - Keep `style-src 'self' 'unsafe-inline'` **without** a nonce, so React and SSR `style=""` attributes such as `--i` and the hero custom properties keep working.
-  - Do not add a style nonce: a nonce makes browsers ignore `'unsafe-inline'` (tech research §4.4).
-- **Fonts.** Remove `https://fonts.googleapis.com` from `styleSrc` and `https://fonts.gstatic.com` from `fontSrc` in both the dev policy (`security-config.ts:84, 86`) and the production policy (`:145, :147`), with CSP tests (R3-V2).
-- **Verification.** Every motion or 3D change is verified on a production build (`npm run build && npm start`) with a `securitypolicyviolation` listener. The dev CSP is report-only and allows `unsafe-eval`, so dev cannot reveal violations.
+- **Scripts:** `'self' 'nonce-…'` in production (`src/lib/security-config.ts`). Inline code is limited to the nonce'd boot script; WebGL uses no `eval`, WASM, or workers.
+- **Styles:** Keep `style-src 'self' 'unsafe-inline'` without a style nonce so inline CSS variables (`--i`, hero depth custom properties) remain valid.
+- **Fonts:** Self-hosted woff2 subsets only (no external font origins).
 
 ### 5.10 Performance budget
 
-- **Measured profile** for V5/V13: puppeteer (repo devDependency) on a production build, 390×844 @3x, CPU throttling ×4, network 1.6 Mbps down / 750 kbps up / 150 ms RTT.
-- **Metrics:** `largest-contentful-paint` via PerformanceObserver, CLS via `layout-shift`, TBT from long tasks, median of 5 runs. This replaces the Lighthouse matrix removed by R3-D24; the advisory vitals audit that measured these was removed on 2026-11-14.
-
-| Budget | Limit |
-|---|---|
-| LCP (mobile profile) | ≤ 2.5 s on every public route |
-| CLS | ≤ 0.05 |
-| INP (interaction tests: calendar select, chip filter, menu open) | ≤ 200 ms |
-| TBT | ≤ pre-redesign baseline + 50 ms |
-| WebGL init | No long task > 50 ms on a real mid-range Android (owner device check; SwiftShader measured 397 ms and is not representative) |
-| WebGL frame | ≤ 8 ms per frame at ≤ 0.65 MP render target |
-| Critical-path fonts | ≤ 40 KB (one preload) |
-| All fonts per page | ≤ 210 KB |
-| Global CSS after R3-V12 | ≤ 30 KB gz (the mockup's whole stylesheet was 13.5 KB gz) |
-| Mobile hero image | ≤ 60 KB WebP / ≤ 40 KB AVIF at 720 w |
-| Desktop hero image | ≤ 180 KB at 1920 w |
-
-**First-party client JS added by the redesign, per route (gz).** Measured as the sum of `encodedDataLength` of script responses minus the pre-redesign baseline.
-
-| Route | Sync | Deferred | LCP element |
-|---|---|---|---|
-| Home `/{l}` | ≤ 14 KB (header menu, switches, bottom bar, season switch, rooms chips/deck, reveal observer, relief pointer, fact counters) | Hero GL ≤ 6 KB + depth map ≤ 2 KB (capable devices only); pointer effects ≤ 1.5 KB (fine pointer only) | Hero `<img>` (9:16 crop on phones) |
-| Apartment | ≤ 8 KB (chips, lightbox) | Pointer effects ≤ 1.5 KB (fine pointer only) | Lead photo (`living_8` crop) |
-| Availability | Calendar island (react-day-picker 9 + stay rules) ≤ 40 KB. SUSPECTED size; measure in R3-F09 and record | Pointer effects ≤ 1.5 KB (fine pointer only) | H1 text |
-| Stay hub | ≤ 4 KB | none | H1 text |
-| Guide list | ≤ 8 KB (search, chips, favourites) | Leaflet + map only when "Map" is chosen; pointer effects ≤ 1.5 KB (fine pointer only) | First card image or H1 |
-| Guide detail | ≤ 3 KB | Pointer effects ≤ 1.5 KB (fine pointer only) | Detail photo |
-| Phones, privacy, 404 | ≤ 1 KB | Pointer effects ≤ 1.5 KB (fine pointer only) | H1 text |
-| Offline | ≤ 1 KB | none | H1 text |
-| Guest sign-in, check-in, portal refresh | ≤ baseline + 2 KB | none | H1 text |
-| Admin | 0 change | none | n/a |
-
-- **Pointer effects** (R3-V14 M27/M30, `src/lib/motion/pointerEffectsRuntime.ts`): one lazy chunk, 1.0 KB gz in the R3-V14 production build. The site header mounts it on every non-stay route, so magnetic primary buttons work beyond home. Coarse-pointer devices never fetch it, and the stay routes (§5.1 calm mode) never load it.
-- **Fact counters** (M34, `src/components/home/FactCounters.tsx`): about 0.6 KB gz (esbuild minified estimate), inside the home sync budget.
+- LCP ≤ 2.5 s; CLS ≤ 0.05; INP ≤ 200 ms; WebGL frame ≤ 8 ms (≤ 0.65 MP render target).
+- Critical preloaded fonts ≤ 40 KB (all subsets ≤ 210 KB); global CSS ≤ 30 KB gz; lazy `pointerEffectsRuntime` chunk only on non-stay fine-pointer devices; lazy `heroGl` only on capable home devices.
 
 ---
 
 ## 6. Iconography and brand mark
 
-**Icon set** (`src/components/icons/Icon.tsx`).
+**Icon set** (`src/components/icons/Icon.tsx`): Inline SVG icons (`24×24` viewBox, `fill="none"`, `stroke="currentColor"`, `strokeWidth=1.75`, round caps/joins, `aria-hidden="true"`). Icon-only controls require a localized `aria-label`. Sizes: 20 px in buttons, 24 px standalone, 30 px tiles, 44 px highlight discs.
 
-- It extends the existing inline-SVG pattern of the former `MenuIcons.tsx`, folded into `Icon.tsx` in R3-V2: one `Icon` component with `name` and a union type; no sprite file, no icon font, no emoji.
-- Spec: 24×24 viewBox, `fill="none"`, `stroke="currentColor"`, stroke width 1.75, round caps and joins, `aria-hidden="true"`.
-- Sizes: 20 px in buttons, 24 px standalone, 30 px in tiles, 44 px discs in highlights (10 px padding, `primary-tint` bg, `primary-text` stroke).
-- An icon-only control always has a localized `aria-label`.
+**Defined `IconName` keys (49):**
 
-**Names** (46 listed here, plus `image` and `user` kept from the former MenuIcons), grouped:
+- **Navigation:** `arrow-right`, `arrow-left`, `arrow-up-right`, `chevron-left`, `chevron-right`, `close`, `menu`.
+- **Theme and motion:** `sun`, `moon`, `motion`.
+- **Contact:** `phone`, `message` (WhatsApp), `mail`, `camera` (Instagram), `map-pin`, `directions`.
+- **Stay facts:** `bath`, `parking`, `mountain`, `walk`, `car`, `bus`, `plane`.
+- **Amenities:** `home`, `wifi`, `snowflake`, `flame`, `kitchen`, `basket`, `baby`, `key`, `lock`, `rules`.
+- **Guide:** `heart`, `heart-filled`, `search`, `grid`, `map`, `compass`, `museum`, `beach`, `fork`, `star`.
+- **Status & menu:** `info`, `check`, `copy`, `alert`, `clock`, `user`.
 
-- **Navigation:** `arrow-right`, `arrow-left`, `arrow-up-right` (external), `chevron-left`, `chevron-right`, `close`, `menu`.
-- **Theme and language:** `sun`, `moon`, `motion` (a wave line with a slash for "reduce").
-- **Contact:** `phone`, `message` (WhatsApp; generic bubble, the label says "WhatsApp"), `mail`, `camera` (Instagram; generic, the label says "Instagram"), `map-pin`, `directions`.
-- **Stay facts:** `bath`, `parking` (a "P" sign drawn as a stroked square with P), `mountain`, `walk`, `car`, `bus` (fixes the 🚗-for-bus bug, assets research §6), `plane`.
-- **Amenities:** `wifi`, `snowflake` (A/C), `flame` (fireplace), `kitchen`, `washer`, `baby` (cot, high chair), `key`, `lock`, `rules`.
-- **Guide:** `heart`, `heart-filled`, `search`, `grid`, `map`, `compass`, `museum`, `beach`, `fork` (food), `star` (the home pin on the relief map).
-- **Status:** `info`, `check`, `alert`, `clock`.
-
-**Brand mark** (from `messinian-light/assets/favicon.svg`): a half sun over two wave lines.
-
-- In the header the sun uses `--color-sun` and the waves `--color-accent`.
-- App icons (R3-V3) replace today's QR-code PNGs in `public/icons/*.png` (180, 192 and 512 px, maskable): the mark on a `#0C3440` rounded square, with the mark inside the central 80 % safe zone. They are generated with `sharp` from the SVG.
-- `favicon.ico` is regenerated from the same SVG.
+**Brand mark** (`src/components/icons/BrandMark.tsx`, `public/brand/mark.svg`): Half sun (`--color-sun`) over two wave lines (`--color-accent`), reused to generate `public/icons/*.png` (`npm run design:icons`) and `public/og/og-{en,el}.jpg` (`npm run design:og`).
 
 ---
 
@@ -959,407 +652,129 @@ Screenshot proof in the mockup: `home-390-reduced.png`, `availability-390-reduce
 
 ### 7.1 Rules
 
-- Photo-first, real photos only. No stock photo is ever presented as the apartment.
-- **Treatment:** no filters, no duotone. Night mode applies `--hero-tint` on the hero only. One owner-approved exception (2026-10-11): in `living_11` the brand labels of the snacks and the wine bottle on the dining table are blurred (a feathered Gaussian blur on those labels only; nothing else in the photo is edited, and the original stays in `jpegmini_optimized/_site-masters/living/`).
-- **Rounded corners:** `--radius-card` on cards; 0 on full-bleed; `--radius-object` inside the window frame.
-- **Text over photos** only on the scrim: the hero content scrim is attached to the text block (`.hero__content::before`: 0 → .58 at 150 px → .80 at 150 px + 30 % → .90). Room and gallery captions use `transparent 35 % → .62 at 62 % → .88`.
-- **Formats:** AVIF + WebP `<source>`s with pre-generated sizes via `<picture>` for hero crops. Everything else uses `next/image` with correct `sizes`. `alt` text is localized and descriptive; decorative duplicates get `alt=""`.
-- **Loading:** only the LCP image uses `loading="eager"` and `fetchPriority="high"`; everything else is lazy. There is no separate `<link rel="preload">` for the art-directed hero, because the SSR `<picture>` is discovered by the preload scanner and `ReactDOM.preload` has no `media` option.
-- **File size:** `check:image-assets` (512 KB cap) still applies. Recompress the heavy guide images: `archaeological-museum-hero.jpg` 293 KB, `railway-museum-hero.jpg` 278 KB, `taxi-hero.webp` 362 KB. Target ≤ 120 KB.
+- Real apartment photographs only (no stock stand-ins for rooms).
+- **Treatment:** No synthetic colour filters (night mode uses `--hero-tint` on the hero only). In `living_11`, snack/bottle brand labels are softly blurred while preserving the rest of the frame.
+- **Loading & optimization:** Hero `<picture>` (AVIF + WebP crops) uses `loading="eager"` / `fetchPriority="high"`; secondary photos use lazy `next/image` with accurate `sizes` and localized `alt` text (`alt=""` for decorative duplicates).
+- **Validation:** `npm run check:image-assets` enforces format, decodable dimensions, `≤ 512 KB` per raster asset, zero EXIF/XMP/IPTC metadata, and no ICC profile under `public/house/`. *(Note: `public/moments/archaeological-museum-hero.jpg` (293 KB), `railway-museum-hero.jpg` (278 KB), and `public/phones/taxi-hero.webp` (362 KB) are within the 512 KB cap and remain candidates for future compression to ≤ 120 KB.)*
 
 ### 7.2 Hero crops and depth maps
 
-**Generator.** `scripts/design/gen-hero-assets.ts` (tsx, imports `sharp` like `scripts/check-image-assets.ts`) is run once and its outputs are committed to `public/house/balcony/hero/`. The master is `public/house/balcony/balcony_1.jpeg` (1920×1281).
+Generated by `scripts/design/gen-hero-assets.ts` from `public/house/balcony/balcony_1.jpeg` (1920×1281) into `public/house/balcony/hero/` plus paper-grain tiles in `public/design/grain-{light,dark}.webp` (`160×160`). Hero height is `height: min(760px, 88svh); min-height: 600px` (`min(900px, 88svh)` / `min-height: 640px` at ≥ 768 px) so the hero stays `< 100svh` for LCP.
 
-| Viewport (`<source media>`) | Crop | Files (w × h) | Crop origin | Quality | Expected size |
-|---|---|---|---|---|---|
-| `(max-width: 639px)` | 9:16 | `balcony-hero-9x16-480.{avif,webp}` (480×853), `-9x16-720` (721×1281) | Crop width 721, left = round((1920 − 721) × .62) = 743, top 0 | WebP q60, AVIF q45 | 721 w: ≈ 53 KB WebP / ≈ 36 KB AVIF (assets research) |
-| `(max-width: 1023px)` | 4:5 | `-4x5-800` (800×1000), `-4x5-1024` (1025×1281) | Crop width 1025, left = round(895 × .60) = 537 | WebP q60, AVIF q45 | 1025 w: ≈ 72 KB / ≈ 48 KB |
-| default | 3:2 | `-3x2-1440` (1440×961), `-3x2-1920` (1920×1281) | Full frame, `object-position: 60% 40%` | WebP q70, AVIF q50 | ≤ 180 KB at 1920 |
-| Depth maps | same crops | `depth-9x16.webp` (216×384), `depth-4x5.webp` (256×320), `depth-3x2.webp` (480×320) | Same crop maths on the blurred full depth map | WebP q80 | ≤ 2 KB each (mockup: 0.9 / 1.8 KB) |
-| Grain | n/a | `public/design/grain-light.webp`, `grain-dark.webp` (160×160, alpha) | Deterministic LCG noise (`gen-assets.mjs:41-45`) | n/a | ≤ 10 KB each |
+### 7.3 Gallery selection (42 photos in `src/data/apartmentPhotos.ts`)
 
-Hero height: `height: min(760px, 88svh); min-height: 600px` (≥ 768 px: `min(900px, 88svh)`, min 640). It must stay below 100svh so the image stays the LCP element (web.dev on full-viewport elements). On mobile, `object-position` is `50% 50%` for the 9:16 crop.
-
-The old `balcony_1_hero_720.webp`, `_1440.webp` and `balcony_1_hero.webp` are deleted in V5 once no reference remains. Search the whole repo, including `public/sw.js`, before deleting.
-
-### 7.3 Per-room photo selection (Apartment and Home)
-
-Marketing views: 42 photos (selection of 2026-10-11; two balcony photos and one parking photo added on 2026-10-12): 31 in the six rooms, 1 in the parking section, then 10 in the details section "Up close". Excluded photos are listed with the reason. *Retired* files were moved out of `public/` into the owner's local, git-ignored folder `jpegmini_optimized/_retired-from-site/<room folder>/`.
-
-| Room (chip) | Lead photo and crop | Others, in order | Excluded from marketing |
-|---|---|---|---|
-| Living | `living_8`, crop top 8 % (blown lamp, AC unit) | `living_6` (crop bottom 15 %), `living_11` (dining table through the arch; brand labels blurred, §7.1), `living_7`, `living_9` (fireplace corner), `living_10` (entrance landing), `living_4`, `living_5` | `living_2`: branded packaging (*retired*). `living_1`: old entrance decor, replaced by `living_10` (*retired*). `living_3`: branded packaging. `living_1_booking`: duplicate |
-| Kitchen | `kitchen_2` | `kitchen_6`, `kitchen_3`, `kitchen_4`, `kitchen_5`, `kitchen_1` | none |
-| Bedroom 1 | `bedroom_1`, crop left 20 % (lace curtain) | `bedroom_2`, `bedroom_3`, `bedroom_5` (dressing table) | `bedroom_4`: near-duplicate of `_3`, and 4:3 |
-| Bedroom 2 | `bedroom_2_5` | `bedroom_2_6`, `bedroom_2_3`, `bedroom_2_1` | `bedroom_2_2` (duplicate of `_1`), `bedroom_2_4` (duplicate of `_3`) |
-| Bathroom | `bathroom_6` | `bathroom_7`, `bathroom_3` (washing machine), `bathroom_4` | `bathroom_5` (duplicate), `bathroom_1` (soft). `bathroom_8` (medicines) and `bathroom_2` (toilet signs): *retired*; restore them from that folder if the stay hub or the house rules ever show them |
-| Balcony | `balcony_2` (table under the awnings) | `balcony_3` (table in the awnings' shade), `balcony_1` (the hero master, §7.2), `balcony_4` (corner of the balcony with a view over trees to the mountains; a broom, a mop bucket and a drying rack stand on the left), `balcony_5` (the long side balcony in the sun) | none |
-| Parking (`parking`; not a room, no home card) | `parking_1` (the concrete parking area beside the building, 3:2) | none | IMG_6210 (the same area from the side: softer, mostly the façade and a balcony); the entrance side of IMG_6211 (door, house-number plate, sticker) |
-| Up close (`details`; not a room, no home card) | `details_1` (sunlight through a sheer curtain) | `details_2` (table mirror and a cinnamon bundle), `details_3` (pomegranates, pine cones and driftwood, fireplace behind), `details_4` (white steps fanning around a turn of the staircase), `details_5` (wooden shelves), `details_6` (decorative pumpkin), `details_7` (shells from above), `details_8` (curtain tie-back), `details_9` (shells on the balcony table), `details_10` (silver mirror) | the placemats from above (its jute weave keeps the crops that show the table above the §7.1 `check:image-assets` limit); a second table-mirror frame (duplicate); the bedside lamp (cable and switch in frame); the gift basket (cluttered); the views over the rooftops (haze, wires, poles, drying racks); the sailboat by the arch (no clean 2:3 crop) |
-
-- **Owner photos of 2026-08-01** (`living_9`, `living_10`, `living_11`, `bedroom_5`, `balcony_2`, `balcony_3`, `details_1` to `details_10`): iPhone originals (Display P3, with EXIF metadata) cut to 2:3 and saved as 1280×1920 sRGB JPEGs without any metadata (sharp, mozjpeg, 4:2:0; the details photos and `living_11` at one fixed quality, 80). The originals are in `jpegmini_optimized/_site-masters/` (local, git-ignored). The owner's other photos stay unused in `jpegmini_optimized/`: listing exports of 1024 px or less (soft in the full-screen viewer, because the Next.js image optimizer never enlarges them and the browser stretches them to the screen), duplicates, branded packaging, guest-book pages with names, weaker or off-topic shots (dark, blurred, off-colour or cluttered), and the shots listed in §7.4. `living_11` (IMG_6262) is the one photo with branded packaging in the marketing set: the owner allowed it on 2026-10-11, with the brand labels blurred (§7.1).
-- **Owner balcony photos of 2026-10-12** (`balcony_4` from IMG_6251, cut to 3:2 and saved as 1920×1280; `balcony_5` from IMG_6256, cut to 2:3 and saved as 1280×1920): added at the owner's request: the first selection had left out the utility corner of the balcony (a broom, a mop bucket and a drying rack), which `balcony_4` shows. Same encoding as the other owner photos (sRGB, no metadata, one fixed quality, 80); the originals are in `jpegmini_optimized/_site-masters/balcony/`. The wall light above the balcony door is cropped out of `balcony_5`.
-- **Owner parking photo of 2026-10-12** (`parking_1` from IMG_6211, taken 2026-08-01): added at the owner's request ("another category, parking, with 1 photo of the parking"). The box {left 450, top 736, width 3450, height 2300} of the 5712 × 3213 original, saved as 1920 × 1280 (3:2, 498,786 bytes; same encoding as the other owner photos: sRGB, no metadata, one fixed quality 80, mozjpeg, 4:2:0); the original is in `jpegmini_optimized/_site-masters/parking/`. The frame ends on the cream pilaster with the downpipe, right of the grey pillar, so the door, the house-number plate and the door sticker are not in it. The Parking section (EN "Parking", EL "Πάρκινγκ", line "Free and private, outdoors at the property") sits between Balcony and Up close and is the only section with one tile: it is shown alone, at most 820 px wide (`apt-masonry--single`).
-- **Home room cards:** the lead photo of each room at 4:5 below 1024 px and 330 × 420 px at 1024 px and above (`home.css`), by `object-position`. The balcony card uses `balcony_2` at `object-position: 50% 100%` (table and chairs), so the home page does not show `balcony_1` a third time after the hero and the BalconyWindow.
-- **Details section "Up close"** (`details`; Greek "Από κοντά"): the last gallery section of the apartment page, after the parking section, with the line "Shells, wood and stone in the afternoon light" (the ten photos were taken on 2026-08-01 between 16:55 and 17:45). Ten owner close-ups, all 2:3. Their order does not alternate warm and pale tiles (measured 2026-10-13 on the files in `public/house/details`: `details_2`, `details_4` and `details_6` are the palest, mean luminance 184–192 of 255; `details_1`, `details_5`, `details_7` and `details_9` the warmest, mean red minus blue 34–74), so a row can hold two pale tiles (`details_2` and `details_4` share the first row from 1280 px). The section is a row-major grid (`apt-masonry--grid`): 2 tiles per row below 768 px, 3 from 768 px, 4 from 1280 px, so the rows are 2 + 2 + 2 + 2 + 2, 3 + 3 + 3 + 1 and 4 + 4 + 2. No home card (`homeRooms.ts` keeps its six rooms); the copy is in `house.ts`. Details add to the room photos and never stand in for them: no clutter or utility corners, no brands or packaging, no people or guest belongings, no private data, and nothing that suggests an amenity missing from `apartmentData.ts`. Three originals have EXIF orientation 6, so the processing calls `autoOrient()` before `extract()`; sharp applies the orientation first only in that order.
-- **Guide cards:** use the museum `*-hero` photos at 16:10. The square drawn emblems are not used, to avoid a second visual style.
-  - `viktoria-karelia-museum` omits `heroImage` (the dark source file was removed), so it uses the **art tile** instead.
-  - The **art tile** is `band-bg` with a `band-accent` 56 px category icon and the category name. It is a deliberate illustrated tile used for any entry without a licensed photo, never beige or striped placeholders.
-- **Phones:** photos become 64 px rounded thumbnails, not banners. The SOS illustration is not used.
-
-### 7.4 Missing photos: art direction for the owner
-
-| Need | Unlocks | Brief |
+| Room / Section | Lead photo | Order & layout notes |
 |---|---|---|
-| Gulf from the balcony, golden hour | "Sea view" copy; the shader's water shimmer pass (the depth-mask pipeline supports it) | Same standpoint as `balcony_1`; 3:2 and 4:5; horizon level; 30–45 min before sunset |
-| Balcony at blue hour, lanterns on | An honest Night-mode hero photo (swapped by theme instead of the tint) | Same framing as the day shot |
-| Building exterior, entrance, street | Proof for "50 m from the Town Hall" (the parking spot is shown by `parking_1`, section 7.3) | Daylight; no licence plates or faces |
-| Host portrait | The host letter | Natural light on the balcony, 4:5, relaxed |
-| Bedroom 2 reshoot; the shower or bath | A sharp Bedroom 2 set; resolves the "bathtub" vs "rainfall shower" contradiction (assets research §6) | Wide angle, level verticals, lights on + daylight |
-| General | n/a | ≥ 2400 px long edge; no people except the host; no brands or packaging (one owner-approved exception: `living_11`, labels blurred, §7.1); no private documents |
+| Living (`living`) | `living_8` | `living_6`, `living_11`, `living_7`, `living_9`, `living_10`, `living_4`, `living_5` |
+| Kitchen (`kitchen`) | `kitchen_2` | `kitchen_6`, `kitchen_3`, `kitchen_4`, `kitchen_5`, `kitchen_1` |
+| Bedroom 1 (`bedroom1`) | `bedroom_1` | `bedroom_2`, `bedroom_3`, `bedroom_5` |
+| Bedroom 2 (`bedroom2`) | `bedroom_2_5` | Row-major grid (`apt-masonry--grid`); `bedroom_2_6`, `bedroom_2_3`, `bedroom_2_1` |
+| Bathroom (`bathroom`) | `bathroom_6` | `bathroom_7`, `bathroom_3`, `bathroom_4` |
+| Balcony (`balcony`) | `balcony_2` | `balcony_3`, `balcony_1`, `balcony_4`, `balcony_5`. Home card uses `balcony_2` (`50% 100%`) so `balcony_1` is not repeated immediately below the hero |
+| Parking (`parking`) | `parking_1` | Single-photo section (`apt-masonry--single`, max 820 px); no home room card |
+| Up close (`details`) | `details_1` | Row-major grid (`apt-masonry--grid`), `details_1`–`details_10`; no home room card |
 
-The owner's photos of 2026-08-01 also show the building and its entrance, the driveway, other balconies and the view over the rooftops; of these, a close-up of the stairs (§7.3, details section), two balcony photos in the Balcony section (`balcony_4`, `balcony_5`) and, since 2026-10-12, the parking (`parking_1`) are used. The rest stay unused: on 2026-10-11 the owner decided that the site gets no section for the exterior and entrance or for the other balconies. The view frames are hazy and show wires, poles or drying racks; a clear view at golden hour (first row of the table above) would be the one to add. On 2026-10-12 the owner asked for one Parking section with one photo; this supersedes the sentence of 2026-10-11 for the parking only: the exterior and the entrance still get no section and stay out of the frame (door, house-number plate, stickers), and the other balconies stay unused.
+Guide cards use `16:10` category photos when present or an illustrated **art tile** (`band-bg` with `band-accent` 56 px icon, e.g., `viktoria-karelia-museum`). Phone rows render 64 px rounded thumbnails.
 
-Until then:
+### 7.4 Owner photo opportunities
 
-- Use the illustrated relief map and typographic sections.
-- Do not use `phones/taxi-hero.webp` (the only seafront picture) as a view image. Its source is unrecorded and it is not the view from the apartment.
+Owner additions that would unlock future improvements: golden-hour balcony view toward the gulf, true blue-hour balcony frame for dark mode, host portrait for `HostLetter`, and Bedroom 2 / shower reshoots. Never use `phones/taxi-hero.webp` as an apartment view photo.
 
 ---
 
 ## 8. Components and states
 
-Primitives live in `src/components/ui/` and extend the existing `Button`, `Surface`, `Badge` and `EmptyPanel` with `clsx`. Every interactive element has these states:
+Primitives live in `src/components/ui/` (and `src/components/Toast.tsx`), styled with semantic tokens and visible `:focus-visible` outlines:
 
-- **Default.**
-- **Hover** (fine pointers only, `@media (hover: hover) and (pointer: fine)`).
-- **Active.**
-- **`:focus-visible`:** a 3 px `focus` ring with 3 px offset; `band-focus` on bands and photos.
-- **Disabled** (`aria-disabled` for items that must stay focusable).
-
-Colour always comes from tokens.
-
-| Component | Variants / parts | States and rules |
+| Component | Variants / structure | Key behaviour |
 |---|---|---|
-| **Button** | `primary` (primary / primary-fg, glow shadow) · `secondary` (surface, accent text, `border-strong`) · `ghost` (transparent, fg, underline on hover) · `glass` (on photo: bg `rgb(255 248 238 / .12)`, text `#FFF8EE`, border `rgb(255 248 238 / .5)`, blur 10 px) · `on-band` (band-accent / band-accent-fg) · `link-arrow` (text link and an arrow that nudges 4 px on hover). Sizes: `sm` 40 px (16 px padding, 15 px text), `md` 48 px (22 px, 16 px), `lg` 56 px (28 px, 17 px); `block` | Hover: primary → primary-hover plus glint (M18). Active: `scale(.98)`. Disabled: opacity .55, no hover. Loading (**not implemented as of 2026-10-13**: `Button` has no loading prop): `aria-busy`, a spinner replaces the leading icon, the label is kept, the width is fixed. External links: `arrow-up-right` icon, `rel="noopener noreferrer"`, visually hidden "(opens in a new tab)" (`opensInNewTab`). Weight 600, **never uppercase**. `asChild` for links (existing API) |
-| **IconButton** | 44 px circle, 1 px `border`; `on-photo` variant (glass) | Hover: bg `surface-sunken`. A localized `aria-label` is required |
-| **Chip** | Filter / toggle chip, 40 px, pill, 1 px `border-strong`, 15 px 500; optional count (`tabular-nums`, `fg-muted`) | Pressed (`aria-pressed="true"`): bg `fg`, text `bg`, count at 80 % opacity. Hover: `surface-sunken`. A chip row scrolls sideways with `scroll-padding-inline: var(--gutter)`. **Chips without content are not rendered** (plan V8) |
-| **Segmented** | Container `surface-sunken`, 3 px padding, pill; items ≥ 36 px | Selected: bg `surface`, text `fg`, `shadow-rest`. Used by LanguageSwitch, the theme setting in the menu, and SeasonSwitch |
-| **LanguageSwitch** | Segmented with **links**: `EN` / `ΕΛ` | Each is an `<a hreflang lang>` to the same path in the other locale; query and hash are preserved (the logic is `localeSwitchHref` in `src/components/shell/shellLinks.ts`). The current one has `aria-current="true"`. Keeps the existing locale cookie behaviour |
-| **ThemeSwitch** | Header IconButton (sun/moon) + a menu Segmented "Auto · Day · Night", also in the footer (owner-approved, O41) | Toggle: stores `theme`, sets `data-theme`, runs the circular View Transition (§5.7). "Auto" removes the key and the attribute. Label: "Switch to night" / "Αλλαγή σε νυχτερινό" (and the reverse) |
-| **MotionSwitch** | Toggle button in the footer and the menu: "Reduce motion" / "Λιγότερη κίνηση"; pressed shows "Allow motion" / "Επαναφορά κίνησης" | `aria-pressed`. When the OS already reduces motion: disabled, with the note "Reduced by your device settings" / "Μειωμένη από τις ρυθμίσεις της συσκευής σας" |
-| **Card** (a pattern, not a `ui/` component) | `surface`, 1 px `border`, `radius-card`, `shadow-rest` | Clickable card: one stretched primary link; nested buttons (Save) sit above it. Hover (fine): `translateY(-4px)`, `shadow-raised`, image `scale(1.05)` over 900 ms |
-| **Tile** (stay hub) | Card, min-height 150; `portal` variant on `band-bg`; `sos` row | `portal`: display title 28 px (40 px at ≥ 1024), CTA `on-band`. `sos`: the first row of the phones tile (`StayHub.tsx`), "112" 700 in `primary-text` as a `tel:112` link; not a `StayTile` variant. `locked` variant (Wi-Fi, check-out before sign-in): `lock` icon plus "Sign in to see" |
-| **Section** | `default` (bg) · `sunken` (**not implemented**: `Section.tsx` has no sunken variant yet) · `band`; head = Eyebrow + Title (`d2`) + Lead | Eyebrow: 13 px, 600, `primary-text`, a 28 px leading rule; EN uppercase with tracking .16em, EL sentence case with tracking .04em and 14 px |
-| **Callout** | `info` · `success` · `warning` · `danger` (the `*-bg` / `*` tokens), icon, `radius-tile`, padding 12/14 | `role="status"` for live notes; `role="alert"` only for blocking errors |
-| **Field** (a pattern, not a `ui/` component) | Label (15 px 600) above; input 48 px, `radius-field`, `surface` bg, 1 px `border-control`; hint 13 px `fg-muted` | Focus: ring. Error: `danger` 2 px border, message with icon, `aria-invalid`, `aria-describedby`. Phone: `inputmode="tel" autocomplete="tel"` |
-| **SiteHeader** | Glass pill, sticky `top: 10px`, 56 px, margin `10px var(--gutter)`, overlaps the hero via a negative bottom margin. Brand (mark + wordmark) on the left; nav at ≥ 1320 px (five links in Greek need that room; below it the menu carries them); tools (LanguageSwitch, ThemeSwitch, CTA, menu button below 1320 px). **Variants:** `marketing` (nav: Apartment · Availability · Kalamata guide · Contact (`/{l}#contact`) · Your stay (`/{l}/stay`, a plain link without CTA styling; the footer shows it on its own); CTA "Check dates" at ≥ sm) · `guide` (same nav, **no CTA**) · `stay` (brand links to `/{l}/stay`; items: Your stay · Kalamata guide; no marketing nav, no CTA) | Current page: `aria-current="page"` plus a 1.5 px `primary` underline. After 24 px of scroll: `shadow-raised`. Brand label min 12 px |
-| **MobileMenu** | `<dialog>` opened with `showModal()`, sheet from the right, `min(88vw, 380px)`, `surface-raised`, `shadow-overlay`. Contents: nav links (display 22 px), LanguageSwitch, theme Segmented (Auto/Day/Night), MotionSwitch; in the marketing variant also Call and WhatsApp (text plus icon) | Focus trapped natively; Esc and backdrop click close it; `html:has(dialog[open]) { overflow: hidden }`; focus returns to the menu button. Entry via `@starting-style` (M23) |
-| **SiteFooter** | Waves rule (1.4 px `border-strong`). **Marketing:** brand, and under it the primary tagline (§1.2; display 400 at `--text-h3`, upright so the Greek pages need no extra italic file) and the location line (`fg-muted`, caption), both the owner-approved hero copy (`home.heroTagline`, `home.heroFacts`; the hero itself no longer shows it); nav (without "Your stay", which the footer links separately); contact (phone, e-mail, Instagram, WhatsApp; on the home page the block has `id="contact"`, the target of every "Contact" link); the host identity as text only (ΑΜΑ, the host's name (Greek and Latin in one string), address; `HostIdentity`, outside the `#contact` block, no link); Privacy; "Staying with us now? Your stay →"; the theme Segmented (Auto · Day · Night, owner-approved deviation, O41); MotionSwitch; LanguageSwitch. **Stay:** the host identity as text only, Privacy, the theme Segmented (Auto · Day · Night, O41), MotionSwitch, LanguageSwitch (no tagline, no contact block) | Bottom padding `calc(96px + env(safe-area-inset-bottom))` when a bottom bar exists. The `#contact` block has `scroll-margin-top` so the sticky header does not cover it. No booking CTA in the footer (guide pages share it, §9.5) |
-| **BookBar** (mobile, < lg; Home and Apartment only) | Glass pill, fixed 12 px from the edges plus `safe-area-inset-bottom`: "Free tonight" (or "Next free night: Tue 20 Oct") + `sm` primary "Check dates"; no price | Hidden until the hero leaves the view, and while any in-page booking CTA is visible (IntersectionObserver). Hidden entirely unless the calendar is fresh and has a free night. `visibility` is toggled for accessibility |
-| **FactStrip** | Six facts: `90 m²` · `2` bedrooms · `1` bathroom · `4` guests · `2nd` floor · `P` free parking. Last cell is a `link-arrow` "See free dates" (**no price**) | Card `shadow-raised`, overlaps the hero by 26 px (mobile) / 72 px (≥ lg). 2 columns on mobile, one row at ≥ lg. Motion M6 |
-| **SeasonSwitch + Highlights** | Segmented "Summer (Apr–Oct)" / "Winter (Nov–Mar)" + 4 highlight cards per season (icon disc, `h3`, 15 px text, link "See summer dates" / "See winter dates" to `/{l}/availability` with the first month of that season in the F09 fragment scheme, e.g. `m=YYYY-MM`) | The default season is computed server-side from `propertyToday(PROPERTY_TIME_ZONE, now)` against `SUMMER_MONTHS` in `src/components/home/homeSeason.ts`. The switch has `aria-controls`, and the list has `aria-live="polite"`. Card content comes from R3-C1 strings; no invented claims. M8 and M9 |
-| **BalconyWindow** | Frame (10 px, 14 px at ≥ 700), aspect 4:5 on mobile / 16:10 at ≥ 700, `perspective: 1500px`; two CSS-gradient louvred shutters (only under motion), flare layer, italic quote below | M10. The shutters are `aria-hidden` |
-| **RoomsShowcase** | Chips (6 rooms, synced to the centred or active card) + track. Below lg: coverflow, card width `min(68vw, 300px)`, 4:5, snap centre. At ≥ lg: deck fan, 330×420 cards. Captions (room number 13 px + name display 28 px + one line) **on the active or centred card only** | Chips and arrow keys move the active card; Enter opens `/{l}/apartment#<room>`; "See all photos". M11 and M12 |
-| **NightsTeaser** | The next 14 nights: 7 columns on mobile (two rows, no sideways scroll), 14 at ≥ lg. Each cell: weekday (12 px, EL not uppercased) and date (display 22 px); no price. Booked: hatch + strike + "Booked" in the accessible name. Legend ("Booked", only when a night is booked) + CTA "See availability" | Rendered only with a fresh calendar that knows all 14 nights (a stale, missing or failed read hides the section). M13 |
-| **LocationRelief + DistanceList** | Band section: DistanceList (source of truth: numbered rows with name, "how", and value in display 22 px) + the relief map (`role="img"` with a text alternative, "Illustrative map, not to scale. Positions from the guide's map data.") | Pins come from `src/data/mapLocations.ts` coordinates. Below 700 px, non-home pins show number only. The home label reads "You're staying here" / "Εδώ μένετε". The overlapping "50 m" label is fixed by offset. M14 and M15 |
-| **HostLetter** | Paper card (`radius-object`, rotated −.8°, `shadow-object`, grain), italic title, drop cap in `primary-text`, signature, meta (languages, reply time) | Fields render only when owner data exists (§1.4). Motion: fade only |
-| **FAQAccordion** | `<details name="faq">` (exclusive accordion; Chrome 120, Safari 17.2, Firefox 130), summary 48 px min, 17 px 600, "+" rotating 45° in `primary-text`, answer `fg-muted` 60ch; first item open | Keyboard: native. M24 |
-| **Calendar** (react-day-picker 9, already a dependency, skinned; logic from `src/lib/availability/stayQuote.ts`) | Months: `surface`, `radius-card`, `shadow-rest`. Caption: display 26 px, nominative. Weekday row 12 px 600 `fg-muted` (EN uppercase, EL sentence case, full day names in `abbr title`). Cells ≥ 44 px (mobile min-height 58): date 16 px 600; a check-out-only day adds the 12 px "out" note. **Mobile (< md): stacked months**, 3 at first plus "Show 3 more months" up to the `AVAILABILITY_HORIZON_DAYS` horizon. **≥ md: 2 months side by side** with previous/next IconButtons and a page turn (M19) | **Day states:** free · booked (hatch, strike, `aria-disabled`, name "…, booked") · check-out-only (the first booked night after the chosen check-in, clickable, labelled "out") · past (opacity .45, disabled) · beyond horizon (disabled) · check-in and check-out (`cal-selected`, 12 px outer radius) · in range (`cal-range`) · today (underline, 3 px offset) · focus (inset ring) · hover (`surface-sunken`). **Keyboard:** WAI-ARIA APG grid (arrows, Home/End, PageUp/PageDown, Enter/Space; react-day-picker default) + `aria-selected`. **Live region** (polite) messages: "Choose your check-in night" → "Now pick your check-out, latest Fri 6 Nov" (`maxCheckOut`) → "Minimum 2 nights from this date" (`minimumNightsFor`) → **crossing rule:** "Sat 24 Oct is booked, so Tue 27 Oct is your new check-in" (graft 8). Messages also show **inside** the calendar as a `warning` Callout |
-| **SummaryCard** | `surface`, `radius-dialog`, `shadow-raised`; sticky `top: 90px` at ≥ lg. Parts: eyebrow "Your stay"; dates in display 32 px ("18–23 Oct", **en dash, never →**); sub line (full dates, nights, "up to 4 guests"); CTAs; trust line (`summary.trust`; the wording is the dictionary's, `src/i18n/domains/availability.ts`) | **States:** empty ("Pick your dates.") · check-in chosen · complete · rejected (the `StayRejection` reason as a `warning` Callout) · stale, unavailable or not configured (the calendar is hidden; the card shows contact CTAs only; the page still works). CTAs: `booking.bookingCom` (primary; the link comes from `bookingComHref` in `src/lib/contactLinks.ts` and shows only while it is valid; no stay dates are appended); WhatsApp and Call (secondary, text labels). Motion M20 |
-| **GalleryLightbox** | `<dialog>` full screen, bg `viewer-bg`; a horizontal **native scroll-snap** track (`scroll-snap-type: x mandatory`), images `object-fit: contain`; top bar: room name and "7 / 41" (tabular), close (44 px); previous/next at ≥ md (48 px glass IconButtons) | Swipe = native scroll (no gesture library). Keys: ←/→ (`scrollTo`), Home/End, Esc. The counter updates on `scrollend`, with an IntersectionObserver fallback. Only the current ±1 images are eager. Open and close morph (§5.7); reduced motion is instant. Replaces the `framer-motion` ±1000 px spring slides in `ApartmentGalleryLightbox.tsx:36-54` |
-| **GuideCard** | Media 16:10 (photo or art tile); meta: category (`olive`, 13 px 600) · straight-line distance ("1.7 km", `fg-muted`, computed from the apartment coordinates in `mapLocations.ts`); title display 22 px; summary 15 px, 2-line clamp; footer: "Directions" (`link-arrow`, external, the existing Google Directions link) + Save | Save = favourite toggle (`aria-pressed`, `heart` / `heart-filled` in `primary-text`) with a burst (M21). Shared element name `guide-<slug>` |
-| **GuideFilters** | Search field (48 px, `search` icon, `type="search"`, clears with Esc) + category chips with counts + List/Map Segmented | Filtering is client-side over the SSR list; the result count is announced in a polite live region; the empty state is an EmptyPanel with "Clear filters" |
-| **MapCard** (Leaflet, restyled; tiles per R3-M1) | Pins are `L.divIcon` HTML identical to the relief pins (a paper pill with a number disc; home pin terracotta). Popup = compact GuideCard (title, category, distance, Directions, Details) | Keyboard: the list stays the primary navigation; the map is supplementary. Popup colours use tokens; no per-component dark selectors |
-| **Toast** | Bottom centre, above the bars, `surface-raised`, `shadow-overlay`, `radius-tile` | `role="status"`; auto-dismisses after 5 s unless it has an action |
-| **EmptyPanel / Skeleton** | EmptyPanel: icon, title, text, one action. Skeleton (**not implemented**: no primitive in `src/components/ui`): `surface-sunken` blocks | Skeleton shimmer only under `motion-ok`; otherwise static |
+| **Button** | `primary`, `secondary`, `ghost`, `glass`, `on-band`, `link-arrow`; `sm`/`md`/`lg`/`block`, `asChild` | Fine-pointer hover lift + warm glint, active `scale(.98)`, external links include `opensInNewTab` SR cue; weight 600, never uppercase |
+| **IconButton** | 44 px circle; `on-photo` glass variant | Required localized `aria-label` |
+| **Chip** | 40 px pill, optional `tabular-nums` count | `aria-pressed`; horizontal scroll with `--gutter` scroll padding; empty filter chips omitted |
+| **Segmented** | `surface-sunken` track, active `surface` pill | Used by `LanguageSwitch`, menu theme switch, and `SeasonSwitch` |
+| **LanguageSwitch** | `<a hreflang lang>` EN / ΕΛ links | Preserves pathname/query/hash via `localeSwitchHref` (stripping legacy claim params) and marks `aria-current="true"` |
+| **ThemeSwitch** | Header button + menu/footer `Auto · Day · Night` segmented control | Updates `localStorage.theme` + `data-theme`, runs §5.7 circular View Transition under `data-motion="full"` |
+| **MotionSwitch** | Toggle button (`Reduce motion` / `Allow motion`) | `aria-pressed`; disabled with note when OS already requests reduced motion |
+| **Card / Tile** | `surface` card (`--radius-card`); `portal` band tile & SOS `tel:112` row | Full-card overlay link with elevated nested `SaveButton`; `locked` tiles link to sign-in |
+| **Section** | `default`, `band`, `plain` (`src/components/ui/Section.tsx`) | Head = eyebrow + display title + optional lead |
+| **Callout** | `info`, `warning` (`Callout.tsx`); error banners use `.ui-callout--danger` | `role="status"` for live notes; `role="alert"` for blocking errors |
+| **SiteHeader** | Sticky floating glass pill (`marketing`, `guide`, `stay` variants) | Nav inline at ≥ 1320 px, `MobileMenu` below; `scroll` > 24 px adds `shadow-raised` |
+| **MobileMenu** | `<dialog>` sheet (`showModal()`) | Native focus trap, Esc/backdrop close, restores focus to trigger |
+| **SiteFooter** | `marketing` and `stay` variants | Marketing includes tagline, `#contact` block (phone, email, WhatsApp, Instagram), host identity (`HostIdentity`), privacy, `stay` link, switches; no booking CTA |
+| **BookBar** | Fixed mobile bottom bar (`Home` / `Apartment` when calendar fresh & free) | Visible only `< lg`; hidden while hero or another booking CTA is visible (`IntersectionObserver`) |
+| **Calendar & SummaryCard** | Skinned `react-day-picker` + `src/lib/availability/stayQuote.ts` | 3 stacked months + "Show 3 more" below `md`, 2 side-by-side at ≥ `md`; crossing-booked reset, check-out-only `"out"` label, live announcements; SummaryCard omits prices and falls back cleanly when calendar stale/unconfigured |
+| **GalleryLightbox** | Full-screen `<dialog>` with CSS horizontal scroll-snap | Keyboard `←`/`→`/`Home`/`End`/`Esc`, `1 / 42` counter (`scrollend` + `IntersectionObserver`), focus trap & restoration |
+| **GuideFilters & MapCard** | Search (Esc clears) + non-empty category chips + List/Map toggle | Lazy loads `LeafletMap` on Map view; numbered `L.divIcon` pins matching relief map + token-styled popups |
+| **Toast** | Floating status banner in `src/components/Toast.tsx` | `role="status"`, auto-dismisses after 5 s unless an action is present |
+| **EmptyPanel** | Icon, title, description, optional action | Used for empty search results and empty favourites |
 
 ---
 
 ## 9. Page layouts
 
-Shell per route: M = marketing header, G = guide header, S = stay header (§8). Every page keeps the existing skip link (`src/app/[locale]/layout.tsx`) and `<main id="main-content">`.
+Shell per route: **M** = marketing header (`BookBar` on Home/Apartment), **G** = guide header, **S** = stay header (all share skip link + `<main id="main-content">`).
 
-### 9.1 Home `/{l}` (M, BookBar) — R3-V5
-
-1. **Hero** (living photograph).
-   - Content in the bottom third, behind the scrim: H1 "Dolce far niente" (two lines, the second indented `.9em`, `lang="it"`), CTAs "Check dates" (`primary`, links to availability) and the Booking.com link (`glass`: "Book on Booking.com"; only while the link is valid). There is no lede under the H1 and no price line (the site shows no price); on viewports from 768 px the CTA row sits in the right column.
-   - At ≥ 768 px: the H1 across both columns, then the CTA row in the right column and a vertical "Scroll" hint (hint line runs 2×, ends by 4.6 s).
-   - M1–M5.
-2. **FactStrip** overlapping the hero.
-3. *KineticBand: removed on 2026-10-11 at the owner's request; the FactStrip is followed directly by the intro, with no spacer.*
-4. **Intro + Highlights** with the SeasonSwitch (eyebrow "The apartment", title d2, lead).
-5. **BalconyWindow** (eyebrow "The balcony", title, window, italic quote).
-6. **RoomsShowcase** ("A slow walk through the rooms"; its headline sits outside any transformed element, which fixes the cut-off line).
-7. **NightsTeaser** (eyebrow "Availability", the next 14 nights free or booked, CTA; only with a fresh calendar).
-8. **Location** (band): title "Between Taygetos *and the gulf*", lead, DistanceList, LocationRelief.
-9. **HostLetter** (`id="host"`).
-10. **Optional ReviewsStrip** (only with the owner's real review data, §1.4).
-11. **FAQ**: check-in/out, parking, children and cot. *The cancellation question was removed on 2026-10-15 at the owner's request: the site shows no cancellation policy.*
-12. *ContactBand: removed on 2026-10-11 at the owner's request; the footer's contact block is the `#contact` target (item 13).*
-13. **Footer** with the tagline and location line under the brand, the contact block (`id="contact"`, the target of every "Contact" link) and "Staying with us now? Your stay →".
-
-The mockup's `home-390-light.png` and `home-1440-light.png` show order and proportions. Where they conflict, the fixes in §0.3 apply.
-
-### 9.2 Apartment `/{l}/apartment` (M, BookBar) — R3-V6
-
-- Page head: eyebrow, H1 "The apartment" (d1), a lead of one paragraph, FactStrip (inline, no overlap), and the text-only host identity block (`HostIdentity`: ΑΜΑ, the host's name, address) with no link.
-- Lead photo: `living_8` crop, 3:2 at ≥ md and 4:5 on mobile, `radius-card`, LCP (eager, high priority).
-- Sticky room chips below the header (`top: calc(var(--header-offset) + var(--header-h) + 8px)`), anchor-linking to the room sections. The active chip follows scroll via IntersectionObserver.
-- Per room, then the parking section and the details section "Up close" (`id` = room key, `parking` or `details`): title d3, one line, a masonry gallery using CSS `columns` (2 on mobile, 3 at md, 4 at xl; 8/12 px gap; `break-inside: avoid`), or a row-major grid with the same column counts when all its tiles share one box ratio (`apt-masonry--grid`: Up close and Bedroom 2). Photos in the §7.3 order, tapping opens GalleryLightbox. A section with one photo shows it alone, at most 820 px wide.
-- Amenities: grouped lists with icons (§6); 2 columns at ≥ md; facts only from `apartmentData.ts` after the R3-C1 contradiction fixes.
-- CTA section: "See free dates" (primary) + "Book on Booking.com" as a secondary button (when its link is valid).
-- The "Contact" link targets `/{l}#contact` (plan V6): the home footer's contact block since 2026-10-11.
-
-### 9.3 Availability `/{l}/availability` (M, no BookBar) — R3-V7 (skins R3-F09)
-
-- Back link "The apartment" (`link-arrow`, reversed).
-- H1 "Free dates" (d1) and lead "Choose your check-in night, then your check-out day." The page head ends with the text-only host identity block (`HostIdentity`: ΑΜΑ, the host's name, address), with no link.
-- Below lg: Calendar (stacked months) → legend (free · booked hatch · your stay) → in-calendar note → SummaryCard. At ≥ lg: a grid of `minmax(0, 1fr) 380px`, with the Calendar (2 months) on the left and the sticky SummaryCard on the right.
-- Then the sections from F09: How to book and Contact (the Cancellation and Prices sections were removed on 2026-10-15 at the owner's request). Each is a plain Section with a `d3` title and `fg-muted` body, 65ch.
-- **Data states** (from `availabilityRepository`):
-  - fresh: normal (a night that the Booking.com export blocks, as a reservation or as a closure, is a booked night in the calendar, the nights strip and the no-JS list);
-  - stale (> 12 h), unavailable or not configured: the calendar is replaced by an `info` Callout plus the contact CTAs (a stale calendar has every night unknown, and the site shows no price, so there is nothing left to show; the last-update line still shows). The lead and the How to book steps that refer to the calendar (choose the dates in it; book the same dates on Booking.com) are left out in these states.
-- The page must work without JS as a static list of the next 60 nights (booked or free), and the CTAs still work (F09 test: "repository failure still shows the CTAs").
-
-### 9.4 Your stay hub `/{l}/stay` (S; calm mode; **no booking CTA, no BookBar, no WebGL, no scroll effects**) — R3-V9
-
-- H1 "Welcome home." / "Καλώς ήρθατε." (d1) with a decorative half-sun (sun rays at .5 opacity, behind the text), and a one-line lead.
-- Tiles grid: `repeat(2, minmax(0, 1fr))`, gap 12; at ≥ lg `repeat(4, minmax(0, 1fr))`, with the portal tile spanning 2×2.
-  1. **Portal** (band tile, full width on mobile): signed out, "Sign in to your stay" → `/{l}/guest`; signed in, "Open your check-in" → `/{l}/check-in`. Rendered only when the portal feature flag is on (`getFeatureFlagsAsync`).
-  2. **Wi-Fi** and 3. **Check-out**: `locked` until sign-in; after sign-in they link to the matching anchors of the check-in page.
-  4. **House rules** (links to the rules section).
-  5. **Important phones**: an SOS row "112, free from any phone" as a `tel:112` link, plus the next 2 numbers as `tel:` rows.
-  6. **Kalamata guide**, with a search field that submits to the guide list.
-  7. **Favourites** (count).
-- The footer is the slim stay variant.
-
-### 9.5 Kalamata guide — R3-V8
-
-- **List** `/{l}/moments` (G):
-  - H1 "Kalamata guide" / "Οδηγός Καλαμάτας", lead.
-  - GuideFilters: search, chips with counts (only categories with content), List/Map.
-  - Cards sorted by straight-line distance: `repeat(1|2|3, minmax(0, 1fr))` at base/sm/lg.
-  - "Map" view: restyled Leaflet, lazy (Leaflet and CSS load only on toggle) with the numbered list below; the URL keeps `?map=1` (existing).
-  - Calm-mode motion plus the shared-element morph into detail.
-- **Detail** `/{l}/[category]/[slug]` (G):
-  - Back link; hero photo 16:10 (`radius-card` below xl, full-bleed band at ≥ xl) with shared element `guide-<slug>`; category and distance meta; H1 d1; summary lead; facts list (address, hours if present, phone buttons as `tel:`); "Directions" (secondary, external); Save.
-  - "More nearby": 3 GuideCards.
-  - No booking CTA.
-- **Favourites** `/{l}/favorites` (G): H1, grid of saved GuideCards, EmptyPanel ("No favourites yet. Tap the heart on any place.").
-
-### 9.6 Important phones `/{l}/phones` (G, calm)
-
-- H1 "Important phones".
-- **Emergency block first:** a `band` Tile "112, free from any phone, EU-wide" with a 56 px `on-band` "Call 112" button.
-- Then grouped rows (Police, Hospital, Fire, Taxi, …). Each row: 64 px thumbnail (or icon disc), name (17 px 600), description (15 px muted), number (tabular, `fg`), and a 48 px "Call" button (`secondary`, `phone` icon plus text) as a `tel:` link.
-- Rows separated by `border` hairlines; no cards.
-
-### 9.7 Guest sign-in `/{l}/guest` (S, calm) — R3-V9
-
-- A centred column, max 480 px.
-- H1 "Sign in to your stay" (d2); lead explaining that the host sends a link.
-- Card with Fields (phone, password), primary button (block, loading state), `danger` Callout for errors (generic messages, no account enumeration: keep the current server messages), and a privacy link.
-- **Claim flow** (grant token present): H1 "Set up your stay", fields phone + new password + confirm, and the terms checkbox with the privacy link outside the hashed span (R3-L3).
-- **Password-less account** state and **expired grant** state as `info` / `warning` Callouts with the host contact.
-- `UnifiedGuestClient` logic is unchanged; restyle only.
-
-### 9.8 Check-in `/{l}/check-in` (S, calm, authenticated) — R3-V9
-
-- H1 "Your stay" with dates.
-- Sections as cards:
-  - arrival (address, the map (`ApartmentLocationMap`, loaded on demand), Directions);
-  - Wi-Fi (`WifiAccessCard`, a copy button with a toast);
-  - house rules (list with icons);
-  - check-out (time and steps);
-  - emergency numbers (R3-L10; `tel:112` first);
-  - a link to the guide.
-- The warm boutique palette scoped in `12-apartment-checkin.css:185-557` is replaced by tokens.
-- **Portal refresh** `/{l}/portal/refresh`: a centred calm status, "Signing you in…", with the mark; no spinner loop longer than 5 s (after 5 s show the text "Still working…" and a manual link).
-
-### 9.9 Privacy `/{l}/privacy` (G) — R3-L2, styled per V4 tokens
-
-A single editorial column (65ch), H1 d1, lead, sections with d3 titles, body at 17 px / 1.7, and a table of processing purposes with `border` rules. No motion beyond the header.
-
-### 9.10 404 (`src/app/[locale]/not-found.tsx`, root) and errors (`error.tsx` ×2)
-
-- **404:** the S-style minimal header; a centred brand mark (96 px); H1 "This page is taking a siesta." / "Αυτή η σελίδα κάνει σιέστα."; lead; three links: Home, Kalamata guide, Your stay. No photo.
-- **Error:** the same layout, H1 "Something went wrong", a "Try again" button (the `retry()` action) and a Home link. No technical details.
-
-### 9.11 Offline (`/offline`, `/{l}/offline`) — R3-V9
-
-- A calm page: the mark; H1 "You're offline" / "Είστε εκτός σύνδεσης".
-- The cached pages list (existing `OfflineActions`) as `link-arrow` rows.
-- A `band` Tile "Emergency: 112" (a `tel:` link works offline).
-- The fonts and tokens CSS must be in the service-worker precache so the page renders in brand fonts offline: check `public/sw.js` in V9.
-
-### 9.12 Admin `/admin/*` — R3-V10 (tokens only)
-
-- No redesign, no motion, no fonts beyond the global stacks.
-- Replace colours in `src/styles/13-compatibility-admin.css` and the admin components with the semantic tokens (`surface`, `fg`, `border-control`, `danger` and so on), remove the per-component dark selectors, and check contrast (G-CONTRAST).
-- Admin pages use the `stay`-style minimal header (brand + "Admin"), not the marketing shell.
-- `src/app/admin/guests/page.tsx` has no motion library: `framer-motion` was removed on 2026-11-14, and its entrance fades are the gated `.admin-rise` CSS rule in `admin.css` (tech research §7).
+- **9.1 Home `/{l}` (M, BookBar):** Living-photo Hero (with valid Booking.com secondary CTA) → `FactStrip` → Highlights (`SeasonSwitch`) → `BalconyWindow` → `RoomsShowcase` → `NightsTeaser` (only with fresh 14-night calendar) → Location (`DistanceList` + `LocationRelief`) → `HostLetter` → `FaqSection` → Footer (`#contact`).
+- **9.2 Apartment `/{l}/apartment` (M, BookBar):** Page head + inline `FactStrip` + text-only `HostIdentity` → `living_8` LCP photo → sticky room chips (`IntersectionObserver` `aria-current`) → room masonry/grids (`42` photos, opening `GalleryLightbox`) + amenities + CTA row.
+- **9.3 Availability `/{l}/availability` (M):** Back link → heading + `HostIdentity` → responsive Calendar + sticky `SummaryCard` (or `info` `Callout` + contact CTAs when calendar stale/unconfigured) + no-JS 60-night `<noscript>` fallback + plain Info/Contact sections (no prices/cancellation).
+- **9.4 Your stay hub `/{l}/stay` (S, calm, zero booking CTA):** Greeting + 4-column/2-column tile grid (Portal tile gated by `portalEnabled`, locked Wi-Fi/check-out until sign-in, House rules, Important phones with `tel:112`, Guide search, Favourites count).
+- **9.5 Kalamata guide `/{l}/moments`, `/{l}/[category]/[slug]`, `/{l}/favorites` (G, calm):** Filterable straight-line-distance grid + lazy `?map=1` Leaflet view; detail hero/facts/`More nearby`; saved grid with `EmptyPanel`.
+- **9.6 Important phones `/{l}/phones` (G, calm):** `112` `band` tile followed by hairline rows with 64 px thumbnails and `tel:` call links.
+- **9.7 Guest sign-in & claim `/{l}/guest` (S, calm):** Centered 480 px column supporting sign-in, two-step claim exchange, password-reset onboarding, and localized callouts.
+- **9.8 Check-in `/{l}/check-in` & Portal refresh `/{l}/portal/refresh` (S, calm, auth):** Stay dates, lazy map/directions, copyable Wi-Fi credentials, arrival request form, rules, emergency `tel:112`; refresh page shows 5 s "Still working…" fallback.
+- **9.9 Privacy `/{l}/privacy` (G):** Editorial 65ch layout with data/cookie inventory table.
+- **9.10–9.11 404, Errors, Offline (`/offline`, `/{l}/offline`):** Minimal stay shell with brand mark, localized headings, safe home/retry/offline links, and `tel:112` offline card.
+- **9.12 Admin `/admin/*`:** Minimal stay-style admin header + token-styled tables/forms (`.admin-rise` CSS reveal in `admin.css`, zero third-party animation library).
 
 ---
 
-## 10. Dependencies
+## 10. Key front-end dependencies
 
-**Added: none.**
-
-| Need | Choice | Why it beats a new package |
+| Need | Choice | Notes |
 |---|---|---|
-| 3D hero | Hand-written WebGL (≤ 6 KB gz) | three.js ≈ 176 KB, R3F ≥ 233 KB, OGL 10–15 KB for no gain; the CSP blocks their WASM loaders and CDN defaults (§5.6) |
-| Scroll and 3D motion | CSS scroll-driven animations, CSS 3D, `@starting-style`, IntersectionObserver | 0 KB; runs on the compositor; GSAP and Lenis are rejected |
-| Page and element transitions | React `<ViewTransition>` (shipped with Next 16.4.5) + `document.startViewTransition` | 0 KB extra |
-| Lightbox gestures | Native scroll-snap inside `<dialog>` | 0 KB; native momentum; replaces the `framer-motion` usage on public routes |
-| Calendar | `react-day-picker` ^9.14.0 (**already installed**, planned by R3-F09) | Accessible grid and keyboard support already built in; skinned with tokens |
-| Map | `leaflet` ^1.9.4 (already installed) | Existing; restyle only |
-| Fonts | Vendored woff2 files + `next/font/local` (part of Next) | Not an npm dependency; `npm pack` is a one-time download (§2.2) |
-
-**Removed.** `framer-motion` 11.18.2 was no longer used on public routes after V6; its only remaining user, `src/app/admin/guests/page.tsx`, now uses the gated `.admin-rise` CSS fade in `admin.css`, and the package was removed on 2026-11-14. Removing it was a dependency change outside the approved removal list, so it was an **open question** for the owner (§13) until it was settled on 2026-11-14.
+| 3D Hero | Custom WebGL fragment shader (`heroGl.ts`) | Lazy-loaded; falls back cleanly to SSR `<picture>` |
+| Motion & reveal | CSS scroll-driven timelines, `@starting-style`, `IntersectionObserver` | Zero runtime animation dependency |
+| Transitions | React `<ViewTransition>` + `document.startViewTransition` | Isolated in `SharedElement.tsx`, `ThemeSwitch.tsx`, `ApartmentGallery.tsx` |
+| Calendar | `react-day-picker` | Skinned with tokens; business logic in `src/lib/availability/stayQuote.ts` |
+| Map | `leaflet` | Lazy-loaded on toggle / check-in address card |
+| Fonts | Self-hosted `woff2` + `next/font/local` | Per-subset `unicode-range` loading |
 
 ---
 
 ## 11. Implementation layout
 
-Current layout (2026-10-11):
-
-```
-src/app/fonts/            fonts.ts, 6 × .woff2, OFL-NotoSerifDisplay.txt, OFL-Commissioner.txt, SOURCES.txt
-src/styles/tokens.css     @theme tokens (colour, font, text, radius, shadow, ease) + dark overrides in @layer base
-src/styles/base.css       @layer base: focus ring, :lang(el) tokens, scrollbars (body switch in shell.css; headings, links, selection deferred)
-src/styles/motion.css     all motion (gated by §5.2), keyframes, View Transition rules, reduced-motion reset
-src/styles/components/    ui, shell, hero, apartment, lightbox, home, guide, legal, calendar, stay, admin (.css, unlayered, imported by
-                          globals.css) and map.css (imported by LeafletMap.tsx with leaflet.css)
-src/components/ui/        Button, IconButton, Chip, Segmented, Surface, Section, Callout, Badge, MetricCard, EmptyPanel
-src/components/icons/     Icon.tsx (icon names are the keys of its `PATHS` record, type `IconName`), BrandMark.tsx
-src/components/shell/     SiteHeader, MobileMenu, SiteFooter, HostIdentity, BookBar, AvailabilityBookBar, LanguageSwitch, ThemeSwitch, MotionSwitch, shellLinks.ts
-src/components/motion/    SharedElement.tsx
-src/components/home/      hero/* (HeroLivingPhoto, HeroGlIsland, heroGl, heroCover), FactStrip, FactCounters, Highlights,
-                          SeasonHighlights, BalconyWindow, RoomsSection, RoomsShowcase, NightsTeaser, LocationSection, ReliefTilt, HostLetter,
-                          FaqSection, HomeRevealObserver
-src/components/gallery/   ApartmentGallery, GalleryLightbox, photoMorph.ts
-src/components/guide/     GuideList, GuideCard, GuideDetail, FavoritesList, PhonesDirectory, SaveButton (map: src/components/ApartmentLocationMap.tsx,
-                          LeafletMap.tsx, maps/tileSource.ts)
-src/components/stay/      StayHub, StayTile, StaySessionTiles, EmergencyTile, StatusPage
-src/lib/motion/           scheduleIdle.ts, heroCapability.ts, motionPreference.ts, pointerEffects.ts, pointerEffectsRuntime.ts
-scripts/design/           gen-hero-assets.ts (design:hero), gen-og-images.ts (design:og), gen-app-icons.ts (design:icons)
-public/house/balcony/hero/  crops + depth maps;  public/design/grain-*.webp;  public/brand/mark.svg;  public/og/og-{en,el}.jpg
-```
-
-**`src/app/globals.css` target order** (after R3-V12):
+`src/app/globals.css` imports styles in strict cascade order (unlayered component sheets beat `@import "tailwindcss"` utilities cleanly without `dark:` variants):
 
 ```css
-@layer theme, base, components, utilities;
 @import "tailwindcss";
+@source not "../../**/*.md";
 @import "../styles/tokens.css";
 @import "../styles/base.css";
-@import "../styles/components/…";
 @import "../styles/motion.css";
+@import "../styles/components/*.css";
 ```
 
-**During migration (history).** R3-V2 wraps every legacy import in a cascade layer placed between `base` and `components`: `@layer theme, base, legacy, components, utilities;` and `@import "../styles/01-tokens.css" layer(legacy);` for each of `01…13`. New components and utilities then reliably beat legacy CSS.
+Key visual directories:
 
-- **Risk.** Today legacy CSS is unlayered and beats Tailwind utilities; after the change, utilities win over legacy rules. V2 must therefore run G-VIS on **every existing route** (en/el, light/dark, 390/1440) and fix regressions inside V2.
-- **Fallback if the regressions are extensive:** keep legacy unlayered, import new CSS after it unlayered, and use class selectors only (no element selectors) in new CSS until V12.
-
-**After R3-V12b.** The fallback was applied (O38) and R3-V12b deleted the legacy sheets, so `globals.css` is `tailwindcss`, `tokens.css`, `base.css`, `motion.css`, then `components/*.css`. The component sheets stay unlayered, because layering them now would let utilities beat them. With no legacy rule left to compete, the class-selectors-only constraint no longer applies to new CSS. The existing class-only rules (two classes for colour) are kept as they are.
-
----
-
-## 12. Migration plan (R3-V2 … R3-V13)
-
-*Status: done (R3-V14 added the motion and 3D pass of §5.5). The table is the plan as executed; the legacy files it names no longer exist.*
-
-- **Every task:**
-  - The standard gates G-STD; G-VIS (390/1440, light/dark, en/el for changed routes); G-CONTRAST (the design-token test plus measured pairs for new surfaces); G-I18N for new strings.
-  - Deletes the legacy CSS and components it replaces (the "each V-task deletes the CSS it replaces" rule).
-  - Does a knip-clean removal with a documented reference search before deleting anything.
-- **Motion changes** are also verified on a production build with a CSP violation listener (§5.9).
-- **Baselines.** Before V2, record the baseline of per-route JS bytes, LCP and TBT (§5.10).
-
-| Task | Scope | Legacy removed | Extra gates / acceptance |
-|---|---|---|---|
-| **R3-V2 Foundations** | 1. Fonts: `npm pack` fetch (after O29 issuer check), commit the 6 woff2 files + OFL + SOURCES, `fonts.ts`, classes on `<html>`; **Turbopack spike** (§2.3) with its documented fallback. 2. `tokens.css` (all of §3.2, §4, §5.3), `base.css`, `motion.css` skeleton with the gate, the `motion-ok` variant. 3. New boot script (§5.2) + `motionPreference.ts`. 4. Legacy CSS into `layer(legacy)` (§11) with full-site G-VIS. 5. `Icon.tsx` (§6) replacing `MenuIcons.tsx` and the emoji icons in `categories.ts`, `house.ts`, `about.ts`. 6. Primitives in `src/components/ui/` (§8: Button, IconButton, Chip, Segmented, Card, Tile, Section, Callout, Field). 7. CSP: remove the Google Fonts origins (`security-config.ts:84, 86, 145, 147`) + tests. 8. `tests/unit/design-tokens.test.ts` (dark-block parity + every §3.3 pair) and the NFC check on i18n. 9. `scripts/design/gen-hero-assets.ts` + generated assets | `01-tokens.css` font stacks (replaced); nothing visual yet except fonts | Network log: 1 font preload; EN page without Greek glyphs does not fetch Greek files (or the fallback is applied and documented). CSP tests updated (G-REG). Every existing route unchanged except typography (G-VIS diff reviewed) |
-| **R3-V3 Brand** | Name "Dolce Far Niente · Kalamata" in `appTitle`, root `metadata.title`, `appleWebApp.title`, manifest `name`/`short_name`, `theme_color`/`background_color` `#F6F0E6`, `viewport.themeColor` pair (§3.2), JSON-LD logo (B17), app icons and favicon from the mark (§6). `HOST_CONTACT` gains Instagram and WhatsApp | QR-code icons in `public/icons/` | Icons are maskable-safe (80 % zone). Manifest validated |
-| **R3-V4 Shell** | SiteHeader (3 variants), MobileMenu, SiteFooter (2 variants), LanguageSwitch, ThemeSwitch (+ circular View Transition), MotionSwitch, BookBar component (wired in V5/V6); `body` switches to `bg` / `fg` / `font-text` + grain site-wide; `TopControls` replaced | `TopControls.tsx`, `ThemeToggle.tsx`, `LocaleSwitcher.tsx` (logic moved), `navigation/menuLinks.ts` if unused, `02-layout.css` header, top-gap and nav parts, `04-theme.css` global dark overrides that fight the tokens | Keyboard: menu focus trap and return, Esc, switches reachable. The stay variant has no booking link (unit test on the link list). Theme reveal is skipped under reduced motion |
-| **R3-V5 Home** | §9.1 in full: hero (crops, scrim, M1–M4) + **WebGL island (M5)**, FactStrip, KineticBand, Highlights + SeasonSwitch, BalconyWindow, RoomsShowcase (coverflow/deck), NightsTeaser (needs the F09 repository; if F09 is not merged, the section is omitted behind a data check), LocationRelief + DistanceList, HostLetter, FAQ, ContactBand, BookBar. `/about` → 308 to `/{l}#host` (proxy redirect helper from R3-F10). Fix the Check-In card 404 | `HomeHero.tsx`, `SearchBar.tsx`, `HomeInteractiveBar.tsx`, `DeferredHomeInteractiveBar.tsx`, `DateRangePicker.tsx` (if unused), `home/HomeFeatureGrid.tsx`, `ContactSection.tsx` / `DeferredContactSection.tsx` (replaced), `03-home.css`, `07-search-listing.css` booking-bar parts, `11-contact.css`, old hero webps | Hero contrast re-measured on the real page (≥ §3.3). LCP element = hero img, ≤ 2.5 s on the profile. Canvas absent under reduced motion (puppeteer `emulateMediaFeatures`). No horizontal overflow (element right edges). Kinetic band has `aria-hidden`. GL chunk ≤ 6 KB gz. 0 CSP violations on a production build |
-| **R3-V6 Apartment** | §9.2; GalleryLightbox (native snap + morph); `next/image` `sizes`; Contact target fix | `ApartmentCinematic.tsx`, `ApartmentGalleryLightbox.tsx` (framer-motion), `AmenitiesList.tsx` / `DescriptionBox.tsx` if replaced, `12-apartment-checkin.css` apartment parts (`:571` onwards) | Lightbox keyboard (←/→/Esc/Home/End), focus return, `aria-modal`, counter announced. Morph verified in Chrome + Safari 26 or falls back to crossfade |
-| **R3-V7 Availability** | §9.3: skin the F09 `AvailabilityPlanner` (react-day-picker `classNames`, custom `DayButton` for the check-out note), SummaryCard, live-region messages and the crossing rule, stacked months on mobile | `08-vendor.css` react-day-picker parts (`:1-169`), `07-search-listing.css` "React Day Picker Custom Styles" (`:341` onwards), `12-apartment-checkin.css:109-184` booking-bar and date-picker parts | Tests: crossing rule, check-out on the first booked night, min-stay message, no `<form>`/`fetch` (F09 rule). Keyboard pass. INP ≤ 200 ms on selection |
-| **R3-V8 Kalamata guide** | §9.5, §9.6: GuideCard, GuideFilters, favourites burst, Directions, art tiles, detail morph, restyled Leaflet (tiles per R3-M1), phones page | `10-moments.css`, `moments/*` components replaced, `CategoryGridClient.tsx`/`ListingCard.tsx` if replaced, `08-vendor.css` Leaflet parts (`:171` onwards), `maps/leafletPopup.ts` restyle | Only chips with content render (test). Search result count announced. Leaflet loads only on map toggle (network log) |
-| **R3-V9 In-stay** | §9.4, §9.7, §9.8, §9.11: `/stay` hub, guest sign-in, check-in, portal refresh, offline pages, `tel:112`; proxy: first visit without a `lang` cookie gets `el` when `Accept-Language` prefers Greek (G-REG in proxy tests); service worker precaches fonts and tokens CSS | `12-apartment-checkin.css` check-in palette (`:185-557`), `StatusCluster` styling moved to tokens | No booking CTA or Booking.com link anywhere in the S-shell pages (test that renders each stay route and asserts no `booking.com` link and no availability CTA). Calm mode only (no `animation-timeline` rules apply) |
-| **R3-V10 Admin** | §9.12 tokens only; `MotionConfig reducedMotion="user"` in admin/guests | `13-compatibility-admin.css` colours → tokens; per-component dark selectors | G-CONTRAST on admin tables, forms and badges |
-| **R3-V11 SEO & sharing** | Metadata per page, canonical + `x-default`, static OG images 1200×630 made with `sharp` from the hero 3:2 crop + wordmark (en/el), sitemap/robots, Organization JSON-LD | none | OG images ≤ 300 KB; text on OG images passes 4.5:1 over the scrim |
-| **R3-V12 Legacy CSS sweep** | Delete what remains of `src/styles/01…13`, the `layer(legacy)` imports, `@custom-variant dark`, the `@theme inline` brand-* block; `05-primitives.css:290-298` reset moves into `motion.css` (extended to View Transitions); close R-166, R-187–R-190, R-217, R-223, R-250, R-272, R-274–R-284 with one G-CONTRAST row each | All legacy CSS | `grep -rn "dark:" src` returns only intentional non-colour uses (expected: none). Global CSS ≤ 30 KB gz. Full-site G-VIS |
-| **R3-V13 Accessibility & performance** | Keyboard pass on every route, reduced-motion pass (OS + in-page switch), decide on the display-italic preload (§2.2), overflow audit by element right edges. The advisory browser audits (axe, responsive, vitals) were removed on 2026-11-14 | none | All §5.10 budgets met or recorded as findings. Owner device checklist (§13) handed over |
-
-**Dependencies on other plan tasks:**
-
-- V5's NightsTeaser needs R3-F05–F09 data.
-- V7 needs F09.
-- V8's map needs R3-M1.
-- V9's privacy link needs R3-L2 (the link may point to the route before the text is final).
-- Copy strings come from R3-C1 (owner-approved and applied on 2026-10-06; the `// C1 review` draft markers are removed).
+```text
+src/app/fonts/            fonts.ts, 6 × .woff2, OFL-*.txt, SOURCES.txt
+src/styles/               tokens.css, base.css, motion.css, components/{admin,apartment,calendar,guide,hero,home,legal,lightbox,map,shell,stay,ui}.css
+src/components/ui/        Badge, Button, Callout, Chip, EmptyPanel, IconButton, MetricCard, Section, Segmented, Surface (+ src/components/Toast.tsx)
+src/components/icons/     BrandMark.tsx, Icon.tsx (`IconName`, 49 keys)
+src/components/shell/     AvailabilityBookBar, BookBar, HostIdentity, LanguageSwitch, MobileMenu, MotionSwitch, SiteFooter, SiteHeader, ThemeSwitch, shellLinks.ts
+src/components/motion/    SharedElement.tsx
+src/components/home/      BalconyWindow, FactCounters, FactStrip, FaqSection, Highlights, HomeRevealObserver, HostLetter, LocationSection, NightsTeaser, ReliefTilt, RoomsSection, RoomsShowcase, SeasonHighlights, hero/*, home{Nights,Relief,Rooms,Season}.ts
+src/components/gallery/   ApartmentGallery, GalleryLightbox, photoMorph.ts
+src/components/guide/     FavoritesList, GuideCard, GuideDetail, GuideList, PhonesDirectory, SaveButton, guide{Entries,Filters}.ts (map: ApartmentLocationMap, LeafletMap, MapLoadingSkeleton, maps/*)
+src/components/stay/      EmergencyTile, StatusPage, StayHub, StaySessionTiles, StayTile
+src/lib/motion/           heroCapability.ts, motionPreference.ts, pointerEffects.ts, pointerEffectsRuntime.ts, scheduleIdle.ts
+scripts/design/           gen-app-icons.ts, gen-hero-assets.ts, gen-og-images.ts, mark.ts
+public/                   house/balcony/hero/*, design/grain-{light,dark}.webp, brand/mark.svg, og/og-{en,el}.jpg
+```
 
 ---
 
-## 13. Open items
+## 13. Open owner visual items
 
-**For the owner (defaults apply until answered):**
-
-1. A balcony photo showing the gulf, a blue-hour balcony photo, exterior shots, a host portrait, and Bedroom 2 and bathroom reshoots (§7.4). Default: the honest copy in §1.4.
-2. The host letter's languages and reply time, and whether to show ratings or reviews. Default: fields hidden, no reviews. The letter carries no signature: the owner decided on 2026-10-20 that the hostess's name is not published (`HOST_PROFILE.name` stays empty). The address, the ΑΜΑ and the Booking.com listing link were supplied by the owner on 2026-10-14, and the host's name («Παναγιώτης Βασιλάκης / Panagiotis Vasilakis», one string in both scripts; Greek label «Ονοματεπώνυμο», English label «Host name») on 2026-10-15 (`HOST_CONTACT` and `BOOKING_COM_LISTING_URL` in `src/data/contact.ts`). The host is a private individual and «Dolce Far Niente» is only the brand, so the ΑΦΜ and a ΓΕΜΗ number are deliberately not shown. The privacy page lists the controller from `HOST_CONTACT`.
-3. Beach distance: settled by R3-C1 (owner, 2026-10-06): the copy says "the nearest beach is 5 minutes by car" with no km figure (`src/i18n/domains/home.ts`, `house.ts` location panel, `checkin.ts` `tip1`).
-4. Remove `framer-motion` after V6/V10 (dependency removal outside the approved list)? Settled: removed on 2026-11-14; the guests page uses the gated `.admin-rise` CSS fade in `admin.css`.
-
-**Not verified (SUSPECTED; each has its check):**
-
-- **Turbopack next/font with per-subset calls:** resolved by the V2 spike (§2.3): all checks passed.
-- **Visual quality of the Noto Serif Display and Commissioner Greek glyphs:** they were only named in the mockups, which used Baskerville and Seravek. V2 renders a specimen: `Καλωσήρθατε στην Καλαμάτα, θέα στον Ταΰγετο και τον Μεσσηνιακό κόλπο. ΐ ΰ ϊ ϋ Ά Έ Ή Ί Ό Ύ Ώ ς 85 €/νύχτα`, at 16/22/45/88 px, en and el, light and dark.
-- **Real devices** (owner checklist):
-  - mid-range Android: WebGL init long task and frame time;
-  - iPhone on iOS 26: scroll-driven animations and View Transitions;
-  - iPhone on iOS 18: static fallback;
-  - Firefox: static fallback;
-  - iPhone in Low Power Mode.
-  - All WebGL numbers so far come from headless Chrome (SwiftShader or hardware GL on this Mac).
-- **Other checks:**
-  - The View Transition morph into a top-layer `<dialog>`: V6.
-  - The react-day-picker calendar bundle size: F09/V7.
-  - Whether Booking.com date parameters on the listing link work: not verified, so none are appended.
-
----
-
-## 14. Sources
-
-- **Research (this workflow):** references, tech, fonts and assets research texts (§0 of the workflow input). Scratch files are in `.runtime/design/research/`.
-- **Winning mockup:** `.runtime/design/messinian-light/`: `DESIGN.md`, `styles.css`, `hero-gl.js`, `boot.js`, `tools/*`, `shots/*`.
-- **Graft mockups:** `.runtime/design/aegean-depth/` and `.runtime/design/kalamata-playful/`.
-- **Installed Next docs and source, read at 16.3.6 (CONFIRMED by reading; the pin is now 16.4.5):**
-  - `node_modules/next/dist/docs/01-app/03-api-reference/02-components/font.md` (`declarations`, `preload`, `adjustFontFallback`, `variable`)
-  - `node_modules/next/dist/compiled/@next/font/dist/local/{loader.js,get-fallback-metrics-from-font-file.js}`
-  - `node_modules/next/dist/build/webpack/loaders/next-font-loader/postcss-next-font.js`
-  - `node_modules/next/dist/docs/01-app/02-guides/view-transitions.md`
-- **Font files and ranges:**
-  - https://data.jsdelivr.com/v1/packages/npm/@fontsource-variable/noto-serif-display@5.3.0?structure=flat
-  - https://data.jsdelivr.com/v1/packages/npm/@fontsource-variable/commissioner@5.3.0?structure=flat
-  - https://cdn.jsdelivr.net/npm/@fontsource-variable/noto-serif-display@5.3.0/unicode.json
-  - The three above were fetched 2026-09-28 for sizes and ranges only; runtime serving stays self-hosted.
-- **Font sources and licences:** https://github.com/google/fonts/tree/main/ofl/notoserifdisplay, https://github.com/google/fonts/tree/main/ofl/commissioner, https://openfontlicense.org/ofl-faq/
-- **Repo facts cited** (paths and line numbers as read when this spec was written; `src/components/HomeHero.tsx` and the legacy style sheets were deleted later):
-  - `src/lib/security-config.ts:84-86, 145-147, 176-177`
-  - `src/app/layout.tsx:26, 40-49`
-  - `src/data/stayPolicy.ts`
-  - `src/lib/availability/{stayQuote.ts,money.ts,calendarDate.ts}`
-  - `src/components/DeferredRuntimeManagers.tsx:6-40`
-  - `src/components/HomeHero.tsx`
-  - `src/styles/01-tokens.css:118-121`
-  - `src/styles/05-primitives.css:290-298`
-  - `scripts/check-image-assets.ts:3`
-  - `public/app.webmanifest`
-  - `next.config.ts` (Turbopack)
-- **Standards:**
-  - WCAG 2.2 understanding documents 1.4.3, 1.4.11, 2.2.2, 2.3.3, 2.5.8
-  - WAI-ARIA APG date picker grid: https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/examples/datepicker-dialog/
-  - web.dev LCP: https://web.dev/articles/lcp
+1. Owner confirmation of the published `BOOKING_COM_LISTING_URL` Share link in `src/data/contact.ts`.
+2. Future optional photography upgrades (§7.4): sunset gulf view from balcony, blue-hour balcony frame, host portrait, Bedroom 2 / bathroom reshoots.

@@ -1,33 +1,66 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-const SCRIPT = path.resolve('scripts/ensure-pepper.js');
-let workDir = '';
-let envFilePath = '';
+describe('check-pepper predev warning', () => {
+  const SCRIPT = path.resolve('scripts/check-pepper.js');
+  let workDir = '';
 
-function run(env: Record<string, string> = {}): string {
-  const childEnv: NodeJS.ProcessEnv = { ...process.env };
-  for (const key of Object.keys(childEnv)) if (key.startsWith('POSTGRES_')) delete childEnv[key];
-  return execFileSync(process.execPath, [SCRIPT], {
-    cwd: workDir,
-    env: { ...childEnv, ...env },
-    encoding: 'utf8',
+  function run(envFile: string): { status: number | null; stderr: string } {
+    fs.writeFileSync(path.join(workDir, '.env.local'), envFile);
+    const childEnv: NodeJS.ProcessEnv = { ...process.env };
+    delete childEnv.SECURITY_PEPPER;
+    delete childEnv.CLAIM_TOKEN_PEPPER;
+    const result = spawnSync(process.execPath, [SCRIPT], { cwd: workDir, env: childEnv, encoding: 'utf8' });
+    return { status: result.status, stderr: result.stderr };
+  }
+
+  beforeEach(() => {
+    workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'check-pepper-test-'));
   });
-}
+  afterEach(() => {
+    if (workDir) fs.rmSync(workDir, { recursive: true, force: true });
+  });
+
+  it('treats an empty SECURITY_PEPPER or CLAIM_TOKEN_PEPPER followed by other lines as missing', () => {
+    const first = run('SECURITY_PEPPER=\nCLAIM_TOKEN_PEPPER=def\nFOO=bar\n');
+    expect(first.status).toBe(0);
+    expect(first.stderr).toContain('SECURITY_PEPPER not found');
+
+    const second = run('CLAIM_TOKEN_PEPPER=\nSECURITY_PEPPER=abc\n');
+    expect(second.stderr).toContain('CLAIM_TOKEN_PEPPER not found');
+  });
+
+  it('accepts non-empty values', () => {
+    const result = run('SECURITY_PEPPER=abc\nCLAIM_TOKEN_PEPPER=def\n');
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe('');
+  });
+});
 
 describe('ensure-pepper local environment bootstrap', () => {
+  const SCRIPT = path.resolve('scripts/ensure-pepper.js');
+  let workDir = '';
+  let envFilePath = '';
+
+  function run(env: Record<string, string> = {}): string {
+    const childEnv: NodeJS.ProcessEnv = { ...process.env };
+    for (const key of Object.keys(childEnv)) if (key.startsWith('POSTGRES_')) delete childEnv[key];
+    return execFileSync(process.execPath, [SCRIPT], {
+      cwd: workDir,
+      env: { ...childEnv, ...env },
+      encoding: 'utf8',
+    });
+  }
+
   beforeEach(() => {
     workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ensure-pepper-test-'));
     envFilePath = path.join(workDir, '.env.local');
   });
   afterEach(() => {
-    if (workDir) {
-      fs.rmSync(workDir, { recursive: true, force: true });
-    }
+    if (workDir) fs.rmSync(workDir, { recursive: true, force: true });
   });
 
   it('creates .env.local with the docker-compose database URL and development secrets', () => {
