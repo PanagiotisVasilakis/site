@@ -66,18 +66,12 @@ describe('admin request list: notification status', () => {
     expect(status).toBe('DEAD');
   });
 
-  const nothingFailed: [string, ListedEvent[], OutboxStatus | undefined][] = [
-    ['a leased decision over a delivered created event', [decisionEvent('LEASED'), createdEvent('DELIVERED')], 'LEASED'],
-  ];
-
-  it.each(nothingFailed)('reports the newest status when nothing failed: %s', async (_label, events, expected) => {
-    expect(await notificationStatusOf(events)).toBe(expected);
+  it('reports the newest status when nothing failed: a leased decision over a delivered created event', async () => {
+    expect(await notificationStatusOf([decisionEvent('LEASED'), createdEvent('DELIVERED')])).toBe('LEASED');
   });
 
-  it.each([
-    ['redacted: false', { requestId: 'b', redacted: false }],
-  ])('still reports an older DEAD event with %s', async (_label, payload) => {
-    const status = await notificationStatusOf([decisionEvent('DELIVERED'), { status: 'DEAD', payload }]);
+  it('still reports an older DEAD event with redacted: false', async () => {
+    const status = await notificationStatusOf([decisionEvent('DELIVERED'), { status: 'DEAD', payload: { requestId: 'b', redacted: false } }]);
 
     expect(status).toBe('DEAD');
   });

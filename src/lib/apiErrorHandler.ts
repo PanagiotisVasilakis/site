@@ -9,6 +9,8 @@ import {
   isClientIdentityUnavailableError,
 } from './net/clientIdentity';
 import { getClientIp } from './net/getClientIp';
+import { isSameOriginRequest } from './net/sameOrigin';
+import { isAdminRequest } from './rbac';
 import { logSecurityDiagnostic } from './security-monitoring';
 
 // Public error-code enum for route handlers
@@ -438,6 +440,31 @@ export function validateRequestBody<T>(schema: z.ZodType<T>, maxBytes = DEFAULT_
       );
     }
   };
+}
+
+export function assertSameOriginMutation(
+  request: NextRequest,
+  message = 'Cross-origin admin mutation rejected',
+): void {
+  const origin = request.headers.get('origin');
+  if (origin && !isSameOriginRequest(origin, request)) {
+    throw new ApiError(ErrorCodes.FORBIDDEN, message);
+  }
+}
+
+export async function requireAdminRequest(
+  request: NextRequest,
+  options?: { sameOrigin?: boolean; message?: string },
+): Promise<void> {
+  if (!(await isAdminRequest(request))) {
+    throw new ApiError(
+      ErrorCodes.UNAUTHORIZED,
+      options?.message ?? 'Admin credentials required',
+    );
+  }
+  if (options?.sameOrigin) {
+    assertSameOriginMutation(request);
+  }
 }
 
 /**

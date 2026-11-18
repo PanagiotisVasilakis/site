@@ -1,29 +1,32 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-// Fixed, git-ignored scratch directory: the checker reads ./package-lock.json and
-// ./node_modules/<pkg>/package.json from its cwd.
-const WORK_DIR = '.runtime/check-licenses-test';
-const ELKJS_DIR = `${WORK_DIR}/node_modules/elkjs`;
-const OTHER_DIR = `${WORK_DIR}/node_modules/not-elkjs`;
+let workDir = '';
+let elkjsDir = '';
+let otherDir = '';
 
 beforeEach(() => {
-  fs.rmSync(WORK_DIR, { recursive: true, force: true });
-  fs.mkdirSync(ELKJS_DIR, { recursive: true });
-  fs.mkdirSync(OTHER_DIR, { recursive: true });
+  workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'check-licenses-test-'));
+  elkjsDir = path.join(workDir, 'node_modules/elkjs');
+  otherDir = path.join(workDir, 'node_modules/not-elkjs');
+  fs.mkdirSync(elkjsDir, { recursive: true });
+  fs.mkdirSync(otherDir, { recursive: true });
 });
 
 afterEach(() => {
-  fs.rmSync(WORK_DIR, { recursive: true, force: true });
+  if (workDir) {
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }
 });
 
 function runChecker(elkjsLicense: string, otherLicense: string) {
-  fs.writeFileSync(`${ELKJS_DIR}/package.json`, JSON.stringify({ name: 'elkjs', version: '1.0.0', license: elkjsLicense }));
-  fs.writeFileSync(`${OTHER_DIR}/package.json`, JSON.stringify({ name: 'not-elkjs', version: '1.0.0', license: otherLicense }));
+  fs.writeFileSync(path.join(elkjsDir, 'package.json'), JSON.stringify({ name: 'elkjs', version: '1.0.0', license: elkjsLicense }));
+  fs.writeFileSync(path.join(otherDir, 'package.json'), JSON.stringify({ name: 'not-elkjs', version: '1.0.0', license: otherLicense }));
   fs.writeFileSync(
-    `${WORK_DIR}/package-lock.json`,
+    path.join(workDir, 'package-lock.json'),
     JSON.stringify({
       packages: {
         '': { version: '0.0.0' },
@@ -34,7 +37,7 @@ function runChecker(elkjsLicense: string, otherLicense: string) {
   );
 
   return spawnSync(path.resolve('node_modules/.bin/tsx'), [path.resolve('scripts/check-licenses.ts')], {
-    cwd: WORK_DIR,
+    cwd: workDir,
     encoding: 'utf8',
     timeout: 30_000,
   });

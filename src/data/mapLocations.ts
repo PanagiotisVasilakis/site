@@ -1,5 +1,4 @@
 import type { Locale } from '@/i18n/config';
-import { dedupeById } from '@/lib/collections';
 import { pickLocale } from '@/lib/localize';
 import { getApartmentContent } from '@/data/apartmentData';
 import { HOST_CONTACT } from '@/data/contact';
@@ -84,7 +83,6 @@ interface KalamataLandmarkDefinition {
   address: LocalizedMapText;
   coordinates: MapCoordinates;
   markerType: MapMarkerType;
-  sourceUrls: string[];
 }
 
 /**
@@ -102,10 +100,6 @@ const KALAMATA_LANDMARKS: readonly KalamataLandmarkDefinition[] = [
     address: { en: 'Almyros, Verga, Kalamata', el: 'Αλμυρός, Βέργα, Καλαμάτα' },
     coordinates: [22.155378, 36.99795],
     markerType: 'beach',
-    sourceUrls: [
-      'https://visit-kalamata.gr/en/almyrosen/',
-      'https://sandee.com/map/almiros-beach/@36.99795,22.155378',
-    ],
   },
   {
     id: 'landmark-kordia-beach',
@@ -117,10 +111,6 @@ const KALAMATA_LANDMARKS: readonly KalamataLandmarkDefinition[] = [
     address: { en: 'Kordia Beach, Kalamata', el: 'Παραλία Κορδίας, Καλαμάτα' },
     coordinates: [22.0894, 37.027],
     markerType: 'beach',
-    sourceUrls: [
-      'https://www.blueflag.gr/el/beach/dytiki-kalamata-paralia-kordia',
-      'https://visitpeloponnese.com/en/toyristiko-periehomeno/beaches-kalamata',
-    ],
   },
   {
     id: 'landmark-vasileos-georgiou-square',
@@ -132,10 +122,6 @@ const KALAMATA_LANDMARKS: readonly KalamataLandmarkDefinition[] = [
     address: { en: 'Vasileos Georgiou Square, Kalamata', el: 'Πλατεία Βασιλέως Γεωργίου, Καλαμάτα' },
     coordinates: [22.1110293, 37.0381278],
     markerType: 'city-center',
-    sourceUrls: [
-      'https://kalamata.gr/el/component/gmapfp/308:plateia-georgiou?view=gmapfp',
-      'https://www.openstreetmap.org/way/298356181',
-    ],
   },
   {
     id: 'landmark-march-23-square',
@@ -147,10 +133,6 @@ const KALAMATA_LANDMARKS: readonly KalamataLandmarkDefinition[] = [
     address: { en: '23rd of March Square, Kalamata', el: 'Πλατεία 23ης Μαρτίου, Καλαμάτα' },
     coordinates: [22.1131936, 37.0429578],
     markerType: 'sightseeing',
-    sourceUrls: [
-      'https://greece.terrabook.com/el/messinia/page/plateia-23-martiou/',
-      'https://www.openstreetmap.org/way/552176073',
-    ],
   },
   {
     id: 'landmark-agia-triada-church',
@@ -162,9 +144,6 @@ const KALAMATA_LANDMARKS: readonly KalamataLandmarkDefinition[] = [
     address: { en: '150 Athinon Avenue, Kalamata', el: 'Αθηνών 150, Καλαμάτα' },
     coordinates: [22.0958081, 37.0416033],
     markerType: 'church',
-    sourceUrls: [
-      'https://kalamata.gr/el/component/gmapfp/420:2014-01-13-09-09-51?view=gmapfp',
-    ],
   },
   {
     id: 'landmark-sklavenitis-athinon',
@@ -176,10 +155,6 @@ const KALAMATA_LANDMARKS: readonly KalamataLandmarkDefinition[] = [
     address: { en: 'Athinon Avenue, Kalamata', el: 'Λεωφόρος Αθηνών, Καλαμάτα' },
     coordinates: [22.0911789, 37.0433823],
     markerType: 'shop',
-    sourceUrls: [
-      'https://www.sklavenitis.gr/about/katastimata/',
-      'https://www.openstreetmap.org/node/6636741387',
-    ],
   },
 ];
 
@@ -293,5 +268,10 @@ export function getKalamataMapLocations(
     locations.push(numbered ? { ...location, number: count } : location);
   });
 
-  return dedupeById(locations);
+  const seen = new Set<string>();
+  return locations.filter((location) => {
+    if (seen.has(location.id)) return false;
+    seen.add(location.id);
+    return true;
+  });
 }

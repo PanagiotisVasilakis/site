@@ -3,27 +3,19 @@
 The selected production topology is deliberately local and layered:
 
 ```text
-Cloudflare Free (coarse abuse controls)
-  -> Nginx (request-rate and connection controls)
+Cloudflare Free (coarse abuse controls & WAF)
   -> Next.js + PostgreSQL (authoritative sensitive-operation limits)
 ```
 
 Upstash, Redis, Valkey, a Cloudflare Worker, and process-local authoritative
 counters are not production dependencies. Public reads do not write limiter
-state. They rely on the edge/proxy layers, safe caching, and bounded queries.
+state. They rely on the edge CDN/WAF layer, safe caching, and bounded queries.
 
 ## Layer ownership
 
 - Cloudflare supplies coarse network and abuse controls. Its API is not a
   readiness dependency.
-- Nginx has separate `auth_operations`, `public_writes`, and `broad_api`
-  request zones plus a per-client connection zone. The checked-in rates and
-  bursts are observation defaults, not load-qualified production thresholds.
-  `limit_req_dry_run on` and `limit_conn_dry_run on` must remain enabled until
-  staging/load evidence and false-positive review approve a versioned change
-  to enforcement. When enforcement is enabled, Nginx uses `429` for
-  request/connection rejection.
-- PostgreSQL is authoritative only for sensitive operations: administrator
+- PostgreSQL is authoritative for sensitive operations: administrator
   and guest authentication, claims, guest session refresh (the `portal-refresh`
   limiter: 60 requests per 15 minutes on the client-address dimension only,
   checked only when a refresh cookie is present), sensitive public writes,
@@ -50,8 +42,7 @@ that the response time does not reveal which numbers do. Each comparison holds
 one thread of Node's libuv pool (four threads by default) for about 0.2 s on a
 current CPU. The PostgreSQL limiter bounds these comparisons per client address
 (five per 15 minutes for an IPv4 address or an IPv6 /64) and per phone number,
-not globally; a flood spread over many addresses is left to Cloudflare and, once
-enforcement is approved, to the Nginx `auth_operations` zone.
+not globally; a flood spread over many addresses is filtered at the edge by Cloudflare.
 
 Expired `rate_limits` rows are deleted by `runRetention` in the versioned
 operations worker. Operators must verify the timer runs and alert on cleanup
@@ -70,17 +61,16 @@ sixth attempt is still denied.
 Public forwarding headers cannot select that source; the limiter requires the
 private canonical IP and a valid proxy attestation. Credentials and
 attacker-supplied administrator hints are never key material. Administrator
-logins answered with `401` or `429` appear only as the info log line
-`API request completed` with that status in the application log; the Nginx
-access log (`origin_safe` format, `$status` field) also records that status; no
-counter or alert rule records them.
+logins answered with `401` or `429` appear as the info log line
+`API request completed` with that status in the application log; no counter or
+alert rule records them.
 Named-identity progressive budgets and durable off-host alerting are future
 work.
 
 Code and deterministic route/PostgreSQL regressions establish this contract.
-Manual evidence is still pending: run the A/B sequence through the staging
-proxy topology, confirm forwarding-header spoofing is rejected there, and
-observe the 401/429/success distributions.
+Manual evidence is still pending: run the A/B sequence through the production
+Cloudflare edge transform rule, confirm forwarding-header spoofing is rejected
+there, and observe the 401/429/success distributions.
 
 ## Operational signals
 
@@ -88,8 +78,6 @@ Monitor bounded categories, never request bodies, credentials, raw header
 chains, or high-cardinality route values:
 
 - Cloudflare blocked and challenged request totals;
-- Nginx passed, delayed, dry-run, and rejected totals by `auth`,
-  `public_write`, and `broad_api` layer;
 - application `429` and `503` totals by bounded operation category;
 - PostgreSQL limiter latency and errors;
 - limiter-table row count, key cardinality, oldest expired row, and cleanup

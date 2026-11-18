@@ -49,7 +49,6 @@ export const guestStore = {
       session_id: string;
       family_id?: string;
       device_hint?: string;
-      ip_hint?: string;
     },
   ): Promise<{ rec: GuestRefreshTokenRec; token: string }> {
     const rawSecret = crypto.randomBytes(32).toString('base64url');
@@ -65,7 +64,6 @@ export const guestStore = {
       Date.now() + ttlDays * 24 * 60 * 60 * 1000,
       {
         deviceHint: opts.device_hint,
-        ipHint: opts.ip_hint
       }
     );
 
@@ -73,10 +71,6 @@ export const guestStore = {
     const token = `${rec.id}.${rawSecret}`;
 
     return { rec, token };
-  },
-  
-  async verifyRefreshToken(token: string): Promise<GuestRefreshTokenRec | undefined> {
-    return refreshTokenRepository.verify(token);
   },
   
   async revokeRefreshFamily(token: string): Promise<boolean> {
@@ -88,7 +82,6 @@ export const guestStore = {
     ttlDays = 7,
     context: {
       device_hint?: string;
-      ip_hint?: string;
       presented_session: RefreshSessionBinding;
     },
   ): Promise<
@@ -113,7 +106,6 @@ export const guestStore = {
       tokenExpiresAt: now + ttlDays * 24 * 60 * 60 * 1000,
       sessionExpiresAt: new Date(now + GUEST_SESSION_TTL_SECONDS * 1000),
       deviceHash: context.device_hint,
-      ipHash: context.ip_hint,
       presentedSession: context.presented_session,
       createSessionToken: createGuestSessionToken,
     });
@@ -143,10 +135,6 @@ export const guestStore = {
 
   async findBookingsOnDate(date: Date): Promise<Booking[]> {
     return bookingRepository.findOnDate(date);
-  },
-
-  async getAllUsers(): Promise<User[]> {
-    return userRepository.getAll();
   },
 
   async findUsersByIds(ids: readonly string[]): Promise<User[]> {

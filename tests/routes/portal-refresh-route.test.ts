@@ -14,7 +14,7 @@ vi.mock('@/lib/guestDataStore', () => ({
   guestStore: { rotateRefreshToken: mocks.rotateRefreshToken },
 }));
 vi.mock('@/lib/portalAuthHttp', () => ({
-  requestAuthContext: () => ({ deviceHint: 'device-hint', ipHint: 'ip-hint', ipHash: 'ip-hash' }),
+  requestAuthContext: () => ({ deviceHint: 'device-hint', ipHash: 'ip-hash' }),
 }));
 
 import { POST } from '@/app/api/portal/refresh/route';

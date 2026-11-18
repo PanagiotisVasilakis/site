@@ -218,7 +218,7 @@ async function seedThirdControlPrincipal(
   }, 'seed');
 }
 
-function authContext(loadedModules: AuthModules): { deviceHint: string; ipHint: string } {
+function authContext(loadedModules: AuthModules): { deviceHint: string } {
   return loadedModules.requestAuthContext(new loadedModules.NextRequest(REFRESH_URL, {
     method: 'POST',
     headers: REQUEST_HEADERS,
@@ -241,7 +241,6 @@ async function issueBoundAuthorizationChain(
     session_id: sessionId,
     family_id: fixture.familyId,
     device_hint: context.deviceHint,
-    ip_hint: context.ipHint,
   });
   if (refresh.rec.id !== sessionId) {
     throw new Error('Synthetic refresh generation was not paired with its session.');

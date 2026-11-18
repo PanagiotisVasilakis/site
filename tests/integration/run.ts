@@ -7,6 +7,7 @@ import {
   startDisposablePostgres,
   stopDisposablePostgres,
 } from './support/database-lifecycle';
+import { signalChildProcess } from './support/migrations';
 import { REPOSITORY_ROOT } from './support/runtime';
 import type { DisposablePostgresRuntime } from './support/runtime';
 
@@ -18,22 +19,6 @@ const SIGNAL_EXIT_CODES: Partial<Record<NodeJS.Signals, number>> = {
 let activeChild: ReturnType<typeof spawn> | undefined;
 let receivedSignal: NodeJS.Signals | undefined;
 let forcedTerminationTimer: NodeJS.Timeout | undefined;
-
-function signalChildProcess(
-  child: ReturnType<typeof spawn>,
-  signal: NodeJS.Signals,
-): void {
-  if (!child.pid) return;
-  if (process.platform !== 'win32') {
-    try {
-      process.kill(-child.pid, signal);
-      return;
-    } catch {
-      // Fall back to the direct process if its group already changed.
-    }
-  }
-  child.kill(signal);
-}
 
 function handleSignal(signal: NodeJS.Signals): void {
   receivedSignal = signal;
@@ -61,8 +46,8 @@ function runIntegrationTests(runtime: DisposablePostgresRuntime): Promise<number
           NODE_ENV: 'test',
           NO_COLOR: '1',
           LOG_CONSOLE: 'false',
-          // Integration requests provide the same private pair that the local
-          // Nginx contract supplies in production.
+          // Integration requests provide the same private pair that the
+          // trusted-ingress contract supplies in production.
           ORIGIN_PROXY_SHARED_SECRET:
             '073b10dd0d75ab99f24afa5a32cf30945abddd8b8b003dd5ab0967e452c738f2',
         },

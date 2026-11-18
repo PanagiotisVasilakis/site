@@ -15,14 +15,13 @@ import {
 import { requireCanonicalClientIp } from '@/lib/net/clientIdentity';
 import { privacyHmac } from '@/lib/privacyHash';
 
-export function requestAuthContext(request: NextRequest): { deviceHint: string; ipHint: string; ipHash: string } {
+export function requestAuthContext(request: NextRequest): { deviceHint: string; ipHash: string } {
   // Identity must be available before any context HMAC is created. In
   // particular, never turn the sentinel `unknown` into a valid-looking hint.
   const ip = requireCanonicalClientIp(request);
   const userAgent = request.headers.get('user-agent') || 'unknown';
   return {
     deviceHint: privacyHmac(userAgent, 'portal-auth:device-hint:v1'),
-    ipHint: privacyHmac(ip, 'portal-auth:ip-hint:v1'),
     // Audit rows share the security-event IP hash so events correlate across types.
     ipHash: privacyHmac(ip, 'security-event-ip:v1'),
   };
@@ -70,7 +69,6 @@ export async function attachPortalAuthCookies(
     const issued = await guestStore.issueRefreshToken(input.userId, 7, {
       session_id: sessionId,
       device_hint: context.deviceHint,
-      ip_hint: context.ipHint,
     });
     const refreshCookie = createRefreshCookie(issued.token, 7);
     response.cookies.set(refreshCookie.name, refreshCookie.value, refreshCookie.options);

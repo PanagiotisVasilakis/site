@@ -65,7 +65,7 @@ interface CommandResult {
 const MIGRATION_TIMEOUT_MS = 60_000;
 const TERMINATION_GRACE_MS = 2_000;
 
-function signalChildProcess(
+export function signalChildProcess(
   child: ReturnType<typeof spawn>,
   signal: NodeJS.Signals,
 ): void {

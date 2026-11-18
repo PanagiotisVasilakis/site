@@ -2,15 +2,17 @@ import type { Metadata } from 'next';
 import { describe, expect, it } from 'vitest';
 
 import { generateMetadata as homeMetadata } from '@/app/[locale]/page';
+import { generateMetadata as localeLayoutMetadata } from '@/app/[locale]/layout';
 import { generateMetadata as apartmentMetadata } from '@/app/[locale]/apartment/page';
 import { generateMetadata as availabilityMetadata } from '@/app/[locale]/availability/page';
+import { generateMetadata as checkInMetadata } from '@/app/[locale]/check-in/page';
 import { generateMetadata as categoryMetadata } from '@/app/[locale]/[category]/page';
 import { generateMetadata as itemMetadata } from '@/app/[locale]/[category]/[slug]/page';
 import { generateMetadata as favouritesMetadata } from '@/app/[locale]/favorites/page';
 import { generateMetadata as privacyMetadata } from '@/app/[locale]/privacy/page';
 import { generateMetadata as portalRefreshMetadata } from '@/app/[locale]/portal/refresh/page';
-import { metadata as guestMetadata } from '@/app/[locale]/guest/layout';
-import { metadata as localeOfflineMetadata } from '@/app/[locale]/offline/page';
+import { generateMetadata as guestMetadata } from '@/app/[locale]/guest/page';
+import { generateMetadata as localeOfflineMetadata } from '@/app/[locale]/offline/page';
 import { metadata as offlineMetadata } from '@/app/offline/page';
 import { metadata as adminMetadata } from '@/app/admin/page';
 import { metadata as adminAvailabilityMetadata } from '@/app/admin/availability/page';
@@ -26,9 +28,9 @@ import { siteUrl } from '@/lib/site';
 type Load = (locale: string) => Promise<Metadata>;
 
 function detailItem(categoryId: string, withPhoto: boolean): { slug: string; image: string | undefined } {
-  const item = getItemsByCategory(categoryId).find((candidate) => Boolean(candidate.heroImage ?? candidate.image) === withPhoto);
+  const item = getItemsByCategory(categoryId).find((candidate) => Boolean(candidate.heroImage) === withPhoto);
   if (!item) throw new Error(`no ${categoryId} item ${withPhoto ? 'with' : 'without'} a photo`);
-  return { slug: item.slug ?? toSlug(item.name), image: item.heroImage ?? item.image };
+  return { slug: item.slug ?? toSlug(item.name), image: item.heroImage };
 }
 
 const moment = detailItem('moments', true);
@@ -75,8 +77,8 @@ describe('public page metadata (identity §12 R3-V11)', () => {
 
   it.each([
     ['portal refresh', () => portalRefreshMetadata({ params: Promise.resolve({ locale: 'en' }) })],
-    ['guest', async () => guestMetadata],
-    ['localized offline', async () => localeOfflineMetadata],
+    ['guest', () => guestMetadata({ params: Promise.resolve({ locale: 'en' }) })],
+    ['localized offline', () => localeOfflineMetadata({ params: Promise.resolve({ locale: 'en' }) })],
     ['offline', async () => offlineMetadata],
   ] as const)('%s is not indexed', async (_name, load) => {
     expect((await load()).robots).toEqual(NOT_INDEXED);
@@ -104,5 +106,35 @@ describe('Organization JSON-LD', () => {
       email: 'dolcefarnienteapartments@gmail.com',
       telephone: '+30 695 581 0051',
     });
+  });
+});
+
+describe('check-in page metadata', () => {
+  it.each([
+    ['el', 'Πληροφορίες άφιξης'],
+    ['en', 'Check-in information'],
+    ['xx', 'Check-in information'],
+  ])('uses the %s title and stays out of search indexes', async (locale, title) => {
+    const metadata = await checkInMetadata({ params: Promise.resolve({ locale }) });
+
+    expect(metadata).toEqual({ robots: { index: false, follow: false }, title });
+  });
+});
+
+describe('locale layout metadata', () => {
+  it('leaves the description, canonical, og:url and title unset for pages without their own', async () => {
+    const metadata = await localeLayoutMetadata({ params: Promise.resolve({ locale: 'el' }) });
+
+    // Noindex pages (/stay, /guest, …) and 404s used to inherit the home page canonical.
+    expect(metadata.description).toBeUndefined();
+    expect(metadata.alternates).toBeUndefined();
+    expect(metadata.openGraph).not.toHaveProperty('url');
+    expect(metadata.openGraph).toMatchObject({ images: [expect.objectContaining({ url: `${siteUrl}/og/og-el.jpg` })] });
+    expect(metadata.twitter).toEqual({ card: 'summary_large_image' });
+
+    // A string title here resolves to { template: null } in Next's metadata
+    // resolution and would clear the root "%s | Dolce Far Niente · Kalamata"
+    // template for every page under /[locale].
+    expect(metadata.title).toBeUndefined();
   });
 });

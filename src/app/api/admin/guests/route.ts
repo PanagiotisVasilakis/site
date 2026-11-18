@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { guestDataExport } from '@/lib/guestDataExport';
-import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
-import { isAdminRequest } from '@/lib/rbac';
+import { withErrorHandler, createSuccessResponse, requireAdminRequest, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 
 const isoDate = z.iso.date();
 
 export const GET = withErrorHandler(async (request: NextRequest) => {
-  if (!(await isAdminRequest(request))) {
-    throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
-  }
+  await requireAdminRequest(request);
 
   const { searchParams } = new URL(request.url);
   const param = (name: string) => searchParams.get(name) || undefined;

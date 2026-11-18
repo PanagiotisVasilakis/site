@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getAllBookings: vi.fn(),
   getBookingDetails: vi.fn(),
   searchBookingsByDateRange: vi.fn(),
+  loggerError: vi.fn(),
 }));
 
 vi.mock('@/lib/rbac', () => ({ isAdminRequest: mocks.isAdminRequest }));
@@ -16,6 +17,21 @@ vi.mock('@/lib/guestDataExport', () => ({
     searchBookingsByDateRange: mocks.searchBookingsByDateRange,
   },
 }));
+vi.mock('@/lib/logger-enterprise', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/logger-enterprise')>();
+  return {
+    ...actual,
+    logger: {
+      ...actual.logger,
+      error: mocks.loggerError,
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      getContext: actual.logger.getContext.bind(actual.logger),
+      setContext: actual.logger.setContext.bind(actual.logger),
+    },
+  };
+});
 
 import { GET } from '@/app/api/admin/guests/route';
 
@@ -72,10 +88,8 @@ describe('admin guests route query validation', () => {
     expect(mocks.getBookingDetails).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ['startDate=2026-10-5'],
-  ])('answers 422 for a malformed search date (%s) without searching', async (dates) => {
-    const response = await get(`action=search&${dates}`);
+  it('answers 422 for a malformed search date (startDate=2026-10-5) without searching', async () => {
+    const response = await get('action=search&startDate=2026-10-5');
 
     expect(response.status).toBe(422);
     expect(mocks.searchBookingsByDateRange).not.toHaveBeenCalled();
@@ -102,4 +116,21 @@ describe('admin guests route query validation', () => {
       expect(mocks.getBookingDetails).not.toHaveBeenCalled();
     },
   );
+
+  it('logs unexpected failures at error level without echoing internal messages', async () => {
+    mocks.getAllBookings.mockRejectedValue(new Error('relation "bookings" does not exist'));
+
+    const response = await GET(
+      new NextRequest('https://guest-guide.test/api/admin/guests?action=list'),
+      { params: Promise.resolve({}) },
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.text()).not.toContain('does not exist');
+    expect(mocks.loggerError).toHaveBeenCalledWith(
+      'Unexpected API error',
+      expect.any(Object),
+      expect.objectContaining({ message: 'relation "bookings" does not exist' }),
+    );
+  });
 });

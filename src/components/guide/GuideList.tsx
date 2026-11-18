@@ -11,10 +11,9 @@ import type { MapContentItem } from '@/data/mapLocations';
 import type { Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 import { useFavorites } from '@/lib/favorites';
-import { filterBySearchText } from '@/lib/searchText';
 import { GuideCard } from './GuideCard';
 import type { GuideEntry } from './guideEntries';
-import { chipCounts, filterByCategory, type GuideFilterKey } from './guideFilters';
+import { chipCounts, filterByCategory, filterBySearchText, type GuideFilterKey } from './guideFilters';
 
 /*
  * Leaflet, its CSS and the map module load only when the Map view is chosen (§9.5, §12 R3-V8): this chunk

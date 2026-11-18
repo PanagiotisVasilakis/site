@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createAdminSession, revokeAdminSession, signAdmin, verifyAdmin } from '@/lib/auth/admin';
+import { createAdminSession, revokeAdminSession, setAdminSessionCookie, signAdmin, verifyAdmin } from '@/lib/auth/admin';
 import { logger } from '@/lib/logger-enterprise';
 import { withErrorHandler, validateRequestBody } from '@/lib/apiErrorHandler';
 import crypto from 'node:crypto';
@@ -56,15 +56,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   });
   
   const res = NextResponse.json({ success: true }, { status: 200 });
-  
-  res.cookies.set('admin_jwt', jwt, {
-    path: '/',
-    httpOnly: true,
-    sameSite: 'strict',
-    maxAge: 7200,
-    secure: process.env.NODE_ENV === 'production',
-  });
-  
+  setAdminSessionCookie(res, jwt);
+
   logger.info('Admin login successful');
   return res;
 });

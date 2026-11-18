@@ -4,7 +4,8 @@ import { Icon } from '@/components/icons/Icon';
 import type { Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 import { EMERGENCY_112_HREF, EMERGENCY_112_ID, telHref } from '@/lib/contactLinks';
-import { getItemsByCategory, pickLocale } from '@/lib/data';
+import { getItemsByCategory } from '@/lib/data';
+import { pickLocale } from '@/lib/localize';
 import { FavouritesTile, StaySessionTiles } from './StaySessionTiles';
 import { StayTile } from './StayTile';
 

@@ -2,9 +2,7 @@
 .github
 .next
 dist
-.runtime
 .codex
-.cursor
 .vscode
 .venv
 AGENTS.md
@@ -13,9 +11,7 @@ GEMINI.md
 agent-knowledge
 graphify-out
 node_modules
-reports
 coverage
-artifacts
 *.tsbuildinfo
 next-env.d.ts
 *.log
@@ -30,7 +26,6 @@ next-env.d.ts
 !.env.example
 src/generated/prisma
 public/version.json
-tmp
 
 # Local agent and review files
 .claude/

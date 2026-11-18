@@ -47,7 +47,6 @@ describe('admin session refresh route', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ success: true, expiresAt: '2030-03-01T12:00:00.000Z' });
     expect(response.cookies.get('admin_jwt')?.maxAge).toBe(7200);
-    expect(response.cookies.get('admin_jwt')).toMatchObject({ httpOnly: true, sameSite: 'strict', path: '/' });
     expect(response.cookies.get('admin_jwt')).toMatchObject({ httpOnly: true, sameSite: 'strict', path: '/', secure: true });
   });
 

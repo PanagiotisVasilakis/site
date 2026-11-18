@@ -56,8 +56,8 @@ describe('proxy locale for a first visit (Accept-Language)', () => {
     expect(response.headers.get('location')).toBe(`${ORIGIN}/el`);
   });
 
-  it.each(['/en'])('never redirects an explicit locale path (%s)', async (path) => {
-    const response = await runProxy(path, { 'accept-language': 'el-GR,el;q=0.9' });
+  it('never redirects an explicit locale path (/en)', async () => {
+    const response = await runProxy('/en', { 'accept-language': 'el-GR,el;q=0.9' });
 
     expect(response.status).toBe(200);
     expect(response.headers.get('location')).toBeNull();

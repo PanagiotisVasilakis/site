@@ -31,7 +31,7 @@ npm test                 # complete deterministic suite
 npm run test:unit        # pure unit tests
 npm run test:security    # security and boundary tests
 npm run test:components  # jsdom component tests
-npm run test:routes      # public route contracts
+npm run test:routes      # API and route handler contracts
 npm run test:integration # disposable PostgreSQL migration/integration foundation
 npm run test:watch       # interactive local development
 npm run test:coverage    # suite plus enforced coverage gate

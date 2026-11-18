@@ -71,9 +71,23 @@ describe('portal auth client identity', () => {
 
     expect(requestAuthContext(trusted)).toEqual({
       deviceHint: 'portal-auth:device-hint:v1:synthetic-test-client',
-      ipHint: 'portal-auth:ip-hint:v1:203.0.113.10',
       ipHash: 'security-event-ip:v1:203.0.113.10',
     });
+
+    const trustedOtherIp = new NextRequest('https://guest.test/api/portal/claims', {
+      method: 'POST',
+      headers: {
+        'user-agent': 'synthetic-test-client',
+        'x-origin-verified-client-ip': '198.51.100.99',
+        'x-origin-proxy-attestation': String(process.env.ORIGIN_PROXY_SHARED_SECRET),
+      },
+    });
+    expect(requestAuthContext(trustedOtherIp).deviceHint).toBe(
+      requestAuthContext(trusted).deviceHint,
+    );
+    expect(requestAuthContext(trustedOtherIp).ipHash).not.toBe(
+      requestAuthContext(trusted).ipHash,
+    );
   });
 
   describe('refresh family handoff', () => {

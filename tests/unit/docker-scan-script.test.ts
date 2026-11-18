@@ -1,7 +1,8 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 // Official Trivy 0.69.3 image by its multi-platform index digest
 // (published before the 0.69.4-0.69.6 compromise, GHSA-69fq-xp46-6x23).
@@ -50,28 +51,34 @@ exit 0
 
 const BASH = execFileSync('/bin/sh', ['-c', 'command -v bash'], { encoding: 'utf8' }).trim();
 
-// Fixed, git-ignored scratch directory. The bin directories are written once for the file
-// (the first exec of a newly written script is slow on some hosts); TMP and the stub's
-// records are recreated for every test.
-const WORK = path.resolve('.runtime/docker-scan-test');
-const BIN = path.join(WORK, 'bin');
-const DOCKER_BIN = path.join(WORK, 'docker-bin');
-const TRIVY_BIN = path.join(WORK, 'trivy-bin');
-const TMP = path.join(WORK, 'tmp');
-const LOG = path.join(WORK, 'docker.log');
-const MODES = path.join(WORK, 'modes.txt');
-const TRIVY_LOG = path.join(WORK, 'trivy.log');
+let WORK = '';
+let BIN = '';
+let DOCKER_BIN = '';
+let TRIVY_BIN = '';
+let TMP = '';
+let LOG = '';
+let MODES = '';
+let TRIVY_LOG = '';
 
 // The script's PATH is BIN alone (plus DOCKER_BIN or TRIVY_BIN, which hold only their stub, when a
 // test wants Docker or a host Trivy), so neither a host Trivy nor the real Docker CLI can be
 // found. These wrappers expose only the system tools the script and the stubs need.
 const TOOL_WRAPPER = '#!/bin/sh\nexport PATH=/usr/bin:/bin\nexec "${0##*/}" "$@"\n';
 
-beforeAll(() => {
-  rmSync(WORK, { recursive: true, force: true });
+beforeEach(() => {
+  WORK = mkdtempSync(path.join(os.tmpdir(), 'docker-scan-test-'));
+  BIN = path.join(WORK, 'bin');
+  DOCKER_BIN = path.join(WORK, 'docker-bin');
+  TRIVY_BIN = path.join(WORK, 'trivy-bin');
+  TMP = path.join(WORK, 'tmp');
+  LOG = path.join(WORK, 'docker.log');
+  MODES = path.join(WORK, 'modes.txt');
+  TRIVY_LOG = path.join(WORK, 'trivy.log');
+
   mkdirSync(BIN, { recursive: true });
   mkdirSync(DOCKER_BIN);
   mkdirSync(TRIVY_BIN);
+  mkdirSync(TMP);
   writeFileSync(path.join(BIN, 'mktemp'), TOOL_WRAPPER, { mode: 0o755 });
   writeFileSync(path.join(BIN, 'rm'), TOOL_WRAPPER, { mode: 0o755 });
   writeFileSync(path.join(BIN, 'chmod'), TOOL_WRAPPER, { mode: 0o755 });
@@ -80,15 +87,11 @@ beforeAll(() => {
   writeFileSync(path.join(TRIVY_BIN, 'trivy'), TRIVY_STUB, { mode: 0o755 });
 });
 
-beforeEach(() => {
-  rmSync(TMP, { recursive: true, force: true });
-  rmSync(LOG, { force: true });
-  rmSync(MODES, { force: true });
-  rmSync(TRIVY_LOG, { force: true });
-  mkdirSync(TMP);
+afterEach(() => {
+  if (WORK) {
+    rmSync(WORK, { recursive: true, force: true });
+  }
 });
-
-afterAll(() => rmSync(WORK, { recursive: true, force: true }));
 
 function runScan(
   scanner: string,

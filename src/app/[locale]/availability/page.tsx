@@ -18,8 +18,7 @@ import { readAvailabilityOrNull } from '@/lib/availability/readAvailabilityOrNul
 import type { AvailabilityStatus, PublicAvailability } from '@/lib/prisma-repositories/availabilityRepository';
 import { localizedAlternates, localizedOpenGraph } from '@/lib/seo';
 
-// Free nights: the booking entry point (the old /book and
-// /booking-details paths redirect here in src/proxy.ts). Rendered per request.
+// Free nights: the booking entry point. Rendered per request.
 export const dynamic = 'force-dynamic';
 
 type AvailabilityPageProps = { params: Promise<{ locale: string }> };

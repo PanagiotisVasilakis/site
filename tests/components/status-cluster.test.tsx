@@ -3,6 +3,7 @@
 import { act, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import StatusCluster from '@/components/StatusCluster';
+import { stubMatchMedia } from '../support/dom';
 
 const labels = {
   online: 'Online',
@@ -28,34 +29,21 @@ describe('StatusCluster', () => {
     Reflect.deleteProperty(document, 'hidden');
   });
 
-  function setViewport(isDesktop: boolean) {
-    vi.stubGlobal('matchMedia', vi.fn(() => ({
-      matches: isDesktop,
-      media: '(min-width: 640px)',
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })));
-  }
-
   it('does not poll continuously on idle tabs or desktop viewports', async () => {
-    setViewport(true);
+    stubMatchMedia(true);
     const desktop = render(<StatusCluster labels={labels} />);
     await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
     expect(fetchSpy).not.toHaveBeenCalled();
     desktop.unmount();
 
-    setViewport(false);
+    stubMatchMedia(false);
     render(<StatusCluster labels={labels} />);
     await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('probes on mobile when returning online or after a long idle visibility return', async () => {
-    setViewport(false);
+    stubMatchMedia(false);
     render(<StatusCluster labels={labels} />);
 
     act(() => { window.dispatchEvent(new Event('online')); });
@@ -69,7 +57,7 @@ describe('StatusCluster', () => {
   });
 
   it('aborts an in-flight probe on unmount', async () => {
-    setViewport(false);
+    stubMatchMedia(false);
     let signal: AbortSignal | undefined;
     fetchSpy.mockImplementation((_input, init) => {
       signal = init?.signal ?? undefined;
@@ -82,5 +70,19 @@ describe('StatusCluster', () => {
 
     unmount();
     expect(signal?.aborted).toBe(true);
+  });
+
+  it('renders net-status markup matching stay.css classes and accessible status attributes', () => {
+    stubMatchMedia(false);
+    const { container, getByRole } = render(<StatusCluster labels={labels} />);
+    const status = getByRole('status');
+    expect(status.tagName).toBe('SPAN');
+    expect(status).toHaveClass('net-status');
+    expect(status).toHaveAttribute('data-state', 'online');
+    expect(status).toHaveAttribute('aria-live', 'polite');
+    expect(status).toHaveAttribute('aria-label', 'Online.');
+    expect(status).toHaveAttribute('title', 'Online.');
+    expect(container.querySelector('.net-status-dot')).toHaveAttribute('aria-hidden');
+    expect(container.querySelector('.net-status__label')?.textContent).toBe('Online');
   });
 });

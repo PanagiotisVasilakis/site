@@ -21,7 +21,6 @@ type RotationResult = Awaited<ReturnType<RefreshTokenRepository['rotate']>>;
 type OverlapKind =
   | 'same-context'
   | 'same-context-invalid-binding'
-  | 'same-agent-other-ip'
   | 'different-context'
   | 'different-context-owner-rollback'
   | 'completed-replay-contention';
@@ -178,7 +177,6 @@ const ISOLATED_REPLACEMENT_SALT = '38383838383838383838383838383838';
 const APPROVED_DEVICE_HASH = '5'.repeat(64);
 const APPROVED_IP_HASH = '6'.repeat(64);
 const SUSPICIOUS_DEVICE_HASH = '7'.repeat(64);
-const SUSPICIOUS_IP_HASH = '8'.repeat(64);
 
 const ISOLATED_USER_ID = '13000000-0000-4000-8000-000000000002';
 const ISOLATED_BOOKING_ID = '23000000-0000-4000-8000-000000000002';
@@ -514,7 +512,6 @@ function createReplacement(
     tokenExpiresAt: now.getTime() + 7 * 24 * 60 * 60 * 1_000,
     sessionExpiresAt: new Date(now.getTime() + 2 * 60 * 60 * 1_000),
     deviceHash: context === 'approved' ? APPROVED_DEVICE_HASH : SUSPICIOUS_DEVICE_HASH,
-    ipHash: context === 'approved' ? APPROVED_IP_HASH : SUSPICIOUS_IP_HASH,
     presentedSession: { status: 'missing' as const },
     createSessionToken: () => {
       if (rollBackOwner) throw new Error('Synthetic rotation rollback after overlap ownership');
@@ -532,11 +529,9 @@ async function readTheftSignals(client: PrismaClient): Promise<TheftSignal[]> {
 
 async function readAuthorizationState(
   client: PrismaClient,
-  repository: RefreshTokenRepository,
 ): Promise<AuthorizationState> {
   const [primaryFamily, primaryTokens, primarySessions, isolatedFamily, isolatedTokens,
-    isolatedSessions, rootVerification, replacementVerification, contenderVerification,
-    isolatedVerification, theftSignals] =
+    isolatedSessions, theftSignals] =
     await Promise.all([
       client.refreshTokenFamily.findUnique({ where: { id: PRIMARY_FAMILY_ID } }),
       client.refreshToken.findMany({
@@ -554,14 +549,44 @@ async function readAuthorizationState(
       client.refreshTokenFamily.findUnique({ where: { id: ISOLATED_FAMILY_ID } }),
       client.refreshToken.findMany({ where: { familyId: ISOLATED_FAMILY_ID } }),
       client.session.findMany({ where: { userId: ISOLATED_USER_ID } }),
-      repository.verify(`${ROOT_GENERATION_ID}.${ROOT_SECRET}`),
-      repository.verify(`${WINNER_GENERATION_ID}.${WINNER_SECRET}`),
-      repository.verify(`${CONTENDER_GENERATION_ID}.${CONTENDER_SECRET}`),
-      repository.verify(`${ISOLATED_GENERATION_ID}.${ISOLATED_SECRET}`),
       readTheftSignals(client),
     ]);
 
+  const now = Date.now();
   const sessionsById = new Map(primarySessions.map((session) => [session.id, session]));
+  const isPrimaryUsable = (id: string, secret: string) => {
+    const token = primaryTokens.find((candidate) => candidate.id === id);
+    const session = sessionsById.get(id);
+    return Boolean(
+      token
+      && session
+      && session.userId === token.userId
+      && !session.revokedAt
+      && !token.revokedAt
+      && token.expiresAt.getTime() > now
+      && primaryFamily
+      && !primaryFamily.revokedAt
+      && primaryFamily.absoluteExpiresAt.getTime() > now
+      && hashSecret(secret, token.salt) === token.tokenHash,
+    );
+  };
+  const isolatedToken = isolatedTokens.find((candidate) => candidate.id === ISOLATED_GENERATION_ID);
+  const isolatedSession = isolatedSessions.find((candidate) => candidate.id === ISOLATED_GENERATION_ID);
+  const isolatedVerification = Boolean(
+    isolatedToken
+    && isolatedSession
+    && isolatedSession.userId === isolatedToken.userId
+    && !isolatedSession.revokedAt
+    && !isolatedToken.revokedAt
+    && isolatedToken.expiresAt.getTime() > now
+    && isolatedFamily
+    && !isolatedFamily.revokedAt
+    && isolatedFamily.absoluteExpiresAt.getTime() > now
+    && hashSecret(ISOLATED_SECRET, isolatedToken.salt) === isolatedToken.tokenHash,
+  );
+  const rootVerification = isPrimaryUsable(ROOT_GENERATION_ID, ROOT_SECRET);
+  const replacementVerification = isPrimaryUsable(WINNER_GENERATION_ID, WINNER_SECRET);
+  const contenderVerification = isPrimaryUsable(CONTENDER_GENERATION_ID, CONTENDER_SECRET);
   const generationSessionPairingValid = primaryTokens.every((token) => {
     const session = sessionsById.get(token.id);
     return Boolean(session
@@ -603,7 +628,6 @@ async function readAuthorizationState(
 
 async function readFamilyRotationState(
   client: PrismaClient,
-  repository: RefreshTokenRepository,
   fixture: {
     familyId: string;
     bookingId: string;
@@ -613,19 +637,36 @@ async function readFamilyRotationState(
     replacementSecret: string;
   },
 ): Promise<FamilyRotationState> {
-  const [family, tokens, rootVerification, replacementVerification] = await Promise.all([
+  const [family, tokens] = await Promise.all([
     client.refreshTokenFamily.findUnique({ where: { id: fixture.familyId } }),
     client.refreshToken.findMany({
       where: { familyId: fixture.familyId },
       orderBy: { createdAt: 'asc' },
     }),
-    repository.verify(`${fixture.rootId}.${fixture.rootSecret}`),
-    repository.verify(`${fixture.replacementId}.${fixture.replacementSecret}`),
   ]);
   const sessions = await client.session.findMany({
     where: { id: { in: tokens.map((token) => token.id) } },
   });
   const sessionsById = new Map(sessions.map((session) => [session.id, session]));
+  const now = Date.now();
+  const isUsable = (id: string, secret: string) => {
+    const token = tokens.find((candidate) => candidate.id === id);
+    const session = sessionsById.get(id);
+    return Boolean(
+      token
+      && session
+      && session.userId === token.userId
+      && !session.revokedAt
+      && !token.revokedAt
+      && token.expiresAt.getTime() > now
+      && family
+      && !family.revokedAt
+      && family.absoluteExpiresAt.getTime() > now
+      && hashSecret(secret, token.salt) === token.tokenHash,
+    );
+  };
+  const rootVerification = isUsable(fixture.rootId, fixture.rootSecret);
+  const replacementVerification = isUsable(fixture.replacementId, fixture.replacementSecret);
 
   return {
     familyRevoked: Boolean(family?.revokedAt),
@@ -721,7 +762,6 @@ async function executeOverlap(
         withTestPrismaClient(target, async (monitorClient) => {
           const ownerRepository = createRefreshTokenRepository(ownerClient);
           const contenderRepository = createRefreshTokenRepository(contenderClient);
-          const monitorRepository = createRefreshTokenRepository(monitorClient);
           const blockerReady = Promise.withResolvers<number>();
           const releaseBlocker = Promise.withResolvers<void>();
           let ownerPromise: Promise<RotationResult> | undefined;
@@ -795,7 +835,6 @@ async function executeOverlap(
                 CONTENDER_SALT,
                 kind === 'same-context'
                   || kind === 'same-context-invalid-binding'
-                  || kind === 'same-agent-other-ip'
                   || kind === 'completed-replay-contention'
                   ? 'approved'
                   : 'suspicious',
@@ -807,8 +846,6 @@ async function executeOverlap(
                 ...contenderReplacement,
                 presentedSession: { status: 'invalid' as const },
               };
-            } else if (kind === 'same-agent-other-ip') {
-              contenderRotation = { ...contenderReplacement, ipHash: SUSPICIOUS_IP_HASH };
             }
             contenderPromise = contenderRepository.rotate(
               `${ROOT_GENERATION_ID}.${ROOT_SECRET}`,
@@ -818,7 +855,7 @@ async function executeOverlap(
 
             let contenderWaitObserved = false;
             let contenderResult: RotationResult;
-            if (kind === 'same-context' || kind === 'same-agent-other-ip') {
+            if (kind === 'same-context') {
               contenderResult = await withDeadline(
                 contenderPromise,
                 'same-context concurrent classification',
@@ -869,7 +906,7 @@ async function executeOverlap(
                 && ownerLock.blockingPids.includes(blockerPid),
               contenderWaitObserved,
               ...(completedRotationCommit ? { completedRotationCommit } : {}),
-              state: await readAuthorizationState(monitorClient, monitorRepository),
+              state: await readAuthorizationState(monitorClient),
             };
           } finally {
             releaseBlocker.resolve(undefined);
@@ -901,7 +938,6 @@ async function executeFamilyIsolation(
             const primaryRepository = createRefreshTokenRepository(primaryClient);
             const secondaryRepository = createRefreshTokenRepository(secondaryClient);
             const isolatedRepository = createRefreshTokenRepository(isolatedClient);
-            const monitorRepository = createRefreshTokenRepository(monitorClient);
             const blockerReady = Promise.withResolvers<number>();
             const releaseBlocker = Promise.withResolvers<void>();
             let primaryPromise: Promise<RotationResult> | undefined;
@@ -986,7 +1022,7 @@ async function executeFamilyIsolation(
               await blockerPromise;
 
               const [primaryState, secondaryState, isolatedState] = await Promise.all([
-                readFamilyRotationState(monitorClient, monitorRepository, {
+                readFamilyRotationState(monitorClient, {
                   familyId: PRIMARY_FAMILY_ID,
                   bookingId: PRIMARY_BOOKING_ID,
                   rootId: ROOT_GENERATION_ID,
@@ -994,7 +1030,7 @@ async function executeFamilyIsolation(
                   replacementId: WINNER_GENERATION_ID,
                   replacementSecret: WINNER_SECRET,
                 }),
-                readFamilyRotationState(monitorClient, monitorRepository, {
+                readFamilyRotationState(monitorClient, {
                   familyId: SECONDARY_FAMILY_ID,
                   bookingId: SECONDARY_BOOKING_ID,
                   rootId: SECONDARY_ROOT_GENERATION_ID,
@@ -1002,7 +1038,7 @@ async function executeFamilyIsolation(
                   replacementId: SECONDARY_REPLACEMENT_GENERATION_ID,
                   replacementSecret: SECONDARY_REPLACEMENT_SECRET,
                 }),
-                readFamilyRotationState(monitorClient, monitorRepository, {
+                readFamilyRotationState(monitorClient, {
                   familyId: ISOLATED_FAMILY_ID,
                   bookingId: ISOLATED_BOOKING_ID,
                   rootId: ISOLATED_GENERATION_ID,
@@ -1056,7 +1092,6 @@ async function executeGenerationIsolation(
     withTestPrismaClient(target, async (rotationClient) => (
       withTestPrismaClient(target, async (monitorClient) => {
         const rotationRepository = createRefreshTokenRepository(rotationClient);
-        const monitorRepository = createRefreshTokenRepository(monitorClient);
         const markerReady = Promise.withResolvers<number>();
         const releaseMarker = Promise.withResolvers<void>();
         let rotationPromise: Promise<RotationResult> | undefined;
@@ -1108,7 +1143,7 @@ async function executeGenerationIsolation(
           releaseMarker.resolve(undefined);
           await markerPromise;
           const [state, isolatedState] = await Promise.all([
-            readFamilyRotationState(monitorClient, monitorRepository, {
+            readFamilyRotationState(monitorClient, {
               familyId: PRIMARY_FAMILY_ID,
               bookingId: PRIMARY_BOOKING_ID,
               rootId: WINNER_GENERATION_ID,
@@ -1116,7 +1151,7 @@ async function executeGenerationIsolation(
               replacementId: NEXT_GENERATION_ID,
               replacementSecret: NEXT_SECRET,
             }),
-            readFamilyRotationState(monitorClient, monitorRepository, {
+            readFamilyRotationState(monitorClient, {
               familyId: ISOLATED_FAMILY_ID,
               bookingId: ISOLATED_BOOKING_ID,
               rootId: ISOLATED_GENERATION_ID,
@@ -1159,7 +1194,6 @@ async function executeContendedCompletedReplay(
     withTestPrismaClient(target, async (contenderClient) => (
       withTestPrismaClient(target, async (monitorClient) => {
         const contenderRepository = createRefreshTokenRepository(contenderClient);
-        const monitorRepository = createRefreshTokenRepository(monitorClient);
         const markerReady = Promise.withResolvers<number>();
         const releaseMarker = Promise.withResolvers<void>();
         let contenderPromise: Promise<RotationResult> | undefined;
@@ -1216,7 +1250,7 @@ async function executeContendedCompletedReplay(
           await markerPromise;
           const [family, state, theftSignals] = await Promise.all([
             monitorClient.refreshTokenFamily.findUnique({ where: { id: PRIMARY_FAMILY_ID } }),
-            readFamilyRotationState(monitorClient, monitorRepository, {
+            readFamilyRotationState(monitorClient, {
               familyId: PRIMARY_FAMILY_ID,
               bookingId: PRIMARY_BOOKING_ID,
               rootId: ROOT_GENERATION_ID,
@@ -1260,7 +1294,6 @@ async function executeRollbackThenRetry(
         withTestPrismaClient(target, async (monitorClient) => {
           const ownerRepository = createRefreshTokenRepository(ownerClient);
           const retryRepository = createRefreshTokenRepository(retryClient);
-          const monitorRepository = createRefreshTokenRepository(monitorClient);
           const blockerReady = Promise.withResolvers<number>();
           const releaseBlocker = Promise.withResolvers<void>();
           let ownerPromise: Promise<RotationResult> | undefined;
@@ -1336,7 +1369,7 @@ async function executeRollbackThenRetry(
               },
               markerReleased,
               retry: safeRotationEvidence(retryResult),
-              state: await readAuthorizationState(monitorClient, monitorRepository),
+              state: await readAuthorizationState(monitorClient),
             };
           } finally {
             releaseBlocker.resolve(undefined);
@@ -1483,43 +1516,6 @@ describe.sequential('refresh overlap classification through PostgreSQL contentio
       });
     }
   }, 600_000);
-
-  it('classifies a same-device overlap from a different IP as concurrent without revocation', async () => {
-    const result = await runFreshOverlap('same-agent-other-ip', 1);
-    expect(result).toEqual({
-      owner: {
-        status: 'rotated',
-        familyId: PRIMARY_FAMILY_ID,
-        oldId: ROOT_GENERATION_ID,
-        replacementId: WINNER_GENERATION_ID,
-        sessionId: WINNER_GENERATION_ID,
-        sessionTokenIssued: true,
-      },
-      contender: { status: 'concurrent', familyId: PRIMARY_FAMILY_ID },
-      ownerLockObserved: true,
-      contenderWaitObserved: false,
-      state: {
-        primary: {
-          familyRevoked: false,
-          familyReason: null,
-          tokenCount: 2,
-          activeTokenCount: 1,
-          revokedTokenCount: 1,
-          descendantCount: 1,
-          activeDescendantCount: 1,
-          sessionCount: 2,
-          activeSessionCount: 1,
-          revokedSessionCount: 1,
-          generationSessionPairingValid: true,
-          rootUsable: false,
-          replacementUsable: true,
-          contenderUsable: false,
-        },
-        isolated: ACTIVE_ISOLATED_FAMILY,
-        theftSignals: [],
-      },
-    });
-  }, 120_000);
 
   it('revokes after 15 different-context overlaps while preserving the approved winner result', async () => {
     for (let repetition = 1; repetition <= 15; repetition += 1) {

@@ -6,12 +6,11 @@ import {
   ApiErrorCode,
   createSuccessResponse,
   readJsonBody,
+  requireAdminRequest,
   ValidationError,
   withErrorHandler,
 } from '@/lib/apiErrorHandler';
-import { isSameOriginRequest } from '@/lib/net/sameOrigin';
 import { eraseGuestByAdmin } from '@/lib/privacyService';
-import { isAdminRequest } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,13 +26,7 @@ export const POST = withErrorHandler(async (
   request: NextRequest,
   context: { params: Promise<Record<string, string>> },
 ) => {
-  if (!(await isAdminRequest(request))) {
-    throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
-  }
-  const origin = request.headers.get('origin');
-  if (origin && !isSameOriginRequest(origin, request)) {
-    throw new ApiError(ApiErrorCode.FORBIDDEN, 'Cross-origin admin mutation rejected');
-  }
+  await requireAdminRequest(request, { sameOrigin: true });
   const { userId } = await context.params;
   if (!z.uuid().safeParse(userId).success) {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Guest not found');

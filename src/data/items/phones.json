@@ -10,8 +10,6 @@
     "summary_el": "Ευρωπαϊκός αριθμός έκτακτης ανάγκης 24/7 για αστυνομία, πυροσβεστική και ιατρική βοήθεια",
     "description": "Free 24/7 emergency line across Greece and the EU. Call 112 for immediate help from police, fire or ambulance services.",
     "description_el": "Δωρεάν γραμμή έκτακτης ανάγκης 24/7 σε Ελλάδα και ΕΕ. Καλέστε το 112 για άμεση βοήθεια από αστυνομία, πυροσβεστική ή ασθενοφόρο.",
-    "heroImage": "/phones/sos-hero.webp",
-    "heroImagePosition": "center center",
     "tags": ["emergency", "safety"],
     "sourceUrls": ["https://www.taxheaven.gr/circulars/52580/19567-25-09-2025"]
   },

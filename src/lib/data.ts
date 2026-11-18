@@ -2,9 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { ZodError } from "zod";
 import { ItemSchema, type Item } from "../data/schemas";
-import type { Locale } from "@/i18n/config";
 import { logger } from '@/lib/logger-enterprise';
-import { pickLocale } from '@/lib/localize';
 
 const dataRoot = path.join(process.cwd(), "src", "data", "items");
 
@@ -98,11 +96,3 @@ export function toSlug(name: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 }
-
-export { pickLocale };
-
-export const pickCategoryLocale = (
-  cat: import("@/data/schemas").Category,
-  key: "title" | "description",
-  locale: Locale
-) => pickLocale(cat as Record<string, unknown>, key, locale);

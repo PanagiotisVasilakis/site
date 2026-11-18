@@ -42,12 +42,6 @@ export interface GuideEntry {
   distanceText?: string;
 }
 
-/**
- * §7.3: photos that must not be shown as a card or hero image. viktoria-karelia-hero.jpg is almost black
- * (L = .018) and the SOS illustration is not used, so both get the art tile.
- */
-const ART_TILE_PHOTOS = new Set(['/moments/viktoria-karelia-hero.jpg', '/phones/sos-hero.webp']);
-
 const EARTH_RADIUS_KM = 6371.0088;
 
 /** Great-circle (haversine) distance in km between two [lng, lat] points. */
@@ -90,7 +84,7 @@ export function toGuideEntry(item: Item, category: Category, locale: Locale, t: 
   const slug = item.slug ?? item.id;
   const name = pickLocale(item, 'name', locale) ?? item.name;
   const address = pickLocale(item, 'address', locale);
-  const photo = item.heroImage && !ART_TILE_PHOTOS.has(item.heroImage) ? item.heroImage : undefined;
+  const photo = item.heroImage;
   const tagLabel = tags.map((tag) => t.momentTags[tag]).find(Boolean);
   const categoryLabel = tagLabel
     ?? t.categories[category.slug as keyof Dictionary['categories']]

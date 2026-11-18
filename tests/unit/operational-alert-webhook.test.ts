@@ -45,8 +45,8 @@ describe('operational alert webhook redirects', () => {
     receiver = undefined;
   });
 
-  it.each([302])('records a %i redirect as a failed notification and never requests the redirect target', async (status) => {
-    receiver = await startRedirectingReceiver(status);
+  it('records a 302 redirect as a failed notification and never requests the redirect target', async () => {
+    receiver = await startRedirectingReceiver(302);
     vi.stubEnv('ALERT_WEBHOOK_URL', receiver.url);
     vi.stubEnv('ALERT_WEBHOOK_TOKEN', TOKEN);
 
@@ -61,13 +61,11 @@ describe('operational alert webhook redirects', () => {
     expect(data.notificationLastError).not.toContain(TOKEN);
   });
 
-  it.each([
-    ['an http:// URL', 'http://alerts.example.test/hook', 'ALERT_WEBHOOK_URL must use HTTPS in production'],
-  ])('refuses %s in production before sending the alert or its token', async (_label, url, lastError) => {
+  it('refuses an http:// URL in production before sending the alert or its token', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('ALERT_WEBHOOK_URL', url);
+    vi.stubEnv('ALERT_WEBHOOK_URL', 'http://alerts.example.test/hook');
     vi.stubEnv('ALERT_WEBHOOK_TOKEN', TOKEN);
     // Without the guard this receiver would accept the alert and the bearer token.
     fetchMock.mockResolvedValue(new Response('', { status: 200 }));
@@ -78,7 +76,7 @@ describe('operational alert webhook redirects', () => {
     expect(prismaMock.alert.update).toHaveBeenCalledTimes(1);
     const { data } = prismaMock.alert.update.mock.calls[0][0];
     expect(data).not.toHaveProperty('notificationDeliveredAt');
-    expect(data).toMatchObject({ notificationAttempts: { increment: 1 }, notificationLastError: lastError });
+    expect(data).toMatchObject({ notificationAttempts: { increment: 1 }, notificationLastError: 'ALERT_WEBHOOK_URL must use HTTPS in production' });
   });
 
   it('still sends the alert over HTTPS in production', async () => {

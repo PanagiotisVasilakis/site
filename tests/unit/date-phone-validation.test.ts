@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { isGuestFormValid } from '@/components/guest/guestValidation';
-import { normalizePhone } from '@/lib/phone';
+import { normalizePhone, phoneLookupCandidates } from '@/lib/phone';
 import { wifiDisclosureWindow } from '@/lib/propertyTime';
 
 describe('Wi-Fi disclosure window', () => {
@@ -90,5 +90,13 @@ describe('phone and guest form validation', () => {
     expect(isGuestFormValid('signup', { ...validSignup, origin: '' })).toBe(false);
     expect(isGuestFormValid('signup', { ...validSignup, claimToken: 'too-short' })).toBe(false);
     expect(isGuestFormValid('signup', { ...validSignup, acceptTerms: false })).toBe(false);
+  });
+
+  it('returns the international reading first, then the Greek local form in phoneLookupCandidates', () => {
+    expect(phoneLookupCandidates('691 234 5678')).toEqual(['+6912345678', '+306912345678']);
+  });
+
+  it('returns nothing from phoneLookupCandidates for 10 digits starting with 0, whose international reading is invalid', () => {
+    expect(phoneLookupCandidates('0123456789')).toEqual([]);
   });
 });

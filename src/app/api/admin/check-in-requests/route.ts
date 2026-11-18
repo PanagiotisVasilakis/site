@@ -1,8 +1,7 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { CheckInRequestStatus } from '@/generated/prisma/client';
-import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
-import { isAdminRequest } from '@/lib/rbac';
+import { withErrorHandler, createSuccessResponse, requireAdminRequest } from '@/lib/apiErrorHandler';
 import { adminListPageQuerySchema } from '@/lib/adminListPage';
 import { checkInRequestRepository, type CheckInRequestRecord } from '@/lib/prisma-repositories/checkInRequestRepository';
 
@@ -36,9 +35,7 @@ function serializeRequest(request: CheckInRequestRecord) {
 }
 
 export const GET = withErrorHandler(async (request: NextRequest) => {
-  if (!(await isAdminRequest(request))) {
-    throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
-  }
+  await requireAdminRequest(request);
 
   const { searchParams } = new URL(request.url);
   const filter = statusFilterSchema.parse(searchParams.get('status') ?? 'pending');

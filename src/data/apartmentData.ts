@@ -7,11 +7,6 @@ const apartmentData = {
     el: BRAND_NAME
   },
 
-  location: {
-    city: 'Kalamata',
-    country: 'Greece'
-  },
-
   description: {
     en: 'A 90 m² two-bedroom apartment on the 2nd floor, with large sunny terraces and views of the mountain and the sea, on a quiet street 50 m from the new Town Hall. Free Wi-Fi and air conditioning. For families: a baby cot, baby-bath equipment and a high chair. Supermarkets, a bakery and a bus stop are nearby, and there is free private parking at the property.',
     el: 'Διαμέρισμα 90 τ.μ. με δύο υπνοδωμάτια στον 2ο όροφο, με μεγάλες ηλιόλουστες βεράντες και θέα σε βουνό και θάλασσα, σε ήσυχο δρόμο 50 μ. από το νέο Δημαρχείο. Δωρεάν Wi-Fi και κλιματισμός. Για οικογένειες: παρκοκρέβατο, εξοπλισμός μπάνιου μωρού και καρεκλάκι φαγητού. Κοντά υπάρχουν σούπερ μάρκετ, φούρνος και στάση λεωφορείου, και στο κατάλυμα υπάρχει δωρεάν ιδιωτικό πάρκινγκ.'
@@ -153,6 +148,5 @@ export function getApartmentContent(locale: Locale) {
     shortName: data.shortName[locale],
     description: data.description[locale],
     amenityGroups: data.amenityGroups.map((group) => ({ id: group.id, title: group.title[locale], items: group.items[locale] })),
-    location: data.location
   };
 }

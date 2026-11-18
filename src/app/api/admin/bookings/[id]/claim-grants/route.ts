@@ -1,10 +1,10 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 
-import { ApiError, ApiErrorCode, createSuccessResponse, readJsonBody, ValidationError, withErrorHandler } from '@/lib/apiErrorHandler';
+import { ApiError, ApiErrorCode, assertSameOriginMutation, createSuccessResponse, readJsonBody, ValidationError, withErrorHandler } from '@/lib/apiErrorHandler';
 import { verifyAdminSession } from '@/lib/auth/admin';
-import { isSameOriginRequest } from '@/lib/net/sameOrigin';
 import { issueBookingClaimGrant, PortalAuthError } from '@/lib/portalAuthService';
+import { setClaimTransportResponseHeaders } from '@/lib/portalClaimExchange';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,10 +20,7 @@ export const POST = withErrorHandler(async (
   const admin = token ? await verifyAdminSession(token) : null;
   if (!admin?.session_id) throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
 
-  const origin = request.headers.get('origin');
-  if (origin && !isSameOriginRequest(origin, request)) {
-    throw new ApiError(ApiErrorCode.FORBIDDEN, 'Cross-origin admin mutation rejected');
-  }
+  assertSameOriginMutation(request);
   const parsed = schema.safeParse(await readJsonBody(request, 8 * 1_024));
   if (!parsed.success) throw new ValidationError(parsed.error.issues);
   const { id } = await context.params;
@@ -40,8 +37,7 @@ export const POST = withErrorHandler(async (
       expiresAt: grant.expiresAt.toISOString(),
       channel: parsed.data.channel,
     }, 201);
-    response.headers.set('cache-control', 'no-store');
-    response.headers.set('referrer-policy', 'no-referrer');
+    setClaimTransportResponseHeaders(response);
     return response;
   } catch (error) {
     if (error instanceof PortalAuthError) {

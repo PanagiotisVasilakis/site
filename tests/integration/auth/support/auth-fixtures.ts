@@ -126,13 +126,6 @@ export async function seedAuthEligibilityFixtures(
   }, 'seed');
 }
 
-export async function seedRevokedSessionEligibilityFixture(
-  target: DisposableDatabaseTarget,
-  now: Date,
-): Promise<void> {
-  await seedAuthEligibilityFixtures(target, now);
-}
-
 export async function expireSessionForFixture(
   target: DisposableDatabaseTarget,
   sessionId: string,

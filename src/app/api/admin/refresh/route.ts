@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { refreshAdminSession, signAdmin, verifyAdminSession } from '@/lib/auth/admin';
+import { refreshAdminSession, setAdminSessionCookie, signAdmin, verifyAdminSession } from '@/lib/auth/admin';
 import { withErrorHandler } from '@/lib/apiErrorHandler';
 import { logger } from '@/lib/logger-enterprise';
 
@@ -29,15 +29,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const ttlSeconds = Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
   const fresh = signAdmin({ session_id: sessionId, login_at: loginAt }, ttlSeconds);
   const res = NextResponse.json({ success: true, expiresAt: expiresAt.toISOString() }, { status: 200 });
-  
-  res.cookies.set('admin_jwt', fresh, {
-    path: '/',
-    httpOnly: true,
-    sameSite: 'strict',
-    maxAge: ttlSeconds,
-    secure: process.env.NODE_ENV === 'production',
-  });
-  
+  setAdminSessionCookie(res, fresh, ttlSeconds);
+
   logger.info('Admin session refreshed');
   return res;
 });

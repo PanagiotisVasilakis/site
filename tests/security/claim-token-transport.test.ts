@@ -38,7 +38,6 @@ vi.mock('@/lib/portalAuthHttp', () => ({
   attachPortalAuthCookies: mocks.attachPortalAuthCookies,
   requestAuthContext: vi.fn(() => ({
     deviceHint: 'synthetic-device-hint',
-    ipHint: 'synthetic-ip-hint',
     ipHash: 'synthetic-ip-hash',
   })),
 }));

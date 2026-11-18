@@ -6,7 +6,13 @@ import { EmergencyTile } from '@/components/stay/EmergencyTile';
 import { StatusPage } from '@/components/stay/StatusPage';
 import type { Metadata } from 'next';
 
-export const metadata: Metadata = { robots: { index: false, follow: false } };
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params;
+  return {
+    robots: { index: false, follow: false },
+    title: getDictionary(normalizeLocale(locale)).stay.offline.title,
+  };
+}
 
 // identity §9.11: a calm page with the mark, the cached pages as link-arrow rows and the 112 band tile.
 export default async function OfflineLocalePage({ params }: { params: Promise<{ locale: string }> }) {

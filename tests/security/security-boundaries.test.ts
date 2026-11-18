@@ -1,5 +1,8 @@
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import type { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -243,10 +246,8 @@ describe('runtime environment fail-closed policy', () => {
     }
   });
 
-  it.each([
-    ['empty', ''],
-  ])('treats an %s CARTO_BASEMAPS_KEY as not configured', (_label, value) => {
-    const result = runtimeEnvSchema.safeParse(productionEnv({ CARTO_BASEMAPS_KEY: value }));
+  it('treats an empty CARTO_BASEMAPS_KEY as not configured', () => {
+    const result = runtimeEnvSchema.safeParse(productionEnv({ CARTO_BASEMAPS_KEY: '' }));
     expect(result.success).toBe(true);
     if (result.success) expect(result.data.CARTO_BASEMAPS_KEY).toBeUndefined();
   });
@@ -357,6 +358,68 @@ describe('runtime environment fail-closed policy', () => {
       expect(runtimeEnvSchema.safeParse(productionEnv({ LOG_LEVEL: level })).success, level).toBe(true);
     }
   });
+
+  it('enforces the standalone startup credential contract (missing, invalid, identical exit 78; valid exits 0 without leaking credentials)', () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'runtime-credential-contract-'));
+    try {
+      const serverFixture = path.join(root, 'server-fixture.mjs');
+      writeFileSync(serverFixture, 'export const started = true;\n', { mode: 0o600 });
+
+      const valid = productionEnv({
+        DATABASE_URL: 'postgresql://release:synthetic@127.0.0.1:1/release_build',
+        DIRECT_URL: 'postgresql://release:synthetic@127.0.0.1:1/release_build',
+        SECURITY_PEPPER: 'release-only-security-pepper',
+        CLAIM_TOKEN_PEPPER: 'release-only-claim-token-pepper-0000',
+        GUEST_WIFI_NETWORK: 'RELEASE-SYNTHETIC-NETWORK',
+        GUEST_WIFI_PASSWORD: 'release-only-password',
+        ALLOWED_ORIGINS: 'https://release.example.invalid',
+        NEXT_TELEMETRY_DISABLED: '1',
+        NEXT_PUBLIC_SITE_URL: 'https://release.example.invalid',
+        BUILD_SITE_URL: 'https://release.example.invalid',
+      });
+      const missing: Record<string, string | undefined> = { ...valid };
+      delete missing.ADMIN_JWT_SECRET;
+      const invalid = {
+        ...valid,
+        ADMIN_DASH_SECRET: 'replace-me-with-a-production-dashboard-credential',
+      };
+      const identical = {
+        ...valid,
+        GUEST_JWT_SECRET: valid.ADMIN_JWT_SECRET,
+      };
+
+      const runCase = (env: Record<string, string | undefined>) =>
+        spawnSync(process.execPath, [path.resolve('scripts/start-standalone.mjs'), serverFixture], {
+          env: env as NodeJS.ProcessEnv,
+          encoding: 'utf8',
+          shell: false,
+        });
+
+      const cases: Array<[string, ReturnType<typeof runCase>, number]> = [
+        ['missing', runCase(missing), 78],
+        ['invalid', runCase(invalid), 78],
+        ['identical', runCase(identical), 78],
+        ['valid', runCase(valid), 0],
+      ];
+
+      for (const [label, result, expectedStatus] of cases) {
+        expect(result.error, `${label} startup subprocess must execute`).toBeUndefined();
+        expect(result.signal, `${label} startup subprocess must not be signalled`).toBeNull();
+        expect(result.status, `${label} startup result`).toBe(expectedStatus);
+        const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
+        for (const value of [
+          valid.ADMIN_JWT_SECRET,
+          valid.GUEST_JWT_SECRET,
+          valid.ADMIN_DASH_SECRET,
+          invalid.ADMIN_DASH_SECRET,
+        ]) {
+          expect(output.includes(value!), `${label} output must not expose credentials`).toBe(false);
+        }
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('credential hashing and privacy-safe logging', () => {
@@ -451,6 +514,14 @@ describe('credential hashing and privacy-safe logging', () => {
     ['compact JSON holding two e-mail addresses', '{"to":"a@x.com","cc":"b@y.gr"}', '[REDACTED_EMAIL]'],
   ])('redacts a secret or an address embedded in %s', (_label, input, expected) => {
     expect(redactSensitiveText(input)).toBe(expected);
+  });
+
+  it('redacts a booking claim token wherever it appears in free text and keeps ordinary words with the prefix', () => {
+    const claimToken = `claim_${'A1b2C3d4E5'.repeat(4)}xyz`;
+
+    expect(redactSensitiveText(`invalid grant ${claimToken}`)).toBe('invalid grant [REDACTED_TOKEN]');
+    expect(redactSensitiveText(`token=${claimToken}`)).toBe('[REDACTED_TOKEN]');
+    expect(redactSensitiveText('claim_status updated')).toBe('claim_status updated');
   });
 
   it.each([

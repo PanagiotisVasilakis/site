@@ -15,11 +15,6 @@ vi.mock('@/lib/prisma', () => ({
   },
 }));
 vi.mock('@/lib/prisma-repositories/userRepository', () => ({ userRepository: { findByPhone: m.repoFindByPhone } }));
-vi.mock('@/lib/prisma-repositories/bookingRepository', () => ({ bookingRepository: {} }));
-vi.mock('@/lib/prisma-repositories/refreshTokenRepository', () => ({ refreshTokenRepository: {} }));
-vi.mock('@/lib/guestSession', () => ({ createGuestSessionToken: vi.fn(), GUEST_SESSION_TTL_SECONDS: 60 }));
-vi.mock('@/lib/crypto', () => ({ hashSensitive: vi.fn() }));
-vi.mock('@/lib/logger-enterprise', () => ({ logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() } }));
 
 import { guestStore } from '@/lib/guestDataStore';
 import { authenticatePortalUser, PortalAuthError } from '@/lib/portalAuthService';

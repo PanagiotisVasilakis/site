@@ -3,7 +3,7 @@
 // own chunk by HeroGlIsland only after load, idle and the capability gate.
 // Effects: depth parallax (pointer, sideways touch-drag), a depth-aware dolly and afternoon warmth on
 // scroll, one warm light pass. Ambient motion ends by 4.8 s (WCAG 2.2.2); after 5 s the loop draws
-// only in response to input. Ported from .runtime/design/messinian-light/hero-gl.js.
+// only in response to input.
 import { heroDepthSrc } from '@/lib/motion/heroCapability';
 
 import { heroCover, parseObjectPosition } from './heroCover';

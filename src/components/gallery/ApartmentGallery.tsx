@@ -11,7 +11,7 @@ import { morphPhoto } from './photoMorph';
 
 type GalleryRoom = Readonly<{ key: ApartmentRoomKey; name: string; line: string }>;
 
-export type GalleryPhoto = Readonly<{
+type GalleryPhoto = Readonly<{
   id: string;
   room: ApartmentRoomKey;
   src: string;

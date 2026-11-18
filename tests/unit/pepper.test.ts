@@ -6,8 +6,8 @@ import { privacyHmac } from '@/lib/privacyHash';
 describe('HMAC keys have no fallback', () => {
   afterEach(() => vi.unstubAllEnvs());
 
-  it.each(['development'] as const)('refuses a missing claim-token pepper in %s', (mode) => {
-    vi.stubEnv('NODE_ENV', mode);
+  it('refuses a missing claim-token pepper in development', () => {
+    vi.stubEnv('NODE_ENV', 'development');
     vi.stubEnv('SECURITY_PEPPER', 's'.repeat(32));
     vi.stubEnv('CLAIM_TOKEN_PEPPER', '');
 

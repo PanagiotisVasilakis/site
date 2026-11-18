@@ -103,9 +103,9 @@ describe('ThemeSwitch (header toggle)', () => {
     await waitFor(() => expect(root).not.toHaveAttribute('data-vt'));
   });
 
-  it.each([['reduce']])('skips the view transition when data-motion is %s', async (motion) => {
+  it('skips the view transition when data-motion is reduce', async () => {
     const start = installViewTransition();
-    if (motion) root.setAttribute('data-motion', motion);
+    root.setAttribute('data-motion', 'reduce');
     const user = userEvent.setup();
     render(<ThemeSwitch t={en} />);
     await user.click(await screen.findByRole('button', { name: 'Switch to night' }));

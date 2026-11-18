@@ -32,7 +32,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-.dev_pid
 
 # env files
 .env*
@@ -44,29 +43,21 @@ yarn-error.log*
 # worker bundle output of tests/unit/build-workers.test.ts (left behind only by an aborted run)
 /tmp-build-workers-*/
 
-# legacy raw SQL migration output; canonical migrations live in prisma/migrations/
-/migrations/
-
 # typescript
 *.tsbuildinfo
 next-env.d.ts
 .vscode/settings.json
 public/version.json
-QWEN.md
-GEMINI.md
-CLAUDE.md
 *CLAUDE*.md
 *AGENTS*.md
 *GEMINI*.md
 *QWEN*.md
 
 .venv
-.runtime/
 
 # agent knowledge
 /agent-knowledge/
 /.codex/
-/AGENTS.md
 /graphify-out/
 /.claude/
 jpegmini_*/

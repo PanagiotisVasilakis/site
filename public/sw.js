@@ -177,7 +177,7 @@ async function networkFirstPage(request, pathname, search) {
     if (isStorable(response) && !isNetworkOnlyPage(pathname) && !isOfflinePage) {
       cache.put(request, response.clone()).catch(() => {});
     }
-    // Origin outage (Nginx 502, Cloudflare 52x) resolves the fetch: a visited copy beats the error page.
+    // Origin outage (upstream 502, Cloudflare 52x) resolves the fetch: a visited copy beats the error page.
     if (response.status >= 500 && !isNetworkOnlyPage(pathname)) {
       const cached = await cache.match(request);
       if (cached) return cached;

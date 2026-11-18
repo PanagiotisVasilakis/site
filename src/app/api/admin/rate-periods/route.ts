@@ -5,17 +5,16 @@ import {
   ApiErrorCode,
   createSuccessResponse,
   readJsonBody,
+  requireAdminRequest,
   ValidationError,
   withErrorHandler,
 } from '@/lib/apiErrorHandler';
-import { isSameOriginRequest } from '@/lib/net/sameOrigin';
 import {
   createRatePeriod,
   listRatePeriods,
   RatePeriodOverlapError,
   ratePeriodInputSchema,
 } from '@/lib/prisma-repositories/ratePeriodRepository';
-import { isAdminRequest } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,21 +25,13 @@ export const dynamic = 'force-dynamic';
 // integer euro cents. Periods may not overlap (409).
 
 export const GET = withErrorHandler(async (request: NextRequest) => {
-  if (!(await isAdminRequest(request))) {
-    throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
-  }
+  await requireAdminRequest(request);
 
   return createSuccessResponse({ ratePeriods: await listRatePeriods() });
 });
 
 export const POST = withErrorHandler(async (request: NextRequest) => {
-  if (!(await isAdminRequest(request))) {
-    throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
-  }
-  const origin = request.headers.get('origin');
-  if (origin && !isSameOriginRequest(origin, request)) {
-    throw new ApiError(ApiErrorCode.FORBIDDEN, 'Cross-origin admin mutation rejected');
-  }
+  await requireAdminRequest(request, { sameOrigin: true });
 
   const parsed = ratePeriodInputSchema.safeParse(await readJsonBody(request, 4 * 1_024));
   if (!parsed.success) throw new ValidationError(parsed.error.issues);

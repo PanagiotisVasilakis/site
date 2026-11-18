@@ -2,7 +2,7 @@
 import { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import { getDictionary } from '@/i18n/dictionaries';
-import type { Locale } from '@/i18n/config';
+import { defaultLocale, pathLocale } from '@/i18n/config';
 import { Icon } from '@/components/icons/Icon';
 
 type Toast = { id: number; message: string };
@@ -19,7 +19,7 @@ const TOAST_MS = 5000;
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const pathname = usePathname();
-  const locale: Locale = pathname?.startsWith('/el') ? 'el' : 'en';
+  const locale = (pathname ? pathLocale(pathname) : null) ?? defaultLocale;
   const dismissLabel = getDictionary(locale).updates.dismiss;
   const push = useCallback((message: string) => {
     const id = Date.now() + Math.random();
@@ -34,7 +34,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       <div role="status" aria-live="polite" className="ui-toasts">
         {toasts.map(t => (
           <div key={t.id} className="ui-toast">
-            <span className="ui-toast__text">{t.message}</span>
+            <span>{t.message}</span>
             <button type="button" aria-label={dismissLabel} className="ui-toast__close" onClick={() => setToasts(ts => ts.filter(x => x.id !== t.id))}>
               <Icon name="close" size={18} />
             </button>

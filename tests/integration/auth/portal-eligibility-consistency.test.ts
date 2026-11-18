@@ -351,7 +351,6 @@ describe.sequential('portal temporal eligibility consistency', () => {
       7,
       {
         device_hint: DEVICE_HASH,
-        ip_hint: IP_HASH,
         presented_session: {
           status: 'present',
           sessionId: AUTH_SESSION_ID,

@@ -48,21 +48,21 @@ describe('shell variant per route (identity §8, §9)', () => {
 });
 
 describe('shell links', () => {
-  it.each(['en'] as const)('gives the stay variant no booking, availability or Booking.com link (%s)', (locale) => {
-    const t = getDictionary(locale);
+  it('gives the stay variant no booking, availability or Booking.com link (en)', () => {
+    const t = getDictionary('en');
     const hrefs = [
-      brandHref('stay', locale),
-      ...navLinks('stay', locale, t).map((link) => link.href),
+      brandHref('stay', 'en'),
+      ...navLinks('stay', 'en', t).map((link) => link.href),
       ...menuContactLinks('stay', t).map((link) => link.href),
-      ...footerNavLinks('stay', locale, t).map((link) => link.href),
+      ...footerNavLinks('stay', 'en', t).map((link) => link.href),
       ...footerContactLinks('stay', t).map((link) => link.href),
     ];
-    expect(headerCta('stay', locale, t)).toBeNull();
-    expect(footerStayLink('stay', locale, t)).toBeNull();
+    expect(headerCta('stay', 'en', t)).toBeNull();
+    expect(footerStayLink('stay', 'en', t)).toBeNull();
     expect(hrefs.filter((href) => BOOKING_HREF.test(href))).toEqual([]);
-    expect(navLinks('stay', locale, t).map(({ key, href }) => [key, href])).toEqual([
-      ['stay', `/${locale}${STAY_HUB_PATH}`],
-      ['guide', `/${locale}/moments`],
+    expect(navLinks('stay', 'en', t).map(({ key, href }) => [key, href])).toEqual([
+      ['stay', `/en${STAY_HUB_PATH}`],
+      ['guide', '/en/moments'],
     ]);
   });
 
@@ -73,21 +73,19 @@ describe('shell links', () => {
     expect(footerStayLink('marketing', 'en', getDictionary('en'))?.href).toBe('/en/stay');
   });
 
-  it.each([
-    ['en', 'Your stay'],
-  ] as const)('ends the marketing and guide nav with "Your stay" and lists it once in the footer (%s)', (locale, label) => {
-    const t = getDictionary(locale);
-    const stay = { key: 'stay', href: `/${locale}${STAY_HUB_PATH}`, label: t.ui.yourStay };
-    expect(stay.label).toBe(label);
-    expect(navLinks('marketing', locale, t).at(-1)).toEqual(stay);
-    expect(navLinks('guide', locale, t).at(-1)).toEqual(stay);
+  it('ends the marketing and guide nav with "Your stay" and lists it once in the footer (en)', () => {
+    const t = getDictionary('en');
+    const stay = { key: 'stay', href: `/en${STAY_HUB_PATH}`, label: t.ui.yourStay };
+    expect(stay.label).toBe('Your stay');
+    expect(navLinks('marketing', 'en', t).at(-1)).toEqual(stay);
+    expect(navLinks('guide', 'en', t).at(-1)).toEqual(stay);
     // The footer shows "Your stay" on its own (footerStayLink): the nav list must not repeat it.
-    expect(footerNavLinks('marketing', locale, t).map(({ key }) => key)).not.toContain('stay');
-    expect(footerStayLink('marketing', locale, t)).toEqual({
-      key: 'your-stay', href: `/${locale}${STAY_HUB_PATH}`, label: t.shell.footerStay,
+    expect(footerNavLinks('marketing', 'en', t).map(({ key }) => key)).not.toContain('stay');
+    expect(footerStayLink('marketing', 'en', t)).toEqual({
+      key: 'your-stay', href: `/en${STAY_HUB_PATH}`, label: t.shell.footerStay,
     });
-    const footerHubLinks = [...footerNavLinks('marketing', locale, t), footerStayLink('marketing', locale, t)]
-      .filter((link) => link?.href === `/${locale}${STAY_HUB_PATH}`);
+    const footerHubLinks = [...footerNavLinks('marketing', 'en', t), footerStayLink('marketing', 'en', t)]
+      .filter((link) => link?.href === `/en${STAY_HUB_PATH}`);
     expect(footerHubLinks).toHaveLength(1);
   });
 
@@ -186,13 +184,11 @@ describe('scrollToCurrentHash (R-689)', () => {
     expect(target.scrollIntoView).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ['a link without a hash', '/en/apartment'],
-  ])('ignores %s', (_name, href) => {
+  it('ignores a link without a hash', () => {
     const target = { scrollIntoView: vi.fn() };
     stubPage('/en/apartment', '', { contact: target });
     const event = click();
-    scrollToCurrentHash(event, href);
+    scrollToCurrentHash(event, '/en/apartment');
     expect(event.preventDefault).not.toHaveBeenCalled();
     expect(target.scrollIntoView).not.toHaveBeenCalled();
   });

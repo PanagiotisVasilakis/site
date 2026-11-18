@@ -1,5 +1,6 @@
 import { readdirSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { GET as getLive, HEAD as headLive } from '@/app/api/health/live/route';
 
 type MigrationRows = Array<{ migration_name: string }>;
 
@@ -161,17 +162,15 @@ describe('GET and HEAD /api/health/ready', () => {
     expect(mocks.logger.warn).toHaveBeenCalledWith('Readiness: database check failed', { errorName: 'unknown' });
   });
 
-  it.each([
-    { state: 'ready', migrations: [{ migration_name: PINNED }], status: 200 },
-  ])('HEAD answers $state with status $status like GET, with an empty body', async ({ migrations, status }) => {
-    database.migrations = migrations;
+  it('HEAD answers ready with status 200 like GET, with an empty body', async () => {
+    database.migrations = [{ migration_name: PINNED }];
     const { GET, HEAD } = await loadRoute();
 
     const head = await HEAD();
     const get = await GET();
 
-    expect(head.status).toBe(status);
-    expect(get.status).toBe(status);
+    expect(head.status).toBe(200);
+    expect(get.status).toBe(200);
     expect(head.headers.get('cache-control')).toBe('no-store');
     expect(head.body).toBeNull();
     expect(await head.text()).toBe('');
@@ -232,5 +231,18 @@ describe('GET and HEAD /api/health/ready', () => {
 
     expect(mocks.transaction).toHaveBeenCalledTimes(1);
     expect(responses.map((response) => response.status)).toEqual([200, 200, 200]);
+  });
+});
+
+describe('public route contracts (GET and HEAD /api/health/live)', () => {
+  it('returns a timestamped liveness response without dependency details', async () => {
+    const response = getLive();
+    const body = await response.json() as Record<string, unknown>;
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(body.status).toBe('alive');
+    expect(Date.parse(String(body.timestamp))).not.toBeNaN();
+    expect(body).not.toHaveProperty('database');
+    expect(headLive().status).toBe(200);
   });
 });

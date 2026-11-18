@@ -18,21 +18,21 @@ import { GUEST_TERMS_CONTENT_HASH, GUEST_TERMS_VERSION } from '@/lib/guestTerms'
 import { GUEST_TERMS_TEXT } from '@/lib/guestTermsText';
 
 describe('guest terms acceptance', () => {
-  it.each(['el'] as const)('renders exactly the canonical %s terms text on sign-up', (locale) => {
-    navigation.locale = locale;
+  it('renders exactly the canonical el terms text on sign-up', () => {
+    navigation.locale = 'el';
     render(<UnifiedGuestClient />);
 
-    expect(screen.getByText(GUEST_TERMS_TEXT[locale])).toBeInTheDocument();
+    expect(screen.getByText(GUEST_TERMS_TEXT.el)).toBeInTheDocument();
   });
 
-  it.each(['el'] as const)('links the %s privacy notice outside the hashed terms text', (locale) => {
-    navigation.locale = locale;
+  it('links the el privacy notice outside the hashed terms text', () => {
+    navigation.locale = 'el';
     render(<UnifiedGuestClient />);
 
-    const link = screen.getByRole('link', { name: getDictionary(locale).legal.privacy.title });
-    expect(link).toHaveAttribute('href', `/${locale}/privacy`);
-    const terms = screen.getByText(GUEST_TERMS_TEXT[locale]);
-    expect(terms.textContent).toBe(GUEST_TERMS_TEXT[locale]);
+    const link = screen.getByRole('link', { name: getDictionary('el').legal.privacy.title });
+    expect(link).toHaveAttribute('href', '/el/privacy');
+    const terms = screen.getByText(GUEST_TERMS_TEXT.el);
+    expect(terms.textContent).toBe(GUEST_TERMS_TEXT.el);
     expect(terms.contains(link)).toBe(false);
     expect(within(terms.closest('label')!).queryByRole('link')).toBeNull();
   });

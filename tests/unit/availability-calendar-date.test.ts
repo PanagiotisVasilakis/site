@@ -43,7 +43,7 @@ describe('parseIsoDate', () => {
 
 describe('calendar arithmetic', () => {
   // A zone with DST (2026-03-29 and 2026-10-25 are change days), so local-time
-  // arithmetic would fail here even on a UTC host such as the release gate.
+  // arithmetic would fail here even on a UTC host in CI.
   beforeEach(() => {
     vi.stubEnv('TZ', 'Europe/Athens');
   });

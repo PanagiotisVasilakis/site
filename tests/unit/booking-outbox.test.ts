@@ -317,8 +317,8 @@ describe('check-in outbox delivery to a redirecting receiver', () => {
     receiver = undefined;
   });
 
-  it.each([302])('records a %i redirect as a failed attempt and never requests the redirect target', async (status) => {
-    receiver = await startRedirectingReceiver(status);
+  it('records a 302 redirect as a failed attempt and never requests the redirect target', async () => {
+    receiver = await startRedirectingReceiver(302);
     vi.stubEnv('CHECKIN_REQUEST_WEBHOOK_URL', receiver.url);
     vi.stubEnv('CHECKIN_REQUEST_WEBHOOK_TOKEN', TOKEN);
     seed({ nextAttemptAt: new Date(Date.now() - 1_000) });

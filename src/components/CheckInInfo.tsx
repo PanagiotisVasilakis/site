@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import {
   getApartmentMapLocation,
@@ -16,31 +16,10 @@ import { logger } from '@/lib/logger-client';
 import { timePattern } from '@/lib/propertyTime';
 import MapLoadingSkeleton from '@/components/MapLoadingSkeleton';
 import WifiAccessCard from '@/components/checkin/WifiAccessCard';
-import { Icon as LineIcon } from '@/components/icons/Icon';
+import { Icon, type IconName } from '@/components/icons/Icon';
 import { useToast } from '@/components/Toast';
 
 type NearbyCategoryItem = CategoryMapItem;
-
-type IconName =
-  | 'air'
-  | 'basket'
-  | 'bath'
-  | 'car'
-  | 'check'
-  | 'clock'
-  | 'copy'
-  | 'external'
-  | 'home'
-  | 'info'
-  | 'key'
-  | 'map'
-  | 'mapPin'
-  | 'phone'
-  | 'shield'
-  | 'sun'
-  | 'utensils'
-  | 'waves'
-  | 'wifi';
 
 type CopyTarget = 'wifi' | 'network' | 'password' | null;
 
@@ -68,178 +47,6 @@ interface CheckInInfoProps {
   nearbyRestaurants?: NearbyCategoryItem[];
   nearbyServices?: NearbyCategoryItem[];
   cartoBasemapsKey?: string;
-}
-
-function Icon({ name, className }: { name: IconName; className: string }) {
-  const common = {
-    className,
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    stroke: 'currentColor',
-    strokeWidth: 1.8,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-    'aria-hidden': true,
-  };
-
-  switch (name) {
-    case 'air':
-      return (
-        <svg {...common}>
-          <path d="M4 9h11a3 3 0 1 0-3-3" />
-          <path d="M4 14h14a3 3 0 1 1-3 3" />
-          <path d="M4 19h6" />
-        </svg>
-      );
-    case 'basket':
-      return (
-        <svg {...common}>
-          <path d="M6 10h12l-1.4 8.2a2 2 0 0 1-2 1.8H9.4a2 2 0 0 1-2-1.8L6 10Z" />
-          <path d="M9 10a3 3 0 0 1 6 0" />
-          <path d="M9 14h6" />
-        </svg>
-      );
-    case 'bath':
-      return (
-        <svg {...common}>
-          <path d="M5 11V6a3 3 0 0 1 6 0" />
-          <path d="M4 11h16v3a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5v-3Z" />
-          <path d="M8 21v-2" />
-          <path d="M16 21v-2" />
-        </svg>
-      );
-    case 'car':
-      return (
-        <svg {...common}>
-          <path d="M5 15h14l-1.6-4.7A2 2 0 0 0 15.5 9h-7a2 2 0 0 0-1.9 1.3L5 15Z" />
-          <path d="M4 15v3h3" />
-          <path d="M17 18h3v-3" />
-          <circle cx="8" cy="18" r="1.5" />
-          <circle cx="16" cy="18" r="1.5" />
-        </svg>
-      );
-    case 'check':
-      return (
-        <svg {...common}>
-          <path d="m5 12 4 4L19 6" />
-        </svg>
-      );
-    case 'clock':
-      return (
-        <svg {...common}>
-          <circle cx="12" cy="12" r="8.5" />
-          <path d="M12 7.5V12l3 2" />
-        </svg>
-      );
-    case 'copy':
-      return (
-        <svg {...common}>
-          <rect x="8" y="8" width="11" height="11" rx="2" />
-          <path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
-        </svg>
-      );
-    case 'external':
-      return (
-        <svg {...common}>
-          <path d="M14 5h5v5" />
-          <path d="m10 14 9-9" />
-          <path d="M19 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4" />
-        </svg>
-      );
-    case 'home':
-      return (
-        <svg {...common}>
-          <path d="m4 11 8-7 8 7" />
-          <path d="M6.5 10.5V20h11v-9.5" />
-          <path d="M10 20v-5h4v5" />
-        </svg>
-      );
-    case 'info':
-      return (
-        <svg {...common}>
-          <circle cx="12" cy="12" r="8.5" />
-          <path d="M12 11.5V16" />
-          <path d="M12 8h.01" />
-        </svg>
-      );
-    case 'key':
-      return (
-        <svg {...common}>
-          <circle cx="7.5" cy="14.5" r="3.5" />
-          <path d="m10 12 8-8" />
-          <path d="m15 7 2 2" />
-          <path d="m13 9 2 2" />
-        </svg>
-      );
-    case 'map':
-      return (
-        <svg {...common}>
-          <path d="m8 18-5 2V6l5-2 8 2 5-2v14l-5 2-8-2Z" />
-          <path d="M8 4v14" />
-          <path d="M16 6v14" />
-        </svg>
-      );
-    case 'mapPin':
-      return (
-        <svg {...common}>
-          <path d="M12 21s6-5.1 6-11a6 6 0 0 0-12 0c0 5.9 6 11 6 11Z" />
-          <circle cx="12" cy="10" r="2" />
-        </svg>
-      );
-    case 'phone':
-      return (
-        <svg {...common}>
-          <path d="M8.2 5.2 9.6 8a2 2 0 0 1-.4 2.2l-.7.7a12 12 0 0 0 4.6 4.6l.7-.7a2 2 0 0 1 2.2-.4l2.8 1.4a1.5 1.5 0 0 1 .8 1.8l-.7 2.1a2 2 0 0 1-2.1 1.3C8.9 19.9 4.1 15.1 3 7.2a2 2 0 0 1 1.3-2.1l2.1-.7a1.5 1.5 0 0 1 1.8.8Z" />
-        </svg>
-      );
-    case 'shield':
-      return (
-        <svg {...common}>
-          <path d="M12 3 19 6v5c0 4.5-2.8 8.1-7 10-4.2-1.9-7-5.5-7-10V6l7-3Z" />
-          <path d="m9 12 2 2 4-5" />
-        </svg>
-      );
-    case 'sun':
-      return (
-        <svg {...common}>
-          <circle cx="12" cy="12" r="4" />
-          <path d="M12 2v2" />
-          <path d="M12 20v2" />
-          <path d="m4.9 4.9 1.4 1.4" />
-          <path d="m17.7 17.7 1.4 1.4" />
-          <path d="M2 12h2" />
-          <path d="M20 12h2" />
-          <path d="m4.9 19.1 1.4-1.4" />
-          <path d="m17.7 6.3 1.4-1.4" />
-        </svg>
-      );
-    case 'utensils':
-      return (
-        <svg {...common}>
-          <path d="M7 3v8" />
-          <path d="M4.5 3v4.5a2.5 2.5 0 0 0 5 0V3" />
-          <path d="M7 11v10" />
-          <path d="M17 3v18" />
-          <path d="M14 7a3 5 0 0 1 3-4" />
-        </svg>
-      );
-    case 'waves':
-      return (
-        <svg {...common}>
-          <path d="M3 8c2 0 2-1.5 4-1.5S9 8 11 8s2-1.5 4-1.5S17 8 21 8" />
-          <path d="M3 13c2 0 2-1.5 4-1.5S9 13 11 13s2-1.5 4-1.5S17 13 21 13" />
-          <path d="M3 18c2 0 2-1.5 4-1.5S9 18 11 18s2-1.5 4-1.5S17 18 21 18" />
-        </svg>
-      );
-    case 'wifi':
-      return (
-        <svg {...common}>
-          <path d="M5 13a10 10 0 0 1 14 0" />
-          <path d="M8.5 16.5a5 5 0 0 1 7 0" />
-          <path d="M12 20h.01" />
-        </svg>
-      );
-  }
 }
 
 function SectionTitle({
@@ -302,7 +109,7 @@ export default function CheckInInfo({
   ];
 
   const amenityIcons: Record<string, IconName> = {
-    essentials: 'home', comfort: 'air', kitchen: 'utensils', bathroom: 'bath', outdoor: 'sun', safety: 'shield',
+    essentials: 'home', comfort: 'snowflake', kitchen: 'fork', bathroom: 'bath', outdoor: 'sun', safety: 'rules',
   };
   const amenityGroups = getApartmentContent(locale).amenityGroups.map((group) => ({
     title: group.title,
@@ -312,9 +119,9 @@ export default function CheckInInfo({
 
   const taxiPhone = nearbyServices.find((item) => item.id === 'taxi')?.phone;
   const tipItems: Array<{ text: string; icon: IconName }> = [
-    { text: t.checkinInfo.tip1, icon: 'waves' },
+    { text: t.checkinInfo.tip1, icon: 'beach' },
     { text: t.checkinInfo.tip2, icon: 'basket' },
-    { text: t.checkinInfo.tip3, icon: 'utensils' },
+    { text: t.checkinInfo.tip3, icon: 'fork' },
     ...(taxiPhone ? [{ text: t.checkinInfo.tip4.replace('{taxiPhone}', taxiPhone), icon: 'car' as const }] : []),
   ];
 
@@ -327,7 +134,7 @@ export default function CheckInInfo({
     {
       label: t.checkinInfo.waterInfo,
       detail: t.checkinInfo.waterDetail,
-      icon: 'waves',
+      icon: 'beach',
     },
     {
       label: t.checkinInfo.tvInfo,
@@ -371,39 +178,60 @@ export default function CheckInInfo({
   const [arrivalRequestError, setArrivalRequestError] = useState('');
   const sessionRefreshStarted = useRef(false);
   const wifiRevealAwaited = useRef(false);
+  const copiedTimerRef = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (copiedTimerRef.current !== null) {
+      window.clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = null;
+    }
+  }, []);
+
+  const redirectToSessionRefresh = useCallback(() => {
+    if (!sessionRefreshStarted.current) {
+      sessionRefreshStarted.current = true;
+      window.location.replace(sessionRefreshUrl(locale));
+    }
+  }, [locale]);
+
+  const loadCheckInPreferences = useCallback(async (
+    isActive: () => boolean,
+    { applySchedule }: { applySchedule: boolean },
+  ): Promise<boolean> => {
+    const res = await internalFetch('/api/check-in/preferences');
+    if (!isActive()) return false;
+    if (res.status === 401) {
+      redirectToSessionRefresh();
+      return false;
+    }
+    if (!res.ok) return false;
+    const data = await res.json();
+    if (!isActive()) return false;
+    if (data.data) {
+      if (applySchedule) {
+        setCheckInTime(data.data.checkInTime || '15:00');
+        setCheckOutTime(data.data.checkOutTime || '11:00');
+      }
+      setWifiNetwork(data.data.wifi?.network || '');
+      setWifiPassword(data.data.wifi?.password || '');
+      setWifiAvailableAt(typeof data.data.wifiAvailableAt === 'string' ? data.data.wifiAvailableAt : null);
+      setWifiPending(typeof data.data.wifiPending === 'boolean' ? data.data.wifiPending : null);
+    }
+    return true;
+  }, [redirectToSessionRefresh]);
 
   useEffect(() => {
     let active = true;
-    const loadPreferences = async () => {
+    const run = async () => {
       try {
-        const res = await internalFetch('/api/check-in/preferences');
-        if (!active) return;
-        if (res.status === 401) {
-          if (!sessionRefreshStarted.current) {
-            sessionRefreshStarted.current = true;
-            window.location.replace(sessionRefreshUrl(locale));
-          }
-          return;
-        }
-        if (res.ok) {
-          const data = await res.json();
-          if (!active) return;
-          if (data.data) {
-            setCheckInTime(data.data.checkInTime || '15:00');
-            setCheckOutTime(data.data.checkOutTime || '11:00');
-            setWifiNetwork(data.data.wifi?.network || '');
-            setWifiPassword(data.data.wifi?.password || '');
-            setWifiAvailableAt(typeof data.data.wifiAvailableAt === 'string' ? data.data.wifiAvailableAt : null);
-            setWifiPending(typeof data.data.wifiPending === 'boolean' ? data.data.wifiPending : null);
-          }
-        }
+        await loadCheckInPreferences(() => active, { applySchedule: true });
       } catch (error) {
-        console.error('Failed to load check-in preferences:', error);
+        logger.error('Failed to load check-in preferences', error instanceof Error ? error : { error: String(error) });
       }
     };
-    loadPreferences();
+    void run();
     return () => { active = false; };
-  }, [locale]);
+  }, [loadCheckInPreferences]);
 
   useEffect(() => {
     let active = true;
@@ -412,10 +240,7 @@ export default function CheckInInfo({
         const res = await internalFetch('/api/check-in/arrival-request');
         if (!active) return;
         if (res.status === 401) {
-          if (!sessionRefreshStarted.current) {
-            sessionRefreshStarted.current = true;
-            window.location.replace(sessionRefreshUrl(locale));
-          }
+          redirectToSessionRefresh();
           return;
         }
         if (res.ok) {
@@ -424,12 +249,12 @@ export default function CheckInInfo({
           setArrivalRequest(data.data?.request ?? null);
         }
       } catch (error) {
-        console.error('Failed to load arrival request:', error);
+        logger.error('Failed to load arrival request', error instanceof Error ? error : { error: String(error) });
       }
     };
     loadArrivalRequest();
     return () => { active = false; };
-  }, [locale]);
+  }, [redirectToSessionRefresh]);
 
   // The server adds the Wi-Fi details only after wifiAvailableAt, so a page opened earlier asks again one second
   // after it and when the tab returns (a sleeping phone may skip one long timer); only the Wi-Fi fields change, so open
@@ -454,28 +279,14 @@ export default function CheckInInfo({
       requestInFlight = true;
       let failed = false;
       try {
-        const res = await internalFetch('/api/check-in/preferences');
+        const ok = await loadCheckInPreferences(() => active, { applySchedule: false });
         if (!active) return;
-        if (res.status === 401) {
-          sessionRefreshStarted.current = true;
-          window.location.replace(sessionRefreshUrl(locale));
-          return;
-        }
-        if (!res.ok) {
+        if (!ok && !sessionRefreshStarted.current) {
           failed = true;
-          return;
-        }
-        const data = await res.json();
-        if (!active) return;
-        if (data.data) {
-          setWifiNetwork(data.data.wifi?.network || '');
-          setWifiPassword(data.data.wifi?.password || '');
-          setWifiAvailableAt(typeof data.data.wifiAvailableAt === 'string' ? data.data.wifiAvailableAt : null);
-          setWifiPending(typeof data.data.wifiPending === 'boolean' ? data.data.wifiPending : null);
         }
       } catch (error) {
         if (!active) return;
-        console.error('Failed to refresh the Wi-Fi details:', error);
+        logger.error('Failed to refresh the Wi-Fi details', error instanceof Error ? error : { error: String(error) });
         failed = true;
       } finally {
         requestInFlight = false;
@@ -511,7 +322,7 @@ export default function CheckInInfo({
       window.removeEventListener('pageshow', refetchAfterReturn);
       window.removeEventListener('online', onOnline);
     };
-  }, [wifiAvailableAt, wifiNetwork, wifiPending, locale]);
+  }, [wifiAvailableAt, wifiNetwork, wifiPending, loadCheckInPreferences]);
 
   const copyToClipboard = async (text: string, target: CopyTarget) => {
     try {
@@ -519,7 +330,13 @@ export default function CheckInInfo({
       setCopiedTarget(target);
       // identity §9.8: the Wi-Fi copy confirms with a toast as well as the button label.
       toast.push(t.stay.checkin.wifiCopied);
-      setTimeout(() => setCopiedTarget(null), 2000);
+      if (copiedTimerRef.current !== null) {
+        window.clearTimeout(copiedTimerRef.current);
+      }
+      copiedTimerRef.current = window.setTimeout(() => {
+        copiedTimerRef.current = null;
+        setCopiedTarget(null);
+      }, 2000);
     } catch (err) {
       logger.warn('Clipboard copy failed', err instanceof Error ? err : { error: String(err) });
       // Tell the guest the copy failed and to select the details instead.
@@ -559,10 +376,7 @@ export default function CheckInInfo({
         // The guest session expired while this page was open. The refresh page renews it
         // from the refresh cookie or sends the guest to sign in again; replace() keeps the
         // stale page out of the history, as the refresh page itself does.
-        if (!sessionRefreshStarted.current) {
-          sessionRefreshStarted.current = true;
-          window.location.replace(sessionRefreshUrl(locale));
-        }
+        redirectToSessionRefresh();
         return;
       }
       if (!res.ok) {
@@ -582,7 +396,7 @@ export default function CheckInInfo({
       setArrivalRequestSuccess(panel.requestSent);
       setArrivalRequestMessage('');
     } catch (error) {
-      console.error('Failed to submit arrival request:', error);
+      logger.error('Failed to submit arrival request', error instanceof Error ? error : { error: String(error) });
       setArrivalRequestError(panel.requestError);
     } finally {
       setArrivalRequestSubmitting(false);
@@ -631,12 +445,12 @@ export default function CheckInInfo({
               rel="noopener noreferrer"
               className="ui-btn ui-btn--secondary ui-btn--sm"
             >
-              <Icon name="external" className="checkin-action-icon" />
+              <Icon name="arrow-up-right" className="checkin-action-icon" />
               {panel.openMaps}
             </a>
           )}
           <a href="#house-rules" className="ui-btn ui-btn--secondary ui-btn--sm">
-            <Icon name="shield" className="checkin-action-icon" />
+            <Icon name="rules" className="checkin-action-icon" />
             {panel.viewRules}
           </a>
         </div>
@@ -822,7 +636,7 @@ export default function CheckInInfo({
         </section>
 
         <section id="house-rules" className="checkin-panel" aria-labelledby="house-rules-title">
-          <SectionTitle id="house-rules-title" title={t.checkinInfo.houseRulesTitle} icon="shield" />
+          <SectionTitle id="house-rules-title" title={t.checkinInfo.houseRulesTitle} icon="rules" />
           <ul className="checkin-rules">
             {ruleItems.map((rule) => (
               <li key={rule} className="checkin-rule-item">
@@ -912,7 +726,7 @@ export default function CheckInInfo({
         </section>
 
         <section className="checkin-panel" aria-labelledby="tips-title">
-          <SectionTitle id="tips-title" title={t.checkinInfo.tipsTitle} icon="mapPin" />
+          <SectionTitle id="tips-title" title={t.checkinInfo.tipsTitle} icon="map-pin" />
           <div className="checkin-divided">
             {tipItems.map((tip) => (
               <div key={tip.text} className="checkin-line">
@@ -954,7 +768,7 @@ export default function CheckInInfo({
                     key={`${title}-${description}`}
                     className="checkin-card checkin-line"
                   >
-                    <LineIcon name={icon} className="checkin-accent-token" />
+                    <Icon name={icon} className="checkin-accent-token" />
                     <div>
                       <h3 className="checkin-title">{title}</h3>
                       <p className="checkin-copy checkin-copy--small">{description}</p>

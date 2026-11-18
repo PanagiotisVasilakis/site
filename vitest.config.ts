@@ -51,7 +51,6 @@ export default defineConfig({
         'src/lib/availability/money.ts',
         'src/lib/availability/stayQuote.ts',
         'src/lib/bookingOutbox.ts',
-        'src/lib/collections.ts',
         'src/lib/contactLinks.ts',
         'src/lib/whatsapp.ts',
         'src/lib/crypto.ts',

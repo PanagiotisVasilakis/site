@@ -6,9 +6,9 @@ import { getKalamataMapLocations } from '@/data/mapLocations';
 import {
   getItem,
   getItemsByCategory,
-  pickLocale,
   toSlug,
 } from '@/lib/data';
+import { pickLocale } from '@/lib/localize';
 import { logger } from '@/lib/logger-enterprise';
 
 describe('validated content access', () => {

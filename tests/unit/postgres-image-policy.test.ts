@@ -8,7 +8,6 @@ import {
   assertApprovedPostgresImageReference,
   assertApprovedPostgresOciIndex,
   assertLocalDockerEndpoint,
-  postgresImagePolicyDiagnostic,
   validatePostgresOciIndexMetadata,
   validatePulledPostgresImageInspection,
 } from '../integration/support/postgres-image-policy';
@@ -115,7 +114,7 @@ describe('local Docker daemon boundary', () => {
     try {
       assertLocalDockerEndpoint(rawEndpoint);
     } catch (error) {
-      diagnostic = postgresImagePolicyDiagnostic(error);
+      diagnostic = error instanceof Error ? error.message : String(error);
     }
     expect(diagnostic).toContain('image policy rejected');
     expect(diagnostic).not.toContain(rawEndpoint);
@@ -209,20 +208,13 @@ describe('pulled PostgreSQL image inspection', () => {
     })).toThrow('image');
   });
 
-  it('never returns raw Docker authentication diagnostics', () => {
-    const secret = 'Bearer registry-auth-token-value';
-    const diagnostic = postgresImagePolicyDiagnostic(new Error(secret));
-    expect(diagnostic).not.toContain(secret);
-    expect(diagnostic).toContain('Docker diagnostics were withheld');
-  });
-
-  it('does not echo rejected references through policy diagnostics', () => {
+  it('does not echo rejected references through policy errors', () => {
     const rejected = 'registry.example.invalid/private/postgres:16-alpine@sha256:token-value';
     let diagnostic = '';
     try {
       assertApprovedPostgresImageReference(rejected);
     } catch (error) {
-      diagnostic = postgresImagePolicyDiagnostic(error);
+      diagnostic = error instanceof Error ? error.message : String(error);
     }
     expect(diagnostic).not.toContain(rejected);
     expect(diagnostic).toContain('image policy rejected');

@@ -21,7 +21,6 @@ import {
   revokeSessionOnlyForFailureFixture,
   safeAuthStateSnapshot,
   seedAuthEligibilityFixtures,
-  seedRevokedSessionEligibilityFixture,
 } from './support/auth-fixtures';
 import type { AuthPrincipalFixture } from './support/auth-fixtures';
 
@@ -178,7 +177,7 @@ function requireTarget(): DisposableDatabaseTarget {
 function authContext(
   modules: AuthModules,
   requestHeaders: HeadersInit = REQUEST_HEADERS,
-): { deviceHint: string; ipHint: string } {
+): { deviceHint: string } {
   const request = new modules.NextRequest(REFRESH_URL, {
     method: 'POST',
     headers: requestHeaders,
@@ -202,7 +201,6 @@ async function issueBoundAuthorizationChain(
     session_id: sessionId,
     family_id: fixture.familyId,
     device_hint: context.deviceHint,
-    ip_hint: context.ipHint,
   });
   if (issuedRefresh.rec.id !== sessionId) {
     throw new Error('Synthetic refresh generation was not bound to its session generation.');
@@ -475,7 +473,7 @@ describe.sequential('refresh authorization generation regressions', () => {
   it('rejects the confirmed revoked-session state without minting a descendant', async () => {
     const authTarget = requireTarget();
     const fixtureNow = new Date();
-    await seedRevokedSessionEligibilityFixture(authTarget, fixtureNow);
+    await seedAuthEligibilityFixtures(authTarget, fixtureNow);
     const modules = await loadAuthModules();
     const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
     await revokeSessionOnlyForFailureFixture(authTarget, chain.sessionId, new Date());
@@ -518,7 +516,7 @@ describe.sequential('refresh authorization generation regressions', () => {
 
   it('cannot bypass a revoked DB-bound generation by omitting the short-session cookie', async () => {
     const authTarget = requireTarget();
-    await seedRevokedSessionEligibilityFixture(authTarget, new Date());
+    await seedAuthEligibilityFixtures(authTarget, new Date());
     const modules = await loadAuthModules();
     const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
     await revokeSessionOnlyForFailureFixture(authTarget, chain.sessionId, new Date());
@@ -552,7 +550,7 @@ describe.sequential('refresh authorization generation regressions', () => {
 
   it('fails closed for an unbound pre-cutover refresh generation', async () => {
     const authTarget = requireTarget();
-    await seedRevokedSessionEligibilityFixture(authTarget, new Date());
+    await seedAuthEligibilityFixtures(authTarget, new Date());
     const modules = await loadAuthModules();
     const sessionToken = await modules.sessionModule.issueGuestSession(
       REVOKED_SESSION_FIXTURE.userId,
@@ -618,7 +616,7 @@ describe.sequential('refresh authorization generation regressions', () => {
   it('allows natural DB and JWT expiry when the signed generation binding is valid', async () => {
     const authTarget = requireTarget();
     const fixtureNow = new Date();
-    await seedRevokedSessionEligibilityFixture(authTarget, fixtureNow);
+    await seedAuthEligibilityFixtures(authTarget, fixtureNow);
     const modules = await loadAuthModules();
     const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
     await expireSessionForFixture(authTarget, chain.sessionId, new Date());
@@ -664,7 +662,7 @@ describe.sequential('refresh authorization generation regressions', () => {
 
   it('allows refresh without a short-session cookie through the DB-bound generation', async () => {
     const authTarget = requireTarget();
-    await seedRevokedSessionEligibilityFixture(authTarget, new Date());
+    await seedAuthEligibilityFixtures(authTarget, new Date());
     const modules = await loadAuthModules();
     const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
 
@@ -692,7 +690,7 @@ describe.sequential('refresh authorization generation regressions', () => {
 
   it('revokes the family when a predecessor is replayed after its rotation completed', async () => {
     const authTarget = requireTarget();
-    await seedRevokedSessionEligibilityFixture(authTarget, new Date());
+    await seedAuthEligibilityFixtures(authTarget, new Date());
     const modules = await loadAuthModules();
     const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
 
@@ -771,7 +769,7 @@ describe.sequential('refresh authorization generation regressions', () => {
     vi.setSystemTime(CONTROLLED_REPLAY_NOW);
     try {
       const authTarget = requireTarget();
-      await seedRevokedSessionEligibilityFixture(authTarget, new Date());
+      await seedAuthEligibilityFixtures(authTarget, new Date());
       const modules = await loadAuthModules();
       const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
       const rotationResponse = await performRefresh(
@@ -825,16 +823,18 @@ describe.sequential('refresh authorization generation regressions', () => {
 
   it('returns 200 plus cookie-free 409 only for database-observed same-context overlap', async () => {
     const authTarget = requireTarget();
-    await seedRevokedSessionEligibilityFixture(authTarget, new Date());
+    await seedAuthEligibilityFixtures(authTarget, new Date());
     const modules = await loadAuthModules();
     const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
 
     const overlap = await executeRouteOverlap(authTarget, modules, chain, 'same-context');
     const winner = safeIssuedCookieEvidence(overlap.winnerResponse, modules.sessionModule);
     const loser = await safeConcurrentEvidence(overlap.loserResponse);
-    const winnerRefresh = overlap.winnerResponse.cookies.get('guest_rt')?.value;
-    const winnerRefreshValid = Boolean(
-      winnerRefresh && await modules.guestStore.verifyRefreshToken(winnerRefresh),
+    const winnerSession = modules.sessionModule.parseGuestSession(
+      overlap.winnerResponse.cookies.get('guest_session')?.value,
+    );
+    const winnerAccessValid = Boolean(
+      winnerSession && await modules.sessionModule.verifyGuestSessionAccess(winnerSession),
     );
     const after = await safeAuthStateSnapshot(authTarget, new Date());
 
@@ -843,7 +843,7 @@ describe.sequential('refresh authorization generation regressions', () => {
       whileBlocked: overlap.stateWhileWinnerBlocked,
       winner,
       loser,
-      winnerRefreshValid,
+      winnerAccessValid,
       after,
     }).toEqual({
       markerObserved: true,
@@ -875,7 +875,7 @@ describe.sequential('refresh authorization generation regressions', () => {
         sessionCookiePresent: false,
         refreshCookiePresent: false,
       },
-      winnerRefreshValid: true,
+      winnerAccessValid: true,
       after: {
         users: 1,
         bookings: 1,
@@ -898,7 +898,7 @@ describe.sequential('refresh authorization generation regressions', () => {
     ['rejects same-context overlap with an invalid session binding instead of returning 409', 'invalid-binding'],
   ] as const)('%s', async (_title, mode) => {
     const authTarget = requireTarget();
-    await seedRevokedSessionEligibilityFixture(authTarget, new Date());
+    await seedAuthEligibilityFixtures(authTarget, new Date());
     const modules = await loadAuthModules();
     const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
 
@@ -908,12 +908,11 @@ describe.sequential('refresh authorization generation regressions', () => {
     const winnerSession = modules.sessionModule.parseGuestSession(
       overlap.winnerResponse.cookies.get('guest_session')?.value,
     );
-    const winnerRefresh = overlap.winnerResponse.cookies.get('guest_rt')?.value;
+    const after = await safeAuthStateSnapshot(authTarget, new Date());
     const winnerCredentialsValidAfter = {
       session: Boolean(await modules.sessionModule.verifyGuestSessionAccess(winnerSession)),
-      refresh: Boolean(winnerRefresh && await modules.guestStore.verifyRefreshToken(winnerRefresh)),
+      refresh: after.refreshTokens.active > 0,
     };
-    const after = await safeAuthStateSnapshot(authTarget, new Date());
 
     expect({ winner, loser, winnerCredentialsValidAfter, after }).toEqual({
       winner: {
@@ -943,7 +942,7 @@ describe.sequential('refresh authorization generation regressions', () => {
 
   it('rejects a malformed short-session cookie and revokes the presented refresh chain', async () => {
     const authTarget = requireTarget();
-    await seedRevokedSessionEligibilityFixture(authTarget, new Date());
+    await seedAuthEligibilityFixtures(authTarget, new Date());
     const modules = await loadAuthModules();
     const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
 
@@ -1051,7 +1050,7 @@ describe.sequential('refresh authorization generation regressions', () => {
 
   it('rejects a session from another refresh family without touching that family', async () => {
     const authTarget = requireTarget();
-    await seedRevokedSessionEligibilityFixture(authTarget, new Date());
+    await seedAuthEligibilityFixtures(authTarget, new Date());
     const modules = await loadAuthModules();
     const primaryChain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
     const independentChain = await issueBoundAuthorizationChain(modules, {
@@ -1112,7 +1111,7 @@ describe.sequential('refresh authorization generation regressions', () => {
 
   it('rejects an already revoked family without creating replacement records', async () => {
     const authTarget = requireTarget();
-    await seedRevokedSessionEligibilityFixture(authTarget, new Date());
+    await seedAuthEligibilityFixtures(authTarget, new Date());
     const modules = await loadAuthModules();
     const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
     await expect(modules.guestStore.revokeRefreshFamily(chain.refreshToken)).resolves.toBe(true);
@@ -1154,7 +1153,7 @@ describe.sequential('refresh authorization generation regressions', () => {
 
   it('rejects natural family expiry without rewriting it as explicit revocation', async () => {
     const authTarget = requireTarget();
-    await seedRevokedSessionEligibilityFixture(authTarget, new Date());
+    await seedAuthEligibilityFixtures(authTarget, new Date());
     const modules = await loadAuthModules();
     const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
     await expireRefreshFamilyForFixture(
@@ -1184,7 +1183,7 @@ describe.sequential('refresh authorization generation regressions', () => {
 
   it('rejects natural refresh-token expiry without revoking its family', async () => {
     const authTarget = requireTarget();
-    await seedRevokedSessionEligibilityFixture(authTarget, new Date());
+    await seedAuthEligibilityFixtures(authTarget, new Date());
     const modules = await loadAuthModules();
     const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
     await withTestPrismaClient(authTarget, async (prisma) => {
@@ -1214,7 +1213,7 @@ describe.sequential('refresh authorization generation regressions', () => {
 
   it('keeps repeated rejected refresh attempts idempotent and non-enumerating', async () => {
     const authTarget = requireTarget();
-    await seedRevokedSessionEligibilityFixture(authTarget, new Date());
+    await seedAuthEligibilityFixtures(authTarget, new Date());
     const modules = await loadAuthModules();
     const chain = await issueBoundAuthorizationChain(modules, REVOKED_SESSION_FIXTURE);
     await revokeSessionOnlyForFailureFixture(authTarget, chain.sessionId, new Date());

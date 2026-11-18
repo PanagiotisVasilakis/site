@@ -6,9 +6,6 @@
 
 import { readFileSync, existsSync, statSync } from 'fs';
 import { execFileSync, execSync } from 'child_process';
-import { fileURLToPath } from 'url';
-
-import { runNpmAuditEvidenceCheck } from './lib/npm-audit-evidence';
 
 interface SecurityCheck {
   name: string;
@@ -59,8 +56,11 @@ const checks: SecurityCheck[] = [
           // Check if any values look like they contain actual secrets
           const lines = content.split('\n').filter(line => line.trim() && !line.startsWith('#'));
           for (const line of lines) {
-            const [key, value] = line.split('=');
-            if (value && value.length > 20 && !value.includes('your-') && !value.includes('example')) {
+            const separator = line.indexOf('=');
+            if (separator <= 0) continue;
+            const key = line.slice(0, separator).trim();
+            const value = line.slice(separator + 1).trim();
+            if (value.length > 20 && !value.includes('your-') && !value.includes('example')) {
               for (const pattern of dangerousPatterns) {
                 if (pattern.test(key)) {
                   if (tracked || !ignored) {
@@ -80,7 +80,15 @@ const checks: SecurityCheck[] = [
     name: 'Package Vulnerabilities',
     description: 'Check for known vulnerabilities in dependencies',
     severity: 'error',
-    check: runNpmAuditEvidenceCheck
+    check: () => {
+      try {
+        execFileSync('npm', ['audit', '--audit-level=high', '--omit=dev'], { stdio: 'pipe' });
+        return true;
+      } catch {
+        console.error('⚠️ Production dependencies failed `npm audit --audit-level=high --omit=dev`');
+        return false;
+      }
+    }
   },
   {
     name: 'CSP Configuration',
@@ -137,6 +145,7 @@ const checks: SecurityCheck[] = [
     severity: 'error',
     check: () => {
       const secretFiles = [
+        '.env',
         '.env.production',
         '.env.local',
         'private.key',
@@ -270,6 +279,8 @@ async function runSecurityValidation(): Promise<void> {
       console.log(`  💥 Error running check: ${error}\n`);
       if (check.severity === 'error') {
         errorCount++;
+      } else {
+        warningCount++;
       }
     }
   }
@@ -289,12 +300,7 @@ async function runSecurityValidation(): Promise<void> {
   }
 }
 
-// Run validation if script is executed directly
-const isMain = process.argv[1] ? fileURLToPath(import.meta.url) === process.argv[1] : false;
-
-if (isMain) {
-  runSecurityValidation().catch((error) => {
-    console.error('Security validation failed:', error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  });
-}
+runSecurityValidation().catch((error) => {
+  console.error('Security validation failed:', error instanceof Error ? error.message : String(error));
+  process.exit(1);
+});

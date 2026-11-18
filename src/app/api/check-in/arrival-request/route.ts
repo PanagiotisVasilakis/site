@@ -3,13 +3,14 @@ import { z } from 'zod';
 import { withErrorHandler, validateRequestBody, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 import { GUEST_SESSION_COOKIE, parseGuestSession, verifyGuestSessionAccess, type GuestSessionPayload } from '@/lib/guestSession';
 import { guestStore } from '@/lib/guestDataStore';
-import { checkInRequestRepository, type CheckInRequestRecord } from '@/lib/prisma-repositories/checkInRequestRepository';
+import {
+  checkInRequestRepository,
+  deliverCheckInNotification,
+  type CheckInRequestRecord,
+} from '@/lib/prisma-repositories/checkInRequestRepository';
 import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 import { timePattern } from '@/lib/propertyTime';
 import { createPortalBookingEligibilityWindow } from '@/lib/portalBookingEligibility';
-import { logger } from '@/lib/logger-enterprise';
-
-const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const requestSchema = z.object({
   requestedTime: z.string().regex(timePattern, 'Requested time must be in HH:MM format'),
@@ -39,8 +40,10 @@ async function getVerifiedSession(request: NextRequest): Promise<GuestSessionPay
   return verified;
 }
 
+const uuidSchema = z.uuid();
+
 function safeUuid(value: string | undefined): string | undefined {
-  return value && uuidRegex.test(value) ? value : undefined;
+  return value && uuidSchema.safeParse(value).success ? value : undefined;
 }
 
 export const GET = withErrorHandler(async (request: NextRequest) => {
@@ -92,20 +95,11 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     nextStatus: 'PENDING',
   });
   // The request and its outbox event are committed: the immediate delivery is best-effort and the outbox worker retries it.
-  const delivered = created.notificationEventId
-    ? await (await import('@/lib/bookingOutbox')).deliverOutboxEvent(created.notificationEventId).catch((error: unknown) => {
-        logger.warn('Immediate outbox delivery failed', {
-          eventId: created.notificationEventId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        return false;
-      })
-    : false;
-  const notification = !created.created
-    ? { status: 'skipped' as const, reason: 'request_already_pending' }
-    : !created.notificationEventId
-    ? { status: 'skipped' as const, reason: 'webhook_not_configured' }
-    : { status: delivered ? 'sent' as const : 'queued' as const };
+  const notification = await deliverCheckInNotification(
+    created.notificationEventId,
+    created.created,
+    'request_already_pending',
+  );
 
   // 201 for a new request; 200 when the pending request was kept (nothing was created).
   return createSuccessResponse({ request: normalizeRequest(created.request), notification }, created.created ? 201 : 200);

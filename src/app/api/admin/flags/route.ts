@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { withErrorHandler, createSuccessResponse, ApiError, ApiErrorCode, readJsonBody, ValidationError } from '@/lib/apiErrorHandler';
-import { isAdminRequest } from '@/lib/rbac';
-import { isSameOriginRequest } from '@/lib/net/sameOrigin';
+import { withErrorHandler, createSuccessResponse, requireAdminRequest, readJsonBody, ValidationError } from '@/lib/apiErrorHandler';
 import { getFeatureFlagsAsync, setFeatureFlags, type FeatureFlags } from '@/lib/featureFlags';
 import { logger } from '@/lib/logger-enterprise';
 
@@ -14,17 +12,13 @@ const schema = z.object({
 }).strict().refine((obj) => Object.keys(obj).length > 0, { message: 'At least one flag must be provided' });
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
-  if (!(await isAdminRequest(req))) throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
+  await requireAdminRequest(req);
   const flags = await getFeatureFlagsAsync();
   return createSuccessResponse<FeatureFlags>(flags) as NextResponse;
 });
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  if (!(await isAdminRequest(req))) throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
-  const origin = req.headers.get('origin');
-  if (origin && !isSameOriginRequest(origin, req)) {
-    throw new ApiError(ApiErrorCode.FORBIDDEN, 'Cross-origin admin mutation rejected');
-  }
+  await requireAdminRequest(req, { sameOrigin: true });
   const body = await readJsonBody(req, 8 * 1_024);
   const parsed = schema.safeParse(body);
   if (!parsed.success) {

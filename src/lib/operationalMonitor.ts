@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { CALENDAR_STALE_ALERT_MINUTES, GUEST_DATA_RETENTION_MONTHS } from '@/data/stayPolicy';
 import { CALENDAR_SYNC_STATE_ID } from '@/lib/availability/calendarSync';
 import { prisma } from '@/lib/prisma';
+import { ERASURE_CANCELLED_OUTBOX } from '@/lib/prisma-repositories/checkInRequestRepository';
 import { eraseGuestForRetention } from '@/lib/privacyService';
 
 type RuleDefinition = {
@@ -15,10 +16,6 @@ type RuleDefinition = {
   severity: 'low' | 'medium' | 'high' | 'critical';
   read: (windowMinutes: number) => Promise<number>;
 };
-
-// A privacy erasure cancels undelivered events by marking them DEAD with the
-// payload replaced by { redacted: true }; those are not delivery failures.
-const ERASURE_CANCELLED_OUTBOX = { status: 'DEAD' as const, payload: { path: ['redacted'], equals: true } };
 
 const ONE_YEAR_MINUTES = 525_600;
 

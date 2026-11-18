@@ -140,17 +140,15 @@ describe('apartment page (identity §9.2)', () => {
     expect(container.querySelectorAll('.apt-masonry--grid')).toHaveLength(2);
   });
 
-  it.each([
-    ['en', 'See free dates', '/en/availability', '/en#contact'],
-  ] as const)('links (%s) to the free dates and to the home contact section', async (locale, seeDates, availability, contactHref) => {
-    const { container } = await renderPage(locale);
+  it('links (en) to the free dates and to the home contact section', async () => {
+    const { container } = await renderPage('en');
 
     const cta = container.querySelector('#book') as HTMLElement;
-    expect(within(cta).getByRole('link', { name: seeDates })).toHaveAttribute('href', availability);
+    expect(within(cta).getByRole('link', { name: 'See free dates' })).toHaveAttribute('href', '/en/availability');
     const contactLinks = [...container.querySelectorAll('a')].filter((a) => a.getAttribute('href')?.endsWith('#contact'));
-    expect(contactLinks.map((a) => a.getAttribute('href'))).toEqual([contactHref]);
+    expect(contactLinks.map((a) => a.getAttribute('href'))).toEqual(['/en#contact']);
     // The old page sent "Contact" to the phones directory (plan V6).
-    expect(container.querySelector(`a[href="/${locale}/phones"]`)).toBeNull();
+    expect(container.querySelector('a[href="/en/phones"]')).toBeNull();
   });
 
   it('hides "Book on Booking.com" without a valid link (identity §1.4)', async () => {

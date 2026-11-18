@@ -6,6 +6,7 @@ import {
   ApiErrorCode,
   createSuccessResponse,
   readJsonBody,
+  requireAdminRequest,
   ValidationError,
   withErrorHandler,
 } from '@/lib/apiErrorHandler';
@@ -16,9 +17,7 @@ import {
   MANUAL_MIN_INTERVAL_MS,
   syncBookingCalendar,
 } from '@/lib/availability/calendarSync';
-import { isSameOriginRequest } from '@/lib/net/sameOrigin';
 import { prisma } from '@/lib/prisma';
-import { isAdminRequest } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,16 +31,10 @@ const STALE_AFTER_MS = CALENDAR_STALE_ALERT_MINUTES * 60 * 1_000;
 
 const syncRequestSchema = z.object({}).strict();
 
-async function requireAdmin(request: NextRequest): Promise<void> {
-  if (!(await isAdminRequest(request))) {
-    throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
-  }
-}
-
 const isConfigured = () => Boolean(process.env.BOOKING_ICAL_URL);
 
 export const GET = withErrorHandler(async (request: NextRequest) => {
-  await requireAdmin(request);
+  await requireAdminRequest(request);
 
   const state = await prisma.calendarSyncState.findUnique({
     where: { id: CALENDAR_SYNC_STATE_ID },
@@ -90,11 +83,7 @@ async function retryAfterSeconds(): Promise<number> {
 }
 
 export const POST = withErrorHandler(async (request: NextRequest) => {
-  await requireAdmin(request);
-  const origin = request.headers.get('origin');
-  if (origin && !isSameOriginRequest(origin, request)) {
-    throw new ApiError(ApiErrorCode.FORBIDDEN, 'Cross-origin admin mutation rejected');
-  }
+  await requireAdminRequest(request, { sameOrigin: true });
 
   const parsed = syncRequestSchema.safeParse(await readJsonBody(request, 256));
   if (!parsed.success) throw new ValidationError(parsed.error.issues);

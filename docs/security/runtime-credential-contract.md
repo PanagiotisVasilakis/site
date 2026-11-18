@@ -54,17 +54,17 @@ Development and tests are isolated:
 - missing admin and guest JWT credentials produce process-local random signing
   values that disappear at process exit;
 - a missing development dashboard credential disables admin login;
-- release verification derives deterministic, explicitly non-production values
-  inside its restricted subprocess environment;
+- security boundary tests verify synthetic, explicitly non-production values
+  inside isolated test cases;
 - no development or test value is a production fallback.
 
 ## Startup and rotation
 
 `scripts/start-standalone.mjs` validates the authoritative runtime schema before
-loading the standalone server. The local release gate runs an isolated startup
-matrix proving missing, invalid, and identical values fail with configuration
-status 78, while independent valid synthetic values pass. Output is checked to
-ensure no credential value is emitted.
+loading the standalone server. `tests/security/security-boundaries.test.ts`
+exercises an isolated startup subprocess matrix proving missing, invalid, and
+identical values fail with configuration status 78, while independent valid
+synthetic values pass and emit no credential values.
 
 Rotate one credential at a time using an atomic replacement in the runtime
 secret source, restart the service, verify readiness and the affected

@@ -6,6 +6,13 @@ import { CheckInRequestStatus, Prisma } from '@/generated/prisma/client';
 import type { CheckInRequest, OutboxStatus } from '@/generated/prisma/client';
 import crypto from 'node:crypto';
 
+// A privacy erasure cancels undelivered events by marking them DEAD with the
+// payload replaced by { redacted: true }; those are not delivery failures.
+export const ERASURE_CANCELLED_OUTBOX = {
+  status: 'DEAD' as const,
+  payload: { path: ['redacted'], equals: true },
+};
+
 export type CheckInRequestRecord = {
   id: string;
   booking_id?: string;
@@ -270,13 +277,12 @@ async function getStatusCounts(): Promise<CheckInRequestStatusCounts> {
 // Requeues the request's exhausted webhook notifications; the outbox worker
 // delivers them on its next run. Returns how many were requeued. Events that
 // a privacy erasure cancelled are DEAD too but must never be sent: they are
-// found with the positive filter of ERASURE_CANCELLED_OUTBOX
-// (operationalMonitor.ts) and excluded by id, because a negated JSON-path
-// filter could also drop the ordinary events, which have no `redacted` key.
-// Without cancelled events no `id` clause is sent.
+// found with the positive ERASURE_CANCELLED_OUTBOX filter and excluded by id,
+// because a negated JSON-path filter could also drop the ordinary events, which
+// have no `redacted` key. Without cancelled events no `id` clause is sent.
 async function retryFailedNotifications(id: string): Promise<number> {
   const cancelled = await prisma.outboxEvent.findMany({
-    where: { checkInRequestId: id, status: 'DEAD', payload: { path: ['redacted'], equals: true } },
+    where: { checkInRequestId: id, ...ERASURE_CANCELLED_OUTBOX },
     select: { id: true },
   });
   const retried = await prisma.outboxEvent.updateMany({
@@ -295,6 +301,28 @@ async function retryFailedNotifications(id: string): Promise<number> {
     },
   });
   return retried.count;
+}
+
+/**
+ * Best-effort immediate delivery for a newly committed check-in outbox event; failures stay queued for the worker.
+ */
+export async function deliverCheckInNotification(
+  eventId: string | null | undefined,
+  active: boolean,
+  inactiveReason: 'request_already_pending' | 'status_unchanged',
+) {
+  if (!active) return { status: 'skipped' as const, reason: inactiveReason };
+  if (!eventId) return { status: 'skipped' as const, reason: 'webhook_not_configured' as const };
+
+  const delivered = await (await import('@/lib/bookingOutbox')).deliverOutboxEvent(eventId).catch((error: unknown) => {
+    logger.warn('Immediate outbox delivery failed', {
+      eventId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  });
+
+  return { status: delivered ? ('sent' as const) : ('queued' as const) };
 }
 
 export const checkInRequestRepository = {

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import internalFetch from '@/lib/internalFetchClient';
+import { isConcurrentRefresh, retryDelayFrom } from '@/lib/portalRefreshClient';
 import {
   emitGuestSessionChanged,
   onGuestSessionChange,
@@ -8,8 +9,6 @@ import {
 import { logger } from '@/lib/logger-client';
 
 const MAX_REFRESH_ATTEMPTS = 3;
-const DEFAULT_RETRY_DELAY_MS = 1_000;
-const MAX_RETRY_DELAY_MS = 5_000;
 
 type StatusOutcome =
   | { kind: 'resolved'; isSignedIn: boolean; portalEnabled: boolean; checkinEnabled: boolean }
@@ -20,27 +19,6 @@ type RefreshOutcome = 'refreshed' | 'unauthorized' | 'portal_off' | 'transient_e
 
 let inFlightStatus: Promise<StatusOutcome> | null = null;
 let inFlightRefresh: Promise<RefreshOutcome> | null = null;
-
-function retryDelayFrom(response: Response): number {
-  const retryAfter = response.headers.get('retry-after');
-  if (!retryAfter) return DEFAULT_RETRY_DELAY_MS;
-  const seconds = Number(retryAfter);
-  if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds * 1_000, MAX_RETRY_DELAY_MS);
-  const retryAt = Date.parse(retryAfter);
-  if (Number.isNaN(retryAt)) return DEFAULT_RETRY_DELAY_MS;
-  return Math.min(Math.max(0, retryAt - Date.now()), MAX_RETRY_DELAY_MS);
-}
-
-async function isConcurrentRefresh(response: Response): Promise<boolean> {
-  if (response.status !== 409) return false;
-  try {
-    const body = await response.json() as { code?: string; error?: string | { code?: string } };
-    const code = typeof body.error === 'object' ? body.error?.code : body.code;
-    return code === 'REFRESH_IN_PROGRESS';
-  } catch {
-    return false;
-  }
-}
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => {

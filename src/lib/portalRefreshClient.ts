@@ -17,7 +17,7 @@ function safeRefreshDestination(value: string, baseHref: string): string | null 
   return safeHref;
 }
 
-function retryDelayFrom(response: Response): number {
+export function retryDelayFrom(response: Response): number {
   const retryAfter = response.headers.get('retry-after');
   if (!retryAfter) return DEFAULT_RETRY_DELAY_MS;
   const seconds = Number(retryAfter);
@@ -27,7 +27,7 @@ function retryDelayFrom(response: Response): number {
   return Math.min(Math.max(0, retryAt - Date.now()), MAX_RETRY_DELAY_MS);
 }
 
-async function isConcurrentRefresh(response: Response): Promise<boolean> {
+export async function isConcurrentRefresh(response: Response): Promise<boolean> {
   if (response.status !== 409) return false;
   try {
     const body = await response.json() as { code?: string; error?: string | { code?: string } };

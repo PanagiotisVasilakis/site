@@ -19,9 +19,14 @@ export function fill(template: string, values: Readonly<Record<string, string | 
   });
 }
 
+/** Formats an ISO calendar date (`YYYY-MM-DD`) using date-fns with the route's DayPicker locale. */
+export function formatIsoDate(date: IsoDate, pattern: string, locale: Locale): string {
+  return format(toLocalDate(date), pattern, { locale: DAY_PICKER_LOCALES[locale] });
+}
+
 /** 'Fri 23 Oct 2026' (en) or 'Παρ 23 Οκτ 2026' (el). */
 export function formatStayDate(date: IsoDate, locale: Locale): string {
-  return format(toLocalDate(date), 'EEE d MMM yyyy', { locale: DAY_PICKER_LOCALES[locale] });
+  return formatIsoDate(date, 'EEE d MMM yyyy', locale);
 }
 
 /** 'Friday, 23 October 2026' (en) or 'Παρασκευή, 23 Οκτωβρίου 2026' (el). */

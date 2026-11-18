@@ -39,8 +39,7 @@ No claim value is accepted from a query parameter, path segment, fragment,
 redirect, or `Location` header. The guest client removes the two legacy query
 names and any legacy claim fragment from the current history entry without
 using their values. The guest page sends `Referrer-Policy: no-referrer`;
-application diagnostics record only pathnames; Nginx access logs use `$uri`
-rather than `$request_uri`. Security audit details never contain the token or
+application diagnostics record only pathnames; edge proxy and server access logs must record only pathnames rather than full query strings. Security audit details never contain the token or
 its exchange digest.
 
 The exchange cookie is not a session and grants no access by itself. A digest

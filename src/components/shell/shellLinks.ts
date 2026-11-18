@@ -6,7 +6,7 @@ import { telHref } from '@/lib/contactLinks';
 
 /** Header variants (identity §8, §9). The footer has only `marketing` and `stay`; guide pages use `marketing`. */
 export type ShellVariant = 'marketing' | 'guide' | 'stay';
-export type FooterVariant = 'marketing' | 'stay';
+type FooterVariant = 'marketing' | 'stay';
 
 /**
  * The in-stay hub `/{l}/stay` (identity §9.4, R3-V9), without the locale prefix. "Your stay" and the stay
@@ -14,7 +14,7 @@ export type FooterVariant = 'marketing' | 'stay';
  */
 export const STAY_HUB_PATH = '/stay';
 
-export interface ShellLink {
+interface ShellLink {
   key: string;
   href: string;
   label: string;
@@ -34,7 +34,7 @@ function firstSegment(pathname: string): string {
   return parts[0] ?? '';
 }
 
-/** marketing: home, apartment, availability (/about redirects to the home page); stay: stay, guest, check-in, portal, offline; guide: the rest. */
+/** marketing: home, apartment, availability; stay: stay, guest, check-in, portal, offline; guide: the rest. */
 export function shellVariantFor(pathname: string): ShellVariant {
   const first = firstSegment(pathname);
   if (MARKETING_ROUTES.has(first)) return 'marketing';

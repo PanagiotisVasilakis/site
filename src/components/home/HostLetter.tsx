@@ -3,7 +3,7 @@ import type { Locale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
 
 /**
- * identity §8 HostLetter, §9.1 item 9 (`id="host"`; /about redirects here). A paper card with the
+ * identity §8 HostLetter, §9.1 item 9 (`id="host"`). A paper card with the
  * host's letter (owner text, R3-C1). The signature and the meta (languages, reply time) are owner data:
  * each renders only when HOST_PROFILE holds it (§1.4), so without it the letter is title and text only.
  */

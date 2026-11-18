@@ -229,7 +229,7 @@ export default function UnifiedGuestClient() {
                   <label htmlFor="origin" className="ui-field__label">
                     {dictionary.originQuestion} *
                   </label>
-                  <select id="origin" className={`${inputClass} ui-field__select`} value={origin} onChange={(event) => setOrigin(event.target.value as GuestOrigin)} required>
+                  <select id="origin" className={inputClass} value={origin} onChange={(event) => setOrigin(event.target.value as GuestOrigin)} required>
                     <option value="">{dictionary.originPlaceholder}</option>
                     <option value="GR">{dictionary.originGR}</option>
                     <option value="ABROAD">{dictionary.originAbroad}</option>

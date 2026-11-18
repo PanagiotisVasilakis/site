@@ -34,11 +34,12 @@ const PATHS = {
   bus: <><rect x="5" y="3" width="14" height="15" rx="2.5" /><path d="M5 11h14M5 7h14M8 18v2.5M16 18v2.5M8.5 14.5h.01M15.5 14.5h.01" /></>,
   plane: <path d="M21 15.5v-2l-8-5V4a1 1 0 0 0-2 0v4.5l-8 5v2l8-2.5V18l-2.5 2v1.5l3.5-1 3.5 1V20L13 18v-5Z" />,
   // Amenities
+  home: <><path d="m4 11 8-7 8 7" /><path d="M6.5 10.5V20h11v-9.5M10 20v-5h4v5" /></>,
   wifi: <path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.5 16a5 5 0 0 1 7 0M12 19.5h.01" />,
   snowflake: <path d="M12 2.5v19M3.8 7.25l16.4 9.5M3.8 16.75l16.4-9.5M9.5 4.5 12 7l2.5-2.5M9.5 19.5 12 17l2.5 2.5" />,
   flame: <path d="M12 21a6 6 0 0 0 6-6c0-4-3-6-4-10-2.5 2-3 4-3 6-1-.5-2-1.5-2.3-3C7 9.5 6 12 6 15a6 6 0 0 0 6 6Z" />,
   kitchen: <path d="M4 10h16v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4ZM2 10h2M20 10h2M9 6.5c0-1 1-1 1-2.5M14 6.5c0-1 1-1 1-2.5" />,
-  washer: <><rect x="4" y="2.5" width="16" height="19" rx="2" /><circle cx="12" cy="13.5" r="4.5" /><path d="M7.5 6h.01M10.5 6h.01" /></>,
+  basket: <><path d="M6 10h12l-1.4 8.2a2 2 0 0 1-2 1.8H9.4a2 2 0 0 1-2-1.8L6 10Z" /><path d="M9 10a3 3 0 0 1 6 0M9 14h6" /></>,
   baby: <path d="M4 4v16M20 4v16M4 16h16M4 8h16M8 8v8M12 8v8M16 8v8" />,
   key: <><circle cx="8" cy="15" r="4.5" /><path d="M11.2 11.8 20 3M16.5 6.5 19 9M14.5 8.5l2 2" /></>,
   lock: <><rect x="5" y="10.5" width="14" height="10.5" rx="2" /><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5M12 15v2" /></>,
@@ -57,10 +58,10 @@ const PATHS = {
   // Status
   info: <><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.5h.01" /></>,
   check: <path d="M4 12.5 9 17l11-11" />,
+  copy: <><rect x="8" y="8" width="11" height="11" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" /></>,
   alert: <path d="M12 3.5 21.5 20h-19ZM12 10v4.5M12 17.5h.01" />,
   clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></>,
   // Menu
-  image: <><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9" r="1.5" /><path d="m5 17 4.5-4.5 3.2 3.2 2.3-2.3 4 3.6" /></>,
   user: <><circle cx="12" cy="8" r="4" /><path d="M4.5 21a7.5 7.5 0 0 1 15 0" /></>,
 } satisfies Record<string, ReactNode>;
 

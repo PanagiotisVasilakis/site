@@ -1,7 +1,9 @@
+import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { STAY_HUB_PATH } from '@/components/shell/shellLinks';
 import { normalizeLocale } from '@/i18n/config';
+import { getDictionary } from '@/i18n/dictionaries';
 import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 import { GUEST_REFRESH_COOKIE, getVerifiedGuestSessionFromCookies } from '@/lib/guestSession';
 import UnifiedGuestClient from './UnifiedGuestClient';
@@ -12,6 +14,14 @@ type GuestUnifiedPageProps = {
   params?: Promise<{ locale?: string }>;
   searchParams?: Promise<{ mode?: string; flash?: string }>;
 };
+
+export async function generateMetadata({ params }: Pick<GuestUnifiedPageProps, 'params'> = {}): Promise<Metadata> {
+  const resolved = params ? await params : undefined;
+  return {
+    robots: { index: false, follow: false },
+    title: getDictionary(normalizeLocale(resolved?.locale)).stay.hub.portalSignInTitle,
+  };
+}
 
 export default async function GuestUnifiedPage({ params, searchParams }: GuestUnifiedPageProps = {}) {
   const flags = await getFeatureFlagsAsync();

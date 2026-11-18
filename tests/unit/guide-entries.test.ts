@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { formatDistance, nearestTo, sortByDistance, straightLineKm, toGuideEntry } from '@/components/guide/guideEntries';
-import { chipCounts, filterByCategory } from '@/components/guide/guideFilters';
+import { chipCounts, filterByCategory, filterBySearchText } from '@/components/guide/guideFilters';
 import { categories } from '@/data/categories';
 import { APARTMENT_LOCATION } from '@/data/mapLocations';
 import { getDictionary } from '@/i18n/dictionaries';
@@ -62,5 +62,23 @@ describe('guide filters (R-325/R-326 decision)', () => {
     expect(filterByCategory(items, 'all')).toHaveLength(3);
     expect(filterByCategory(items, 'bars')).toEqual([]);
     expect(chipCounts([])).toEqual([]);
+  });
+});
+
+describe('search text normalisation', () => {
+  it.each([
+    ['ΜΟΥΣΕΙΟ', 'Μουσείο'],
+    ['ΟΔΟΣ', 'οδός'],
+    ['οδοσ', 'Οδός'],
+    ['προιοντα', 'Προϊόντα'],
+  ])('finds %s in %s', (query, text) => {
+    expect(filterBySearchText([{ name: text }], query)).toEqual([{ name: text }]);
+  });
+
+  it('matches every field and returns all items for an empty query', () => {
+    const items = [{ name: 'Αρχαιολογικό Μουσείο' }, { name: 'Beach', summary: 'Παραλία' }, { description: 'Κάστρο' }];
+
+    expect(filterBySearchText(items, 'ΠΑΡΑΛΙΑ')).toEqual([items[1]]);
+    expect(filterBySearchText(items, '  ')).toEqual(items);
   });
 });

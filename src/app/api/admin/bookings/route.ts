@@ -7,14 +7,13 @@ import {
   ApiErrorCode,
   createSuccessResponse,
   readJsonBody,
+  requireAdminRequest,
   ValidationError,
   withErrorHandler,
 } from '@/lib/apiErrorHandler';
 import { nightsBetween, toDbDate } from '@/lib/availability/calendarDate';
-import { isSameOriginRequest } from '@/lib/net/sameOrigin';
 import { prisma } from '@/lib/prisma';
 import { isoDateSchema } from '@/lib/prisma-repositories/ratePeriodRepository';
-import { isAdminRequest } from '@/lib/rbac';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,13 +41,7 @@ const schema = z.object({
 });
 
 export const POST = withErrorHandler(async (request: NextRequest) => {
-  if (!(await isAdminRequest(request))) {
-    throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
-  }
-  const origin = request.headers.get('origin');
-  if (origin && !isSameOriginRequest(origin, request)) {
-    throw new ApiError(ApiErrorCode.FORBIDDEN, 'Cross-origin admin mutation rejected');
-  }
+  await requireAdminRequest(request, { sameOrigin: true });
 
   const parsed = schema.safeParse(await readJsonBody(request, 4 * 1_024));
   if (!parsed.success) throw new ValidationError(parsed.error.issues);

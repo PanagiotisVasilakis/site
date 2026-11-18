@@ -18,7 +18,8 @@ vi.mock('@/lib/guestSession', async (importOriginal) => ({
   verifyGuestSessionAccess: mocks.verifyGuestSessionAccess,
 }));
 vi.mock('@/lib/guestDataStore', () => ({ guestStore: { findUserById: mocks.findUserById } }));
-vi.mock('@/lib/prisma-repositories/checkInRequestRepository', () => ({
+vi.mock('@/lib/prisma-repositories/checkInRequestRepository', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/prisma-repositories/checkInRequestRepository')>()),
   checkInRequestRepository: { create: mocks.create, findLatestForGuest: mocks.findLatestForGuest },
 }));
 vi.mock('@/lib/bookingOutbox', () => ({ deliverOutboxEvent: mocks.deliverOutboxEvent }));

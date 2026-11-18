@@ -67,7 +67,8 @@ import { favoriteIdOf } from '@/components/guide/guideEntries';
 import { categories } from '@/data/categories';
 import { getDictionary } from '@/i18n/dictionaries';
 import { telHref } from '@/lib/contactLinks';
-import { getItemsByCategory, pickLocale } from '@/lib/data';
+import { getItemsByCategory } from '@/lib/data';
+import { pickLocale } from '@/lib/localize';
 
 const wrap = (node: ReactNode) => render(<ToastProvider>{node}</ToastProvider>);
 const params = (locale: string) => ({ params: Promise.resolve({ locale }) });
@@ -266,15 +267,15 @@ describe('/{l}/stay hub (identity §9.4)', () => {
 });
 
 describe('stay routes render calm, with no booking CTA (identity §12 R3-V9)', () => {
-  it.each(['en'])('guest sign-in (%s)', (locale) => {
-    navigation.locale = locale;
+  it('guest sign-in (en)', () => {
+    navigation.locale = 'en';
     const { container } = wrap(<UnifiedGuestClient />);
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
     expectCalmStayPage(container);
   });
 
-  it.each(['en'])('guest claim flow (%s)', (locale) => {
-    navigation.locale = locale;
+  it('guest claim flow (en)', () => {
+    navigation.locale = 'en';
     navigation.search = 'mode=signup';
     const { container } = wrap(<UnifiedGuestClient />);
     expectCalmStayPage(container);
@@ -300,21 +301,21 @@ describe('stay routes render calm, with no booking CTA (identity §12 R3-V9)', (
     expectCalmStayPage(container);
   });
 
-  it.each(['en'] as const)('check-in lists the emergency numbers, 112 first (R3-L10, %s)', async (locale) => {
+  it('check-in lists the emergency numbers, 112 first (R3-L10, en)', async () => {
     session.isSignedIn = true;
-    navigation.locale = locale;
-    const { container } = wrap(await CheckInPage(params(locale)));
+    navigation.locale = 'en';
+    const { container } = wrap(await CheckInPage(params('en')));
 
     const section = container.querySelector('#emergency') as HTMLElement;
     const hrefs = within(section).getAllByRole('link').map((link) => link.getAttribute('href'));
     expect(hrefs[0]).toBe('tel:112');
     expect(hrefs.filter((href) => href === 'tel:112')).toHaveLength(1);
-    const title = getDictionary(locale).checkinInfo.emergencyTitle;
+    const title = getDictionary('en').checkinInfo.emergencyTitle;
     const phones = getItemsByCategory('phones');
     const listed = phones.filter((item) => item.tags?.includes('emergency') && item.id !== 'emergency-112');
     expect(listed.length).toBeGreaterThanOrEqual(6);
     for (const item of listed) {
-      const name = pickLocale(item, 'name', locale) ?? item.name;
+      const name = pickLocale(item, 'name', 'en') ?? item.name;
       expect(within(section).getByRole('link', { name: `${title}: ${name}` })).toHaveAttribute('href', telHref(item.phone));
     }
     for (const item of phones.filter((entry) => !entry.tags?.includes('emergency'))) {

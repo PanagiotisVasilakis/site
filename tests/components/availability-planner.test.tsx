@@ -473,11 +473,9 @@ describe('AvailabilityPlanner', () => {
     expect(container.querySelector('[data-day="2026-11-09"]')).not.toBeNull();
   });
 
-  it.each([
-    '#checkin=2026-10-07&checkout=2026-10-10&m=2027-06',
-  ])('lets the stay win over the month in %s', (fragment) => {
+  it('lets the stay win over the month in #checkin=2026-10-07&checkout=2026-10-10&m=2027-06', () => {
     stubViewport(true);
-    window.history.replaceState(null, '', `${PAGE_PATH}${fragment}`);
+    window.history.replaceState(null, '', `${PAGE_PATH}#checkin=2026-10-07&checkout=2026-10-10&m=2027-06`);
     const { container } = renderPlanner();
 
     expect(within(summary()).getByText('3 nights')).toBeInTheDocument();

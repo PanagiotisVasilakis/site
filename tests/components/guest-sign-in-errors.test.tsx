@@ -86,15 +86,15 @@ describe('guest sign-in flow', () => {
     expect(emitMock).toHaveBeenCalledWith('signin');
   });
 
-  it.each(['en'])('falls back to the %s check-in page when the server names no redirect', async (locale) => {
-    navigation.locale = locale;
+  it('falls back to the en check-in page when the server names no redirect', async () => {
+    navigation.locale = 'en';
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { success: true, data: { bookingId: 'booking-1' } }));
     render(<UnifiedGuestClient />);
     fireEvent.change(document.getElementById('guest-phone')!, { target: { value: PHONE } });
     fireEvent.change(document.getElementById('guest-password')!, { target: { value: PASSWORD } });
     submitForm();
 
-    await waitFor(() => expect(navigation.router.push).toHaveBeenCalledWith(`/${locale}/check-in`));
+    await waitFor(() => expect(navigation.router.push).toHaveBeenCalledWith('/en/check-in'));
     expect(emitMock).toHaveBeenCalledWith('signin');
   });
 

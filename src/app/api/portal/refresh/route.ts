@@ -15,24 +15,18 @@ import { logger } from '@/lib/logger-enterprise';
 import { requestAuthContext } from '@/lib/portalAuthHttp';
 import { checkSensitiveRateLimit } from '@/lib/sensitiveRateLimit';
 
-function applyAuthCookies(response: NextResponse, sessionJwt: string, refreshToken: string): void {
-  const sessionCookie = createSessionCookie(sessionJwt);
-  response.cookies.set(sessionCookie.name, sessionCookie.value, sessionCookie.options);
-
-  const refreshCookie = createRefreshCookie(refreshToken);
-  response.cookies.set(refreshCookie.name, refreshCookie.value, refreshCookie.options);
-}
-
-function clearAuthCookies(response: NextResponse): void {
-  const sessionCookie = clearSessionCookie();
-  const refreshCookie = clearRefreshCookie();
-  response.cookies.set(sessionCookie.name, sessionCookie.value, sessionCookie.options);
-  response.cookies.set(refreshCookie.name, refreshCookie.value, refreshCookie.options);
+function applyCookies(
+  response: NextResponse,
+  cookies: Array<ReturnType<typeof createSessionCookie>>,
+): void {
+  for (const cookie of cookies) {
+    response.cookies.set(cookie.name, cookie.value, cookie.options);
+  }
 }
 
 function unauthorizedResponse(): NextResponse {
   const response = new NextResponse('Unauthorized', { status: 401 });
-  clearAuthCookies(response);
+  applyCookies(response, [clearSessionCookie(), clearRefreshCookie()]);
   return response;
 }
 
@@ -65,7 +59,6 @@ async function issueRefreshedSession(
   const context = requestAuthContext(request);
   const rotated = await guestStore.rotateRefreshToken(refreshToken, 7, {
     device_hint: context.deviceHint,
-    ip_hint: context.ipHint,
     presented_session: parseGuestSessionBinding(
       request.cookies.get(GUEST_SESSION_COOKIE)?.value,
     ),
@@ -135,6 +128,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     return unauthorizedResponse();
   }
   const res = createSuccessResponse({ refreshed: true });
-  applyAuthCookies(res, refreshed.jwt, refreshed.refreshToken);
+  applyCookies(res, [createSessionCookie(refreshed.jwt), createRefreshCookie(refreshed.refreshToken)]);
   return res;
 });

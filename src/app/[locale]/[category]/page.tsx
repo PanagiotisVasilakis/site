@@ -4,7 +4,8 @@ import { PhonesDirectory } from '@/components/guide/PhonesDirectory';
 import { knownFavoriteIds, sortByDistance, toGuideEntry } from '@/components/guide/guideEntries';
 import { EmptyPanel } from '@/components/ui/EmptyPanel';
 import { categories } from "@/data/categories";
-import { getItemsByCategory, pickCategoryLocale } from "@/lib/data";
+import { getItemsByCategory } from "@/lib/data";
+import { pickLocale } from '@/lib/localize';
 import { notFound } from "next/navigation";
 import { getDictionary, type Dictionary } from "@/i18n/dictionaries";
 import { normalizeLocale } from '@/i18n/config';
@@ -18,8 +19,8 @@ function pageCopy(cat: Category, locale: Locale, t: Dictionary): { title: string
   if (cat.slug === 'moments') return { title: t.guide.title, lead: t.guide.lead };
   if (cat.slug === 'phones') return { title: t.guide.phonesTitle, lead: t.guide.phonesLead };
   return {
-    title: pickCategoryLocale(cat, 'title', locale) ?? cat.title,
-    lead: pickCategoryLocale(cat, 'description', locale) ?? cat.description,
+    title: pickLocale(cat, 'title', locale) ?? cat.title,
+    lead: pickLocale(cat, 'description', locale) ?? cat.description,
   };
 }
 

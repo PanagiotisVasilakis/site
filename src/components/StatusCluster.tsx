@@ -151,16 +151,20 @@ export default function StatusCluster({ labels }: Props) {
   const netState = hydrated ? netStateRaw : 'online';
   const netLabel = labels[netState];
 
+  const aria = `${netLabel}.`;
+
+  // Colours come from tokens per state (components/stay.css, R3-V9).
   return (
-    <div
-      className="status-pill"
+    <span
+      role="status"
+      className="net-status"
       data-state={netState}
-      aria-label={netLabel}
+      aria-live="polite"
+      aria-label={aria}
+      title={aria}
     >
-      <span className="status-pill__dot" aria-hidden="true" />
-      <span className="status-pill__text">
-        {netLabel}
-      </span>
-    </div>
+      <span className="net-status-dot" aria-hidden />
+      <span className="net-status__label">{netLabel}</span>
+    </span>
   );
 }

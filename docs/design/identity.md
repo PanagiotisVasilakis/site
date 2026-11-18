@@ -408,7 +408,7 @@ Measure: running text ≤ 65ch; lead ≤ 38em.
 
 **Method.**
 
-- Computed with `/private/tmp/claude-503/-Users-pvasilakis-site/e6271ddf-8171-43b6-8d73-718dfd3a7330/scratchpad/contrast.mjs`: the WCAG formula, with alpha tokens composited over the stated background (the composite hex is shown).
+- Computed via the WCAG relative-luminance formula with alpha tokens composited over the stated background (verified continuously by `tests/unit/design-tokens.test.ts`).
 - The R3-V2 unit test must reproduce these numbers.
 - Minimums: 4.5 for text, 3.0 for large text (≥ 24 px, or ≥ 18.66 px bold) and for UI boundaries and focus indicators.
 - **Result: 0 failures.** The table has 123 rows (59 light, 56 dark, 8 both; rows from R3-V5b, V5c, V6, V7, V8, V9, V10 and V12a included; the two kinetic band rows went with the band on 2026-10-11). `tests/unit/design-tokens.test.ts` holds 13 more pairs (136 labels in all; rows with the same pair, minimum and ratio share one test case) and is the source of truth; 135 of its labels have a minimum, and the decorative `sun` row has none (it is never text). R3-V9 note: over the stay hub's half sun, `fg-muted` would be 2.50:1 at night, so the sun is sized from `--text-d1` and ends above the lead; only the d1 H1 (large text) sits over it.
@@ -1004,7 +1004,7 @@ Marketing views: 42 photos (selection of 2026-10-11; two balcony photos and one 
 - **Home room cards:** the lead photo of each room at 4:5 below 1024 px and 330 × 420 px at 1024 px and above (`home.css`), by `object-position`. The balcony card uses `balcony_2` at `object-position: 50% 100%` (table and chairs), so the home page does not show `balcony_1` a third time after the hero and the BalconyWindow.
 - **Details section "Up close"** (`details`; Greek "Από κοντά"): the last gallery section of the apartment page, after the parking section, with the line "Shells, wood and stone in the afternoon light" (the ten photos were taken on 2026-08-01 between 16:55 and 17:45). Ten owner close-ups, all 2:3. Their order does not alternate warm and pale tiles (measured 2026-10-13 on the files in `public/house/details`: `details_2`, `details_4` and `details_6` are the palest, mean luminance 184–192 of 255; `details_1`, `details_5`, `details_7` and `details_9` the warmest, mean red minus blue 34–74), so a row can hold two pale tiles (`details_2` and `details_4` share the first row from 1280 px). The section is a row-major grid (`apt-masonry--grid`): 2 tiles per row below 768 px, 3 from 768 px, 4 from 1280 px, so the rows are 2 + 2 + 2 + 2 + 2, 3 + 3 + 3 + 1 and 4 + 4 + 2. No home card (`homeRooms.ts` keeps its six rooms); the copy is in `house.ts`. Details add to the room photos and never stand in for them: no clutter or utility corners, no brands or packaging, no people or guest belongings, no private data, and nothing that suggests an amenity missing from `apartmentData.ts`. Three originals have EXIF orientation 6, so the processing calls `autoOrient()` before `extract()`; sharp applies the orientation first only in that order.
 - **Guide cards:** use the museum `*-hero` photos at 16:10. The square drawn emblems are not used, to avoid a second visual style.
-  - `viktoria-karelia-hero.jpg` is almost black (L = .018), so it uses the **art tile** instead.
+  - `viktoria-karelia-museum` omits `heroImage` (the dark source file was removed), so it uses the **art tile** instead.
   - The **art tile** is `band-bg` with a `band-accent` 56 px category icon and the category name. It is a deliberate illustrated tile used for any entry without a licensed photo, never beige or striped placeholders.
 - **Phones:** photos become 64 px rounded thumbnails, not banners. The SOS illustration is not used.
 
@@ -1030,7 +1030,7 @@ Until then:
 
 ## 8. Components and states
 
-Primitives live in `src/components/ui/` and extend the existing `Button`, `Surface`, `Badge` and `EmptyPanel` with `class-variance-authority` and `clsx`, which are already dependencies. Every interactive element has these states:
+Primitives live in `src/components/ui/` and extend the existing `Button`, `Surface`, `Badge` and `EmptyPanel` with `clsx`. Every interactive element has these states:
 
 - **Default.**
 - **Hover** (fine pointers only, `@media (hover: hover) and (pointer: fine)`).
@@ -1094,7 +1094,7 @@ Shell per route: M = marketing header, G = guide header, S = stay header (§8). 
 6. **RoomsShowcase** ("A slow walk through the rooms"; its headline sits outside any transformed element, which fixes the cut-off line).
 7. **NightsTeaser** (eyebrow "Availability", the next 14 nights free or booked, CTA; only with a fresh calendar).
 8. **Location** (band): title "Between Taygetos *and the gulf*", lead, DistanceList, LocationRelief.
-9. **HostLetter** (`id="host"`; `/about` 308-redirects here, per V5).
+9. **HostLetter** (`id="host"`).
 10. **Optional ReviewsStrip** (only with the owner's real review data, §1.4).
 11. **FAQ**: check-in/out, parking, children and cot. *The cancellation question was removed on 2026-10-15 at the owner's request: the site shows no cancellation policy.*
 12. *ContactBand: removed on 2026-10-11 at the owner's request; the footer's contact block is the `#contact` target (item 13).*

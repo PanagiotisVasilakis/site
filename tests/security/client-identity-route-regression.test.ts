@@ -15,7 +15,6 @@ const mocks = vi.hoisted(() => ({
   logger: {
     setContext: vi.fn(),
     getContext: vi.fn(),
-    trace: vi.fn(),
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
@@ -27,7 +26,8 @@ const SYNTHETIC_ADMIN_DASH_CREDENTIAL = createHash('sha256')
   .update('client-identity-route-isolated-fixture', 'utf8')
   .digest('base64url');
 
-vi.mock('@/lib/auth/admin', () => ({
+vi.mock('@/lib/auth/admin', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/auth/admin')>()),
   createAdminSession: mocks.createAdminSession,
   signAdmin: mocks.signAdmin,
   verifyAdmin: vi.fn(),
@@ -172,7 +172,6 @@ async function expectGenericIdentityUnavailable(
   const body = await response.text();
   expect(body).toMatch(/service[_ ]unavailable|temporarily unavailable/i);
   const diagnostics = JSON.stringify([
-    ...mocks.logger.trace.mock.calls,
     ...mocks.logger.debug.mock.calls,
     ...mocks.logger.info.mock.calls,
     ...mocks.logger.warn.mock.calls,
@@ -328,7 +327,6 @@ describe('missing client identity route boundary', () => {
     const exposed = JSON.stringify([
       body,
       response.headers.get('set-cookie'),
-      ...mocks.logger.trace.mock.calls,
       ...mocks.logger.debug.mock.calls,
       ...mocks.logger.info.mock.calls,
       ...mocks.logger.warn.mock.calls,

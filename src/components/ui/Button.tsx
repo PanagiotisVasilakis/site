@@ -1,38 +1,25 @@
 import React from 'react';
 import clsx from 'clsx';
-import { cva, type VariantProps } from 'class-variance-authority';
 
 /** identity §8 Button (styles in src/styles/components/ui.css); `variant` defaults to primary. */
-const buttonVariants = cva('ui-btn', {
-  variants: {
-    variant: {
-      primary: 'ui-btn--primary',
-      secondary: 'ui-btn--secondary',
-      ghost: 'ui-btn--ghost',
-      glass: 'ui-btn--glass',
-      'on-band': 'ui-btn--on-band',
-      'link-arrow': 'ui-btn--link-arrow',
-    },
-    size: {
-      sm: 'ui-btn--sm',
-      md: 'ui-btn--md',
-      lg: 'ui-btn--lg',
-    },
-    block: {
-      true: 'ui-btn--block',
-    },
-  },
-  defaultVariants: {
-    variant: 'primary',
-    size: 'md',
-  },
-});
+const BUTTON_VARIANTS = {
+  primary: 'ui-btn--primary',
+  secondary: 'ui-btn--secondary',
+  ghost: 'ui-btn--ghost',
+  glass: 'ui-btn--glass',
+  'on-band': 'ui-btn--on-band',
+  'link-arrow': 'ui-btn--link-arrow',
+} as const;
 
-type ButtonVariantProps = VariantProps<typeof buttonVariants>;
+const BUTTON_SIZES = {
+  sm: 'ui-btn--sm',
+  md: 'ui-btn--md',
+  lg: 'ui-btn--lg',
+} as const;
 
 type StyleProps = {
-  variant?: NonNullable<ButtonVariantProps['variant']>;
-  size?: NonNullable<ButtonVariantProps['size']>;
+  variant?: keyof typeof BUTTON_VARIANTS;
+  size?: keyof typeof BUTTON_SIZES;
   block?: boolean;
 };
 
@@ -47,8 +34,14 @@ type ButtonAsChildProps = Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, 'c
 
 type AppButtonProps = ButtonProps | ButtonAsChildProps;
 
-export function Button({ className, asChild, variant, size, block, ...props }: AppButtonProps) {
-  const classes = clsx(buttonVariants({ variant, size, block }), className);
+export function Button({ className, asChild, variant = 'primary', size = 'md', block, ...props }: AppButtonProps) {
+  const classes = clsx(
+    'ui-btn',
+    BUTTON_VARIANTS[variant],
+    BUTTON_SIZES[size],
+    block && 'ui-btn--block',
+    className,
+  );
 
   if (asChild) {
     const { children, ...anchorProps } = props as Omit<ButtonAsChildProps, 'asChild'>;

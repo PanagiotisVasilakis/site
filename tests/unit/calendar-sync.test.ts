@@ -127,10 +127,8 @@ afterEach(() => {
 });
 
 describe('syncBookingCalendar: configuration', () => {
-  it.each([
-    ['empty', ''],
-  ])('returns not_configured without touching the database or the network when the URL is %s', async (_label, value) => {
-    vi.stubEnv('BOOKING_ICAL_URL', value);
+  it('returns not_configured without touching the database or the network when the URL is empty', async () => {
+    vi.stubEnv('BOOKING_ICAL_URL', '');
 
     await expect(sync('scheduled')).resolves.toEqual({ status: 'not_configured' });
     await expect(sync('manual')).resolves.toEqual({ status: 'not_configured' });
@@ -190,11 +188,9 @@ describe('syncBookingCalendar: success', () => {
   });
 
   // 24 October is already past at the property (01:30 on 25 October in Athens), although it is still the UTC date.
-  it.each<[string, string[]]>([
-    ['only past nights', ['2026-10-23', '2026-10-24']],
-  ])('stores an empty calendar on a scheduled run when the snapshot holds %s', async (_label, stored) => {
+  it('stores an empty calendar on a scheduled run when the snapshot holds only past nights', async () => {
     mocks.fetch.mockResolvedValue(new Response(calendar(), { status: 200 }));
-    mocks.findUnique.mockResolvedValue({ blockedNights: stored.map(utcMidnight) });
+    mocks.findUnique.mockResolvedValue({ blockedNights: ['2026-10-23', '2026-10-24'].map(utcMidnight) });
 
     await expect(sync('scheduled')).resolves.toEqual({ status: 'synced', blockedNights: 0 });
 
@@ -248,11 +244,11 @@ describe('syncBookingCalendar: not claimed', () => {
     expect(mocks.fetch).not.toHaveBeenCalled();
   });
 
-  it.each(['scheduled'] as const)('a %s run returns busy while another run holds the lease', async (trigger) => {
+  it('a scheduled run returns busy while another run holds the lease', async () => {
     mocks.updateMany.mockResolvedValue({ count: 0 });
     mocks.findUnique.mockResolvedValue({ leaseExpiresAt: NOW });
 
-    await expect(sync(trigger)).resolves.toEqual({ status: 'busy' });
+    await expect(sync('scheduled')).resolves.toEqual({ status: 'busy' });
 
     expect(mocks.updateMany).toHaveBeenCalledTimes(1);
     expect(mocks.fetch).not.toHaveBeenCalled();

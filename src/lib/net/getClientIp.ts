@@ -54,7 +54,7 @@ function validAttestation(presented: string | null): boolean {
  * Resolve the canonical identity asserted by the local trusted reverse proxy.
  *
  * Public forwarding headers are deliberately ignored. Both private headers are
- * overwritten by Nginx, and the attestation is compared in constant time. A
+ * overwritten by the trusted reverse proxy, and the attestation is compared in constant time. A
  * duplicate Fetch header is comma-coalesced and therefore rejected.
  */
 export function getClientIp(request: NextRequest): string {

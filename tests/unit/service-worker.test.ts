@@ -327,7 +327,7 @@ describe('service worker', () => {
     expect(await visited.text()).toBe('network /en/moments');
   });
 
-  // R-425: during an origin outage Nginx answers 502 (Cloudflare 52x). The fetch resolves instead of rejecting,
+  // R-425: during an origin outage an edge proxy answers 502 (Cloudflare 52x). The fetch resolves instead of rejecting,
   // so the fallback to the visited copy never ran and the guest saw the error page.
   it('serves the visited copy of a public page when the origin answers 5xx; unvisited and network-only pages keep the 5xx (R-425)', async () => {
     let status = 200;
@@ -523,7 +523,7 @@ describe('service worker', () => {
   // R-459: next/image serves photos as `/_next/image?url=…&w=…&q=…`: no file extension, not under /_next/static/.
   it('caches the next/image optimizer responses of visited pages, so their photos render offline (R-459)', async () => {
     const photo = (width: number) => ({
-      request: { url: `${ORIGIN}/_next/image?url=%2Fphones%2Fsos-hero.webp&w=${width}&q=75`, method: 'GET', mode: 'no-cors' },
+      request: { url: `${ORIGIN}/_next/image?url=%2Fphones%2Fpolice-hero.webp&w=${width}&q=75`, method: 'GET', mode: 'no-cors' },
     });
     const { handlers } = loadWorker(async (request) => {
       if (!online) throw new TypeError('Failed to fetch');
@@ -534,11 +534,11 @@ describe('service worker', () => {
 
     const first = await dispatch(handlers, 'fetch', photo(128)) as Response | undefined;
     expect(first, 'the worker answers /_next/image requests').toBeDefined();
-    expect(await first!.text()).toBe('network /_next/image?url=%2Fphones%2Fsos-hero.webp&w=128&q=75');
+    expect(await first!.text()).toBe('network /_next/image?url=%2Fphones%2Fpolice-hero.webp&w=128&q=75');
 
     online = false;
     const offline = await dispatch(handlers, 'fetch', photo(128)) as Response;
-    expect(await offline.text()).toBe('network /_next/image?url=%2Fphones%2Fsos-hero.webp&w=128&q=75');
+    expect(await offline.text()).toBe('network /_next/image?url=%2Fphones%2Fpolice-hero.webp&w=128&q=75');
     // The cache key is the whole URL: a width that was never fetched is not answered with another one.
     const other = await dispatch(handlers, 'fetch', photo(256)) as Response;
     expect(other.status).toBe(504);

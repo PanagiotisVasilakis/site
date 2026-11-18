@@ -170,9 +170,8 @@ async function waitForDatabaseLock(
 
 async function readRaceState(
   client: PrismaClient,
-  repository: RefreshTokenRepository,
 ): Promise<RaceState> {
-  const [family, tokens, sessions, rootVerification, replacementVerification] = await Promise.all([
+  const [family, tokens, sessions] = await Promise.all([
     client.refreshTokenFamily.findUnique({ where: { id: FAMILY_ID } }),
     client.refreshToken.findMany({
       where: { familyId: FAMILY_ID },
@@ -182,9 +181,26 @@ async function readRaceState(
       where: { id: { in: [ROOT_CREDENTIAL_ID, REPLACEMENT_CREDENTIAL_ID] } },
       orderBy: { createdAt: 'asc' },
     }),
-    repository.verify(`${ROOT_CREDENTIAL_ID}.${ROOT_SECRET}`),
-    repository.verify(`${REPLACEMENT_CREDENTIAL_ID}.${REPLACEMENT_SECRET}`),
   ]);
+  const now = Date.now();
+  const isUsable = (id: string, secret: string) => {
+    const token = tokens.find((candidate) => candidate.id === id);
+    const session = sessions.find((candidate) => candidate.id === id);
+    return Boolean(
+      token
+      && session
+      && session.userId === token.userId
+      && !session.revokedAt
+      && !token.revokedAt
+      && token.expiresAt.getTime() > now
+      && family
+      && !family.revokedAt
+      && family.absoluteExpiresAt.getTime() > now
+      && hashSecret(secret, token.salt) === token.tokenHash,
+    );
+  };
+  const rootVerification = isUsable(ROOT_CREDENTIAL_ID, ROOT_SECRET);
+  const replacementVerification = isUsable(REPLACEMENT_CREDENTIAL_ID, REPLACEMENT_SECRET);
 
   return {
     familyRevoked: Boolean(family?.revokedAt),
@@ -248,7 +264,6 @@ async function executeRace(
             tokenExpiresAt: now.getTime() + 7 * 24 * 60 * 60 * 1_000,
             sessionExpiresAt: new Date(now.getTime() + 2 * 60 * 60 * 1_000),
             deviceHash: DEVICE_HASH,
-            ipHash: IP_HASH,
             presentedSession: { status: 'missing' as const },
             createSessionToken: () => 'synthetic-race-session-token',
           };
@@ -310,10 +325,7 @@ async function executeRace(
           return {
             revocationResult,
             rotationResult,
-            state: await readRaceState(
-              blockerAndMonitorClient,
-              refreshRepository,
-            ),
+            state: await readRaceState(blockerAndMonitorClient),
           };
         } finally {
           releaseBlocker.resolve(undefined);
@@ -367,7 +379,6 @@ async function runSigningFailureRollback(): Promise<RaceState> {
             tokenExpiresAt: now.getTime() + 7 * 24 * 60 * 60 * 1_000,
             sessionExpiresAt: new Date(now.getTime() + 2 * 60 * 60 * 1_000),
             deviceHash: DEVICE_HASH,
-            ipHash: IP_HASH,
             presentedSession: { status: 'missing' },
             createSessionToken: () => {
               throw new Error('Synthetic response-credential construction failure');
@@ -388,7 +399,7 @@ async function runSigningFailureRollback(): Promise<RaceState> {
       } finally {
         errorLog.mockRestore();
       }
-      return readRaceState(client, repository);
+      return readRaceState(client);
     });
   } finally {
     await dropIsolatedDatabase(target);

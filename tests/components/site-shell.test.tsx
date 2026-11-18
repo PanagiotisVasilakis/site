@@ -3,6 +3,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { removeDialogMethods, stubMatchMedia } from '../support/dom';
 
 const navigation = vi.hoisted(() => ({ pathname: '/en', search: '' }));
 const session = vi.hoisted(() => ({ isSignedIn: false, portalEnabled: true, checkinEnabled: true, signOut: vi.fn() }));
@@ -26,6 +27,7 @@ vi.mock('@/hooks/useGuestSession', () => ({
 vi.mock('@/lib/motion/pointerEffects', () => ({ usePointerEffects: pointerEffects }));
 
 import { ToastProvider } from '@/components/Toast';
+import DocumentLocale from '@/components/DocumentLocale';
 import SiteHeader from '@/components/shell/SiteHeader';
 import SiteFooter from '@/components/shell/SiteFooter';
 import LanguageSwitch from '@/components/shell/LanguageSwitch';
@@ -45,14 +47,6 @@ function installDialog() {
   Object.defineProperty(HTMLDialogElement.prototype, 'showModal', { configurable: true, value: showModal });
   Object.defineProperty(HTMLDialogElement.prototype, 'close', { configurable: true, value: close });
   return { showModal, close };
-}
-
-function installMatchMedia(matches = false) {
-  vi.stubGlobal('matchMedia', (media: string) => ({
-    matches, media, onchange: null,
-    addEventListener: () => undefined, removeEventListener: () => undefined,
-    addListener: () => undefined, removeListener: () => undefined, dispatchEvent: () => true,
-  }) as MediaQueryList);
 }
 
 // jsdom has no Element.scrollIntoView; the mock records which element was scrolled to (mock.contexts).
@@ -97,13 +91,12 @@ describe('site shell', () => {
     session.checkinEnabled = true;
     dialog = installDialog();
     scrollIntoView = installScrollIntoView();
-    installMatchMedia(false);
+    stubMatchMedia(false);
     window.history.replaceState(null, '', '/en');
   });
 
   afterEach(() => {
-    Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal');
-    Reflect.deleteProperty(HTMLDialogElement.prototype, 'close');
+    removeDialogMethods();
     Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
   });
 
@@ -341,8 +334,8 @@ describe('site shell', () => {
       .toHaveAttribute('href', `/${locale}/privacy`);
   });
 
-  it.each(['/en'])('offers Auto · Day · Night in the footer at every width (%s)', (pathname) => {
-    navigation.pathname = pathname;
+  it('offers Auto · Day · Night in the footer at every width (/en)', () => {
+    navigation.pathname = '/en';
     render(<SiteFooter locale="en" />);
     const theme = within(screen.getByRole('contentinfo')).getByRole('group', { name: 'Theme' });
     expect(within(theme).getByRole('button', { name: 'Auto' })).toHaveAttribute('aria-pressed', 'true');
@@ -419,20 +412,17 @@ describe('site shell', () => {
     ]);
   });
 
-  it.each([['/en', 'en']] as const)(
-    'shows the host identity as text only in the footer, marketing and stay (%s)',
-    (pathname, locale) => {
-      navigation.pathname = pathname;
-      render(<SiteFooter locale={locale} />);
-      const identity = screen.getByRole('contentinfo').querySelector('.host-identity') as HTMLElement;
-      expect(identity).not.toBeNull();
-      const labels = getDictionary(locale).shell.identity;
-      for (const text of [labels.registryLabel, labels.legalNameLabel, labels.addressLabel, '00003515821', HOST_CONTACT.legalName, HOST_CONTACT.address]) {
-        expect(within(identity).getByText(text)).toBeInTheDocument();
-      }
-      expect(within(identity).queryByRole('link')).toBeNull();
-    },
-  );
+  it('shows the host identity as text only in the footer, marketing and stay (/en)', () => {
+    navigation.pathname = '/en';
+    render(<SiteFooter locale="en" />);
+    const identity = screen.getByRole('contentinfo').querySelector('.host-identity') as HTMLElement;
+    expect(identity).not.toBeNull();
+    const labels = getDictionary('en').shell.identity;
+    for (const text of [labels.registryLabel, labels.legalNameLabel, labels.addressLabel, '00003515821', HOST_CONTACT.legalName, HOST_CONTACT.address]) {
+      expect(within(identity).getByText(text)).toBeInTheDocument();
+    }
+    expect(within(identity).queryByRole('link')).toBeNull();
+  });
 });
 
 describe('LanguageSwitch', () => {
@@ -461,5 +451,18 @@ describe('LanguageSwitch', () => {
     window.history.replaceState(null, '', '/en/apartment?m=2026-10#kitchen');
     fireEvent(window, new HashChangeEvent('hashchange'));
     expect(await screen.findByRole('link', { name: 'Ελληνικά' })).toHaveAttribute('href', '/el/apartment?m=2026-10#kitchen');
+  });
+});
+
+describe('document locale behavior', () => {
+  afterEach(() => {
+    document.documentElement.lang = '';
+  });
+
+  it('keeps the document language synchronized on rerender', () => {
+    const { rerender } = render(<DocumentLocale locale="en" />);
+    expect(document.documentElement.lang).toBe('en');
+    rerender(<DocumentLocale locale="el" />);
+    expect(document.documentElement.lang).toBe('el');
   });
 });

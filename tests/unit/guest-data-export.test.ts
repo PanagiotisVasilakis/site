@@ -9,6 +9,7 @@ const guestStore = vi.hoisted(() => ({
   findUsersByIds: vi.fn(),
   findUserByPhone: vi.fn(),
   findBookingById: vi.fn(),
+  findBookingByReference: vi.fn(),
   findUserById: vi.fn(),
   getStatistics: vi.fn(),
 }));
@@ -48,6 +49,7 @@ beforeEach(() => {
   guestStore.findBookingsByUserId.mockResolvedValue([]);
   guestStore.findUsersByIds.mockResolvedValue([]);
   guestStore.findBookingById.mockImplementation(async (id: string) => bookings.find((b) => b.id === id) ?? null);
+  guestStore.findBookingByReference.mockResolvedValue(null);
   guestStore.findUserById.mockResolvedValue(null);
   guestStore.getStatistics.mockResolvedValue({ totalBookings: 4, totalUsers: 1, totalClaimedBookings: 1 });
 });
@@ -102,5 +104,19 @@ describe('guest data export date handling', () => {
     });
     expect(guestStore.getStatistics).toHaveBeenCalledOnce();
     expect(guestStore.getAllBookings).not.toHaveBeenCalled();
+  });
+
+  it('exports a booking looked up by reference without querying it again by id', async () => {
+    const guest = { id: 'user-1', phoneE164: '+12025550100', createdAt: new Date(0), updatedAt: new Date(0) };
+    guestStore.findBookingByReference.mockResolvedValue({ ...booking('ref-1', '2030-07-14', '2030-07-16'), userId: 'user-1', externalReference: 'REF-1' });
+    guestStore.findUserById.mockResolvedValue(guest);
+
+    const exported = await guestDataExport.getBookingByReference('REF-1');
+
+    expect(exported?.booking.id).toBe('ref-1');
+    expect(exported?.user?.phone).toBe('+12025550100');
+    expect(guestStore.findBookingByReference).toHaveBeenCalledExactlyOnceWith('REF-1');
+    expect(guestStore.findUserById).toHaveBeenCalledExactlyOnceWith('user-1');
+    expect(guestStore.findBookingById).not.toHaveBeenCalled();
   });
 });

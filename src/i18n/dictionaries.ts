@@ -2,31 +2,16 @@
 
 import type { Locale } from "./config";
 
-import type {
-  CommonDictionary,
-  HouseDictionary,
-  LocationPanelDictionary,
-  CheckinDictionary,
-  CheckinInfoDictionary,
-  PortalDictionary,
-  AvailabilityDictionary,
-  ShellDictionary,
-  HomeDictionary,
-  LegalDictionary,
-  GuideDictionary,
-  StayDictionary
-} from './domains';
-
-import { commonTranslations } from './domains/common';
-import { houseTranslations, locationPanelTranslations } from './domains/house';
-import { checkinTranslations, checkinInfoTranslations } from './domains/checkin';
-import { portalTranslations } from './domains/portal';
-import { availabilityTranslations } from './domains/availability';
-import { shellTranslations } from './domains/shell';
-import { homeTranslations } from './domains/home';
-import { legalTranslations } from './domains/legal';
-import { guideTranslations } from './domains/guide';
-import { stayTranslations } from './domains/stay';
+import { commonTranslations, type CommonDictionary } from './domains/common';
+import { houseTranslations, locationPanelTranslations, type HouseDictionary, type LocationPanelDictionary } from './domains/house';
+import { checkinTranslations, checkinInfoTranslations, type CheckinDictionary, type CheckinInfoDictionary } from './domains/checkin';
+import { portalTranslations, type PortalDictionary } from './domains/portal';
+import { availabilityTranslations, type AvailabilityDictionary } from './domains/availability';
+import { shellTranslations, type ShellDictionary } from './domains/shell';
+import { homeTranslations, type HomeDictionary } from './domains/home';
+import { legalTranslations, type LegalDictionary } from './domains/legal';
+import { guideTranslations, type GuideDictionary } from './domains/guide';
+import { stayTranslations, type StayDictionary } from './domains/stay';
 
 export type Dictionary = CommonDictionary & {
   house: HouseDictionary;

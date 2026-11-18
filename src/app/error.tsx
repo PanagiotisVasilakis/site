@@ -2,9 +2,10 @@
 
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
+import { logger } from '@/lib/logger-client';
 import { errorReporter } from '@/lib/errorReporting';
 import { getDictionary } from '@/i18n/dictionaries';
-import type { Locale } from '@/i18n/config';
+import { defaultLocale, pathLocale } from '@/i18n/config';
 import { Button } from '@/components/ui/Button';
 import { StatusLinks, StatusPage } from '@/components/stay/StatusPage';
 
@@ -17,22 +18,15 @@ interface GlobalErrorProps {
 // details on the page (the error is reported to the server-side error log).
 export default function GlobalError({ error, retry }: GlobalErrorProps) {
   const pathname = usePathname();
-  const locale: Locale = pathname?.startsWith('/el') ? 'el' : 'en';
+  const locale = (pathname ? pathLocale(pathname) : null) ?? defaultLocale;
   const t = getDictionary(locale);
 
   useEffect(() => {
-    // Report error with full context
-    console.error('Global unhandled UI error', {
-      errorDetails: {
-        name: error.name,
-        message: error.message,
-        digest: error.digest,
-        stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined,
-      },
-      context: 'global-error-boundary',
-      route: typeof window !== 'undefined' ? window.location.pathname : 'unknown',
-      userAgent: typeof window !== 'undefined' ? navigator.userAgent : 'unknown',
-    }, error);
+    logger.error('Unhandled UI error (global)', {
+      message: error.message,
+      stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined,
+      digest: error.digest,
+    });
 
     // Report once per error to the server-side error log.
     void errorReporter.reportError(error, { category: 'globalError' });
@@ -41,7 +35,7 @@ export default function GlobalError({ error, retry }: GlobalErrorProps) {
   return (
     <main id="main-content" className="status-main">
       <StatusPage title={t.errors.somethingWentWrong} lead={t.errors.unexpectedError}>
-        <Button variant="primary" className="status-page__action" onClick={() => retry()}>{t.errors.tryAgain}</Button>
+        <Button variant="primary" onClick={() => retry()}>{t.errors.tryAgain}</Button>
         <StatusLinks links={[{ href: `/${locale}`, label: t.cta.home }]} />
       </StatusPage>
     </main>

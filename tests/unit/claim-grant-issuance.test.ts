@@ -33,17 +33,13 @@ describe('claim grant issuance access window', () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it.each([
-    ['check-in in 7 days', 7, 10],
-  ])('issues a token for a booking with %s', async (_label, start, end) => {
-    await expect(issueFor(start, end)).resolves.toMatchObject({ token: expect.stringMatching(/^claim_/) });
+  it('issues a token for a booking with check-in in 7 days', async () => {
+    await expect(issueFor(7, 10)).resolves.toMatchObject({ token: expect.stringMatching(/^claim_/) });
     expect(prismaMock.tx.bookingClaimGrant.create).toHaveBeenCalledTimes(1);
   });
 
-  it.each([
-    ['check-in in 8 days', 8, 12],
-  ])('refuses %s without creating a grant', async (_label, start, end) => {
-    await expect(issueFor(start, end)).rejects.toEqual(new PortalAuthError('BOOKING_NOT_IN_ACCESS_WINDOW'));
+  it('refuses check-in in 8 days without creating a grant', async () => {
+    await expect(issueFor(8, 12)).rejects.toEqual(new PortalAuthError('BOOKING_NOT_IN_ACCESS_WINDOW'));
     expect(prismaMock.tx.bookingClaimGrant.create).not.toHaveBeenCalled();
   });
 });

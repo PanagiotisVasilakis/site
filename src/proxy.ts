@@ -16,19 +16,6 @@ function isNonLocalizedRoute(pathname: string) {
   return NON_LOCALIZED_ROUTE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
-// Booking pages replaced by /{locale}/availability (R3-F10).
-const RETIRED_BOOKING_PAGES = ['/book', '/booking-details'];
-
-/** The exact retired page, with or without one trailing slash; never a lookalike or a subpath. */
-function isRetiredBookingPage(path: string) {
-  return RETIRED_BOOKING_PAGES.some((page) => path === page || path === `${page}/`);
-}
-
-// The About page became the home page's host letter (R3-V5): /{locale}/about -> /{locale}#host.
-function isRetiredAboutPage(path: string) {
-  return path === '/about' || path === '/about/';
-}
-
 /**
  * The supported locale an `Accept-Language` header prefers most (identity §12 R3-V9), or null. q-values are
  * respected (q=0 means "not acceptable"; an unparsable q skips the entry); a tie keeps the header order; only
@@ -50,8 +37,8 @@ function preferredLocale(header: string | null): string | null {
 }
 
 /** A redirect that carries the security headers the proxy computed for the request. */
-function redirectWithSecurityHeaders(url: URL, status: 302 | 308, securityResponse: NextResponse) {
-  const redirectResponse = NextResponse.redirect(url, status);
+function redirectWithSecurityHeaders(url: URL, securityResponse: NextResponse) {
+  const redirectResponse = NextResponse.redirect(url, 302);
   securityResponse.headers.forEach((value, key) => {
     redirectResponse.headers.set(key, value);
   });
@@ -86,38 +73,21 @@ export async function proxy(req: NextRequest) {
     return response;
   }
 
-  // A retired booking page moves permanently to the availability page; its
-  // query (the old form's dates) is dropped. A new URL, not a clone of nextUrl,
-  // so a trailing slash on the old path is not carried over.
   const urlLocale = pathLocale(pathname);
-  if (urlLocale && isRetiredBookingPage(pathname.slice(urlLocale.length + 1))) {
-    return redirectWithSecurityHeaders(new URL(`/${urlLocale}/availability`, req.nextUrl.origin), 308, response);
-  }
-  if (urlLocale && isRetiredAboutPage(pathname.slice(urlLocale.length + 1))) {
-    return redirectWithSecurityHeaders(new URL(`/${urlLocale}#host`, req.nextUrl.origin), 308, response);
-  }
-
   const cookieLocale = req.cookies.get("lang")?.value;
 
   if (!urlLocale) {
     // An explicit choice (the cookie) wins; a first visit follows the browser's language preference.
     const target = isLocale(cookieLocale) ? cookieLocale : preferredLocale(req.headers.get('accept-language')) ?? defaultLocale;
-    let url: URL;
-    if (isRetiredBookingPage(pathname)) {
-      url = new URL(`/${target}/availability`, req.nextUrl.origin);
-    } else if (isRetiredAboutPage(pathname)) {
-      url = new URL(`/${target}#host`, req.nextUrl.origin);
+    const url = req.nextUrl.clone();
+    // Always redirect to home page for root "/"
+    if (pathname === "/") {
+      url.pathname = `/${target}`;
     } else {
-      url = req.nextUrl.clone();
-      // Always redirect to home page for root "/"
-      if (pathname === "/") {
-        url.pathname = `/${target}`;
-      } else {
-        url.pathname = `/${target}${pathname}`;
-      }
+      url.pathname = `/${target}${pathname}`;
     }
     // Temporary locale selection redirect.
-    const redirectResponse = redirectWithSecurityHeaders(url, 302, response);
+    const redirectResponse = redirectWithSecurityHeaders(url, response);
 
     redirectResponse.cookies.set("lang", target, LANG_COOKIE_OPTIONS);
 

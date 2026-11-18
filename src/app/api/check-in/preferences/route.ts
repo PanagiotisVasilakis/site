@@ -1,11 +1,10 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { withErrorHandler, validateRequestBody, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
+import { withErrorHandler, validateRequestBody, createSuccessResponse, requireAdminRequest, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 import { GUEST_SESSION_COOKIE, parseGuestSession, verifyGuestSessionAccess } from '@/lib/guestSession';
 import { isAdminRequest } from '@/lib/rbac';
 import { getFeatureFlagsAsync } from '@/lib/featureFlags';
 import { PROPERTY_TIME_ZONE } from '@/data/stayPolicy';
-import { isSameOriginRequest } from '@/lib/net/sameOrigin';
 import { timePattern, wifiDisclosureWindow } from '@/lib/propertyTime';
 
 const preferencesSchema = z.object({
@@ -106,14 +105,10 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     throw new ApiError(ApiErrorCode.NOT_FOUND, 'Not Found');
   }
 
-  if (!(await isAdminRequest(request))) {
-    throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required to update preferences');
-  }
-
-  const origin = request.headers.get('origin');
-  if (origin && !isSameOriginRequest(origin, request)) {
-    throw new ApiError(ApiErrorCode.FORBIDDEN, 'Cross-origin admin mutation rejected');
-  }
+  await requireAdminRequest(request, {
+    sameOrigin: true,
+    message: 'Admin credentials required to update preferences',
+  });
 
   // Strict for the request body only: readPreferences parses the stored value, which also carries updatedAt.
   const parseBody = validateRequestBody(preferencesSchema.strict(), 4 * 1_024);

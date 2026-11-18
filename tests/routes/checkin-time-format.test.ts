@@ -23,7 +23,8 @@ vi.mock('@/lib/prisma', () => ({
     booking: { findUnique: mocks.bookingFind },
   },
 }));
-vi.mock('@/lib/prisma-repositories/checkInRequestRepository', () => ({
+vi.mock('@/lib/prisma-repositories/checkInRequestRepository', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/prisma-repositories/checkInRequestRepository')>()),
   checkInRequestRepository: { create: mocks.createRequest },
 }));
 

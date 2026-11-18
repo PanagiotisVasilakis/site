@@ -259,8 +259,3 @@ export function validatePulledPostgresImageInspection(
     platform: `linux/${architecture}`,
   };
 }
-
-export function postgresImagePolicyDiagnostic(error: unknown): string {
-  if (error instanceof PostgresImagePolicyError) return error.message;
-  return 'Disposable PostgreSQL image verification failed; Docker diagnostics were withheld.';
-}

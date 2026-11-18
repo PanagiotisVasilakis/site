@@ -24,7 +24,7 @@ export function nightsTeaserFrom(availability: NightsView): readonly NightCell[]
 }
 
 /** BookBar's note: tonight or the next free night, only from a fresh calendar. */
-export type NextFreeNight = Readonly<{ tonight: boolean; date: IsoDate }>;
+type NextFreeNight = Readonly<{ tonight: boolean; date: IsoDate }>;
 
 export function nextFreeNight(availability: NightsView): NextFreeNight | null {
   if (availability.status !== 'fresh') return null;

@@ -63,8 +63,7 @@ const grey = (v: number): string => {
   return `rgb(${c},${c},${c})`;
 };
 
-// Hand-painted depth (white = near) in the 1200 × 801 space of the review image, from the mockup
-// (.runtime/design/messinian-light/tools/gen-assets.mjs:17-38): sky, Taygetos, pine and rooftops,
+// Hand-painted depth (white = near) in the 1200 × 801 space of the review image: sky, Taygetos, pine and rooftops,
 // far parapet, table and chairs, right plant, left plant, nearest parapet.
 const DEPTH_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="801" viewBox="0 0 1200 801">
 <defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">

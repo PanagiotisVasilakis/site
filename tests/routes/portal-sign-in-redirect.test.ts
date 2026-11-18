@@ -68,7 +68,7 @@ describe('portal sign-in redirect', () => {
     mocks.authenticatePortalUser.mockResolvedValue({ userId: 'user-1', bookingId: 'booking-1' });
     mocks.consumeBookingClaimGrant.mockResolvedValue({ userId: 'user-1', bookingId: 'booking-1' });
     mocks.attachPortalAuthCookies.mockResolvedValue(undefined);
-    mocks.requestAuthContext.mockReturnValue({ deviceHint: 'device-hint', ipHint: 'ip-hint', ipHash: 'ip-hash' });
+    mocks.requestAuthContext.mockReturnValue({ deviceHint: 'device-hint', ipHash: 'ip-hash' });
     mocks.readPortalClaimExchange.mockReturnValue(TOKEN_DIGEST);
   });
 

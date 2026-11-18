@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import LocaleLayout from '@/app/[locale]/layout';
+import { normalizeLocale } from '@/i18n/config';
 
 // notFound() throws an error with this digest; Next answers it with a 404 and the not-found page.
 const NOT_FOUND_DIGEST = /^NEXT_HTTP_ERROR_FALLBACK;404$/;
@@ -14,9 +15,20 @@ describe('locale layout guard', () => {
     await expect(renderLayout(locale)).rejects.toMatchObject({ digest: expect.stringMatching(NOT_FOUND_DIGEST) });
   });
 
-  it.each(['en'])('still renders the layout for the supported locale %s', async (locale) => {
-    const tree = await renderLayout(locale);
+  it('still renders the layout for the supported locale en', async () => {
+    const tree = await renderLayout('en');
 
-    expect(tree.props).toMatchObject({ 'data-locale': locale, lang: locale });
+    expect(tree.props).toMatchObject({ 'data-locale': 'en', lang: 'en' });
+  });
+});
+
+describe('normalizeLocale', () => {
+  it.each([
+    ['el', 'el'],
+    ['EL', 'en'],
+    [null, 'en'],
+    ['../el', 'en'],
+  ] as const)('maps %j to %s', (value, expected) => {
+    expect(normalizeLocale(value)).toBe(expected);
   });
 });

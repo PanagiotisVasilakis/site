@@ -108,14 +108,12 @@ describe('canonical client identity', () => {
       .not.toContain(CLIENT_IDENTITY_UNAVAILABLE);
   });
 
-  it.each([
-    ['en', 'temporarily unavailable'],
-  ] as const)('is shown to a %s guest as the unavailable message, not the generic one', async (locale, expected) => {
+  it('is shown to an en guest as the unavailable message, not the generic one', async () => {
     const body = await createClientIdentityUnavailableResponse().json();
-    const mapped = mapApiErrorToUI(body, locale);
+    const mapped = mapApiErrorToUI(body, 'en');
 
-    expect(mapped.summary).toContain(expected);
-    expect(mapped.summary).not.toBe(mapApiErrorToUI(null, locale).summary);
+    expect(mapped.summary).toContain('temporarily unavailable');
+    expect(mapped.summary).not.toBe(mapApiErrorToUI(null, 'en').summary);
   });
 
   it('logs only the bounded rejection reason at warn level', () => {

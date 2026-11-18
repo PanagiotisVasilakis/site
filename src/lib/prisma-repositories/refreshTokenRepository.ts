@@ -68,7 +68,6 @@ type RefreshTokenReplacement = {
   tokenExpiresAt: number;
   sessionExpiresAt: Date;
   deviceHash?: string;
-  ipHash?: string;
   presentedSession: RefreshSessionBinding;
   createSessionToken: (session: RefreshSessionRecord) => string;
 };
@@ -238,7 +237,7 @@ async function create(
   salt: string,
   familyId: string,
   expiresAt: number,
-  opts?: { deviceHint?: string; ipHint?: string },
+  opts?: { deviceHint?: string },
 ): Promise<GuestRefreshTokenRec> {
   const token = await database.$transaction(async (tx) => {
     if (!(await lockUser(tx, userId))) {
@@ -268,8 +267,6 @@ async function create(
         userId,
         absoluteExpiresAt: new Date(now.getTime() + REFRESH_FAMILY_TTL_MS),
         deviceHash: opts?.deviceHint ?? null,
-        // ipHint is deliberately not stored: the overlap check compares the device hash
-        // only, so an IP hash would be personal data that nothing reads.
       },
     });
     return tx.refreshToken.create({
@@ -286,40 +283,6 @@ async function create(
 
   logger.info('Refresh token created (prisma)', { tokenId: token.id, userId, familyId });
   return mapToken(token);
-}
-
-async function verify(
-  database: PrismaClient,
-  token: string,
-): Promise<GuestRefreshTokenRec | undefined> {
-  const parsed = parseCompositeToken(token);
-  if (!parsed) return undefined;
-  const now = Date.now();
-
-  const candidate = await database.refreshToken.findUnique({
-    where: { id: parsed.id },
-    include: { family: true },
-  });
-  const session = candidate
-    ? await database.session.findUnique({ where: { id: candidate.id } })
-    : null;
-  if (!candidate
-    || !session
-    || session.userId !== candidate.userId
-    || session.revokedAt
-    || candidate.revokedAt
-    || candidate.expiresAt.getTime() <= now
-    || candidate.family.revokedAt
-    || candidate.family.absoluteExpiresAt.getTime() <= now
-    || !verifySensitive(parsed.secret, candidate.salt, candidate.tokenHash)) {
-    return undefined;
-  }
-
-  await database.refreshToken.update({
-    where: { id: candidate.id },
-    data: { lastUsedAt: new Date(now) },
-  });
-  return mapToken({ ...candidate, lastUsedAt: new Date(now) });
 }
 
 async function rotate(
@@ -607,18 +570,8 @@ async function revokeFamilyForToken(
     || !verifySensitive(parsed.secret, initial.salt, initial.tokenHash)) return false;
 
   return database.$transaction(async (tx) => {
-    if (!(await lockUser(tx, initial.userId)) || !(await lockFamily(tx, initial.familyId))) {
-      return false;
-    }
-    const candidate = await tx.refreshToken.findUnique({
-      where: { id: parsed.id },
-      include: { family: true },
-    });
-    if (!candidate
-      || candidate.family.userId !== candidate.userId
-      || !verifySensitive(parsed.secret, candidate.salt, candidate.tokenHash)) {
-      return false;
-    }
+    const candidate = await lockAndReloadCandidate(tx, initial, parsed);
+    if (!candidate) return false;
     await revokeFamilyGraph(tx, candidate.familyId, new Date(), reason);
     return true;
   });
@@ -627,7 +580,6 @@ async function revokeFamilyForToken(
 export function createRefreshTokenRepository(database: PrismaClient) {
   return {
     create: create.bind(undefined, database),
-    verify: verify.bind(undefined, database),
     rotate: rotate.bind(undefined, database),
     revokeAuthorizationForSession: revokeAuthorizationForSession.bind(undefined, database),
     revokeFamilyForToken: revokeFamilyForToken.bind(undefined, database),

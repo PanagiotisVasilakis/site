@@ -1,6 +1,6 @@
 /**
  * Legal texts (R3-L2: /[locale]/privacy). Every string marked `// legal review` is a draft that
- * the owner approves (review sheet .runtime/content/L2-privacy-review.html) before release.
+ * the owner approves before release.
  * Placeholders in braces are replaced by the page: {months}, {button}.
  *
  * The storage lists are keyed by the exact cookie, localStorage and sessionStorage names the code uses;

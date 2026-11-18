@@ -1,15 +1,13 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { CheckInRequestStatus } from '@/generated/prisma/client';
-import { withErrorHandler, validateRequestBody, createSuccessResponse, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
-import { isAdminRequest } from '@/lib/rbac';
-import { isSameOriginRequest } from '@/lib/net/sameOrigin';
+import { withErrorHandler, validateRequestBody, createSuccessResponse, requireAdminRequest, ApiError, ApiErrorCode } from '@/lib/apiErrorHandler';
 import {
   CheckInRequestAlreadyDecidedError,
   CheckInRequestNotFoundError,
   checkInRequestRepository,
+  deliverCheckInNotification,
 } from '@/lib/prisma-repositories/checkInRequestRepository';
-import { logger } from '@/lib/logger-enterprise';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,14 +27,7 @@ export const PATCH = withErrorHandler(async (
   request: NextRequest,
   context: { params: Promise<Record<string, string>> }
 ) => {
-  if (!(await isAdminRequest(request))) {
-    throw new ApiError(ApiErrorCode.UNAUTHORIZED, 'Admin credentials required');
-  }
-
-  const origin = request.headers.get('origin');
-  if (origin && !isSameOriginRequest(origin, request)) {
-    throw new ApiError(ApiErrorCode.FORBIDDEN, 'Cross-origin admin mutation rejected');
-  }
+  await requireAdminRequest(request, { sameOrigin: true });
 
   const params = await context.params;
   if (!idSchema.safeParse(params.id).success) throw new ApiError(ApiErrorCode.NOT_FOUND, 'Check-in request not found');
@@ -76,20 +67,11 @@ export const PATCH = withErrorHandler(async (
     throw error;
   }
   // The decision and its outbox event are committed: the immediate delivery is best-effort and the outbox worker retries it.
-  const delivered = update.notificationEventId
-    ? await (await import('@/lib/bookingOutbox')).deliverOutboxEvent(update.notificationEventId).catch((error: unknown) => {
-        logger.warn('Immediate outbox delivery failed', {
-          eventId: update.notificationEventId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        return false;
-      })
-    : false;
-  const notification = !update.changed
-    ? { status: 'skipped' as const, reason: 'status_unchanged' }
-    : !update.notificationEventId
-      ? { status: 'skipped' as const, reason: 'webhook_not_configured' }
-      : { status: delivered ? 'sent' as const : 'queued' as const };
+  const notification = await deliverCheckInNotification(
+    update.notificationEventId,
+    update.changed,
+    'status_unchanged',
+  );
 
   return createSuccessResponse({
     request: {

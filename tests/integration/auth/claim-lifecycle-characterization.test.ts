@@ -569,10 +569,7 @@ describe.sequential('booking claim lifecycle characterization', () => {
     const claim = await performClaim({ remember: true });
     if (!claim.credentials) throw new Error('Remember-enabled claim did not issue both credentials.');
 
-    const [{ parseGuestSession }, { guestStore }] = await Promise.all([
-      import('@/lib/guestSession'),
-      import('@/lib/guestDataStore'),
-    ]);
+    const { parseGuestSession } = await import('@/lib/guestSession');
     const predecessorSession = parseGuestSession(claim.credentials.sessionToken);
     const predecessorId = claim.credentials.refreshToken.split('.', 1)[0];
     expect(predecessorSession?.sid).toBe(predecessorId);
@@ -634,10 +631,6 @@ describe.sequential('booking claim lifecycle characterization', () => {
       bookingBinding: true,
       familyBinding: true,
     });
-    await expect(guestStore.verifyRefreshToken(claim.credentials.refreshToken)).resolves
-      .toBeUndefined();
-    await expect(guestStore.verifyRefreshToken(refresh.refreshToken)).resolves
-      .toMatchObject({ id: replacementId, family_id: graph.family.id });
   });
 
   it.each([false, true])(

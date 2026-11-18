@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 // This must name the newest schema migration (tests/unit/readiness-migration.test.ts
 // enforces it). Readiness is not merely a TCP/SELECT probe: the running binary
 // and database schema must agree, so the newest finished migration in the database
-// has to be exactly this one. A database that is behind (migrate has not run yet) and
+// has to be exactly this one. A database that is behind (migrations have not run yet) and
 // one that is ahead (an older image started after a later release migrated) are both
 // not ready.
 const EXPECTED_MIGRATION = '20261020120000_booking_calendar_source';
@@ -34,7 +34,7 @@ async function databaseReady(): Promise<boolean> {
     const newest: string | undefined = rows[0]?.migration_name;
     if (newest === EXPECTED_MIGRATION) return true;
 
-    // Behind: run the migrate service. Ahead: start the image that matches the database.
+    // Behind: apply migrations (`prisma migrate deploy`). Ahead: start the image that matches the database.
     // Migration names start with a timestamp, so string order is the "C" order of the query.
     const metadata = { expectedMigration: EXPECTED_MIGRATION, newestAppliedMigration: newest ?? null };
     if (newest !== undefined && newest > EXPECTED_MIGRATION) {
@@ -50,16 +50,12 @@ async function databaseReady(): Promise<boolean> {
   }
 }
 
-async function checkReadiness(): Promise<boolean> {
-  return databaseReady();
-}
-
 async function getReadiness(): Promise<boolean> {
   const now = Date.now();
   if (cachedReadiness && cachedReadiness.expiresAt > now) return cachedReadiness.ready;
   if (readinessInFlight) return readinessInFlight;
 
-  readinessInFlight = checkReadiness().then((ready) => {
+  readinessInFlight = databaseReady().then((ready) => {
     cachedReadiness = { ready, expiresAt: Date.now() + READINESS_CACHE_MS };
     return ready;
   }).finally(() => {

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import { ApiErrorCode } from '@/lib/apiErrorTypes';
-import { dedupeById } from '@/lib/collections';
 import { mapsHref, telHref } from '@/lib/contactLinks';
 import { serializeJsonLd } from '@/lib/jsonLd';
 import { toSafeLocalPath } from '@/lib/safeLocalPath';
@@ -9,17 +8,6 @@ import { absUrl, siteUrl } from '@/lib/site';
 import { mapApiErrorToUI } from '@/lib/userFacingErrors';
 
 describe('core utility contracts', () => {
-  it('deduplicates by id while preserving first-seen order and value', () => {
-    expect(dedupeById([
-      { id: 'first', value: 1 },
-      { id: 'second', value: 2 },
-      { id: 'first', value: 3 },
-    ])).toEqual([
-      { id: 'first', value: 1 },
-      { id: 'second', value: 2 },
-    ]);
-  });
-
   it('builds safe phone and maps links', () => {
     expect(telHref('+30 (695) 123-4567')).toBe('tel:+306951234567');
     expect(telHref()).toBeUndefined();

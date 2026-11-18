@@ -2,7 +2,8 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { type Locale, normalizeLocale } from '@/i18n/config';
 import { getDictionary } from '@/i18n/dictionaries';
-import { getItemsByCategory, pickLocale } from '@/lib/data';
+import { getItemsByCategory } from '@/lib/data';
+import { pickLocale } from '@/lib/localize';
 import type { Item } from '@/data/schemas';
 import { GUEST_REFRESH_COOKIE, getVerifiedGuestSessionFromCookies } from '@/lib/guestSession';
 import CheckInInfo from '@/components/CheckInInfo';
@@ -58,7 +59,7 @@ export default async function CheckInPage({ params }: { params: Promise<{ locale
   }
 
   return (
-    <div className="stay-page checkin-page">
+    <div className="stay-page">
       <CheckInInfo
         locale={eff}
         nearbyRestaurants={nearbyRestaurants}

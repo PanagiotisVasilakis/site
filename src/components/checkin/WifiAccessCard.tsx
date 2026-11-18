@@ -1,3 +1,5 @@
+import { Icon } from '@/components/icons/Icon';
+
 type WifiCopyTarget = 'network' | 'password';
 
 interface WifiAccessCardProps {
@@ -13,19 +15,6 @@ interface WifiAccessCardProps {
   onCopy: (value: string, target: WifiCopyTarget) => void;
   networkCopyLabel: string;
   passwordCopyLabel: string;
-}
-
-function CopyIcon({ copied }: { copied: boolean }) {
-  return copied ? (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-      <path d="m5 12 4 4L19 6" />
-    </svg>
-  ) : (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-      <rect x="8" y="8" width="11" height="11" rx="2" />
-      <path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
-    </svg>
-  );
 }
 
 export default function WifiAccessCard({
@@ -76,7 +65,9 @@ export default function WifiAccessCard({
                 className="checkin-copy-action"
                 aria-label={item.ariaLabel}
               >
-                <span className="checkin-copy-action__icon"><CopyIcon copied={copiedTarget === item.target} /></span>
+                <span className="checkin-copy-action__icon">
+                  <Icon name={copiedTarget === item.target ? 'check' : 'copy'} size={14} />
+                </span>
                 {copiedTarget === item.target ? copiedLabel : copyLabel}
               </button>
             </dd>

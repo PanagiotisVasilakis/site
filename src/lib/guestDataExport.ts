@@ -59,7 +59,8 @@ class GuestDataExport {
       logger.info('Booking not found', { referenceLength: reference.length });
       return null;
     }
-    return this.getBookingDetails(booking.id);
+    const user = booking.userId ? await guestStore.findUserById(booking.userId) : undefined;
+    return toBookingExport(booking, user);
   }
 
   async getBookingsByPhone(phone: string): Promise<BookingExport[]> {

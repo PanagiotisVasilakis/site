@@ -20,7 +20,8 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@/lib/auth/admin', () => ({
+vi.mock('@/lib/auth/admin', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/auth/admin')>()),
   createAdminSession: mocks.createAdminSession,
   signAdmin: mocks.signAdmin,
   verifyAdmin: mocks.verifyAdmin,

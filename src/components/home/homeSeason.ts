@@ -6,7 +6,7 @@ import type { IsoDate } from '@/lib/availability/calendarDate';
 
 export type Season = 'summer' | 'winter';
 
-export type HomeSeasons = Readonly<{
+type HomeSeasons = Readonly<{
   /** The season of the property's today. */
   current: Season;
   /** 'YYYY-MM': the first month of each season from today's month on (today's month for the current one). */

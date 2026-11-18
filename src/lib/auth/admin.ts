@@ -6,6 +6,7 @@
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import type { JwtPayload, SignOptions } from 'jsonwebtoken';
+import type { NextResponse } from 'next/server';
 import { readRuntimeCredential } from '../runtime-credentials.js';
 
 const { sign, verify } = jwt;
@@ -134,4 +135,24 @@ export async function revokeAdminSession(sessionId: string | undefined): Promise
     where: { id: sessionId, revokedAt: null },
     data: { revokedAt: new Date() },
   });
+}
+
+export function setAdminSessionCookie(
+  response: NextResponse,
+  token: string,
+  maxAgeSeconds = ADMIN_SESSION_TTL_MS / 1000,
+): void {
+  response.headers.set('cache-control', 'no-store');
+  response.cookies.set('admin_jwt', token, {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'strict',
+    maxAge: maxAgeSeconds,
+    ...(maxAgeSeconds === 0 ? { expires: new Date(0) } : {}),
+    secure: process.env.NODE_ENV === 'production',
+  });
+}
+
+export function clearAdminSessionCookie(response: NextResponse): void {
+  setAdminSessionCookie(response, '', 0);
 }

@@ -28,7 +28,7 @@ const EXPECTED = [
   ['SECURITY_PEPPER', /^[^\S\n]*SECURITY_PEPPER[^\S\n]*=[^\S\n]*\S/m, randomSecret],
   ['CLAIM_TOKEN_PEPPER', /^[^\S\n]*CLAIM_TOKEN_PEPPER[^\S\n]*=[^\S\n]*\S/m, randomSecret],
   ['GUEST_JWT_SECRET', /^\s*GUEST_JWT_SECRET\s*=\s*/m, randomSecret],
-  // Local stand-in for the Nginx attestation; `npm run dev:proxy` sends it (scripts/dev-proxy.mjs).
+  // Local stand-in for the trusted-ingress attestation; `npm run dev:proxy` sends it (scripts/dev-proxy.mjs).
   ['ORIGIN_PROXY_SHARED_SECRET', /^[^\S\n]*ORIGIN_PROXY_SHARED_SECRET[^\S\n]*=[^\S\n]*\S/m, randomSecret],
   ['GUEST_WIFI_NETWORK', /^\s*GUEST_WIFI_NETWORK\s*=\s*/m, () => 'local-guest-network'],
   ['GUEST_WIFI_PASSWORD', /^\s*GUEST_WIFI_PASSWORD\s*=\s*/m, () => crypto.randomBytes(16).toString('base64url')],

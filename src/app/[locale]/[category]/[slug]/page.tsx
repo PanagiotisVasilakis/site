@@ -1,5 +1,6 @@
 import { categories } from "@/data/categories";
-import { getItem, getItemsByCategory, pickLocale } from "@/lib/data";
+import { getItem, getItemsByCategory } from "@/lib/data";
+import { pickLocale } from "@/lib/localize";
 import { absUrl } from "@/lib/site";
 import { GuideDetail } from '@/components/guide/GuideDetail';
 import { nearestTo, toGuideEntry } from '@/components/guide/guideEntries';
@@ -19,7 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const title = pickLocale(item, 'name', eff) ?? item.name;
   const description = pickLocale(item, 'summary', eff) ?? item.summary;
   const suffix = `/${cat.slug}/${slug}`;
-  const image = item.heroImage ?? item.image;
+  const image = item.heroImage;
   return {
     title,
     description,
@@ -56,11 +57,10 @@ export default async function ItemPage({ params }: { params: Promise<{ locale: s
         name: entry.name,
         description: entry.summary,
         url: absUrl(`/${eff}/${cat.slug}/${slug}`),
-        image: item.image,
+        image: item.heroImage,
         ...(cat.slug === 'moments' ? {} : {
           address: entry.address,
           telephone: item.phone,
-          image: item.heroImage ?? item.image,
         }),
       }}
       nonce={nonce}

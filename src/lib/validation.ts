@@ -10,7 +10,7 @@ function hasText(value: unknown): boolean {
 }
 
 // Item URLs are /{locale}/{category}/{slug}: lowercase ASCII words joined by single hyphens, i.e. /^[a-z0-9]+(?:-[a-z0-9]+)*$/.
-// Checked word by word because lint:security flags the nested quantifier of that one-liner.
+// Checked word by word because security/detect-unsafe-regex flags the nested quantifier of that one-liner.
 const SLUG_WORD = /^[a-z0-9]+$/;
 
 // Throws if any localized required field missing for configured locales, if an

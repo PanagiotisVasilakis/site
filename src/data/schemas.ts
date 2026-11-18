@@ -40,7 +40,6 @@ export const ItemSchema = z.object({
   directionsUrl: z.url().optional(),
   sourceUrls: z.array(z.url()).optional(),
   tags: z.array(z.string()).optional(),
-  image: z.string().optional(),
   heroImage: z.string().optional(),
   heroImagePosition: z.string().optional(),
   slug: z.string().optional(),

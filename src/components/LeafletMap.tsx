@@ -30,7 +30,7 @@ export interface LeafletMapLabels {
   closePopup: string;
 }
 
-export interface LeafletMapProps {
+interface LeafletMapProps {
   center: [number, number];
   zoom?: number;
   markers?: readonly LeafletMarkerData[];

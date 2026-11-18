@@ -48,14 +48,14 @@ describe('validateLocalization', () => {
   });
 
   // pickLocale treats a whitespace-only value as missing, so the gate must too (R-437).
-  it.each([' '])('throws when an item has the whitespace-only name_el %j', (blank) => {
-    getItemsByCategoryMock.mockReturnValue([{ ...item, name_el: blank }]);
+  it('throws when an item has the whitespace-only name_el " "', () => {
+    getItemsByCategoryMock.mockReturnValue([{ ...item, name_el: ' ' }]);
     expect(() => validateLocalization(['en', 'el'])).toThrow('Missing name for item taverna locale el');
   });
 
-  it.each([' '])('throws when a category has the whitespace-only title_el %j', (blank) => {
+  it('throws when a category has the whitespace-only title_el " "', () => {
     categoriesMock.length = 0;
-    categoriesMock.push({ ...category, title_el: blank });
+    categoriesMock.push({ ...category, title_el: ' ' });
     expect(() => validateLocalization(['en', 'el'])).toThrow('Missing title for category food locale el');
   });
 

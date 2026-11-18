@@ -23,10 +23,6 @@ async function findById(id: string): Promise<UserRecord | undefined> {
   return (await prisma.user.findUnique({ where: { id }, select: userSelect })) ?? undefined;
 }
 
-async function getAll(): Promise<UserRecord[]> {
-  return await prisma.user.findMany({ orderBy: { createdAt: 'desc' }, select: userSelect });
-}
-
 async function findManyByIds(ids: readonly string[]): Promise<UserRecord[]> {
   if (ids.length === 0) return [];
   return await prisma.user.findMany({
@@ -42,7 +38,6 @@ async function count(): Promise<number> {
 export const userRepository = {
   findByPhone,
   findById,
-  getAll,
   findManyByIds,
   count,
 };

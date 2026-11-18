@@ -95,12 +95,15 @@ npm test
 npm run test:coverage
 npm run typecheck
 npm run lint -- --max-warnings=0
-npm run lint:security
 npm run check:dead-code
+npm run check:image-assets
+npm run security:license-check
 npm run validate:security
 npm run validate:local
 npm run test:integration
 ```
+
+`npm run dev` runs `scripts/check-pepper.js` automatically (`predev`), `npm run build` runs `scripts/validate-content.ts` and `scripts/generate-version.ts`, and `npm run start` runs `scripts/prepare-standalone.mjs` (`prestart`).
 
 The default suite does not contact a live PostgreSQL, webhook, or third-party
 API. `test:integration` is the isolated exception: it owns a digest-pinned
@@ -130,12 +133,11 @@ launch should be dark.
 
 ## Operational workers
 
-In production the workers are bundled by `scripts/build-workers.mjs` into `/app/dist/workers/` inside the unified production image:
+In production the workers are bundled by `npm run build:workers` (`scripts/build-workers.mjs`) into `/app/dist/workers/` inside the unified production image:
 - `node dist/workers/drain-outbox.mjs` (scheduled every 1 minute)
 - `node dist/workers/run-operational-maintenance.mjs` (scheduled every 5 minutes)
 
-Manual development runs use `tsx`, which does not read `.env.local` by itself, so give
-it the file with `--env-file` (the app loads it itself):
+In development you can run `npm run outbox:drain` / `npm run operations:check` (when env vars are already exported in the shell) or pass `.env.local` explicitly with `tsx --env-file`:
 
 ```bash
 npx tsx --env-file=.env.local scripts/drain-outbox.ts
@@ -163,4 +165,4 @@ Guest data retention (`GUEST_DATA_RETENTION_MONTHS` in `src/data/stayPolicy.ts`,
   header overwrite and private attestation contract; do not trust a
   public forwarding header directly.
 - Outbox backlog: inspect `outbox_events.last_error`, the destination URL/token, and the outbox worker logs.
-- `next dev` or `next build` run by a coding agent (Claude Code) may send the installed Next version to `https://registry.npmjs.org/-/npm/v1/security/advisories/bulk` and stop once with an upgrade recommendation when an advisory applies (`experimental.agentUpgrade` defaults to `'security'` since Next 16.4.0; `next.config.ts` leaves it at the default). Retry the same command, or run the build from a plain shell. Docker builds are not affected.
+- `next dev` or `next build` run by a coding agent may send the installed Next version to `https://registry.npmjs.org/-/npm/v1/security/advisories/bulk` and stop once with an upgrade recommendation when an advisory applies (`experimental.agentUpgrade` defaults to `'security'` since Next 16.4.0; `next.config.ts` leaves it at the default). Retry the same command, or run the build from a plain shell. Docker builds are not affected.

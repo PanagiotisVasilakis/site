@@ -1,4 +1,4 @@
-export interface MapTileSource {
+interface MapTileSource {
   url: string;
   attribution: string;
 }

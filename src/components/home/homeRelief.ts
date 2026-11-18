@@ -29,7 +29,7 @@ const PIN_SOURCES: Partial<Record<HomeDistanceKey, { landmark: string } | { mome
   museum: { moment: 'archaeological-museum-messinia' },
 };
 
-export type ReliefPin = Readonly<{ key: HomeDistanceKey; left: number; top: number }>;
+type ReliefPin = Readonly<{ key: HomeDistanceKey; left: number; top: number }>;
 
 function coordinatesOf(source: { landmark: string } | { moment: string }, locale: Locale): LngLat | null {
   if ('landmark' in source) {

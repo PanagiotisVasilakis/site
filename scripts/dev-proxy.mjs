@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /*
- * Local development stand-in for the production Nginx trusted-ingress hop.
+ * Local development stand-in for the production trusted-ingress hop.
  *
  * Sensitive routes resolve client identity only from the two private headers
- * that Nginx overwrites in production (docs/security/trusted-ingress.md). A
+ * that the trusted reverse proxy overwrites in production (docs/security/trusted-ingress.md). A
  * browser cannot send them, so `next dev` alone answers 503 on admin login,
  * guest sign-in/claims and the other limited routes. This
  * proxy listens on loopback, drops any client-supplied private headers, adds

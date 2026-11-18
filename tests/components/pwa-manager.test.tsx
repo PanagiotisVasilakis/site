@@ -2,6 +2,7 @@
 
 import { fireEvent, render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { stubMatchMedia } from '../support/dom';
 
 const logger = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn(), debug: vi.fn(), info: vi.fn() }));
 vi.mock('@/lib/logger-client', () => ({ logger }));
@@ -51,7 +52,7 @@ describe('PwaManager service worker registration (R-253)', () => {
     vi.stubEnv('NEXT_PUBLIC_FORCE_SW_DEV', '1');
     container = fakeServiceWorkerContainer();
     Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: container });
-    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })));
+    stubMatchMedia(false);
   });
 
   afterEach(() => {
@@ -129,7 +130,7 @@ describe('PwaManager site storage (R-375)', () => {
     waitingWorker = { postMessage: vi.fn() };
     container = fakeServiceWorkerContainer();
     Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: container });
-    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })));
+    stubMatchMedia(false);
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ version: '1.2.3', build: 'abc' })));
   });
 
@@ -371,7 +372,7 @@ describe('PwaManager hands visited pages to the service worker (R-628)', () => {
       getRegistrations: vi.fn(async () => []),
     });
     Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: container });
-    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })));
+    stubMatchMedia(false);
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ version: '1.2.3', build: 'abc' })));
     navigation.pathname = '/en/stay';
     window.history.replaceState({}, '', '/en/stay');

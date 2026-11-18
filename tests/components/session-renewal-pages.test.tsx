@@ -40,11 +40,11 @@ beforeEach(() => {
 });
 
 describe('check-in page without a session', () => {
-  it.each([
-    ['en', '/en/portal/refresh?next=%2Fen%2Fcheck-in&failure=%2Fen%2Fguest%3Fflash%3Dsession_required'],
-  ])('sends a guest who still holds a refresh cookie to the session refresh page (%s)', async (locale, target) => {
+  it('sends a guest who still holds a refresh cookie to the session refresh page (en)', async () => {
     refreshCookie.value = 'refresh-token';
-    await expect(CheckInPage(params(locale))).rejects.toThrow(new Error(`NEXT_REDIRECT ${target}`));
+    await expect(CheckInPage(params('en'))).rejects.toThrow(
+      new Error('NEXT_REDIRECT /en/portal/refresh?next=%2Fen%2Fcheck-in&failure=%2Fen%2Fguest%3Fflash%3Dsession_required'),
+    );
   });
 
   it('sends a guest without a refresh cookie to sign-in', async () => {

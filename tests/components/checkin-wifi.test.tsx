@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const fetchMock = vi.hoisted(() => vi.fn());
 const warnMock = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/internalFetchClient', () => ({ default: fetchMock }));
-vi.mock('@/lib/logger-client', () => ({ logger: { warn: warnMock } }));
+vi.mock('@/lib/logger-client', () => ({ logger: { warn: warnMock, error: vi.fn() } }));
 vi.mock('next/dynamic', () => ({ default: () => function MapStub() { return null; } }));
 
 import CheckInInfo from '@/components/CheckInInfo';
