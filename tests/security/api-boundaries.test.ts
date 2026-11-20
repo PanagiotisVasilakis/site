@@ -106,6 +106,16 @@ describe('API response and deadline middleware', () => {
     expect(body.meta).not.toHaveProperty('processingTime');
   });
 
+  it('uses the request logger correlation id when none is passed', async () => {
+    silenceLogger();
+    const wrapped = withErrorHandler(async () => createSuccessResponse({ seen: logger.getContext()?.correlationId }));
+    const response = await wrapped(new NextRequest('https://guest.test/api/example'), { params: Promise.resolve({}) });
+    const body = await response.json();
+    expect(typeof body.data.seen).toBe('string');
+    expect(response.headers.get('x-correlation-id')).toBe(body.data.seen);
+    expect(body.meta.correlationId).toBe(body.data.seen);
+  });
+
   it('maps known API errors to stable status, code and correlation headers', async () => {
     silenceLogger();
     const wrapped = withErrorHandler(async () => {

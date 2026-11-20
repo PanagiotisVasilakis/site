@@ -218,6 +218,12 @@ describe('nights teaser, BookBar, FAQ, HostLetter, and LocationRelief', () => {
     expect(nextFreeNight(availability({ status: 'stale' }))).toBeNull();
   });
 
+  it('skips a free night shorter than its minimum stay', () => {
+    const rates = [{ start: TODAY, end: addDays(TODAY, 365), minimumNights: 2 }];
+    expect(nextFreeNight(availability({ nights: `obo${'o'.repeat(362)}`, rates }))).toEqual({ tonight: false, date: '2026-10-20' });
+    expect(nextFreeNight(availability({ nights: `ob${'b'.repeat(363)}`, rates }))).toBeNull();
+  });
+
   it('renders exclusive FAQ accordion and conditional HostLetter signature/metadata', () => {
     const faq = render(<FaqSection locale="en" />);
     const items = Array.from(faq.container.querySelectorAll('details'));

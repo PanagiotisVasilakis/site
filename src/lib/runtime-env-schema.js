@@ -26,6 +26,15 @@ function isPostgresUrl(value) {
   return protocol === 'postgresql:' || protocol === 'postgres:';
 }
 
+// node-postgres lets an `options` value in the URL replace the `-c TimeZone=UTC` session pin (prismaPgConfig).
+function hasNoOptionsParameter(value) {
+  try {
+    return !new URL(value).searchParams.has('options');
+  } catch {
+    return true;
+  }
+}
+
 function requireHttpsInProduction(env, context, name) {
   if (env.NODE_ENV === 'production' && env[name]) {
     const protocol = urlProtocol(env[name]);
@@ -79,7 +88,7 @@ export function isBookingCalendarUrl(value) {
 export const runtimeEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'production']).default('development'),
 
-  DATABASE_URL: z.url().min(1, 'DATABASE_URL is required').refine(isPostgresUrl, 'DATABASE_URL must use postgres or postgresql'),
+  DATABASE_URL: z.url().min(1, 'DATABASE_URL is required').refine(isPostgresUrl, 'DATABASE_URL must use postgres or postgresql').refine(hasNoOptionsParameter, 'DATABASE_URL must not carry an options parameter'),
 
   ADMIN_JWT_SECRET: optionalEnv(z.string()),
   ADMIN_DASH_SECRET: optionalEnv(z.string()),
@@ -101,7 +110,7 @@ export const runtimeEnvSchema = z.object({
   CHECKIN_REQUEST_WEBHOOK_TOKEN: optionalEnv(z.string().min(20)),
   ALERT_WEBHOOK_URL: optionalEnv(z.url()),
   ALERT_WEBHOOK_TOKEN: optionalEnv(z.string().min(20)),
-  ALERT_WEBHOOK_REQUIRED: z.enum(['0', '1']).optional().default('0'),
+  ALERT_WEBHOOK_REQUIRED: optionalEnv(z.enum(['0', '1'])),
   BOOKING_ICAL_URL: optionalEnv(z.string().refine(
     isBookingCalendarUrl,
     'BOOKING_ICAL_URL must be an https Booking.com calendar export URL (ical.booking.com/v1/export or admin.booking.com/hotel/hoteladmin/ical.html, with its token in the query)',

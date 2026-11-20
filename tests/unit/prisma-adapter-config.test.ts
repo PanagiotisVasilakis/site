@@ -83,6 +83,14 @@ describe('Prisma PostgreSQL adapter configuration', () => {
       },
     });
   });
+
+  it('refuses a URL that carries an options parameter without echoing it', () => {
+    const base = 'postgresql://user:pass@localhost:5432/app';
+    expect(() => buildPrismaPgAdapterArgs(`${base}?options=-c%20TimeZone%3DEurope%2FAthens&connection_limit=5`))
+      .toThrow(new Error('DATABASE_URL must not carry an options parameter'));
+    expect(buildPrismaPgAdapterArgs(`${base}?connection_limit=5`).config)
+      .toEqual(expect.objectContaining({ options: '-c TimeZone=UTC' }));
+  });
 });
 
 describe('prisma client lifecycle', () => {

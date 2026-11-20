@@ -43,6 +43,8 @@ type ManifestLike = {
   private?: boolean;
   license?: unknown;
   licenses?: unknown;
+  optional?: boolean;
+  devOptional?: boolean;
 };
 
 type PackageLockLike = {
@@ -74,14 +76,26 @@ type SpdxExpressionNode =
 
   const issues: LicenseIssue[] = [];
   const seen = new Set<string>();
+  let checked = 0;
 
   for (const packagePath of Object.keys(lockfile.packages)) {
     if (packagePath === '') {
       continue;
     }
 
+    const entry = lockfile.packages[packagePath];
     const manifest = await readInstalledManifest(packagePath);
     if (!manifest) {
+      // Optional platform packages are legitimately absent; devOptional ones are dev dependencies that npm ci installs.
+      if (entry?.optional === true) {
+        continue;
+      }
+
+      issues.push({
+        name: inferPackageName(packagePath) ?? packagePath,
+        version: typeof entry?.version === 'string' ? entry.version : '',
+        reason: 'listed in package-lock.json but not installed (run npm ci)',
+      });
       continue;
     }
 
@@ -104,6 +118,7 @@ type SpdxExpressionNode =
       continue;
     }
     seen.add(key);
+    checked += 1;
 
     const licenses = extractLicenses(manifest);
 
@@ -124,6 +139,12 @@ type SpdxExpressionNode =
         reason: `disallowed license: ${licenses.join(', ')}`,
       });
     }
+  }
+
+  if (checked === 0) {
+    console.error('No installed package was checked: run npm ci first.');
+    process.exitCode = 1;
+    return;
   }
 
   if (issues.length > 0) {
@@ -258,5 +279,7 @@ function isAllowedSpdxExpression(node: SpdxExpressionNode): boolean {
     return false;
   }
 
-  return isAllowedSpdxExpression(node.left) && isAllowedSpdxExpression(node.right);
+  return node.conjunction === 'or'
+    ? isAllowedSpdxExpression(node.left) || isAllowedSpdxExpression(node.right)
+    : isAllowedSpdxExpression(node.left) && isAllowedSpdxExpression(node.right);
 }

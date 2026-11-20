@@ -324,6 +324,22 @@ describe('PwaManager site storage (R-375)', () => {
       expect(container.removeEventListener).toHaveBeenCalledWith('controllerchange', onControllerChange);
       expect(logger.error).not.toHaveBeenCalledWith('Update reload handler failed', expect.anything());
     });
+
+    it('keeps a dismissed update hidden until the waiting worker names its version', async () => {
+      localStorage.setItem('update-dismissed-version', '2.0.0:newbuild0123');
+      localStorage.setItem('app-version', '1.0.0');
+      container.register.mockResolvedValue({ waiting: waitingWorker, addEventListener: vi.fn() });
+      render(<ShellWithPwaManager />);
+
+      await waitFor(() => expect(waitingWorker.postMessage).toHaveBeenCalledWith({ type: 'REQUEST_VERSION' }));
+      expect(element('update-banner').style.display).not.toBe('flex');
+
+      workerMessageListener()(runtimeVersionMessage('2.0.0', 'newbuild0123', waitingWorker));
+      expect(element('update-banner').style.display).toBe('none');
+
+      workerMessageListener()(runtimeVersionMessage('3.0.0', 'otherbuild456', waitingWorker));
+      expect(element('update-banner').style.display).toBe('flex');
+    });
   });
 });
 

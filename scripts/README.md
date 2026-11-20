@@ -129,7 +129,9 @@ NEXT_PUBLIC_SITE_URL=https://your-host.example npm run docker:build   # builds v
 npm run docker:scan                                                    # pinned Trivy container, else host Trivy or Docker Scout
 ```
 
-`scripts/image-tag.sh` marks an uncommitted tree with `-dirty`; never ship such a tag. Record the image ID that `docker:build` prints.
+`docker:build` refuses a tree with uncommitted changes. `ALLOW_DIRTY=1` builds a local trial image tagged `-dirty` whose recorded commit does not match its contents: never ship it. Record the image ID that `docker:build` prints.
+
+**Applying migrations.** The image contains neither the Prisma CLI nor the migrations, so it cannot migrate its database. When a release adds a migration, apply it before you start the new image: from a checkout of the same commit, after `npm ci`, run `npx prisma migrate deploy` with the production database URL exported in the shell as `DIRECT_URL`. `prisma.config.ts` uses `DIRECT_URL` before `DATABASE_URL` and also loads the checkout's `.env*` files without overriding exported variables, so a `DIRECT_URL` from a `.env*` file wins over an exported `DATABASE_URL`. Until it is applied, `/api/health/ready` answers 503 with `{"status":"not_ready"}` and the server logs `Readiness: expected migration is not applied`.
 
 **Feature flags after the first migrate.** A database migrated from empty has the
 guest portal and check-in switched on: the migration

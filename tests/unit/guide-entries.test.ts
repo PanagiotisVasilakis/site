@@ -19,6 +19,8 @@ describe('guide entries (identity §8 GuideCard, §7.3)', () => {
     expect(formatDistance(0.799, 'en')).toBe('800 m');
     expect(formatDistance(0.799, 'el')).toBe('800 μ.');
     expect(formatDistance(0.001, 'en')).toBe('10 m');
+    expect(formatDistance(0.994, 'en')).toBe('990 m');
+    expect(formatDistance(0.997, 'en')).toBe('1 km');
   });
 
   it('sorts places without coordinates last and finds the nearest others', () => {

@@ -7,12 +7,12 @@ const OFFLINE_PATHS = ['/offline', '/en/offline', '/el/offline'];
 /**
  * Where Retry goes: the page the service worker could not open, which it names in the `from` of the offline URL
  * (`/{locale}/offline?from=<page>`, R-648). `from` comes from the address bar, so it must be a safe local path, and
- * not an offline page (that would only bring the guest back here). toSafeLocalPath still returns `//host` for
- * `/.//host` (dot segments leave an empty one), which a browser reads as another site: refused here.
+ * not an offline page (that would only bring the guest back here). toSafeLocalPath already refuses a path that
+ * canonicalizes to `//host` (e.g. `/.//host`), which a browser would read as another site.
  */
 function retryTarget(search: string): string | null {
   const target = toSafeLocalPath(new URLSearchParams(search).get('from'));
-  if (!target || target.startsWith('//')) return null;
+  if (!target) return null;
   return OFFLINE_PATHS.includes(target.split(/[?#]/, 1)[0]) ? null : target;
 }
 

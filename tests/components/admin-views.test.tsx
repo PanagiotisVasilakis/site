@@ -85,6 +85,89 @@ describe('admin arrival requests: failed notifications', () => {
   });
 });
 
+describe('admin arrival requests: a request decided elsewhere', () => {
+  it('reloads the list and keeps the error when the decision conflicts', async () => {
+    let listCalls = 0;
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === '/api/check-in/preferences') {
+        return new Response(JSON.stringify({ success: true, data: { checkInTime: '14:30' } }), { status: 200 });
+      }
+      if (init?.method === 'PATCH') {
+        return new Response(JSON.stringify({ success: false, error: { message: 'Request was already decided' } }), { status: 409 });
+      }
+      listCalls += 1;
+      if (listCalls > 1) {
+        return new Response(JSON.stringify({
+          success: true,
+          data: { requests: [], summary: { pending: 0, approved: 0, rejected: 0, total: 0 }, total: 0, nextCursor: null },
+        }), { status: 200 });
+      }
+      return new Response(JSON.stringify({
+        success: true,
+        data: {
+          requests: [{
+            id: REQUEST_ID,
+            guestName: 'Maria',
+            requestedTime: '17:00',
+            status: 'pending',
+            notificationStatus: 'pending',
+            createdAt: '2030-06-01T10:00:00.000Z',
+            updatedAt: '2030-06-01T10:00:00.000Z',
+          }],
+          summary: { pending: 1, approved: 0, rejected: 0, total: 1 },
+          total: 1,
+          nextCursor: null,
+        },
+      }), { status: 200 });
+    });
+
+    render(<AdminRequestsClient />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Approve' }));
+
+    expect(await screen.findByText('Request was already decided')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+    expect(listCalls).toBe(2);
+  });
+});
+
+describe('admin arrival requests: pagination', () => {
+  const SECOND_REQUEST_ID = '76000000-0000-4000-8000-000000000002';
+  const listedRequest = (id: string, guestName: string) => ({
+    id,
+    guestName,
+    requestedTime: '17:00',
+    status: 'pending',
+    notificationStatus: 'pending',
+    createdAt: '2030-06-01T10:00:00.000Z',
+    updatedAt: '2030-06-01T10:00:00.000Z',
+  });
+
+  it('appends the next page and hides Load more on the last page', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === '/api/check-in/preferences') {
+        return new Response(JSON.stringify({ success: true, data: { checkInTime: '14:30' } }), { status: 200 });
+      }
+      const page = url.includes('cursor=cursor-2')
+        ? { requests: [listedRequest(SECOND_REQUEST_ID, 'Nikos')], nextCursor: null }
+        : { requests: [listedRequest(REQUEST_ID, 'Maria')], nextCursor: 'cursor-2' };
+      return new Response(JSON.stringify({
+        success: true,
+        data: { ...page, summary: { pending: 2, approved: 0, rejected: 0, total: 2 }, total: 2 },
+      }), { status: 200 });
+    });
+
+    render(<AdminRequestsClient />);
+    expect(await screen.findByText('Maria')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
+
+    expect(await screen.findByText('Nikos')).toBeInTheDocument();
+    expect(screen.getByText('Maria')).toBeInTheDocument();
+    expect(screen.getByText('Showing 2 of 2')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/api/admin/check-in-requests?status=pending&cursor=cursor-2');
+  });
+});
+
 describe('admin settings check-in times', () => {
   it('loads the saved times and posts the edited check-in time', async () => {
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {

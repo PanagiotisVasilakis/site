@@ -33,10 +33,20 @@ function parsePositiveInteger(value: string | null): number | undefined {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
+function carriesOptionsParameter(connectionString: string): boolean {
+  try {
+    return new URL(connectionString).searchParams.has('options');
+  } catch {
+    return false;
+  }
+}
+
 export function buildPrismaPgAdapterArgs(connectionString: string): {
   config: PrismaPgConfig;
   options?: PrismaPgOptions;
 } {
+  // node-postgres lets an `options` value in the URL replace the UTC pin below; workers and dev never run the start-up schema that refuses it.
+  if (carriesOptionsParameter(connectionString)) throw new Error('DATABASE_URL must not carry an options parameter');
   const config: PrismaPgConfig = {
     connectionString,
     connectionTimeoutMillis: DEFAULT_CONNECTION_TIMEOUT_MS,

@@ -268,4 +268,73 @@ describe('evaluateOperationalAlerts', () => {
       });
     });
   });
+
+  describe('notification of a growing value', () => {
+    const fetchMock = vi.fn();
+    const delivered = (ruleId: string, value: number) => ({
+      id: 'alert-open',
+      ruleId,
+      value,
+      status: 'OPEN',
+      openedAt: NOW,
+      notificationDeliveredAt: NOW,
+    });
+
+    beforeEach(() => {
+      fetchMock.mockResolvedValue(new Response('', { status: 200 }));
+      vi.stubGlobal('fetch', fetchMock);
+      vi.stubEnv('ALERT_WEBHOOK_URL', 'https://alerts.example.test/hook');
+      prismaMock.alert.update.mockImplementation(async ({ where, data }) => ({
+        ...delivered('rule:Dead outbox events', 1),
+        id: where.id,
+        ...data,
+      }));
+    });
+
+    it('notifies again when the dead-event count grew', async () => {
+      prismaMock.alert.findFirst.mockImplementation(async ({ where }: { where: { ruleId: string } }) => (
+        where.ruleId === 'rule:Dead outbox events' ? delivered('rule:Dead outbox events', 1) : null
+      ));
+      prismaMock.$transaction.mockResolvedValue([3, 0]);
+
+      await expect(evaluateOperationalAlerts()).resolves.toEqual({ opened: 0, resolved: 0, evaluated: 4 });
+
+      expect(fetchMock).toHaveBeenCalledExactlyOnceWith('https://alerts.example.test/hook', expect.anything());
+    });
+
+    it('stays quiet when the count did not grow', async () => {
+      prismaMock.alert.findFirst.mockImplementation(async ({ where }: { where: { ruleId: string } }) => (
+        where.ruleId === 'rule:Dead outbox events' ? delivered('rule:Dead outbox events', 1) : null
+      ));
+      prismaMock.$transaction.mockResolvedValue([1, 0]);
+
+      await expect(evaluateOperationalAlerts()).resolves.toEqual({ opened: 0, resolved: 0, evaluated: 4 });
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('does not re-notify an age rule whose value rises every run', async () => {
+      prismaMock.outboxEvent.findFirst.mockResolvedValue({ createdAt: new Date(Date.now() - 30 * 60_000) });
+      prismaMock.alert.findFirst.mockImplementation(async ({ where }: { where: { ruleId: string } }) => (
+        where.ruleId === 'rule:Stale pending outbox' ? delivered('rule:Stale pending outbox', 20) : null
+      ));
+
+      await evaluateOperationalAlerts();
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('retries a growth notification that failed on the last run', async () => {
+      const failed = { ...delivered('rule:Dead outbox events', 3), notificationLastError: 'Alert webhook failed' };
+      prismaMock.alert.findFirst.mockImplementation(async ({ where }: { where: { ruleId: string } }) => (
+        where.ruleId === 'rule:Dead outbox events' ? failed : null
+      ));
+      prismaMock.alert.update.mockImplementation(async ({ where, data }) => ({ ...failed, id: where.id, ...data }));
+      prismaMock.$transaction.mockResolvedValue([3, 0]);
+
+      await expect(evaluateOperationalAlerts()).resolves.toEqual({ opened: 0, resolved: 0, evaluated: 4 });
+
+      expect(fetchMock).toHaveBeenCalledExactlyOnceWith('https://alerts.example.test/hook', expect.anything());
+    });
+  });
 });

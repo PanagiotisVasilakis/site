@@ -336,7 +336,7 @@ export function createSuccessResponse<T>(
   status: number = 200,
   requestCorrelationId?: string
 ): NextResponse {
-  const correlationId = requestCorrelationId || generateCorrelationId();
+  const correlationId = requestCorrelationId || logger.getContext()?.correlationId || generateCorrelationId();
   const response: ApiResponse<T> = {
     success: true,
     data,

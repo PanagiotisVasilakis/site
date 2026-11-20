@@ -2,8 +2,8 @@
  * Keys for the HMACs over claim tokens and privacy-preserving identifiers.
  * There is no fallback value in any environment: the runtime environment schema
  * requires both keys at startup, and `npm run ensure-pepper` generates them for
- * local development. `hashSensitive` (crypto.ts) keeps its own module-load
- * resolver.
+ * local development. `hashSensitive` (crypto.ts) reads `SECURITY_PEPPER` through
+ * this function at each call.
  */
 export function requirePepper(name: 'SECURITY_PEPPER' | 'CLAIM_TOKEN_PEPPER'): string {
   const value = process.env[name];

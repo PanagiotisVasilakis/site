@@ -46,7 +46,7 @@ Production runs a single unified non-root Docker image built from `docker/Docker
 
 `npm run outbox:drain` and `npm run operations:check` run the same workers in development only.
 
-Production startup never loads `.env.local` and requires an explicit trusted-proxy topology. Secrets are injected at runtime from the deployment environment. The tag carries `-dirty` when the working tree has uncommitted changes; the HTTPS site URL is required because Next.js compiles canonical URLs and the sitemap into the output, and the commit is recorded in `public/version.json` and the `org.opencontainers.image.revision` label.
+Production startup never loads `.env.local` and requires an explicit trusted-proxy topology. Secrets are injected at runtime from the deployment environment. `docker:build` refuses a working tree with uncommitted changes unless `ALLOW_DIRTY=1` (a `-dirty` trial image, never deployed); the HTTPS site URL is required because Next.js compiles canonical URLs and the sitemap into the output, and the commit is recorded in `public/version.json` and the `org.opencontainers.image.revision` label.
 
 ## Design system
 

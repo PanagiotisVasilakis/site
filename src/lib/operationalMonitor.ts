@@ -14,6 +14,7 @@ type RuleDefinition = {
   threshold: number;
   windowMinutes: number;
   severity: 'low' | 'medium' | 'high' | 'critical';
+  notifyOnIncrease?: boolean;
   read: (windowMinutes: number) => Promise<number>;
 };
 
@@ -28,6 +29,7 @@ const RULES: RuleDefinition[] = [
     threshold: 0,
     windowMinutes: 5,
     severity: 'critical',
+    notifyOnIncrease: true,
     read: async () => {
       const [dead, cancelled] = await prisma.$transaction([
         prisma.outboxEvent.count({ where: { status: 'DEAD' } }),
@@ -62,6 +64,7 @@ const RULES: RuleDefinition[] = [
     // Twice the five-minute schedule: consecutive evaluations overlap, so an event stored between two runs is counted by the next one.
     windowMinutes: 10,
     severity: 'high',
+    notifyOnIncrease: true,
     read: (windowMinutes) => prisma.securityAuditEvent.count({
       where: {
         severity: { in: ['high', 'critical'] },
@@ -179,7 +182,9 @@ export async function evaluateOperationalAlerts(): Promise<{ opened: number; res
       if (!current) {
         opened += 1;
       }
-      if (!alert.notificationDeliveredAt && webhookUrl) {
+      // A count that grew since the last run, or a re-notification that failed, is news even after the first notification was delivered.
+      const grew = definition.notifyOnIncrease === true && current !== null && value > current.value;
+      if ((!alert.notificationDeliveredAt || grew || alert.notificationLastError) && webhookUrl) {
         try {
           await notifyAlert({ url: webhookUrl, id: alert.id, rule, value, openedAt: alert.openedAt });
           await prisma.alert.update({

@@ -52,9 +52,9 @@ export function straightLineKm([lng1, lat1]: readonly [number, number], [lng2, l
   return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(h));
 }
 
-/** "1.5 km" from 1 km up (one decimal), "650 m" below (to 10 m), in the locale's unit style. */
+/** "1.5 km" from 0.995 km up (one decimal, so 0.995 is "1 km"), "650 m" below (to 10 m), in the locale's unit style. */
 export function formatDistance(km: number, locale: Locale): string {
-  if (km < 1) {
+  if (km < 0.995) {
     const metres = Math.max(10, Math.round(km * 100) * 10);
     return new Intl.NumberFormat(locale, { style: 'unit', unit: 'meter', maximumFractionDigits: 0 }).format(metres);
   }

@@ -111,9 +111,10 @@ describe('check-in Wi-Fi copy toast (identity §9.8)', () => {
   });
 });
 
-// R-391 / R-684 / R-683 / R-682 (decision D13): the preferences are fetched once and the server adds the Wi-Fi
-// details only after wifiAvailableAt, so a page left open before that time asks the server again one second
-// after it. The page is never reloaded, so the form, its messages and the offline state stay as they are.
+// R-391 / R-684 / R-683 / R-682 (decision D13), R-894: the preferences are fetched once and the server adds the
+// Wi-Fi details only after wifiAvailableAt, so a page left open before that time asks the server again one second
+// after it and once more 60 seconds after that request succeeds. The page is never reloaded, so the form, its
+// messages and the offline state stay as they are.
 describe('check-in Wi-Fi refetch at the disclosure time', () => {
   const T0 = new Date('2030-03-01T10:00:00.000Z').getTime();
   const MAX_TIMER_DELAY = 2_147_483_647;
@@ -234,9 +235,25 @@ describe('check-in Wi-Fi refetch at the disclosure time', () => {
 
     await advance(6_000);
     expect(preferencesRequests()).toBe(2);
+    // R-894: the former value 2 encoded the missing follow-up; the server is asked once more a minute later.
     await advance(120_000);
-    expect(preferencesRequests()).toBe(2);
+    expect(preferencesRequests()).toBe(3);
+    await advance(600_000);
+    expect(preferencesRequests()).toBe(3);
     expect(reload).not.toHaveBeenCalled();
+  });
+
+  it('asks once more a minute later when the server still withholds the details at that time', async () => {
+    await renderPage(withheld(5_000), withheld(5_000), revealed(5_000));
+
+    await advance(6_000);
+    expect(preferencesRequests()).toBe(2);
+    expect(screen.queryByText('Guest-Net')).not.toBeInTheDocument();
+    await advance(60_000);
+    expect(preferencesRequests()).toBe(3);
+    expect(screen.getAllByText('Guest-Net').length).toBeGreaterThan(0);
+    await advance(600_000);
+    expect(preferencesRequests()).toBe(3);
   });
 
   it('does not ask again when the Wi-Fi details are already shown', async () => {

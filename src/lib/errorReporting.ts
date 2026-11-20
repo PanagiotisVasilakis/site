@@ -34,8 +34,11 @@ interface ReportOptions {
   location?: ErrorLocation;
 }
 
+const MAX_REPORTS_PER_PAGE = 10; // the server accepts 10 a minute per address
+
 class ErrorReporter {
   private reportingEndpoint = '/api/errors';
+  private readonly reportedKeys = new Set<string>();
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -101,6 +104,10 @@ class ErrorReporter {
         category: truncate(options.category, 50),
       };
 
+      const key = [report.error.name, report.error.message, report.error.fileName ?? '', report.error.lineNumber ?? ''].join('|');
+      if (this.reportedKeys.has(key) || this.reportedKeys.size >= MAX_REPORTS_PER_PAGE) return false;
+      this.reportedKeys.add(key);
+
       const response = await fetch(this.reportingEndpoint, {
         method: 'POST',
         headers: {
@@ -122,7 +129,7 @@ class ErrorReporter {
   }
 
   private extractLocationFromStack(stack?: string): ErrorLocation {
-    const match = stack?.match(/at.*\((.+):(\d+):(\d+)\)/);
+    const match = stack?.match(/at.*\((.+):(\d+):(\d+)\)/) ?? stack?.match(/@(.+):(\d+):(\d+)$/m);
     return {
       fileName: match?.[1],
       lineNumber: match ? parseInt(match[2], 10) : undefined,

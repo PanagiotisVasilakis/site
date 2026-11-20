@@ -30,6 +30,7 @@ type ArrivalRequest = {
   status: ArrivalRequestStatus;
 };
 
+const WIFI_FOLLOW_UP_MS = 60_000;
 const MAP_HEIGHT = 'clamp(240px, 35vw, 420px)';
 const MAP_LOADING_HEIGHT = '260px';
 const DynamicApartmentLocationMap = dynamic(() => import('@/components/ApartmentLocationMap'), {
@@ -257,8 +258,9 @@ export default function CheckInInfo({
   }, [redirectToSessionRefresh]);
 
   // The server adds the Wi-Fi details only after wifiAvailableAt, so a page opened earlier asks again one second
-  // after it and when the tab returns (a sleeping phone may skip one long timer); only the Wi-Fi fields change, so open
-  // forms stay. A page loaded after that time sends nothing: after the stay the server still answers without the
+  // after it, once more 60 seconds after that on-time request succeeds (a phone clock ahead of the server), and
+  // when the tab returns (a sleeping phone may skip one long timer); only the Wi-Fi fields change, so open forms
+  // stay. A page loaded after that time sends nothing: after the stay the server still answers without the
   // details. No timer is set beyond the 32-bit limit (a browser fires such a timer at once).
   useEffect(() => {
     if (wifiNetwork || !wifiAvailableAt) return;
@@ -273,21 +275,24 @@ export default function CheckInInfo({
     let requestInFlight = false;
     let onlineRetryLeft = 1;
     let waitingForOnline = false;
+    let followUp: number | undefined;
 
-    const refetchWifi = async () => {
-      if (requestInFlight || sessionRefreshStarted.current) return;
+    const refetchWifi = async (): Promise<boolean> => {
+      if (requestInFlight || sessionRefreshStarted.current) return false;
       requestInFlight = true;
       let failed = false;
       try {
         const ok = await loadCheckInPreferences(() => active, { applySchedule: false });
-        if (!active) return;
+        if (!active) return false;
         if (!ok && !sessionRefreshStarted.current) {
           failed = true;
         }
+        return ok;
       } catch (error) {
-        if (!active) return;
+        if (!active) return false;
         logger.error('Failed to refresh the Wi-Fi details', error instanceof Error ? error : { error: String(error) });
         failed = true;
+        return false;
       } finally {
         requestInFlight = false;
         if (failed && onlineRetryLeft > 0) {
@@ -295,6 +300,11 @@ export default function CheckInInfo({
           waitingForOnline = true;
         }
       }
+    };
+
+    // A phone clock ahead of the server fires the timer early while the server still withholds the details: ask once more.
+    const refetchOnTime = async () => {
+      if (await refetchWifi() && active) followUp = window.setTimeout(() => { void refetchWifi(); }, WIFI_FOLLOW_UP_MS);
     };
 
     const refetchAfterReturn = () => {
@@ -310,7 +320,7 @@ export default function CheckInInfo({
     };
 
     const timer = delay > 0 && delay + 1_000 <= 2_147_483_647
-      ? window.setTimeout(refetchWifi, delay + 1_000)
+      ? window.setTimeout(() => { void refetchOnTime(); }, delay + 1_000)
       : undefined;
     document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('pageshow', refetchAfterReturn);
@@ -318,6 +328,7 @@ export default function CheckInInfo({
     return () => {
       active = false;
       window.clearTimeout(timer);
+      window.clearTimeout(followUp);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('pageshow', refetchAfterReturn);
       window.removeEventListener('online', onOnline);

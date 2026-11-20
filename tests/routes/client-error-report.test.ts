@@ -147,4 +147,41 @@ describe('client error report contract', () => {
     expect(data.ipHash).toBe(privacyHmac('203.0.113.7', 'security-event-ip:v1'));
     expect(data.ipHash).not.toBe(createHash('sha256').update('203.0.113.7').digest('hex'));
   });
+
+  it('reads file, line and column from a Safari or Firefox stack', async () => {
+    let sentBody = '';
+    vi.stubGlobal('window', { location: { href: 'https://guest-guide.test/en' } });
+    vi.stubGlobal('fetch', vi.fn(async (_input: unknown, init?: RequestInit) => {
+      sentBody = String(init?.body);
+      return new Response(null, { status: 201 });
+    }));
+
+    const error = new Error('Safari frame failed');
+    error.stack = 'render@https://guest-guide.test/_next/static/chunks/app.js:12:34\nglobal code@https://guest-guide.test/en:1:1';
+
+    await expect(errorReporter.reportError(error)).resolves.toBe(true);
+    expect(JSON.parse(sentBody).error).toMatchObject({
+      fileName: 'https://guest-guide.test/_next/static/chunks/app.js',
+      lineNumber: 12,
+      columnNumber: 34,
+    });
+  });
+
+  it('sends one report per distinct error and at most ten per page', async () => {
+    vi.resetModules();
+    const { errorReporter: fresh } = await import('@/lib/errorReporting');
+    vi.stubGlobal('window', { location: { href: 'https://guest-guide.test/en' } });
+    const fetchMock = vi.fn(async () => new Response(null, { status: 201 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const same = new Error('same failure');
+    await expect(fresh.reportError(same)).resolves.toBe(true);
+    await expect(fresh.reportError(same)).resolves.toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    for (let i = 0; i < 12; i += 1) {
+      await fresh.reportError(new Error(`distinct ${i}`));
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(10);
+  });
 });

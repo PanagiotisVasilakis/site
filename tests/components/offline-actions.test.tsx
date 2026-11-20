@@ -49,7 +49,7 @@ describe('offline page actions (R-648)', () => {
 
     it.each([
       ['an absolute URL of another site', 'https://evil.example/en/moments'],
-      // toSafeLocalPath canonicalizes these to `//evil.example/…`, which `location.assign` would read as another site.
+      // toSafeLocalPath refuses these: they canonicalize to `//evil.example/…`, which `location.assign` would read as another site.
       ['a dot segment hiding a second slash', '/.//evil.example/en/moments'],
       ['an encoded backslash', '/%5Cevil.example'],
       ['an empty value', ''],

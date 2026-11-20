@@ -72,6 +72,26 @@ describe('runtime environment fail-closed policy', () => {
     if (!result.success) expect(result.error.issues.some(({ path }) => path[0] === expectedPath)).toBe(true);
   });
 
+  it('rejects a DATABASE_URL that carries an options parameter and keeps other query parameters', () => {
+    const withOptions = runtimeEnvSchema.safeParse({
+      ...requiredEnv,
+      DATABASE_URL: `${requiredEnv.DATABASE_URL}?options=-c%20TimeZone%3DEurope%2FAthens`,
+    });
+    expect(withOptions.success).toBe(false);
+    if (!withOptions.success) {
+      expect(withOptions.error.issues).toContainEqual(expect.objectContaining({
+        path: ['DATABASE_URL'],
+        message: 'DATABASE_URL must not carry an options parameter',
+      }));
+    }
+
+    const otherParameters = runtimeEnvSchema.safeParse({
+      ...requiredEnv,
+      DATABASE_URL: `${requiredEnv.DATABASE_URL}?connection_limit=5&sslmode=require`,
+    });
+    expect(otherParameters.success).toBe(true);
+  });
+
   it.each([
     ['missing admin JWT credential', { ADMIN_JWT_SECRET: undefined }, 'ADMIN_JWT_SECRET'],
     ['missing guest JWT credential', { GUEST_JWT_SECRET: undefined }, 'GUEST_JWT_SECRET'],
@@ -134,6 +154,11 @@ describe('runtime environment fail-closed policy', () => {
     if (!result.success) {
       expect(result.error.issues.some(({ path }) => path[0] === expectedPath)).toBe(true);
     }
+  });
+
+  it('treats an empty ALERT_WEBHOOK_REQUIRED as unset and still rejects other values', () => {
+    expect(runtimeEnvSchema.safeParse(productionEnv({ ALERT_WEBHOOK_REQUIRED: '' })).success).toBe(true);
+    expect(runtimeEnvSchema.safeParse(productionEnv({ ALERT_WEBHOOK_REQUIRED: '2' })).success).toBe(false);
   });
 
   it.each([
@@ -558,29 +583,26 @@ describe('HMAC keys and crypto secret bootstrap policy', () => {
     expect(privacyHmac('203.0.113.7', 'ctx')).not.toBe(first);
   });
 
-  it('generates one process-local pepper in development when none is configured', async () => {
-    vi.resetModules();
-    vi.stubEnv('NODE_ENV', 'development');
-    vi.stubEnv('SECURITY_PEPPER', '');
-    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const cryptoModule = await import('@/lib/crypto');
-    const signed = cryptoModule.hashSensitive('value');
-    expect(cryptoModule.verifySensitive('value', signed.salt, signed.hash)).toBe(true);
-    expect(warning).toHaveBeenCalledTimes(1);
-  });
-
-  it('fails module initialization in production without SECURITY_PEPPER but allows build phase', async () => {
+  it('reads SECURITY_PEPPER at each call, with no generated fallback in any environment', async () => {
     vi.resetModules();
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('NEXT_PHASE', '');
     vi.stubEnv('SECURITY_PEPPER', '');
-    await expect(import('@/lib/crypto')).rejects.toThrow('SECURITY_PEPPER');
-
-    vi.resetModules();
-    vi.stubEnv('NEXT_PHASE', 'phase-production-build');
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const cryptoModule = await import('@/lib/crypto');
-    expect(cryptoModule.hashSensitive('build-value').hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(() => cryptoModule.hashSensitive('v')).toThrow('SECURITY_PEPPER is required');
+    expect(() => cryptoModule.verifySensitive('v', 'salt', 'a'.repeat(64))).toThrow('SECURITY_PEPPER is required');
+
+    vi.stubEnv('NODE_ENV', 'development');
+    expect(() => cryptoModule.hashSensitive('v')).toThrow('SECURITY_PEPPER is required');
+
+    vi.stubEnv('SECURITY_PEPPER', 'a'.repeat(32));
+    const signed = cryptoModule.hashSensitive('value');
+    expect(cryptoModule.verifySensitive('value', signed.salt, signed.hash)).toBe(true);
+    expect(signed.hash).toBe(createHash('sha256').update(`${'a'.repeat(32)}:${signed.salt}:value`).digest('hex'));
+
+    vi.stubEnv('SECURITY_PEPPER', 'b'.repeat(32));
+    expect(cryptoModule.verifySensitive('value', signed.salt, signed.hash)).toBe(false);
     expect(warning).not.toHaveBeenCalled();
   });
 });

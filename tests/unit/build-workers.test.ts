@@ -44,4 +44,33 @@ describe('worker bundles for the production image', () => {
     const runnerStage = dockerfile.split(/^FROM\s+\S+\s+AS\s+runner$/mu)[1];
     expect(runnerStage).toContain('COPY --from=builder --chown=nextjs:nodejs /app/dist/workers ./dist/workers');
   });
+
+  it('copies every module the start script imports into the runner stage of Dockerfile.security', () => {
+    const dockerfile = readFileSync('docker/Dockerfile.security', 'utf8');
+    const runnerStage = dockerfile.split(/^FROM\s+\S+\s+AS\s+runner$/mu)[1];
+
+    // Static imports only: the start script loads server.js with a dynamic import at run time.
+    const files = new Set<string>();
+    const packages = new Set<string>();
+    const queue = ['scripts/start-standalone.mjs'];
+    for (let file = queue.shift(); file !== undefined; file = queue.shift()) {
+      if (files.has(file)) continue;
+      files.add(file);
+      const source = readFileSync(file, 'utf8');
+      for (const match of source.matchAll(/^\s*import\s[^'"]*['"]([^'"]+)['"]/gmu)) {
+        const specifier = match[1];
+        if (specifier.startsWith('node:')) continue;
+        if (specifier.startsWith('.')) {
+          queue.push(path.posix.join(path.posix.dirname(file), specifier));
+        } else {
+          packages.add(specifier.startsWith('@') ? specifier.split('/').slice(0, 2).join('/') : specifier.split('/')[0]);
+        }
+      }
+    }
+    expect([...files]).toEqual(expect.arrayContaining(['scripts/start-standalone.mjs', 'src/lib/runtime-env-schema.js', 'src/lib/runtime-credentials.js']));
+    expect([...packages]).toContain('zod');
+
+    for (const file of files) expect(runnerStage).toContain(`COPY --from=builder --chown=nextjs:nodejs /app/${file} ./${file}`);
+    for (const name of packages) expect(runnerStage).toContain(`COPY --from=builder --chown=nextjs:nodejs /app/node_modules/${name} ./node_modules/${name}`);
+  });
 });

@@ -212,6 +212,8 @@ export default function AdminRequestsClient() {
       );
 
       if (!result.ok) {
+        // Another administrator may have decided it already (409): show the current list, then the reason.
+        await loadRequests(filterRef.current, false);
         setFeedback({ type: 'error', message: result.message });
         return;
       }

@@ -88,7 +88,8 @@ export default function PwaManager() {
             if (!b) return;
             const dismissedUpdate = readStored(() => localStorage.getItem('update-dismissed-version'));
             const updateKey = b.getAttribute('data-update-key');
-            if (dismissedUpdate && updateKey && dismissedUpdate === updateKey) return;
+            // Until the worker's version reply sets the key, a stored dismissal keeps the banner hidden; the reply shows it for a different update.
+            if (dismissedUpdate && (!updateKey || dismissedUpdate === updateKey)) return;
             b.style.display = 'flex';
           };
           if (reg.waiting) {
